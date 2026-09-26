@@ -1,31 +1,3 @@
-# promtool unit test for ContainerRestartLoop.
-#
-# Two things are locked here, and the second one is why this file was rewritten on 2026-09-22.
-#
-# 1. The 2026-07-15 false-critical fix. `changes(...[15m]) > 3`, not `increase()`: the start time is
-#    a GAUGE holding a Unix epoch, so increase() returned the epoch delta between the old and the new
-#    start time and a single routine recreate of backend/frontend/ingest paged CRITICAL. One restart
-#    must not page; a genuine loop of 4+ restarts inside 15 minutes must.
-#
-# 2. The input is the PODMAN shape. Until 2026-09-22 the rule read cAdvisor's
-#    `container_start_time_seconds` directly and this test fed it exactly that series -- so it stayed
-#    green while the rule it was guarding could not fire on the host that serves, because cAdvisor is
-#    deleted there (ADR-0163). A test that feeds a rule the series production no longer has proves
-#    the arithmetic and nothing about the alert. So the series below are what the podman exporter
-#    actually publishes (`podman_container_started_seconds` keyed on `id` only, plus
-#    `podman_container_info` carrying the name), and the rule reaches them through the
-#    `basetool:container:start_time_seconds` recording rule, as in production.
-#
-#    Under Quadlet a restart is a RECREATE (ExecStart carries --replace --rm), so the restarted
-#    container comes back under a NEW id. The frontend loop below is written that way -- one id per
-#    start -- because a loop that kept one id and only moved the value would pass even if the join
-#    lost track of a replaced container.
-#
-# Run locally (no promtool installed on the host -- use an ephemeral container, see
-# monitoring/README.md monitoring-config lint recipe):
-#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" -w /cfg \
-#     prom/prometheus:v3.14.0 test rules tests/containerrestartloop_changes_test.yml
-
 rule_files:
   - ../alerts/containers-runtime.yml
   - ../alerts/infrastructure.yml
@@ -36,8 +8,6 @@ tests:
   - name: ContainerRestartLoop counts restarts, not the start-time delta, on the podman exporter's series
     interval: 1m
     input_series:
-      # backend restarts exactly ONCE, at t9, and comes back as a new container: the old id's series
-      # ends, the new id's begins. changes() over any 15m window is <= 1, so it MUST NOT page.
       - series: 'podman_container_info{id="b0000000000a",name="backend",image="ghcr.io/x@sha256:a",pod_id="",pod_name="",ports=""}'
         values: "1x8"
       - series: 'podman_container_started_seconds{id="b0000000000a",pod_id="",pod_name=""}'
@@ -47,11 +17,6 @@ tests:
       - series: 'podman_container_started_seconds{id="b0000000000b",pod_id="",pod_name=""}'
         values: "_x9 2000x30"
 
-      # frontend crash-loops: a new container every minute from t0 to t5, then settles on the sixth.
-      # Prometheus 3 range selectors are LEFT-OPEN, so the window at t15 is (t0, t15] and holds the
-      # starts at t1..t5 -- four changes, > 3. Written with five starts the window held only three and
-      # the test failed, which is the reason this comment spells the boundary out. With for:5m the
-      # alert MUST page critical at t15.
       - series: 'podman_container_info{id="f00000000001",name="frontend",image="ghcr.io/x@sha256:b",pod_id="",pod_name="",ports=""}'
         values: "1"
       - series: 'podman_container_started_seconds{id="f00000000001",pod_id="",pod_name=""}'
@@ -86,7 +51,6 @@ tests:
             exp_annotations:
               summary: "Container restart loop: frontend"
               description: "Container frontend restarted more than 3 times in 15 minutes."
-      # Once the loop has aged out of the window the alert resolves.
       - eval_time: 25m
         alertname: ContainerRestartLoop
         exp_alerts: []

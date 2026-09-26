@@ -43,22 +43,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Assembles the delegated Leitung view (epic #800, REQ-ROLE-004) for the {@code
- * /organisation/leitung} page: the org units the caller may appoint into, grouped by tier, with
- * each unit's roster + the two delegated-capability flags. It is a pure read aggregator — every
- * appointment is a separate write through the Phase-3 endpoints, each re-checking authorisation, so
- * this service is deliberately not a write authority.
+ * Read-only aggregator for the delegated Leitung view (REQ-ROLE-004): the org units the caller may
+ * appoint into or manage, grouped by tier, with rosters and capability flags.
  *
- * <p>The manageable set is computed entirely from the caller's own delegated reach via {@link
- * OrgRoleManagementSecurityService} and, for a Spezialkommando's roster, {@link
- * SpecialCommandSecurityService#canManageMembers} (the same verdicts the write endpoints gate on),
- * plus the admin short-circuit from {@link AuthHelperService#isAdmin()}; a unit is only ever
- * returned when the caller can act on it, so a plain member receives four empty lists. The service
- * therefore leaks no cross-tenant data even though it is gated only by {@code isAuthenticated()} at
- * the controller.
- *
- * <p>Class-level {@code @Transactional(readOnly = true)} so the lazy {@code user} association on
- * each roster row materialises while assembling the DTOs.
+ * <p>A unit is returned only when the caller's own delegated reach allows acting on it, so a plain
+ * member receives empty lists. Appointments are written through separate, individually authorized
+ * endpoints.
  */
 @Service
 @RequiredArgsConstructor
@@ -75,13 +65,11 @@ public class LeitungViewService {
 
   /**
    * Builds the caller's delegated Leitung view: the OL(s), Bereiche, Staffeln and Spezialkommandos
-   * they may appoint into or manage the roster of, each with its roster and capability flags. A
-   * Spezialkommando is listed when the caller may appoint its lead (admin, parent Bereichsleiter)
-   * or manage its members (admin, its own SK lead). Returns empty tier lists for a caller with no
-   * appointment or roster reach.
+   * they may appoint into or manage the roster of. Tier lists are empty for a caller with no such
+   * reach.
    *
    * @param authentication the current authentication, forwarded to the delegated verdicts; never
-   *     {@code null} at the call site (the controller is {@code isAuthenticated()}-gated).
+   *     {@code null}.
    * @return the assembled view; never {@code null}.
    */
   @NotNull
@@ -90,7 +78,6 @@ public class LeitungViewService {
 
     List<LeitungUnitDto> ols = new ArrayList<>();
     for (OrgUnit ol : sortedByName(orgUnitRepository.findActiveOrganisationsleitung())) {
-      // Appointing an OL member has no delegated rung — it is admin-only.
       if (admin) {
         ols.add(unit(ol, true, false));
       }
@@ -127,8 +114,6 @@ public class LeitungViewService {
       } else if (unit.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
         boolean canAppointLead =
             admin || roleSecurity.canAppointSkLead(unit.getId(), authentication);
-        // The SK lead manages their own SK's roster (member list + Logistiker/Einsatzmanager
-        // flags) — the same verdict the /api/v1/special-commands/{id}/members endpoints gate on.
         boolean canManageRoster =
             admin || specialCommandSecurity.canManageMembers(unit.getId(), authentication);
         if (canAppointLead || canManageRoster) {
@@ -141,12 +126,12 @@ public class LeitungViewService {
   }
 
   /**
-   * Maps one managed org unit to its view DTO: its roster (ordered Staffelleiter-/lead-first, then
-   * by name) and — for a Staffel — its Kommandogruppen.
+   * Maps one managed org unit to its view DTO: its roster (lead first, then by name) and, for a
+   * Staffel, its Kommandogruppen.
    *
    * @param orgUnit the managed org unit; never {@code null}.
-   * @param canAppointLead the resolved "may set the top seat" capability.
-   * @param canManageRoster the resolved "may manage the subordinate roster" capability.
+   * @param canAppointLead whether the caller may set the top seat.
+   * @param canManageRoster whether the caller may manage the subordinate roster.
    * @return the unit DTO; never {@code null}.
    */
   @NotNull

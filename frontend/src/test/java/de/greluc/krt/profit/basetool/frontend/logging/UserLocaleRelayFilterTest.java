@@ -35,9 +35,8 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import reactor.core.publisher.Mono;
 
 /**
- * Unit tests for {@link UserLocaleRelayFilter}: the {@code Accept-Language} header must carry the
- * user's resolved locale on outbound backend calls (so backend-localized RFC 7807 problem details
- * arrive in the user's language, #435) and must be absent when no locale context is bound.
+ * Unit tests for {@link UserLocaleRelayFilter}: outbound backend calls carry the user's resolved
+ * locale as {@code Accept-Language}, and no header when no locale context is bound.
  */
 class UserLocaleRelayFilterTest {
 
@@ -50,27 +49,21 @@ class UserLocaleRelayFilterTest {
 
   @Test
   void relayUserLocale_addsAcceptLanguageFromLocaleContext() {
-    // Given — the servlet layer resolved the user's UI language to German
     LocaleContextHolder.setLocale(Locale.GERMAN);
     AtomicReference<ClientRequest> sent = new AtomicReference<>();
 
-    // When
     filter.relayUserLocale().filter(request(), capture(sent)).block();
 
-    // Then
     assertThat(sent.get().headers().getFirst(HttpHeaders.ACCEPT_LANGUAGE)).isEqualTo("de");
   }
 
   @Test
   void relayUserLocale_omitsHeaderWithoutBoundLocaleContext() {
-    // Given — no locale context (background task / scheduled job)
     LocaleContextHolder.resetLocaleContext();
     AtomicReference<ClientRequest> sent = new AtomicReference<>();
 
-    // When
     filter.relayUserLocale().filter(request(), capture(sent)).block();
 
-    // Then — the backend falls through to its default-locale behaviour
     assertThat(sent.get().headers().getFirst(HttpHeaders.ACCEPT_LANGUAGE)).isNull();
   }
 

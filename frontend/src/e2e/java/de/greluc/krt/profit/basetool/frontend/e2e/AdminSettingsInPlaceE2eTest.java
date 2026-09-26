@@ -37,22 +37,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the stale optimistic-lock {@code @Version} bug class on in-place writes (epic
- * #571, #582): the admin system-settings form ({@code POST /admin/settings} with {@code
- * X-Requested-With} → per-setting {@code PUT /api/v1/settings/{key}}) saves through {@code
- * window.krtFetch.write} without a page reload and must survive a SECOND consecutive in-place save.
- *
- * <p>The proven bug: a pre-fix backend {@code SystemSettingService.updateSetting} returned a stale
- * version after a real change, so the next write replaying that version 409ed with {@code
- * OPTIMISTIC_LOCK}. The fix flushes (save → saveAndFlush) so the AJAX twin returns the bumped
- * versions that the page writes back into the hidden {@code *Version} inputs.
- *
- * <p>Each save bumps {@code ageYellowDays} to a <em>genuinely different</em> value (a no-op re-save
- * never bumps the {@code @Version} and would not exercise the bug). A window marker proves no
- * reload happened between the two saves; the persisted value is read back from the backend to
- * confirm the second write landed; and the absence of an error toast and of the {@code
- * OPTIMISTIC_LOCK} reload-confirm dialog ({@code .krt-confirm-overlay}) is the discriminator that
- * turns the second save red on the pre-fix backend.
+ * The admin system-settings form saves in place and a second consecutive in-place save does not
+ * 409, proving the fresh per-setting {@code @Version} is written back after each save.
  */
 @Tag("e2e")
 class AdminSettingsInPlaceE2eTest {
@@ -95,13 +81,8 @@ class AdminSettingsInPlaceE2eTest {
   }
 
   /**
-   * Opens the admin-settings page, changes {@code ageYellowDays} to a fresh value and saves in
-   * place (asserting a success toast and no reload), then — without reloading — changes it again
-   * and saves a second time, asserting the second consecutive save is a 200 (success toast, no
-   * error/conflict toast, no reload-confirm dialog, marker survives) and that the second value is
-   * the one the backend persisted. The second save only succeeds if the AJAX twin wrote the fresh
-   * per-setting {@code @Version} back into the hidden version input — a stale version 409s
-   * OPTIMISTIC_LOCK.
+   * Saves {@code ageYellowDays} twice in place with different values and asserts both succeed
+   * without reload or conflict, and that the second value is persisted.
    */
   @Test
   void savesSettingsInPlaceThenDoubleSaveDoesNotConflict() {
@@ -117,9 +98,6 @@ class AdminSettingsInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/admin/settings");
         page.waitForLoadState();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // both saves stayed in place. The position:fixed footer can cover the bottom submit button,
-        // so it is dropped out of the way before the (non-navigating) AJAX clicks.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -128,12 +106,9 @@ class AdminSettingsInPlaceE2eTest {
         Locator yellowDays = page.locator("#ageYellowDays");
         Locator submit = page.locator("#admin-settings-form button[type='submit']");
 
-        // Two distinct yellow-day values, both kept below the red threshold (default 90) so the
-        // cross-field invariant (yellow < red) never rejects the save for an unrelated reason.
         int firstValue = 31;
         int secondValue = 32;
 
-        // First in-place save: a genuinely different value.
         yellowDays.fill(String.valueOf(firstValue));
         saveInPlace(page, submit);
         assertEquals(
@@ -142,8 +117,6 @@ class AdminSettingsInPlaceE2eTest {
             "the settings save must update in place — no page reload on success");
         assertEquals(firstValue, persistedYellowDays(), "the first in-place save must persist");
 
-        // Second consecutive in-place save WITHOUT a reload: only succeeds if the twin wrote the
-        // fresh @Version back into the hidden input (otherwise the stale version 409s).
         yellowDays.fill(String.valueOf(secondValue));
         saveInPlace(page, submit);
         assertEquals(
@@ -162,12 +135,8 @@ class AdminSettingsInPlaceE2eTest {
   }
 
   /**
-   * Clears any prior toast, submits the settings form, waits for the in-place {@code POST
-   * /admin/settings} to settle, and asserts the success UX: a non-error success toast appeared, NO
-   * error toast surfaced, and the {@code OPTIMISTIC_LOCK} reload-confirm dialog ({@code
-   * .krt-confirm-overlay}) never opened — the latter two being what a stale second save would
-   * trigger on the pre-fix backend. The submit button is re-enabled in the twin's {@code finally},
-   * so waiting on the POST response and the resulting toast suffices to gate the next click.
+   * Submits the settings form and asserts a success toast, no error toast and no {@code
+   * OPTIMISTIC_LOCK} reload-confirm dialog.
    *
    * @param page the authenticated admin-settings page
    * @param submit the settings form's submit button
@@ -188,14 +157,11 @@ class AdminSettingsInPlaceE2eTest {
   }
 
   /**
-   * Reads the persisted yellow-aging threshold straight from the backend ({@code GET
-   * /api/v1/settings/job_order.age_yellow_days}), so the persistence assertion does not race the
-   * client's in-place writeback.
+   * Reads the persisted yellow-aging threshold from {@code GET
+   * /api/v1/settings/job_order.age_yellow_days}.
    *
    * @return the persisted {@code ageYellowDays} value as an int
-   * @throws IllegalStateException if the backend returns a non-numeric {@code value} for the
-   *     setting — surfaced explicitly (with the offending raw value and key) instead of leaking a
-   *     bare {@link NumberFormatException}, while still failing the test
+   * @throws IllegalStateException if the backend returns a non-numeric {@code value}
    */
   private static int persistedYellowDays() {
     String body =

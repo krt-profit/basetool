@@ -80,10 +80,6 @@ class HangarUserEndpointsSecurityTest {
     user.setId(UUID.randomUUID());
     user.setUsername("hanger_user");
     userRepository.save(user);
-    // R6.b: the owner resolver requires the target user to have at least one org-unit
-    // membership before stamping. Anchor to V80-seeded IRIDIUM so addShip resolves. Post-R9 D3
-    // (V101): membership is the only Staffel link — the legacy app_user.squadron_id column was
-    // dropped.
     OrgUnitMembership iridiumMembership = new OrgUnitMembership();
     iridiumMembership.setId(new OrgUnitMembershipId(user.getId(), Squadron.IRIDIUM_ID));
     iridiumMembership.setUser(user);

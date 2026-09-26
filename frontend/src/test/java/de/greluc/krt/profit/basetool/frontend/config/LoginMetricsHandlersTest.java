@@ -47,11 +47,9 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 /**
- * Unit tests for the login-outcome metric handlers ({@link LoginSuccessMetricsHandler} / {@link
- * LoginFailureMetricsHandler}, #1041 item 18): the success/failure counters must be bumped with the
- * right bounded tags and the wrapped navigation/redirect must still run. The failure-reason mapping
- * is exercised directly to pin that only the bounded OAuth2 error code — not the raw description —
- * decides the bucket.
+ * Unit tests for {@link LoginSuccessMetricsHandler} and {@link LoginFailureMetricsHandler}: the
+ * counters carry the right bounded tags, the wrapped redirect still runs, and only the OAuth2 error
+ * code decides the failure reason.
  */
 class LoginMetricsHandlersTest {
 
@@ -73,8 +71,7 @@ class LoginMetricsHandlersTest {
   }
 
   /**
-   * Drives one failure through the handler with a stubbed request/response so the superclass
-   * redirect does not blow up, and returns the registry it counted into.
+   * Drives one failure through the handler with a stubbed request and response.
    *
    * @param exception the failure to report
    * @return the registry the counter was bumped against
@@ -117,22 +114,13 @@ class LoginMetricsHandlersTest {
         .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
     assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("invalid_state_parameter")))
         .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
-    // invalid_request is raised by OAuth2LoginAuthenticationFilter for a bare/partial callback (a
-    // scanner/probe or stale bookmark hitting /login/oauth2/code/*) BEFORE any token exchange, so
-    // it
-    // must be a benign state failure, not provider_error — otherwise it false-trips
-    // FrontendLoginBroken.
     assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("invalid_request")))
         .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
   }
 
   /**
-   * The OIDC {@code prompt=none} error set must land in the benign bucket.
-   * SsoReAuthenticationEntryPoint probes Keycloak with {@code prompt=none} on every unauthenticated
-   * top-level navigation, and Keycloak answers {@code login_required} whenever the browser carries
-   * no live SSO cookie — an authorization-response error raised before any token exchange. Counting
-   * those as provider_error made a path-scanning bot trip FrontendLoginBroken overnight with login
-   * perfectly healthy (2026-07-28).
+   * Verifies that the OIDC {@code prompt=none} errors, such as {@code login_required}, land in the
+   * benign bucket rather than {@code provider_error}.
    */
   @Test
   void reasonFor_mapsPromptNoneSilentSsoErrorsToInvalidState() {
@@ -154,19 +142,13 @@ class LoginMetricsHandlersTest {
         .isEqualTo(MetricNames.LOGIN_REASON_PROVIDER_ERROR);
     assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("invalid_token_response")))
         .isEqualTo(MetricNames.LOGIN_REASON_PROVIDER_ERROR);
-    // access_denied is an authorization-response error too, but it means an explicit refusal rather
-    // than routine "no session yet" noise, so it deliberately stays a provider_error.
     assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("access_denied")))
         .isEqualTo(MetricNames.LOGIN_REASON_PROVIDER_ERROR);
   }
 
   /**
-   * An {@link OAuth2AuthenticationException} carrying no {@link OAuth2Error} must map to
-   * provider_error without throwing. This pins a real hazard of the set-based lookup: {@code
-   * Set.of(…).contains(null)} throws {@link NullPointerException}, so the null guard in {@code
-   * isStateError} is load-bearing (the superseded chain of {@code "literal".equals(code)} calls was
-   * null-safe by construction). {@code new OAuth2Error(null)} is rejected by Spring, so the null
-   * error can only be reached through a stub.
+   * Verifies that an {@link OAuth2AuthenticationException} without an {@link OAuth2Error} maps to
+   * {@code provider_error} without throwing.
    */
   @Test
   void reasonFor_mapsMissingErrorToProviderErrorWithoutThrowing() {
@@ -219,10 +201,8 @@ class LoginMetricsHandlersTest {
   }
 
   /**
-   * The bucket {@code FrontendLoginBroken} fires on must reach the log at WARN and must carry the
-   * two fields that make it triageable: the bounded OAuth2 error code and the root cause's type.
-   * Before audit finding H3 the handler had no logger at all, so the alert's own "check the
-   * frontend logs" instruction pointed at nothing.
+   * Verifies that a {@code provider_error} failure is logged at WARN with the OAuth2 error code and
+   * the root cause's type.
    */
   @Test
   void onAuthenticationFailure_logsProviderErrorAtWarnWithCodeAndRootCause() throws Exception {
@@ -295,21 +275,10 @@ class LoginMetricsHandlersTest {
 
   @Test
   void aFailedLoginDoesNotParkTheExceptionInTheSession() throws Exception {
-    // The write that caused the 2026-09-02 outage. SimpleUrlAuthenticationFailureHandler stores the
-    // AuthenticationException under SPRING_SECURITY_LAST_EXCEPTION in the session; sessions are
-    // JSON
-    // in Redis here, and that value writes cleanly and cannot be read back — reconstruction dies on
-    // `authenticationRequest cannot be null`. Reading a session deserializes every field, so one
-    // failed login left that member with an HTTP 500 on everything until the session expired.
-    //
-    // Nothing is lost by not storing it: the UI reads the `error` QUERY PARAMETER, never this
-    // attribute, and the failure is already counted and logged before the redirect.
     org.springframework.mock.web.MockHttpServletRequest request =
         new org.springframework.mock.web.MockHttpServletRequest();
     org.springframework.mock.web.MockHttpServletResponse response =
         new org.springframework.mock.web.MockHttpServletResponse();
-    // A session must already exist, or the superclass would skip the write for a different reason
-    // and the test would pass without proving anything.
     request.getSession(true);
 
     new LoginFailureMetricsHandler(new SimpleMeterRegistry(), "/?error")
@@ -326,9 +295,6 @@ class LoginMetricsHandlersTest {
 
   @Test
   void aFailedLoginStillRedirectsAndStillExposesTheFailureForThisRequest() throws Exception {
-    // Replacing the superclass call must not change what a member sees, so both halves are pinned:
-    // the redirect still goes to the configured failure URL, and the exception is still reachable
-    // within this request (a request attribute is never serialized).
     org.springframework.mock.web.MockHttpServletRequest request =
         new org.springframework.mock.web.MockHttpServletRequest();
     org.springframework.mock.web.MockHttpServletResponse response =

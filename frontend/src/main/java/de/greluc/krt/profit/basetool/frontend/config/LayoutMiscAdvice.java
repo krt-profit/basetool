@@ -29,24 +29,11 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
- * Cross-cutting advice for the miscellaneous chrome model attributes that the layout fragments read
- * on every render but that do not belong to the OrgUnit context or the capability gates: the
- * dynamic {@code appTitle}, the always-on {@code unreadNotificationCount} bell badge, and the
- * {@code currentRequestUri} the switcher form posts back to.
+ * Contributes the miscellaneous layout model attributes: {@code appTitle}, {@code
+ * unreadNotificationCount} and {@code currentRequestUri}.
  *
- * <p>{@code appTitle} depends on the active OrgUnit context ({@code activeOrgUnit} + {@code
- * isAllSquadronsMode}) which is produced by {@code OrgUnitContextAdvice} and cross-injected here by
- * name — Spring's {@code ModelFactory} orders {@code @ModelAttribute} methods by dependency across
- * all advice beans, so the reference resolves regardless of the source bean.
- *
- * <p>The notification count is the {@code unreadNotifications} part of the request's single {@code
- * GET /api/v1/me/layout} answer, shared through {@link LayoutContextLoader}; a backend hiccup hides
- * the badge (count 0) rather than breaking the chrome.
- *
- * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
- * they serialise through Jackson and never read a model attribute. See that annotation for why the
- * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. It
- * issues no backend read of its own (FE-PERF-01).
+ * <p>Scoped to {@link UsesLayoutModel}; the notification count comes from the shared {@link
+ * LayoutContextLoader} read, and a backend error hides the badge.
  */
 @ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
@@ -59,30 +46,14 @@ public class LayoutMiscAdvice {
   private final MessageSource messageSource;
 
   /**
-   * Composes the dynamic application title rendered in the {@code <title>} tag and the sidebar
-   * brand logo — the single place the active OrgUnit context surfaces to the user (REQ-ORG-024; the
-   * previously-redundant top-right context chip was removed). Resolution:
+   * Composes the application title for the {@code <title>} tag and sidebar brand (REQ-ORG-024):
+   * "Profit Basetool – &lt;shorthand or name&gt;" for an active org unit, "– Alle Staffeln" for an
+   * admin without a pin, otherwise plain "Profit Basetool", localised via {@link
+   * LocaleContextHolder}.
    *
-   * <ul>
-   *   <li>An active pin of <em>either</em> kind ({@code SQUADRON} or {@code SPECIAL_COMMAND}) →
-   *       "Profit Basetool – &lt;shorthand&gt;", falling back to the OrgUnit name when it carries
-   *       no shorthand. Reading from {@code activeOrgUnit} (the merged Staffel + SK catalogue) —
-   *       rather than the Squadron-only {@code activeSquadron} — is what lets an SK pin show in the
-   *       title at all; the chip used to be the only surface that did.
-   *   <li>Admin in all-OrgUnits mode (no pin) → "Profit Basetool – Alle Staffeln".
-   *   <li>No context (squadron-less non-admin, anonymous) → plain "Profit Basetool".
-   * </ul>
-   *
-   * <p>The active OrgUnit context ({@code activeOrgUnit} + {@code isAllSquadronsMode}) is produced
-   * by {@code OrgUnitContextAdvice} and cross-injected here by name. Resolution uses the request
-   * locale via {@link LocaleContextHolder} so the suffix is localised consistently with the rest of
-   * the page (the message-format pattern {@code {0}} is filled with the OrgUnit shorthand/name or
-   * the localised "all squadrons" label). The {@code app.title.with.squadron} key name predates SK
-   * support and is kept generic — it now serves any OrgUnit kind.
-   *
-   * @param activeOrgUnit resolved active OrgUnit (Staffel or SK), or {@code null}.
-   * @param isAllSquadronsMode whether the current viewer is an admin without a selection.
-   * @return the rendered title string, never {@code null}.
+   * @param activeOrgUnit the active org unit (Staffel or SK), or {@code null}
+   * @param isAllSquadronsMode whether the viewer is an admin without a selection
+   * @return the rendered title, never {@code null}
    */
   @ModelAttribute("appTitle")
   public String appTitle(
@@ -104,14 +75,11 @@ public class LayoutMiscAdvice {
   }
 
   /**
-   * The caller's unread-notification count, fed to the always-on bell badge rendered on every page
-   * (REQ-NOTIF-006). Read from the request's single layout answer ({@link LayoutContextLoader}), so
-   * it costs no call of its own; zero when unauthenticated, for a handler that writes its body
-   * directly, or on a backend error, so a hiccup hides the badge rather than breaking the chrome.
-   * The bell's client-side polling keeps it fresh after the initial render.
+   * The caller's unread-notification count for the bell badge (REQ-NOTIF-006), taken from the
+   * shared {@link LayoutContextLoader} read.
    *
    * @param request the current request, through which the layout context is memoised
-   * @return the unread count, or {@code 0} when it cannot or need not be resolved
+   * @return the unread count, or {@code 0} when unauthenticated, not needed, or on a backend error
    */
   @ModelAttribute("unreadNotificationCount")
   public long unreadNotificationCount(HttpServletRequest request) {
@@ -119,13 +87,11 @@ public class LayoutMiscAdvice {
   }
 
   /**
-   * The request URI the sidebar switcher form posts back as {@code _referer} so the redirect after
-   * the squadron change lands the user on the same page they were on. We resolve it via a model
-   * attribute rather than the Thymeleaf {@code #httpServletRequest} utility because the latter is
-   * not exposed in every render context (MockMvc tests in particular).
+   * The request URI the sidebar switcher form posts back as {@code _referer}, so the redirect after
+   * a squadron change returns to the same page.
    *
-   * @param request the current HTTP servlet request injected by Spring; never {@code null}.
-   * @return the path + query of the current request, or {@code "/"} as a defensive fallback.
+   * @param request the current request; never {@code null}
+   * @return the path and query of the current request, or {@code "/"} as a fallback
    */
   @ModelAttribute("currentRequestUri")
   public String currentRequestUri(HttpServletRequest request) {

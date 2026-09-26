@@ -45,13 +45,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Pins BE-PERF-07: {@code GET /api/v1/me/layout} answers its four parts in <em>one</em> read-only
- * transaction, where the web layout used to open one per call ({@code /active-org-unit}, {@code
- * /org-units}, {@code /capabilities}, {@code /notifications/unread-count}).
- *
- * <p>Calls the proxied controller bean the way the dispatcher does, with a JWT principal and a
- * bound servlet request, but without a test transaction around it — a surrounding transaction would
- * absorb the controller's own and make the count meaningless.
+ * Verifies that {@code GET /api/v1/me/layout} answers all four parts in one read-only transaction.
+ * Runs without a surrounding test transaction so the count is meaningful.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -108,8 +103,6 @@ class MeLayoutSingleTransactionTest {
 
   @Test
   void theSeparateCallsOpenSeveral_soTheCounterSeesTheDifference() {
-    // The contrast that makes the assertion above mean something: asked one by one, the same
-    // answers cost more than one transaction.
     Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
     stats.setStatisticsEnabled(true);
     stats.clear();

@@ -21,9 +21,10 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
  * Machine-readable reason attached to an {@link ImportIssueDto} of a refinery screenshot import
- * draft (#434, plan §7.5). The set is part of the cross-module contract: the frontend translates
- * each code via its own {@code refineryImport.issue.*} message keys, so renaming a constant is a
- * breaking API change.
+ * draft.
+ *
+ * <p>The frontend translates each code via {@code refineryImport.issue.*}; renaming a constant
+ * breaks the API.
  */
 public enum ImportIssueCode {
 
@@ -35,9 +36,8 @@ public enum ImportIssueCode {
   UNMATCHED_MATERIAL,
 
   /**
-   * A material was matched only by the fuzzy stage (score at or above the accept threshold but not
-   * an exact/alias/suffix hit). Never silently accepted — the issue carries the match score as
-   * {@code confidence} plus the ranked alternatives so the user verifies the pick.
+   * A material was matched only fuzzily; the issue carries the score and ranked alternatives for
+   * the user to verify.
    */
   LOW_CONFIDENCE_MATERIAL,
 
@@ -49,37 +49,24 @@ public enum ImportIssueCode {
   NO_REFINED_MATERIAL,
 
   /**
-   * The row's quality lies outside the savable 0..1000 range (likely a VLM misread). The value is
-   * kept un-clamped in the draft so the user sees what was read; the review form forces a
-   * correction before the order can be saved.
+   * The row's quality lies outside 0..1000; the value stays unclamped and must be corrected before
+   * saving.
    */
   OUT_OF_RANGE_QUALITY,
 
-  /**
-   * {@code rawLocationName} was null (normal for pre-cropped panel input — the location sits in the
-   * terminal header outside the panel) or did not resolve to a refinery-equipped location.
-   */
+  /** {@code rawLocationName} was null or did not resolve to a refinery-equipped location. */
   UNRESOLVED_LOCATION,
 
   /** {@code rawMethodName} did not resolve to a known refining method (case-insensitive). */
   UNRESOLVED_METHOD,
 
-  /**
-   * The row's REFINE toggle was OFF (typically the INERT MATERIALS aggregate) — intentionally not
-   * added to the draft, because the create path requires a positive output quantity.
-   */
+  /** The row's REFINE toggle was OFF, so it was not added to the draft. */
   SKIPPED_REFINE_OFF,
 
-  /**
-   * The row carried a zero input or (quoted) zero output quantity and was not added to the draft —
-   * distinct from {@link #UNQUOTED_ROW}, whose fix is re-capturing after GET QUOTE.
-   */
+  /** The row carried a zero input or output quantity and was not added to the draft. */
   SKIPPED_ZERO_QTY,
 
-  /**
-   * The row's YIELD cell was un-quoted ({@code "--"}, {@code outputQuantity == null}) — the
-   * screenshot was taken before pressing GET QUOTE. The row cannot be drafted; re-capture fixes it.
-   */
+  /** The row's YIELD cell was unquoted ({@code "--"}); the screenshot predates GET QUOTE. */
   UNQUOTED_ROW,
 
   /**
@@ -90,10 +77,9 @@ public enum ImportIssueCode {
   UNQUOTED_ORDER,
 
   /**
-   * The refine-ON row quantities sum past the {@code TO REFINE} panel total beyond the ±1-per-row
-   * display rounding (or a single row alone exceeds it) — a quantity was mis-read or a screenshot
-   * captured twice. One-sided per the frozen Phase-0 rule: a shortfall (scrolled-out rows) is never
-   * flagged and {@code IN MANIFEST} is never validated.
+   * The refine-ON row quantities exceed the {@code TO REFINE} total beyond ±1 per row of rounding.
+   *
+   * <p>A shortfall is never flagged.
    */
   SUM_MISMATCH,
 

@@ -38,33 +38,13 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
 /**
- * Unit tests for the frontend's {@link KeycloakHealthIndicator}. The indicator is driven against an
- * in-process {@link MockWebServer} so the OIDC discovery response — including failure modes such as
- * 4xx/5xx upstream codes and connection-refused — can be staged deterministically without a real
- * Keycloak.
- *
- * <p>Three behaviour classes are covered:
- *
- * <ol>
- *   <li>Happy path — a 2xx response from {@code /.well-known/openid-configuration} yields {@link
- *       Status#UP}.
- *   <li>Upstream error — a 4xx/5xx response yields {@link Status#DOWN} with the upstream status
- *       code attached as a detail for log correlation.
- *   <li>Transport failure — the upstream port is closed (server shut down before the probe), so the
- *       {@code JdkClientHttpRequestFactory} surfaces an I/O failure that maps to {@link
- *       Status#DOWN} with the exception class as a detail.
- * </ol>
- *
- * <p>Each test pins the request path to {@code /.well-known/openid-configuration} so a future
- * refactor that accidentally pointed the indicator at the wrong sub-resource (e.g. the JWKS or the
- * token endpoint) would fail loud.
+ * Unit tests for {@link KeycloakHealthIndicator} against a {@link MockWebServer}: a 2xx discovery
+ * answer is {@link Status#UP}; a 4xx/5xx answer or a transport failure is {@link Status#DOWN} with
+ * a detail. Also pins the request path {@code /.well-known/openid-configuration}.
  */
 class KeycloakHealthIndicatorTest {
 
-  /**
-   * Short timeouts keep transport-failure tests millisecond-fast — the production indicator uses
-   * 2&nbsp;s / 3&nbsp;s but we do not need those margins against an in-process server.
-   */
+  /** Short connect timeout that keeps transport-failure tests fast. */
   private static final Duration TEST_CONNECT_TIMEOUT = Duration.ofMillis(500);
 
   private static final Duration TEST_READ_TIMEOUT = Duration.ofMillis(500);
@@ -163,16 +143,8 @@ class KeycloakHealthIndicatorTest {
     assertNotEquals("", error.toString(), "the recorded error class name must not be empty");
   }
 
-  // ─── Spring constructor-selection guard ─────────────────────────────────
-
   @Test
   void productionConstructor_isAnnotatedAutowired_soSpringCanInstantiate() {
-    // Regression guard: the indicator declares TWO constructors -- the production @Value one and a
-    // package-private test-only one with explicit Duration parameters. Spring 4+ refuses to
-    // auto-select between multiple constructors and falls back to a no-arg default; without that,
-    // it aborts startup with `NoSuchMethodException: <init>()`. The fix is exactly the @Autowired
-    // marker on the production constructor; the test below asserts that marker survives any
-    // future refactor.
     long autowiredCtors =
         Arrays.stream(KeycloakHealthIndicator.class.getDeclaredConstructors())
             .filter(ctor -> ctor.isAnnotationPresent(Autowired.class))

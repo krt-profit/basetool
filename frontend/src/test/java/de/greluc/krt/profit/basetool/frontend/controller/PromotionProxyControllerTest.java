@@ -40,19 +40,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Pure-Mockito unit tests for {@link PromotionProxyController}.
- *
- * <p>This controller is intentionally a thin pass-through: each endpoint forwards exactly one verb
- * to a deterministic backend URI. The tests therefore focus on the *contract* — URI shape, body
- * propagation, response body propagation, and the {@code 204 No Content} convention on DELETE —
- * rather than on any business logic. The five resource families (topics, categories,
- * rank-requirements, level-contents, evaluations) plus the single PUT endpoint for evaluations
- * yield 13 endpoints total, each covered by a targeted test below.
- *
- * <p>The {@code @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")} guard on every endpoint is
- * enforced by Spring Security at the framework layer and is not exercised by these unit tests; the
- * authorization wiring is verified in {@code MissionSecurityRenderingTest} and similar MockMvc
- * tests for the broader stack.
+ * Mockito unit tests for the pass-through {@link PromotionProxyController}: URI shape, body and
+ * response propagation, and {@code 204 No Content} on DELETE for all 13 endpoints. Authorization is
+ * not exercised here.
  */
 @SuppressWarnings("rawtypes")
 @ExtendWith(MockitoExtension.class)
@@ -61,8 +51,6 @@ class PromotionProxyControllerTest {
   @Mock private BackendApiClient backendApiClient;
 
   @InjectMocks private PromotionProxyController controller;
-
-  // ── Topics ──────────────────────────────────────────────────────────────
 
   @Test
   void createTopic_forwardsBodyToBackendTopicsEndpoint() {
@@ -101,8 +89,6 @@ class PromotionProxyControllerTest {
     verify(backendApiClient).delete("/api/v1/promotion/topics/" + id, Void.class);
   }
 
-  // ── Categories ──────────────────────────────────────────────────────────
-
   @Test
   void createCategory_forwardsBodyToBackendCategoriesEndpoint() {
     Map<String, Object> body =
@@ -136,8 +122,6 @@ class PromotionProxyControllerTest {
     verify(backendApiClient).delete("/api/v1/promotion/categories/" + id, Void.class);
   }
 
-  // ── Rank Requirements ───────────────────────────────────────────────────
-
   @Test
   void createRankRequirement_forwardsBodyToBackend() {
     Map<String, Object> body = Map.of("fromRank", 20, "toRank", 19, "minimumLevel", "LEVEL_A");
@@ -169,8 +153,6 @@ class PromotionProxyControllerTest {
     assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
     verify(backendApiClient).delete("/api/v1/promotion/rank-requirements/" + id, Void.class);
   }
-
-  // ── Level Contents ──────────────────────────────────────────────────────
 
   @Test
   void createLevelContent_forwardsBodyToBackend() {
@@ -205,14 +187,8 @@ class PromotionProxyControllerTest {
     verify(backendApiClient).delete("/api/v1/promotion/level-contents/" + id, Void.class);
   }
 
-  // ── Evaluations ─────────────────────────────────────────────────────────
-
   @Test
   void updateEvaluation_buildsUserCategoryPath_andForwardsBody() {
-    // The evaluations endpoint uniquely takes two path variables, and the proxy must expand both
-    // into the backend URI in the right order. Both are UUIDs: Keycloak issues the JWT sub as one
-    // and the backend's MemberEvaluationController declares `@PathVariable UUID userId`, so a
-    // non-UUID sub never had a route through this proxy in the first place.
     UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     Map<String, Object> body = Map.of("version", 0, "assignedLevel", "LEVEL_B");
@@ -227,9 +203,6 @@ class PromotionProxyControllerTest {
 
   @Test
   void updateEvaluation_handlesNullAssignedLevelInBody() {
-    // Setting a level back to "Keine" sends assignedLevel: null. The proxy
-    // is body-agnostic; we verify the body is passed through unchanged so
-    // the backend's optimistic-lock + null-handling logic stays in charge.
     UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     java.util.Map<String, Object> body = new java.util.HashMap<>();

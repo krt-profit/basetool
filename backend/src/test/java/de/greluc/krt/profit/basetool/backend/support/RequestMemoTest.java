@@ -32,9 +32,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Pins the contract of the one request memo the scope resolvers, the cascade and the user mapper
- * share (BE-SIMP-09): computed once per request and key, kept apart by key, and a plain computation
- * — or nothing at all — outside a request.
+ * Pins the contract of the shared request memo: computed once per request and key, kept apart by
+ * key, and computed directly outside a request.
  */
 class RequestMemoTest {
 

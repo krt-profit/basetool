@@ -36,27 +36,11 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Every localized string a browser script reads is provided by the pages that load it.
+ * Tests that every literal i18n key a browser script reads through {@code window.krtI18nText} or a
+ * {@code krtFetch.sectionWrite} config is provided by some template, as a {@code data-*} attribute
+ * or a bootstrap object property.
  *
- * <p>Since 2026-09-23 the scripts carry no literal defaults: a string goes through {@code
- * window.krtI18nText(value, key)}, which renders the key name and reports an {@code i18n_missing}
- * client error when the page did not provide it. That makes a gap visible in production; this test
- * makes it visible before, by reading every literal {@code key} passed to {@code krtI18nText} (and
- * every dictionary key a {@code krtFetch.sectionWrite} config names) and finding its source:
- *
- * <ul>
- *   <li>{@code data-foo} — a markup attribute: some template must emit {@code data-foo=} (plainly,
- *       as {@code th:data-foo} or inside a {@code th:attr}).
- *   <li>{@code NAME.a.b} / {@code NAME[key]} — a bootstrap object: at least one template must
- *       declare {@code NAME = {…}}, and every template that declares it must name the property
- *       ({@code b:} or {@code 'key'}). A dictionary a fragment and its host page merge with {@code
- *       Object.assign} counts its contributors together.
- * </ul>
- *
- * <p>A key built at run time (the ones whose name is concatenated) is not visible here; those are
- * limited to {@code sectionWrite}'s per-section labels and the dictionary helpers of {@code
- * mission-detail.js} / {@code mission-presence.js}, whose fixed keys are covered by their own
- * literal call sites.
+ * <p>Keys built at run time are not covered.
  */
 class I18nDictionaryCoverageTest {
 
@@ -92,7 +76,6 @@ class I18nDictionaryCoverageTest {
         }
         Matcher dictName = DICT_NAME.matcher(js);
         while (dictName.find()) {
-          // The config block the name belongs to ends at its sections map.
           int end = js.indexOf("sections:", dictName.end());
           Matcher configKey =
               CONFIG_KEY.matcher(js.substring(dictName.end(), end < 0 ? js.length() : end));
@@ -137,7 +120,6 @@ class I18nDictionaryCoverageTest {
           : "no template emits " + key;
     }
     if (key.indexOf('.') < 0 && key.indexOf('[') < 0) {
-      // A bare global a bootstrap assigns on its own (window.MSG_X = /*[[#{…}]]*/ …).
       Pattern global = Pattern.compile("\\b" + Pattern.quote(key) + "\\s*=[^=]");
       return templates.values().stream().anyMatch(t -> global.matcher(t).find())
           ? null
@@ -154,8 +136,6 @@ class I18nDictionaryCoverageTest {
       property = key.substring(key.lastIndexOf('.') + 1);
     }
     Pattern declaration = Pattern.compile("\\b" + Pattern.quote(name) + "\\s*=\\s*\\{");
-    // A dictionary a fragment and its host page both contribute to is merged with
-    // Object.assign(window.NAME || {}, {...}); its entries count across all contributors.
     Pattern merge = Pattern.compile("\\b" + Pattern.quote(name) + "\\s*=\\s*Object\\.assign\\(");
     Pattern entry =
         Pattern.compile(
@@ -219,9 +199,6 @@ class I18nDictionaryCoverageTest {
    */
   @Test
   void noScriptFallsBackToALiteralDefault() throws IOException {
-    // A literal that reads like UI text (a capital letter or a space, and a letter) right after
-    // `||`. Selectors, keys and field names never match; the two data fallbacks that are not UI
-    // text are listed explicitly.
     Pattern fallback =
         Pattern.compile(
             "\\|\\|\\s*'([^'\\n]*[A-ZÄÖÜ ][^'\\n]*)'|\\|\\|\\s*'([A-Za-zäöüß][^'\\n]*)'");
@@ -235,9 +212,6 @@ class I18nDictionaryCoverageTest {
         Matcher m = fallback.matcher(js);
         while (m.find()) {
           String literal = m.group(1) != null ? m.group(1) : m.group(2);
-          // Not UI text: identifiers, enum constants and HTTP verbs, MIME types, CSS values and
-          // download file names (the server's Content-Disposition name wins; the literal only
-          // names a file on disk).
           if (literal.matches("[a-z][\\w\\-]*")
               || literal.matches("[A-Z][A-Z_]*")
               || literal.matches("accountId|application/json")

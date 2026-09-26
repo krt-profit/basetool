@@ -39,15 +39,8 @@
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
-    <!--/*
-      The two create forms are one live-sync section ("forms"): both their parent pickers list units
-      a peer can create, so a peer's create makes them stale together (#1235, REQ-FE-015). The stable
-      #org-structure-forms container survives the swap; the inner th:block is what ?fragment=forms
-      renders.
-    */-->
     <div id="org-structure-forms">
     <th:block th:fragment="orgStructureForms">
-    <!--/* ===== Create the Organisationsleitung (only when none exists yet) ===== */-->
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.orgStructure.ol.create}">Organisationsleitung anlegen</h2>
         <p th:if="${hasOl}" class="text-muted" th:text="#{admin.orgStructure.ol.exists}">Die Organisationsleitung besteht bereits.</p>
@@ -72,7 +65,6 @@
         </form>
     </div>
 
-    <!--/* ===== Create a Bereich ===== */-->
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.orgStructure.bereich.create}">Bereich anlegen</h2>
         <form id="bereich-form" data-trigger="os-create-bereich">
@@ -114,17 +106,11 @@
     </th:block>
     </div>
 
-    <!--/* ===== The hierarchy: every unit + its parent edge ===== */-->
     <div id="org-structure-units">
     <th:block th:fragment="orgStructureUnits">
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.orgStructure.units.title}">Einheiten und Zuordnung</h2>
         <p class="text-muted" th:text="#{admin.orgStructure.units.hint}">Wähle die übergeordnete Einheit; Staffeln/Spezialkommandos gehören in einen Bereich, Bereiche in die Organisationsleitung.</p>
-        <!--/* .table-responsive (REQ-UI-009): three columns of unit metadata reach 495px once the
-             table actually has rows, which is wider than a phone — it widened the layout viewport
-             to 520px and took the notification bell out of view with it. Invisible on an empty
-             stack, which is why the local sweep passed and CI did not: the e2e flows create org
-             units, the smoke run does not. */-->
         <div class="table-responsive">
         <table id="org-units-table">
             <thead>

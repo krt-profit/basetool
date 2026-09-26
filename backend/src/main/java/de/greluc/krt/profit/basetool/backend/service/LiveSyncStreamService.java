@@ -52,41 +52,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Registry of the app's open live-sync streams, and the only place a {@code changed} frame is
- * written to one (ADR-0143).
+ * Registry of the app's open live-sync streams and the only writer of {@code changed} frames to
+ * them (ADR-0143). Performs no access control; topics arrive already authorized.
  *
- * <p>A stream is opened by {@link #subscribe(UUID, List)} with the topic set already authorized;
- * this class does no access control of its own. It keeps two indices over the same subscriptions —
- * by topic, so a frame reaches one room without walking every stream, and by subscriber, so the
- * per-member cap can evict the oldest. Both are updated through {@link #retire} alone, guarded by a
- * one-shot flag, because a stream can be retired concurrently by a failed send, its own timeout,
- * the servlet container's completion callback and an eviction, and a half-removed subscription
- * would keep a dead emitter in a room forever.
- *
- * <p>Modelled on {@link NotificationStreamService} down to the timeout, the heartbeat and the
- * failure tagging — the same transport with the same hazards, in front of nginx and a mobile NAT.
- *
- * <p><b>Delivery is off the caller's thread</b> (BE-PERF-13, 2026-09-23; ADR-0143 amendment). A
- * {@code changed} frame used to be written to every stream of a room synchronously, on the thread
- * that published it — the request thread of {@code POST /live-sync/changed}, or the Redis listener
- * — so one subscriber whose socket buffer was full held the publishing request (and every other
- * subscriber after it in the loop) for as long as its write blocked. Every write now goes into the
- * stream's own bounded queue ({@value #MAX_QUEUED_FRAMES} frames), and one drain task per stream
- * empties it on the delivery executor:
+ * <p>Subscriptions are indexed by topic and by subscriber, and removed from both only through
+ * {@link #retire}, at most once. Frames go into a per-stream bounded queue ({@value
+ * #MAX_QUEUED_FRAMES} frames) drained off the caller's thread:
  *
  * <ul>
- *   <li><b>Order per stream is preserved</b>: at most one drain runs per stream at a time (a
- *       one-shot {@code draining} flag), and it takes frames in queue order. The {@code subscribed}
- *       event is queued before the stream joins any room, so it is always its first frame.
- *   <li><b>Back-pressure drops, it never grows</b>: a frame offered to a full queue is dropped and
- *       counted ({@code basetool_livesync_frames_dropped_total{event}}), never buffered without
- *       bound. A stream that far behind is either dead or unreadably slow; the app re-fetches
- *       through its own reads anyway, so a lost {@code changed} costs a stale panel until the next
- *       frame or navigation, not data.
- *   <li><b>Threads are bounded by streams</b>: the executor starts one virtual thread per drain,
- *       and the flag allows one drain per stream, so the concurrency is capped by the open-stream
- *       count, which {@link #MAX_STREAMS_PER_SUB} caps per member. A blocked write parks one
- *       virtual thread and delays nobody else.
+ *   <li>at most one drain per stream, so per-stream order is preserved and the {@code subscribed}
+ *       event is always first;
+ *   <li>a frame offered to a full queue is dropped and counted in {@code
+ *       basetool_livesync_frames_dropped_total{event}};
+ *   <li>each drain runs on its own virtual thread, so a blocked write delays no other stream.
  * </ul>
  */
 @Service
@@ -94,30 +72,15 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class LiveSyncStreamService {
 
   /**
-   * Emitter lifetime. Long, because the cost of a re-open is a fresh authorization of every topic;
-   * short enough that a stream stranded by a NAT that dropped the connection without an RST is
-   * eventually collected rather than held until redeploy.
+   * Emitter lifetime; long enough to avoid frequent re-authorization, short enough to collect
+   * streams stranded by a silently dropped connection.
    */
   private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
 
-  /**
-   * Open streams one member may hold at once.
-   *
-   * <p>Far above real use — the app shows one screen and opens one stream — and low enough that a
-   * crafted client cannot pin thousands of emitters. Reaching it evicts the oldest rather than
-   * refusing the newest: the newest is the screen the member is actually looking at.
-   */
+  /** Open streams one member may hold at once; reaching it evicts the member's oldest stream. */
   static final int MAX_STREAMS_PER_SUB = 4;
 
-  /**
-   * Frames one stream may have waiting for its drain before further frames are dropped.
-   *
-   * <p>A healthy stream drains within milliseconds and never holds more than a handful — the relay
-   * buckets (ADR-0094's numbers) cap a room at 100 accepted frames per second, and the heartbeat
-   * adds one every 20 s. Sixty-four is several seconds of a room at that ceiling, so reaching it
-   * means the subscriber stopped reading, and the bound is what keeps such a stream from holding
-   * memory for its whole 30-minute life.
-   */
+  /** Frames one stream may have queued before further frames are dropped. */
   static final int MAX_QUEUED_FRAMES = 64;
 
   private final Map<String, Set<Subscription>> byTopic = new ConcurrentHashMap<>();
@@ -145,9 +108,7 @@ public class LiveSyncStreamService {
   }
 
   /**
-   * Builds the registry over a given delivery executor — the seam for tests, which pass a direct
-   * executor to keep the frame order observable without waiting, or a real one to prove that a
-   * blocked subscriber does not hold the publisher.
+   * Builds the registry over a given delivery executor.
    *
    * @param meterRegistry registry the gauges and the failure / drop counters bind to
    * @param deliveryExecutor where the per-stream drain tasks run; not shut down by this instance
@@ -200,17 +161,13 @@ public class LiveSyncStreamService {
   }
 
   /**
-   * Opens a stream for one member over an already-authorized topic set.
-   *
-   * <p>The {@code subscribed} event goes out first and names the accepted topics, so the client can
-   * tell "live" from "the server dropped this room" without waiting for a frame that will never
-   * come. A caller that reaches the per-member cap evicts its own oldest stream.
+   * Opens a stream for one member over an already-authorized topic set. The first event is {@code
+   * subscribed}, naming the accepted topics; reaching the per-member cap evicts the oldest stream.
    *
    * @param sub the caller's Keycloak {@code sub}
    * @param topics the topics the caller was allowed to join; must not be empty
    * @return the emitter, to be returned from the controller
-   * @throws IllegalArgumentException if {@code topics} is empty — an unauthorized stream is a 403
-   *     at the controller, never an emitter with no rooms
+   * @throws IllegalArgumentException if {@code topics} is empty
    */
   @NotNull
   public SseEmitter subscribe(@NotNull UUID sub, @NotNull List<LiveSyncTopic> topics) {
@@ -218,8 +175,6 @@ public class LiveSyncStreamService {
       throw new IllegalArgumentException("A live-sync stream needs at least one accepted topic");
     }
     Subscription subscription = new Subscription(sub, canonicalTopics(topics), newEmitter());
-    // Queued before the stream joins a room, so it is always the first frame the drain writes —
-    // a changed frame delivered concurrently can only queue behind it.
     send(subscription, MetricNames.LIVESYNC_EVENT_SUBSCRIBED, subscribedPayload(subscription));
     List<Subscription> evicted = new ArrayList<>();
     bySub.compute(
@@ -253,12 +208,7 @@ public class LiveSyncStreamService {
   }
 
   /**
-   * Writes one {@code changed} frame to every stream in a room.
-   *
-   * <p>Sections are the caller's business: they arrive already clipped to the topic class's
-   * whitelist. A frame whose sections clipped to nothing never reaches here — an empty section list
-   * would tell a client "something changed" without saying what, which every client would then have
-   * to interpret as "reload everything".
+   * Queues one {@code changed} frame for every stream in a room.
    *
    * @param topic the room
    * @param sections the section keys, non-empty and already whitelisted
@@ -307,10 +257,8 @@ public class LiveSyncStreamService {
   }
 
   /**
-   * Queues one event for a stream and makes sure a drain will write it — never on this thread.
-   *
-   * <p>A retired stream takes nothing. A full queue drops the frame and counts it under {@code
-   * basetool_livesync_frames_dropped_total{event}} rather than growing (see the class Javadoc).
+   * Queues one event for a stream and ensures a drain will write it off this thread. A retired
+   * stream takes nothing; a full queue drops and counts the frame.
    *
    * @param subscription the target stream
    * @param event the SSE event name
@@ -348,7 +296,6 @@ public class LiveSyncStreamService {
     try {
       deliveryExecutor.execute(() -> drain(subscription));
     } catch (RejectedExecutionException e) {
-      // Only after shutdown: the stream is going away with the context, so give up on it.
       subscription.draining().set(false);
       log.debug("Live-sync delivery executor refused a drain; retiring the stream", e);
       retire(subscription, false);
@@ -357,8 +304,7 @@ public class LiveSyncStreamService {
 
   /**
    * Writes a stream's queued frames in order until the queue is empty, retiring the stream on the
-   * first failed write. Re-checks the queue after releasing the flag, so a frame queued between the
-   * last poll and the release is not stranded until the next one arrives.
+   * first failed write.
    *
    * @param subscription the stream to drain
    */
@@ -413,8 +359,8 @@ public class LiveSyncStreamService {
    * Removes a stream from both indices, at most once, and optionally completes it.
    *
    * @param subscription the stream to retire
-   * @param complete whether to complete the emitter — {@code false} when the container is already
-   *     tearing it down, since completing an emitter from inside its own completion callback throws
+   * @param complete whether to complete the emitter; {@code false} from inside its own completion
+   *     callback
    */
   private void retire(@NotNull Subscription subscription, boolean complete) {
     if (!subscription.retired().compareAndSet(false, true)) {
@@ -464,12 +410,8 @@ public class LiveSyncStreamService {
   }
 
   /**
-   * Renders a {@code changed} payload.
-   *
-   * <p>Hand-built rather than mapped, and safe to build that way precisely because neither part is
-   * free text: the topic is a canonical string this backend produced from its own registry, and
-   * every section has already been matched against a whitelist of literals. Nothing that reaches
-   * here can carry a quote or a backslash.
+   * Renders a {@code changed} JSON payload by hand; safe because topic and sections are canonical,
+   * whitelisted strings.
    *
    * @param topic the room
    * @param sections the whitelisted section keys
@@ -506,11 +448,8 @@ public class LiveSyncStreamService {
   }
 
   /**
-   * One open stream.
-   *
-   * <p>Identity-compared on purpose — two streams of the same member over the same topics are
-   * different rooms' members and must be removable independently — which is what the default record
-   * equality would break, so it is overridden back to identity below.
+   * One open stream, compared by identity so two equal-looking streams stay independently
+   * removable.
    *
    * @param sub the member holding the stream
    * @param topics the canonical room keys it belongs to

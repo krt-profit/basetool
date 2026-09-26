@@ -1,25 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  Labelled org-unit <select> for the Job Order create/edit forms (Phase 2, #342). Unlike the
-  generic owner-picker fragment, this one always renders (the responsible/requesting pickers are
-  mandatory even when a single option exists) and takes a dynamic label key.
-
-  Inputs:
-    - selectId : the <select> element id (also used for the <label for>)
-    - name     : the form field name (e.g. "responsibleOrgUnitId" / "requestingOrgUnitId")
-    - options  : List<OrgUnitMembershipOptionDto> (orgUnitId, orgUnitName, orgUnitShorthand, kind)
-    - selected : preselected UUID or null
-    - labelKey : i18n message key for the field label
-    - required : whether the picker is mandatory (boolean)
-
-  Groups options under <optgroup>s in top-down hierarchy order (Organisationsleitung, Bereich,
-  Staffel, Spezialkommando) when more than one kind is present; flat list otherwise. The requesting
-  (Auftraggeber) picker may now carry Bereich + OL options (epic #692) so a Bereichsleitung/OL
-  member can place an order on behalf of their tier; the responsible picker only ever receives
-  profit-eligible Staffeln/SKs, so its Bereich/OL optgroups stay empty and unrendered. CSP-safe.
-*/-->
 <div th:fragment="orgUnitSelect(selectId, name, options, selected, labelKey, required)"
      class="form-group">
     <label th:for="${selectId}" th:text="#{__${labelKey}__}">Einheit</label>

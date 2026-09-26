@@ -55,24 +55,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the user profile page ({@code /profile}).
+ * Controller of the user profile page ({@code /profile}) and its editable fields: description,
+ * display name, default payout preference and blueprint sharing.
  *
- * <p>Renders the current user's profile data and exposes the editable fields (description, display
- * name, and the default payout preference — the latter persisted through its own lightweight
- * endpoint so the central {@code UserDto} contract stays untouched). The page layers two data
- * sources: the OIDC token claims (used as the immediate default) and the backend {@code
- * /api/v1/users/me} payload (used to overwrite the token values with the authoritative DB state,
- * including the optimistic-locking {@code version} needed for subsequent updates). When the backend
- * is unreachable, the token-only view still renders so the user always sees something.
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, as on
- * every sibling in this package. The three {@code authHelper.isAnonymous()} guards that used to
- * open each handler went with the anonymous caller (ADR-0159), and without a gate of its own this
- * class would have been protected only by a URL matcher two folders away — the arrangement the
- * members-only change set out to end. It is defence in depth, not the enforcement: {@code
- * anyRequest().authenticated()} already refuses at {@code AuthorizationFilter}. Without it, a
- * regression in that one matcher would reach {@code principal.getPreferredUsername()} on a null
- * principal.
+ * <p>Renders from token claims overlaid with {@code /api/v1/users/me}, and still renders from the
+ * token alone when the backend is unreachable.
  */
 @Controller
 @UsesLayoutModel
@@ -92,13 +79,10 @@ public class ProfileController {
   private String issuerUri;
 
   /**
-   * Renders the profile page. The controller seeds the model from token claims, then overlays the
-   * backend {@code /me} record where available and parses the {@code joinDate} into a {@code
-   * LocalDate} plus the derived months-in-squadron counter. A fresh {@link ProfileDescriptionForm}
-   * is added to the model unless one is already there (preserves user input across a failed
-   * submit).
+   * Renders the profile page from token claims overlaid with the backend {@code /me} record, adding
+   * a fresh {@link ProfileDescriptionForm} unless one is already present.
    *
-   * @param model Thymeleaf model populated with the layered profile data and the description form
+   * @param model model populated with the profile data and the description form
    * @param principal authenticated OIDC user
    * @return the {@code profile} view name
    */
@@ -109,12 +93,10 @@ public class ProfileController {
     model.addAttribute("username", principal.getPreferredUsername());
     model.addAttribute("email", principal.getEmail());
 
-    // Default from Token
     model.addAttribute("rank", getSingleClaim(principal, "rank"));
     model.addAttribute("description", getSingleClaim(principal, "description"));
     model.addAttribute("displayName", getSingleClaim(principal, "displayName"));
 
-    // Fetch from Backend to get latest DB state
     try {
       Map<String, Object> user = backendApiClient.get("/api/v1/users/me", STRING_OBJECT_MAP_TYPE);
 
@@ -122,9 +104,6 @@ public class ProfileController {
         if (user.get("rank") != null) {
           model.addAttribute("rank", user.get("rank"));
         }
-        // Always overwrite description from DB, even if null (to allow clearing)
-        // But if DB is null and Token has it? Prefer DB (it might have been deleted locally).
-        // Actually, if DB has null, we might want to show empty.
         if (user.containsKey("description")) {
           model.addAttribute("description", user.get("description"));
         }
@@ -141,24 +120,15 @@ public class ProfileController {
             model.addAttribute(
                 "monthsInSquadron", ChronoUnit.MONTHS.between(joinDate, LocalDate.now()));
           } catch (Exception ignored) {
-            // joinDate missing or malformed — leave attribute unset
           }
         }
-        // REQ-ORG-017: surface the user's FULL Staffel membership set (up to two) so the identity
-        // band shows every Staffel affiliation, not just the single active-context pin. Each
-        // element
-        // is the serialised SquadronReferenceDto ({name, shorthand}).
         if (user.get("squadrons") instanceof java.util.List<?> squadrons) {
           model.addAttribute("profileSquadrons", squadrons);
         }
       }
-    } catch (Exception e) {
-      // Backend unavailable? Keep Token data.
+    } catch (Exception ignored) {
     }
 
-    // Default payout preference, fetched from its own lightweight endpoint so the central UserDto
-    // contract stays untouched. Resilient: a backend hiccup or an unexpected value leaves the
-    // selector at PAYOUT rather than failing the whole page.
     PayoutPreference defaultPayoutPreference = PayoutPreference.PAYOUT;
     try {
       Map<String, Object> pref =
@@ -168,18 +138,11 @@ public class ProfileController {
             PayoutPreference.valueOf(String.valueOf(pref.get("defaultPayoutPreference")));
       }
     } catch (Exception e) {
-      // Backend unavailable or unrecognised value — keep the PAYOUT default. Logged at debug
-      // (not error) because this is an optional sub-fetch on a page that still renders fine; a
-      // persistently failing endpoint then leaves a breadcrumb instead of silently hiding the
-      // user's saved preference. No PII is logged.
       log.debug(
           "Could not load the default payout preference; defaulting the selector to PAYOUT", e);
     }
     model.addAttribute("defaultPayoutPreference", defaultPayoutPreference);
 
-    // Global blueprint-sharing opt-in, fetched from its own lightweight endpoint (same isolation
-    // from the central UserDto as the payout preference). Resilient: a backend hiccup leaves the
-    // toggle off rather than failing the whole page.
     boolean shareBlueprintsGlobally = false;
     try {
       Map<String, Object> sharing =
@@ -189,8 +152,6 @@ public class ProfileController {
             Boolean.parseBoolean(String.valueOf(sharing.get("shareBlueprintsGlobally")));
       }
     } catch (Exception e) {
-      // Backend unavailable — keep the off default. Logged at debug (not error) because this is an
-      // optional sub-fetch on a page that still renders fine. No PII is logged.
       log.debug(
           "Could not load the global blueprint-sharing flag; defaulting the toggle to off", e);
     }
@@ -198,31 +159,18 @@ public class ProfileController {
 
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
 
-    // The member's own Art. 17 erasure request, if they have one (REQ-SEC-061). Isolated like the
-    // two sub-fetches above, so a backend hiccup does not fail the whole profile page.
-    //
-    // A failure is reported as a failure, though, and that is a correction. It used to render as
-    // the no-request state, which means a DECLINED request could quietly disappear from the page
-    // -- and that card is the surface Art. 12(4) obliges the controller to carry the refusal
-    // reason on. The member could not tell the difference between "you never asked" and "we
-    // cannot show you what you asked". The flag also suppresses the raise action, so nobody
-    // submits a second request on top of one they cannot see.
     Map<String, Object> deletionRequest = null;
     boolean deletionRequestUnavailable = false;
     try {
       deletionRequest =
           backendApiClient.get("/api/v1/users/me/deletion-request", STRING_OBJECT_MAP_TYPE);
     } catch (Exception e) {
-      // Debug, not error: 204 (no request) is the normal case, and this path is not an outage.
       log.debug("Could not load the member's deletion request; the card says so", e);
       deletionRequestUnavailable = true;
     }
     model.addAttribute("deletionRequest", deletionRequest);
     model.addAttribute("deletionRequestUnavailable", deletionRequestUnavailable);
 
-    // Identity-tile initials for the read-only identity block (Variante A profile redesign).
-    // Derived from the already-resolved display name (token, then DB overlay) with a username
-    // fallback — no new avatar/upload feature, just the squared monogram the design calls for.
     model.addAttribute(
         "initials",
         computeInitials(
@@ -256,22 +204,17 @@ public class ProfileController {
   }
 
   /**
-   * Handles the description + display-name update form post.
+   * Handles the description and display-name form post.
    *
-   * <p>Validation errors render the profile view inline (no redirect) so the {@link BindingResult}
-   * stays request-scoped and never serializes through a Redis FlashMap (see {@code
-   * RedisSessionConfig}). A 409 with problem type {@code concurrency-conflict} surfaces as a
-   * dedicated optimistic-lock toast so the user knows to refresh and retry; any other failure lands
-   * as a generic update-failed toast. {@code null} form fields are sent as the empty string — the
-   * backend's {@link de.greluc.krt.profit.basetool.backend.config.NormalizedStringDeserializer}
-   * maps that back to a blank, which is the intended "clear this field" semantics.
+   * <p>Validation errors re-render inline; a {@code concurrency-conflict} 409 shows the
+   * optimistic-lock toast. {@code null} fields are sent as empty strings, which clears them.
    *
    * @param form validated form payload
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used when re-rendering inline
+   * @param model model used when re-rendering inline
    * @param principal authenticated OIDC user
    * @param redirectAttributes flash attributes carrier for the result toast
-   * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
+   * @return the inline {@code profile} view on validation failure, otherwise a redirect to {@code
    *     /profile}
    */
   @NotNull
@@ -283,8 +226,6 @@ public class ProfileController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render the profile view directly; the BindingResult stays request-scoped so it
-      // never goes through a Redis-serialised FlashMap (see RedisSessionConfig).
       return profile(model, principal);
     }
     try {
@@ -313,25 +254,16 @@ public class ProfileController {
   }
 
   /**
-   * AJAX variant of {@link #updateDescription}: performs the same update but answers with JSON
-   * instead of a redirect, so the profile page saves in place (epic #571, REQ-FE-001). It is
-   * selected over the form handler only for the {@code krtFetch.write} call, which sends {@code
-   * X-Requested-With: XMLHttpRequest} with a JSON body; a script-disabled browser still posts the
-   * HTML form and lands on {@link #updateDescription}, so the redirect path stays the no-JS
-   * fallback.
+   * AJAX variant of {@link #updateDescription} that answers with JSON (REQ-FE-001).
    *
-   * <p>On success the user row's bumped {@code version} is read back from {@code /me} and returned
-   * so the client can write it into every {@code version} field on the page — the description form
-   * and the payout-preference form share one row version, so without this the next save would 409.
-   * A backend 409 with problem type {@code concurrency-conflict} is mapped to an {@code
-   * OPTIMISTIC_LOCK}-coded 409 so {@code krtFetch} shows the reload-confirm; validation errors map
-   * to 400 and any other failure to a 5xx, each carrying a localized {@code detail}.
+   * <p>Returns the user row's new {@code version}, shared by all profile forms. A backend conflict
+   * maps to an {@code OPTIMISTIC_LOCK} 409, validation errors to 400.
    *
-   * @param form validated JSON payload (description, displayName, version)
-   * @param bindingResult validation-errors carrier for the bound JSON body
+   * @param form validated JSON payload
+   * @param bindingResult validation errors of the JSON body
    * @param principal authenticated OIDC user
-   * @return 200 with {@code {version, description, displayName}} on success; otherwise a 4xx/5xx
-   *     body carrying a localized {@code detail} (plus a {@code code} for the optimistic-lock case)
+   * @return 200 with {@code {version, description, displayName}}, otherwise an error body with a
+   *     localized {@code detail}
    */
   @PostMapping(
       value = "/profile/description",
@@ -374,19 +306,15 @@ public class ProfileController {
   }
 
   /**
-   * Handles the default-payout-preference selector post. Kept as a separate form (and backend
-   * endpoint) from the description update so the central {@code UserDto} contract stays untouched;
-   * both forms echo the same user-row {@code version}, so the post-redirect-GET refresh after
-   * either save re-renders the other with the bumped version (no stale-version 409 on the next
-   * click). A 409 with problem type {@code concurrency-conflict} surfaces as the optimistic-lock
-   * toast; any other failure as the generic update-failed toast.
+   * Handles the default-payout-preference form post; a {@code concurrency-conflict} 409 shows the
+   * optimistic-lock toast.
    *
-   * @param form validated selector payload (preference + version)
+   * @param form validated selector payload
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used when re-rendering inline
+   * @param model model used when re-rendering inline
    * @param principal authenticated OIDC user
    * @param redirectAttributes flash attributes carrier for the result toast
-   * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
+   * @return the inline {@code profile} view on validation failure, otherwise a redirect to {@code
    *     /profile}
    */
   @NotNull
@@ -398,7 +326,6 @@ public class ProfileController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render inline so the BindingResult stays request-scoped (never a Redis FlashMap).
       return profile(model, principal);
     }
     try {
@@ -430,24 +357,16 @@ public class ProfileController {
   }
 
   /**
-   * AJAX variant of {@link #updatePayoutPreference}: performs the same update but answers with JSON
-   * instead of a redirect, so the profile page saves the payout preference in place (epic #571,
-   * REQ-FE-001). Selected over the form handler only for the {@code krtFetch.write} call (which
-   * sends {@code X-Requested-With: XMLHttpRequest} with a JSON body); a script-disabled browser
-   * still posts the HTML form and lands on {@link #updatePayoutPreference}, so the redirect path
-   * stays the no-JS fallback.
+   * AJAX variant of {@link #updatePayoutPreference} that answers with JSON (REQ-FE-001).
    *
-   * <p>On success the user row's bumped {@code version} is read back from {@code /me} and returned
-   * so the client can write it into every {@code version} field on the page — the description form
-   * and the payout-preference form share one row version, so without this the next save would 409.
-   * A backend 409 with problem type {@code concurrency-conflict} maps to an {@code OPTIMISTIC_LOCK}
-   * 409 so {@code krtFetch} shows the reload-confirm; validation errors map to 400.
+   * <p>Returns the user row's new {@code version}. A backend conflict maps to an {@code
+   * OPTIMISTIC_LOCK} 409, validation errors to 400.
    *
-   * @param form validated JSON payload (defaultPayoutPreference, version)
-   * @param bindingResult validation-errors carrier for the bound JSON body
+   * @param form validated JSON payload
+   * @param bindingResult validation errors of the JSON body
    * @param principal authenticated OIDC user
-   * @return 200 with {@code {version, defaultPayoutPreference}} on success; otherwise a 4xx/5xx
-   *     body carrying a localized {@code detail} (plus a {@code code} for the optimistic-lock case)
+   * @return 200 with {@code {version, defaultPayoutPreference}}, otherwise an error body with a
+   *     localized {@code detail}
    */
   @PostMapping(
       value = "/profile/payout-preference",
@@ -490,19 +409,15 @@ public class ProfileController {
   }
 
   /**
-   * Handles the global blueprint-sharing toggle post (no-JS fallback). Kept as a separate form (and
-   * backend endpoint) from the description update so the central {@code UserDto} contract stays
-   * untouched; all profile forms echo the same user-row {@code version}, so the post-redirect-GET
-   * refresh re-renders the others with the bumped version. A 409 with problem type {@code
-   * concurrency-conflict} surfaces as the optimistic-lock toast; any other failure as the generic
-   * update-failed toast.
+   * Handles the global blueprint-sharing toggle form post; a {@code concurrency-conflict} 409 shows
+   * the optimistic-lock toast.
    *
-   * @param form validated toggle payload (flag + version)
+   * @param form validated toggle payload
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used when re-rendering inline
+   * @param model model used when re-rendering inline
    * @param principal authenticated OIDC user
    * @param redirectAttributes flash attributes carrier for the result toast
-   * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
+   * @return the inline {@code profile} view on validation failure, otherwise a redirect to {@code
    *     /profile}
    */
   @NotNull
@@ -514,7 +429,6 @@ public class ProfileController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render inline so the BindingResult stays request-scoped (never a Redis FlashMap).
       return profile(model, principal);
     }
     try {
@@ -544,22 +458,16 @@ public class ProfileController {
   }
 
   /**
-   * AJAX variant of {@link #updateBlueprintSharing}: same update, JSON response, in-place save
-   * (epic #571, REQ-FE-001). Selected over the form handler only for the {@code krtFetch.write}
-   * call (which sends {@code X-Requested-With: XMLHttpRequest} with a JSON body); a script-disabled
-   * browser still posts the HTML form and lands on {@link #updateBlueprintSharing}.
+   * AJAX variant of {@link #updateBlueprintSharing} that answers with JSON (REQ-FE-001).
    *
-   * <p>On success the user row's bumped {@code version} is read back from {@code /me} and returned
-   * so the client can sync it into every {@code version} field on the page (all profile forms share
-   * one row version). A backend 409 with problem type {@code concurrency-conflict} maps to an
-   * {@code OPTIMISTIC_LOCK} 409 so {@code krtFetch} shows the reload-confirm; validation errors map
-   * to 400.
+   * <p>Returns the user row's new {@code version}. A backend conflict maps to an {@code
+   * OPTIMISTIC_LOCK} 409, validation errors to 400.
    *
-   * @param form validated JSON payload (shareBlueprintsGlobally, version)
-   * @param bindingResult validation-errors carrier for the bound JSON body
+   * @param form validated JSON payload
+   * @param bindingResult validation errors of the JSON body
    * @param principal authenticated OIDC user
-   * @return 200 with {@code {version, shareBlueprintsGlobally}} on success; otherwise a 4xx/5xx
-   *     body carrying a localized {@code detail} (plus a {@code code} for the optimistic-lock case)
+   * @return 200 with {@code {version, shareBlueprintsGlobally}}, otherwise an error body with a
+   *     localized {@code detail}
    */
   @PostMapping(
       value = "/profile/blueprint-sharing",
@@ -602,14 +510,10 @@ public class ProfileController {
   }
 
   /**
-   * Reads the user row's current {@code version} back from {@code /api/v1/users/me} after a write
-   * so the client can sync the freshly bumped value into the page's {@code version} fields. Falls
-   * back to {@code priorVersion + 1} when the re-fetch is unavailable — the description update
-   * bumps the version by exactly one, so this still prevents a spurious 409 on the next save if the
-   * backend round-trip hiccups.
+   * Reads the user row's current {@code version} from {@code /api/v1/users/me} after a write.
    *
-   * @param priorVersion the version the client submitted (may be {@code null})
-   * @return the current user-row version, or a best-effort {@code priorVersion + 1}
+   * @param priorVersion the submitted version; may be {@code null}
+   * @return the current version, or {@code priorVersion + 1} when the lookup fails
    */
   private Long refreshedUserVersion(Long priorVersion) {
     try {
@@ -618,7 +522,6 @@ public class ProfileController {
         return MapPayloadValues.longOrZero(me.get("version"));
       }
     } catch (Exception ignored) {
-      // Re-fetch failed — fall through to the best-effort increment below.
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
   }
@@ -650,16 +553,15 @@ public class ProfileController {
   }
 
   /**
-   * Derives the 1–2 letter identity-tile monogram shown in the profile's identity block. The source
-   * is the user's display name, falling back to the username when no display name is set. A name
-   * with two or more whitespace-separated tokens yields the first letter of its first two tokens
-   * ({@code "John Doe" -> "JD"}); a single token yields its first two characters ({@code "Valk" ->
-   * "VA"}). The result is upper-cased via {@link Locale#ROOT}; an absent or blank source yields the
-   * empty string so the tile renders empty rather than throwing.
+   * Derives the 1–2 letter monogram of the profile's identity tile from the display name, else the
+   * username.
    *
-   * @param displayName the user's chosen display name; may be {@code null} or blank
-   * @param username the Keycloak username used as the fallback source; may be {@code null}
-   * @return the upper-cased initials (0–2 characters); never {@code null}
+   * <p>Two or more tokens yield their first letters ({@code "John Doe" -> "JD"}), one token its
+   * first two characters; the result is upper-cased.
+   *
+   * @param displayName the display name; may be {@code null} or blank
+   * @param username the fallback username; may be {@code null}
+   * @return the initials, 0–2 characters; empty when no source is set
    */
   private static String computeInitials(String displayName, String username) {
     String base =

@@ -26,40 +26,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The bounded set of live-sync topic <em>classes</em> — the single source of truth for the
- * tool-wide peer-sync relay (REQ-FE-015, ADR-0094).
+ * The bounded set of live-sync topic classes for the peer-sync relay (REQ-FE-015, ADR-0094).
  *
- * <p>A concrete topic string is either the bare {@link #prefix} (a global room, e.g. {@code
- * orders}) or {@code prefix:{uuid}} (a per-resource room, e.g. {@code mission:5f…}). Each class
- * fixes:
- *
- * <ul>
- *   <li>{@link #prefix} — the wire prefix that identifies the class;
- *   <li>{@link #scoped} — whether a concrete topic of this class carries a resource UUID (a
- *       resource room) or is the bare prefix (a global room);
- *   <li>{@link #allowedSections} — the whitelist of section keys the relay accepts and forwards for
- *       this class. Anything else in an inbound {@code changed} frame is dropped, so a client can
- *       never make peers re-fetch an arbitrary URL. This set MUST stay in lockstep with the page's
- *       JS seam map (the REQ-FE-010 three-mirror-points rule, build-enforced by {@code
- *       LiveSyncSectionMapParityTest});
- *   <li>{@link #presenceEnabled} — whether this class carries editor-presence (focus/blur/heartbeat
- *       dots). Only the mission surface does today;
- *   <li>{@link #metricLabel} — the bounded {@code topic_class} metric label value (REQ-OBS-011);
- *   <li>{@link #authProbePath} — the authenticated backend read that authorizes a {@code /ws/sync}
- *       <em>subscribe</em>: for a resource-scoped class the per-resource read (the {@code {id}}
- *       placeholder is replaced with the topic's resource UUID), for a global class authorized by a
- *       capability the capabilities endpoint whose {@link #capabilityField} is required. {@code
- *       null} when the socket's authentication alone authorizes the subscribe. See {@code
- *       LiveSyncSubscriptionAuthorizer};
- *   <li>{@link #capabilityField} — for a global class authorized by a capability, the boolean flag
- *       of the {@link #authProbePath} response that must be {@code true} (e.g. {@code
- *       canViewJobOrders} for the {@code orders} queue); {@code null} otherwise.
- * </ul>
- *
- * <p>Note that {@code bank} and {@code bank:{accountId}} deliberately share the {@link #prefix}
- * {@code bank}: the bare prefix resolves to {@link #BANK_STAFF} (the staff-wide room) and the
- * prefixed form to {@link #BANK_ACCOUNT} (a per-account room). {@link LiveSyncTopic#parse(String)}
- * disambiguates them by the presence of the id segment.
+ * <p>Each class fixes its wire {@link #prefix}, whether it is {@link #scoped}, the {@link
+ * #allowedSections} whitelist (kept in lockstep with the page's JS seam map, REQ-FE-010), whether
+ * {@link #presenceEnabled}, its {@link #metricLabel}, and how a subscribe is authorized ({@link
+ * #authProbePath}, {@link #capabilityField}).
  */
 @RequiredArgsConstructor
 public enum LiveSyncTopicClass {
@@ -83,14 +55,9 @@ public enum LiveSyncTopicClass {
       null),
 
   /**
-   * Per-operation room: the operation detail page (#1115). No editor-presence dots; a subscribe is
-   * authorized by the same authenticated {@code GET /api/v1/operations/{id}} the page performs.
-   *
-   * <p>Four sections: {@code overview} (core save) and {@code payout} (paid-out toggle) are
-   * broadcast from the operation surface itself; {@code missions} (the embedded child-missions
-   * table) and {@code finance} (the roll-up) are cross-published from the <em>mission</em> surface
-   * — a mission core/finance edit maps {@code overview → missions} / {@code finance → finance} onto
-   * this room (#1241), so an operation viewer refreshes them in place without a reload.
+   * Per-operation room for the operation detail page, authorized by {@code GET
+   * /api/v1/operations/{id}}; sections {@code overview}, {@code payout}, {@code missions} and
+   * {@code finance}.
    */
   OPERATION(
       "operation",
@@ -102,14 +69,8 @@ public enum LiveSyncTopicClass {
       null),
 
   /**
-   * Per-order room: the job-order detail page (#1102). No editor-presence dots; a subscribe is
-   * authorized by the same authenticated {@code GET /api/v1/orders/{id}} the page performs — a
-   * requesting owner who reaches the order through the requester escape (REQ-ORDERS-023) gets a
-   * redacted 2xx and is allowed, while a foreign order answers 403/404 and is denied. Distinct from
-   * the {@link #ORDERS_QUEUE} global room despite the shared {@code order}/{@code orders} wire
-   * stem: {@link LiveSyncTopic#parse(String)} keys them apart by prefix and the id segment. Its
-   * {@code topic_class} metric label is {@code order_detail} (the queue's is {@code orders_queue})
-   * so the two never read as one accidental duplicate series on the ops dashboard.
+   * Per-order room for the job-order detail page, authorized by {@code GET /api/v1/orders/{id}};
+   * distinct from {@link #ORDERS_QUEUE}, with metric label {@code order_detail}.
    */
   ORDER(
       "order",
@@ -132,21 +93,9 @@ public enum LiveSyncTopicClass {
       null),
 
   /**
-   * Global job-order queue room: the {@code /orders} list (#1102). A subscribe is authorized by the
-   * caller's {@code canViewJobOrders} capability (a non-profit requester / guest who only sees
-   * their own orders is refused), so the {@link #authProbePath} is the capabilities endpoint and
-   * {@link #capabilityField} the boolean to require rather than a per-resource read. Its {@code
-   * topic_class} metric label is {@code orders_queue} (the per-order room's is {@code
-   * order_detail}) so the two never read as one accidental duplicate series on the ops dashboard.
-   *
-   * <p>Two sections, one per page that renders the queue's data: {@code queue} for the order list
-   * itself, and {@code demand} for the cross-order material-demand overview {@code
-   * /orders/material-demand} (REQ-ORDERS-034), which folds the same orders into per-org-unit
-   * material totals. They share this room rather than each opening their own because both are
-   * invalidated by exactly the same events — an order created, completed, rejected, or its linked
-   * stock changed — and both are gated on the same {@code canViewJobOrders} capability. Neither
-   * page carries the other's key, so the two seam maps <em>partition</em> this whitelist rather
-   * than each matching it (see {@code LiveSyncSectionMapParityTest}).
+   * Global job-order queue room, authorized by the {@code canViewJobOrders} capability; sections
+   * {@code queue} (the order list) and {@code demand} (the material-demand overview,
+   * REQ-ORDERS-034).
    */
   ORDERS_QUEUE(
       "orders",
@@ -158,20 +107,8 @@ public enum LiveSyncTopicClass {
       "canViewJobOrders"),
 
   /**
-   * Per-refinery-order room: the refinery-order detail page {@code /refinery-orders/{id}} (#1238).
-   * No editor-presence dots; a subscribe is authorized by the same authenticated {@code GET
-   * /api/v1/refinery-orders/{id}} the page performs, so a caller who may not read the order is
-   * denied.
-   *
-   * <p>Two sections: {@code order} (the main edit form — order-level fields, the goods editor and
-   * the status-gated action row) and {@code store} (the Einlagern dialog's form body, whose rows
-   * are derived from the order's output goods). A save changes both, which is why the store
-   * dialog's source data is a section of its own rather than part of the main seam.
-   *
-   * <p>The wire prefix is deliberately {@code refinery-order} rather than a bare {@code refinery},
-   * and the {@code topic_class} metric label {@code refinery_order}: it keeps the {@code refinery}
-   * stem free for a future global refinery-queue room without the two collapsing into one
-   * accidental duplicate series, the same separation {@link #ORDER} / {@link #ORDERS_QUEUE} carry.
+   * Per-refinery-order room for {@code /refinery-orders/{id}}, authorized by {@code GET
+   * /api/v1/refinery-orders/{id}}; sections {@code order} and {@code store}.
    */
   REFINERY_ORDER(
       "refinery-order",
@@ -183,14 +120,9 @@ public enum LiveSyncTopicClass {
       null),
 
   /**
-   * Per-account bank room: a Kartellbank account detail page — the staff {@code
-   * /bank/accounts/{id}} and the org-unit {@code /org-unit-bank/accounts/{id}} views (#556, #666).
-   * No editor-presence dots. A subscribe is authorized by a <b>dual</b> per-account read: first the
-   * staff read {@code GET /api/v1/bank/accounts/{id}}, and on an explicit 403/404 the org-unit read
-   * {@code GET /api/v1/org-units/bank/accounts/{id}} ({@link #fallbackProbePath}) — a member may
-   * see an account they own via the org-unit view even without bank-staff rights. The subscribe is
-   * denied only when <b>both</b> reads explicitly refuse; any transient failure fails open. Shares
-   * the {@code bank} prefix with {@link #BANK_STAFF} (disambiguated by the id segment).
+   * Per-account bank room for the staff and org-unit account detail pages; a subscribe is denied
+   * only when both the staff read and the org-unit {@link #fallbackProbePath} refuse. Shares the
+   * {@code bank} prefix with {@link #BANK_STAFF}.
    */
   BANK_ACCOUNT(
       "bank",
@@ -204,15 +136,9 @@ public enum LiveSyncTopicClass {
       null),
 
   /**
-   * Global bank-staff room: the staff dashboard grid, the confirmation queue, the management tab
-   * and the grants matrix ({@code /bank}, {@code /bank/requests}, {@code /bank/manage}, {@code
-   * /bank/grants}). No editor-presence dots. A subscribe is authorized by a <b>local</b> role check
-   * against the authorities captured at handshake — a caller holding {@code ROLE_BANK_EMPLOYEE} or
-   * {@code ROLE_BANK_MANAGEMENT} — with no backend call ({@link #requiredAnyRole}); a caller with
-   * neither is denied. The management-only {@code grants} section stays protected per-fragment (a
-   * bank employee without management is refused the grants fragment GET), so admitting either bank
-   * role to the room is safe. Shares the {@code bank} prefix with {@link #BANK_ACCOUNT} (the bare
-   * prefix, no id, resolves here).
+   * Global bank-staff room for {@code /bank}, {@code /bank/requests}, {@code /bank/manage} and
+   * {@code /bank/grants}, authorized locally by {@code ROLE_BANK_EMPLOYEE} or {@code
+   * ROLE_BANK_MANAGEMENT} ({@link #requiredAnyRole}).
    */
   BANK_STAFF(
       "bank",
@@ -226,12 +152,8 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.BANK_EMPLOYEE), Roles.authority(Roles.BANK_MANAGEMENT))),
 
   /**
-   * Global org-unit bank room: the org-unit officer/lead overview and account-detail settings
-   * ({@code /org-unit-bank}, {@code /org-unit-bank/accounts/{id}} — the settings region; the
-   * per-account balance/bookings/chart there ride the {@link #BANK_ACCOUNT} room). No
-   * editor-presence dots. A subscribe is authorized by a <b>local</b> member-or-above role check
-   * ({@link Roles#MEMBER_AUTHORITIES}) against the captured authorities — the same gate the {@code
-   * /org-unit-bank} page carries — with no backend call.
+   * Global org-unit bank room for the {@code /org-unit-bank} overview and account settings,
+   * authorized locally by a member-or-above role ({@link Roles#MEMBER_AUTHORITIES}).
    */
   ORGUNIT_BANK(
       "orgunit-bank",
@@ -245,66 +167,33 @@ public enum LiveSyncTopicClass {
       Roles.MEMBER_AUTHORITIES),
 
   /**
-   * Global Materialbörse board room: the material-exchange trade board (REQ-MARKET-010/018). A
-   * single global room carrying two opaque section keys — {@code board} for the offers (Angebote)
-   * and {@code requests} for the wanted-listings (Gesuche); every peer re-pulls its own {@code
-   * KRT_MEMBER}-gated board fragment for whichever section changed, so no board data crosses the
-   * socket. No editor-presence dots. A subscribe is authorized by the socket's authentication alone
-   * (no probe path, no capability, no role gate) — the same "authenticated member" bar the board
-   * page itself already carries.
+   * Global Materialbörse room (REQ-MARKET-010/018) with sections {@code board} and {@code
+   * requests}, authorized by the socket's authentication alone.
    */
   MATERIALBOARD(
       "materialboard", false, Set.of("board", "requests"), false, "materialboard", null, null),
 
   /**
-   * Global shared-Lager room for the squadron inventory (the shared {@code /inventory/all} view,
-   * REQ-FE-010 / REQ-INV-027, #1307). A single global room carrying one opaque {@code stock} key: a
-   * peer's allocation, book-out, transfer or delete-all change on the shared Lager tells the other
-   * viewers to re-pull their own filtered table fragment — no stock data crosses the socket. No
-   * editor-presence dots. A subscribe is authorized by the socket's authentication alone (no probe,
-   * no capability, no role gate), so a read-only viewer is refreshed too; every viewer re-fetches
-   * its own owner- and org-unit-scoped view, which makes a cross-squadron peer refresh a harmless
-   * no-op.
+   * Global shared-Lager room for {@code /inventory/all} (REQ-INV-027) with the {@code stock}
+   * section, authorized by the socket's authentication alone.
    */
   INVENTORY_ALL("inventory", false, Set.of("stock"), false, "inventory_all", null, null),
 
   /**
-   * Global mission-list room: the {@code /missions} overview (#1235). A single global room carrying
-   * one opaque {@code list} key — a peer's mission create, core edit (name / status / schedule) or
-   * delete tells the other viewers to re-pull their own filtered, paginated list fragment. Distinct
-   * from the per-mission {@link #MISSION} room despite the shared {@code mission}/{@code missions}
-   * wire stem: {@link LiveSyncTopic#parse(String)} matches the prefix exactly, so the two never
-   * collide (the {@code order}/{@code orders} precedent). Its {@code topic_class} metric label is
-   * {@code missions_list} (the detail room's is {@code mission}) so the two stay separate series.
-   *
-   * <p>No editor-presence dots. A subscribe is authorized by the socket's authentication alone: the
-   * list itself is {@code isAuthenticated()} and every viewer re-fetches its own org-unit-scoped,
-   * guest-redacted page, so a peer outside the acting user's scope simply re-renders the same rows.
+   * Global mission-list room for {@code /missions} with the {@code list} section, authorized by the
+   * socket's authentication alone; distinct from the per-mission {@link #MISSION} room.
    */
   MISSIONS_LIST("missions", false, Set.of("list"), false, "missions_list", null, null),
 
   /**
-   * Global refinery-order queue room: the {@code /refinery-orders} list (#1235). A single global
-   * room carrying one opaque {@code queue} key — a peer's order create, update, store ("Einlagern")
-   * or cancel tells the other viewers to re-pull their own status/onlyMine-filtered results
-   * fragment. No editor-presence dots. A subscribe is authorized by the socket's authentication
-   * alone, matching the list's own {@code isAuthenticated()} gate; the {@code onlyMine} filter is
-   * applied per viewer on its own re-fetch, so a peer's refresh can never surface another user's
-   * narrowing.
+   * Global refinery-order queue room for {@code /refinery-orders} with the {@code queue} section,
+   * authorized by the socket's authentication alone.
    */
   REFINERY("refinery", false, Set.of("queue"), false, "refinery_queue", null, null),
 
   /**
-   * Global member-roster room: the {@code /members} Mitgliederverwaltung list (#1235) — the surface
-   * the issue calls "Rollen", where a member's roles and Staffel memberships are assigned. A single
-   * global room carrying one opaque {@code roster} key — a peer's member edit, delete or manual
-   * Keycloak sync tells the other admins to re-pull their own filtered, paginated table fragment.
-   * No editor-presence dots.
-   *
-   * <p>A subscribe is authorized by a <b>local</b> {@code ROLE_ADMIN} check against the authorities
-   * captured at handshake ({@link #requiredAnyRole}), with no backend call — the same gate the
-   * class-level {@code @PreAuthorize} on the page carries, so the room's subscriber set is exactly
-   * the population that can act on it.
+   * Global member-roster room for {@code /members} with the {@code roster} section, authorized
+   * locally by {@code ROLE_ADMIN} ({@link #requiredAnyRole}).
    */
   MEMBERS(
       "members",
@@ -318,21 +207,9 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.ADMIN))),
 
   /**
-   * Global org-structure room: the admin Organisationsstruktur editor ({@code
-   * /admin/org-structure}) and the member-visible Organigramm ({@code /org-chart}) — #1235. Three
-   * opaque section keys: {@code units} (the admin editor's unit + parent-edge table), {@code forms}
-   * (its create forms, whose Bereich/Organisationsleitung pickers go stale when a peer adds one)
-   * and {@code chart} (the org-chart tree). The two surfaces share one room because they render the
-   * same hierarchy: an admin's parent-edge change must refresh a member's open Organigramm, and an
-   * org-chart position edit must refresh the admin editor.
-   *
-   * <p>No editor-presence dots. A subscribe is authorized by the socket's authentication alone
-   * rather than an ADMIN gate — the org-chart is deliberately member-visible ({@code
-   * OrgChartPageController} carries no class-level ADMIN check) and a member must receive the
-   * {@code chart} key. The admin-only sections stay protected per-fragment (a non-admin's {@code
-   * /admin/org-structure} fragment GET is refused, and their page has no such container anyway, so
-   * the receiver skips those keys), which is the same per-fragment protection {@link #BANK_STAFF}
-   * relies on for its management-only {@code grants} section.
+   * Global org-structure room shared by {@code /admin/org-structure} and {@code /org-chart}, with
+   * sections {@code units}, {@code forms} and {@code chart}; authorized by the socket's
+   * authentication alone, the admin sections staying protected per fragment.
    */
   ORG_STRUCTURE(
       "org-structure",
@@ -391,17 +268,15 @@ public enum LiveSyncTopicClass {
    * Defines one topic class.
    *
    * @param prefix the wire prefix identifying the class
-   * @param scoped {@code true} if a concrete topic carries a resource UUID, {@code false} for a
-   *     bare-prefix global room
-   * @param allowedSections the section-key whitelist the relay forwards for this class
+   * @param scoped {@code true} if a concrete topic carries a resource UUID
+   * @param allowedSections the section-key whitelist the relay forwards
    * @param presenceEnabled whether this class carries editor-presence dots
    * @param metricLabel the bounded {@code topic_class} metric label value
-   * @param authProbePath the authenticated backend read that authorizes a subscribe — for a scoped
-   *     class a per-resource read with an {@code {id}} placeholder, for a global class the
-   *     capabilities endpoint whose {@link #capabilityField} is checked — or {@code null} when the
-   *     socket authentication alone authorizes the subscribe
-   * @param capabilityField for a global class authorized by a capability, the boolean field of the
-   *     {@link #authProbePath} response that must be {@code true}; {@code null} otherwise
+   * @param authProbePath the backend read that authorizes a subscribe (per-resource with an {@code
+   *     {id}} placeholder, or the capabilities endpoint), or {@code null} when authentication alone
+   *     suffices
+   * @param capabilityField the capability flag of the {@link #authProbePath} response that must be
+   *     {@code true}, or {@code null}
    */
   LiveSyncTopicClass(
       @NotNull String prefix,
@@ -497,12 +372,10 @@ public enum LiveSyncTopicClass {
   }
 
   /**
-   * Returns a second per-resource authorization read tried only when the {@link #authProbePath}
-   * explicitly refuses (403/404) — the subscribe is denied only when both reads refuse. Used by the
-   * {@link #BANK_ACCOUNT} room so an org-unit owner who may see the account through the org-unit
-   * view but not as bank staff is still allowed.
+   * Returns a second authorization read tried only when {@link #authProbePath} refuses with
+   * 403/404; used by {@link #BANK_ACCOUNT}.
    *
-   * @return the fallback probe path template, or {@code null} when the class has no fallback read
+   * @return the fallback probe path template, or {@code null} when the class has none
    */
   @Nullable
   public String fallbackProbePath() {
@@ -510,12 +383,10 @@ public enum LiveSyncTopicClass {
   }
 
   /**
-   * Returns the authorities of which the caller must hold at least one for a <b>local</b>,
-   * backend-free subscribe authorization (matched against the authorities captured at handshake),
-   * or {@code null} when the class is not locally role-gated. Used by the global {@link
-   * #BANK_STAFF} and {@link #ORGUNIT_BANK} rooms.
+   * Returns the authorities of which the caller must hold one for a local, backend-free subscribe
+   * authorization.
    *
-   * @return the any-of required authority set, or {@code null}
+   * @return the any-of required authority set, or {@code null} when the class is not role-gated
    */
   @Nullable
   public Set<String> requiredAnyRole() {

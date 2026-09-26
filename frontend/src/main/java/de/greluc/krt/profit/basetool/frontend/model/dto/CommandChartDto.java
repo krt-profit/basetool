@@ -23,28 +23,21 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of one Kommando(gruppe) within a Staffel. The Kommando is its own row, so {@link
- * #positionId} / {@link #version} are the handle the inline editor uses to rename it, remove it, or
- * assign / reassign its Kommandoleiter. The Kommandoleiter lives on that row and is carried inline
- * ({@link #leaderUserId} / {@link #leaderUserName} for an account, {@link #leaderDisplayName} for a
- * free-text name, all {@code null} while the seat is vacant).
+ * Frontend mirror of one Kommando(gruppe) within a Staffel, with its Kommandoleiter carried inline
+ * as an account or a free-text name (all {@code null} while vacant).
  *
  * @param positionId id of the Kommando row; handle for rename / remove / assign-lead / add-child.
- * @param name the Kommando's display name, or {@code null} when unnamed (template shows a
- *     fallback).
+ * @param name the Kommando's display name, or {@code null} when unnamed.
  * @param version optimistic-lock version of the Kommando row, echoed back on rename / assign-lead.
  * @param sortIndex stable display order among the Staffel's Kommandos.
- * @param kommandoGroupId id of the {@code kommando_group} this Kommando mirrors, or {@code null}
- *     for a legacy chart-only Kommando. When non-{@code null} the template renders the Kommando
- *     read-only (managed under Organisation -&gt; Leitung, epic #800 / REQ-ROLE-006): no rename,
- *     remove, leader-assign or add-child controls.
+ * @param kommandoGroupId id of the mirrored {@code kommando_group}, or {@code null}; when set, the
+ *     Kommando renders read-only (REQ-ROLE-006).
  * @param leaderUserId id of the Kommandoleiter account, or {@code null} for a free-text leader or a
  *     vacant seat.
  * @param leaderUserName the Kommandoleiter account's effective display name, or {@code null} for a
  *     free-text leader or a vacant seat.
- * @param leaderDisplayName the free-text Kommandoleiter name for a member without a Basetool
- *     account, or {@code null} when the leader is an account or the seat is vacant; mutually
- *     exclusive with {@code leaderUserId}.
+ * @param leaderDisplayName the free-text Kommandoleiter name, or {@code null}; mutually exclusive
+ *     with {@code leaderUserId}.
  * @param deputy the Stv. Kommandoleiter node, or {@code null} when vacant.
  * @param ensigns the Ensigns reporting into this Kommando; never {@code null}, possibly empty.
  */

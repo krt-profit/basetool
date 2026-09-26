@@ -46,20 +46,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression test for the "create-account modal's Org-Einheit picker renders <code>null</code> for
- * every option" bug. The {@code /api/v1/org-units/active} endpoint returns the {@link
- * OrgUnitMembershipOptionDto} wire shape ({@code orgUnitId} / {@code orgUnitName} / {@code
- * orgUnitShorthand}); the page controller previously deserialized it into the unrelated {@code
- * OrgUnitReferenceDto} ({@code id} / {@code name} / {@code shorthand}), so Jackson left every label
- * field null and the dropdown printed {@code null} for each org unit. This test pins that an
- * org-unit option reaches the rendered create-account modal with its name (and shorthand) as the
- * visible label and its id as the option value.
+ * Tests that the create-account modal's org-unit picker, fed by the {@link
+ * OrgUnitMembershipOptionDto} wire shape, renders each org unit's name and shorthand as label and
+ * its id as value.
  */
 @SpringBootTest
 class BankManagePageControllerOrgUnitPickerMvcTest {
 
-  // Epic #692 Phase 6 (REQ-ORG-019): the bank create form sources its picker from the all-kinds
-  // endpoint (Staffel + SK + Bereich + OL), so it can link AREA→Bereich and CARTEL→OL.
   private static final String ACTIVE_URI = "/api/v1/org-units/active-all-kinds";
 
   @Autowired private WebApplicationContext context;
@@ -83,8 +76,6 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
     OrgUnitMembershipOptionDto staffel =
         new OrgUnitMembershipOptionDto(orgUnitId, "Staffel IRIDIUM", "IRI", "SQUADRON", true);
 
-    // The accounts / holders / users fetches may return null; the controller defaults them to empty
-    // lists. Only the org-unit catalog needs a concrete option to assert the picker label.
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(List.of(staffel));
@@ -93,9 +84,7 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
         .perform(get("/bank/manage"))
         .andExpect(status().isOk())
         .andExpect(view().name("bank-manage"))
-        // The visible label is the org-unit name plus its shorthand — never the literal "null".
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM (IRI)")))
-        // The option value is the org-unit id, so a submitted form actually carries an orgUnitId.
         .andExpect(content().string(Matchers.containsString("value=\"" + orgUnitId + "\"")))
         .andExpect(content().string(Matchers.not(Matchers.containsString(">null</option>"))));
   }

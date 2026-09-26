@@ -39,14 +39,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time enforcement of REQ-UI-024 / ADR-0212: every stylesheet declares the one layer order
- * and puts every rule inside a layer it is allowed to use.
- *
- * <p>A rule outside any layer is not a harmless omission: unlayered styles beat every layer, so one
- * forgotten wrapper would silently put a whole file above the state classes and the migrated inline
- * styles — the load-order-and-specificity contest the layers exist to end, back in a form nobody
- * would recognise. A file that restates the order differently would reorder the layers for every
- * page that loads it first.
+ * Build-time check that every stylesheet declares the one cascade layer order and places every rule
+ * inside a layer it may use (REQ-UI-024, ADR-0212), since unlayered rules beat every layer.
  */
 class CascadeLayerOrderTest {
 
@@ -103,12 +97,8 @@ class CascadeLayerOrderTest {
   }
 
   /**
-   * Asserts that the two runtime state classes are declared in the {@code utilities} layer and
-   * nowhere else, so they beat every component, page and migrated rule by layer alone.
-   *
-   * <p>Before the layers, {@code .krtm-hidden} at (0,1,0) lost to any (0,2,0) rule that set {@code
-   * display}, and pages compensated with co-located {@code .x.krtm-hidden} re-assertions — which
-   * only worked where someone remembered to write one.
+   * Asserts that the two runtime state classes are declared only in the {@code utilities} layer, so
+   * they beat every component, page and migrated rule by layer alone.
    *
    * @throws IOException if a stylesheet cannot be read
    * @throws URISyntaxException if the CSS classpath root cannot be resolved

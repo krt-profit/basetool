@@ -34,60 +34,18 @@ import tools.jackson.databind.ser.std.StdSerializer;
 import tools.jackson.dataformat.cbor.CBORMapper;
 
 /**
- * Makes CBOR encode the same document JSON does (REQ-API-011, ADR-0161 §8.5).
+ * Makes CBOR responses encode the same document as JSON (REQ-API-011, ADR-0161).
  *
- * <p><strong>Without this class the second encoding is a second contract</strong>, and the
- * difference is invisible until it reaches a screen. Jackson's {@code UUIDSerializer} asks the
- * generator {@code canWriteBinaryNatively()} and writes the sixteen raw bytes when the answer is
- * yes. JSON answers no and emits {@code "00000000-0000-0000-0000-000000000001"}; CBOR answers yes
- * and emits binary, which anything that then treats the value as text renders as {@code
- * AAAAAAAAAAAAAAAAAAAAAQ==}. That is base64 of those bytes, and it is what appeared in a {@code
- * <select>} value, in picker option ids and in table row keys — failing five end-to-end write flows
- * on all three browsers while every unit test stayed green.
- *
- * <p>209 properties of the frozen external contract are {@code type: string, format: uuid}
- * (REQ-API-009). A representation that silently stops being a string on one encoding is exactly the
- * in-place shape change that requirement exists to forbid, so the fix belongs at the encoder rather
- * than at each reader.
- *
- * <p><b>Only the UUID is overridden.</b> The other divergence the fidelity test found — {@code
- * BigDecimal} arriving as a decimal node in CBOR where JSON's reader had already widened it to a
- * double — is left alone deliberately: it is CBOR being <em>more</em> faithful, not less, and every
- * consumer binds it to a declared type rather than reading the tree. It is recorded in {@code
- * CborJsonFidelityTest} rather than papered over, so a future reader meets it as a known difference
- * instead of a surprise.
- *
- * <h2>And the converter is write-only</h2>
- *
- * <p>ADR-0161 &sect;8.5 and REQ-API-011 both say only the <em>response</em> direction negotiates.
- * Nothing enforced that: {@code JacksonCborHttpMessageConverter} inherits {@code canRead}, so
- * adding the dependency also made the backend <b>accept</b> {@code Content-Type: application/cbor}
- * request bodies, on 229 of 233 write mappings, since only four declare {@code consumes}.
- *
- * <p>That is not a second encoding of one contract, it is a second <em>parser</em>, and it does not
- * carry the project's read-side rules. {@code JacksonConfig} installs those through a {@code
- * JsonMapperBuilderCustomizer}, which by Boot's contract reaches the {@code JsonMapper} alone; a
- * {@code CBORMapper} never sees it, and the module is registered inline rather than service-loaded
- * so {@code findModules} does not find it either. A body posted as CBOR would therefore skip {@code
- * NormalizedStringDeserializer} entirely, with no trim, no NFC normalisation and no {@code
- * StringNormalization.MAX_FREE_TEXT_LENGTH} rejection, so an over-long free-text field reaches the
- * database as a column overflow instead of a validation error and the stored text never compares
- * equal to the same value posted as JSON. {@code FAIL_ON_NULL_FOR_PRIMITIVES = false} is missing
- * too, so an omitted boolean answers 400 instead of defaulting.
- *
- * <p>Refusing to read is the fix that matches what the requirement already claims, and it removes
- * the whole class rather than re-deriving each rule for a second mapper. A caller that posts CBOR
- * gets {@code 415}, which is the honest answer.
+ * <p>UUIDs are written as strings instead of raw binary. The CBOR converter is write-only: a
+ * request body sent as {@code application/cbor} is answered with {@code 415}, since only JSON
+ * reading applies the project's input normalization.
  */
 @Configuration
 public class CborFidelityConfig implements WebMvcConfigurer {
 
   /**
-   * Replaces the auto-detected CBOR converter with one whose mapper writes UUIDs as strings.
-   *
-   * <p>Registered through the builder rather than by post-processing a converter list, because the
-   * builder is where Spring 7 expects a format's converter to be chosen and it keeps the
-   * auto-detected JSON, Smile and XML converters exactly as they were.
+   * Replaces the auto-detected CBOR converter with a write-only one whose mapper writes UUIDs as
+   * strings, leaving the other converters unchanged.
    *
    * @param builder the server-side converter builder Spring hands every configurer.
    */
@@ -108,12 +66,8 @@ public class CborFidelityConfig implements WebMvcConfigurer {
   }
 
   /**
-   * The CBOR converter, with reading removed.
-   *
-   * <p>{@code canRead} is the single point: the {@code Class} overload delegates to the {@code
-   * ResolvableType} one, so refusing there refuses every path. Spring then answers a {@code
-   * Content-Type: application/cbor} body with {@code 415 Unsupported Media Type} instead of routing
-   * it into a mapper that does not carry the project's read-side rules.
+   * The CBOR converter with reading disabled, so a CBOR request body yields {@code 415 Unsupported
+   * Media Type}.
    */
   private static final class WriteOnlyCborConverter extends JacksonCborHttpMessageConverter {
 

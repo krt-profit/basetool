@@ -1,10 +1,3 @@
-# Test profile. Lives in `src/test/resources` so it is on the test classpath only and never ships in
-# the production jar (audit item SEC-17; it sat in `src/main/resources` until 2026-09-23).
-#
-# The server connector serves HTTPS in dev/prod (REQ-INGEST-001), but tests run with the MOCK web
-# environment (IngestControllerTest uses MockMvc) and ship no keystore. Disabling SSL here keeps the
-# test context off the keystore entirely and resolves the `key-store-password` placeholder that would
-# otherwise be unresolved under the test profile (mirrors backend application-test.yml).
 server:
   ssl:
     enabled: false
@@ -15,8 +8,6 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Unreachable placeholder issuer; the JWKS fetch is lazy, and slice tests supply their own
-          # JwtDecoder / mock authentication so no network call is made.
           issuer-uri: http://keycloak.example.com/realms/test
 
 app:
@@ -26,11 +17,7 @@ app:
     handoff-ttl: PT1M
     max-payload-bytes: 1048576
   rate-limit:
-    # Disabled by default for tests; the rate-limit test re-enables it explicitly.
     enabled: false
 
-# Alphabetical key order in the generated OpenAPI document (REQ-API-007, audit item BLD-CI-09), so
-# the committed `api/openapi.json` that OpenApiGeneratorTest writes is byte-stable and CI can fail a
-# pull request whose document is stale (`git diff --exit-code` in ci.yml).
 springdoc:
   writer-with-order-by-keys: true

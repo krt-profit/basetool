@@ -1,33 +1,9 @@
 #!/usr/bin/env python3
 """Fail when the edge probe expects a refusal on a path the vhost allow-list admits.
 
-The nightly probe and the vhost allow-list describe the same surface from two
-sides, and nothing compared them. Five times an admission was written into the
-allow-list (then a block in the API vhost runbook, since 2026-09-12
-``docker/edge/include/api-allowlist.conf``) while the probe kept its old refusal row,
-and every time production was the first to say so -- as a red cron run that reads
-like edge drift when it is really a stale table:
-
-* ``POST /api/v1/bank/deposits`` (phase O)
-* ``POST /api/v1/hangar/import/fleetview`` (phase X)
-* ``POST …/participants/{id}/check-in/slim`` (2026-09-08)
-* ``GET /api/v1/refinery-orders/all`` (phase Y, 2026-09-09)
-* ``GET /api/v1/materials/{id}`` (REQ-SEC-052 made it authenticated, 2026-09-09)
-
-The rule this asserts is the one all five broke, and it needs no knowledge of
-what a path *should* answer:
-
-    a probe row expecting 404 must name a path the allow-list does NOT admit.
-
-404 is the vhost's own refusal. Once a path is admitted the request reaches the
-backend, which answers 401/403/405 -- never the edge's 404. So an admitted path
-with a 404 row is a contradiction between two files in this repository, provable
-here, with no access to production.
-
-The reverse direction is deliberately NOT asserted: a row expecting 401 on an
-unadmitted path would be wrong too, but distinguishing "unadmitted" from "this
-checker failed to model an nginx regex" is the difference between a guard and a
-false blocker, and a false blocker on a nightly gate is worse than the drift.
+Compares ``edge-deny-probe.yml`` with ``docker/edge/include/api-allowlist.conf``: a probe
+row expecting 404 (the vhost's own refusal) must name a path the allow-list does not
+admit. The reverse direction is not checked.
 
 Exit codes:
   0  -> every 404 row names a path the allow-list refuses.
@@ -46,26 +22,19 @@ REPO = Path(__file__).resolve().parents[2]
 PROBE = REPO / ".github" / "workflows" / "edge-deny-probe.yml"
 ALLOW_LIST = REPO / "docker" / "edge" / "include" / "api-allowlist.conf"
 
-# The probe's stand-in for "an id that cannot exist".
 NIL = "00000000-0000-4000-8000-00000000cafe"
 
-# `probe VERB PATH CODE`, where PATH may be quoted and may carry $nil.
 PROBE_LINE = re.compile(
     r"""^\s*probe\s+(?P<verb>[A-Z]+)\s+(?P<path>"[^"]+"|'[^']+'|\S+)\s+(?P<code>\d{3})\s*$""",
     re.MULTILINE,
 )
 
-# The two shapes the allow-list uses to admit a path.
 LITERAL_RULE = re.compile(r'if\s*\(\s*\$uri\s*=\s*"([^"]+)"\s*\)\s*\{\s*set\s+\$krt_api_allowed\s+1;')
 REGEX_RULE = re.compile(r'if\s*\(\s*\$uri\s*~\s*"([^"]+)"\s*\)\s*\{\s*set\s+\$krt_api_allowed\s+1;')
 
 
 def probe_rows() -> list[tuple[str, str, int]]:
-    """Read every ``probe`` assertion out of the workflow.
-
-    Parses the workflow text rather than running the shell, so the check needs no
-    network, no container and no production access -- the whole point being that
-    this contradiction is provable from the repository alone.
+    """Parse every ``probe`` assertion out of the workflow text.
 
     :return: one ``(verb, path, expected_code)`` per assertion, ``$nil`` expanded.
     :raises OSError: if the workflow cannot be read.
@@ -81,14 +50,11 @@ def probe_rows() -> list[tuple[str, str, int]]:
 def admitting_rules() -> tuple[list[str], list[re.Pattern[str]]]:
     """Read the allow-list's admitting rules out of the edge's nginx include.
 
-    Only rules that set ``$krt_api_allowed 1`` count: the block also carries
-    read-only-family and rate-limit rules that admit nothing.
+    Only rules that set ``$krt_api_allowed 1`` count.
 
     :return: the literal paths, and the compiled regexes, that admit a request.
     :raises OSError: if the allow-list cannot be read.
-    :raises re.error: if a rule's regex is not valid Python ``re`` syntax, which
-        means this checker can no longer model the block and must be fixed rather
-        than trusted.
+    :raises re.error: if a rule's regex is not valid Python ``re`` syntax.
     """
     text = ALLOW_LIST.read_text(encoding="utf-8")
     literals = LITERAL_RULE.findall(text)

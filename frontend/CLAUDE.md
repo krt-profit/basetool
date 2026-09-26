@@ -56,9 +56,10 @@ against an empty design system and never treat its absence as "no design system 
 A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
 `TemplateCommentHygieneTest`):
 
-- **Comments are Thymeleaf parser-level comments** — `<!--/* … */-->` — never `<!-- … -->`, which is
-  sent with every response. Never put the star-slash pair inside one: it closes the block early and
-  renders the rest of the text into the page. Write `* /`.
+- **No comments.** A template carries no comment of any kind — the code base keeps no comments
+  besides Javadoc (ADR-0214); the reasoning goes into the commit message and the PR. A plain
+  `<!-- … -->` would also be sent with every response, which `TemplateCommentHygieneTest` fails.
+  The only `<!--/*/ … /*/-->` allowed is Thymeleaf's prototype-only markup, which is not a comment.
 - **Page CSS goes into `static/css/pages/<page>.css`**, linked with `<link rel="stylesheet">` where
   a `<style>` block would stand (in the `extraLinks` fragment for the head). No `<style>` element in
   a template. It is linted by `:frontend:lintCssInline` with the tiny template rule set, and
@@ -75,7 +76,7 @@ order decides, before specificity:
 - A page rule beats a design-system rule as an ordinary rule. Do not bump specificity
   (`main .x`, `div.x`, `.x.x`) and do not add `!important` for it.
 - A design-system declaration that has to beat page CSS goes into the `@layer page` block at the end
-  of `styles.css`, with a comment naming what it beats. Never into `utilities`, which would also beat
+  of `styles.css`. Never into `utilities`, which would also beat
   the page rules that out-specify it and every migrated inline class.
 - A migrated `krtm-*` class beats page and component rules, like the inline style it replaced. To
   restyle such an element, remove the migrated class from the markup; do not fight it.
@@ -116,10 +117,20 @@ for the user to see or click — a toast, a confirm, a download link — goes in
 </th:block>
 ```
 
-The optional parameters are `titleId` (a script retitles the dialog), `open` (server-rendered open
-state), `closeTrigger` (the ✕'s own handler; `''` when a script binds it by `closeClass`),
-`closeClass` and `closeId`. The wrapper's head comment documents each one. A condition or iteration
-goes on a `<th:block>` around the call. In a fragment file, name the body with its template
+The fragment declares no signature; a call names only the parameters it needs:
+
+| Parameter | Meaning |
+| --- | --- |
+| `modalId` | Required. The `<dialog>` id, also the close control's `data-modal-id`. |
+| `titleKey` | Required. i18n key of the `<h2>` title. |
+| `body` | Required. Fragment expression for everything below the head: `.krt-modal-body` and `.krt-modal-foot`, or a `<form>` wrapping both. |
+| `variant` | Extra class on `.krt-modal`: `krt-modal--wide`, `--xwide`, `--danger`, or a page's own frame class. |
+| `titleId` | Id of the `<h2>` for a script that retitles the dialog; the dialog is then labelled by the heading (`aria-labelledby`), otherwise it carries the title as `aria-label`. |
+| `open` | `true` renders the dialog open (e.g. after a server-side validation error). |
+| `closeTrigger` | The ✕'s `data-trigger`; default `close-modal-display`. A page handler must end in `window.krtModal.close`. `''` when a script binds the close by `closeClass`. |
+| `closeClass` / `closeId` | Class / id on the close control for a page script. |
+
+A condition or iteration goes on a `<th:block>` around the call. In a fragment file, name the body with its template
 (`~{fragments/x :: x-modal-body}`). A new dialog id also needs `DialogA11yE2eTest` to reach it, or an
 `UNREACHED` entry with the reason. Render a dialog under the same condition as its openers and the
 script that drives it: a dialog nothing can open, or whose handlers were never loaded, is dead

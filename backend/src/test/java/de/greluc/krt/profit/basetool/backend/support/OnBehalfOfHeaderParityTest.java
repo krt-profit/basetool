@@ -30,17 +30,9 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the on-behalf-of header literal across the module boundary (ADR-0129).
- *
- * <p>The ingest gateway and the backend are separate Gradle modules with no shared code, so the
- * header name is declared twice. A rename on one side alone does not fail anything: the gateway
- * would send a header the backend never reads, the backend would fall back to the token's own
- * subject — which is the gateway's service account — and <em>every ingest upload would silently be
- * attributed to a service account instead of to the member who sent it</em>. Nothing would error
- * and nothing would be logged.
- *
- * <p>Reads the gateway's source rather than its class, because the backend test runtime does not
- * have the ingest module on its classpath.
+ * Pins the on-behalf-of header name shared by the ingest gateway and the backend (ADR-0129), by
+ * reading the gateway's source. A mismatch would silently attribute every ingest upload to the
+ * gateway's service account.
  */
 class OnBehalfOfHeaderParityTest {
 

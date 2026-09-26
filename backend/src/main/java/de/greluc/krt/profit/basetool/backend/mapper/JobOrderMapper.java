@@ -48,9 +48,6 @@ import org.springframework.beans.factory.annotation.Autowired;
     })
 public abstract class JobOrderMapper {
 
-  // Field injection, because MapStruct's generated subclass has a no-arg constructor — the same
-  // shape as MissionMapper. Depends only on the support-package leaf interface, never on the
-  // service layer or SecurityContextHolder (ArchUnit mapperLayerShouldNotReachIntoSecurityContext).
   @Autowired protected StockViewerAccess stockAccess;
 
   /**
@@ -74,41 +71,26 @@ public abstract class JobOrderMapper {
   }
 
   /**
-   * Maps a {@link JobOrder} entity to its outbound DTO. The legacy free-text {@code squadron} field
-   * was removed from the DTO together with the V90 DROP COLUMN migration; clients consume the
-   * structured {@code requestingSquadron} reference (and its {@code shorthand} sub-field) for a
-   * human-readable label.
+   * Maps a {@link JobOrder} entity to its outbound DTO, projecting the responsible and requesting
+   * org units (Staffel or Spezialkommando) into {@code SquadronReferenceDto} slots.
    *
-   * <p>The Phase 2 rework (#342) exposes {@code responsibleOrgUnit} (the processing unit) and
-   * {@code requestingOrgUnit} (the customer) on the entity, both typed {@code OrgUnit}; the DTO
-   * publishes them as {@code SquadronReferenceDto}. The two explicit mappings below route both
-   * fields through {@code SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a
-   * Staffel or a Spezialkommando — into the slim reference (id/name/shorthand), so an SK
-   * responsible or requester surfaces its SK badge instead of a blank cell. {@code
-   * responsibleOrgUnit} is {@code null} only on pre-rework rows not yet backfilled (Phase 3).
-   *
-   * @param jobOrder the entity to project; {@code null} returns {@code null}.
-   * @return the populated outbound DTO.
+   * @param jobOrder the entity to project; {@code null} returns {@code null}
+   * @return the outbound DTO
    */
   @Mapping(target = "responsibleOrgUnit", source = "responsibleOrgUnit")
   @Mapping(target = "requestingOrgUnit", source = "requestingOrgUnit")
   @Mapping(target = "items", ignore = true)
   @Mapping(target = "aggregatedMaterials", ignore = true)
   @Mapping(target = "itemHandovers", ignore = true)
-  // Per-order redaction decision is not an entity property; it is stamped by the read path
-  // (JobOrderService.getJobOrderById) via JobOrderDto#withRedacted, so the mapper leaves it false.
   @Mapping(target = "redacted", ignore = true)
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(jobOrder))")
-  // MapStruct reads a record's wither as a fluent setter of a property named after it; there
-  // is no such property, so it is ignored.
   @Mapping(target = "withAssignees", ignore = true)
   @Mapping(target = "withRedacted", ignore = true)
   public abstract JobOrderDto toDto(JobOrder jobOrder);
 
   /**
-   * Maps a {@link JobOrderMaterial} child to its DTO. {@code currentStock} (inventory queried at
-   * request time) and the claim fields {@code claims}/{@code openAmount} (populated by the service
-   * for SK orders, Phase 5 #345) are all owned by the service layer and stay unmapped here.
+   * Maps a {@link JobOrderMaterial} child to its DTO, leaving the service-owned {@code
+   * currentStock}, {@code claims} and {@code openAmount} unmapped.
    */
   @Mapping(target = "currentStock", ignore = true)
   @Mapping(target = "claims", ignore = true)
@@ -116,22 +98,18 @@ public abstract class JobOrderMapper {
   public abstract JobOrderMaterialDto toDto(JobOrderMaterial material);
 
   /**
-   * Maps a single {@link JobOrderAssignee} edge to its DTO: the assigned {@code user} routes
-   * through {@code UserMapper}, while {@code note} and the edge's own {@code version} map straight
-   * across.
+   * Maps a {@link JobOrderAssignee} edge to its DTO, including the assigned user, note and version.
    *
-   * @param assignee the assignee edge to project; {@code null} returns {@code null}.
-   * @return the populated assignee DTO.
+   * @param assignee the assignee edge; {@code null} returns {@code null}
+   * @return the assignee DTO
    */
   public abstract JobOrderAssigneeDto toDto(JobOrderAssignee assignee);
 
   /**
-   * Seeds the {@link UserMapper} request memo for the Bearbeiter of a whole page of orders at once,
-   * so mapping the page costs two membership/Staffel queries in total rather than two per order
-   * (REQ-DATA-003). Call it before mapping the page; {@link #mapAndSortAssignees(Set)} then finds
-   * every assignee already memoised.
+   * Seeds the {@link UserMapper} request memo for the assignees of a whole page of orders in one go
+   * (REQ-DATA-003); call it before mapping the page.
    *
-   * @param orders the orders about to be mapped; never {@code null}.
+   * @param orders the orders about to be mapped; never {@code null}
    */
   public void primeAssignees(@NotNull Collection<JobOrder> orders) {
     assigneeUserMapper.primeStaffelMemberships(
@@ -143,20 +121,16 @@ public abstract class JobOrderMapper {
   }
 
   /**
-   * Maps a set of {@link JobOrderAssignee} edges into a DTO list sorted by the assignee's effective
-   * name (case-insensitive), so the Bearbeiter list renders in a stable order across reloads and
-   * fragment refreshes.
+   * Maps assignee edges to a DTO list sorted case-insensitively by the assignee's effective name.
    *
-   * @param assignees the assignee edges to project; {@code null} returns {@code null}.
-   * @return the sorted assignee DTO list.
+   * @param assignees the assignee edges; {@code null} returns {@code null}
+   * @return the sorted assignee DTOs
    */
   @Nullable
   public List<JobOrderAssigneeDto> mapAndSortAssignees(Set<JobOrderAssignee> assignees) {
     if (assignees == null) {
       return null;
     }
-    // One membership query + one Staffel load for the whole Bearbeiter list instead of up to three
-    // queries per assignee (REQ-DATA-003).
     assigneeUserMapper.primeStaffelMemberships(
         assignees.stream().map(JobOrderAssignee::getUser).toList());
     return assignees.stream()

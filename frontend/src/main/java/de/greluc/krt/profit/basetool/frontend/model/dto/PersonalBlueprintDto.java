@@ -23,9 +23,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Read DTO mirroring the backend {@code PersonalBlueprintResponse} (#327): one blueprint the
- * calling user owns. {@code ownerSub} is intentionally absent — it is never exposed at the
- * boundary.
+ * Mirror of the backend {@code PersonalBlueprintResponse}: one blueprint the calling user owns,
+ * without the owner's subject.
  *
  * @param id entry id
  * @param productKey normalized product key
@@ -34,7 +33,7 @@ import java.util.UUID;
  * @param acquiredAt in-game acquisition time, or {@code null}
  * @param note free-form note, or {@code null}
  * @param removable whether the owner may delete this entry; {@code false} for an auto-granted
- *     default blueprint, which the list uses to hide the delete control
+ *     default blueprint
  * @param version optimistic-lock version echoed back on update
  * @param createdAt row creation timestamp
  * @param updatedAt row last-update timestamp

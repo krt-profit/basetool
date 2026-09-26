@@ -109,27 +109,20 @@ public class PromotionPageController {
       ELIGIBILITY_LIST_TYPE = new ParameterizedTypeReference<List<PromotionEligibilityDto>>() {};
 
   /**
-   * Chunk size for the {@link CatalogPages#fetchAll page walks} feeding the evaluation matrix
-   * (evaluations and members). This is a <b>chunk size</b>, not a cap: the walk keeps requesting
-   * pages until the backend reports the last one, so the matrix stays complete at any data volume
-   * (REQ-PROMO-001) — unlike the former one-shot {@code ?size=10000} request whose overflow was
-   * silently dropped. A squadron that fits one chunk still costs exactly one request.
+   * Page size of the {@link CatalogPages#fetchAll page walks} feeding the evaluation matrix; a
+   * chunk size, not a cap (REQ-PROMO-001).
    */
   private static final int MATRIX_FETCH_PAGE_SIZE = 1000;
 
   private final BackendApiClient backendApiClient;
 
   /**
-   * Throws {@link AccessDeniedException} when the per-squadron promotion-feature flag is off for
-   * the current caller, so every {@code @GetMapping} below short-circuits with HTTP 403 instead of
-   * rendering the page. The advisor-supplied flag (admin override + active-org-unit lookup) is
-   * passed in as a {@link ModelAttribute} parameter so the controller does not duplicate the
-   * resolution logic that {@code CapabilityFlagsAdvice.promotionFeatureEnabled} already runs once
-   * per request.
+   * Throws {@link AccessDeniedException}, answered with 403, when the promotion feature is disabled
+   * for the caller.
    *
-   * @param enabled value of the {@code promotionFeatureEnabled} model attribute; {@code null} is
-   *     treated as enabled (mirrors the advisor's permissive default).
-   * @throws AccessDeniedException when {@code Boolean.FALSE.equals(enabled)} resolves true.
+   * @param enabled the {@code promotionFeatureEnabled} model attribute; {@code null} counts as
+   *     enabled
+   * @throws AccessDeniedException when {@code enabled} is {@code Boolean.FALSE}
    */
   private static void requirePromotionFeature(Boolean enabled) {
     if (Boolean.FALSE.equals(enabled)) {
@@ -140,14 +133,10 @@ public class PromotionPageController {
   }
 
   /**
-   * Schritt 5: Übersicht Beförderungssystem – öffentlich für alle eingeloggten Nutzer.
+   * Renders the promotion-system overview for every signed-in user.
    *
-   * <p>Reicht zusätzlich den aktuellen Rang des eingeloggten Nutzers (falls vorhanden) an das
-   * Template weiter, damit dort ein "du-bist-hier"-Marker auf demjenigen Rangsprung gerendert
-   * werden kann, der die nächste Beförderung des Nutzers betrifft ({@code fromRank ==
-   * currentUserRank}). Ist der Rang nicht ermittelbar (z. B. Backend down, Guest-User ohne Rang im
-   * DTO), wird {@code null} weitergegeben und der Marker einfach nicht angezeigt — die Seite
-   * funktioniert weiterhin als reine Übersicht.
+   * <p>Passes the caller's current rank, or {@code null} when unknown, so the template can mark the
+   * caller's next rank step.
    */
   @NotNull
   @GetMapping("/overview")
@@ -189,16 +178,11 @@ public class PromotionPageController {
   }
 
   /**
-   * Schritt 6: Meine Bewertungen – nur für den eingeloggten Nutzer selbst. Lädt zusätzlich die
-   * Beförderbarkeits-Auswertung pro konfigurierter Rangstufen-Kombination und reicht sie an das
-   * Template weiter, damit der Nutzer sieht, welche Rangsprünge bereits erreichbar sind und welche
-   * Anforderungen noch fehlen.
+   * Renders the caller's own evaluations with the promotion eligibility of every configured rank
+   * step.
    *
-   * <p>Zusätzlich wird {@code requiredLevelByCategory} berechnet: pro Kategorie die höchste
-   * Mindeststufe, die irgendeine Rangvoraussetzung verlangt. Das Template kann damit Kategorien
-   * markieren, in denen die eigene Bewertung unter dem höchsten Anforderungslevel liegt
-   * ("Schwachstellen"-Highlighting), ohne dass der Nutzer alle Beförderbarkeits-Karten
-   * gegenüberstellen muss.
+   * <p>Also computes {@code requiredLevelByCategory}, the highest minimum level any requirement
+   * demands per category, so the template can highlight weak categories.
    */
   @NotNull
   @GetMapping("/my-evaluations")
@@ -208,7 +192,6 @@ public class PromotionPageController {
     List<PromotionTopicDto> topics = fetchTopics();
     List<MemberEvaluationDto> myEvaluations = fetchMyEvaluations();
 
-    // Build a map: categoryId -> evaluation for quick lookup
     Map<String, MemberEvaluationDto> evaluationByCategoryId = new LinkedHashMap<>();
     for (MemberEvaluationDto eval : myEvaluations) {
       evaluationByCategoryId.put(eval.categoryId().toString(), eval);
@@ -220,9 +203,6 @@ public class PromotionPageController {
       topicCategoryMap.put(topic.id().toString(), categories);
     }
 
-    // Per category the strictest minimum level any rank requirement demands. Used by the
-    // template to highlight categories where the user's assigned level falls below the
-    // highest expectation across all promotion steps. PromotionLevel ordering is A < B < C.
     Map<String, String> requiredLevelByCategory = new LinkedHashMap<>();
     for (RankRequirementDto req : fetchAllRankRequirements()) {
       if (req.categoryId() == null || req.minimumLevel() == null) {
@@ -247,14 +227,12 @@ public class PromotionPageController {
   }
 
   /**
-   * Returns a positive number iff {@code a} is a strictly higher promotion level than {@code b}.
-   * The ordering matches {@link de.greluc.krt.profit.basetool.backend.model.PromotionLevel} on the
-   * backend (LEVEL_A &lt; LEVEL_B &lt; LEVEL_C). Unknown or null inputs sort below known values so
-   * the highest-known wins when iterating.
+   * Compares two promotion levels in {@code PromotionLevel} order; unknown or {@code null} values
+   * sort below known ones.
    *
-   * @param a first level identifier (e.g. {@code "LEVEL_B"}); may be {@code null}
+   * @param a first level identifier, e.g. {@code "LEVEL_B"}; may be {@code null}
    * @param b second level identifier; may be {@code null}
-   * @return positive iff {@code a > b}, negative iff {@code a < b}, zero otherwise
+   * @return positive iff {@code a} is higher, negative iff lower, zero otherwise
    */
   private int compareLevels(String a, String b) {
     return levelOrdinal(a) - levelOrdinal(b);
@@ -273,15 +251,11 @@ public class PromotionPageController {
   }
 
   /**
-   * Schritt 7: Bewertungsverwaltung – nur für ADMIN und OFFICER. Reicht zusätzlich die pro Mitglied
-   * vorausberechnete Beförderbarkeitsliste an das Template; die Offiziere sehen dadurch unmittelbar
-   * in der Übersicht, welcher Spieler für welche Beförderung bereit ist.
+   * Renders the evaluation management page for ADMIN and OFFICER, including each member's promotion
+   * eligibility.
    *
-   * <p>Beyond the flat list of categories the view also receives a stable {@code categoriesByTopic}
-   * map so the template can render a two-row header (topic group on top, categories beneath) and a
-   * {@code categoryCountByTopic} map so each topic header cell knows the exact colspan to use. The
-   * order of {@link PromotionTopicDto} entries in {@code topics} matches the column order of {@code
-   * allCategories}, which is what the row body relies on.
+   * <p>Also provides {@code categoriesByTopic} and {@code categoryCountByTopic} for the two-row
+   * header; the order of {@code topics} matches the column order of {@code allCategories}.
    */
   @NotNull
   @GetMapping("/manage")
@@ -293,20 +267,12 @@ public class PromotionPageController {
       Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
 
-    // Cheap single-member eligibility re-render for the in-place evaluation save flow
-    // (REQ-FE-005): after a grade is stored the member's promotability may have flipped,
-    // so the client re-fetches just this one eligibility cell instead of reloading the
-    // whole matrix. Only this member's eligibility is queried, keeping the call lightweight
-    // even when the squadron has hundreds of evaluations.
     if ("eligibilityCell".equals(fragment) && userId != null && !userId.isBlank()) {
       model.addAttribute("eligList", fetchEligibilityForUser(userId));
       return "promotion-manage :: eligibilityCell";
     }
 
     List<PromotionTopicDto> topics = fetchTopics();
-    // Flat list of all categories in topic-then-sortOrder order. Built in lock-step with the
-    // per-topic map so the template can iterate row cells against the flat list and header
-    // cells against the grouped map without re-sorting on the view layer.
     List<PromotionCategoryDto> allCategories = new ArrayList<>();
     Map<String, List<PromotionCategoryDto>> categoriesByTopic = new LinkedHashMap<>();
     Map<String, Integer> categoryCountByTopic = new LinkedHashMap<>();
@@ -317,18 +283,10 @@ public class PromotionPageController {
       allCategories.addAll(topicCategories);
     }
 
-    // Fetch all evaluations for admin view — the COMPLETE set via a page walk (REQ-PROMO-001), not
-    // one capped chunk, so no member/category cell is silently missing from the matrix.
     CompleteCatalog<MemberEvaluationDto> evaluationsCatalog = fetchAllEvaluations();
     List<MemberEvaluationDto> allEvaluations = evaluationsCatalog.items();
-    // Build map: userId+categoryId -> evaluation
     Map<String, MemberEvaluationDto> evaluationMap = new LinkedHashMap<>();
-    // Per-user latest updatedAt across all categories. Used by the template to render a
-    // "letzte Aenderung am" tooltip on the member cell so officers can spot members whose
-    // assessment has gone stale without having to scan every column.
     Map<String, java.time.Instant> lastEvaluatedByUser = new LinkedHashMap<>();
-    // Per-user "has at least one stored evaluation" flag. Used by the client-side filter
-    // "nur Mitglieder ohne Bewertung" so it does not have to inspect every cell in the row.
     Map<String, Boolean> hasEvaluationsByUser = new LinkedHashMap<>();
     for (MemberEvaluationDto eval : allEvaluations) {
       evaluationMap.put(eval.userId() + "_" + eval.categoryId(), eval);
@@ -341,13 +299,10 @@ public class PromotionPageController {
       }
     }
 
-    // Fetch all members — likewise the COMPLETE, page-walked axis (REQ-PROMO-001).
     CompleteCatalog<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> membersCatalog =
         fetchMembers();
     List<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> members = membersCatalog.items();
 
-    // Eligibility per member, keyed by member.id (stringified UUID) so the template can
-    // look it up cheaply. Failures for a single member don't break the whole page.
     Map<String, List<PromotionEligibilityDto>> eligibilityByUser = new LinkedHashMap<>();
     for (de.greluc.krt.profit.basetool.frontend.model.dto.UserDto member : members) {
       if (member.id() != null) {
@@ -365,15 +320,8 @@ public class PromotionPageController {
     model.addAttribute("eligibilityByUser", eligibilityByUser);
     model.addAttribute("lastEvaluatedByUser", lastEvaluatedByUser);
     model.addAttribute("hasEvaluationsByUser", hasEvaluationsByUser);
-    // Either matrix axis stopping at the page-walk safety cap means the rendered matrix is
-    // incomplete — surface it with a loud banner rather than showing silent holes that read as
-    // "not yet evaluated" (REQ-PROMO-001, mirrors REQ-ADMIN-002). The flag lives inside the
-    // matrixBody fragment so it is present on both the full render and the in-place re-render.
     model.addAttribute(
         "matrixTruncated", evaluationsCatalog.truncated() || membersCatalog.truncated());
-    // matrixBody is the authoritative full re-render used to recover from an optimistic-lock
-    // conflict in place: it rebuilds every row with fresh @Version, level, eligibility and
-    // last-evaluated state — exactly what the old full-page reload produced, minus the navigation.
     if ("matrixBody".equals(fragment)) {
       return "promotion-manage :: matrixBody";
     }
@@ -410,17 +358,13 @@ public class PromotionPageController {
   }
 
   /**
-   * Schritt 8: Admin-Bereich – Rangvoraussetzungen verwalten. The admin view groups the flat list
-   * of requirements by their {@code (fromRank, toRank)} pair so each promotion step is rendered as
-   * one section with its own table, mirroring the read-only layout used on {@code
-   * /promotion/overview}.
+   * Renders the admin page of rank requirements, grouped into one section per {@code (fromRank,
+   * toRank)} pair.
    *
-   * @param promotionFeatureEnabled per-squadron feature flag; {@code false} short-circuits with 403
-   * @param fragment when {@code "ranksResults"}, only the requirements-list fragment is rendered
-   *     (for an in-place AJAX swap after a create/edit/delete) instead of the whole page
-   * @param model Spring MVC model populated with the grouped requirements, topics and categories
-   * @return the Thymeleaf view (or {@code view :: fragment}) name for the rank-requirements admin
-   *     page
+   * @param promotionFeatureEnabled per-squadron feature flag; {@code false} answers 403
+   * @param fragment {@code "ranksResults"} renders only the requirements-list fragment
+   * @param model model populated with the grouped requirements, topics and categories
+   * @return the view name, or its fragment selector
    */
   @NotNull
   @GetMapping("/admin/rank-requirements")
@@ -443,10 +387,6 @@ public class PromotionPageController {
               groupedRequirements.computeIfAbsent(key, k -> new ArrayList<>()).add(req);
             });
 
-    // categoriesByTopic powers the cascading Topic -> Category dropdown in the
-    // create/edit modals: when the admin picks a topic, the client filters the
-    // category dropdown to that topic's categories only, so a category from a
-    // different topic can no longer be combined with a topic accidentally.
     List<PromotionTopicDto> topics = fetchTopics();
     Map<String, List<PromotionCategoryDto>> categoriesByTopic = new LinkedHashMap<>();
     for (PromotionTopicDto topic : topics) {
@@ -463,10 +403,6 @@ public class PromotionPageController {
     }
     return "promotion-admin-rank-requirements";
   }
-
-  // ---------------------------------------------------------------------------------
-  // Private helper methods
-  // ---------------------------------------------------------------------------------
 
   private List<PromotionTopicDto> fetchTopics() {
     try {
@@ -529,12 +465,9 @@ public class PromotionPageController {
   }
 
   /**
-   * Returns the rank of the currently authenticated user, or {@code null} if no rank is set or the
-   * {@code /me} call fails. Used by the overview and my-evaluations pages to render a
-   * "you-are-here" marker on the relevant promotion step. A {@code null} return is non-fatal — the
-   * calling templates render without the marker rather than failing the whole page.
+   * Returns the signed-in user's rank for the "you are here" marker.
    *
-   * @return the user's rank as an {@link Integer}, or {@code null} when unavailable
+   * @return the user's rank, or {@code null} when unset or the lookup fails
    */
   @Nullable
   private Integer fetchCurrentUserRank() {
@@ -560,14 +493,8 @@ public class PromotionPageController {
   }
 
   /**
-   * Walks <b>every</b> page of the squadron-scoped evaluation listing. Evaluations grow
-   * multiplicatively (members × categories), so no single fixed page size is safe: the former
-   * one-shot {@code ?size=10000} request silently dropped everything past the bound and the matrix
-   * rendered holes indistinguishable from "not yet evaluated" (REQ-PROMO-001). The shared {@link
-   * CatalogPages#fetchAll} page walk (ADR-0102) assembles the complete set and reports whether it
-   * had to stop at its safety cap; the caller surfaces that truncation loudly. A backend error is
-   * swallowed to an empty catalogue, preserving the page's established fail-soft-to-empty
-   * behaviour.
+   * Fetches every page of the squadron-scoped evaluations via {@link CatalogPages#fetchAll}
+   * (REQ-PROMO-001); a backend error yields an empty catalogue.
    *
    * @return the complete evaluation catalogue with its truncation flag
    */
@@ -588,15 +515,9 @@ public class PromotionPageController {
   }
 
   /**
-   * Walks <b>every</b> page of the squadron's evaluatable members. The backend's {@code
-   * /api/v1/promotion/evaluations/members} endpoint applies the same scope as {@code
-   * SquadronScopeService.currentSquadronId()} (Officer = own squadron, Admin = focused squadron or
-   * all squadrons) and excludes any user that carries the Admin OR the Officer role (issue #817):
-   * admins are squadron-less by design, and officers run the Bewertungsverwaltung rather than being
-   * its subject, so neither belongs in the matrix — it assesses only the ordinary members of the
-   * squadron. Fetched completely via {@link CatalogPages#fetchAll} so a squadron beyond the page
-   * size never silently loses matrix rows (REQ-PROMO-001); a backend error degrades to an empty
-   * catalogue.
+   * Fetches every page of the squadron's evaluatable members via {@link CatalogPages#fetchAll}
+   * (REQ-PROMO-001); admins and officers are excluded by the backend, and a backend error yields an
+   * empty catalogue.
    *
    * @return the complete member catalogue with its truncation flag
    */

@@ -37,24 +37,10 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * A message key a controller puts in the model must exist in all three bundles (the root i18n
- * rule).
+ * Tests that every literal message key a controller puts into the model or flash under an {@code
+ * *error} attribute exists in all three bundles.
  *
- * <p><b>Why {@code MessageBundleConsistencyTest} cannot catch this.</b> It compares the three
- * bundles against each other and scans templates for the keys they reference. A key that a
- * controller passes as a <em>model attribute</em> and a template renders as {@code #{${error}}} is
- * in no template and is missing from all three bundles equally — so it is consistent, unreferenced,
- * and invisible.
- *
- * <p>That is how {@code error.loadFailed} shipped on two admin pages: with the backend down the
- * admin saw {@code ??error.loadFailed_de??} in a red HUD box, and three tests asserted the broken
- * key. Every other page controller in the module uses an area-scoped key that exists, which is what
- * made the two outliers hard to notice by reading.
- *
- * <p>The scan is deliberately narrow: only literals handed to {@code addAttribute} or {@code
- * addFlashAttribute} under a key ending in {@code error}, and only ones shaped like a message key.
- * A key assembled at runtime cannot be checked from source, and guessing at one would make this
- * test the thing that goes out of date.
+ * <p>Only literals shaped like a message key are checked.
  */
 class ModelErrorKeyCoverageTest {
 
@@ -73,7 +59,6 @@ class ModelErrorKeyCoverageTest {
           "messages_en.properties",
           resolveModuleRelative("src/main/resources/messages_en.properties"));
 
-  // covers the i18n rule - a key the page renders but no bundle defines shows as ??key_de??
   @Test
   void everyErrorKeyPutInTheModelExistsInEveryBundle() throws IOException {
     Map<String, List<String>> keysBySource = errorKeys();

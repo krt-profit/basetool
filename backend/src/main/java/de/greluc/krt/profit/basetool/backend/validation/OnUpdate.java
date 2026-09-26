@@ -20,14 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.validation;
 
 /**
- * Jakarta Bean Validation group marking constraints that apply only on an <em>update</em>, not on a
- * create — the seam that lets a single {@code XxxWriteRequest} serve both operations (S13, #919).
+ * Bean Validation group for constraints that apply only on update, letting one write DTO serve both
+ * create and update.
  *
- * <p>A collapsed write DTO carries the optimistic-lock version as {@code @NotNull(groups =
- * OnUpdate.class) Long version}: the create endpoint validates with {@code @Valid} (the {@code
- * jakarta.validation.groups.Default} group only), so a missing version is accepted; the update
- * endpoint validates with {@code @Validated(&#123;Default.class, OnUpdate.class&#125;)}, so both
- * the base field constraints and the required-version constraint fire and a missing version
- * surfaces as the same {@code VALIDATION_FAILED} 400 it did when Update was its own DTO.
+ * <p>The optimistic-lock version is declared {@code @NotNull(groups = OnUpdate.class)}: create
+ * endpoints validate with {@code @Valid}, update endpoints with
+ * {@code @Validated(&#123;Default.class, OnUpdate.class&#125;)}, so only an update requires the
+ * version.
  */
 public interface OnUpdate {}

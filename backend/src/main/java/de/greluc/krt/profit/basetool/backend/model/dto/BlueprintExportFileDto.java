@@ -24,28 +24,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * Internal DTO for parsing the root of an uploaded external blueprint export (#327, Phase 4;
- * scmdb.net export added later). All three supported exporters — the SCMDB log-watcher, the <a
- * href="https://github.com/krt-profit/basetool-bp-extractor">Basetool Blueprint Extractor</a>, and
- * the <a href="https://scmdb.net">scmdb.net</a> profile / tracking export — wrap their records in a
- * top-level {@code blueprints} array; every other top-level field (schema version, tool metadata,
- * mission list, player / profile summaries, …) is ignored. In the scmdb.net export the sibling
- * {@code missions} array (the player's mission tracker) is consumed by neither this import nor any
- * other basetool surface — only {@code blueprints} is read.
- *
- * <p>{@code additionalSourceFolders} is mirrored from the Blueprint Extractor's {@code
- * BlueprintExport} contract for explicitness only — the import never consumes it. The extractor
- * keeps its export schema at version 1 and evolves it additively (same rule as ADR-0008 for the
- * refinery extract; precedent: {@code capturedAt} on {@code sourceImages}), so new nullable
- * envelope fields like this one must parse without a schema bump while exports from older extractor
- * versions, which lack the key entirely, stay accepted.
+ * Root of an uploaded external blueprint export; only the {@code blueprints} array is read and
+ * every other top-level field is ignored.
  *
  * @param blueprints the acquired-blueprint entries; {@code null} if the key is absent
- * @param additionalSourceFolders extra game-channel folders the Blueprint Extractor scanned beside
- *     its primary {@code sourceFolder} (currently the {@code HOTFIX} sibling of {@code LIVE});
- *     {@code null} when only the primary folder was scanned, when an older extractor wrote the
- *     export, or in SCMDB log-watcher exports — the extractor serializes the key even when {@code
- *     null} (it encodes defaults). Provenance only, not consumed by the import
+ * @param additionalSourceFolders extra game-channel folders the Blueprint Extractor scanned, or
+ *     {@code null}; provenance only, not consumed
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record BlueprintExportFileDto(

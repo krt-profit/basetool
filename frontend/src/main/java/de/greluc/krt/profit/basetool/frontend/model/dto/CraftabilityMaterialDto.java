@@ -22,11 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code CraftabilityMaterialDto}: the per-material craftability
- * breakdown for one material a blueprint consumes (#781) — a RESOURCE commodity or a
- * PIECE-material-bridged ITEM ingredient (a hand-mined gem, ADR-0046). Every availability/quality
- * figure is given twice (inventory alone and with the open refinery yield) so the refinery toggle
- * switches client-side.
+ * Frontend mirror of the backend {@code CraftabilityMaterialDto}: the craftability breakdown for
+ * one material a blueprint consumes (ADR-0046). Every availability and quality figure is given
+ * without and with the open refinery yield.
  *
  * @param materialId the material's id
  * @param materialName the material's display name
@@ -41,8 +39,7 @@ import java.util.UUID;
  * @param missingScuWithRefinery amount short of one craft including refinery yield
  * @param craftable crafts this material alone allows from inventory
  * @param craftableWithRefinery crafts this material alone allows including refinery yield
- * @param quantityType the material's quantity unit ({@code "SCU"} / {@code "PIECE"}); the {@code
- *     *Scu} figures are in this unit, so the UI labels them "SCU" or "Stück" accordingly
+ * @param quantityType the unit of the {@code *Scu} figures, {@code "SCU"} or {@code "PIECE"}
  */
 public record CraftabilityMaterialDto(
     UUID materialId,

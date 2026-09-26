@@ -20,12 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Account approval lifecycle of an {@link User} (epic #720, Track 1, REQ-SEC-017).
+ * Account approval lifecycle of a {@link User} (REQ-SEC-017).
  *
- * <p>A brand-new Discord registration starts {@link #PENDING} and is granted no authorities until
- * an admin moves it to {@link #ACTIVE} (or {@link #REJECTED}). Credential/admin-created users and
- * every pre-existing account are {@code ACTIVE}. Persisted via {@code @Enumerated(STRING)} against
- * {@code app_user.approval_status} (CHECK-constrained to these three names).
+ * <p>A new Discord registration starts {@link #PENDING} with no authorities until an admin moves it
+ * to {@link #ACTIVE} or {@link #REJECTED}; credential- and admin-created users are {@code ACTIVE}.
  */
 public enum ApprovalStatus {
 

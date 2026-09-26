@@ -43,7 +43,6 @@ import org.junit.jupiter.api.Test;
  */
 class MissionMapperCrewLeaderSortingTest {
 
-  // None of the mappers MissionMapper uses is reached by these mappings.
   private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null);
 
   @Test
@@ -60,7 +59,6 @@ class MissionMapperCrewLeaderSortingTest {
 
   @Test
   void shouldKeepAlphabeticalOrder_WhenNoLeadershipRolePresent() {
-    // Given: three crew members, none with leadership role
     MissionUnit unit = new MissionUnit();
     Set<MissionCrew> crew = new LinkedHashSet<>();
     crew.add(buildCrew("Zulu", false, JobTypeArchetype.CREW));
@@ -68,10 +66,8 @@ class MissionMapperCrewLeaderSortingTest {
     crew.add(buildCrew("Mike", false, JobTypeArchetype.CREW));
     unit.setCrew(crew);
 
-    // When
     List<MissionCrewDto> result = mapper.resolveCrew(unit);
 
-    // Then: alphabetical
     assertEquals(3, result.size());
     assertEquals("Alpha", result.get(0).participantName());
     assertEquals("Mike", result.get(1).participantName());
@@ -80,7 +76,6 @@ class MissionMapperCrewLeaderSortingTest {
 
   @Test
   void shouldPlaceSingleCrewLeaderFirst() {
-    // Given
     MissionUnit unit = new MissionUnit();
     Set<MissionCrew> crew = new LinkedHashSet<>();
     crew.add(buildCrew("Alpha", false, JobTypeArchetype.CREW));
@@ -88,10 +83,8 @@ class MissionMapperCrewLeaderSortingTest {
     crew.add(buildCrew("Commander", true, JobTypeArchetype.CREW));
     unit.setCrew(crew);
 
-    // When
     List<MissionCrewDto> result = mapper.resolveCrew(unit);
 
-    // Then
     assertEquals(3, result.size());
     assertEquals("Commander", result.get(0).participantName());
     assertEquals("Alpha", result.get(1).participantName());
@@ -100,7 +93,6 @@ class MissionMapperCrewLeaderSortingTest {
 
   @Test
   void shouldPlaceMultipleCrewLeadersFirst_StableAlphabeticalWithinGroup() {
-    // Given
     MissionUnit unit = new MissionUnit();
     Set<MissionCrew> crew = new LinkedHashSet<>();
     crew.add(buildCrew("Yankee", false, JobTypeArchetype.CREW));
@@ -109,10 +101,8 @@ class MissionMapperCrewLeaderSortingTest {
     crew.add(buildCrew("Alpha-Leader", true, JobTypeArchetype.CREW));
     unit.setCrew(crew);
 
-    // When
     List<MissionCrewDto> result = mapper.resolveCrew(unit);
 
-    // Then: leaders first, alphabetical within each group
     assertEquals(4, result.size());
     assertEquals("Alpha-Leader", result.get(0).participantName());
     assertEquals("Bravo-Leader", result.get(1).participantName());
@@ -122,9 +112,6 @@ class MissionMapperCrewLeaderSortingTest {
 
   @Test
   void shouldTreatMissionArchetypeLeadershipEquivalentForCrewSorting() {
-    // Regression guard: a crew member assigned a MISSION-archetype leadership JobType
-    // must also be treated as a leader in the unit crew list, so existing MISSION
-    // leadership semantics are preserved.
     MissionUnit unit = new MissionUnit();
     Set<MissionCrew> crew = new LinkedHashSet<>();
     crew.add(buildCrew("Alpha", false, JobTypeArchetype.CREW));

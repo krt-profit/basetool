@@ -63,9 +63,6 @@ class OrgChartPageControllerTest {
 
   @Test
   void orgChart_loadsChartWithoutPreloadingUsers() {
-    // Account-linked seats are mirror-only now (epic #800, REQ-ROLE-006): the chart editor offers
-    // no
-    // account picker, so the page no longer preloads the user-lookup list.
     BackendApiClient backend = mock(BackendApiClient.class);
     OrgChartPageController controller = new OrgChartPageController(backend);
     OrgChartDto chart = emptyChart();
@@ -95,7 +92,6 @@ class OrgChartPageControllerTest {
 
   @Test
   void orgChart_fragmentChartBody_returnsChartBodySelector() {
-    // The in-place chart refresh (epic #571 / REQ-FE-005) re-renders only the chartBody fragment.
     BackendApiClient backend = mock(BackendApiClient.class);
     OrgChartPageController controller = new OrgChartPageController(backend);
     OrgChartDto chart = emptyChart();

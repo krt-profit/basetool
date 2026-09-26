@@ -1,18 +1,3 @@
-# promtool unit tests for the alerts the 2026-09-22 operations audit added or corrected.
-#
-#   DeployHeartbeatStale        OPS-MON-02  ticks that stopped happening, not outcomes they wrote
-#   RestoreDrillStaleOrMissing  OPS-MON-05  8 days for a weekly drill, not 35
-#   PostgresDown / RedisDown    OPS-MON-03  an exporter that answers while its target does not
-#   ContainerUnhealthy          OPS-MON-03  a container failing its own health check
-#   HostSecurityUpdates*        OPS-SEC-01  dnf-automatic failing or not running
-#   HostRebootRequired          OPS-SEC-01  an installed fix waiting for a reboot
-#
-# Each alert is shown firing AND shown silent in the state it must not page on, because a rule that
-# has only ever been seen green proves nothing. Run it the way the other tests here are run --
-# monitoring/README.md:
-#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 test rules tests/ops_audit_2026_09_alerts_test.yml
-
 rule_files:
   - ../alerts/infrastructure.yml
   - ../alerts/ops-automation.yml
@@ -20,7 +5,6 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
-  # OPS-MON-02. Every healthy tick restamps the heartbeat, so its age never exceeds one tick.
   - name: "DeployHeartbeatStale - a heartbeat that keeps pace with time() is silent"
     interval: 1m
     input_series:
@@ -31,7 +15,6 @@ tests:
         alertname: DeployHeartbeatStale
         exp_alerts: []
 
-  # The timer stopped: the last outcome stays a success, and only the heartbeat's age says so.
   - name: "DeployHeartbeatStale - a heartbeat frozen for over an hour fires"
     interval: 1m
     input_series:
@@ -50,7 +33,6 @@ tests:
               summary: "Deploy heartbeat stale >1h (no tick has verified the stack)"
               description: "No deploy tick has observed the stack at its target and healthy for over an hour, or the heartbeat metric is absent -- so the running stack is not being verified and no release can reach it. Check `systemctl list-timers iri-deploy.timer` and `systemctl status iri-deploy.service`, then `{app=\"ops-deploy\"}` in Grafana -> Explore -> Loki for the last tick's lines (a FATAL, a lock message, or nothing at all). A deliberate skip (a gated stateful-infra change, a backoff after a rollback) also stops the heartbeat; DeployConfigBlocked and DeployRolledBack name those."
 
-  # absent(): a host whose deployer aborts before its first metric write.
   - name: "DeployHeartbeatStale - a deployer that never wrote the gauge fires"
     interval: 1m
     input_series:
@@ -69,9 +51,6 @@ tests:
               summary: "Deploy heartbeat stale >1h (no tick has verified the stack)"
               description: "No deploy tick has observed the stack at its target and healthy for over an hour, or the heartbeat metric is absent -- so the running stack is not being verified and no release can reach it. Check `systemctl list-timers iri-deploy.timer` and `systemctl status iri-deploy.service`, then `{app=\"ops-deploy\"}` in Grafana -> Explore -> Loki for the last tick's lines (a FATAL, a lock message, or nothing at all). A deliberate skip (a gated stateful-infra change, a backoff after a rollback) also stops the heartbeat; DeployConfigBlocked and DeployRolledBack name those."
 
-  # OPS-MON-05. The drill is weekly (REQ-OPS-011); the threshold was 35 days, which let four
-  # consecutive drills fail silently. Sampled every minute (a sparser series would read as
-  # ABSENT between samples, and absent() would then fire for the wrong reason).
   - name: "RestoreDrillStaleOrMissing - one missed weekly drill is reported, seven days are not"
     interval: 1m
     input_series:
@@ -90,7 +69,6 @@ tests:
               summary: "Restore drill stale >8d or metric absent"
               description: "The weekly restore drill (iri-restore-drill.timer, Sun 05:30) has not succeeded for more than 8 days -- at least one weekly drill failed or did not run -- or the metric is absent (never ran). `{app=\"ops-restore-drill\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki over the last 10d carries the abort reason; an empty stream means the unit never fired — check `systemctl list-timers iri-restore-drill.timer`. Not visible via `journalctl -u iri-restore-drill.service` (stdout/stderr are appended to /var/log/iri-restore-drill.log)."
 
-  # OPS-MON-03. TargetDown cannot see this: the exporter itself is up and scraped.
   - name: "PostgresDown - an exporter that answers pg_up 0 pages, one that answers 1 does not"
     interval: 1m
     input_series:
@@ -114,7 +92,6 @@ tests:
               summary: "PostgreSQL down: basetool-backend"
               description: "postgres-exporter for basetool-backend has not been able to connect to its database for 2 minutes (pg_up == 0) while the exporter itself answers -- the database is down, refusing connections, or out of connection slots. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status db-backend.service` (or db-keycloak.service) and its journal (`journalctl CONTAINER_NAME=db-backend`)."
 
-  # Redis holds every web session; a down Redis logs every member out.
   - name: "RedisDown - redis_up 0 pages after two minutes"
     interval: 1m
     input_series:
@@ -135,8 +112,6 @@ tests:
               summary: "Redis down"
               description: "redis-exporter has not been able to reach Redis for 2 minutes (redis_up == 0) while the exporter itself answers. Redis holds every web session and the live-sync fan-out, so members are being logged out and live updates have stopped. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status redis.service` and `journalctl CONTAINER_NAME=redis`; a missing or unreadable /var/iri/redis/users.acl stops it from starting at all (ADR-0088)."
 
-  # OPS-MON-03. The podman exporter labels health by id; the name comes from the info join.
-  # -1 unknown, 0 healthy, 1 unhealthy, 2 starting (prometheus-podman-exporter 1.20.0).
   - name: "ContainerUnhealthy - an unhealthy container is named, a starting and a healthy one are not"
     interval: 1m
     input_series:
@@ -170,7 +145,6 @@ tests:
               summary: "Container unhealthy: keycloak"
               description: "Container keycloak has failed its own health check for 10 minutes. For backend, frontend and ingest deploy.sh restarts it on its next tick (DeployHealthRestartFailing pages if that does not help); for every other container nothing restarts it automatically. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman healthcheck run keycloak` and `journalctl CONTAINER_NAME=keycloak`."
 
-  # Under Quadlet every restart is a recreate with a new id; the unhealthy one's series ends.
   - name: "ContainerUnhealthy - a container recreated under a new id does not keep the old one's verdict"
     interval: 1m
     input_series:
@@ -187,7 +161,6 @@ tests:
         alertname: ContainerUnhealthy
         exp_alerts: []
 
-  # OPS-SEC-01. Written by the unit's own ExecStopPost=, from $SERVICE_RESULT.
   - name: "HostSecurityUpdatesFailing - a failed dnf-automatic run warns after an hour"
     interval: 1m
     input_series:
@@ -208,8 +181,6 @@ tests:
               summary: "Unattended security updates failed on the host"
               description: "The last dnf-automatic run failed, so security advisories published since the previous good run are not installed. `journalctl -u dnf-automatic.service` on the host shows why (a repository that could not be reached, a dependency conflict, the runtime exclusion blocking a required update)."
 
-  # The run timestamp moves every 24 h for two days, then stops at 48 h. Two days later (96 h)
-  # it is stale; held for 26 h, the warning arrives at 122 h.
   - name: "HostSecurityUpdatesStale - daily runs are silent, a run older than two days warns after a day"
     interval: 1m
     input_series:
@@ -231,7 +202,6 @@ tests:
               summary: "Unattended security updates have not run"
               description: "dnf-automatic has not finished a run for more than two days, or has never recorded one -- the host is not being patched. Check `systemctl list-timers dnf-automatic.timer` and `systemctl status dnf-automatic.service`, and that /etc/systemd/system/dnf-automatic.service.d/20-basetool-metrics.conf (installed by the basetool_host role, tasks/45-updates.yml) is present."
 
-  # absent() is held for 26 h: a freshly provisioned host gets its first run within 24 h.
   - name: "HostSecurityUpdatesStale - a host that never recorded a run is not paged before its first window"
     interval: 1m
     input_series:
@@ -250,7 +220,6 @@ tests:
               summary: "Unattended security updates have not run"
               description: "dnf-automatic has not finished a run for more than two days, or has never recorded one -- the host is not being patched. Check `systemctl list-timers dnf-automatic.timer` and `systemctl status dnf-automatic.service`, and that /etc/systemd/system/dnf-automatic.service.d/20-basetool-metrics.conf (installed by the basetool_host role, tasks/45-updates.yml) is present."
 
-  # The boot unit re-reads needs-restarting after the reboot and writes 0.
   - name: "HostRebootRequired - an installed fix waiting a day for a reboot warns; the reboot clears it"
     interval: 1m
     input_series:

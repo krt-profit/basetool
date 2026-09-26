@@ -35,16 +35,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Guards the web-side fallback for the Android App Link (REQ-SEC-038).
- *
- * <p>The path exists because a correct {@code assetlinks.json} does not stop the browser from
- * following {@code /app/callback}: a device whose domain verification already failed keeps that
- * state — sticky on Android 12+ — and a desktop browser has no app to hand the link to at all. Both
- * were observed on 2026-09-15, with the frontend answering a bare 404 mid-login.
- *
- * <p>What is asserted here is what a member actually experiences, in the order it happens: the
- * callback must not 404, must not keep the authorization code in the URL, and must reach a page
- * that renders without a session.
+ * Tests the web-side fallback of the Android App Link (REQ-SEC-038): {@code /app/callback} must not
+ * 404, must drop the authorization code from the URL and must reach a page that renders without a
+ * session.
  */
 @SpringBootTest
 @DisplayName("Android App Link fallback")
@@ -58,24 +51,13 @@ class AppLinkControllerTest {
 
   @Autowired private WebApplicationContext context;
 
-  /**
-   * Keeps the real client registration out of the context.
-   *
-   * <p>Building it performs OIDC discovery against the configured issuer, which no unit test can
-   * reach — the context then fails with an {@code UnknownHostException} that says nothing about the
-   * endpoint under test. Every other {@code @SpringBootTest} in this module mocks it for the same
-   * reason.
-   */
+  /** Keeps the real client registration, which performs OIDC discovery, out of the test context. */
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
       clientRegistrationRepository;
 
   /**
    * Builds a MockMvc that runs the real security filter chain.
-   *
-   * <p>Without the chain this test would pass while both paths redirect into the OAuth2 entry point
-   * in production — which is the state this change removes, so asserting it without the chain would
-   * assert nothing.
    *
    * @return the configured MockMvc.
    */
@@ -90,8 +72,6 @@ class AppLinkControllerTest {
   @Test
   @DisplayName("the callback redirects anonymously instead of 404-ing mid-login")
   void callbackRedirectsAnonymously() throws Exception {
-    // Anonymous on purpose: the device that could not open the app often has no web session
-    // either, and behind the catch-all this would answer 302 into the OAuth entry point.
     mvc()
         .perform(get(CALLBACK_WITH_CODE))
         .andExpect(status().isSeeOther())
@@ -101,10 +81,6 @@ class AppLinkControllerTest {
   @Test
   @DisplayName("the redirect target carries no part of the authorization code")
   void redirectDropsTheAuthorizationCode() throws Exception {
-    // The whole point of redirecting rather than rendering. A page served at the callback would
-    // leave the code in the address bar, in the history entry, and — since the response is
-    // Referrer-Policy: strict-origin-when-cross-origin — in the Referer of every same-origin
-    // subresource it pulls.
     String location =
         mvc().perform(get(CALLBACK_WITH_CODE)).andReturn().getResponse().getRedirectedUrl();
 
@@ -127,8 +103,6 @@ class AppLinkControllerTest {
   @Test
   @DisplayName("the help page resolves its text, rather than printing the keys")
   void helpPageResolvesItsMessages() throws Exception {
-    // A missing bundle entry renders as ??appLink.title_de?? and still returns 200, so the status
-    // assertion above cannot see it.
     String body =
         mvc().perform(get("/app/link-help")).andReturn().getResponse().getContentAsString();
 

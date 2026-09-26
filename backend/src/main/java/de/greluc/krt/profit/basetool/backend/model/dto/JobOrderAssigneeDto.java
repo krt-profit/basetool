@@ -22,11 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Outbound view of a single job-order assignee edge: the assigned {@link UserDto} plus the
- * assignee's optional free-text {@code note} and the edge's own optimistic-lock {@code version}.
- * The note is visible to everyone who can see the order; only the assignee themselves or a
- * Logistician+ may change it. The {@code version} is the per-edge lock token the note PUT/DELETE
- * echoes back, independent of the parent order's version.
+ * One job-order assignee: the user, their optional note and the edge's own optimistic-lock version,
+ * independent of the order's version.
  *
  * @param user the assigned user
  * @param note the assignee's note, or {@code null} when none is set

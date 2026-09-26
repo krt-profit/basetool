@@ -50,17 +50,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Rejects ingest requests whose body exceeds the configured cap before it is relayed to the backend
- * (REQ-INGEST-005) — the gateway mirror of the frontend proxy's 2&nbsp;MB guard. A real extract is
- * a few KB; a larger body is almost certainly hostile or buggy, so it is refused with 413 instead
- * of being buffered and streamed onward.
+ * Rejects ingest requests whose body exceeds the configured cap with 413 (REQ-INGEST-005).
  *
- * <p>An honestly-declared {@code Content-Length} is checked up front. A {@code Transfer-Encoding:
- * chunked} request carries no {@code Content-Length} ({@code getContentLengthLong()} returns {@code
- * -1}), which an attacker could otherwise use to slip an arbitrarily large body past a length-only
- * check and exhaust the gateway heap (security audit INGEST-DOS-1). For that case the body is
- * counted as it is read and rejected the moment it crosses the cap; a within-cap body is buffered
- * (bounded by the cap) and re-served to the controller unchanged.
+ * <p>A declared {@code Content-Length} is checked up front; a chunked body is counted while read
+ * and rejected once it crosses the cap, otherwise re-served to the controller from a bounded
+ * buffer.
  */
 @Component
 @Slf4j
@@ -69,10 +63,8 @@ import tools.jackson.databind.ObjectMapper;
 public class PayloadSizeLimitFilter extends OncePerRequestFilter {
 
   /**
-   * After the per-IP {@link RateLimitingFilter}, still before Spring Security. It used to run
-   * first, which meant a chunked body was read and buffered (up to the cap) before the caller's
-   * budget was even consulted — an over-budget flood still cost the gateway a full body read per
-   * request.
+   * Runs after {@link RateLimitingFilter} and before Spring Security, so an over-budget request is
+   * rejected before its body is read.
    */
   public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 30;
 
@@ -97,19 +89,14 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
     long max = ingestProperties.maxPayloadBytes();
     long declared = request.getContentLengthLong();
 
-    // Fast path: an honestly-declared oversized body is rejected without reading it.
     if (declared > max) {
       reject(response, declared, max);
       return;
     }
 
-    // Chunked / unknown-length body: the declared check above cannot see its real size, so count
-    // it while reading and reject once it crosses the cap.
     if (declared < 0) {
       byte[] body = readWithinCap(request.getInputStream(), max);
       if (body == null) {
-        // The stream is abandoned the moment the cap is crossed, so the exact size is unknown by
-        // design — `declared` stays -1, which is itself the diagnostic (a chunked body).
         reject(response, declared, max);
         return;
       }
@@ -124,18 +111,12 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
    * Writes the standard 413 {@code application/problem+json} response.
    *
    * @param response the response to populate
-   * @param declaredBytes the body's declared {@code Content-Length}, or {@code -1} for a chunked
-   *     body whose real size was never fully read
+   * @param declaredBytes the declared {@code Content-Length}, or {@code -1} for a chunked body
    * @param maxBytes the configured cap the body exceeded
    * @throws IOException if writing the body fails
    */
   private void reject(@NotNull HttpServletResponse response, long declaredBytes, long maxBytes)
       throws IOException {
-    // REQ-OBS-011: the DoS guard was silent (no log, no metric) unlike the sibling bot / rate-limit
-    // filters — count and DEBUG-log each 413 so a flood of oversized-body probes is detectable.
-    // Both sizes are logged because the reject alone does not say which of the two very different
-    // situations it is: a cap set below what a legitimate extract needs (declared just over max),
-    // or a hostile body (declared orders of magnitude over, or -1 for a chunked flood).
     meterRegistry.counter(MetricNames.INGEST_PAYLOAD_REJECTED).increment();
     log.debug(
         "Ingest payload rejected: declared={} bytes exceeds max={} bytes", declaredBytes, maxBytes);
@@ -150,10 +131,7 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Reads up to {@code maxBytes} from the stream, returning the buffered bytes — or {@code null}
-   * when the stream carries more than {@code maxBytes}, signalling the caller to reject with 413.
-   * At most {@code maxBytes} plus one read-buffer worth of data is ever held in memory, and reading
-   * stops the moment the cap is crossed so a hostile body is never fully buffered.
+   * Reads the stream up to {@code maxBytes}, stopping as soon as the cap is crossed.
    *
    * @param in the request body stream
    * @param maxBytes the inclusive cap
@@ -177,11 +155,8 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Limits this filter to the ingest endpoints; other paths (actuator, api-docs) are unaffected.
-   *
-   * <p>Decided on the decoded path via {@link IngestPathScope}: a raw {@code getRequestURI()}
-   * prefix test would skip the cap for an encoded spelling of the same endpoint, handing back the
-   * unbounded-body vector this filter exists to close.
+   * Limits this filter to the ingest endpoints, decided on the decoded path via {@link
+   * IngestPathScope}.
    *
    * @param request the current request
    * @return {@code true} for any path that is not under {@code /v1}
@@ -192,12 +167,8 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Re-serves an already-counted request body to downstream handlers from an in-memory buffer, so
-   * the controller can still read a chunked body the filter had to consume to measure it.
-   *
-   * <p>The buffer is adopted, not copied: {@link #readWithinCap} hands over a freshly allocated
-   * array nothing else references, so the former defensive {@code clone()} only doubled the peak
-   * memory of every chunked upload — up to the full cap — for no protection at all.
+   * Re-serves an already-read request body from memory so the controller can read it; the buffer is
+   * adopted without copying.
    */
   private static final class CachedBodyRequest extends HttpServletRequestWrapper {
 
@@ -228,8 +199,6 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
 
         @Override
         public int read(byte @NotNull [] buffer, int offset, int length) {
-          // Bulk read. The inherited InputStream#read(byte[], int, int) loops over read() one byte
-          // at a time, which is what Jackson hit for every byte of a buffered chunked body.
           return delegate.read(buffer, offset, length);
         }
 

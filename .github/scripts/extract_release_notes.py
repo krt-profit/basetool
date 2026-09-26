@@ -1,24 +1,10 @@
 #!/usr/bin/env python3
 """Render a GitHub Release body for a tag from the reconciled CHANGELOG.
 
-Given a tag such as ``v0.3.55`` this slices the dated ``## [v0.3.55](...) - DATE``
-section that ``reconcile_changelog.py`` produced and re-emits its body with the
-German Keep-a-Changelog headers (``### Added`` / ``### Changed`` / ``### Fixed``
-/ ...) remapped to the release-notes skill's German rubric headings
-(``## Neu`` / ``## Verbesserungen`` / ``## Fehlerbehebungen`` / ...). The bullet
-text is copied verbatim: this is a deterministic CI extraction for the GitHub
-Release body, not the skill's LLM-driven editorial rewrite, so it neither filters
-internal entries nor simplifies the prose -- it only reshapes the headings.
-
-When ``--version``, ``--registry`` and ``--owner`` are all supplied, a Docker
-image + SBOM footer is appended, so the workflow obtains the complete release
-body from one call. Building the whole body here (rather than with shell
-``printf``) keeps the literal markdown backticks out of the workflow's shell,
-where shellcheck would otherwise mistake them for command substitution (SC2016).
-
-If the tag has no section -- e.g. the release contained only internal commits --
-a neutral German placeholder line is emitted and the exit code stays 0, so the
-release is still created.
+Copies the tag's section verbatim, remapping ``### Added`` / ``### Changed`` / ... to
+the German rubric headings (``## Neu`` / ``## Verbesserungen`` / ...). With
+``--version``, ``--registry`` and ``--owner`` a Docker image and SBOM footer is
+appended. A tag without a section yields a German placeholder line; exit code 0.
 
 Usage:
     extract_release_notes.py <tag> [changelog]
@@ -28,19 +14,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import re
 import sys
 
-# Ensure umlauts print on any console (Windows defaults to cp1252 and crashes).
 for _stream in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(AttributeError, ValueError):
         _stream.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):  # already wrapped / not reconfigurable
-        pass
 
-# A CHANGELOG ``### `` section's first word -> the release-notes skill's German
-# rubric. Sections without a mapping keep their own first word as the heading so
-# nothing is silently dropped (this CI extraction is content-preserving).
 RUBRIC: dict[str, str] = {
     "Added": "Neu",
     "Changed": "Verbesserungen",
@@ -50,20 +31,8 @@ RUBRIC: dict[str, str] = {
     "Deprecated": "Veraltet",
 }
 
-# The modules whose production image is built, scanned, signed and pushed on every
-# release. This must stay in lock-step with the ``module:`` build matrix in
-# ``release-images.yml``, and ``check_sbom_coverage.py`` asserts that it does --
-# the list here silently lost ``ingest`` while the matrix kept building, scanning
-# and signing it, so three releases announced two of the three images they ship.
-# An image missing from the notes does not read as an omission; it reads as an
-# image the release does not have, which is the same failure mode the SBOM
-# checker was written for.
 SERVICE_IMAGES: tuple[str, ...] = ("backend", "frontend", "ingest")
 
-# The modules whose CycloneDX SBOMs are attached to the release and committed
-# under ``<module>/docs/`` (REQ-OPS-025). Deliberately NOT the same set as the
-# images above: ``keycloak-spi`` ships a provider-JAR bundle rather than a
-# service image, and is still a component a consumer has to be able to audit.
 SBOM_MODULES: tuple[str, ...] = ("backend", "frontend", "ingest", "keycloak-spi")
 
 
@@ -82,7 +51,6 @@ def changelog_section(tag: str, path: str) -> str:
     with open(path, encoding="utf-8") as handle:
         lines = handle.read().split("\n")
 
-    # Match the reconciled, dated version heading "## [<tag>](...) - DATE".
     head = re.compile(rf"^## \[{re.escape(tag)}\]")
     start = next((i for i, line in enumerate(lines) if head.match(line)), None)
     if start is None:
@@ -155,7 +123,6 @@ def main() -> None:
     parts = [changelog_section(args.tag, args.changelog)]
     if args.version and args.registry and args.owner:
         parts.append(image_and_sbom_footer(args.version, args.registry, args.owner))
-    # Blank line between the changelog section and the footer.
     print("\n\n".join(parts))
 
 

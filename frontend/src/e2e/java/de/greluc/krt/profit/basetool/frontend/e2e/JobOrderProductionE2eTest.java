@@ -43,35 +43,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow for the Herstellung (production booking) feature of ITEM job orders
- * (REQ-ORDERS-025): a logistician records how many ordered units were manufactured, and the booking
- * consumes the exact linked inventory the recipe needs. Delivery is gated by manufacture — a fresh
- * item order (manufactured = 0) offers no item-handover control until production is booked.
+ * E2E flow for production booking (Herstellung) on ITEM job orders (REQ-ORDERS-025).
  *
- * <p>The fixture creates a one-unit order of the bootstrap-seeded orderable widget (its blueprint
- * derives a single RESOURCE material at 1.0 SCU/unit), then links one inventory entry of that exact
- * recipe material to the order over the API. The flow then drives the real production modal from
- * the "Bestellte Items" tab (the production surface folds into it): it enters an amount, allocates
- * the required demand from the linked stock entry, and books once the reconcile chip reports full
- * coverage.
- *
- * <p>Since REQ-INV-032 the production modal additionally carries a REQUIRED book-in section: the
- * produced units land as game-item Lager stock at a chosen location, so the flow picks the location
- * combobox (the reconcile gate holds the book button until one is chosen) and afterwards proves the
- * booked-in stock end-to-end — the item-stock total of the produced game item grows by exactly the
- * manufactured unit (read through the same grouped {@code catalog=ITEM} API the item view uses),
- * and the produced widget is visible on {@code /inventory/all?view=items} with its name and
- * whole-unit amount.
- *
- * <p>Six things are asserted end-to-end: before production the item-handover control is absent
- * (delivery gated); the booking succeeds through the UI; afterwards the persisted {@code
- * manufacturedAmount} is 1 (read back through the backend) and the item-handover control has
- * appeared (delivery unlocked); the produced stock is visible in the shared Lager's item view
- * (REQ-INV-032); since the book-in auto-earmarks the produced unit to the order, the order detail's
- * "Bestellte Items" tab shows the earmarked stock inline in the item's expand row (REQ-ORDERS-028);
- * and marking it delivered on the item-collection page persists the per-(entry, order) delivered
- * marker (REQ-ORDERS-030/031). The actor is {@code test-admin}, which satisfies the production role
- * gate through the role hierarchy and is an IRIDIUM member (the order's responsible unit).
+ * <p>Asserts that delivery is gated until production is booked, that booking through the modal
+ * consumes the linked stock and books the produced unit into the Lager (REQ-INV-032), that the
+ * earmarked stock shows on the order's "Bestellte Items" tab (REQ-ORDERS-028), and that marking it
+ * delivered persists (REQ-ORDERS-030/031). Runs as {@code test-admin}.
  */
 @Tag("e2e")
 class JobOrderProductionE2eTest {
@@ -111,13 +88,9 @@ class JobOrderProductionE2eTest {
   }
 
   /**
-   * Creates a one-unit item order, verifies delivery is gated pre-production, books the manufacture
-   * of the single unit through the production modal (consuming the linked stock and booking the
-   * produced unit in, REQ-INV-032), and asserts the persisted manufactured amount, the now-unlocked
-   * item-handover control, and the produced item stock — grown by exactly one unit and visible on
-   * the shared Lager's item view. Finally it asserts the order-detail "Bestellte Items" tab shows
-   * the auto-earmarked stock inline in the item's expand row (REQ-ORDERS-028), and marking it
-   * delivered on the item-collection page persists the marker (REQ-ORDERS-030/031).
+   * Books production of a one-unit item order and asserts the gated-then-unlocked delivery control,
+   * the persisted manufactured amount, the booked-in item stock, the earmarked stock on the order
+   * detail, and the persisted delivered marker.
    */
   @Test
   void booksProductionConsumingLinkedStockAndUnlocksDelivery() {
@@ -138,48 +111,32 @@ class JobOrderProductionE2eTest {
         JsonObject order = seeder.findOrderByHandle(USERNAME, PASSWORD, handle);
         String id = order.get("id").getAsString();
 
-        // Delivery is gated by manufacture: with manufactured = 0 the item-handover control is not
-        // rendered yet, and the tab explains why instead of showing a misleading "all delivered"
-        // note (REQ-ORDERS-025).
         E2eSupport.navigate(page, baseUrl + "/orders/" + id + "?tab=item-handovers");
         assertThat(page.getByTestId("item-handover-open")).hasCount(0);
         assertThat(page.getByTestId("item-handover-none-manufactured")).isVisible();
 
-        // Link one inventory entry of the order's exact derived recipe material, so the production
-        // modal has stock to consume. The recipe material is resolved from the persisted order
-        // rather
-        // than assumed, so the linked stock always matches what the modal fetches.
         String materialId = firstRecipeMaterialId(seeder, id);
         String locationId =
             seeder.createLocation(USERNAME, PASSWORD, "E2E Production Loc " + UUID.randomUUID());
         seeder.createInventoryItemForJobOrder(
             USERNAME, PASSWORD, materialId, locationId, id, 1000, 5);
 
-        // REQ-INV-032 baseline: the produced widget's squadron-wide item-stock total before the
-        // booking. The bootstrap widget is shared across the suite's item-order classes, so the
-        // proof is a delta, never an absolute total.
         String gameItemId = orderedGameItemId(seeder, id);
         double stockBefore = itemStockTotal(seeder, gameItemId);
 
         bookProductionOfOneUnit(page, baseUrl, id);
 
-        // The manufactured amount is now persisted, and delivery is unlocked: the item-handover
-        // control appears (outstanding = manufactured - delivered = 1).
         assertEquals(
             1, manufacturedAmount(seeder, id), "one unit must be recorded as manufactured");
         E2eSupport.navigate(page, baseUrl + "/orders/" + id + "?tab=item-handovers");
         assertThat(page.getByTestId("item-handover-open")).isVisible();
 
-        // REQ-INV-032 end-to-end: the booking also booked the produced unit in as game-item Lager
-        // stock — the item-stock total grew by exactly the manufactured unit ...
         double stockAfter = itemStockTotal(seeder, gameItemId);
         assertEquals(
             stockBefore + 1.0,
             stockAfter,
             0.001,
             "the production booking must book the produced unit in as item stock");
-        // ... and the produced stock is visible on the shared Lager's item view: the widget's
-        // group row renders the gameItem name and the whole-unit total (no quality columns).
         E2eSupport.navigate(page, baseUrl + "/inventory/all?view=items");
         Locator itemGroupRow =
             page.locator("div.tree-row--group[data-game-item-id='" + gameItemId + "']");
@@ -189,10 +146,6 @@ class JobOrderProductionE2eTest {
         assertThat(itemGroupRow.locator(".tree-amount"))
             .containsText(Pattern.compile("(?<!\\d)" + Math.round(stockAfter) + "(?!\\d)"));
 
-        // REQ-ORDERS-028: the produced unit was auto-earmarked to the order ("dem Auftrag
-        // zuordnen" defaults on), so the order detail's "Bestellte Items" tab shows the earmarked
-        // stock inline in the item's expand row — expand the line and the stock block lists the
-        // earmarked whole unit (read-only; collecting happens on the Itemsammelübersicht page).
         E2eSupport.navigate(page, baseUrl + "/orders/" + id + "?tab=items");
         Locator expandToggle =
             page.locator("button.od-prod-toggle[data-trigger='od-toggle-demand']").first();
@@ -203,13 +156,6 @@ class JobOrderProductionE2eTest {
         assertThat(inlineStock).isVisible();
         assertThat(inlineStock.locator("tbody tr")).hasCount(1);
 
-        // REQ-ORDERS-030 (delivered flip): collecting / marking delivered happens on the
-        // Itemsammelübersicht page (analogous to the Materialsammlung). The per-(entry, order)
-        // toggle starts unchecked; flipping it persists via PATCH /inventory/{id}/delivered. Await
-        // the PATCH so the mutation is not dropped, then prove both halves: the re-rendered
-        // checkbox
-        // reflects the new state, and the marker is persisted (read back through the item-stock
-        // endpoint, not the optimistic checkbox).
         E2eSupport.navigate(page, baseUrl + "/orders/" + id + "/item-collection");
         Locator deliveredToggle =
             page.locator("input.delivered-checkbox[data-job-order-id='" + id + "']").first();
@@ -248,8 +194,6 @@ class JobOrderProductionE2eTest {
     page.locator("#item-requestingOrgUnitId").selectOption(IRIDIUM_ID);
     page.locator("#item-handle").fill(handle);
 
-    // Pick the seeded widget explicitly (by name) so the derived recipe is the known single 1.0-SCU
-    // material, then wait for the derivation to render the first material's quality control.
     page.getByTestId("order-item-combobox").first().click();
     page.locator("li[role='option']")
         .filter(new Locator.FilterOptions().setHasText(ORDERABLE_ITEM_NAME))
@@ -257,8 +201,6 @@ class JobOrderProductionE2eTest {
         .click();
     page.locator("select[name='items[0].materials[0].quality']").waitFor();
 
-    // Order exactly one unit (re-deriving the recipe), so a single produced unit completes the line
-    // and its 1.0-SCU/unit ingredient needs exactly 1.0 SCU.
     page.locator("input[name='items[0].amount']").fill("1");
     page.locator("select[name='items[0].materials[0].quality']").waitFor();
 
@@ -277,30 +219,18 @@ class JobOrderProductionE2eTest {
    * @param orderId the item order to book production against
    */
   private static void bookProductionOfOneUnit(Page page, String baseUrl, String orderId) {
-    // The production surface folds into the "Bestellte Items" tab (#1317 follow-up): the
-    // "Herstellung
-    // erfassen" button is the last column there, and there is no separate Herstellung tab.
     E2eSupport.navigate(page, baseUrl + "/orders/" + orderId + "?tab=items");
     page.locator("[data-trigger='od-open-production']").first().click();
 
-    // The modal lazily fetches the material's linked inventory; wait for the per-entry allocation
-    // input to render, then cover the full demand (1.0 SCU for one unit at 1.0 SCU/unit).
     Locator allocation = page.locator("#production-materials [data-prod-alloc]").first();
     allocation.waitFor();
     page.locator("#production-amount").fill("1");
     allocation.fill("1");
 
-    // Book-in gate (REQ-INV-032): with the demand covered but no location picked yet the book
-    // button stays disabled; picking the first offered location from the server-searched
-    // remote-locations combobox (browse-mode fetch on open, REQ-FE-016) re-enables it. Which
-    // location receives the stock is irrelevant to this flow — the stock assertion sums across
-    // locations.
     assertThat(page.locator("#production-book-btn")).isDisabled();
     E2eSupport.selectComboboxFirstOption(
         page.locator(".krt-combobox:has(#production-location) .krt-combobox__input"));
 
-    // Reconcile enables the book button only when every material's demand is exactly covered and
-    // the book-in location is chosen.
     assertThat(page.locator("#production-book-btn")).isEnabled();
     page.waitForResponse(
         response ->

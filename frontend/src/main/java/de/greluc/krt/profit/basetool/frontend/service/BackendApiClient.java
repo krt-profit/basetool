@@ -50,30 +50,19 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * WebClient wrapper for the backend REST API. Centralises RFC-7807 problem-response parsing into
- * {@link BackendServiceException} and exposes typed convenience overloads for every HTTP verb.
- * {@code getCached(CachedCatalog, ...)} layers Spring Cache on top, routing each {@link
- * CachedCatalog} to its per-domain named cache via {@link CatalogCacheResolver} (FE-CACHE-1/2).
+ * WebClient wrapper for the backend REST API: parses RFC-7807 problem responses into {@link
+ * BackendServiceException} and exposes typed overloads for every HTTP verb. {@code
+ * getCached(CachedCatalog, ...)} adds Spring Cache, routing each {@link CachedCatalog} to its
+ * domain cache via {@link CatalogCacheResolver}.
  *
- * <p><b>Resilience layering.</b> Every outbound call — regardless of HTTP verb — passes through the
- * {@link de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter WebClient
- * filter chain}, which applies the operators bulkhead → time limiter → retry (only on idempotent
- * verbs GET/HEAD/OPTIONS/TRACE, never on writes) → circuit breaker against the {@code backendApi}
- * Resilience4j instance. The filter-level {@link io.github.resilience4j.timelimiter.TimeLimiter}
- * therefore covers POST/PUT/PATCH/DELETE the same way it covers GET — there is no timeout gap on
- * state-changing calls. This filter chain is the <b>single</b> resilience pass: the formerly
- * present method-level {@code @Retry}/{@code @CircuitBreaker} AOP annotations (bound to a separate
- * {@code backend} Resilience4j instance) were removed because they wrapped every call a second time
- * — double-retrying each GET (up to 2×2 attempts) and tracking a parallel circuit-breaker window —
- * without adding the one thing that actually guards a hung upstream thread, the {@link
- * io.github.resilience4j.timelimiter.TimeLimiter}, which only the filter carries. Removing them
- * also makes a circuit-breaker-open on a write surface as a clean {@code 503} (the filter throws
- * {@link io.github.resilience4j.circuitbreaker.CallNotPermittedException} inside the reactive
- * chain, where {@link #exchange} maps it) instead of escaping the AOP proxy unmapped.
+ * <p>Resilience comes solely from the {@link
+ * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter WebClient filter
+ * chain}: bulkhead, time limiter, retry (idempotent verbs only) and circuit breaker, for every
+ * verb.
  *
- * <p>Page controllers should call into this client and let {@link
- * de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler} surface failures — do
- * not catch {@link BackendServiceException} on the call site.
+ * <p>Page controllers let {@link
+ * de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler} surface failures rather
+ * than catching {@link BackendServiceException}.
  */
 @Service
 @RequiredArgsConstructor
@@ -83,11 +72,8 @@ public class BackendApiClient {
   private final WebClient webClient;
 
   /**
-   * The bearer-less client for the Terms-of-Use wording, and nothing else (REQ-SEC-052).
-   *
-   * <p>Injected by name so the narrowing is enforced by the object graph rather than by a comment:
-   * a second caller would have to ask for this bean explicitly, which {@code
-   * TermsDocumentClientUsageTest} refuses.
+   * The bearer-less client for the Terms-of-Use wording, and nothing else (REQ-SEC-052); {@code
+   * TermsDocumentClientUsageTest} refuses any other injection of it.
    */
   private final WebClient termsDocumentClient;
 
@@ -95,16 +81,10 @@ public class BackendApiClient {
   private static final String TERMS_DOCUMENT_URI = "/api/v1/terms/document";
 
   /**
-   * Reads the Terms-of-Use wording in force, without a bearer token.
+   * Reads the Terms-of-Use wording in force without a bearer token, for the public {@code /terms}
+   * page (REQ-SEC-052).
    *
-   * <p>The one anonymous backend call the frontend makes (ADR-0138 / REQ-SEC-028, REQ-SEC-052). It
-   * has to be anonymous because the public {@code /terms} page renders it for a visitor who has no
-   * session, and it can be anonymous because the document is the same text that page publishes.
-   *
-   * <p>A named method rather than a boolean flag. Its predecessor was {@code get(uri, type, true)},
-   * and the flag was passed at roughly forty call sites — every one of them a decision to send a
-   * request with no identity, taken by typing {@code true}. Now there is one method, one client and
-   * one URI, and {@code TermsDocumentClientUsageTest} asserts nothing else injects the bean.
+   * <p>The only anonymous backend call the frontend makes.
    *
    * @return the wording in force, or {@code null} when the backend returned no body
    */
@@ -143,20 +123,12 @@ public class BackendApiClient {
   }
 
   /**
-   * Whether a problem code is one of the access gates refusing an authenticated user, rather than a
-   * backend-call failure.
+   * Whether a problem code is one of the access gates refusing an authenticated user (pending
+   * approval, unaccepted terms, no role) rather than a backend-call failure.
    *
-   * <p>All three are expected, high-frequency and self-clearing: a pending registration polls until
-   * an admin approves it, an unconsented session hits the Terms-of-Use gate on every request until
-   * it accepts, and a role-less account is refused on every call until an administrator assigns one
-   * (REQ-SEC-017, REQ-SEC-028, REQ-SEC-053). None of them says anything about backend health, which
-   * is what {@code basetool_backend_client_errors_total} is read as.
-   *
-   * <p>{@code NO_ROLE} joined the list on 2026-09-06, having been missed when it shipped: one
-   * waiting account loading one page produced a WARN and an error-counter increment per fragment on
-   * it — {@code /users/me}, terms status, capabilities, notifications, active org unit, org units,
-   * mission search — which is the shape that made {@code BackendCallFailureSustained} fire on the
-   * consent rollout and is exactly what excluding the other two exists to prevent.
+   * <p>These refusals are expected, frequent and self-clearing (REQ-SEC-017, REQ-SEC-028,
+   * REQ-SEC-053), so they are not treated as backend failures in the logs or in {@code
+   * basetool_backend_client_errors_total}.
    *
    * @param problemCode the RFC 7807 {@code code} the backend returned, may be {@code null}
    * @return {@code true} when the refusal is an expected access gate
@@ -174,11 +146,8 @@ public class BackendApiClient {
 
   /**
    * GET against the authenticated backend, expanding {@code uriVariables} into {@code uriTemplate}
-   * so the WebClient encodes them per RFC 3986. Prefer this over hand-encoding a value into the URI
-   * string: a value carrying spaces or reserved characters (e.g. a normalized blueprint product key
-   * such as {@code killshot "dominion camo" rifle}) round-trips intact, whereas {@code
-   * URLEncoder.encode} form-encoding (space &rarr; {@code +}) gets mangled when re-encoded across
-   * the frontend&rarr;backend hop. Targets the authenticated WebClient only.
+   * so the WebClient encodes them per RFC 3986. Prefer this over hand-encoding values with spaces
+   * or reserved characters into the URI.
    *
    * @param uriTemplate the URI template containing {@code {name}} placeholders
    * @param responseType the decoded response type
@@ -201,11 +170,9 @@ public class BackendApiClient {
   }
 
   /**
-   * Cached GET of a {@link CachedCatalog}. Subsequent calls within the catalogue's domain-cache TTL
-   * hit the cache; the per-domain named cache is resolved by {@link CatalogCacheResolver}
-   * (FE-CACHE-1/2). Only an allowlisted {@link CachedCatalog} can be cached, so a per-principal URI
-   * is unrepresentable. A {@link CachedCatalog.Fetch#PAGE_WALK} catalogue is assembled complete —
-   * every backend page walked and merged before the single cache write (REQ-ADMIN-003).
+   * Cached GET of a {@link CachedCatalog}, stored in its domain cache (resolved by {@link
+   * CatalogCacheResolver}) until the domain's TTL expires or an eviction. A {@link
+   * CachedCatalog.Fetch#PAGE_WALK} catalogue is cached complete, every page merged (REQ-ADMIN-003).
    *
    * @param catalog the allowlisted catalogue to fetch and cache
    * @param responseType the decoded response type
@@ -214,9 +181,6 @@ public class BackendApiClient {
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
-    // The page walk is not an optimisation: a bounded single GET of a PAGE_WALK catalogue returns
-    // its first chunk, and the cache then holds that truncated answer for the whole TTL
-    // (REQ-ADMIN-003). A mid-walk failure propagates unchanged, so no partial catalogue is cached.
     if (catalog.isPageWalked()) {
       return fetchCompleteCatalog(catalog, responseType);
     }
@@ -249,22 +213,15 @@ public class BackendApiClient {
 
   /**
    * Assembles a {@link CachedCatalog.Fetch#PAGE_WALK} catalogue by walking every backend page
-   * through {@link CatalogPages#fetchAll} ({@code &page=0..n} appended to the pinned URI, whose
-   * {@code size=} is the chunk size) and merging the contents into one synthetic {@link
-   * PageResponse} — the value the caller's {@code @Cacheable} frame then caches, so the cached
-   * entry is always the complete catalogue. Hitting the {@link CatalogPages#MAX_CATALOG_PAGES}
-   * runaway cap logs a warning instead of a banner: these catalogues feed pickers and sidebar
-   * fragments with no page-level truncation surface (REQ-ADMIN-003).
+   * through {@link CatalogPages#fetchAll} and merging the contents into one {@link PageResponse},
+   * which the caller's {@code @Cacheable} frame caches (REQ-ADMIN-003). Hitting {@link
+   * CatalogPages#MAX_CATALOG_PAGES} logs a warning.
    *
    * @param catalog the page-walked catalogue to assemble
-   * @param responseType the caller's declared response type — always {@code PageResponse<E>} for a
-   *     page-walked catalogue
+   * @param responseType the caller's declared response type, always {@code PageResponse<E>}
    * @param <T> the caller's response body type
    * @return the merged catalogue as a single {@code PageResponse}
    */
-  // A PAGE_WALK catalogue is always consumed as PageResponse<E> via the type-ref overload
-  // (FrontendCacheSplitTest pins the modes; the Class overload rejects walked constants), so the
-  // T <-> PageResponse casts below are the unavoidable Object->generic case.
   @NotNull
   @SuppressWarnings("unchecked")
   private <T> T fetchCompleteCatalog(
@@ -319,12 +276,8 @@ public class BackendApiClient {
   }
 
   /**
-   * Coarse evict-all fallback (drops every catalogue domain). Retained for admin mutations whose
-   * changed domain set is not cleanly known at the call site (e.g. the shared {@code
-   * AdminMissionDataPageController.okOrRelay} AJAX helper that spans job-types / squadrons /
-   * frequency-types) — over-eviction is always safe, whereas a wrong narrow evict would strand
-   * stale data (REQ-DATA-007). Prefer {@link #evict(CacheDomain...)} with the precise domain(s) at
-   * any single-purpose site.
+   * Evicts every catalogue domain, for admin mutations whose affected domains are not known at the
+   * call site (REQ-DATA-007). Prefer {@link #evict(CacheDomain...)} wherever the domain is known.
    */
   public void clearStaticDataCache() {
     evictAllCatalogues();
@@ -424,18 +377,13 @@ public class BackendApiClient {
   }
 
   /**
-   * The single backend exchange every verb goes through: build the request, retrieve, decode, block
-   * — and map every failure the same way. A {@link WebClientResponseException} is handed to {@link
-   * #handleWebClientException} (RFC 7807 parsing, logging, the error counter); anything else —
-   * including a Resilience4j refusal the {@code WebClientConfig} filter raised inside the reactive
-   * chain, and a malformed URI template — to {@link #handleException}. Both always throw, so the
-   * method either returns the decoded body or fails with a {@link BackendServiceException} or
-   * {@link ReauthenticationRequiredException}.
+   * The single backend exchange every verb goes through: builds the request, retrieves, decodes and
+   * blocks, mapping every failure the same way.
    *
-   * <p>It replaced eight per-verb copies of the same {@code try}/{@code catch} (FE-SIMP-02). The
-   * request is built <em>inside</em> the {@code try} on purpose, exactly as those copies did: a URI
-   * the WebClient cannot expand fails the same way a transport fault does rather than escaping
-   * unmapped.
+   * <p>A {@link WebClientResponseException} goes to {@link #handleWebClientException}; anything
+   * else, including a Resilience4j refusal and a malformed URI template, to {@link
+   * #handleException}. Either way the call returns the body or throws {@link
+   * BackendServiceException} or {@link ReauthenticationRequiredException}.
    *
    * @param method the HTTP verb, used only as the log field and the {@code method} metric label
    * @param uri the path or URI template, used only in log lines and exception messages
@@ -474,31 +422,9 @@ public class BackendApiClient {
 
   private <T> T handleWebClientException(WebClientResponseException e, String method, String uri) {
     if (!e.getStatusCode().isError()) {
-      // Not a backend refusal at all, despite the exception type. A WebClient exchange that fails
-      // while the RESPONSE BODY is still being read is wrapped by Spring's DefaultClientResponse
-      // into a WebClientResponseException carrying the status that had ALREADY arrived — so a
-      // connection torn down mid-body surfaces as "200 OK from GET /api/v1/missions/lookup, but
-      // response failed with cause: PrematureCloseException: Connection prematurely closed DURING
-      // response". The status line is the truth about the headers, not about the call.
-      //
-      // Feeding that to the Problem+JSON path produced `Backend returned 200 [UNKNOWN]`: an error
-      // object that claims success, a WARN naming a "client error" no client made, an empty
-      // correlationId the backend never got to send, and — because 200 < 500 — the transport fault
-      // counted as `reason=backend_4xx`, i.e. blamed on the caller. The page controllers then
-      // logged it at ERROR with a stack trace whose top frame pointed at `fromProblem`, which
-      // reads as a parsing bug rather than a lost connection. Observed in production 2026-09-20.
-      //
-      // The sibling failure — the connection dying BEFORE any response — never had this problem:
-      // Spring raises WebClientRequestException there, which `catch (Exception)` already routes to
-      // handleException. Send this one the same way so both halves of one transport fault are
-      // classified alike (504 / BACKEND_TIMEOUT / reason=timeout).
       return handleException(e, method, uri);
     }
     BackendServiceException parsed = BackendServiceException.fromProblem(e, objectMapper);
-    // Log every RFC7807 backend failure exactly once, at the boundary, so individual page
-    // controllers don't have to repeat the same boilerplate. Field errors and the
-    // user-facing detail are included to make a 400 VALIDATION_FAILED diagnosable from the
-    // log alone (see AGENTS.md / CHANGELOG); rejected user values are never logged.
     if (parsed.getStatusCode() >= 500) {
       log.error(
           "Backend error on {} {}: status={}, code={}, correlationId={}, detail={}, fieldErrors={}",
@@ -510,20 +436,6 @@ public class BackendApiClient {
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
     } else if (isExpectedAccessGateRefusal(parsed.getProblemCode())) {
-      // Expected, high-frequency 403s, not faults. A pending-approval session polls several
-      // endpoints on every page load; an unconsented session 403s on every request, because
-      // BackendRoleSyncFilter's GET /api/v1/users/me is not exempt from the consent gate and its
-      // failure path deliberately leaves the sync stamp unset so the next request retries. After a
-      // terms change that is the whole squadron times every request. A role-less account is the
-      // same shape at a smaller scale: every fragment of every page it loads, until an
-      // administrator assigns a role. Log at DEBUG so none of them floods the client-error log
-      // (mirrors the backend PendingApprovalAccessFilter and TermsAcceptanceAccessFilter, both of
-      // which log their own refusal at DEBUG for the same reason). The backend-4xx metric below is
-      // unaffected, so the monitoring signal stays.
-      //
-      // Reading the same predicate as the metric exclusion below is deliberate: the two lists were
-      // written out separately and NO_ROLE was added to neither, so a third gate could diverge
-      // from a fourth. One list, two readers.
       log.debug(
           "Backend client error on {} {}: status={}, code={}, correlationId={}",
           method,
@@ -543,19 +455,6 @@ public class BackendApiClient {
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
     }
-    // The two access-gate refusals are NOT backend-call failures and must not be counted as such.
-    // They are the application telling the user to do something — get approved, accept the terms —
-    // and they arrive at the rate of "every unconsented session, every request". Counting them here
-    // made `BackendCallFailureSustained` (sum(rate(basetool_backend_client_errors_total[5m])) >
-    // 0.5)
-    // fire 38 minutes after the consent gate shipped, at 3.2/s: the alert cannot tell "the backend
-    // is failing" from "the gate is working", and during a rollout the second drowns the first.
-    //
-    // Nothing is lost. The backend counts each refusal itself, by code, in
-    // basetool_http_error_total{code=PENDING_APPROVAL|TERMS_NOT_ACCEPTED}, and the consent rollout
-    // has its own signal in TermsConsentRolloutStalled. Excluding only these two named codes keeps
-    // the alert sensitive to every genuine 4xx storm — which dropping the whole backend_4xx bucket
-    // from the alert expression would not.
     if (!isExpectedAccessGateRefusal(parsed.getProblemCode())) {
       countBackendError(
           parsed.getStatusCode() >= 500
@@ -568,11 +467,6 @@ public class BackendApiClient {
 
   private <T> T handleException(Exception e, String method, String uri) {
     if (ReauthenticationRequiredException.isReauthSignal(e)) {
-      // The frontend OAuth2 client has no usable token for this session (access token expired and
-      // the refresh token was rejected / rotated away). This is a per-session auth state, not a
-      // backend health problem — log it tersely (no stack trace, DEBUG) and rethrow a typed
-      // exception so GlobalExceptionHandler can bounce the user through a fresh Keycloak login
-      // instead of rendering an empty page and flooding the log with stack traces (REQ-SEC-012).
       log.debug(
           "Re-authentication required on {} {} (correlationId={})",
           method,
@@ -583,10 +477,6 @@ public class BackendApiClient {
     }
     Throwable root = unwrap(e);
     if (root instanceof CallNotPermittedException) {
-      // DEBUG, not WARN: the breaker's one-time OPEN transition already logged WARN
-      // (ResilienceEventLogger). This branch fires for every call blocked while the breaker stays
-      // open, so at WARN a routine backend restart floods the log (issue #1203, REQ-OBS-001). The
-      // failure is still metered under reason=circuit_open below, so the count is never lost.
       log.debug("Circuit breaker open for {} {}: {}", method, uri, root.getMessage());
       countBackendError(MetricNames.REASON_CIRCUIT_OPEN, method);
       throw new BackendServiceException(
@@ -610,14 +500,6 @@ public class BackendApiClient {
           java.util.Collections.emptyList(),
           null);
     }
-    // java.io.IOException is the whole transport family in one predicate: ConnectException
-    // (refused / unreachable), SocketException (reset), SSLException (handshake), and the one
-    // that motivated widening this from the former bare ConnectException — reactor.netty's
-    // PrematureCloseException, which is how a connection dying mid-exchange reaches us.
-    //
-    // Codec failures cannot land here: a body that will not decode raises DecodingException, a
-    // RuntimeException. So broadening to IOException cannot swallow a parsing bug and report it
-    // as a dead backend.
     if (root instanceof TimeoutException
         || root instanceof WebClientRequestException
         || root instanceof java.io.IOException) {

@@ -23,40 +23,16 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Pagination metadata returned by every paginated SC Wiki endpoint. Lives inside the {@code meta}
- * field of {@link ScWikiResponseDto}; consumed by {@code ScWikiClient.fetchAllPages} to decide when
- * to stop walking pages.
+ * Pagination metadata ({@code meta}) of a paginated SC Wiki response, read by {@code
+ * ScWikiClient.fetchAllPages} to stop the page walk (ADR-0147).
  *
- * <p>The standard envelope shape (verified against the live API on 2026-05-27) is:
+ * <p>A missing {@link #lastPage()} on a full first page is a contract break, and a {@link #total()}
+ * above the distinct rows enumerated voids the census before any tombstone sweep.
  *
- * <pre>{@code
- * {
- *   "data": [ ... ],
- *   "links": { ... },
- *   "meta": {
- *     "current_page": 1,
- *     "last_page":    2,
- *     "per_page":    200,
- *     "total":       205
- *   }
- * }
- * }</pre>
- *
- * <p>Some sub-resource endpoints (e.g. {@code /api/blueprints/{uuid}}) return a single row without
- * an envelope; this DTO is not used for those.
- *
- * <p>Because the record is {@link JsonIgnoreProperties}{@code (ignoreUnknown = true)}, an upstream
- * rename of any of these fields decodes as {@code null} instead of failing — which is why the
- * client treats an absent {@link #lastPage()} on a full first page as a contract break, and
- * cross-checks {@link #total()} against the number of DISTINCT rows the walk enumerated (never the
- * merged row count, which a re-paginated feed inflates by exactly as much as it hides) before
- * letting the result drive a tombstone sweep. A shortfall voids the census; a surplus does not —
- * {@code /api/items} reports 12 283 for a feed whose own paginator serves 12 331 (ADR-0147).
- *
- * @param currentPage 1-based page number this response represents
+ * @param currentPage 1-based page number of this response
  * @param lastPage highest page number for the current filter / sort
- * @param perPage rows per page (= the {@code ?page[size]=…} we sent)
- * @param total total row count across all pages; the client's completeness cross-check reads it
+ * @param perPage rows per page, as requested via {@code ?page[size]=…}
+ * @param total total row count across all pages; used for the completeness check
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiMetaDto(

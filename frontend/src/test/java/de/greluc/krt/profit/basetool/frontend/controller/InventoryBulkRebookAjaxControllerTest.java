@@ -51,10 +51,9 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * MVC tests for the Massen-Umbuchen proxy {@link InventoryWriteController#bulkRebook}
- * (REQ-INV-036): a valid request forwards the whole payload (ids, mode and targets) to the backend
- * and relays the moved/skipped counts the page needs to phrase its toast, a backend rejection is
- * propagated as {@code problem+json} with its {@code code}, and a request missing its ids or its
- * mode is rejected up front with {@code 422} without ever calling the backend.
+ * (REQ-INV-036): the payload is forwarded and the moved/skipped counts relayed, a backend rejection
+ * is relayed as {@code problem+json}, and a request without ids or mode is rejected with {@code
+ * 422} without a backend call.
  */
 @SpringBootTest
 class InventoryBulkRebookAjaxControllerTest {
@@ -96,8 +95,6 @@ class InventoryBulkRebookAjaxControllerTest {
                         + locationId
                         + "\",\"mergeStock\":true}"))
         .andExpect(status().isOk())
-        // The page distinguishes a full success from a largely-skipped run, so both counts must
-        // survive the relay unchanged.
         .andExpect(jsonPath("$.rebooked").value(3))
         .andExpect(jsonPath("$.skipped").value(2));
 
@@ -175,9 +172,6 @@ class InventoryBulkRebookAjaxControllerTest {
   @Test
   @WithMockUser
   void bulkRebook_missingMode_returns422AndDoesNotCallBackend() throws Exception {
-    // The mode drives which write the backend performs, so a payload without one must never reach
-    // it — the guard lives here because @Valid would surface as a 500 through the frontend's
-    // GlobalExceptionHandler.
     mockMvc
         .perform(
             post("/inventory/bulk-rebook")

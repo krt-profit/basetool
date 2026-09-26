@@ -82,21 +82,12 @@ class HangarServiceTest {
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
 
     ShipRequestDto request =
-        new ShipRequestDto(
-            "Test",
-            UUID.randomUUID(),
-            "LTI",
-            null,
-            false,
-            0L, // different version
-            null);
+        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, 0L, null);
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> hangarService.updateShip(userId, shipId, request));
   }
-
-  // ---- getMyShipsFiltered (REQ-HANGAR-002) ----
 
   @Test
   void getMyShipsFiltered_delegatesToRepositoryWithTrimmedSearch() {
@@ -105,7 +96,6 @@ class HangarServiceTest {
     Page<Ship> page = new PageImpl<>(List.of(new Ship()));
     when(shipRepository.findByOwnerIdFiltered(userId, "Cutlass", pageable)).thenReturn(page);
 
-    // Surrounding whitespace is trimmed before the term reaches the repository.
     Page<Ship> result = hangarService.getMyShipsFiltered(userId, "  Cutlass  ", pageable);
 
     assertEquals(page, result);
@@ -119,17 +109,13 @@ class HangarServiceTest {
     Page<Ship> page = new PageImpl<>(List.of());
     when(shipRepository.findByOwnerIdFiltered(userId, null, pageable)).thenReturn(page);
 
-    // A blank/whitespace-only term means "no filter": the repository receives null, not "".
     hangarService.getMyShipsFiltered(userId, "   ", pageable);
 
     verify(shipRepository).findByOwnerIdFiltered(userId, null, pageable);
   }
 
-  // ---- deleteAllShipsForUser ----
-
   @Test
   void deleteAllShipsForUser_DeletesAllShipsAndUnlinksUnits() {
-    // Given
     UUID userId = UUID.randomUUID();
     UUID shipId1 = UUID.randomUUID();
     UUID shipId2 = UUID.randomUUID();
@@ -147,10 +133,8 @@ class HangarServiceTest {
     when(missionUnitRepository.findByShipId(shipId1)).thenReturn(List.of(unit));
     when(missionUnitRepository.findByShipId(shipId2)).thenReturn(List.of());
 
-    // When
     hangarService.deleteAllShipsForUser(userId);
 
-    // Then
     verify(missionUnitRepository, times(1)).save(unit);
     assertNull(unit.getShip(), "MissionUnit.ship should be null after unlink");
     verify(entityManager, times(1)).flush();
@@ -159,14 +143,11 @@ class HangarServiceTest {
 
   @Test
   void deleteAllShipsForUser_NoShips_DoesNothing() {
-    // Given
     UUID userId = UUID.randomUUID();
     when(shipRepository.findByOwnerId(userId)).thenReturn(List.of());
 
-    // When
     hangarService.deleteAllShipsForUser(userId);
 
-    // Then
     verify(missionUnitRepository, never()).findByShipId(any());
     verify(shipRepository, never()).deleteAll(anyList());
     verify(entityManager, never()).flush();
@@ -174,7 +155,6 @@ class HangarServiceTest {
 
   @Test
   void deleteAllShipsForUser_OnlyDeletesOwnShips() {
-    // Given
     UUID userId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID shipId = UUID.randomUUID();
@@ -182,14 +162,11 @@ class HangarServiceTest {
     Ship ship = new Ship();
     ship.setId(shipId);
 
-    // Only ships of userId are returned by repository (user isolation guaranteed by query)
     when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship));
     when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of());
 
-    // When
     hangarService.deleteAllShipsForUser(userId);
 
-    // Then
     verify(shipRepository, times(1)).findByOwnerId(userId);
     verify(shipRepository, never()).findByOwnerId(otherUserId);
     verify(shipRepository, times(1)).deleteAll(List.of(ship));
@@ -216,17 +193,12 @@ class HangarServiceTest {
     when(shipTypeRepository.findById(typeId)).thenReturn(Optional.of(type));
     when(shipRepository.save(any(Ship.class))).thenReturn(ship);
 
-    ShipRequestDto request =
-        new ShipRequestDto(
-            "Test", typeId, "LTI", null, false, 1L, // matching version
-            null);
+    ShipRequestDto request = new ShipRequestDto("Test", typeId, "LTI", null, false, 1L, null);
 
     hangarService.updateShip(userId, shipId, request);
 
     verify(shipRepository, times(1)).save(ship);
   }
-
-  // --- R5.d.f addShip picker delegation -----------------------------------
 
   @Test
   void addShip_delegatesPickerResolutionToOwnerScopeService() {
@@ -269,9 +241,6 @@ class HangarServiceTest {
 
   @Test
   void addShip_membershiplessUser_savesOwnerlessShip() {
-    // A user with no org-unit membership (and no picker output) gets a null owning org unit from
-    // the resolver — V132 made the column nullable so the ship persists as an ownerless personal
-    // ship instead of failing the create with a 400.
     UUID userId = UUID.randomUUID();
     UUID shipTypeId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.backend.model.User user =
@@ -301,12 +270,8 @@ class HangarServiceTest {
         user, saved.getOwner(), "the ship is still attributable through its per-user owner");
   }
 
-  // --- getSquadronOverview owner-detail scoping ---------------------------
-
   @Test
   void getSquadronOverview_withOwnerDetails_scopesDetailLookupBySamePredicateAsCounts() {
-    // Given an admin pinned to a single squadron: scope = (adminAllScope=false,
-    // activeOrgUnitId=squadronId, memberOrgUnitIds=empty).
     UUID squadronId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 20);
     when(ownerScopeService.currentUnitOverviewScope())
@@ -316,8 +281,6 @@ class HangarServiceTest {
     fighter.setId(UUID.randomUUID());
     fighter.setName("Fighter");
 
-    // countShipsByType aggregates one in-scope ship of that type. List.<Object[]>of pins the
-    // element type so the lone Object[] is one row, not three Object rows (varargs trap).
     Page<Object[]> counts =
         new PageImpl<>(List.<Object[]>of(new Object[] {fighter, 1L, 1L}), pageable, 1);
     when(shipRepository.countShipsByType(false, squadronId, Set.of(), null, pageable))
@@ -334,12 +297,8 @@ class HangarServiceTest {
         .thenReturn(List.of(inScopeShip));
     when(shipMapper.shipTypeToDto(any())).thenReturn(null);
 
-    // When
     var page = hangarService.getSquadronOverview(pageable, true, null);
 
-    // Then the owner breakdown is loaded by the SCOPED query, fed the exact same scope triple as
-    // the counts — never an unscoped lookup that would leak a foreign OrgUnit's ship of a shared
-    // type into a pinned squadron's overview.
     verify(shipRepository).findByShipTypeInScoped(List.of(fighter), false, squadronId, Set.of());
     assertEquals(1, page.getContent().size());
     assertEquals(1L, page.getContent().get(0).count());
@@ -349,8 +308,6 @@ class HangarServiceTest {
 
   @Test
   void getSquadronOverview_normalizesBlankQueryToNullAndTrimsTerms() {
-    // covers REQ-HANGAR-001 — a blank filter means "no filter" (the repository's null contract),
-    // and surrounding whitespace from the search box never reaches the LIKE pattern.
     UUID squadronId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 10);
     when(ownerScopeService.currentUnitOverviewScope())
@@ -364,16 +321,12 @@ class HangarServiceTest {
             org.mockito.ArgumentMatchers.eq(pageable)))
         .thenReturn(empty);
 
-    // When the filter arrives blank / padded
     hangarService.getSquadronOverview(pageable, false, "   ");
     hangarService.getSquadronOverview(pageable, false, "  Cutlass ");
 
-    // Then the repository sees null for blank and the trimmed term otherwise
     verify(shipRepository).countShipsByType(false, squadronId, Set.of(), null, pageable);
     verify(shipRepository).countShipsByType(false, squadronId, Set.of(), "Cutlass", pageable);
   }
-
-  // --- setHomeLocationForMyShips bulk action -------------------------------
 
   @Test
   void setHomeLocationForMyShips_validHomeLocation_setsAndReturnsCount() {

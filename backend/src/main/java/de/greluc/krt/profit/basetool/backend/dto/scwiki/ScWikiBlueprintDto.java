@@ -25,15 +25,15 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * SC Wiki blueprint DTO — a row from {@code /api/blueprints} (SC_WIKI_SYNC_PLAN.md §3.3). The R4
- * {@code ScWikiBlueprintSyncService} consumes the {@link #ingredients} and {@link
- * #dismantleReturns} arrays directly off the list payload (matching the plan's §8.2 pseudocode); if
- * the upstream list endpoint omits them they bind to {@code null} and the blueprint row is still
- * persisted (the sync tolerates absent ingredient arrays and logs how many it resolved).
+ * SC Wiki blueprint row from {@code /api/blueprints}.
+ *
+ * <p>{@link #ingredients} and {@link #dismantleReturns} are read straight off the list payload and
+ * may be {@code null}; the blueprint is persisted either way.
  *
  * @param uuid SC Wiki blueprint UUID (upsert key)
  * @param key Wiki internal key, e.g. {@code "BP_CRAFT_AMRS_LaserCannon_S1"}
- * @param outputItemUuid authoritative output-item UUID (trust over any nested {@code output.uuid})
+ * @param outputItemUuid authoritative output-item UUID (trusted over any nested {@code
+ *     output.uuid})
  * @param outputName display name of the output item
  * @param categoryUuid Wiki category UUID
  * @param craftTimeSeconds craft time in seconds
@@ -41,15 +41,12 @@ import java.util.UUID;
  * @param gameVersion game version the row was last seen in
  * @param ingredientCount Wiki-reported ingredient count
  * @param unlockingMissionsCount Wiki-reported unlocking-mission count
- * @param ingredients ordered ingredient lines (may be {@code null} if the list omits them)
- * @param dismantleReturns ordered dismantle-return lines (may be {@code null})
- * @param requirementGroups named build slots, each with its ingredient children and the stat
- *     modifiers that slot contributes to the crafted item. Present only on the blueprint
- *     <em>detail</em> response ({@code GET /api/blueprints/{uuid}}); {@code null} on list payloads.
- * @param summaryProperties de-duplicated roll-up of the stats this blueprint affects (detail
- *     response only; {@code null} on list payloads)
- * @param dismantle dismantle time / efficiency metadata (detail response only; {@code null} on list
- *     payloads)
+ * @param ingredients ordered ingredient lines, or {@code null}
+ * @param dismantleReturns ordered dismantle-return lines, or {@code null}
+ * @param requirementGroups named build slots with their ingredients and stat modifiers; detail
+ *     response only, {@code null} on list payloads
+ * @param summaryProperties de-duplicated roll-up of the affected stats; detail response only
+ * @param dismantle dismantle time / efficiency; detail response only
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiBlueprintDto(

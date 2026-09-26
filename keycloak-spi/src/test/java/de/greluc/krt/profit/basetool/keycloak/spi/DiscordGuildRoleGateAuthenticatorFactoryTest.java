@@ -38,7 +38,6 @@ class DiscordGuildRoleGateAuthenticatorFactoryTest {
 
   @Test
   void declaresStableIdAndIsConfigurable() {
-    // Given / When / Then
     assertEquals("discord-guild-role-gate", factory.getId());
     assertTrue(factory.isConfigurable());
     assertFalse(factory.isUserSetupAllowed());
@@ -46,22 +45,18 @@ class DiscordGuildRoleGateAuthenticatorFactoryTest {
 
   @Test
   void offersRequiredAndDisabledOnly() {
-    // When
     List<Requirement> choices = List.of(factory.getRequirementChoices());
 
-    // Then — a gate is either enforced or off; ALTERNATIVE/CONDITIONAL make no sense here.
     assertEquals(List.of(Requirement.REQUIRED, Requirement.DISABLED), choices);
   }
 
   @Test
   void exposesGuildRoleAndApiBaseConfigKeys() {
-    // When
     Set<String> keys =
         factory.getConfigProperties().stream()
             .map(ProviderConfigProperty::getName)
             .collect(Collectors.toSet());
 
-    // Then
     assertTrue(keys.contains(DiscordGuildRoleGateAuthenticatorFactory.CONFIG_GUILD_ID));
     assertTrue(keys.contains(DiscordGuildRoleGateAuthenticatorFactory.CONFIG_KRT_MITGLIED_ROLE_ID));
     assertTrue(keys.contains(DiscordGuildRoleGateAuthenticatorFactory.CONFIG_API_BASE_URL));

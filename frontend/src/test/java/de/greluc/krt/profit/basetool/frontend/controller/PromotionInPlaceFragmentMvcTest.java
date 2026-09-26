@@ -53,14 +53,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level rendering checks for the in-place AJAX fragments the promotion admin/manage pages swap
- * after a write instead of reloading (epic #571 / #580, spec REQ-FE-005).
- *
- * <p>Each {@code ?fragment=...} request must render <em>only</em> the section that changes — the
- * list of cards / the matrix body / a single eligibility cell — and must <em>not</em> carry the
- * surrounding page chrome (toolbars, modals, the second {@code &lt;table&gt;} header). Injecting a
- * whole page into the small results container would duplicate ids and double-render the toolbar, so
- * these boundary assertions are the regression guard for the fragment cut points.
+ * Verifies that each {@code ?fragment=...} request on the promotion admin and manage pages renders
+ * only the changing section, without surrounding page chrome (REQ-FE-005).
  */
 @SpringBootTest
 class PromotionInPlaceFragmentMvcTest {
@@ -105,10 +99,7 @@ class PromotionInPlaceFragmentMvcTest {
                 .param("fragment", "topicsResults")
                 .sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
-        // The fragment must contain the topic card (proves the list rendered) ...
         .andExpect(content().string(containsString("data-pa-topic-id=\"" + topicId + "\"")))
-        // ... but NOT the page-level toolbar trigger or the create/edit modals that live
-        // outside the swapped region (a full-page leak would duplicate them).
         .andExpect(content().string(not(containsString("pa-open-create-topic"))))
         .andExpect(content().string(not(containsString("id=\"modal-create-topic\""))))
         .andExpect(content().string(not(containsString("<title"))));
@@ -192,15 +183,12 @@ class PromotionInPlaceFragmentMvcTest {
                 .param("fragment", "matrixBody")
                 .sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
-        // The matrix and its member rows must render ...
         .andExpect(
             content()
                 .string(
                     allOf(
                         containsString("pm-matrix"),
                         containsString("data-pm-user-id=\"" + memberId + "\""))))
-        // ... while the toolbar search box and bulk-edit panel that sit outside the swapped
-        // region must stay out of the fragment.
         .andExpect(content().string(not(containsString("id=\"pm-member-search\""))))
         .andExpect(content().string(not(containsString("id=\"pm-bulk-panel\""))));
   }
@@ -212,8 +200,6 @@ class PromotionInPlaceFragmentMvcTest {
     PromotionEligibilityDto elig =
         new PromotionEligibilityDto(memberId.toString(), 20, 19, true, true, List.of());
 
-    // The eligibilityCell branch returns early after a single per-member eligibility fetch —
-    // it must not trigger the full matrix build (members / evaluations / topics).
     when(backendApiClient.get(
             contains("/api/v1/promotion/eligibility/user/" + memberId), anyTypeRef()))
         .thenReturn(List.of(elig));
@@ -225,14 +211,12 @@ class PromotionInPlaceFragmentMvcTest {
                 .param("userId", memberId.toString())
                 .sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
-        // An eligible configured rule renders an eligibility chip ...
         .andExpect(
             content()
                 .string(
                     allOf(
                         containsString("eligibility-chip"),
                         containsString("data-pm-eligible=\"true\""))))
-        // ... but the fragment is just the cell content: no surrounding table or member row.
         .andExpect(content().string(not(containsString("pm-matrix"))))
         .andExpect(content().string(not(containsString("data-pm-user-id"))));
   }

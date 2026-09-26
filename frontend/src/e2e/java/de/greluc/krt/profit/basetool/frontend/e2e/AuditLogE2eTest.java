@@ -36,11 +36,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Unified admin audit-log viewer end to end (REQ-AUDIT-001/-002, ADR-0037): a bank mutation writes
- * a bank audit row, and the unified {@code /admin/audit-log} viewer lists it under the Bank tab,
- * filters by event type in place, switches between the eight area tabs, and the legacy {@code
- * /admin/bank-audit} URL redirects in. The viewer is admin-only — the permission carve-out itself
- * is covered by {@link BankPermissionsE2eTest}.
+ * Unified admin audit-log viewer end to end (REQ-AUDIT-001/-002, ADR-0037): a bank mutation appears
+ * under the Bank tab, filters work in place, tabs switch, and {@code /admin/bank-audit} redirects
+ * to the viewer.
  */
 @Tag("e2e")
 class AuditLogE2eTest {
@@ -67,7 +65,6 @@ class AuditLogE2eTest {
       return;
     }
     seeder = new BackendSeeder();
-    // Generate a deposit so a DEPOSIT_BOOKED bank audit row is guaranteed for the Bank tab.
     String employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
     String accountId =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Audit Account", "SPECIAL");
@@ -86,7 +83,8 @@ class AuditLogE2eTest {
   }
 
   /**
-   * Lists the bank tab's rows, filters in place, switches tabs, and follows the legacy redirect.
+   * Lists the bank tab's rows, filters in place, switches tabs, and follows the {@code
+   * /admin/bank-audit} redirect.
    */
   @Test
   void unifiedAuditViewerListsFiltersAndSwitchesTabs() {
@@ -97,24 +95,18 @@ class AuditLogE2eTest {
       try {
         E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
 
-        // The legacy bank-audit URL redirects into the unified page on the Bank tab.
         E2eSupport.navigate(page, baseUrl + "/admin/bank-audit");
         page.waitForLoadState();
         assertThat(page).hasURL(Pattern.compile(".*/admin/audit-log\\?domain=BANK.*"));
 
         assertThat(page.locator("[data-testid='audit-panel']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        // Web-first wait before the one-shot count(): rows paint shortly after the panel, and on
-        // slower engines (webkit) a bare count() races that paint and reads 0. isVisible retries.
         assertThat(page.locator("[data-testid='audit-row']").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertTrue(
             page.locator("[data-testid='audit-row']").count() >= 1,
             "the Bank tab lists at least one event");
 
-        // The admin retention-purge control is present (REQ-AUDIT-004); opening it surfaces the
-        // backup-recommended warning. Non-mutating on purpose — actually purging here would delete
-        // the seeded deposit row the rest of this run relies on.
         assertThat(page.locator("[data-testid='audit-purge-open']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         page.locator("[data-testid='audit-purge-open']").click();
@@ -122,12 +114,8 @@ class AuditLogE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         page.locator("#audit-purge-modal [data-trigger='close-modal-display']").first().click();
 
-        // Mark the live document: a full navigation/reload wipes it. The filter swaps the results
-        // in
-        // place (REQ-FE-002), so there is no form-post navigation to await.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // Filter to DEPOSIT_BOOKED and apply — the seeded deposit keeps the table non-empty.
         page.locator("[data-testid='audit-filter-event']").selectOption("DEPOSIT_BOOKED");
         page.locator("[data-testid='audit-filter-apply']").click();
         assertThat(page.locator("[data-testid='audit-row']").first())
@@ -136,29 +124,21 @@ class AuditLogE2eTest {
             page.locator("[data-testid='audit-row']").count() >= 1,
             "filtering by DEPOSIT_BOOKED still lists the seeded deposit");
 
-        // The filter ran in place — no page reload — and the URL carries the filter (history sync).
         assertThat(page).hasURL(Pattern.compile(".*[?&]eventType=DEPOSIT_BOOKED.*"));
         assertEquals(
             Boolean.TRUE,
             page.evaluate("() => window.__krtNoReload === true"),
             "Filtering the audit log must update in place — no page reload.");
 
-        // Since V238 the bank trail records the originating client too, so the filter is offered
-        // on this tab as well -- it was the one exception when the column shipped for audit_event
-        // alone (REQ-AUDIT-005).
         assertThat(page.locator("[data-testid='audit-filter-client']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
 
-        // Switch to the Lager (INVENTORY) tab — a tab is a plain link (full navigation).
         page.locator("[data-testid='audit-tab-INVENTORY']").click();
         page.waitForLoadState();
         assertThat(page).hasURL(Pattern.compile(".*[?&]domain=INVENTORY.*"));
         assertThat(page.locator("[data-testid='audit-panel']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
 
-        // ... and on a generic tab as well. Filtering to the app narrows to rows the app wrote;
-        // the seeded stack was written by the web frontend, so the assertion is on the round trip
-        // carrying the filter, not on a row count.
         assertThat(page.locator("[data-testid='audit-filter-client']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         page.evaluate("() => { window.__krtNoReload = true; }");

@@ -45,13 +45,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin-only read surface for the {@code external_sync_report} audit log (SC_WIKI_SYNC_PLAN.md
- * §8.8). Backs the {@code /admin/sync-reports} frontend pages.
+ * Admin-only read and purge surface for the {@code external_sync_report} audit log, backing the
+ * {@code /admin/sync-reports} pages.
  *
- * <p>Class-level {@code @PreAuthorize("hasRole('ADMIN')")} — sync diagnostics are an administration
- * concern. The endpoint is read-only; the sync services are the only writers, via {@link
- * SyncReportService}. Ordering is fixed to newest-first in the repository, so the endpoint exposes
- * only page / size, not a sort parameter (no user-controlled sort field to whitelist).
+ * <p>Results are always newest-first, so no sort parameter is exposed.
  */
 @RestController
 @RequestMapping("/api/v1/sync-reports")
@@ -97,16 +94,11 @@ public class SyncReportController {
   }
 
   /**
-   * Deletes sync-report events older than {@code olderThanDays} days, optionally scoped to one
-   * source. Backs the admin "delete reports older than X days" maintenance action. An absent /
-   * unrecognised {@code source} purges both catalogues; a recognised one confines the purge to it.
-   *
-   * <p>Method-level {@code @Transactional} (read-write) overrides the class-level {@code readOnly =
-   * true} so the {@code @Modifying} delete runs in a writable transaction.
+   * Deletes sync-report events older than {@code olderThanDays} days, optionally for one source. An
+   * absent or unrecognised {@code source} purges both catalogues.
    *
    * @param source optional catalogue filter ({@code "UEX"} / {@code "SCWIKI"}, case-insensitive)
-   * @param olderThanDays minimum age in days a report must exceed to be deleted (must be at least
-   *     1)
+   * @param olderThanDays minimum age in days a report must exceed to be deleted (at least 1)
    * @return the number of rows deleted
    */
   @NotNull

@@ -45,22 +45,14 @@ import org.mapstruct.Mapping;
     })
 public interface RefineryOrderMapper {
   /**
-   * Maps a {@link RefineryOrder} entity to its full DTO; the {@code profit} field is derived from
-   * {@link #computeProfit}.
+   * Maps a {@link RefineryOrder} to its full DTO, deriving {@code profit} via {@link
+   * #computeProfit} and publishing the owning org unit as {@code owningSquadron}.
    *
-   * <p>After R9 Step 2 the refinery-order entity exposes {@code owningOrgUnit} (typed {@code
-   * OrgUnit}); the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for
-   * API stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
-   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned orders now
-   * surface their SK badge instead of a blank cell.
-   *
-   * @param entity the refinery-order entity to project; {@code null} returns {@code null}.
-   * @return the populated refinery-order DTO.
+   * @param entity the entity to project; {@code null} returns {@code null}
+   * @return the refinery-order DTO
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
-  // owningOrgUnitId is the create/update picker INPUT; the read side publishes owningSquadron.
   @Mapping(target = "owningOrgUnitId", ignore = true)
   RefineryOrderDto toDto(RefineryOrder entity);
 
@@ -75,15 +67,12 @@ public interface RefineryOrderMapper {
   RefineryGoodDto toDto(RefineryGood good);
 
   /**
-   * Same as {@link #toDto(RefineryOrder)} but additionally fills {@code yieldBonusPercent} on every
-   * good whose {@code inputMaterial} appears in {@code yieldByMaterialId}. Goods whose material is
-   * not in the map stay {@code null} (caller must distinguish "no data" from "explicit zero" — a 0%
-   * yield row from UEX is a perfectly valid value).
+   * Maps a refinery order like {@link #toDto(RefineryOrder)} and fills {@code yieldBonusPercent} on
+   * each good whose input material is in the map; others stay {@code null}.
    *
-   * @param entity the refinery order to map, may be {@code null}
-   * @param yieldByMaterialId per-material yield bonus map (see {@code
-   *     RefineryOrderService.getYieldBonusByMaterialForLocation})
-   * @return enriched DTO, or {@code null} when {@code entity} is {@code null}
+   * @param entity the refinery order, may be {@code null}
+   * @param yieldByMaterialId per-material yield bonus in percent
+   * @return the enriched DTO, or {@code null} when {@code entity} is {@code null}
    */
   default RefineryOrderDto toDto(RefineryOrder entity, Map<UUID, Integer> yieldByMaterialId) {
     RefineryOrderDto base = toDto(entity);
@@ -115,12 +104,8 @@ public interface RefineryOrderMapper {
   }
 
   /**
-   * Slim list-row DTO of a {@link RefineryOrder}; reuses the same profit computation. Like {@link
-   * #toDto(RefineryOrder)} it routes the entity's {@code owningOrgUnit} through {@code
-   * SquadronMapper.orgUnitToReferenceDto} into the DTO's {@code owningSquadron} slot — without this
-   * explicit mapping the renamed source property ({@code owningOrgUnit} since R9 Step 2) no longer
-   * matches the target name and the IGNORE policy would leave every list row's owner {@code null},
-   * blanking the Staffel/SK column in the refinery overview.
+   * Maps a {@link RefineryOrder} to its slim list-row DTO, with the same profit computation and the
+   * owning org unit as {@code owningSquadron}.
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
@@ -131,7 +116,6 @@ public interface RefineryOrderMapper {
    * service (resolved from the JWT) and stripped here.
    */
   @Mapping(target = "owner", ignore = true)
-  // The owning org unit is resolved by the service from owningOrgUnitId (REQ-ORG-016).
   @Mapping(target = "owningOrgUnit", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
@@ -151,8 +135,8 @@ public interface RefineryOrderMapper {
   RefineryGood toEntity(RefineryGoodDto dto);
 
   /**
-   * Computes profit/loss = oreSales - expenses - otherExpenses for the order. Null values are
-   * treated as 0 so that legacy data does not trigger an NPE.
+   * Computes profit as {@code oreSales − expenses − otherExpenses}, treating {@code null} values as
+   * 0.
    */
   default Double computeProfit(RefineryOrder entity) {
     if (entity == null) {

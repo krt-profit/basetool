@@ -28,11 +28,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 /**
- * Inbound payload for adding a custom (mission-specific) radio frequency (REQ-MISSION-014).
- *
- * <p>The {@code value} carries the same input limits as the global "Frequenztypen" values — up to
- * three integer digits and two decimals (0 – 999.99), matching the {@code precision = 5, scale = 2}
- * column and the frontend {@code ^\d{1,3}([.,]\d{1,2})?$} pattern.
+ * Inbound payload for adding a mission-specific radio frequency (REQ-MISSION-014).
  *
  * @param name the free-text channel label (required, ≤100 chars).
  * @param value the frequency value (required, 0 – 999.99 with at most two decimals).

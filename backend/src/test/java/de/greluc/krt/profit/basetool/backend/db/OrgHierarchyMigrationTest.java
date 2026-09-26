@@ -35,21 +35,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the V164 org-hierarchy migration (epic #692, REQ-ORG-014/017): the two new {@code
- * org_unit} kinds, the {@code parent_org_unit_id} column with its index, the cross-row parent-kind
- * trigger, the OL-has-no-parent CHECK, the relaxed "at most two Staffeln" guard (the old single-
- * Staffel unique index is gone, replaced by INSERT- and UPDATE-side counting triggers), and the new
- * {@code org_unit_membership} leadership flags. The test profile boots Postgres via Testcontainers
- * and runs every migration at startup, so this exercises the real DDL.
- *
- * <p>Three angles are covered: structural presence of every new object (so a renamed/dropped object
- * is caught as an early-warning canary), the org_unit-side three-level parent invariants, and the
- * membership-side ≤2-Staffel counting trigger on both INSERT and UPDATE (the UPDATE path proves the
- * re-point edge case where the about-to-be-replaced row must not be counted against itself). The
- * membership-flag CHECKs and the matching service-layer guard (REQ-ORG-017) are verified in a later
- * phase where the service and its fixtures exist; here throwaway {@code app_user} / {@code
- * org_unit} rows are inserted directly and removed in a finally block so the shared schema is left
- * untouched.
+ * Verifies the V164 org-hierarchy migration (REQ-ORG-014/017): the new {@code org_unit} kinds and
+ * parent column, the parent-kind invariants, and the at-most-two-Staffeln membership triggers.
+ * Throwaway rows are removed in a finally block.
  */
 @SpringBootTest
 class OrgHierarchyMigrationTest {
@@ -68,21 +56,12 @@ class OrgHierarchyMigrationTest {
     assertColumnExists(jdbc, "org_unit", "parent_org_unit_id");
     assertIndexExists(jdbc, "org_unit", "idx_org_unit_parent");
 
-    // V164 added the four Bereich/OL boolean leadership flags; epic #800 Phase 5 (V187) dropped
-    // them
-    // in favour of the unified `role` column — their removal is verified by v187DropsBooleanFlags*.
-
-    // The "at most one Staffel" partial unique index is replaced by the ≤2 counting triggers,
-    // which fire on BOTH INSERT and UPDATE to match the dropped index's full write coverage.
     assertIndexAbsent(jdbc, "uq_org_unit_membership_one_squadron");
     assertTriggerExists(
         jdbc, "org_unit_membership", "trg_org_unit_membership_max_two_squadron_ins");
     assertTriggerExists(
         jdbc, "org_unit_membership", "trg_org_unit_membership_max_two_squadron_upd");
 
-    // New CHECK constraints and the parent-validation trigger are present. (The two boolean-flag
-    // CHECKs chk_org_unit_membership_bereich_flags_only_on_bereich / _ol_flag_only_on_ol were
-    // dropped by V187 with the columns — see v187DropsBooleanFlagsAndConstraints.)
     assertConstraintExists(jdbc, "chk_org_unit_ol_has_no_parent");
     assertTriggerExists(jdbc, "org_unit", "trg_org_unit_parent_ins");
   }
@@ -103,7 +82,6 @@ class OrgHierarchyMigrationTest {
 
     cleanup(jdbc, squadronId, bereichId, olId, rejectedId);
     try {
-      // Happy path: OL (no parent) -> Bereich (parent OL) -> Squadron (parent Bereich).
       insertOrgUnit(jdbc, olId, "ORGANISATIONSLEITUNG", "TEST_OH_OL", "TOHOL", false, null);
       insertOrgUnit(jdbc, bereichId, "BEREICH", "TEST_OH_BER", "TOHB", false, olId);
       insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_OH_SQ", "TOHS", true, bereichId);
@@ -112,9 +90,6 @@ class OrgHierarchyMigrationTest {
       assertThat(countById(jdbc, bereichId)).isOne();
       assertThat(countById(jdbc, squadronId)).isOne();
 
-      // A Bereich must have an OL parent — a Squadron parent is rejected by the parent trigger.
-      // Asserting on the trigger's message (not just any DataAccessException) pins the failure to
-      // the parent-kind rule, so a coincidental constraint violation cannot green this case.
       assertThatThrownBy(
               () ->
                   insertOrgUnit(
@@ -122,7 +97,6 @@ class OrgHierarchyMigrationTest {
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("must have an ORGANISATIONSLEITUNG parent");
 
-      // An OL must have no parent — the BEFORE trigger fires before the CHECK, so its message wins.
       assertThatThrownBy(
               () ->
                   insertOrgUnit(
@@ -130,7 +104,6 @@ class OrgHierarchyMigrationTest {
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("must not have a parent");
 
-      // A Bereich must never carry promotion — rejected by chk_org_unit_promotion_only_squadron.
       assertThatThrownBy(
               () -> insertOrgUnit(jdbc, rejectedId, "BEREICH", "TEST_OH_X", "TOHX", true, olId))
           .isInstanceOf(DataAccessException.class)
@@ -141,12 +114,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * Behavioural checks for the ≤2-Staffel counting trigger on both INSERT and UPDATE (REQ-ORG-017),
-   * the guard that replaced the old single-Staffel unique index. Inserts a throwaway user plus four
-   * org units (three Staffeln + one Spezialkommando), then drives the trigger: a third Staffel
-   * INSERT is rejected, a re-point that keeps the user at two Staffeln is allowed (the
-   * about-to-be-replaced row must not be counted against itself), and an UPDATE that would push the
-   * user to a third Staffel is rejected. All rows are removed in a finally block.
+   * Verifies the at-most-two-Staffeln trigger (REQ-ORG-017): a third Staffel is rejected on INSERT
+   * and UPDATE, while a re-point that stays at two is allowed.
    */
   @Test
   void v164EnforcesAtMostTwoSquadronMembershipsOnInsertAndUpdate() {
@@ -167,29 +136,22 @@ class OrgHierarchyMigrationTest {
       insertOrgUnit(jdbc, sqC, "SQUADRON", "TEST_OH_SQC", "TOSC", false, null);
       insertOrgUnit(jdbc, skX, "SPECIAL_COMMAND", "TEST_OH_SKX", "TOSX", false, null);
 
-      // Two Staffeln are fine; the kind is filled in by the sync trigger from the org_unit row.
       insertMembership(jdbc, userId, sqA);
       insertMembership(jdbc, userId, sqB);
       assertThat(squadronMembershipCount(jdbc, userId)).isEqualTo(2);
 
-      // A third Staffel INSERT trips the counting trigger.
       assertThatThrownBy(() -> insertMembership(jdbc, userId, sqC))
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("at most two Staffeln");
 
-      // An SK membership does not count towards the Staffel cap.
       insertMembership(jdbc, userId, skX);
       assertThat(squadronMembershipCount(jdbc, userId)).isEqualTo(2);
 
-      // Re-pointing one of the two Staffeln to another Staffel keeps the user at two — allowed.
-      // Without OLD-row exclusion in the UPDATE trigger the replaced sqA row would miscount as a
-      // third Staffel and this valid move would be wrongly rejected.
       repointMembership(jdbc, userId, sqA, sqC);
       assertThat(membershipExists(jdbc, userId, sqC)).isTrue();
       assertThat(membershipExists(jdbc, userId, sqA)).isFalse();
       assertThat(squadronMembershipCount(jdbc, userId)).isEqualTo(2);
 
-      // Re-pointing the SK membership onto a Staffel would make a third Staffel — rejected.
       assertThatThrownBy(() -> repointMembership(jdbc, userId, skX, sqA))
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("at most two Staffeln");
@@ -216,10 +178,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V184 (epic #800, REQ-ROLE-001): the unified {@code role} rank column exists, is kind-scoped by
-   * {@code chk_org_unit_membership_role_kind}, defaults to {@code MEMBER}, and rejects a rank that
-   * does not match the membership's org-unit kind. Uses throwaway rows cleaned up in a finally
-   * block.
+   * Verifies V184 (REQ-ROLE-001): the kind-scoped {@code role} column defaults to {@code MEMBER}
+   * and rejects a rank not matching the org-unit kind.
    */
   @Test
   void v184AddsKindScopedRoleColumn() {
@@ -238,19 +198,12 @@ class OrgHierarchyMigrationTest {
       insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_RM_SQ", "TRMS", false, null);
       insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_RM_SK", "TRMK", false, null);
 
-      // A fresh squadron membership defaults to MEMBER.
       insertMembership(jdbc, userId, squadronId);
       assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("MEMBER");
 
-      // A squadron rank is accepted on a SQUADRON membership.
       updateMembershipRole(jdbc, userId, squadronId, "STAFFELLEITER");
       assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("STAFFELLEITER");
 
-      // A squadron rank on a SPECIAL_COMMAND membership is rejected by the kind-scoped CHECK. This
-      // path is trigger-neutral (a squadron rank does not engage the V165/V187
-      // enforce_leader_excludes_squadron trigger), so the kind CHECK is the guard that fires — a
-      // silo rank here would instead trip the cross-row trigger first (proven separately in
-      // v187LeaderExclusionTriggerReadsRole_squadronRanksExempt).
       insertMembership(jdbc, userId, skId);
       assertThatThrownBy(() -> updateMembershipRole(jdbc, userId, skId, "STAFFELLEITER"))
           .isInstanceOf(DataAccessException.class)
@@ -263,9 +216,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V185 (epic #800, REQ-ROLE-003): the {@code kommando_group} table + the membership group link
-   * exist; a group must belong to a SQUADRON; a squadron holds at most four groups; and the
-   * group-link CHECK confines {@code kommando_group_id} to the in-group squadron ranks.
+   * Verifies V185 (REQ-ROLE-003): {@code kommando_group} belongs to a SQUADRON, at most four per
+   * squadron, and {@code kommando_group_id} is confined to in-group squadron ranks.
    */
   @Test
   void v185CreatesKommandoGroupWithSquadronAndCardinalityRules() {
@@ -289,12 +241,10 @@ class OrgHierarchyMigrationTest {
       insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_KG_SQ", "TKGS", false, null);
       insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_KG_SK", "TKGK", false, null);
 
-      // A group must belong to a SQUADRON — an SK parent is rejected by the validation trigger.
       assertThatThrownBy(() -> insertKommandoGroup(jdbc, g1, skId, "Bad"))
           .isInstanceOf(DataAccessException.class)
           .hasMessageContaining("must belong to a SQUADRON");
 
-      // Four groups are fine; the fifth trips the counting trigger.
       insertKommandoGroup(jdbc, g1, squadronId, "Alpha");
       insertKommandoGroup(jdbc, g2, squadronId, "Bravo");
       insertKommandoGroup(jdbc, g3, squadronId, "Charlie");
@@ -309,11 +259,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V186 (epic #800, REQ-ROLE-006): the org-chart Kommando node ({@code COMMAND_LEAD}) carries a
-   * nullable {@code kommando_group_id} link. A leaderless linked node is accepted (exactly what the
-   * chart mirror writes); a second node for the same group is rejected by {@code
-   * uq_org_chart_one_command_per_group}; and a group link on any non-{@code COMMAND_LEAD} rank is
-   * rejected by {@code chk_org_chart_kommando_group_type}.
+   * Verifies V186 (REQ-ROLE-006): a {@code COMMAND_LEAD} node may link one Kommandogruppe, a second
+   * node for the same group is rejected, and non-{@code COMMAND_LEAD} ranks cannot link one.
    */
   @Test
   void v186LinksOrgChartCommandNodeToKommandoGroup() {
@@ -339,18 +286,15 @@ class OrgHierarchyMigrationTest {
       insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_OC_SQ", "TOCS", false, null);
       insertKommandoGroup(jdbc, groupId, squadronId, "Alpha");
 
-      // A leaderless COMMAND_LEAD tied to the group is accepted (exactly what the mirror writes).
       insertOrgChartPosition(jdbc, cmd1, "COMMAND_LEAD", squadronId, null, "Alpha", groupId);
       assertThat(orgChartPositionCount(jdbc, cmd1)).isOne();
 
-      // A second COMMAND_LEAD for the same group trips uq_org_chart_one_command_per_group.
       assertThatThrownBy(
               () ->
                   insertOrgChartPosition(
                       jdbc, cmd2, "COMMAND_LEAD", squadronId, null, "Alpha2", groupId))
           .isInstanceOf(DataAccessException.class);
 
-      // A group link on a non-COMMAND_LEAD rank is rejected by chk_org_chart_kommando_group_type.
       assertThatThrownBy(
               () ->
                   insertOrgChartPosition(
@@ -367,9 +311,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V187 (epic #800, REQ-ROLE-001 Phase 5 cleanup): the five legacy boolean leadership columns and
-   * their three CHECK constraints are gone, while the unified {@code role} column and the rewritten
-   * {@code enforce_leader_excludes_squadron} trigger remain.
+   * Verifies V187 (REQ-ROLE-001): the boolean leadership columns and their CHECKs are absent, while
+   * the {@code role} column and the {@code enforce_leader_excludes_squadron} trigger remain.
    */
   @Test
   void v187DropsBooleanFlagsAndConstraints() {
@@ -385,7 +328,6 @@ class OrgHierarchyMigrationTest {
     assertConstraintAbsent(jdbc, "chk_org_unit_membership_bereich_flags_only_on_bereich");
     assertConstraintAbsent(jdbc, "chk_org_unit_membership_ol_flag_only_on_ol");
 
-    // The unified rank column and the rewritten cross-row silo trigger survive.
     assertColumnExists(jdbc, "org_unit_membership", "role");
     assertConstraintExists(jdbc, "chk_org_unit_membership_role_kind");
     assertTriggerExists(
@@ -395,11 +337,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V187 behavioural proof that the rewritten {@code enforce_leader_excludes_squadron} trigger
-   * reads the unified {@code role} (not the dropped booleans): a squadron rank is EXEMPT (a
-   * Staffelleiter IS a Staffel member), while a silo-leadership rank (here {@code SK_LEAD}) is
-   * still rejected for a user who holds a Staffel membership (REQ-ORG-017). Uses throwaway rows
-   * cleaned up in a finally block.
+   * Verifies that {@code enforce_leader_excludes_squadron} reads {@code role}: squadron ranks are
+   * exempt, while {@code SK_LEAD} is rejected for a Staffel member (REQ-ORG-017).
    */
   @Test
   void v187LeaderExclusionTriggerReadsRole_squadronRanksExempt() {
@@ -415,14 +354,10 @@ class OrgHierarchyMigrationTest {
       insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V187_SQ", "TV87S", false, null);
       insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_V187_SK", "TV87K", false, null);
 
-      // A Staffel member promoted to STAFFELLEITER is EXEMPT — a squadron rank does not trip the
-      // silo trigger (it would have, were the trigger still keyed on a boolean leadership flag).
       insertMembership(jdbc, userId, squadronId);
       updateMembershipRole(jdbc, userId, squadronId, "STAFFELLEITER");
       assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("STAFFELLEITER");
 
-      // A plain SK membership coexists, but promoting it to SK_LEAD while the user still holds a
-      // Staffel membership is rejected by the role-based trigger.
       insertMembership(jdbc, userId, skId);
       assertThatThrownBy(() -> updateMembershipRole(jdbc, userId, skId, "SK_LEAD"))
           .isInstanceOf(DataAccessException.class)
@@ -435,10 +370,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V188 (epic #800, REQ-ROLE-003): the squadron-rank singleton caps are backstopped by partial
-   * unique indexes. A second STAFFELLEITER on the same Staffel is rejected at the DB layer — the
-   * airtight backstop behind the service-layer roster check for the concurrent-double-assign
-   * window. Uses throwaway rows cleaned up in a finally block.
+   * Verifies V188 (REQ-ROLE-003): a partial unique index rejects a second STAFFELLEITER on the same
+   * Staffel.
    */
   @Test
   void v188SquadronRankSingletonIndexes() {
@@ -465,8 +398,6 @@ class OrgHierarchyMigrationTest {
       updateMembershipRole(jdbc, userA, squadronId, "STAFFELLEITER");
       assertThat(membershipRole(jdbc, userA, squadronId)).isEqualTo("STAFFELLEITER");
 
-      // A second Staffelleiter on the SAME Staffel trips the partial unique index, even though the
-      // silo trigger exempts the squadron rank.
       insertMembership(jdbc, userB, squadronId);
       assertThatThrownBy(() -> updateMembershipRole(jdbc, userB, squadronId, "STAFFELLEITER"))
           .isInstanceOf(DataAccessException.class)

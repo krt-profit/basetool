@@ -57,11 +57,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the bank surface (REQ-BANK-010): the role checks of the URL matrix and
- * the method-level {@code @PreAuthorize} annotations — incl. the two carve-outs that matter most:
- * members see <em>nothing</em>, and bank management does NOT pass the admin-only {@code
- * /api/v1/bank/admin/**} URL gate. Capability gates delegate to the (mocked) {@code
- * BankSecurityService}; its real decision logic is covered by {@code BankSecurityServiceTest}.
+ * MockMvc gate matrix for the bank surface (REQ-BANK-010): URL and {@code @PreAuthorize} role
+ * checks, including that members see nothing and bank management does not pass the admin-only
+ * {@code /api/v1/bank/admin/**} gate. Capability checks use a mocked {@code BankSecurityService}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -128,11 +126,8 @@ class BankControllerSecurityTest {
 
   @Test
   void bankGates_ignoreTheActiveOrgUnitPinHeader() throws Exception {
-    // REQ-BANK-008: the X-Active-Org-Unit-Id admin pin influences no bank gate, in either
-    // direction — it neither grants a member access nor alters a bank employee's.
     String pinnedOrgUnit = UUID.randomUUID().toString();
 
-    // A member with the pin set still sees no bank surface.
     mockMvc
         .perform(
             get("/api/v1/bank/accounts")
@@ -140,7 +135,6 @@ class BankControllerSecurityTest {
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
 
-    // A bank employee with the same pin set still passes (no org-unit scoping is applied).
     when(bankAccountService.getAccounts(
             org.mockito.ArgumentMatchers.anyBoolean(), any(), any(), any(), any(), any()))
         .thenReturn(org.springframework.data.domain.Page.empty());
@@ -157,8 +151,6 @@ class BankControllerSecurityTest {
 
   @Test
   void accountsList_forwardsSearchAndFilterParams_toTheService() throws Exception {
-    // REQ-BANK-053: the query/status/type params bind and reach the service as the escaped-here
-    // query String plus the requested status/type sets (a picker path: ACTIVE-only, CARTEL).
     org.mockito.ArgumentCaptor<String> queryCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
     @SuppressWarnings("unchecked")
@@ -201,8 +193,6 @@ class BankControllerSecurityTest {
 
   @Test
   void accountsList_absentFilters_forwardTheFullEnumSets() throws Exception {
-    // The management table passes no status/type: the controller must forward "all" so every
-    // account (incl. CLOSED / every type) is listed rather than silently narrowing.
     @SuppressWarnings("unchecked")
     org.mockito.ArgumentCaptor<
             java.util.Set<de.greluc.krt.profit.basetool.backend.model.BankAccountStatus>>
@@ -240,7 +230,6 @@ class BankControllerSecurityTest {
 
   @Test
   void accountCreate_member_isForbidden() throws Exception {
-    // A user without any bank role cannot reach the create endpoint (URL/method gate).
     mockMvc
         .perform(
             post("/api/v1/bank/accounts")
@@ -252,9 +241,6 @@ class BankControllerSecurityTest {
 
   @Test
   void accountCreate_employee_reachesEndpoint() throws Exception {
-    // REQ-BANK-030: the create gate is now BANK_EMPLOYEE (an employee may create SPECIAL accounts);
-    // the SPECIAL-only restriction is enforced in the service (see BankAccountServiceTest). The
-    // service is mocked here, so reaching it yields 201.
     mockMvc
         .perform(
             post("/api/v1/bank/accounts")
@@ -283,7 +269,6 @@ class BankControllerSecurityTest {
 
   @Test
   void balanceSeries_withoutAccess_isForbidden() throws Exception {
-    // REQ-BANK-049: the balance-series read is gated exactly like the booking history (canSee).
     when(bankSecurityService.canSee(any(UUID.class), any())).thenReturn(false);
     mockMvc
         .perform(
@@ -377,7 +362,6 @@ class BankControllerSecurityTest {
 
   @Test
   void adminSurface_management_isForbidden_admin_isAllowed() throws Exception {
-    // The audit log is admin-only — bank management must NOT see it (REQ-BANK-010/-012).
     mockMvc
         .perform(
             get("/api/v1/bank/admin/audit")
@@ -410,8 +394,6 @@ class BankControllerSecurityTest {
 
   @Test
   void bankAuditPurge_management_isForbidden_admin_isAllowed() throws Exception {
-    // The retention purge is admin-only (REQ-AUDIT-004) — bank management must NOT pass the
-    // admin-only /api/v1/bank/admin/** gate.
     mockMvc
         .perform(
             delete("/api/v1/bank/admin/audit")
@@ -429,7 +411,6 @@ class BankControllerSecurityTest {
 
   @Test
   void bankAuditExportJson_management_isForbidden_admin_isAllowed() throws Exception {
-    // The JSON export is admin-only (REQ-AUDIT-003) — bank management must NOT pass.
     mockMvc
         .perform(
             get("/api/v1/bank/admin/audit/export.json")
@@ -480,8 +461,6 @@ class BankControllerSecurityTest {
 
   @Test
   void holderHistory_withoutVisibility_isForbidden() throws Exception {
-    // REQ-BANK-032: a bank employee may read only their own holder's history; the canSeeHolder
-    // gate denies someone else's holder, even though the URL role gate (BANK_EMPLOYEE) passes.
     when(bankSecurityService.canSeeHolder(any(UUID.class), any())).thenReturn(false);
     mockMvc
         .perform(

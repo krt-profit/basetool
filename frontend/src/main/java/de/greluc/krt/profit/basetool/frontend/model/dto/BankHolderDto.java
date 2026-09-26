@@ -24,14 +24,12 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of one holder-registry row (REQ-BANK-003, ADR-0039) with the holder's global
- * custody total shown on the management "Halter" tab.
+ * Frontend mirror of one holder-registry row (REQ-BANK-003) with the holder's global custody total.
  *
  * @param id the holder row's id
  * @param userId the linked basetool user, or {@code null} after user deletion
- * @param handle the holder's display label — the linked user's live effective name (display name
- *     preferred, username fallback), falling back to the deletion-proof handle snapshot once the
- *     user is deleted (REQ-BANK-003)
+ * @param handle the linked user's live effective name, or the handle snapshot once the user is
+ *     deleted
  * @param active whether the holder accepts new incoming postings
  * @param totalHeld signed global sum the holder physically holds across the whole bank (may be
  *     negative)

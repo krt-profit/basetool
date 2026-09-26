@@ -22,8 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * Response payload for one per-account grant row (epic #556, REQ-BANK-009), shaped for the grants
- * flag matrix (G1/G2 mockups): the row identity plus labels for both grouping directions.
+ * Response payload for one per-account bank grant row (REQ-BANK-009).
  *
  * @param userId the grantee's user id (one half of the composite key)
  * @param userHandle the grantee's effective display name
@@ -33,8 +32,8 @@ import java.util.UUID;
  * @param canDeposit whether the grantee may book deposits onto the account
  * @param canWithdraw whether the grantee may book withdrawals from the account
  * @param canTransfer whether the grantee may transfer out of / rebook within the account
- * @param granteeHasBankRole {@code false} marks the grant inert (the grantee currently lacks the
- *     Bank Employee role — the only inert case, rendered as {@code tr.is-inert})
+ * @param granteeHasBankRole {@code false} marks the grant inert (grantee lacks the Bank Employee
+ *     role)
  * @param version optimistic-locking version the client must echo on flag changes
  */
 public record BankGrantDto(

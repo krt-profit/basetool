@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.OwnerOrgUnitRequiredException;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -42,16 +41,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Create-time owner-stamping slab of {@link OwnerScopeService} (L3 split, #922): resolves the
- * {@link OrgUnit} a newly-created aggregate should be stamped on (the SPEZIALKOMMANDO_PLAN.md
- * §5.5.1 picker-output matrix) and validates an explicit owning-org-unit reassignment
- * (REQ-ORG-018). It reads the caller's active-context pin and membership reach from {@link
- * RequestScopeResolver} and the cascade-aware editable scope from {@link AccessGateService}; {@link
- * OwnerScopeService} is the delegating facade that forwards each {@code resolve*} method here.
- *
- * <p>The class-level {@code @Transactional(readOnly = true)} mirrors {@link OwnerScopeService} —
- * the stamp resolution only reads (membership + org-unit lookups); the caller persists the stamped
- * entity in its own write transaction.
+ * Create-time owner stamping behind {@link OwnerScopeService}: resolves the {@link OrgUnit} a new
+ * aggregate is stamped on and validates an explicit owning-org-unit reassignment (REQ-ORG-018).
+ * Read-only; the caller persists the stamped entity in its own transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -65,66 +57,21 @@ public class OrgUnitStampingService {
   private final OrgUnitRepository orgUnitRepository;
 
   /**
-   * Resolves the {@link Squadron} that a newly-created aggregate should be stamped on, honouring an
-   * optional R5.d owner-picker output. Centralises the validation that every aggregate-stamping
-   * service path (inventory create, refinery-order create, mission create, …) would otherwise have
-   * to duplicate.
+   * Resolves the {@link Squadron} a newly created aggregate is stamped on from the optional
+   * owner-picker output.
    *
-   * <p>R6.b tightens the contract to the plan §5.5.1 0/1/&gt;1-membership matrix:
+   * <p>Without a pick, a single membership is auto-stamped and several memberships require a pick.
+   * A pick must be one of the target user's memberships and must not be a Spezialkommando.
    *
-   * <ol>
-   *   <li><b>0 memberships</b> — {@link BadRequestException}. Admin / guest principals cannot stamp
-   *       aggregates; the caller path should not reach this method with a memberless user.
-   *   <li><b>1 membership + {@code owningOrgUnitId == null}</b> — auto-stamp that single membership
-   *       (preserves today's single-Staffel default for the 100% of users still on the legacy
-   *       {@code app_user.squadron_id} link).
-   *   <li><b>1 membership + {@code owningOrgUnitId} matches</b> — auto-stamp; the explicit picker
-   *       output agrees with the only option, no-op.
-   *   <li><b>1 membership + {@code owningOrgUnitId} mismatch</b> — {@link BadRequestException}
-   *       (foreign-org-unit forgery).
-   *   <li><b>&gt;1 memberships + {@code owningOrgUnitId == null}</b> — {@link BadRequestException}
-   *       ("owningOrgUnitId is required"). Before R6.b this path silently stamped the legacy
-   *       Staffel, hiding the SK choice from a multi-membership user — see the audit's regression
-   *       #4 against the R5.d frontend contract.
-   *   <li><b>&gt;1 memberships + {@code owningOrgUnitId} matches one</b> — picker output honoured;
-   *       the matched OrgUnit is returned.
-   *   <li><b>&gt;1 memberships + {@code owningOrgUnitId} foreign</b> — {@link BadRequestException}
-   *       (foreign-org-unit forgery).
-   *   <li><b>Picker selects a Spezialkommando</b> — {@link BadRequestException} ("Spezialkommando
-   *       ownership not yet supported"). Soft block until the destructive-cleanup release drops the
-   *       {@code owning_squadron_id} NOT NULL constraint; until then the picker UI may offer SK
-   *       options but the backend reliably rejects them rather than persisting half-stamped rows.
-   * </ol>
-   *
-   * <p>Membership sources (hybrid until the §5.2 D3 migration replaces {@code User.squadron} with
-   * an authoritative membership-table read):
-   *
-   * <ul>
-   *   <li>{@link User#getSquadron()} — the user's home Staffel; non-null today for every user. Read
-   *       first because the legacy column is still authoritative for the Staffel link.
-   *   <li>{@link OrgUnitMembershipRepository#findAllByIdUserIdAndKind} with kind {@link
-   *       OrgUnitKind#SPECIAL_COMMAND} — the SK memberships added via the R5.b endpoints. SK
-   *       memberships are never reflected on {@link User} so the repository read is the only
-   *       source. The kind=SQUADRON rows backfilled by V95 are not consulted here — the
-   *       authoritative Staffel comes from {@link User#getSquadron()}.
-   * </ul>
-   *
-   * <p>Once D3 lands and {@code User.squadron} is removed, this method switches to a single {@link
-   * OrgUnitMembershipRepository#findAllByIdUserId} read.
-   *
-   * @param targetUser the user the new aggregate belongs to (e.g. the inventory item's owner, the
-   *     refinery order's owner); never {@code null}.
+   * @param targetUser the user the new aggregate belongs to; never {@code null}.
    * @param owningOrgUnitId the picker output from the form, or {@code null} when the picker was not
    *     used.
    * @return the Squadron whose stock / aggregate list this row should join; never {@code null}.
-   * @throws BadRequestException when the picker output references an org unit the target user does
-   *     not belong to, the user has zero memberships, the user has multiple memberships and no
-   *     explicit choice was supplied, or the resolved org unit is a Spezialkommando.
+   * @throws BadRequestException when the user has no membership, the pick is foreign, several
+   *     memberships lack a pick, or the resolved org unit is a Spezialkommando.
    */
   public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
-    // Post-D3: every membership (Staffel + SK) is sourced from org_unit_membership — the legacy
-    // User.squadron column was dropped in R9 Step 5 / V101.
     List<OrgUnitMembership> allMemberships =
         orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId());
     for (OrgUnitMembership m : allMemberships) {
@@ -141,17 +88,10 @@ public class OrgUnitStampingService {
       if (memberOrgUnitIds.size() == 1) {
         stampedOrgUnitId = memberOrgUnitIds.iterator().next();
       } else {
-        // REQ-ORG-017 "pin, else choose": honour an active-context pin onto one of the target's own
-        // org units (self-service create) so a pinned member need not re-pick; otherwise force a
-        // choice.
         Optional<UUID> pinned = requestScopeResolver.readActiveSquadronFromHeader();
         if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
           stampedOrgUnitId = pinned.get();
         } else {
-          // Its own type, and therefore its own stable problem code: this is the one rejection on
-          // the stamping path the member can actually fix, and the frontend needs something to
-          // branch on to say so in their own language (REQ-ORG-023). Under the generic BAD_REQUEST
-          // the picker surfaces echoed this very English sentence into a German toast.
           throw new OwnerOrgUnitRequiredException(
               "User belongs to multiple org units; owningOrgUnitId is required");
         }
@@ -164,10 +104,6 @@ public class OrgUnitStampingService {
       stampedOrgUnitId = owningOrgUnitId;
     }
 
-    // Polymorphic load + unproxy instead of a Squadron-typed findById: the stamped id often equals
-    // an org unit this transaction already holds as a base-typed OrgUnit proxy (the aggregate's
-    // owning unit), and a subclass-typed load would force Hibernate to narrow that proxy
-    // (HHH000179, breaks ==). The kind check moves from the SQL discriminator filter into Java.
     return orgUnitRepository
         .findById(stampedOrgUnitId)
         .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
@@ -180,44 +116,22 @@ public class OrgUnitStampingService {
   }
 
   /**
-   * V99-aligned successor of {@link #resolveSquadronForPickerOutput(User, UUID)} — applies the same
-   * SPEZIALKOMMANDO_PLAN.md §5.5.1 picker-output matrix (0 / 1 / &gt;1 memberships, valid / foreign
-   * choice) but returns an {@link OrgUnit} so SK selections are honoured instead of rejected. Use
-   * with {@code entity.setOwningOrgUnit(...)}; the existing entity dual-write lifecycle hook
-   * mirrors the value onto the legacy {@code owningSquadron} field whenever the resolved OrgUnit
-   * happens to be a {@link Squadron}, so the legacy column stays populated for Staffel ownership
-   * during the V99-NOT-NULL-relaxed soak. For SpecialCommand ownership the legacy column stays null
-   * — which is now valid because V99 dropped the {@code NOT NULL} constraint.
+   * Resolves the {@link OrgUnit} a newly created aggregate is stamped on from the optional
+   * owner-picker output, accepting every org-unit kind.
    *
-   * <p>If the resolver produces an SK selection (allowed post-V99 with the lifted NOT NULL on the
-   * legacy column), the caller writes only the new {@code owningOrgUnitId} via {@code
-   * entity.setOwningOrgUnit(...)}. The lifecycle hook leaves the legacy column null for that row,
-   * which is now legal.
-   *
-   * <p>Decision matrix (extends the legacy {@link #resolveSquadronForPickerOutput(User, UUID)}
-   * matrix, which stays strict): 0 memberships → 400; 1 + null picker → auto-stamp the sole direct
-   * membership; &gt;1 + null picker → 400 (force an explicit choice). An explicit pick is honoured
-   * when it is one of the target user's DIRECT memberships <em>or</em> — epic #692 Phase 4 /
-   * REQ-ORG-016 — an org unit the current <b>caller</b> may edit ({@link
-   * AccessGateService#canEditOrgUnit(UUID)}, cascade-aware), the create-on-behalf widening; a pick
-   * that is neither → 400. Because of that widening this resolver and the still-strict
-   * (membership-only) {@code resolveSquadronForPickerOutput} no longer agree byte-for-byte: a pick
-   * foreign to the target user but within the caller's editable scope is rejected by the latter and
-   * honoured here.
+   * <p>Without a pick, a single direct membership is auto-stamped. An explicit pick is honoured
+   * when it is a direct membership of the target user or an org unit the caller may edit ({@link
+   * AccessGateService#canEditOrgUnit(UUID)}, REQ-ORG-016).
    *
    * @param targetUser the user whose memberships gate the picker output validation; never {@code
    *     null}.
    * @param owningOrgUnitId the picker-supplied org unit id; {@code null} triggers the auto-stamp
    *     path when the user has exactly one membership.
-   * @return the resolved {@link OrgUnit} — a {@link Squadron}, a {@link
-   *     de.greluc.krt.profit.basetool.backend.model.SpecialCommand}, or (Phase 4) a {@link
-   *     de.greluc.krt.profit.basetool.backend.model.Bereich} / {@link
-   *     de.greluc.krt.profit.basetool.backend.model.Organisationsleitung}; never {@code null}.
-   * @throws BadRequestException on 0 memberships, or an explicit pick that is neither a direct
-   *     membership of the target user nor within the caller's editable scope.
-   * @throws OwnerOrgUnitRequiredException on a &gt;1-membership {@code null} picker with no
-   *     honourable active-context pin — the one rejection here the member can fix, which is why it
-   *     carries its own stable problem code (REQ-ORG-023).
+   * @return the resolved {@link OrgUnit}; never {@code null}.
+   * @throws BadRequestException on 0 memberships, or a pick that is neither a direct membership of
+   *     the target user nor within the caller's editable scope.
+   * @throws OwnerOrgUnitRequiredException when several memberships lack both a pick and an
+   *     honourable active-context pin (REQ-ORG-023).
    */
   public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
@@ -229,31 +143,17 @@ public class OrgUnitStampingService {
   }
 
   /**
-   * Nullable-owner variant of {@link #resolveOrgUnitForPickerOutput(User, UUID)} for the three
-   * <em>ownerless-personal-aggregate</em> roots (ship, refinery order, inventory item). Behaves
-   * identically to the strict resolver, with one carve-out: a {@code targetUser} who belongs to no
-   * org unit <em>and</em> supplied no explicit picker output resolves to {@code null} instead of a
-   * 400. That {@code null} is a legal owner for these three aggregates — V132 dropped the {@code
-   * NOT NULL} on their {@code owning_org_unit_id} column precisely so a membershipless user can
-   * still add a ship, raise a refinery order, or record inventory. The row is then attributable
-   * through its own per-user owner column ({@code ship.owner} / {@code refinery_order.owner} /
-   * {@code inventory_item.user}) and is scoped to that user only — see {@link
-   * AccessGateService#canSeeShip(UUID)}, {@link AccessGateService#canSeeRefineryOrder(UUID)},
-   * {@link AccessGateService#canSeeInventoryItem(UUID)}.
-   *
-   * <p>The carve-out is deliberately narrow: a membershipless user who nonetheless supplies a
-   * non-null {@code owningOrgUnitId} is still rejected — they cannot claim ownership of an org unit
-   * they do not belong to. Every other branch of the SPEZIALKOMMANDO_PLAN.md §5.5.1 matrix (1 /
-   * &gt;1 memberships; valid / foreign / multi-membership-null choice) is unchanged from the strict
-   * resolver.
+   * Variant of {@link #resolveOrgUnitForPickerOutput(User, UUID)} for the ownerless-personal
+   * aggregates (ship, refinery order, inventory item): a membershipless user without a pick
+   * resolves to {@code null} instead of a 400. Every other case behaves identically.
    *
    * @param targetUser the user whose memberships gate the picker output; never {@code null}.
    * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} when the picker was not
    *     used.
    * @return the resolved {@link OrgUnit}, or {@code null} when {@code targetUser} has no membership
-   *     and supplied no explicit choice (the ownerless-personal-aggregate case).
-   * @throws BadRequestException for every non-ownerless rejection branch of the §5.5.1 matrix,
-   *     including a membershipless user who supplied a non-null (therefore foreign) choice.
+   *     and supplied no explicit choice.
+   * @throws BadRequestException for every other rejection, including a membershipless user who
+   *     supplied a pick.
    */
   @Nullable
   public OrgUnit resolveOrgUnitForPickerOutputNullable(
@@ -270,25 +170,12 @@ public class OrgUnitStampingService {
   }
 
   /**
-   * Validates and resolves the target org unit for an explicit <b>reassignment</b> of an existing
-   * aggregate's owning org unit (REQ-ORG-018 / ADR-0050 — the mission Verwaltung "Zugeordnete
-   * Einheit" control). Unlike {@link #resolveOrgUnitForPickerOutputNullable(User, UUID)} this
-   * carries <em>no</em> auto-stamp or home-Staffel fallback: the caller picks an explicit target
-   * and it is accepted only when it lies within their assignable scope.
+   * Validates and resolves the target of an explicit reassignment of an aggregate's owning org unit
+   * (REQ-ORG-018), without any auto-stamp fallback.
    *
-   * <p>Permission matrix (the orthogonal second gate on top of the per-aggregate write gate the
-   * controller already enforces, e.g. {@code MissionSecurityService.canChangeOwner}):
-   *
-   * <ul>
-   *   <li><b>Admin</b> — any existing org unit, or {@code null} (ownerless), in any direction.
-   *   <li><b>Non-admin</b> — a non-null target must be one of the caller's DIRECT memberships OR an
-   *       org unit they may edit ({@link AccessGateService#canEditOrgUnit(UUID)}, cascade-aware for
-   *       a Bereichsleitung/OL); the same accepted set as the create-on-behalf picker ({@code
-   *       resolveStampedOrgUnit}). A {@code null} (ownerless) target is allowed only for a
-   *       membershipless leadership caller — mirroring who may <em>create</em> an ownerless mission
-   *       (ADR-0004) — so a plain member cannot silently widen a mission to public-leadership
-   *       scope.
-   * </ul>
+   * <p>An admin may pick any org unit or {@code null}. A non-admin may pick a direct membership or
+   * an org unit they may edit ({@link AccessGateService#canEditOrgUnit(UUID)}), and {@code null}
+   * only as a membershipless leadership caller.
    *
    * @param targetOrgUnitId the picker-supplied target org-unit id, or {@code null} for ownerless.
    * @return the resolved managed {@link OrgUnit}, or {@code null} for an ownerless target.
@@ -300,17 +187,12 @@ public class OrgUnitStampingService {
   public OrgUnit resolveReassignTargetOrgUnit(@Nullable UUID targetOrgUnitId) {
     boolean admin = authHelper.isAdmin();
     if (targetOrgUnitId == null) {
-      // Ownerless target: an admin always, otherwise only a membershipless leadership caller. The
-      // member lookup is short-circuited for admins.
       if (admin || requestScopeResolver.currentMemberOrgUnitIds().isEmpty()) {
         return null;
       }
       throw new AccessDeniedException(
           "Only an admin or a membershipless leadership user may make an aggregate ownerless");
     }
-    // Non-null target: an admin may assign anywhere; a non-admin only to a direct membership or a
-    // unit within their editable (cascade-aware) scope. The `!admin` short-circuit keeps the admin
-    // path off the member lookup entirely.
     if (!admin
         && !requestScopeResolver.currentMemberOrgUnitIds().contains(targetOrgUnitId)
         && !accessGateService.canEditOrgUnit(targetOrgUnitId)) {
@@ -342,20 +224,12 @@ public class OrgUnitStampingService {
   }
 
   /**
-   * Applies the §5.5.1 picker-output matrix for a user known to have at least one membership, then
-   * resolves the chosen id to its concrete {@link OrgUnit} subtype in one polymorphic {@link
-   * OrgUnitRepository} load (every kind may own an aggregate since epic #692 Phase 4 /
-   * REQ-ORG-016); the result is unproxied so callers receive the concrete {@link Squadron} /
-   * SpecialCommand / Bereich / OL instance without a subclass-typed re-load that would narrow an
-   * existing base proxy (HHH000179). Shared tail of {@link #resolveOrgUnitForPickerOutput(User,
-   * UUID)} and {@link #resolveOrgUnitForPickerOutputNullable(User, UUID)} — the empty-membership
-   * branch differs between the two callers and is handled by each before delegating here.
+   * Validates the picker output for a user with at least one membership and loads the chosen id as
+   * its concrete, unproxied {@link OrgUnit} subtype.
    *
-   * <p>The auto-stamp ({@code owningOrgUnitId == null}) and {@code >1 → force a choice} rules stay
-   * keyed on the target user's DIRECT memberships, so a leader's default owner is their own
-   * Bereich/OL and ordinary-member stamping is unchanged. An explicit pick is accepted when it is a
-   * DIRECT membership <em>or</em> an org unit the current caller may edit ({@link
-   * AccessGateService#canEditOrgUnit(UUID)}) — the cascade-aware create-on-behalf widening.
+   * <p>Without a pick, a single direct membership is auto-stamped. An explicit pick is accepted
+   * when it is a direct membership or an org unit the caller may edit ({@link
+   * AccessGateService#canEditOrgUnit(UUID)}).
    *
    * @param memberOrgUnitIds the target user's non-empty DIRECT membership set.
    * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} for the auto-stamp
@@ -373,45 +247,15 @@ public class OrgUnitStampingService {
       if (memberOrgUnitIds.size() == 1) {
         stampedOrgUnitId = memberOrgUnitIds.iterator().next();
       } else {
-        // REQ-ORG-017 "pin, else choose": honour an active-context pin onto one of the TARGET
-        // user's
-        // own org units (the self-service create path where caller == target) so a member who has
-        // already pinned a Staffel via the switcher need not re-pick it on the create form;
-        // otherwise force an explicit choice. The pin is only honoured when it is one of the
-        // target's
-        // memberships, so an admin's foreign pin on an on-behalf create still falls through to 400.
         Optional<UUID> pinned = requestScopeResolver.readActiveSquadronFromHeader();
         if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
           stampedOrgUnitId = pinned.get();
         } else {
-          // Its own type, and therefore its own stable problem code: this is the one rejection on
-          // the stamping path the member can actually fix, and the frontend needs something to
-          // branch on to say so in their own language (REQ-ORG-023). Under the generic BAD_REQUEST
-          // the picker surfaces echoed this very English sentence into a German toast.
           throw new OwnerOrgUnitRequiredException(
               "User belongs to multiple org units; owningOrgUnitId is required");
         }
       }
     } else {
-      // Epic #692 Phase 4 (REQ-ORG-016): a picker choice is valid when it is one of the TARGET
-      // user's DIRECT memberships (the historical contract) OR an org unit the CURRENT CALLER may
-      // edit ({@link AccessGateService#canEditOrgUnit(UUID)}, cascade-aware since Phase 3). The
-      // create-on-behalf widening: a Bereichsleitung/OL leader may stamp a subordinate Staffel/SK
-      // (or its own Bereich/OL) they oversee.
-      //
-      // Note the gate keys canEditOrgUnit on the CALLER, while memberOrgUnitIds is the TARGET
-      // user's
-      // set. When caller == targetUser (every self-service create path) the two coincide, so an
-      // ordinary member's accepted set is exactly their own memberships and stamping is
-      // byte-identical
-      // to the pre-Phase-4 gate. They DIVERGE only on the two create-on-behalf paths where a caller
-      // stamps another user's row — inventory book-out/transfer and refinery store — and there the
-      // accepted set is the union of (target's memberships) and (caller's editable scope), by
-      // design:
-      // a leader may place the recipient's row in any unit the leader already controls. This never
-      // widens what the CALLER can see (canEditOrgUnit only admits units already in the caller's
-      // scope)
-      // and REQ-ORG-011 owner-escape keeps the recipient's own visibility of the row.
       if (!memberOrgUnitIds.contains(owningOrgUnitId)
           && !accessGateService.canEditOrgUnit(owningOrgUnitId)) {
         throw new BadRequestException(
@@ -421,16 +265,6 @@ public class OrgUnitStampingService {
       stampedOrgUnitId = owningOrgUnitId;
     }
 
-    // Resolve to the concrete subtype in ONE polymorphic load. Every OrgUnitKind may own an
-    // aggregate here (Staffel, SK, and — epic #692 Phase 4 / REQ-ORG-016 — Bereich / OL), so no
-    // kind filter applies; the picker output was validated above, so a miss is a hard contract
-    // violation (400). Deliberately NOT a subclass-typed
-    // SquadronRepository/SpecialCommandRepository
-    // probe: the stamped id often equals an org unit this transaction already holds as a base-typed
-    // OrgUnit proxy (e.g. the source aggregate's owning unit on a same-unit transfer), and a
-    // subclass-typed load would force Hibernate to narrow that proxy (HHH000179, breaks ==). The
-    // base-typed find reuses the persistence-context instance; unproxy yields the concrete subtype
-    // for callers that pattern-match on it.
     return orgUnitRepository
         .findById(stampedOrgUnitId)
         .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))

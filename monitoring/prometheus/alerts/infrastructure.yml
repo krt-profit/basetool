@@ -1,25 +1,6 @@
-# Infrastructure alerts: host, containers, PostgreSQL, Redis, blackbox probes, certificates.
-# Epic #936 alert catalog. Thresholds are the initial values; Phase 3 (#937 baseline week) tunes them.
 groups:
   - name: infrastructure-critical
     rules:
-      # Scoped OFF the 16 blackbox /probe jobs (blackbox-http*, -edge-deny, -force-ssl,
-      # -members-only, -public-surface, -hsts*, -internal-tls*, -dns-*). Prometheus anchors label
-      # regexes FULLY, so every job name has to be reachable from one of the alternatives — adding a
-      # probe job without adding its prefix here puts it back in scope and pages critical on a
-      # scrape timeout. `-public-surface` was exactly that on 2026-09-13, caught in review.
-      # On a /probe job `up==0` does NOT mean the probed target is down — it
-      # means the Prometheus->exporter scrape itself timed out, because the blackbox module timeout
-      # equalled scrape_timeout (2026-07-12 false-critical: blackbox-internal-tls + blackbox-http-ipv6
-      # paged critical for backend/frontend/ingest + all three public hosts at once, while every
-      # service was healthy). Those probes now carry scrape_timeout:15s, and a genuine failure surfaces
-      # FAST as `probe_success==0` (up stays 1) via the dedicated probe alerts — BlackboxProbeFailed,
-      # EdgeActuatorDenyBroken, EdgeForceSslRedirectBroken, EdgeMembersOnlyRedirectBroken,
-      # EdgeHstsHeaderMissing, EdgeIpv6Unreachable, EdgePublicSurfaceNot200,
-      # DnsResolutionFailed, CertificateExpiringSoon — and app-down liveness for the internal-tls
-      # targets is already paged by the basetool-backend/frontend/ingest scrape jobs. The `!~` regex
-      # KEEPS the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and every
-      # non-probe job in scope. REQ-OBS-008/-012.
       - alert: TargetDown
         expr: up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app).*"} == 0
         for: 3m
@@ -29,9 +10,6 @@ groups:
           summary: "Scrape target down: {{ $labels.job }}"
           description: "Prometheus cannot scrape {{ $labels.job }} / {{ $labels.instance }} for 3 minutes. For scratch-image monitoring services this is their only liveness signal. (Blackbox /probe jobs are excluded — their real failures page via probe_success alerts, not this one.)"
 
-      # Scoped to the two liveness jobs (blackbox-http + the 401-accepting blackbox-http-auth):
-      # the deny/posture jobs (blackbox-edge-deny/-force-ssl/-hsts, REQ-OBS-012) have their own
-      # alerts below and must not double-page through this one.
       - alert: BlackboxProbeFailed
         expr: probe_success{job=~"blackbox-http|blackbox-http-auth"} == 0
         for: 3m
@@ -41,8 +19,6 @@ groups:
           summary: "Public endpoint probe failing: {{ $labels.instance }}"
           description: "The blackbox HTTPS probe for {{ $labels.instance }} has failed for 3 minutes."
 
-      # The `and on()` guard suppresses the posture alert while the edge itself is down — that
-      # case is already paged by BlackboxProbeFailed and the deny probe carries no signal then.
       - alert: EdgeActuatorDenyBroken
         expr: >-
           probe_success{job="blackbox-edge-deny"} == 0
@@ -81,38 +57,6 @@ groups:
           summary: "systemd unit failed: {{ $labels.name }}"
           description: "The systemd unit {{ $labels.name }} is in the failed state (e.g. iri-deploy / iri-backup / iri-restore-drill)."
 
-      # container_start_time_seconds is a cAdvisor GAUGE holding the container's Unix epoch start time,
-      # NOT a monotonic restart counter. increase() over it returns the DELTA between the old and new
-      # start timestamps on a restart (seconds..days), so a SINGLE restart of any container that had
-      # been up more than ~3s exceeded ">3" and paged CRITICAL — which is what a routine deploy recreate
-      # of backend/frontend/ingest did (v1.4.0, 2026-07-15). changes() counts how many times the series
-      # VALUE changed in the window — i.e. actual restarts — which is the intended ">3 restarts/15m"
-      # semantics and matches the sibling Grafana "Container Restarts" panel (02-containers.json, which
-      # already uses changes()). A genuine 4+ crash loop still fires after for:5m; a lone restart no
-      # longer pages (single-restart faults stay covered by ContainerOomKilled / ContainerPidsHigh /
-      # TargetDown). Locked by tests/containerrestartloop_changes_test.yml.
-      #
-      # Reads the NORMALISED start time (containers-runtime.yml), not cAdvisor's. Repointed
-      # 2026-09-22. Until then the expression still named `container_start_time_seconds`, which
-      # only cAdvisor emits, and cAdvisor is deleted on the Podman host (ADR-0163) -- so from the
-      # cutover on this rule evaluated to nothing and a crash-looping container paged no one. An
-      # earlier version of this comment said the rule could not be normalised because nothing on
-      # the Podman host published a start time. That stopped being true when
-      # `basetool:container:start_time_seconds` was added the same day, joining the podman
-      # exporter's `podman_container_started_seconds` onto `podman_container_info` by `id`
-      # (measured on production 2026-09-22: 18 containers, one series each).
-      #
-      # changes() keeps its meaning across the rename. Under Quadlet every restart is a RECREATE
-      # (ExecStart carries --replace --rm), so a restart arrives as a new container id with a new
-      # start time; `max by (name)` in the recording rule folds the old and new id into one
-      # series per name, and its value moving is exactly one restart.
-      #
-      # This is the ONLY crash-loop alert for the application containers, and nothing backs it up:
-      # every generated unit carries `Restart=always` with `StartLimitIntervalSec=0`, so systemd
-      # never gives up on one and never marks it failed -- and SystemdUnitFailed could not see it
-      # if it did, because node_exporter's systemd collector reads the SYSTEM manager and these are
-      # user units of the service account.
-      # Locked by tests/containerrestartloop_changes_test.yml, on the Podman shape.
       - alert: ContainerRestartLoop
         expr: changes(basetool:container:start_time_seconds[15m]) > 3
         for: 5m
@@ -122,28 +66,6 @@ groups:
           summary: "Container restart loop: {{ $labels.name }}"
           description: "Container {{ $labels.name }} restarted more than 3 times in 15 minutes."
 
-      # cAdvisor named-series blackout (#1041 item 7, REQ-OBS-014). This shipped as a real incident
-      # (CHANGELOG v1.1.1): cAdvisor stayed "up" while emitting zero name-labelled series, silently
-      # blinding ContainerRestartLoop / ContainerMemoryHigh — TargetDown cannot catch it because
-      # the scrape still succeeds. The host runs ~20 containers, so a drop below 10 named series means
-      # cAdvisor lost its labels. `container_last_seen{name=~".+"}` metric verified against cadvisor
-      # v0.60.3.
-      # baseline-tune: the < 10 floor assumes the current ~20-container footprint.
-      #
-      # Also not normalised: `container_last_seen` is a cAdvisor liveness series with no cgroup
-      # analogue. Under Podman the same question -- "is anything reporting container metrics at
-      # all" -- is answered by ContainerCgroupCollectorStale and
-      # ContainerCgroupCollectorFoundNothing in containers-runtime.yml, which is why those two
-      # exist rather than being folded into this one.
-      # Reads the NORMALISED family, not cAdvisor's own. Changed 2026-09-20, and it was a
-      # regression waiting for the cutover: the expression counted `container_last_seen`, which
-      # only cAdvisor emits, and cAdvisor is gone on a Podman host (ADR-0163). Measured on the
-      # testing host -- 200 basetool_container_* series, 18 containers reported, and this alert
-      # firing CRITICAL anyway. It would have fired from the first minute the new production host
-      # served, permanently, which is how a critical stops being read.
-      #
-      # `basetool:container:present` is the same normalised series the six value alerts below read
-      # (its cAdvisor leg was removed with cAdvisor on 2026-09-22, ADR-0203).
       - alert: ContainerMetricsMissing
         expr: >-
           count(basetool:container:present) < 10
@@ -155,14 +77,6 @@ groups:
           summary: "No container metrics: fewer than 10 named containers are reporting"
           description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. The source is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer (`systemctl status iri-container-metrics.timer`, /var/iri/monitoring/textfile/containers.prom)."
 
-      # The databases and the session store themselves (OPS-MON-03, added 2026-09-22). Until then
-      # nothing alerted on either being DOWN: TargetDown watches the exporters, and an exporter that
-      # cannot reach its database stays up and answers the scrape with `pg_up 0` / `redis_up 0`. The
-      # backend's health check would eventually take it with it, but that reads as a backend outage
-      # and costs the minutes it takes to look in the wrong place.
-      #
-      # The nightly backup does NOT touch these: it quiesces frontend, backend and ingest and leaves
-      # both databases and Redis running (REQ-OPS-009), so `for: 2m` needs no carve-out for 04:15.
       - alert: PostgresDown
         expr: pg_up == 0
         for: 2m
@@ -190,21 +104,6 @@ groups:
           summary: "PostgreSQL connections >80% ({{ $labels.database }})"
           description: "PostgreSQL {{ $labels.database }} is using more than 80% of its 100 connection slots."
 
-      # Redis RDB durability. (2026-09-08) The rule was `(time() - redis_rdb_last_save_timestamp_seconds) > 3600`
-      # with no guard, which alerts on IDLENESS, not on failure: `--save "60 1"` (ADR-0079) only
-      # snapshots when at least one key changed in 60 s, so a quiet night with zero session writes
-      # ages the timestamp past an hour with nothing whatsoever wrong. It paged twice that night —
-      # 02:05-02:40Z and 04:19-04:24Z — and the redis log across both windows shows every BGSAVE
-      # succeeding ("DB saved on disk", CoW 0 MB, zero errors); the two gaps are simply 00:55->02:39
-      # and 03:09->04:22 with no writes to snapshot. Both "resolved" on the next member's session
-      # write, not on any repair.
-      #
-      # `redis_rdb_changes_since_last_save > 0` is what separates the two: Redis only resets that
-      # counter on a SUCCESSFUL save (a failed fork restores it), so pending-and-unsaved for an hour
-      # is a real broken-snapshot signal, while pending == 0 is an idle store with nothing at risk.
-      # An hour of staleness is not itself a durability problem — AOF (appendfsync everysec) is the
-      # primary layer — so the guard costs no coverage. RedisRdbSaveFailing below catches a failing
-      # fork directly, and in 5 minutes rather than 70.
       - alert: RedisRdbStale
         expr: >-
           (time() - redis_rdb_last_save_timestamp_seconds) > 3600
@@ -216,10 +115,6 @@ groups:
           summary: "Redis has unsaved changes and no RDB snapshot for over 1h"
           description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/iri/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
 
-      # The direct signal the stale-snapshot rule above only ever reached by inference: Redis reports
-      # `rdb_last_bgsave_status:err` in INFO the moment a fork or write fails (the exporter maps ok/err
-      # to 1/0). Fires in 5 minutes and independently of write volume, so a broken fork is caught even
-      # on an idle store where RedisRdbStale correctly stays silent.
       - alert: RedisRdbSaveFailing
         expr: redis_rdb_last_bgsave_status == 0
         for: 5m
@@ -229,11 +124,6 @@ groups:
           summary: "Redis background save is failing"
           description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/iri/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
 
-      # AOF is the PRIMARY durability layer (ADR-0079, ~1 fsync/s, ~1 s worst-case loss), and until
-      # 2026-09-08 nothing alerted on it at all — the rule file watched only the secondary RDB layer.
-      # `aof_last_write_status:err` means the append itself is failing, so writes acknowledged to the
-      # frontend are not reaching disk and a crash drops sessions Redis has already confirmed.
-      # Guarded on `redis_aof_enabled` so the rule stays inert if AOF is ever turned off deliberately.
       - alert: RedisAofWriteFailing
         expr: redis_aof_last_write_status == 0 and redis_aof_enabled == 1
         for: 5m
@@ -243,20 +133,6 @@ groups:
           summary: "Redis AOF writes are failing"
           description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/iri/redis bind mount and the redis log."
 
-      # (REQ-SEC-068 / ADR-0207) Redis refused an AUTH or a command under its ACL. With one ACL
-      # user per service, a refusal is one of exactly two things, and both need a human: a service
-      # whose password in .env does not match the rendered users.acl (the rollout's most likely
-      # mistake — that service then cannot reach its sessions, fan-out or handoff), or a rule in
-      # scripts/redis-users.acl.tmpl too narrow for something the service really does (a new
-      # channel or key prefix). A third is the reason the users exist: something that is not one
-      # of our services trying its luck. INFO's acl_access_denied_* counters, verified against the
-      # pinned redis_exporter on 2026-09-23. Held for five minutes so one stray probe cannot page,
-      # while a misconfigured service -- which fails on every connection attempt -- always will.
-      # On release 1.11.0 one refusal is benign: every frontend start runs Spring Session's CONFIG GET
-      # (TolerantKeyspaceNotificationsAction), the ACL refuses it by design -- two cmd denials per
-      # start on production, 2026-09-25 -- and this rule did not fire for it that day. #2067 sends a
-      # PING instead under a named user, so from the release carrying it no refusal is expected --
-      # verified gone on production after the v1.12.0 deploy, 2026-09-25.
       - alert: RedisAclDenials
         expr: >-
           (sum(increase(redis_acl_access_denied_auth_total[5m])) or vector(0))
@@ -270,10 +146,6 @@ groups:
         annotations:
           summary: "Redis is refusing authentication or commands under its ACL ({{ $value | printf \"%.0f\" }} in 5m)"
           description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/iri/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
-      # No service of ours is refused anything in normal operation, a restart included: since
-      # 2026-09-25 the frontend sends no CONFIG at startup under its own user (a PING instead), so
-      # the one refusal a correctly configured deployment used to produce -- config|get, once per
-      # frontend start -- is gone, and every count above is a finding.
 
       - alert: CertificateExpiringSoon
         expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600
@@ -284,26 +156,6 @@ groups:
           summary: "TLS certificate for {{ $labels.instance }} expires in <14 days"
           description: "The certificate served at {{ $labels.instance }} expires in under 14 days."
 
-      # --- certificates that no listener SERVES --------------------------------------------------
-      # CertificateExpiringSoon above covers everything this deployment serves, and its blind spot is
-      # structural rather than an oversight: a probe can only see a certificate something is serving.
-      #
-      # The internal CA is the case that matters. `basetool-ca.crt` is the trust anchor for every
-      # `proxy_ssl_verify on` upstream at the edge and for the blackbox `https_internal` module
-      # itself. Nothing listens on it, so nothing probed it, so nothing watched it -- and the day it
-      # expires, every verified upstream fails at once AND the probes that would otherwise have
-      # warned about the leaves fail with it. Measured on the testing host 2026-09-20: the one
-      # certificate whose expiry is most expensive was the only one with no coverage at all.
-      #
-      # Filled from the host rather than by a probe: scripts/cert-expiry-metrics.py runs under
-      # iri-cert-expiry.timer and writes basetool_certificate_* into node_exporter's textfile
-      # directory. It reads public certificate FILES only -- never a key, and never the PKCS#12
-      # keystore, which would need a password and whose leaf backend/frontend/ingest/Keycloak all
-      # serve, so the probes already cover it. Label cardinality is the contents of one
-      # operator-provisioned directory (REQ-OBS-006/-011) -- two files on the testing host today,
-      # the internal CA and Grafana's leaf.
-      #
-      # REQ-OBS-008 (internal-cert expiry is monitored).
       - alert: CertificateFileExpiringSoon
         expr: (basetool_certificate_expiry_timestamp_seconds{self_signed="false"} - time()) < 14 * 24 * 3600
         for: 1h
@@ -313,15 +165,6 @@ groups:
           summary: "Certificate file {{ $labels.path }} expires in <14 days"
           description: "The certificate at {{ $labels.path }} ({{ $labels.subject }}) expires in under 14 days and is served by no listener, so no probe covers it. It was issued by {{ $labels.issuer }} -- re-issue it from that CA, put the new file in place and restart whatever reads it."
 
-      # 90 days rather than 14, and the difference is the whole point of the `self_signed` label.
-      # Replacing a CA-signed leaf is a file and a restart. Replacing a self-signed ROOT means
-      # re-issuing every certificate it signed and rolling the new anchor through the edge's
-      # `proxy_ssl_trusted_certificate` and the blackbox `https_internal` module *together* -- work
-      # that has to be staged, not done against a fortnight's deadline.
-      #
-      # A self-signed LEAF (Grafana's) is cheap and gets the same 90 days anyway: a rule that
-      # exempted it by name or by path would be one rename away from silently covering nothing, and
-      # alerting three months early on a cheap certificate costs an acknowledged alert.
       - alert: SelfSignedCertificateExpiring
         expr: (basetool_certificate_expiry_timestamp_seconds{self_signed="true"} - time()) < 90 * 24 * 3600
         for: 1h
@@ -333,29 +176,6 @@ groups:
 
   - name: infrastructure-warning
     rules:
-      # An expiry metric that stopped updating reads exactly like a certificate that is fine: the
-      # value is still there, still in the future, and increasingly a lie. Nothing else would catch
-      # it -- node_exporter keeps serving the .prom file after the collector dies, TargetDown covers
-      # only node_exporter itself, and SystemdUnitFailed covers a unit that EXITS non-zero, not a
-      # timer that stopped being scheduled or a run that never happened. So the collector reports its
-      # own liveness and this rule reads it (REQ-OBS-014).
-      #
-      # 36h because the timer fires daily: one missed run plus margin, not a hair trigger.
-      #
-      # The `or absent(...)` companion is the half that matters most: a collector that has never
-      # written emits no series at all, and `time() - <absent series>` produces no samples rather
-      # than an alert. Without it, the never-installed case -- the one a host rebuild actually
-      # produces -- would be the single state this rule cannot see, while reading as coverage.
-      #
-      # BARE, like `BackupStaleOrMissing` in ops-automation.yml and unlike the scheduled-job
-      # staleness rules in business.yml, and the difference is which kind of metric it reads. Those
-      # read gauges the BACKEND registers, which vanish on a restart -- there a bare absent() means
-      # "just deployed" and pages after every release, which is what their uptime gate exists to
-      # prevent. A textfile metric is the opposite: the .prom file is on disk and outlives every
-      # restart of Prometheus, of node_exporter and of the whole stack, so absent() here can only
-      # mean the collector has never written. The Ansible role takes the first reading at
-      # provisioning time, before the stack that runs Prometheus exists, so there is no window in
-      # which a healthy host looks like this one.
       - alert: CertificateMetricsStale
         expr: (time() - basetool_certificate_metrics_timestamp_seconds) > 36 * 3600 or absent(basetool_certificate_metrics_timestamp_seconds)
         for: 1h
@@ -365,17 +185,6 @@ groups:
           summary: "Certificate expiry metrics are stale"
           description: "iri-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status iri-cert-expiry.timer iri-cert-expiry.service` and /var/iri/monitoring/textfile/certificates.prom on the host."
 
-      # A container whose own health check says it is unhealthy (OPS-MON-03, added 2026-09-22). The
-      # podman exporter publishes podman_container_health per container ID (-1 unknown, 0 healthy,
-      # 1 unhealthy, 2 starting -- prometheus-podman-exporter 1.20.0, the EPEL 10 build the role
-      # installs), and podman_container_info carries the name; the join is the same one the
-      # basetool:container:* recording rules use.
-      #
-      # Ten of the eighteen containers carry a health check; this covers all ten, the databases, Redis,
-      # Keycloak, Grafana and Alertmanager included -- deploy.sh's targeted restart watches only the
-      # three application modules. `for: 10m` rides out a slow start and the nightly quiesce: the
-      # backup STOPS the writers rather than leaving them unhealthy (and a stopped Quadlet container is
-      # removed, so it has no series), and a restarting one reports 2, starting, not 1.
       - alert: ContainerUnhealthy
         expr: >-
           max by (name) (
@@ -388,10 +197,6 @@ groups:
           summary: "Container unhealthy: {{ $labels.name }}"
           description: "Container {{ $labels.name }} has failed its own health check for 10 minutes. For backend, frontend and ingest deploy.sh restarts it on its next tick (DeployHealthRestartFailing pages if that does not help); for every other container nothing restarts it automatically. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman healthcheck run {{ $labels.name }}` and `journalctl CONTAINER_NAME={{ $labels.name }}`."
 
-      # Unattended security updates (OPS-SEC-01, REQ-OPS-032, added 2026-09-22). dnf-automatic applies
-      # security advisories daily and scripts/host-updates-metrics.sh records each run from the unit's
-      # own ExecStopPost=. "Unattended" is the part nobody watches, so these three say when it is not
-      # happening, when it fails, and when an installed fix waits for a reboot only an owner can do.
       - alert: HostSecurityUpdatesFailing
         expr: basetool_host_updates_last_run_success == 0
         for: 1h
@@ -401,9 +206,6 @@ groups:
           summary: "Unattended security updates failed on the host"
           description: "The last dnf-automatic run failed, so security advisories published since the previous good run are not installed. `journalctl -u dnf-automatic.service` on the host shows why (a repository that could not be reached, a dependency conflict, the runtime exclusion blocking a required update)."
 
-      # Stale over two days, held for a day: a fresh host is not paged before its first 07:00 window
-      # (absent() waits out the same 26 hours), and a timer that stopped is reported after its third
-      # missed run at the latest.
       - alert: HostSecurityUpdatesStale
         expr: >-
           (time() - basetool_host_updates_last_run_timestamp_seconds) > 48 * 3600
@@ -433,21 +235,6 @@ groups:
           summary: "Disk >80% on {{ $labels.mountpoint }}"
           description: "Filesystem {{ $labels.mountpoint }} is over 80% full."
 
-      # (#1041 item 14) Host saturation. One CPX42 hosts both DBs, Redis, Keycloak, three JVMs and
-      # the monitoring plane, so memory pressure is the DESIGNED failure mode (the oom_score_adj
-      # sacrifice ordering already OOM-cycled Grafana/Tempo in prod). PSI series are collected by
-      # node_exporter's default `pressure` collector. Memory "full" pressure = fraction of wall time
-      # ALL tasks were stalled reclaiming memory — the earliest saturation signal, before the OOM
-      # kill. baseline-tune: thresholds set in the baseline week.
-      #
-      # THIS COMMENT SAID an absent /proc/pressure leaves the alert "silent, safe" AND THAT WAS
-      # WRONG — corrected 2026-09-22. It was written while the deployment ran on Ubuntu, where PSI
-      # is on by default. Rocky builds the kernel CONFIG_PSI=y with CONFIG_PSI_DEFAULT_DISABLED=y,
-      # so /proc/pressure does not exist without `psi=1` on the kernel command line, and the three
-      # rules below could not fire at all after the cutover. Silent is not safe when the missing
-      # signal is the one that warns first: an alert that cannot fire reads as coverage. The
-      # bootstrap role sets the parameter (27-observability.yml); it takes effect at the next boot,
-      # and `ls /proc/pressure` is what says whether it has.
       - alert: HostMemoryPressureStalled
         expr: rate(node_pressure_memory_stalled_seconds_total[5m]) > 0.10
         for: 10m
@@ -502,8 +289,6 @@ groups:
           summary: "Host load15 >2x vCPU ({{ $labels.instance }})"
           description: "15-minute load average is more than twice the vCPU count for 15 minutes — the run queue is deep (CPU or I/O contention across the co-located services). Investigate the saturating workload."
 
-      # Clock drift breaks JWT iat/exp validation (login failures) and TLS handshakes; the node_timex
-      # collector reports the NTP-adjusted offset. > 0.25s is well beyond a healthy chrony/systemd-timesyncd.
       - alert: HostClockDrift
         expr: abs(node_timex_offset_seconds) > 0.25
         for: 5m
@@ -513,9 +298,6 @@ groups:
           summary: "Host clock drift >0.25s ({{ $labels.instance }})"
           description: "The host clock is more than 0.25s off NTP for 5 minutes — this breaks JWT iat/exp validation (spurious login failures) and TLS handshakes. Check the time-sync service (chrony / systemd-timesyncd)."
 
-      # Physical NIC errors (excludes loopback and the virtual docker/veth/bridge interfaces, which
-      # generate noise) — a failing NIC or a saturated link corrupts packets before the app sees a
-      # timeout.
       - alert: HostNetworkErrors
         expr: |
           sum by (instance, device) (rate(node_network_receive_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) + rate(node_network_transmit_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m])) > 0
@@ -526,35 +308,6 @@ groups:
           summary: "Host NIC errors on {{ $labels.device }} ({{ $labels.instance }})"
           description: "The {{ $labels.device }} interface has had receive/transmit errors for 10 minutes — a failing NIC or saturated link corrupting packets. Check dmesg and the link/driver state."
 
-      # Renamed from ContainerWorkingSetHigh and re-based on container_memory_rss (2026-08-02). The old
-      # expression divided container_memory_working_set_bytes by the limit, and that metric is NOT an
-      # OOM predictor:
-      #
-      #   working_set = anon + ACTIVE file pages (+ kernel)
-      #
-      # The file term includes each service's own memory-mapped BINARY — clean, file-backed and
-      # trivially reclaimable, so the kernel evicts it under pressure rather than OOM-killing. It still
-      # counted fully toward the ratio. Measured 7-day peaks (anon vs what the old rule reported):
-      # alertmanager 48.3% / 95.0%, alloy 40.5% / 94.8%, node-exporter 33.4% / 83.8%, both
-      # postgres-exporters ~42% / ~78% — on the 32M exporters the mapped binary is roughly HALF the
-      # working set. blackbox-exporter (95.3% anon) was the only container in the stack genuinely near
-      # its limit, and this rule still catches it. Page cache also expands to fill whatever limit it is
-      # given, so the old rule was unfixable by more RAM — alloy's 192->256->384->512M history is that
-      # mistake four times over.
-      #
-      # container_memory_rss is cgroup `anon`: heap, thread stacks (so the 2026-07-12 ingest
-      # native-thread OOM is still covered) and JVM native memory. The JVM apps map almost nothing
-      # (frontend 0.45 MiB, ingest 0.11 MiB), so the PR #1419 JVM budgets are unaffected by the change.
-      # Kernel slab/stack is not counted here; ContainerPidsHigh covers the task-count angle
-      # independently. Method + full table: monitoring/README.md -> "Go services" (REQ-OBS-014).
-      #
-      # Reads the NORMALISED series (containers-runtime.yml), not cAdvisor's directly: the Podman
-      # migration renames every container family, and this alert has to keep working on both shapes
-      # while the two run side by side. basetool:container:memory_anon_bytes is cgroup `anon` under
-      # either runtime, so the 0.90 threshold keeps its meaning and is not re-derived.
-      # The `> 0` guard replaces the `name=~".+"` filter the cAdvisor leg carried (removed 2026-09-22):
-      # a zero limit divides to +Inf and would permafire. The cgroup collector writes +Inf for an
-      # unlimited memory.max, so this only ever meets a genuinely broken reading.
       - alert: ContainerMemoryHigh
         expr: >-
           (basetool:container:memory_anon_bytes / (basetool:container:memory_limit_bytes > 0)) > 0.90
@@ -565,13 +318,6 @@ groups:
           summary: "Container anonymous memory >90% of limit: {{ $labels.name }}"
           description: "Container {{ $labels.name }} holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check basetool:container:memory_working_set_bytes only to explain a gap, never to size."
 
-      # A single core app container dropping out of cAdvisor (#1041 item 7, REQ-OBS-014). Complements
-      # the global ContainerMetricsMissing above: fires when fewer than the 7 core containers report a
-      # cAdvisor series (or all are gone), catching a single core container whose container-level
-      # metrics vanished while the plane keeps ~20 total series. Warning (not critical) because a truly
-      # down app container also pages TargetDown on its app scrape.
-      # Reads the normalised series since 2026-09-20 -- same change, same reason as
-      # ContainerMetricsMissing above.
       - alert: CoreContainerMetricsMissing
         expr: >-
           count(basetool:container:present{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis"}) < 7
@@ -583,9 +329,6 @@ groups:
           summary: "A core app container stopped reporting metrics"
           description: "Fewer than the 7 core app containers (backend/frontend/ingest/keycloak/db-backend/db-keycloak/redis) report container metrics — one is down, or the collector lost its series. Cross-check TargetDown and the container's health."
 
-      # Single OOM kill (#1041 item 7, REQ-OBS-014). ContainerRestartLoop needs >3 restarts/15m; a
-      # one-off OOM kill slips under that threshold. `container_oom_events_total` verified present in
-      # cadvisor v0.60.3.
       - alert: ContainerOomKilled
         expr: increase(basetool:container:oom_kills_total[15m]) > 0
         for: 0m
@@ -595,11 +338,6 @@ groups:
           summary: "Container OOM-killed: {{ $labels.name }}"
           description: "Container {{ $labels.name }} recorded an out-of-memory kill in the last 15 minutes. Check its memory limit and working set; on the memory-capped host this is the designed sacrifice order — confirm it was the intended victim."
 
-      # Sustained CPU throttling (#1041 item 7, REQ-OBS-014). container_cpu_cfs_* is emitted only for
-      # containers with a CFS quota; the app containers all set cpus limits (db-backend 4.0, backend 3.0,
-      # keycloak 3.0, frontend 2.0, ingest 1.5 — raised 2026-09-13, ADR-0174/0175 investigation,
-      # …), so this ratio has data for them. Verified against cadvisor v0.60.3.
-      # baseline-tune: the 25% throttled-period ratio is the issue's initial threshold.
       - alert: ContainerCpuThrottledHigh
         expr: >-
           rate(basetool:container:cpu_throttled_periods_total[15m])
@@ -611,38 +349,6 @@ groups:
           summary: "Container CPU throttled >25%: {{ $labels.name }}"
           description: "Container {{ $labels.name }} had more than 25% of its CFS periods throttled for 15 minutes — it is CPU-starved against its limit, degrading latency. Consider raising its cpus limit."
 
-      # Container cgroup-pids exhaustion — the leading-indicator + defense-in-depth complement to the
-      # REQ-OPS-019 root-cause fix (init:true reaps the wget-HTTPS healthcheck's ssl_client zombies on
-      # backend/frontend/ingest). The `pids` cgroup cap (2048 for the four JVM containers
-      # backend/frontend/ingest/keycloak — docker-compose.yml) limits EVERY task in the container, not
-      # just JVM threads: unreaped child-process zombies (the 2026-07-12 ingest incident) and the OS
-      # carrier threads behind virtual threads both count against it yet are INVISIBLE to Micrometer's
-      # jvm_threads_live_threads — which stayed flat (~36) while ingest exhausted the cap, so
-      # JvmThreadsHigh (apps.yml) never fired and only post-crash TargetDown / DeployHealthRestartFailing
-      # paged. init:true removes that specific zombie source; this alert still catches ANY future
-      # pids/task leak (another zombie source, a thread runaway) before the cap is hit. cAdvisor's
-      # container_threads is the cgroup pids.current task count (companion container_threads_max =
-      # pids.max); the `process` metric group that emits it is enabled in docker-compose.monitoring.yml.
-      # Compared against each container's OWN cap via container_threads_max (the cgroup pids.max),
-      # NOT a hardcoded number, and scoped to EVERY named container (amended 2026-07-26). It
-      # previously read `container_threads{name=~"backend|frontend|ingest|keycloak"} > 1638`, which
-      # was blind twice over: the name list omitted every non-JVM container, and the 1638 literal
-      # (80% of 2048) is unreachable for the ones capped at `pids: 512` — so for those the rule could
-      # not have fired even at 100% of their cap. Grafana hit exactly that hole: its wget-HTTPS
-      # healthcheck forks an `ssl_client` per probe that reparents to the Go server (no init, no
-      # wait()), and on 2026-07-26 it sat at 512/512 pids with 493 unreaped zombies and
-      # pids.events max=7445 — refusing every fork, `unhealthy` for two days, with no alert mail at
-      # all. `init: true` on the grafana service (docker-compose.monitoring.yml) removes that
-      # specific zombie source; this rule is what makes any future pids leak visible ANYWHERE.
-      # The `> 0` guard on the denominator drops the unnamed cgroup roots that export
-      # container_threads_max=0 and would otherwise divide to +Inf and fire permanently.
-      # Headroom is ample: measured on prod, grafana read 100% while the next-highest container
-      # (tempo) sat at 12.5%, so 0.8 is nowhere near normal operation. Verified on cadvisor v0.60.5;
-      # the `process` metric group that emits both series is enabled in docker-compose.monitoring.yml.
-      # Normalised via containers-runtime.yml, so it keeps working across the Podman cutover. The
-      # ceiling is the half prometheus-podman-exporter does not publish at all: under Podman it
-      # comes from the cgroup collector reading pids.max, which is the same file cAdvisor read to
-      # produce container_threads_max.
       - alert: ContainerPidsHigh
         expr: >-
           basetool:container:pids
@@ -664,12 +370,6 @@ groups:
           summary: "Redis is evicting keys"
           description: "Redis evicted keys in the last 15 minutes. The session store runs maxmemory-policy noeviction, which never evicts — so any eviction means the policy was changed to an evicting one (allkeys-*/volatile-*), which silently logs users out. Restore noeviction and check what changed the config."
 
-      # (#1041 item 13) Redis memory approaching maxmemory — the real leading indicator. Under the
-      # noeviction policy RedisEvictions never fires, so this ratio is the ONLY warning before Redis
-      # starts rejecting new writes (failed logins / session writes) at the 384mb ceiling — raised from
-      # 192mb by ADR-0085 for the 5000-account session index, though the 192mb figure survived in this
-      # comment and in REQ-OPS-018 until 2026-09-08. Guard on redis_memory_max_bytes > 0 so it stays
-      # inert if maxmemory is ever unset again (no divide-by-zero).
       - alert: RedisMemoryHigh
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85 and redis_memory_max_bytes > 0
         for: 10m
@@ -679,8 +379,6 @@ groups:
           summary: "Redis memory >85% of maxmemory"
           description: "Redis has used more than 85% of its 384mb maxmemory for 10 minutes. Under noeviction, hitting the ceiling makes NEW session writes / logins fail (existing sessions survive) — investigate session growth or a leak before it does."
 
-      # Redis rejected new connections — the maxclients limit was reached (a connection leak or a
-      # client storm). New Spring Session reads/writes then fail, so this is a pre-outage signal.
       - alert: RedisConnectionsRejected
         expr: increase(redis_rejected_connections_total[15m]) > 0
         for: 5m
@@ -699,9 +397,6 @@ groups:
           summary: "PostgreSQL deadlocks detected ({{ $labels.datname }})"
           description: "PostgreSQL recorded deadlocks in the last 15 minutes."
 
-      # (#1041 item 13) Long-running transaction — an idle-in-transaction session blocks autovacuum,
-      # which lets bloat and XID age grow toward wraparound (plausible given the codebase's multi-step
-      # transaction history). The metric IS genuinely in seconds and is 0 when none are open.
       - alert: PostgresLongTransaction
         expr: pg_long_running_transactions_oldest_timestamp_seconds > 3600
         for: 5m
@@ -711,8 +406,6 @@ groups:
           summary: "PostgreSQL transaction open >1h"
           description: "A transaction has been open for more than 1 hour — an idle-in-transaction session blocks autovacuum (bloat + XID-age growth toward wraparound). Find and terminate it via pg_stat_activity."
 
-      # Buffer-cache hit ratio below 90% means queries are hitting disk. Division is NaN when the DB is
-      # idle (both rates 0), so the alert only fires under real block-access load.
       - alert: PostgresCacheHitLow
         expr: |
           sum by (datname) (rate(pg_stat_database_blks_hit{datname!~"template.*"}[30m]))
@@ -724,8 +417,6 @@ groups:
           summary: "PostgreSQL cache hit ratio <90% ({{ $labels.datname }})"
           description: "The buffer-cache hit ratio for {{ $labels.datname }} has been below 90% for 30 minutes — queries are reading from disk. Check shared_buffers sizing and recent query/plan changes."
 
-      # Temp-file spill: queries whose sort/hash exceeds work_mem spill to disk. > 1 GB/h points at an
-      # undersized work_mem or a bad plan.
       - alert: PostgresTempFiles
         expr: increase(pg_stat_database_temp_bytes{datname!~"template.*"}[1h]) > 1073741824
         for: 5m
@@ -735,12 +426,6 @@ groups:
           summary: "PostgreSQL temp files >1GB/h ({{ $labels.datname }})"
           description: "{{ $labels.datname }} wrote more than 1 GB of temp files in the last hour — queries are spilling to disk (work_mem too small, or a bad plan). Check the heavy queries."
 
-      # CRITICAL: transaction-ID wraparound. IMPORTANT — the metric value is an XID AGE COUNT
-      # (age(datfrozenxid)), NOT seconds: postgres_exporter names it *_seconds but the underlying SQL
-      # is age(datfrozenxid), which returns a transaction count. The hard wraparound limit is ~2.1e9;
-      # autovacuum_freeze_max_age defaults to 2e8, so a healthy DB stays well below that. > 1.5e9 means
-      # autovacuum has been failing to freeze for a very long time and the DB nears a forced read-only
-      # shutdown. Do NOT "fix" this threshold to a seconds value.
       - alert: PostgresWraparoundCritical
         expr: pg_database_wraparound_age_datfrozenxid_seconds > 1500000000
         for: 5m
@@ -750,7 +435,6 @@ groups:
           summary: "PostgreSQL XID wraparound age critical ({{ $labels.datname }})"
           description: "The oldest un-frozen transaction-ID age for {{ $labels.datname }} exceeds 1.5 billion of the ~2.1 billion wraparound limit — autovacuum is not keeping up and PostgreSQL will refuse writes as it nears the limit. Investigate autovacuum and long-idle transactions urgently."
 
-      # Posture assertions (REQ-OBS-012). Same `and on()` outage guard as EdgeActuatorDenyBroken.
       - alert: EdgeForceSslRedirectBroken
         expr: >-
           probe_success{job="blackbox-force-ssl"} == 0
@@ -762,18 +446,6 @@ groups:
           summary: "HTTP→HTTPS redirect broken: {{ $labels.instance }}"
           description: "Port 80 on {{ $labels.instance }} no longer answers with a 301/308 to https:// — the Force SSL toggle on the NPM proxy host is off or drifted."
 
-      # REQ-SEC-052 / ADR-0159 seen from outside. The members-only cut-over made three former
-      # public pages redirect an anonymous browser into the OAuth2 flow; this is the only signal
-      # that says so from where a member's browser stands. The app's own sweeps
-      # (AnonymousSurfaceSweepMvcTest) run in-process against MockMvc and would stay green while a
-      # cache rule, a stale upstream or a mis-ordered NPM location served the old page — which is
-      # the failure worth paging on, because it publishes the roster again and nothing else
-      # notices. Same `and on()` outage guard as EdgeActuatorDenyBroken: while the edge itself is
-      # down the probe carries no signal and BlackboxProbeFailed already pages.
-      #
-      # `critical` rather than `warning`, unlike its posture siblings: Force-SSL and HSTS drifting
-      # weaken a transport that still works, this one means member data is being served to the
-      # internet. 5m rather than 15m for the same reason.
       - alert: EdgeMembersOnlyRedirectBroken
         expr: >-
           probe_success{job="blackbox-members-only"} == 0
@@ -785,16 +457,6 @@ groups:
           summary: "Members-only redirect broken: {{ $labels.instance }}"
           description: "{{ $labels.instance }} no longer answers a browser navigation with a 302 into /oauth2/authorization/keycloak. REQ-SEC-052 requires every page except /, /impressum, /privacy, /terms and /licenses to need a login; a 200 here means the page is being served to anonymous visitors. Check the NPM proxy host for a cache or location rule ahead of the app, and confirm the frontend image carries the members-only SecurityConfig."
 
-      # The inverse posture: the paths that must STAY public. Same shape and same outage guard as
-      # EdgeMembersOnlyRedirectBroken above, and the same reason for existing — the app's own
-      # sweeps run in-process and cannot see an edge rule, a cache, or a permitAll entry lost in a
-      # merge. The one that had no probe until now is the manifest, where the failure is silent and
-      # lands on members rather than on a dashboard: a browser reads it before any login, so a 302
-      # makes every new home-screen install take its name and icon from the login page.
-      #
-      # `warning`, not `critical`: unlike its sibling, a failure here exposes nothing — it denies
-      # access to pages that are supposed to be open, and for the legal pages that is a compliance
-      # problem on a slower clock than a data leak. 15m absorbs a deploy.
       - alert: EdgePublicSurfaceNot200
         expr: >-
           probe_success{job="blackbox-public-surface"} == 0
@@ -806,19 +468,6 @@ groups:
           summary: "Public path no longer answers 200: {{ $labels.instance }}"
           description: "{{ $labels.instance }} stopped answering 200 on its first response. REQ-SEC-052 lists it as permitAll, so this is either a lost SecurityConfig entry (the path now 302s into /oauth2/authorization/keycloak) or an edge rule ahead of the app. For /manifest.webmanifest this is user-visible: new installs take their name and icon from whatever the redirect returns (REQ-UI-020, ADR-0164). Note http_2xx would NOT catch this — it follows redirects and would report the Keycloak 200 as success."
 
-      # The third posture on the same surface, and the only public path whose contract is a redirect
-      # (REQ-SEC-038). /app/callback catches an Android login whose App Link did not open the app,
-      # and it must answer 303 to /app/link-help. What the redirect buys is not convenience: the
-      # URL carries a live authorization code, and 303-ing keeps it out of the address bar and the
-      # history entry. Rendering a page there puts it back, and losing the permitAll entry sends the
-      # member into OAuth again holding a dead code.
-      #
-      # Before the route existed this failure looked like `No mapping for GET /app/callback` in the
-      # frontend log and was found from a member's report, two log archives later — which is why it
-      # is asserted from outside rather than only by AppLinkControllerTest in-process.
-      #
-      # `warning` and 15m, like its public-surface sibling: the exposure needs a crawler or a shared
-      # device to become a loss, and 15m absorbs a deploy. Same `and on()` outage guard.
       - alert: EdgeAppLinkFallbackBroken
         expr: >-
           probe_success{job="blackbox-app-link"} == 0
@@ -830,10 +479,6 @@ groups:
           summary: "Android App Link fallback broken: {{ $labels.instance }}"
           description: "https://profit-base.online/app/callback no longer answers 303 to /app/link-help on its first response (REQ-SEC-038). A 200 means the authorization code is being left in the member's address bar and history; a 302 into /oauth2/authorization/keycloak means the permitAll entry was lost and the member is sent back into a login they cannot finish; a 404 means AppLinkController is gone from the image. Check the frontend SecurityConfig anonymous matchers, AppLinkController, and the NPM proxy host for a rule ahead of the app."
 
-      # Regex, not the bare job name: blackbox-hsts-auth (the API vhost, whose probeable paths
-      # answer 401 and therefore need the http_2xx_or_401_hsts module) is a separate job.
-      # Prometheus anchors label regexes fully, so the old spelling `job="blackbox-hsts"` collected
-      # that job's probe_success and alerted on none of it.
       - alert: EdgeHstsHeaderMissing
         expr: >-
           probe_success{job=~"blackbox-hsts.*"} == 0
@@ -845,10 +490,6 @@ groups:
           summary: "HSTS header missing: {{ $labels.instance }}"
           description: "The first response from {{ $labels.instance }} no longer carries Strict-Transport-Security (app-side HSTS, audit finding H-9) — check the frontend security config and the edge forwarding."
 
-      # IPv6 reachability (owner-confirmed AAAA records, 2026-07-06). Fires only when a public vhost is
-      # unreachable over IPv6 while its IPv4 probe of the SAME instance is up — an IPv6-specific
-      # regression. A full outage is paged once by BlackboxProbeFailed on the v4 path (the on(instance)
-      # guard suppresses this then). Warning: IPv4 remains a working path for most clients.
       - alert: EdgeIpv6Unreachable
         expr: >-
           (probe_success{job="blackbox-http-ipv6"} == 0
@@ -862,13 +503,7 @@ groups:
           summary: "Endpoint unreachable over IPv6: {{ $labels.instance }}"
           description: "{{ $labels.instance }} answers over IPv4 but not IPv6 — an IPv6-only regression (broken AAAA path or lost edge v6 binding). IPv6 clients cannot reach it. Check the AAAA record and the edge IPv6 listener."
 
-      # Public DNS resolution: the blackbox DNS probe against 1.1.1.1 failed — the apex is not resolving
-      # an A or AAAA record (missing/removed record, or a zone/provider outage). Warning.
       - alert: DnsResolutionFailed
-        # Regex, not an alternation of the two apex jobs: the staged api-vhost DNS jobs
-        # (blackbox-dns-api-a / -aaaa, see prometheus.yml) must be covered the moment they are
-        # uncommented. Prometheus anchors label regexes fully, so the old spelling silently would
-        # not have matched them and the new records would have shipped without a resolution alert.
         expr: probe_success{job=~"blackbox-dns-.*"} == 0
         for: 5m
         labels:

@@ -37,28 +37,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.FieldSource;
 
 /**
- * Non-destructive page-load smoke for the ADMIN-only management pages that had no end-to-end
- * coverage at all — several admin data-management screens plus the members list and the
- * organisation-leadership view. It guards against a page rendering a 500 (a stale template, a
- * broken controller binding, a missing model attribute) the way {@code CorePagesSmokeE2eTest}
- * guards the member-facing core pages.
+ * Page-load smoke for the ADMIN-only management pages without a dedicated flow, as {@code
+ * test-admin}: each GET must answer 200 and render the authenticated shell.
  *
- * <p>Unlike {@code CorePagesSmokeE2eTest} (tagged {@code smoke}, target-agnostic, possibly a
- * non-admin staging user), these pages are {@code ADMIN}-gated, so this class logs in explicitly as
- * {@code test-admin} and is tagged {@code @Tag("e2e")} to run against the ephemeral stack where
- * that seeded admin exists. It mutates nothing — every check is a GET — asserting both an HTTP 200
- * and the authenticated shell ({@code nav-logout}), so a page that bounced to the IdP or errored
- * fails loudly. Pages already covered by a dedicated flow ({@code /admin/settings}, {@code
- * /admin/materials}, {@code /admin/special-commands}, {@code /admin/default-blueprints}, {@code
- * /admin/bank}, {@code /admin/audit-log}, {@code /admin/mission-data}) are intentionally omitted.
- *
- * <p><b>The routes come from {@link FrontendPageRoutes#ADMIN_SMOKE}</b>, not from a list in this
- * file. Until 2026-09-13 this class, {@code CorePagesSmokeE2eTest} and {@code
- * TouchClassLayoutE2eTest} each enumerated the frontend's page routes by hand, and the three
- * disagreed — the largest was short by seventeen, including {@code /members}, which was in this
- * class's list but not in the sweep's. The omissions above remain a judgement about test value
- * rather than a fact about the mappings, so that slice stays curated; what {@code
- * PageRouteCatalogueTest} now guarantees is that every entry in it is a page route that exists.
+ * <p>The routes come from {@link FrontendPageRoutes#ADMIN_SMOKE}.
  */
 @Tag("e2e")
 class AdminPagesSmokeE2eTest {

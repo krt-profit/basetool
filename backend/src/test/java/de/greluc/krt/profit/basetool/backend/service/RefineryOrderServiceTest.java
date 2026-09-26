@@ -72,22 +72,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for {@link RefineryOrderService#storeRefineryOrder} — the bulk-update + multi-item
- * flow CLAUDE.md flags as a 409 trap. The Lager is append-only: every stored refinery output
- * becomes its own brand-new {@code InventoryItem} row and is never folded into an existing
- * identical stack, so there is no match-and-merge branch and no note-merge to exercise. This suite
- * covers:
- *
- * <ul>
- *   <li>access-control (owner vs non-owner vs logistician bypass)
- *   <li>per-item lookups (material / location / user / job-order {@link NotFoundException}s)
- *   <li>assignee resolution (explicit user vs order-owner fallback)
- *   <li>always inserting a fresh InventoryItem carrying the incoming amount (rounded to SCU scale)
- *   <li>note normalisation on the new row (trimmed value stored; null / blank stored as null)
- *   <li>{@code updateGoodOutputQuantity}: SCU vs PIECE conversion, {@code @Min(1)} clamp at zero,
- *       no-match silent skip, missing output-material guard
- *   <li>final state transition to {@link RefineryOrderStatus#COMPLETED}
- * </ul>
+ * Unit tests for {@link RefineryOrderService#storeRefineryOrder}: access control, per-item lookups,
+ * assignee resolution, one new inventory row per output, note normalisation, output quantity
+ * conversion and the transition to {@link RefineryOrderStatus#COMPLETED}.
  */
 @ExtendWith(MockitoExtension.class)
 class RefineryOrderServiceTest {
@@ -149,10 +136,6 @@ class RefineryOrderServiceTest {
     order.setStatus(RefineryOrderStatus.IN_PROGRESS);
   }
 
-  // ------------------------------------------------------------------
-  // The kept-from-the-original test (regression coverage).
-  // ------------------------------------------------------------------
-
   @Test
   void shouldThrowExceptionWhenStoringCompletedOrder() {
     RefineryOrder completedOrder = new RefineryOrder();
@@ -163,8 +146,6 @@ class RefineryOrderServiceTest {
 
     RefineryOrderStoreDto dto = new RefineryOrderStoreDto(Collections.emptyList());
 
-    // A client-side condition: 400 with a localized detail, not a raw IllegalStateException
-    // (which is a 500 since APPSEC-06).
     BadRequestException ex =
         assertThrows(
             BadRequestException.class,
@@ -172,10 +153,6 @@ class RefineryOrderServiceTest {
 
     assertEquals("error.refinery_order.already_stored", ex.getMessage());
   }
-
-  // ------------------------------------------------------------------
-  // Access control
-  // ------------------------------------------------------------------
 
   @Nested
   class AccessControlTests {
@@ -230,12 +207,8 @@ class RefineryOrderServiceTest {
 
     @Test
     void logisticianBypassesOwnershipCheck_evenForSomeoneElsesOrder() {
-      // Empty items list means we exit the for-loop without needing repository stubs
-      // for material/location lookups. We just need the order to be reachable
-      // and the COMPLETED check to pass.
       when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
 
-      // No throw: logistician overrides owner mismatch.
       refineryOrderService.storeRefineryOrder(
           OTHER_USER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of()), true);
 
@@ -243,10 +216,6 @@ class RefineryOrderServiceTest {
       verify(refineryOrderRepository, times(1)).save(order);
     }
   }
-
-  // ------------------------------------------------------------------
-  // Per-item entity lookup failures
-  // ------------------------------------------------------------------
 
   @Nested
   class ItemLookupFailureTests {
@@ -283,10 +252,6 @@ class RefineryOrderServiceTest {
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.empty());
 
-      // Driven as a caller who IS in scope for the foreign assignee: since REQ-SEC-039 a caller
-      // naming a foreign assignee is refused before the lookup, so the unknown-user path is only
-      // reachable for a caller actually allowed to book on that member's behalf. The gate is
-      // canManageUserInventory (per target), not the org-unit-less ROLE_LOGISTICIAN it replaced.
       when(ownerScopeService.canManageUserInventory(OTHER_USER_ID)).thenReturn(true);
       assertThrows(
           NotFoundException.class,
@@ -316,10 +281,6 @@ class RefineryOrderServiceTest {
     }
   }
 
-  // ------------------------------------------------------------------
-  // Assignee fallback
-  // ------------------------------------------------------------------
-
   @Nested
   class AssigneeResolutionTests {
 
@@ -344,8 +305,6 @@ class RefineryOrderServiceTest {
       stubLookupsForSingleItem();
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.of(other));
 
-      // Booking someone else's stock requires editable org-unit scope on THAT member
-      // (REQ-SEC-005/-039) — the same gate the Einbuchen path applies to a foreign target user.
       when(ownerScopeService.canManageUserInventory(OTHER_USER_ID)).thenReturn(true);
       refineryOrderService.storeRefineryOrder(
           OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))), true);
@@ -356,14 +315,8 @@ class RefineryOrderServiceTest {
     }
 
     /**
-     * REQ-SEC-039: the per-item {@code userId} must not let a plain member write into someone
-     * else's ledger.
-     *
-     * <p>The caller here passes every other gate — they own the order, so the ownership check above
-     * is satisfied — and the only thing standing between them and an arbitrary cross-user inventory
-     * write is this guard. Without it a member could fabricate any material, at any quality and any
-     * amount, as another member's stock (or, with {@code personal}, their private stock) and leave
-     * the audit row attributed to the victim.
+     * A plain member who owns the order still may not name another user as the assignee of a stored
+     * item (REQ-SEC-039).
      */
     @Test
     void throwsAccessDenied_whenNonLogisticianNamesAnotherUserAsAssignee() {
@@ -378,21 +331,11 @@ class RefineryOrderServiceTest {
                   new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))),
                   false));
 
-      // Nothing was written: neither the victim's inventory row nor the order's completion.
       verify(inventoryItemRepository, never()).save(any());
       verify(refineryOrderRepository, never()).save(any());
     }
 
-    /**
-     * REQ-SEC-005 regression: holding LOGISTICIAN is not an answer about a member of a DIFFERENT
-     * org unit.
-     *
-     * <p>The caller here owns the order (so the ownership check passes) and holds the flat {@code
-     * ROLE_LOGISTICIAN} - which is exactly the state that used to authorise this write, because the
-     * guard was a role boolean with no org-unit context. The receiver is a member of another
-     * Staffel, so {@code canManageUserInventory} says no and the write must be refused before the
-     * victim's row or the order completion is touched.
-     */
+    /** A logistician may not name an assignee outside their org-unit scope (REQ-SEC-005). */
     @Test
     void throwsAccessDenied_whenLogisticianNamesAnAssigneeOutsideTheirOrgUnitScope() {
       stubLookupsForSingleItem();
@@ -447,17 +390,11 @@ class RefineryOrderServiceTest {
     }
   }
 
-  // ------------------------------------------------------------------
-  // Owning-OrgUnit stamping (#596 — per-item picker output)
-  // ------------------------------------------------------------------
-
   @Nested
   class OwningOrgUnitStampingTests {
 
     @Test
     void threadsItemOwningOrgUnitIdIntoResolver_andStampsResolvedOrgUnit() {
-      // A multi-membership receiver supplies an explicit picker output; the service must hand that
-      // exact id (not null) to the resolver and stamp the returned OrgUnit on the new Lager row.
       stubLookupsForSingleItem();
       de.greluc.krt.profit.basetool.backend.model.Squadron resolved =
           new de.greluc.krt.profit.basetool.backend.model.Squadron();
@@ -479,8 +416,6 @@ class RefineryOrderServiceTest {
 
     @Test
     void passesNullPickerOutput_whenItemOmitsOwningOrgUnitId() {
-      // No pick: a single-membership / membershipless receiver still flows through with a null
-      // picker output so the resolver keeps its auto-stamp / ownerless behaviour.
       stubLookupsForSingleItem();
 
       refineryOrderService.storeRefineryOrder(
@@ -493,17 +428,11 @@ class RefineryOrderServiceTest {
     }
   }
 
-  // ------------------------------------------------------------------
-  // Always-insert (append-only) + note handling on the new row
-  // ------------------------------------------------------------------
-
   @Nested
   class InsertTests {
 
     @Test
     void alwaysInsertsNewInventoryItem() {
-      // Append-only Lager: every stored output is a fresh row carrying the incoming amount — no
-      // match-and-merge. A pre-existing identical row is irrelevant; nothing accumulates into it.
       stubLookupsForSingleItem();
 
       refineryOrderService.storeRefineryOrder(
@@ -525,8 +454,6 @@ class RefineryOrderServiceTest {
 
     @Test
     void roundsNewItemAmountToThreeDecimals() {
-      // The store path rounds the incoming amount to SCU scale (three decimals, HALF_UP) on the new
-      // row. 2.2 stays 2.2 — there is no summing with any pre-existing stack any more.
       stubLookupsForSingleItem();
 
       refineryOrderService.storeRefineryOrder(
@@ -569,10 +496,6 @@ class RefineryOrderServiceTest {
     }
   }
 
-  // ------------------------------------------------------------------
-  // updateGoodOutputQuantity (SCU vs PIECE, @Min(1) clamp, no-match)
-  // ------------------------------------------------------------------
-
   @Nested
   class GoodOutputQuantityTests {
 
@@ -584,7 +507,6 @@ class RefineryOrderServiceTest {
 
       storeWithMaterial(scuMaterial, 1.234);
 
-      // 1.234 SCU -> round(123.4) -> 123 units
       assertEquals(123, good.getOutputQuantity());
     }
 
@@ -596,16 +518,11 @@ class RefineryOrderServiceTest {
 
       storeWithMaterial(pieceMaterial, 42.4);
 
-      // round(42.4) = 42 units
       assertEquals(42, good.getOutputQuantity());
     }
 
     @Test
     void sameMaterialAtTwoGrades_eachGoodTakesItsOwnAmount() {
-      // A run yields Agricium at 733 and Agricium at 874 — one material, two goods. Matching on
-      // the material alone put BOTH items on the first good: the later one overwrote the earlier
-      // and the second good was never updated at all. Invisible while clients sent the computed
-      // amounts back; the Android Einlagern form corrects them per line, which surfaced it.
       Material scuMaterial = newMaterial(QuantityType.SCU);
       RefineryGood low = newGoodWithOutput(scuMaterial);
       low.setQuality(733);
@@ -641,14 +558,11 @@ class RefineryOrderServiceTest {
 
       storeWithMaterial(untyped, 10.7);
 
-      // The non-SCU branch rounds: round(10.7) = 11.
       assertEquals(11, good.getOutputQuantity());
     }
 
     @Test
     void zeroAmount_isClampedToOne() {
-      // @Min(1) on RefineryGood.outputQuantity makes 0 invalid;
-      // the service must clamp upwards rather than persist an invalid value.
       Material pieceMaterial = newMaterial(QuantityType.PIECE);
       RefineryGood good = newGoodWithOutput(pieceMaterial);
       order.setGoods(new HashSet<>(Set.of(good)));
@@ -660,8 +574,6 @@ class RefineryOrderServiceTest {
 
     @Test
     void noMatchingGood_silentlySkipsTheUpdate() {
-      // Good's output material is DIFFERENT from the stored item's material;
-      // no update should happen, and outputQuantity must keep its previous value.
       Material storedMaterial = newMaterial(QuantityType.SCU);
       Material differentOutputMaterial = newMaterial(QuantityType.SCU);
       RefineryGood good = newGoodWithOutput(differentOutputMaterial);
@@ -678,7 +590,6 @@ class RefineryOrderServiceTest {
 
     @Test
     void goodWithNullOutputMaterial_silentlyIgnored() {
-      // No NPE even if a malformed RefineryGood has no output material set.
       Material stored = newMaterial(QuantityType.SCU);
       RefineryGood broken = new RefineryGood();
       broken.setOutputMaterial(null);
@@ -696,14 +607,10 @@ class RefineryOrderServiceTest {
 
     @Test
     void goodsCollectionIsNull_silentlyReturns() {
-      // Edge: order.goods == null. Should not NPE; just no update happens.
       order.setGoods(null);
 
-      // Use a single item with a valid material; the storeRefineryOrder path
-      // still calls updateGoodOutputQuantity, which must return on null goods.
       stubLookupsForSingleItem();
 
-      // Just verify it doesn't throw.
       refineryOrderService.storeRefineryOrder(
           OWNER_ID,
           ORDER_ID,
@@ -713,10 +620,6 @@ class RefineryOrderServiceTest {
       verify(refineryOrderRepository, times(1)).save(order);
     }
   }
-
-  // ------------------------------------------------------------------
-  // Final state transition
-  // ------------------------------------------------------------------
 
   @Test
   void afterAllItemsProcessed_orderStatusIsCOMPLETED_andOrderSaved() {
@@ -732,8 +635,6 @@ class RefineryOrderServiceTest {
   @Test
   void multipleItems_allInsertedAndOrderCompletedExactlyOnce() {
     stubLookupsForSingleItem();
-    // Two items reuse the same material/location to keep the fixture light; each still inserts its
-    // own row (append-only), so save() is expected exactly twice.
 
     refineryOrderService.storeRefineryOrder(
         OWNER_ID,
@@ -743,13 +644,9 @@ class RefineryOrderServiceTest {
         false);
 
     verify(inventoryItemRepository, times(2)).save(any(InventoryItem.class));
-    verify(refineryOrderRepository, times(1)).save(order); // order saved exactly once
+    verify(refineryOrderRepository, times(1)).save(order);
     assertEquals(RefineryOrderStatus.COMPLETED, order.getStatus());
   }
-
-  // ------------------------------------------------------------------
-  // Personal marker (REQ-INV-035)
-  // ------------------------------------------------------------------
 
   /**
    * The store dialog may book an output row into the receiver's private pool instead of the shared
@@ -773,8 +670,6 @@ class RefineryOrderServiceTest {
 
     @Test
     void storesRowAsShared_whenFlagIsNullOrFalse() {
-      // Backward compatibility: an older client omitting the field must keep producing shared
-      // stock.
       stubLookupsForSingleItem();
 
       refineryOrderService.storeRefineryOrder(
@@ -810,9 +705,6 @@ class RefineryOrderServiceTest {
 
     @Test
     void dropsTheOrdersMissionEarmark_onAPersonalRow_butKeepsItOnASharedOne() {
-      // The mission earmark is derived from the order, not picked per item — marking the batch
-      // personal is precisely the act of taking it out of the mission pool, so the personal row
-      // carries no mission slice while a shared row in the same call still does.
       de.greluc.krt.profit.basetool.backend.model.Mission mission =
           new de.greluc.krt.profit.basetool.backend.model.Mission();
       mission.setId(UUID.randomUUID());
@@ -833,10 +725,6 @@ class RefineryOrderServiceTest {
       assertEquals(1, sharedRow.getMissionAllocations().size());
     }
   }
-
-  // ------------------------------------------------------------------
-  // Helpers
-  // ------------------------------------------------------------------
 
   /**
    * Builds a store item for the default material/location carrying the given personal marker and
@@ -900,7 +788,7 @@ class RefineryOrderServiceTest {
   private static RefineryGood newGoodWithOutput(Material outputMaterial) {
     RefineryGood good = new RefineryGood();
     good.setOutputMaterial(outputMaterial);
-    good.setOutputQuantity(1); // initial value to detect when it's overwritten
+    good.setOutputQuantity(1);
     return good;
   }
 
@@ -989,8 +877,6 @@ class RefineryOrderServiceTest {
 
     @Test
     void zeroBonusValue_isPreserved_notTreatedAsMissing() {
-      // A 0% yield row is a real UEX-published value (the commodity refines at the baseline
-      // yield) — it must end up in the map so the UI can distinguish it from "no data".
       UUID matA = UUID.randomUUID();
       Material a = new Material();
       a.setId(matA);
@@ -1081,11 +967,6 @@ class RefineryOrderServiceTest {
     }
   }
 
-  // --- R5.d.b createRefineryOrder picker delegation -------------------------
-  // The membership-validation + Squadron-resolution logic itself is pinned by
-  // OwnerScopeServiceTest. These tests verify that createRefineryOrder routes the picker output
-  // through the shared resolver instead of stamping the order owner's home Staffel directly.
-
   @Nested
   class CreateOrderPickerDelegationTests {
 
@@ -1141,10 +1022,6 @@ class RefineryOrderServiceTest {
       when(refineryOrderRepository.save(any(RefineryOrder.class)))
           .thenAnswer(i -> i.getArgument(0));
 
-      // Audit H-2: a malicious client echoes an existing order's id + version in the create body to
-      // turn save() into an EntityManager.merge() UPSERT (AbstractEntity.isNew() == id == null),
-      // overwriting and re-owning a foreign order. createRefineryOrder must reset both so the
-      // persistence provider performs a clean INSERT instead.
       RefineryOrder transientOrder = new RefineryOrder();
       transientOrder.setLocation(loc);
       transientOrder.setId(UUID.randomUUID());
@@ -1160,11 +1037,6 @@ class RefineryOrderServiceTest {
       assertNull(
           captor.getValue().getVersion(), "client-supplied version must be nulled on create");
 
-      // REQ-AUDIT-001 + security fix: a refinery create records exactly one REFINERY_ORDER_CREATED,
-      // and its subjectLabel must NOT embed the owner's personal display name (the owner is
-      // captured
-      // separately as the audit row's target user). Pins the non-personal <method> · <location>
-      // label so a regression to <owner> · <location> is caught.
       ArgumentCaptor<String> labelCaptor = ArgumentCaptor.forClass(String.class);
       verify(auditService)
           .record(

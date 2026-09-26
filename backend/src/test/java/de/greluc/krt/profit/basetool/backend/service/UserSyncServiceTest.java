@@ -71,8 +71,6 @@ class UserSyncServiceTest {
 
   @BeforeEach
   void setUp() {
-    // Constructed by hand rather than @InjectMocks: the registry above is deliberately a real
-    // SimpleMeterRegistry and not a @Mock, and @InjectMocks does not wire a plain field.
     userSyncService =
         new UserSyncService(
             keycloakService,
@@ -104,8 +102,6 @@ class UserSyncServiceTest {
 
     assertEquals(0, count);
     verify(keycloakService).fetchUsers(anyCollection(), anySet());
-    // The role-name + already-linked reads happen before the fetch (to parameterise it), but an
-    // empty roster must touch no write path and never reconcile the bank holders.
     verify(userReconciliationService, never()).syncUser(any(KeycloakUserDto.class));
     verify(userReconciliationService, never()).markMissingUsers(anySet());
     verifyNoInteractions(bankHolderReconciliationService);
@@ -120,8 +116,6 @@ class UserSyncServiceTest {
 
     int count = userSyncService.syncFromKeycloak();
 
-    // The bad row is logged and swallowed; only the good row is counted, and the batch still
-    // finishes.
     assertEquals(1, count);
     verify(userReconciliationService).syncUser(user1);
     verify(userReconciliationService).syncUser(user2);
@@ -130,11 +124,8 @@ class UserSyncServiceTest {
   }
 
   /**
-   * #1825: the set handed to {@code markMissingUsers} answers "who does Keycloak still hold", so it
-   * must carry the user whose own reconciliation threw. Collecting the ids only on success made a
-   * transient per-user failure indistinguishable from an upstream deletion, and soft-deleted a
-   * member who was present and enabled in the realm — with the member administration, which reads
-   * {@code in_keycloak} as presence, then offering an admin the hard-delete action on that row.
+   * Verifies that a user whose own reconciliation threw is still counted as present in Keycloak, so
+   * {@code markMissingUsers} does not soft-delete them.
    */
   @Test
   void syncFromKeycloak_aUserWhoseSyncThrew_isStillCountedAsPresentInKeycloak() {
@@ -157,9 +148,8 @@ class UserSyncServiceTest {
   }
 
   /**
-   * The failure must leave a signal an alert can watch ({@code UserSyncPerUserFailure}). Before
-   * #1825 it existed only as a log line, so the condition that soft-deleted a present member had no
-   * metric behind it at all.
+   * Verifies that every per-user sync failure increments the metric behind the {@code
+   * UserSyncPerUserFailure} alert.
    */
   @Test
   void syncFromKeycloak_countsEveryPerUserFailure() {
@@ -201,8 +191,6 @@ class UserSyncServiceTest {
         .when(bankHolderReconciliationService)
         .reconcileAll();
 
-    // The bank-side failure must not abort the core user sync — the count still reflects the
-    // roster.
     int count = userSyncService.syncFromKeycloak();
 
     assertEquals(1, count);
@@ -221,11 +209,9 @@ class UserSyncServiceTest {
           userSyncService.syncFromKeycloak();
 
           ILoggingEvent flagged = eventContaining(appender, "no longer present in Keycloak");
-          // Two leavers is the ordinary trickle: reported, but not an anomaly.
           assertEquals(Level.INFO, flagged.getLevel());
           assertTrue(flagged.getFormattedMessage().contains("2 local users"));
         });
-    // The per-run role-mapping aggregate is emitted by the reconciliation service itself.
     verify(userReconciliationService).logRoleSyncSummary();
   }
 
@@ -239,9 +225,6 @@ class UserSyncServiceTest {
           userSyncService.syncFromKeycloak();
 
           ILoggingEvent flagged = eventContaining(appender, "no longer present in Keycloak");
-          // 42 accounts vanishing in a single run is what an upstream mass-deletion or a
-          // half-degraded roster looks like — the run still "succeeds", so this line is the
-          // only signal.
           assertEquals(Level.WARN, flagged.getLevel());
           assertTrue(flagged.getFormattedMessage().contains("42 local users"));
         });
@@ -256,7 +239,6 @@ class UserSyncServiceTest {
         appender -> {
           userSyncService.syncFromKeycloak();
 
-          // Nobody left: the run must not emit a "0 users flagged" line every night.
           assertTrue(
               appender.list.stream()
                   .noneMatch(

@@ -31,9 +31,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for the bank-local holder registry (epic #556, REQ-BANK-003). Holders are
- * never hard-deleted (the ledger references them with {@code ON DELETE RESTRICT}); the registry
- * list is unbounded by design — it holds one row per custodian player, a few dozen at org scale.
+ * Spring Data repository for the bank-local holder registry (REQ-BANK-003). Holders are never
+ * hard-deleted.
  */
 @Repository
 public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
@@ -57,12 +56,8 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
   boolean existsByUserId(UUID userId);
 
   /**
-   * The full registry with each holder's linked {@code user} fetch-joined in one statement — the
-   * management "Halter" tab (W1 mockup) and every holder-select dropdown. The user is eager-loaded
-   * (LEFT JOIN, {@code null} for a deleted user) so the mapper can resolve the holder's live
-   * display name ({@link BankHolder#getDisplayName()}, REQ-BANK-003) without an N+1; the service
-   * sorts the mapped rows by that live name (the stored {@code handle} order would no longer match
-   * what is shown once a user renamed themselves).
+   * Returns the full holder registry with each linked {@code user} fetch-joined ({@code null} for a
+   * deleted user), so the live display name resolves without an N+1 (REQ-BANK-003).
    *
    * @return every holder row with its {@code user} association initialised
    */
@@ -70,9 +65,8 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
   List<BankHolder> findAllWithUser();
 
   /**
-   * The holder rows linked to any of the given users — the batch lookup of the auto-registration
-   * reconcile (REQ-BANK-029) over the current bank-role roster, avoiding a per-user {@code
-   * findById}.
+   * Returns the holder rows linked to any of the given users, for the auto-registration reconcile
+   * (REQ-BANK-029).
    *
    * @param userIds the linked users' ids
    * @return the matching holder rows (those with a linked user in the set)
@@ -80,26 +74,18 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
   List<BankHolder> findByUserIdIn(Collection<UUID> userIds);
 
   /**
-   * The active, role-managed holders — the candidates the reconcile may auto-deactivate when their
-   * user no longer holds any bank role (REQ-BANK-029). Manually registered holders ({@code
-   * role_managed = false}) are excluded by construction.
+   * Returns the active, role-managed holders, the candidates the reconcile may deactivate when
+   * their user holds no bank role any more (REQ-BANK-029).
    *
    * @return the active holders auto-created from a bank role
    */
   List<BankHolder> findByRoleManagedTrueAndActiveTrue();
 
   /**
-   * Replaces this custodian's handle snapshot with the erasure sentinel, for a granted Art. 17
+   * Replaces this custodian's handle snapshot with the erasure sentinel for a granted Art. 17
    * request (REQ-SEC-062).
    *
-   * <p>The column exists precisely so the registry survives the account: {@code user_id} is {@code
-   * ON DELETE SET NULL} and {@code handle} is {@code NOT NULL}, and {@code
-   * BankHolder#getDisplayName()} falls back to it the moment the foreign key nulls out. So it is
-   * the one snapshot that becomes <em>more</em> visible after a deletion, and it was the most
-   * conspicuous omission from the first version of this erasure.
-   *
-   * <p>Matched by the user id, so it reaches the row while the account still exists — which is
-   * ordered, {@code HandleAnonymisationService} runs before the deletion.
+   * <p>Matched by user id, so it must run before the account is deleted.
    *
    * @param userId the member whose custodian registration is anonymised
    * @param sentinel {@code HandleAnonymisation#SENTINEL}

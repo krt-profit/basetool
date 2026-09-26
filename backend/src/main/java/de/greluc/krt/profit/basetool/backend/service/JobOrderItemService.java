@@ -31,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
@@ -67,25 +66,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Derives, snapshots, aggregates and maps the material side of {@code ITEM} job orders.
+ * Derives, snapshots, aggregates and maps the material side of {@code ITEM} job orders from the
+ * SC-Wiki blueprint graph ({@link Blueprint} + {@link BlueprintIngredient}).
  *
- * <p>The single source of truth for "which materials does a finished item need" is the SC-Wiki
- * blueprint graph ({@link Blueprint} + {@link BlueprintIngredient}). At create time this service
- * reads the chosen blueprint's RESOURCE ingredients, scales each by the ordered amount, applies the
- * requester's per-material Gut/Keine choice (defaulting from the ingredient's {@code minQuality}),
- * and snapshots the result onto the order so it stays stable even if the wiki data later changes.
- * The amount's unit follows the material's {@link QuantityType}: PIECE quantities are kept whole,
- * SCU quantities stay fractional.
- *
- * <p>ITEM ingredients are handled in two ways. A <b>craftable</b> ITEM ingredient (the referenced
- * game item has its own orderable blueprint) is a genuine sub-assembly: it surfaces to the create
- * UI as a separate adoptable line (issue #304 decision 1), so each adopted sub-item contributes its
- * own materials. A <b>non-craftable</b> ITEM ingredient (no blueprint) that nonetheless exists in
- * the shared {@code material} catalogue by name is a procurement component — e.g. a UEX-commodity
- * gem the wiki lists as an "item" with a piece count — and is bridged to that material so it
- * appears as a (PIECE) material requirement on the same {@code material} row that Lager and
- * Refinery use, instead of a recipe-less sub-assembly. ITEM ingredients with neither a blueprint
- * nor a matching material stay unresolved/adoptable as before.
+ * <p>At create time a blueprint's RESOURCE ingredients are scaled by the amount, given the
+ * requester's quality choice and snapshotted onto the order. A craftable ITEM ingredient becomes an
+ * adoptable sub-assembly; a non-craftable one that exists in the {@code material} catalogue is
+ * bridged to that material.
  */
 @Service
 @RequiredArgsConstructor
@@ -105,14 +92,11 @@ public class JobOrderItemService {
   private final MaterialMapper materialMapper;
 
   /**
-   * Builds one <b>new</b> ordered-item line with its derived, snapshotted material requirements.
-   * The returned {@link JobOrderItem} is detached (not yet attached to an order) — the caller wires
-   * it onto the {@link JobOrder} and resolves any sub-assembly parent link. Its production counters
-   * start at zero; to re-derive an <em>existing</em> line without losing them use {@link
+   * Builds one new, detached ordered-item line with its derived material snapshot; the caller
+   * attaches it to the {@link JobOrder}. To re-derive an existing line use {@link
    * #applyItemLine(JobOrderItem, CreateJobOrderItemLineDto)}.
    *
-   * @param line the create payload for this line (game item, chosen blueprint, amount, quality
-   *     choices)
+   * @param line the line payload (game item, blueprint, amount, quality choices)
    * @return a populated {@link JobOrderItem} with its {@link JobOrderItemMaterial} children
    * @throws NotFoundException when the game item or blueprint id is unknown
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
@@ -125,23 +109,14 @@ public class JobOrderItemService {
   }
 
   /**
-   * Re-derives {@code item} from the payload <b>in place</b>: re-resolves the game item and
-   * blueprint, re-validates that the blueprint produces the item, overwrites the amount, and
-   * replaces the snapshotted {@link JobOrderItemMaterial} children with a fresh derivation. The
-   * line's identity and its booked {@link JobOrderItem#getManufacturedAmount() manufacturedAmount}
-   * / {@link JobOrderItem#getDeliveredAmount() deliveredAmount} are deliberately left untouched —
-   * this is what lets an edit re-snapshot the recipe without discarding recorded production
-   * (REQ-ORDERS-032). The caller is responsible for the guards that keep {@code deliveredAmount <=
-   * manufacturedAmount <= amount} intact ({@code JobOrderService#assertLineEditable}).
+   * Re-derives {@code item} from the payload in place, replacing its {@link JobOrderItemMaterial}
+   * snapshot while keeping its identity and its manufactured and delivered amounts
+   * (REQ-ORDERS-032).
    *
-   * <p>Clearing the {@code materials} set relies on the association's {@code orphanRemoval}: the
-   * old child rows are deleted and the freshly derived ones inserted in the same flush. On a
-   * brand-new (builder-created) line the set is simply empty, so {@link #buildItemLine} delegates
-   * here.
+   * <p>The caller must keep {@code deliveredAmount <= manufacturedAmount <= amount} intact.
    *
-   * @param item the line to re-derive — either a managed existing row or a fresh builder instance
-   * @param line the payload carrying the (possibly changed) game item, blueprint, amount and
-   *     quality choices
+   * @param item the line to re-derive, managed or freshly built
+   * @param line the payload with game item, blueprint, amount and quality choices
    * @throws NotFoundException when the game item or blueprint id is unknown
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
    */
@@ -174,16 +149,11 @@ public class JobOrderItemService {
       if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
         material = ingredient.getMaterial();
         if (material == null) {
-          // Unresolved RESOURCE line: cannot be snapshotted, surfaces only as a create-time
-          // warning.
           continue;
         }
         double perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
         rawQuantity = perUnit * line.amount();
       } else {
-        // ITEM ingredient: a craftable sub-assembly stays a separate adoptable line; a
-        // non-craftable
-        // item that maps to a known material is bridged to that material (piece count as quantity).
         material = bridgedMaterial(ingredient);
         if (material == null) {
           continue;
@@ -224,16 +194,12 @@ public class JobOrderItemService {
   }
 
   /**
-   * Aggregates the <b>outstanding</b> material demand across all ordered lines into one row per
-   * {@code (material, quality)}. Each line contributes only the material for its units not yet
-   * manufactured — {@code requiredQuantity × (amount − manufacturedAmount) / amount} — so a
-   * production booking (REQ-ORDERS-025) shrinks the aggregate proportionally, regardless of whether
-   * the material was booked out of stock or marked "nicht ausbuchen"; a fully manufactured line
-   * contributes 0. SCU materials sort first, then by name, then GOOD before NONE — matching the
-   * material-handover table ordering.
+   * Aggregates the outstanding material demand of all ordered lines into one row per {@code
+   * (material, quality)}, counting only each line's not-yet-manufactured share. Sorted SCU first,
+   * then by name, then GOOD before NONE.
    *
-   * @param order the (item) job order to aggregate
-   * @return the aggregated outstanding-material rows; empty for a material order
+   * @param order the job order to aggregate
+   * @return the outstanding-material rows; empty for a material order
    */
   @NotNull
   public List<AggregatedMaterialDto> aggregateMaterials(@NotNull JobOrder order) {
@@ -242,12 +208,6 @@ public class JobOrderItemService {
     Map<Key, Double> sums = new LinkedHashMap<>();
     Map<UUID, Material> materials = new LinkedHashMap<>();
     for (JobOrderItem item : order.getItems()) {
-      // Outstanding demand only: the material for the units still to be manufactured. Every
-      // production booking advances manufacturedAmount — whether it booked the material out of
-      // stock
-      // or the operator marked it "nicht ausbuchen" (REQ-ORDERS-025) — so this aggregate shrinks
-      // proportionally as production progresses, and a fully manufactured line contributes 0. The
-      // row is kept (possibly 0) so a material's quality bucket and its claims stay visible.
       int lineAmount = item.getAmount() != null ? item.getAmount() : 0;
       int manufactured = item.getManufacturedAmount() != null ? item.getManufacturedAmount() : 0;
       int remaining = Math.max(0, lineAmount - manufactured);
@@ -264,10 +224,6 @@ public class JobOrderItemService {
         .map(
             e -> {
               Material material = materials.get(e.getKey().materialId());
-              // currentStock and the claim fields stay neutral here — JobOrderService enriches them
-              // in mapToDtoWithStock: it sums the order-linked inventory per bucket (collection
-              // progress for the overview, #595) and overlays the SK claims (Phase 5, #345).
-              // Non-SK orders keep the null open-amount so the UI renders no claim columns.
               return new AggregatedMaterialDto(
                   materialMapper.toDto(material),
                   e.getKey().quality(),
@@ -293,24 +249,14 @@ public class JobOrderItemService {
   }
 
   /**
-   * Collects the distinct material ids an order requires, across both order kinds: an {@code ITEM}
-   * order's requirements are its snapshotted per-item materials ({@code items → materials}); a
-   * {@code MATERIAL} order's are its material lines ({@code materials}). The two collections are
-   * mutually exclusive per kind, so the result is the non-empty one.
+   * Collects the distinct material ids an order requires: the snapshotted item materials of an
+   * {@code ITEM} order, or the material lines of a {@code MATERIAL} order.
    *
-   * <p>This is the authoritative "may this material be linked to this order?" set: the inventory →
-   * job-order link gate ({@code InventoryItemService}) rejects a material that is not in it, the
-   * Lager order picker hides orders that do not require the row's material, and the order-detail
-   * orphaned-link warning flags already-linked inventory whose material is absent here. A material
-   * not in this set has no requirement row to surface under, so its link would be invisible.
-   *
-   * <p>Walks the lazy {@code items}/{@code items.materials} (ITEM) or {@code materials} (MATERIAL)
-   * collections, so it must run inside a transaction; every current caller is
-   * {@code @Transactional}.
+   * <p>This is the authoritative set of materials that may be linked to the order. Must run inside
+   * a transaction.
    *
    * @param order the order whose required materials to collect.
-   * @return the distinct required material ids, insertion-ordered; never {@code null}, possibly
-   *     empty (an order with no requirements accepts no inventory link).
+   * @return the required material ids in insertion order; never {@code null}, possibly empty.
    */
   @NotNull
   public Set<UUID> requiredMaterialIds(@NotNull JobOrder order) {
@@ -334,25 +280,14 @@ public class JobOrderItemService {
   }
 
   /**
-   * Collects the distinct game-item ids an order <em>requests</em>: the {@code gameItem} of every
-   * ordered line for an {@code ITEM} order, and the <b>empty set</b> for a {@code MATERIAL} order —
-   * a material order has no item lines, so no game-item stock row may ever be linked to it (empty
-   * set = no link possible, the same semantics as {@link #requiredMaterialIds(JobOrder)}).
+   * Collects the distinct game-item ids an {@code ITEM} order requests; empty for a {@code
+   * MATERIAL} order.
    *
-   * <p>This is the authoritative "may this game-item stock row be linked to this order?" set
-   * (REQ-INV-031, the game-item sibling of REQ-ORDERS-018): the inventory → job-order link gate
-   * ({@code InventoryItemService}) rejects a game item that is not in it, and the order-detail
-   * orphaned-link warning flags already-linked item stock whose game item is absent here. It is a
-   * <em>parallel</em> set to {@link #requiredMaterialIds(JobOrder)}, not a replacement — material
-   * rows stay allocatable to ITEM orders through their blueprint-derived material requirements.
-   *
-   * <p>Walks the lazy {@code items} collection (id-only dereference of each line's {@code
-   * gameItem}), so it must run inside a transaction; every current caller is
-   * {@code @Transactional}.
+   * <p>This is the authoritative set of game items whose stock may be linked to the order
+   * (REQ-INV-031). Must run inside a transaction.
    *
    * @param order the order whose requested game items to collect.
-   * @return the distinct requested game-item ids, insertion-ordered; never {@code null}, empty for
-   *     a MATERIAL order (which accepts no item-stock link).
+   * @return the requested game-item ids in insertion order; never {@code null}.
    */
   @NotNull
   public Set<UUID> requiredGameItemIds(@NotNull JobOrder order) {
@@ -400,17 +335,12 @@ public class JobOrderItemService {
   }
 
   /**
-   * Whether this line's chosen blueprint no longer produces the ordered game item (REQ-ORDERS-033).
-   * The item↔blueprint pairing is validated when the line is written, but {@code
-   * ScWikiBlueprintSyncService} re-resolves {@code Blueprint#outputItem} from the Wiki feed on
-   * every run, so an upstream correction can silently re-point a blueprint at a different item and
-   * leave the line snapshotting a foreign recipe. Surfacing the drift on the read model lets the
-   * order page warn instead of presenting the wrong materials as fact.
+   * Whether this line's blueprint no longer produces the ordered game item, e.g. after a Wiki sync
+   * re-pointed it (REQ-ORDERS-033).
    *
    * @param item the ordered-item line to check
-   * @return {@code true} when the blueprint's output item is absent or differs from {@code
-   *     item.gameItem}; {@code false} for a consistent line (and when either side is unset, which
-   *     the {@code nullable = false} columns already preclude)
+   * @return {@code true} when the blueprint's output item is absent or differs from the line's game
+   *     item
    */
   private static boolean isBlueprintStale(@NotNull JobOrderItem item) {
     Blueprint blueprint = item.getBlueprint();
@@ -469,8 +399,6 @@ public class JobOrderItemService {
    */
   @NotNull
   public Page<GameItemReferenceDto> findOrderableItems(String search, @NotNull Pageable pageable) {
-    // Empty string (not null) for "no filter": a null bind into the query's LOWER(CONCAT(...))
-    // makes PostgreSQL infer bytea and fail; "" matches every row via the %% pattern.
     String q = search != null && !search.isBlank() ? search.strip() : "";
     return blueprintRepository.findOrderableItems(q, pageable).map(this::gameItemRef);
   }
@@ -518,8 +446,6 @@ public class JobOrderItemService {
         int perUnit = ingredient.getQuantityUnits() == null ? 0 : ingredient.getQuantityUnits();
         List<BlueprintReferenceDto> subBlueprints = blueprintsForItem(subItem.getId());
         if (subBlueprints.isEmpty()) {
-          // Non-craftable item: if it maps to a known material it is a procurement requirement
-          // (PIECE piece-count), not a sub-assembly. Bridge it onto that shared material row.
           Material material = resolveItemMaterial(subItem, ingredient);
           if (material != null) {
             materials.add(
@@ -560,16 +486,11 @@ public class JobOrderItemService {
   }
 
   /**
-   * Bridges a non-craftable ITEM ingredient to the shared {@code material} catalogue. Returns the
-   * matching material when the ingredient is an ITEM line whose referenced game item has <b>no</b>
-   * orderable blueprint (so it is not a real sub-assembly) yet exists as a material by name — e.g.
-   * a UEX-commodity gem the wiki lists as an "item" with a piece count. Returns {@code null} for
-   * RESOURCE lines, for craftable items (which stay adoptable sub-assemblies), and for items with
-   * no matching material (which stay unresolved). Used by the persist path; the preview path
-   * inlines the same rule to reuse its already-fetched blueprint list.
+   * Bridges a non-craftable ITEM ingredient to the {@code material} catalogue by name.
    *
    * @param ingredient the blueprint ingredient to examine
-   * @return the bridged material, or {@code null} when the ingredient is not a bridgeable item line
+   * @return the bridged material, or {@code null} for RESOURCE lines, craftable items and items
+   *     without a matching material
    */
   @Nullable
   private Material bridgedMaterial(BlueprintIngredient ingredient) {
@@ -581,19 +502,17 @@ public class JobOrderItemService {
       return null;
     }
     if (!blueprintRepository.findByOutputItemId(subItem.getId()).isEmpty()) {
-      // Craftable: a genuine sub-assembly, handled as a separate adoptable line, not a material.
       return null;
     }
     return resolveItemMaterial(subItem, ingredient);
   }
 
   /**
-   * Resolves an ITEM ingredient's component to a material by name, preferring the resolved game
-   * item's name and falling back to the wiki name snapshot. {@code material.name} is unique, so
-   * this yields at most one row.
+   * Resolves an ITEM ingredient's component to a material by name, preferring the game item's name
+   * and falling back to the Wiki name snapshot.
    *
-   * @param subItem the resolved game item of the ITEM ingredient
-   * @param ingredient the owning ingredient (for the wiki-name fallback)
+   * @param subItem the resolved game item of the ingredient
+   * @param ingredient the owning ingredient, for the Wiki-name fallback
    * @return the matching material, or {@code null} when none exists
    */
   @Nullable

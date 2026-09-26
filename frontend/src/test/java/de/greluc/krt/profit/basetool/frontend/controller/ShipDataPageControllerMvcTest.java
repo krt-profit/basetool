@@ -48,21 +48,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression for the Thymeleaf 3.1 JS-inline truncation bug on {@code /ship-data}.
- *
- * <p>Pre-fix, the template called {@code /*[[${shipTypes.![name]}]]*&#47;} immediately followed by
- * {@code /*[[${manufacturers.![name]}]]*&#47;} inside a {@code th:inline="javascript"} script. The
- * first inline expression already truncated the rest of the script, so the second autocomplete
- * never wired, {@code filterTable} was never defined (filter inputs above each table did nothing),
- * and {@code closeModal} was never registered (the "reset all fitted" confirmation modal could not
- * be cancelled). The fix moves both name lists into sibling {@code <datalist>} elements.
- *
- * <p>Post-ADR-0069 the page logic lives in the extracted {@code ship-data.js} module (loaded via
- * {@code th:src}) and the remaining interpolation (the AJAX toast/conflict strings + the reset URL)
- * sits in a small inline bootstrap right before it. This test pins that the module's {@code th:src}
- * tag — emitted AFTER that interpolated bootstrap — appears in the rendered HTML (so a
- * re-introduced inline-truncation bug that ate the bootstrap and dropped the following module tag
- * is still caught), and that the response ends with the closing {@code </html>} tag.
+ * Render test for {@code /ship-data}: the {@code ship-data.js} module tag after the inline
+ * bootstrap is present and the response ends with {@code </html>}, guarding against inline-script
+ * truncation.
  */
 @SpringBootTest
 class ShipDataPageControllerMvcTest {
@@ -124,9 +112,6 @@ class ShipDataPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"Avenger Titan\"")))
         .andExpect(content().string(containsString("value=\"Aegis Dynamics\"")))
         .andExpect(content().string(containsString("src=\"/js/ship-data.js\"")))
-        // covers the .form-group checkbox regression class (PR #1405): the page-scoped rule must
-        // carry the :where() exclusion so it can never capture a checkbox/radio and stretch it into
-        // a full-width padded bar (it ties the global KRT square rule and renders after it).
         .andExpect(
             PageStylesheets.content(
                 containsString(

@@ -1,13 +1,6 @@
-/* Page stylesheet of templates/promotion-manage.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    /* ================================================================
-   TOOLBAR (search, filters, bulk, expand/collapse, CSV, queue)
-   ================================================================ */
     .pm-toolbar {
         display: flex;
         gap: 0.75rem;
@@ -51,11 +44,6 @@
         height: 1rem;
     }
 
-    /*
- * Queue indicator: small spinner + counter shown while saves are
- * in flight. We piggy-back on the global .krt-spinner styling so
- * the rotation animation, sizing and colour palette stay in sync.
- */
     .pm-queue-indicator {
         display: inline-flex;
         align-items: center;
@@ -78,9 +66,6 @@
         border-width: 2px;
     }
 
-    /* ================================================================
-   BULK-EDIT PANEL (visible while ≥1 row checkbox is checked)
-   ================================================================ */
     .pm-bulk-panel {
         display: none;
         gap: 0.5rem;
@@ -109,33 +94,8 @@
         padding: 0.3rem 1.75rem 0.3rem 0.5rem;
     }
 
-    /* ================================================================
-   SCROLL VIEWPORT & MATRIX TABLE
-   ================================================================ */
-    /*
- * Vertical AND horizontal scroll happen inside this wrapper, NOT on
- * the page itself — that is what makes `position: sticky` actually
- * stick. Without a bounded max-height the browser cannot scroll the
- * table independently from the rest of the page, so sticky degrades
- * into "static" and the user loses the gepinnte Mitglied-Spalte.
- *
- * The height is capped to the space between the sticky page header and
- * the fixed footer (`.krt-footer` in styles.css, `position: fixed;
- * bottom: 0`) so the wrapper's own horizontal scrollbar — pinned to its
- * bottom edge — never disappears behind the footer. `--krt-footer-height`
- * is published by sidebar.html JS (falls back to 5rem before
- * DOMContentLoaded); the extra ~25rem reserves the sticky header, the
- * greeting block and the control rows above the table at top-of-page
- * scroll, and `max(...)` floors the height so the matrix never collapses
- * on very short viewports. The previous flat `75vh` ignored the footer
- * and let the bottom rows + horizontal scrollbar slide under the
- * column-stacked (taller) mobile footer. Mirrors the .table-wrapper cap
- * in materials-overview.css / materials-profit-calculation.html.
- */
     .pm-matrix-wrapper {
         overflow: auto;
-        /* The viewport term and its dvh fallback are --krt-panel-viewport-rest in
-       styles.css; 25rem is this panel's own reserve for the chrome above it. */
         max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
         border: 1px solid var(--color-gray-3);
         background-color: var(--color-bg-dark-gray);
@@ -174,7 +134,6 @@
         background-color: rgba(231, 126, 35, 0.06);
     }
 
-    /* Sticky header rows. Two-row header: topic group on top, categories beneath. */
     .pm-matrix thead tr.pm-row-topic th {
         position: sticky;
         top: 0;
@@ -190,7 +149,7 @@
     }
     .pm-matrix thead tr.pm-row-category th {
         position: sticky;
-        top: 2.55rem; /* height of the topic row */
+        top: 2.55rem;
         z-index: 20;
         background-color: var(--color-surface-input);
         color: var(--color-primary);
@@ -203,11 +162,6 @@
         line-height: 1.2;
     }
 
-    /*
- * Sticky column widths and offsets.
- * Order from left to right: checkbox (2.5rem) | Mitglied (14rem) | Beförderbar (11rem)
- * Sticky `left` offsets MUST be the cumulative sum so cells stack flush.
- */
     .pm-matrix .pm-checkbox-col {
         width: 2.5rem;
         min-width: 2.5rem;
@@ -240,7 +194,7 @@
     .pm-matrix .pm-member-cell,
     .pm-matrix thead .pm-member-cell {
         position: sticky;
-        left: 2.5rem; /* width of checkbox column */
+        left: 2.5rem;
         z-index: 15;
         font-weight: 700;
         color: var(--color-primary);
@@ -248,7 +202,7 @@
     .pm-matrix .pm-eligibility-cell,
     .pm-matrix thead .pm-eligibility-cell {
         position: sticky;
-        left: 16.5rem; /* 2.5 (checkbox) + 14 (member) */
+        left: 16.5rem;
         z-index: 14;
         border-right: 2px solid var(--color-primary);
     }
@@ -269,17 +223,6 @@
         text-align: left;
         text-transform: uppercase;
     }
-    /*
- * The pinned columns (checkbox / Mitglied / Beförderbar) are rendered
- * as two separate sticky cells — one in the topic row, one in the
- * category row — instead of a single rowspan="2" cell. The browser
- * cannot reliably reconcile `position: sticky` with `rowspan`, which
- * left the pinned header visibly shorter than the topic+category
- * stack on the scrollable side. Removing the bottom border on the
- * topic-row half and zeroing the padding of the category-row half
- * makes the pair read as one continuous cell while letting each row
- * use its natural height — so both sides of the header now line up.
- */
     .pm-matrix thead tr.pm-row-topic .pm-checkbox-cell,
     .pm-matrix thead tr.pm-row-topic .pm-member-cell,
     .pm-matrix thead tr.pm-row-topic .pm-eligibility-cell {
@@ -291,9 +234,6 @@
         padding: 0;
     }
 
-    /* ================================================================
-   SORT TOGGLE on the Mitglied header
-   ================================================================ */
     .pm-sort-toggle {
         background: none;
         border: none;
@@ -329,9 +269,6 @@
         border-color: var(--color-primary);
     }
 
-    /* ================================================================
-   TOPIC TOGGLE (collapse / expand)
-   ================================================================ */
     .pm-topic-toggle {
         background: none;
         border: none;
@@ -364,26 +301,6 @@
         content: '\2212';
     }
 
-    /*
- * Collapsed topic state.
- *
- * The category-row and body-row cells of a collapsed topic shrink
- * to zero rendered size but stay in the column grid. We avoid
- * `display: none` deliberately: removing the cells from table
- * layout drops their column slots, the topic header (which keeps
- * its original colspan) then has more slots than the rows below,
- * and the browser compensates by sliding the *next* topic's
- * cells leftward — so "Cat B1" ends up rendered underneath
- * "Topic A"'s "+" trigger and the user can no longer reach the
- * trigger they want to expand. Keeping the cells at zero size
- * with `visibility: hidden` preserves the alignment.
- *
- * The topic header itself shrinks to a tap-friendly 3rem with
- * zero TH padding so the entire visible column is the click
- * target — previously the button was only ~24px wide (100% of
- * the 48px content area minus 2x 12px TH padding) and the
- * surrounding ring of TH padding looked clickable but wasn't.
- */
     .pm-matrix [data-pm-topic-collapsed='true'] {
         width: 0;
         min-width: 0;
@@ -410,9 +327,6 @@
         font-size: 1.1rem;
     }
 
-    /* ================================================================
-   LEVEL SELECT
-   ================================================================ */
     .level-select {
         background: var(--color-surface-input);
         color: var(--color-gray-1);
@@ -442,13 +356,6 @@
         border-color: var(--color-danger);
     }
 
-    /*
- * Diff flash on the cell after a save returns 200. Uses inset
- * box-shadow so the highlight stays *inside* the cell border and
- * does not mess with the sticky layout. 800ms is long enough to
- * register peripheral, short enough to not clutter when multiple
- * cells finish in quick succession.
- */
     @keyframes pm-flash-saved {
         0% {
             box-shadow: inset 0 0 0 2px var(--color-success);
@@ -461,9 +368,6 @@
         animation: pm-flash-saved 800ms ease-out;
     }
 
-    /* ================================================================
-   MEMBER CELL META
-   ================================================================ */
     .pm-member-name {
         display: block;
     }
@@ -482,9 +386,6 @@
         display: none;
     }
 
-    /* ================================================================
-   ELIGIBILITY CHIP
-   ================================================================ */
     .eligibility-chip {
         display: inline-block;
         padding: 0.1rem 0.4rem;
@@ -509,9 +410,6 @@
         font-size: 0.75rem;
     }
 
-    /* ================================================================
-   EMPTY / HIDDEN ROWS
-   ================================================================ */
     .pm-empty {
         padding: 1.5rem;
         text-align: center;
@@ -522,9 +420,6 @@
         display: none;
     }
 
-    /* ================================================================
-   RESPONSIVE: tablet/smartphone
-   ================================================================ */
     @media (width <= 1024px) {
         .pm-matrix .pm-member-col {
             width: 11rem;
@@ -541,14 +436,10 @@
             min-width: 9rem;
             max-width: 9rem;
         }
-        /* Member column shifts left to accommodate the checkbox-col change. */
         .pm-matrix .pm-member-cell,
         .pm-matrix thead .pm-member-cell {
             left: 2.5rem;
         }
-        /* Below 1024px the eligibility column drops out of the sticky stack
-       so the smaller viewport keeps a sensible amount of "real" data
-       visible without overflowing the sticky area. */
         .pm-matrix .pm-eligibility-cell,
         .pm-matrix thead .pm-eligibility-cell {
             position: static;

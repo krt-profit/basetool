@@ -33,13 +33,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
- * The one seam every identity consumer asks (ADR-0129).
- *
- * <p>It exists because the acting-member identity swap introduced a second authentication type and
- * every consumer that branched on the type split into fail-closed and fail-open. What is pinned
- * here is therefore not "it returns the sub" but the two boundaries that are easy to get wrong in
- * opposite directions: it must accept an authentication that carries a subject without a token, and
- * it must refuse to invent one from an authentication that has none.
+ * Tests for the single identity seam (ADR-0129): it must accept an authentication that carries a
+ * subject without a token, and must never invent a subject for one that has none.
  */
 class AuthenticatedSubjectTest {
 
@@ -100,12 +95,8 @@ class AuthenticatedSubjectTest {
   }
 
   /**
-   * A username/password authentication yields nothing — its name is a callsign.
-   *
-   * <p>The most important case in this class. A {@code getName()} fallback is the obvious way to
-   * make the token-less case above work, and it would have written members' callsigns into the
-   * {@code userId} MDC field of every log line for such a caller, which REQ-OBS-004 forbids
-   * outright. The opt-in interface exists precisely so this returns empty.
+   * Verifies that a username/password authentication yields no subject, since its name is a
+   * callsign that must not reach the {@code userId} MDC field (REQ-OBS-004).
    */
   @Test
   void refusesToReadANameThatIsACallsign() {

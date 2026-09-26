@@ -87,7 +87,6 @@ class InventoryOrgUnitReconcilerTest {
 
     assertSame(org, r1.getOwningOrgUnit(), "ownerless row adopts the new org unit");
     assertSame(org, r2.getOwningOrgUnit());
-    // A membershipless owner only ever holds NULL-org stock, so promotion never collides.
     verify(inventoryItemRepository, never()).delete(any());
   }
 
@@ -96,18 +95,13 @@ class InventoryOrgUnitReconcilerTest {
     UUID userId = UUID.randomUUID();
     OrgUnit orgA = squadron();
     OrgUnit orgB = squadron();
-    // Same natural key (matA / loc / 900) in two different org units → become identical once both
-    // go
-    // NULL, but append-only inventory keeps them as separate rows (collapsed only for display).
     InventoryItem a = sharedRow(orgA, 4.0, matA, 900);
     InventoryItem b = sharedRow(orgB, 6.0, matA, 900);
-    // A distinct stack (different material) that just gets nulled.
     InventoryItem c = sharedRow(orgA, 2.0, matB, 900);
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(a, b, c));
 
     reconciler.onUserLostLastOrgUnit(userId);
 
-    // Every row drops its org stamp; amounts stay exactly as they were and no row is removed.
     assertNull(a.getOwningOrgUnit());
     assertNull(b.getOwningOrgUnit());
     assertNull(c.getOwningOrgUnit());
@@ -122,7 +116,7 @@ class InventoryOrgUnitReconcilerTest {
     UUID userId = UUID.randomUUID();
     OrgUnit orgA = squadron();
     InventoryItem a = sharedRow(orgA, 4.0, matA, 900);
-    InventoryItem b = sharedRow(orgA, 6.0, matB, 900); // different material → distinct key
+    InventoryItem b = sharedRow(orgA, 6.0, matB, 900);
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(a, b));
 
     reconciler.onUserLostLastOrgUnit(userId);
@@ -146,7 +140,6 @@ class InventoryOrgUnitReconcilerTest {
 
   @Test
   void gainedFirstOrgUnit_recordsRestampAudit() {
-    // Given at least one ownerless-personal shared row that will actually be promoted.
     UUID userId = UUID.randomUUID();
     OrgUnit org = squadron();
     InventoryItem row = sharedRow(null, 5.0, matA, 900);
@@ -154,14 +147,12 @@ class InventoryOrgUnitReconcilerTest {
 
     reconciler.onUserGainedFirstOrgUnit(userId, org);
 
-    // The re-stamp trail must be audited against the owner, with no subject id/label.
     verify(auditService)
         .record(eq(AuditEventType.INVENTORY_ORG_RESTAMPED), isNull(), isNull(), eq(userId), any());
   }
 
   @Test
   void lostLastOrgUnit_recordsRestampAudit() {
-    // Given at least one org-stamped shared row that will actually be demoted.
     UUID userId = UUID.randomUUID();
     InventoryItem row = sharedRow(squadron(), 5.0, matA, 900);
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(row));
@@ -174,8 +165,6 @@ class InventoryOrgUnitReconcilerTest {
 
   @Test
   void gainedFirstOrgUnit_noSharedRows_recordsNoAudit() {
-    // Given a user who gains their first org unit but owns no ownerless shared rows: restamped == 0
-    // must suppress the INVENTORY_ORG_RESTAMPED event (guarded by the 'if (restamped > 0)' check).
     UUID userId = UUID.randomUUID();
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of());
 
@@ -186,8 +175,6 @@ class InventoryOrgUnitReconcilerTest {
 
   @Test
   void lostLast_allAlreadyNull_recordsNoAudit() {
-    // Given shared rows that are all already ownerless (owning_org_unit IS NULL): losing the last
-    // membership re-stamps nothing (restamped == 0), so no audit event may fire.
     UUID userId = UUID.randomUUID();
     InventoryItem a = sharedRow(null, 4.0, matA, 900);
     InventoryItem b = sharedRow(null, 6.0, matB, 900);
@@ -195,13 +182,10 @@ class InventoryOrgUnitReconcilerTest {
 
     reconciler.onUserLostLastOrgUnit(userId);
 
-    // Rows are untouched and no spurious rows=0 audit is emitted.
     assertNull(a.getOwningOrgUnit());
     assertNull(b.getOwningOrgUnit());
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
-
-  // --- helpers --------------------------------------------------------------
 
   private static OrgUnit squadron() {
     Squadron s = new Squadron();

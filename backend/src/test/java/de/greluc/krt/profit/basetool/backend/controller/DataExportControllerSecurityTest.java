@@ -46,17 +46,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the Art. 15 / Art. 20 export surfaces (REQ-SEC-058).
- *
- * <p>Two gates that are opposites, which is why they are tested together:
+ * MockMvc gate matrix for the data export surfaces (REQ-SEC-058).
  *
  * <ul>
- *   <li>{@code /api/v1/users/me/export} is open to <b>every</b> authenticated member — the right is
- *       theirs — and is safe because the subject comes from the token and no endpoint here accepts
- *       a user id. That last property is what this class pins down: there is no parameter with
- *       which one member could export another's data.
- *   <li>{@code /api/v1/admin/users/&#123;id&#125;/export} takes a user id and is therefore <b>ADMIN
- *       only</b>, at the URL matcher and the method gate.
+ *   <li>{@code /api/v1/users/me/export} is open to every authenticated member and accepts no user
+ *       id.
+ *   <li>{@code /api/v1/admin/users/&#123;id&#125;/export} is ADMIN-only at the URL matcher and the
+ *       method gate.
  * </ul>
  */
 @SpringBootTest
@@ -80,7 +76,6 @@ class DataExportControllerSecurityTest {
     when(dataExportReportService.renderPdf(any())).thenReturn(new byte[] {1, 2, 3});
   }
 
-  // covers REQ-SEC-058 — every member may export their own data
   @Test
   void selfExport_member_isAllowed() throws Exception {
     mockMvc
@@ -110,7 +105,6 @@ class DataExportControllerSecurityTest {
     mockMvc.perform(get("/api/v1/users/me/export")).andExpect(status().isUnauthorized());
   }
 
-  // covers REQ-SEC-058 — the admin variant takes an id, so it is admin-only
   @Test
   void adminExport_member_isForbidden() throws Exception {
     mockMvc

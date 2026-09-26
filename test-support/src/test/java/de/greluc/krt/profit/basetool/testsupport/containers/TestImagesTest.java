@@ -30,14 +30,8 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@link TestImages#REDIS} to the image production actually runs (audit item TST-18).
- *
- * <p>The constant is a copy of the {@code x-redis} image in {@code docker-compose.yml}, which
- * {@code scripts/generate-quadlet.py} carries into {@code quadlet/systemd/redis.container} for the
- * production host. A Dependabot digest bump lands in the compose file; this test then fails until
- * the constant is moved in the same change, so the Redis integration tests can never quietly fall
- * back behind production again. Both files are declared as inputs of this module's {@code test}
- * task, so an edit to either re-runs it.
+ * Verifies that {@link TestImages#REDIS} equals the {@code x-redis} image in {@code
+ * docker-compose.yml}, which production runs.
  */
 class TestImagesTest {
 

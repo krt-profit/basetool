@@ -23,13 +23,10 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Response payload for the SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta endpoint.
- * Carries the user's post-write membership state so the frontend can re-render the form without a
- * follow-up GET — saves one round-trip and avoids the "what's the new version?" question after each
- * save.
+ * The user's membership state after a membership-delta write, so the form can re-render without a
+ * follow-up GET.
  *
- * @param memberships the user's complete current Staffel + SK membership list, sorted Staffel-
- *     first then SK alphabetical. Never {@code null}; possibly empty when the user has been
- *     stripped of every membership in the same transaction.
+ * @param memberships the user's complete Staffel and SK memberships, Staffeln first, then SKs
+ *     alphabetically; never {@code null}, possibly empty.
  */
 public record MembershipDeltaResponse(@NotNull List<OrgUnitMembershipDto> memberships) {}

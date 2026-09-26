@@ -77,7 +77,6 @@ class InventoryLogisticianSyncTest {
 
   @Test
   void memberWithLogisticianFlag_ShouldSeeActions() throws Exception {
-    // Given
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(
@@ -113,7 +112,6 @@ class InventoryLogisticianSyncTest {
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, Collections.emptyList(), "keycloak");
 
-    // When & Then
     mockMvc
         .perform(get("/inventory/all").with(authentication(auth)))
         .andExpect(status().isOk())
@@ -122,7 +120,6 @@ class InventoryLogisticianSyncTest {
 
   @Test
   void memberWithoutLogisticianFlag_ShouldNotSeeActions() throws Exception {
-    // Given
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(
@@ -158,7 +155,6 @@ class InventoryLogisticianSyncTest {
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, Collections.emptyList(), "keycloak");
 
-    // When & Then
     mockMvc
         .perform(get("/inventory/all").with(authentication(auth)))
         .andExpect(status().isOk())
@@ -167,7 +163,6 @@ class InventoryLogisticianSyncTest {
 
   @Test
   void officerWithoutLogisticianFlag_ShouldSeeActionsByHierarchy() throws Exception {
-    // Given
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(
@@ -208,7 +203,6 @@ class InventoryLogisticianSyncTest {
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
 
-    // When & Then
     mockMvc
         .perform(get("/inventory/all").with(authentication(auth)))
         .andExpect(status().isOk())

@@ -27,7 +27,6 @@ class LogMaskerTest {
 
   @Test
   void maskEmail_shouldKeepDomainAndFirstChar() {
-    // Given / When / Then
     assertThat(LogMasker.maskEmail("alice@example.com")).isEqualTo("a***@example.com");
   }
 

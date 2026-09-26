@@ -99,7 +99,6 @@ class GlobalExceptionHandlerTest {
 
     assertThat(problem.getStatus()).isEqualTo(400);
     assertThat(problem.getDetail()).isEqualTo("Mission is already finalized.");
-    // A backend 4xx reject is counted once under the bounded backend_reject reason (REQ-OBS-011).
     assertThat(
             meterRegistry
                 .get(MetricNames.INGEST_HANDOFF_ERRORS)
@@ -110,11 +109,9 @@ class GlobalExceptionHandlerTest {
   }
 
   /**
-   * A backend {@code 401}/{@code 403} refuses the gateway's <em>own</em> service-account token, not
-   * the member's (ADR-0129). It must reach the extractor as the server-side relay failure it is — a
-   * 502 with {@code BACKEND_RELAY_FAILED}, never the backend's auth status, which would tell the
-   * member to sign in again — and it must drop the cached token so the next upload mints a fresh
-   * one (ING-SEC-02).
+   * A backend {@code 401}/{@code 403} refuses the gateway's own service-account token (ADR-0129),
+   * so it reaches the extractor as a 502 with {@code BACKEND_RELAY_FAILED} and drops the cached
+   * token.
    */
   @ParameterizedTest
   @ValueSource(ints = {401, 403})
@@ -252,7 +249,6 @@ class GlobalExceptionHandlerTest {
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
     assertThat(problem.getDetail()).isEqualTo("The blueprint export must be a JSON object.");
     assertThat(problem.getProperties()).containsEntry("code", "BAD_REQUEST");
-    // A gateway-side reject is not a relay failure and must not inflate the handoff-error counter.
     assertThat(meterRegistry.find(MetricNames.INGEST_HANDOFF_ERRORS).counters()).isEmpty();
   }
 
@@ -265,7 +261,6 @@ class GlobalExceptionHandlerTest {
     assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("42");
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().getProperties()).containsEntry("code", "RATE_LIMITED");
-    // A pre-relay throttle is not a handoff failure either.
     assertThat(meterRegistry.find(MetricNames.INGEST_HANDOFF_ERRORS).counters()).isEmpty();
   }
 
@@ -303,8 +298,6 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void openCircuit_becomesA502ButIsLoggedAtDebugNotWarn() {
-    // REQ-OBS-001 / issue #1203: the breaker rejects every call for its whole open window, so a
-    // per-call WARN would flood the log during a routine backend restart.
     CallNotPermittedException ex =
         CallNotPermittedException.createCallNotPermittedException(
             CircuitBreakerRegistry.ofDefaults().circuitBreaker("backend"));
@@ -357,8 +350,6 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void redisStagingOutage_becomesARetryable503RatherThanAGeneric500() {
-    // Redis is the gateway's only data store; an outage there is an availability event that
-    // self-heals, so the caller must be told to retry instead of being handed a dead 500.
     ResponseEntity<ProblemDetail> response =
         handler.handleStagingUnavailable(
             new RedisConnectionFailureException("Unable to connect to Redis"));
@@ -368,7 +359,6 @@ class GlobalExceptionHandlerTest {
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().getProperties())
         .containsEntry("code", MetricNames.CODE_SERVICE_UNAVAILABLE);
-    // Counted apart from a genuine internal fault so the dashboard can tell the two outages apart.
     assertThat(relayFailures(MetricNames.REASON_STAGING_UNAVAILABLE)).isEqualTo(1.0d);
     assertThat(relayFailures(MetricNames.REASON_INTERNAL)).isZero();
     assertThat(
@@ -382,8 +372,6 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void redisStagingOutage_isWarnedNotErrored_andNeverEchoesTheEndpoint() {
-    // ERROR would inflate logback_events_total{level="error"} and trip LogbackErrorSpike on an
-    // outage that is not an application fault (REQ-OBS-013); the Lettuce message names the host.
     List<ILoggingEvent> events =
         LogCapture.capture(
             GlobalExceptionHandler.class,

@@ -73,7 +73,6 @@ class PromotionLevelContentServiceTest {
 
   @Test
   void listByCategory_shouldReturnContentsScopedToSquadron() {
-    // Given
     UUID categoryId = UUID.randomUUID();
     UUID scopeId = UUID.randomUUID();
     PromotionCategory category =
@@ -99,10 +98,8 @@ class PromotionLevelContentServiceTest {
         .thenReturn(List.of(content));
     when(mapper.toResponse(content)).thenReturn(response);
 
-    // When
     List<PromotionLevelContentResponse> result = service.listByCategory(categoryId);
 
-    // Then: the active squadron is forwarded to the scoped finder.
     assertEquals(1, result.size());
     assertEquals(PromotionLevel.LEVEL_A, result.get(0).level());
     verify(repository).findAllByCategoryIdScopedOrdered(categoryId, scopeId);
@@ -110,7 +107,6 @@ class PromotionLevelContentServiceTest {
 
   @Test
   void get_shouldRejectCrossSquadron() {
-    // Given: a level content whose category's topic is owned by a foreign squadron.
     UUID id = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
     Squadron owner = new Squadron();
@@ -128,26 +124,22 @@ class PromotionLevelContentServiceTest {
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(ownerScopeService.canSeeSquadron(squadronId)).thenReturn(false);
 
-    // When / Then
     assertThrows(AccessDeniedException.class, () -> service.get(id));
   }
 
   @Test
   void create_shouldThrow_whenCategoryNotFound() {
-    // Given
     UUID categoryId = UUID.randomUUID();
     PromotionLevelContentWriteRequest request =
         new PromotionLevelContentWriteRequest(
             categoryId, PromotionLevel.LEVEL_A, "Beschreibung", null);
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(NotFoundException.class, () -> service.create(request));
   }
 
   @Test
   void create_shouldSaveAndReturn() {
-    // Given
     UUID categoryId = UUID.randomUUID();
     PromotionCategory category =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
@@ -174,10 +166,8 @@ class PromotionLevelContentServiceTest {
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);
 
-    // When
     PromotionLevelContentResponse result = service.create(request);
 
-    // Then
     assertEquals(PromotionLevel.LEVEL_A, result.level());
     verify(repository).save(entity);
     verify(auditService)
@@ -197,8 +187,6 @@ class PromotionLevelContentServiceTest {
    */
   @Test
   void update_flushesSoResponseVersionIsFresh() {
-    // Given: an existing level content with a bare category (no owning squadron -> edit-guard
-    // returns early), version 4.
     UUID id = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     PromotionCategory category =
@@ -228,10 +216,8 @@ class PromotionLevelContentServiceTest {
     when(repository.saveAndFlush(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);
 
-    // When
     service.update(id, request);
 
-    // Then: the flushed entity is what gets mapped, and a plain save never happens.
     verify(repository).saveAndFlush(entity);
     verify(repository, never()).save(entity);
     verify(auditService)
@@ -245,16 +231,13 @@ class PromotionLevelContentServiceTest {
 
   @Test
   void delete_shouldCallRepositoryDelete() {
-    // Given
     UUID id = UUID.randomUUID();
     PromotionLevelContent entity =
         PromotionLevelContent.builder().level(PromotionLevel.LEVEL_B).description("Test").build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
-    // When
     service.delete(id);
 
-    // Then
     verify(repository).delete(entity);
     verify(auditService)
         .record(
@@ -267,11 +250,9 @@ class PromotionLevelContentServiceTest {
 
   @Test
   void get_shouldThrow_whenNotFound() {
-    // Given
     UUID id = UUID.randomUUID();
     when(repository.findById(id)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(NotFoundException.class, () -> service.get(id));
   }
 }

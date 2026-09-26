@@ -55,30 +55,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Servlet filter handling Backend Role Sync.
- *
- * <p>Two pieces of session state drive it, and <strong>both are refreshed on a TTL rather than
- * resolved once per session</strong> (REQ-SEC-013). Pinning either for the session's whole lifetime
- * is what forced a freshly approved Discord member to log out and back in — twice: once because the
- * session still carried the {@code PENDING} verdict cached before the admin decided, and once more
- * because the roles/units the admin assigned afterwards never reached the already-synced principal.
- * With an authenticated session living 720&nbsp;h (REQ-SEC-025) neither ever self-healed.
+ * Servlet filter that keeps the session's approval state and backend authorities current
+ * (REQ-SEC-013).
  *
  * <ul>
- *   <li><b>Approval state</b> — {@code ACTIVE} is terminal (the backend only ever decides a still-
- *       {@code PENDING} registration) and stays cached for free; a non-terminal {@code
- *       PENDING}/{@code REJECTED} verdict is re-read every {@link #APPROVAL_RECHECK_MILLIS}, so an
- *       approval lands within seconds without any re-login.
- *   <li><b>Backend roles/permissions</b> — re-synced every {@link #ROLE_RESYNC_MILLIS}, and
- *       immediately on the {@code PENDING → ACTIVE} transition, so authorities granted after the
- *       session started reach the principal on the next request.
+ *   <li>Approval state: {@code ACTIVE} is terminal and cached; a {@code PENDING} or {@code
+ *       REJECTED} verdict is re-read every {@link #APPROVAL_RECHECK_MILLIS}.
+ *   <li>Roles and permissions: re-synced every {@link #ROLE_RESYNC_MILLIS} and immediately on the
+ *       transition to {@code ACTIVE}, adding and removing authorities as described on {@link
+ *       #syncRoles}.
  * </ul>
- *
- * <p><b>The sync reconciles in both directions</b>: it adds what the backend now grants and drops
- * what it no longer grants, so a revoked role or permission leaves the principal on the next
- * re-sync instead of lingering for the session's lifetime and rendering UI that only 403s. Which
- * authorities may be dropped, and why the rule differs between {@code ROLE_*} and everything else,
- * is documented on {@link #syncRoles}.
  */
 @Component
 @RequiredArgsConstructor
@@ -93,10 +79,8 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   static final String ROLES_SYNCED_AT_FLAG = "BACKEND_ROLES_SYNCED_AT";
 
   /**
-   * Session attribute holding the authority names the last successful sync asserted. It is what
-   * lets a later sync tell a permission <em>this filter</em> granted apart from a login-owned
-   * {@code OIDC_USER} / {@code SCOPE_*} authority, and therefore revoke the former without ever
-   * being able to strip the latter (ADR-0122).
+   * Session attribute holding the authority names the last successful sync asserted, so only
+   * authorities this filter granted are ever revoked (ADR-0122).
    */
   static final String SYNCED_AUTHORITIES_FLAG = "BACKEND_SYNCED_AUTHORITIES";
 
@@ -116,23 +100,14 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   private static final String STATE_REJECTED = "REJECTED";
 
   /**
-   * The account is approved but holds no application role (REQ-SEC-053, ADR-0159).
-   *
-   * <p>Not a registration status: the backend never sends it in {@code approvalStatus}. It is
-   * derived from the refusal — a role-less caller is answered {@code 403 NO_ROLE} on every {@code
-   * /api} path except the three exempt ones, so the role sync's own read of {@code
-   * /api/v1/users/me} is where the frontend meets it. Kept in the same session attribute as the
-   * approval verdict because it routes to the same page and expires the same way.
+   * Gate state for an approved account holding no application role (REQ-SEC-053). Derived from the
+   * backend's {@code 403 NO_ROLE}, never sent as an {@code approvalStatus}.
    */
   static final String STATE_NO_ROLE = "NO_ROLE";
 
   /**
-   * Whether this session's cached gate verdict is "approved, but holding no role" (REQ-SEC-053).
-   *
-   * <p>Exposed for {@code PendingApprovalPageController}, which has to choose between three sets of
-   * words on one page. It reads the verdict rather than the registration status on purpose: the
-   * backend never sends {@code NO_ROLE} in {@code approvalStatus}, because it is derived from a
-   * refusal — and the refusal is what routed the caller to that page.
+   * Checks whether the session's cached gate verdict is "approved, but holding no role"
+   * (REQ-SEC-053).
    *
    * @param session the current session, or {@code null} when there is none
    * @return {@code true} iff the cached verdict is the role-less one
@@ -161,14 +136,11 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   private static final long ROLE_RESYNC_MILLIS = 60_000L;
 
   /**
-   * Returns a stable, non-reversible 8-hex-char digest of the OIDC principal name suitable for log
-   * correlation. CLAUDE.md "Never log names, emails, or tokens" — every log line in this filter
-   * routes the principal through this helper instead of dumping {@code token.getName()} verbatim.
-   * Deterministic per name within a JVM run; collisions across users are statistically irrelevant
-   * for the short-lived correlation window the logs are read against.
+   * Returns a stable, non-reversible 8-hex-char tag of the principal name for log correlation, so
+   * the name itself is never logged.
    *
-   * @param name OIDC principal name (typically the JWT {@code sub}); may be {@code null} or empty.
-   * @return a short tag like {@code "u-1a2b3c4d"}, or {@code "<anon>"} for null/empty input.
+   * @param name OIDC principal name; may be {@code null} or empty
+   * @return a tag like {@code "u-1a2b3c4d"}, or {@code "<anon>"} for null or empty input
    */
   @NotNull
   private static String maskPrincipal(String name) {
@@ -191,12 +163,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         && !isStaticAsset(request)) {
       HttpSession session = request.getSession(false);
       if (session != null) {
-        // Epic #720, Track 1: a PENDING/REJECTED Discord registration is routed to the
-        // account-status page rather than left to collect 403s. REQ-SEC-053 adds a third state to
-        // the same routing: an approved account holding no role, which reaches the identical dead
-        // end for a different reason and needs different words for it. The backend is the source of
-        // truth for all three (it withholds every authority in each case), so this redirect is UX,
-        // not the access control.
         String approval = resolveApprovalState(session);
         if (STATE_PENDING.equals(approval)
             || STATE_REJECTED.equals(approval)
@@ -205,12 +171,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
           return;
         }
 
-        // REQ-SEC-028: while the Terms-of-Use gate is closed for this session, the backend refuses
-        // /api/v1/users/me with 403 TERMS_NOT_ACCEPTED. The failure path below deliberately leaves
-        // the sync stamp unset so the next request retries, which turns "unconsented" into one
-        // futile round trip per non-static request — for every member at once, right after a
-        // wording change. Skipping it costs nothing: the sync could not have succeeded, and the
-        // moment consent is recorded the cached verdict is cleared and the next request syncs.
         if (TermsAcceptanceGateFilter.consentKnownMissing(request)) {
           filterChain.doFilter(request, response);
           return;
@@ -219,19 +179,9 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         if (isDue(session.getAttribute(ROLES_SYNCED_AT_FLAG), ROLE_RESYNC_MILLIS)) {
           log.debug(
               "Session exists, starting role sync for user: {}", maskPrincipal(token.getName()));
-          // Only stamp the session when the backend role read genuinely succeeded. A Resilience4j
-          // fallback (null) or a thrown error must NOT stamp it — otherwise a single backend hiccup
-          // would leave the OidcUser principal without its ROLE_* authorities for a whole
-          // re-sync interval instead of retrying on the very next request (REQ-SEC-013).
           if (syncRoles(token, session, request, response)) {
             session.setAttribute(ROLES_SYNCED_AT_FLAG, System.currentTimeMillis());
           } else if (STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG))) {
-            // The role read is where a role-less account is first recognised, and it runs after the
-            // approval routing above rather than before it. Without this the request that made the
-            // discovery would still be served: the dashboard renders, every backend call on it is
-            // refused with 403 NO_ROLE, and only the NEXT navigation reaches the account-status
-            // page. REQ-SEC-053 wants the dead end at the first request, so route the one that
-            // found it.
             routeToAccountStatus(request, response, filterChain);
             return;
           }
@@ -243,23 +193,13 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Resolves the caller's approval status for this request, re-reading it from the backend when the
-   * cached verdict is non-terminal and older than {@link #APPROVAL_RECHECK_MILLIS} (REQ-SEC-013).
+   * Resolves the caller's approval status, re-reading it when the cached verdict is non-terminal
+   * and older than {@link #APPROVAL_RECHECK_MILLIS} (REQ-SEC-013). On a transition to {@code
+   * ACTIVE} it also forces a role re-sync on this request.
    *
-   * <p>{@link #STATE_ACTIVE} is terminal — the backend refuses to decide anything but a
-   * still-{@code PENDING} registration — so an approved session short-circuits here without ever
-   * touching the backend again. A {@code PENDING}/{@code REJECTED} verdict is the one that can
-   * change underneath a live session, so it is the one that expires; caching it for the session's
-   * whole 720&nbsp;h lifetime is what used to strand an approved member on the waiting page until
-   * they logged out and back in.
-   *
-   * <p>When the re-read observes the {@code → ACTIVE} transition it also drops the role-sync stamp,
-   * so the authorities the approval unlocks are pulled on this very request rather than up to
-   * {@link #ROLE_RESYNC_MILLIS} later.
-   *
-   * @param session the current (non-{@code null}) HTTP session carrying the cached verdict
-   * @return the approval status, or {@code null} when it has never been read successfully — treated
-   *     as "not pending" by the caller so a backend outage never traps an approved user
+   * @param session the current session carrying the cached verdict
+   * @return the approval status, or {@code null} when never read successfully (treated as not
+   *     pending)
    */
   @Nullable
   private String resolveApprovalState(@NotNull HttpSession session) {
@@ -274,8 +214,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
     String fresh = fetchApprovalStatus();
     if (fresh == null) {
-      // Backend unreadable: keep whatever we had rather than downgrading a known verdict, and leave
-      // the stamp untouched so the next request retries instead of waiting out the interval.
       return cached;
     }
     session.setAttribute(APPROVAL_STATE_FLAG, fresh);
@@ -289,21 +227,10 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Drops the cached approval verdict so the next request re-reads it from the backend instead of
-   * reusing one that the caller already knows is stale.
+   * Drops the cached approval verdict so the next request re-reads it, preventing a redirect loop
+   * when the waiting page sends an approved caller away.
    *
-   * <p>Exists for exactly one caller: {@code PendingApprovalPageController} redirects an {@code
-   * ACTIVE} caller off the waiting page, and the waiting page is reached precisely because this
-   * filter believes the caller is not approved. Without this, the redirect and the filter disagree
-   * for up to {@link #APPROVAL_RECHECK_MILLIS} and bounce the browser between {@code /} and {@code
-   * /pending-approval} until the cached verdict expires — the redirect is served from the session,
-   * so it costs no backend read and the loop runs at full speed straight into the browser's
-   * redirect cap. Clearing both attributes puts {@link #resolveApprovalState} back on its
-   * never-read path, where a successful read admits the caller and a failed one yields {@code null}
-   * (not pending) rather than resurrecting the stale verdict, so neither outcome can loop.
-   *
-   * @param session the caller's session, or {@code null} when there is none — then a no-op, since a
-   *     session-less request carries no cached verdict to begin with
+   * @param session the caller's session, or {@code null}, which is a no-op
    */
   public static void forgetApprovalVerdict(@Nullable HttpSession session) {
     if (session == null) {
@@ -314,16 +241,13 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Whether a periodically refreshed piece of session state is stale and must be re-read.
+   * Checks whether a periodically refreshed session value must be re-read.
    *
-   * @param stamp the stored epoch-millis stamp of the last successful read; anything that is not a
-   *     {@link Number} (absent attribute, or a boolean flag written by a pre-upgrade session that
-   *     survived a deploy in Redis) counts as never read. {@link Number} rather than {@code Long}
-   *     because the session round-trips through a JSON serializer, which may hand back a different
-   *     numeric type — and a mismatch there would silently degrade into a read per request.
-   * @param intervalMillis the maximum age the stored value may reach
-   * @return {@code true} when the value must be re-read — including when the stamp lies in the
-   *     future, so a backwards clock jump cannot freeze the refresh
+   * @param stamp the epoch-millis stamp of the last successful read; anything not a {@link Number}
+   *     counts as never read
+   * @param intervalMillis the maximum age the value may reach
+   * @return {@code true} when the value must be re-read, including when the stamp lies in the
+   *     future
    */
   private static boolean isDue(@Nullable Object stamp, long intervalMillis) {
     if (!(stamp instanceof Number stampMillis)) {
@@ -334,11 +258,8 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Reads the caller's approval status from the backend. Returns {@code null} on any failure —
-   * treated as "not pending" so a backend outage never traps an approved user on the waiting page
-   * (the backend still withholds every authority from a genuinely pending account, so this is UX,
-   * not the access boundary). Call frequency is bounded by {@link #resolveApprovalState}, which
-   * caches the verdict and only lets a non-terminal one expire.
+   * Reads the caller's approval status from the backend; any failure yields {@code null}, treated
+   * as not pending.
    *
    * @return the approval status ({@code PENDING}/{@code ACTIVE}/{@code REJECTED}), or {@code null}
    *     when it could not be read
@@ -350,9 +271,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
           backendApiClient.get("/api/v1/users/me/registration-status", RegistrationStatusDto.class);
       return dto == null ? null : dto.approvalStatus();
     } catch (BackendServiceException e) {
-      // Boundary already logged it; this probe re-runs on every request until it succeeds, so keep
-      // the expected backend-unavailable case at DEBUG to avoid per-request WARN spam
-      // (REQ-OBS-001).
       log.debug("Could not read approval status; treating as non-pending for this request.", e);
       return null;
     } catch (Exception e) {
@@ -377,17 +295,14 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Sends the caller to the account-status page, unless the request targets one of the paths that
-   * must stay reachable from it (the page itself, its status poll, logout, the OAuth2 endpoints,
-   * the error page, actuator and static assets - see {@link #isApprovalExempt}), which is passed
-   * down the chain instead.
+   * Redirects the caller to the account-status page, unless the request is {@linkplain
+   * #isApprovalExempt exempt}, in which case it continues down the chain.
    *
    * @param request the current request
    * @param response the response the redirect is written to
    * @param filterChain the chain an exempt request continues down
    * @throws ServletException propagated from an exempt request's downstream chain
-   * @throws IOException propagated from writing the redirect, or from an exempt request's
-   *     downstream chain
+   * @throws IOException propagated from writing the redirect or the downstream chain
    */
   private static void routeToAccountStatus(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -400,20 +315,8 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Whether the request targets an asset or a public document, in which case the filter skips its
-   * whole body.
-   *
-   * <p>The approval and role state are now refreshed on a TTL instead of once per session, so
-   * without this every CSS/JS/font request of a page load would be a candidate for a backend read.
-   * Skipping them keeps the refresh cost at roughly one read per interval per session while still
-   * letting every real navigation (and the waiting page's status poll) drive it. Public documents
-   * are skipped for the same reason: none of them can answer differently for a member whose roles
-   * have just changed.
-   *
-   * <p><strong>Deliberately narrower than {@link #isApprovalExempt}.</strong> It does not include
-   * {@link PublicPaths#isAuthInfrastructure}, because the OAuth callback under {@code /login} is
-   * where a member's authorities are first reconciled — skipping the body there would skip the work
-   * this filter exists to do. See the note on {@link PublicPaths}.
+   * Checks whether the request targets an asset or public document, for which the filter does
+   * nothing. Narrower than {@link #isApprovalExempt}: the OAuth callback is still processed.
    *
    * @param request the current request
    * @return {@code true} for paths the filter has nothing to do for
@@ -423,40 +326,21 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Reads the caller's backend roles/permissions via {@code /api/v1/users/me} and reconciles the
-   * {@link OAuth2AuthenticationToken}'s authorities against them — adding what the backend now
-   * grants and <b>dropping what it no longer grants</b> — rebuilding the {@link OidcUser} principal
-   * plus the token whenever the set actually changed.
-   *
-   * <p>The reconciliation is asymmetric by design, because the two kinds of authority have
-   * different owners (ADR-0122):
+   * Reads the caller's roles and permissions from {@code /api/v1/users/me} and reconciles the
+   * token's authorities, rebuilding the principal and token when the set changed (ADR-0122).
    *
    * <ul>
-   *   <li><b>{@code ROLE_*}</b> — the backend response is authoritative for the entire role
-   *       vocabulary. Its local {@code role} catalog is where realm roles are mirrored to and is
-   *       exactly what the backend's own {@code @PreAuthorize} gates consult, so a role the backend
-   *       no longer reports is one it will no longer honour, and leaving it on the principal only
-   *       renders UI that 403s. A role dropped in Keycloak reaches that mirror with the next
-   *       access-token refresh, and this sync then drops it from the session too. Technical realm
-   *       roles that have no catalog entry ({@code offline_access}, {@code default-roles-*}) fall
-   *       away with it — nothing gates on them.
-   *   <li><b>Everything else</b> — only what a <em>previous</em> sync asserted may be dropped,
-   *       tracked in {@link #SYNCED_AUTHORITIES_FLAG}. Permission strings carry no prefix and are
-   *       therefore indistinguishable from the login-owned {@code OIDC_USER} / {@code SCOPE_*}
-   *       authorities; keying the removal on what this filter itself granted makes it structurally
-   *       impossible to strip one of those.
+   *   <li>{@code ROLE_*}: the backend is authoritative; roles it no longer reports are removed.
+   *   <li>Other authorities: only those a previous sync asserted ({@link #SYNCED_AUTHORITIES_FLAG})
+   *       may be removed, so login-owned authorities are never stripped.
    * </ul>
    *
-   * <p>A failed read changes nothing: the caller leaves the session unstamped and retries.
-   *
    * @param token the current OAuth2 authentication to reconcile
-   * @param session the current session, carrying (and receiving) the set of authorities the last
-   *     successful sync asserted
-   * @param request the servlet request, used to persist the rebuilt security context
-   * @param response the servlet response, used to persist the rebuilt security context
-   * @return {@code true} when the backend read succeeded (a non-null user came back, whether or not
-   *     anything changed); {@code false} when the call returned no user or threw, which signals the
-   *     caller to leave the session unstamped and retry on the next request
+   * @param session the session holding the previously asserted authorities
+   * @param request the servlet request, for persisting the rebuilt security context
+   * @param response the servlet response, for persisting the rebuilt security context
+   * @return {@code true} when the backend read succeeded; {@code false} when it returned no user or
+   *     threw, so the caller retries
    */
   private boolean syncRoles(
       OAuth2AuthenticationToken token,
@@ -468,9 +352,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       UserDto user = backendApiClient.get("/api/v1/users/me", UserDto.class);
 
       if (user == null) {
-        // Resilience4j fallback returns null when the backend is unavailable (e.g. mid-deploy).
-        // Returning false leaves the sync stamp unset so the next request retries instead of
-        // poisoning the session with a principal that never received its ROLE_* (REQ-SEC-013).
         log.warn(
             "Backend role sync skipped: /api/v1/users/me returned no user for {}; leaving the"
                 + " session unsynced so the next request retries.",
@@ -495,9 +376,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
             updatedAuthorities.size());
         OAuth2AuthenticationToken newAuth;
         if (token.getPrincipal() instanceof OidcUser oidcUser) {
-          // We must preserve the nameAttributeKey to avoid changing the principal name,
-          // which would break OAuth2AuthorizedClient lookups.
-          String nameAttributeKey = "sub"; // Default
+          String nameAttributeKey = "sub";
           String currentName = oidcUser.getName();
 
           if (currentName != null) {
@@ -506,7 +385,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
             } else if (currentName.equals(oidcUser.getEmail())) {
               nameAttributeKey = "email";
             } else {
-              // Search for the key that matches the current name
               for (java.util.Map.Entry<String, Object> entry :
                   oidcUser.getAttributes().entrySet()) {
                 if (currentName.equals(String.valueOf(entry.getValue()))) {
@@ -564,11 +442,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
       return true;
     } catch (BackendServiceException | ReauthenticationRequiredException e) {
-      // REQ-SEC-053: the role read is the frontend's first meeting with a role-less account — the
-      // backend refuses it with 403 NO_ROLE like every other /api call. Cached as the session's
-      // verdict so the next request routes to the account-status page instead of repeating the
-      // same refusal on every navigation, and expiring on the same interval as the approval verdict
-      // so an administrator granting a role reaches the member without a re-login.
       if (e instanceof BackendServiceException backendFailure
           && BackendServiceException.CODE_NO_ROLE.equals(backendFailure.getProblemCode())) {
         session.setAttribute(APPROVAL_STATE_FLAG, STATE_NO_ROLE);
@@ -576,12 +449,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         log.info("Backend refused the role sync with NO_ROLE; routing to the account-status page.");
         return false;
       }
-      // REQ-OBS-001: the BackendApiClient boundary already logged this once (5xx=ERROR, 4xx=WARN,
-      // circuit-open=DEBUG). syncRoles re-runs on EVERY request until it succeeds
-      // (SYNC_COMPLETE_FLAG
-      // is only set on success), so re-logging a relayed backend failure at ERROR here turns one
-      // backend outage into a per-request ERROR storm and undoes the #1203 circuit-open-at-DEBUG
-      // design. Defer quietly; the principal gains ROLE_* on the next good request.
       log.debug(
           "Backend role sync deferred (backend unavailable) for user: {}",
           maskPrincipal(token.getName()),
@@ -594,26 +461,20 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * The authority set {@code /api/v1/users/me} asserts for the caller, plus the two flags saying
-   * whether the response may be treated as authoritative for each kind (ADR-0122). A {@code null}
-   * collection means "the backend said nothing about this", which must never be read as "the
-   * backend revoked everything" — so the corresponding removals are skipped for that request.
+   * The authorities {@code /api/v1/users/me} asserts, with flags saying whether roles and
+   * permissions may drive revocation; a missing collection never means "revoke everything".
    *
-   * @param asserted every authority name the backend currently grants — {@code ROLE_*} from the
-   *     role catalog and the two membership flags, plus the flattened permission strings
-   * @param rolesAuthoritative whether the response carried a role list, and its {@code ROLE_*} may
-   *     therefore drive revocation
-   * @param permissionsAuthoritative whether the response carried a permission list, and previously
-   *     asserted permissions may therefore be revoked
+   * @param asserted every authority name the backend grants
+   * @param rolesAuthoritative whether the response carried a role list
+   * @param permissionsAuthoritative whether the response carried a permission list
    */
   private record BackendAuthorities(
       Set<String> asserted, boolean rolesAuthoritative, boolean permissionsAuthoritative) {
 
     /**
-     * Derives the asserted authority set from a backend user DTO: each catalog role name mapped to
-     * its {@code ROLE_UPPER_SNAKE_CASE} authority, the flattened permission strings verbatim (they
-     * carry no prefix by design — {@code hasAuthority} checks them directly), and {@code
-     * ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} for the two org-unit membership flags.
+     * Derives the asserted authorities from a backend user: {@code ROLE_*} for each catalog role,
+     * the permission strings verbatim, and {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER}
+     * for the membership flags.
      *
      * @param user the backend's view of the caller; never {@code null}
      * @return the asserted authorities plus their authoritativeness flags
@@ -640,13 +501,10 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Reconciles the token's current authorities against what the backend asserts, applying the two
-   * ownership rules documented on {@link #syncRoles}: the backend owns the whole {@code ROLE_*}
-   * vocabulary, while a non-role authority may only be dropped when a previous sync is the one that
-   * granted it. Order is preserved and duplicates collapse, so the result is stable across requests
-   * and the {@code modified} comparison does not churn.
+   * Reconciles the token's authorities against the backend's by the rules on {@link #syncRoles},
+   * preserving order and collapsing duplicates.
    *
-   * @param current the authorities on the token right now
+   * @param current the authorities on the token now
    * @param backend what the backend asserts, with its authoritativeness flags
    * @param previouslyAsserted the authority names the last successful sync asserted
    * @return the reconciled authority list
@@ -684,9 +542,8 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Reads back the authority names the last successful sync asserted. Tolerates anything else on
-   * the attribute (absent, or a value shaped differently by an older release whose session survived
-   * a deploy in Redis) by reporting an empty set, which only means "revoke nothing this time".
+   * Reads the authority names the last successful sync asserted; an absent or unexpected value
+   * yields an empty set.
    *
    * @param session the current session
    * @return the previously asserted authority names; never {@code null}
@@ -706,9 +563,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Projects an authority collection onto its bare names for order-insensitive comparison, so the
-   * security context is only rebuilt (and written back to the session) when the set genuinely
-   * changed.
+   * Projects authorities onto their names for order-insensitive comparison.
    *
    * @param authorities the authorities to project
    * @return the authority names as a set

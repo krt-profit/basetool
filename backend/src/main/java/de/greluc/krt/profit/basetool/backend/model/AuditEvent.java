@@ -38,23 +38,12 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One immutable activity audit-trail row for the four audited areas (REQ-AUDIT-001), persisted in
- * the shared {@code audit_event} table created by Flyway V179 and readable only by admins.
+ * One immutable activity audit-trail row of the audited areas (REQ-AUDIT-001), readable only by
+ * admins.
  *
- * <p>Insert-only event log modeled after {@link BankAuditEvent} / {@link ExternalSyncReport}: no
- * {@code @Version}, no updates, {@link #occurredAt} is the single timestamp. Every audited mutation
- * appends exactly one row in the same transaction as the business write — an audit failure fails
- * the mutation, so the trail has no silent gaps. The {@link #domain} discriminator keeps the four
- * logs logically separate inside one physical table (ADR-0037).
- *
- * <p>Reference columns are plain UUIDs (no JPA relations): audit rows must outlive every referenced
- * aggregate (job orders are hard-deleted, inventory rows are depleted), and the admin viewer
- * renders the deletion-proof {@link #actorHandle} and {@link #subjectLabel} snapshots rather than
- * joining live rows.
- *
- * <p>This table is business data, not logging — the observability rule (never log names, emails or
- * tokens to the <em>log stream</em>) is unaffected; free-text user content (notes, recipient
- * handles) is never written into {@link #details}.
+ * <p>Insert-only: every audited mutation appends exactly one row in the same transaction, so an
+ * audit failure fails the mutation. References are plain UUIDs so rows outlive their aggregates;
+ * {@link #details} never carries user free text.
  */
 @Entity
 @Table(name = "audit_event")
@@ -103,15 +92,10 @@ public class AuditEvent {
   private UUID subjectId;
 
   /**
-   * Denormalized human-readable label of the subject (e.g. {@code material @ location}, {@code
-   * #<displayId> '<handle>'}) — snapshotted so the trail stays readable after the subject is gone.
+   * Snapshot of the subject's human-readable label, kept readable after the subject is gone.
    *
-   * <p><b>It can name a person, so do not treat it as non-personal.</b> Most domains snapshot a
-   * material name, a rank step or an org-unit shorthand, which is where that assumption comes from
-   * — but the job-order trails snapshot the order's <em>contact</em> handle, often an outsider with
-   * no account, and {@code DeletionRequestService} snapshots a member's own effective name. It is
-   * therefore a person-name surface in {@code PersonSearchTargets}, and the Art. 15 export
-   * deliberately does not select it (REQ-SEC-058).
+   * <p>It can name a person (e.g. a job order's contact handle), so it is treated as personal data
+   * and excluded from the Art. 15 export (REQ-SEC-058).
    */
   @Nullable
   @Column(name = "subject_label", length = 255)
@@ -131,19 +115,11 @@ public class AuditEvent {
   private String details;
 
   /**
-   * Which client software the mutation came through — the token's {@code azp} mapped onto the
-   * bounded known-client vocabulary (REQ-AUDIT-005, GHSA-2vq5-8p8w-5r64): a known client id
-   * verbatim, {@code other} for an unrecognised one, {@code none} for a caller with no token or a
-   * token carrying no {@code azp}.
+   * The client the mutation came through: the token's {@code azp} mapped onto the bounded
+   * known-client vocabulary, {@code other} for an unknown one, {@code none} when there is no token
+   * or no {@code azp} (REQ-AUDIT-005).
    *
-   * <p>Bounded rather than verbatim for the same reason {@link #details} carries no free text: this
-   * table is evidence, and a client-chosen string is the one kind of value that must not be able to
-   * write itself into it. {@code azp} is signed by Keycloak and unsettable by the client, so
-   * recording it adds no trust that {@code IngestGatewayProperties} does not already place in it.
-   *
-   * <p>{@code null} <em>only</em> on rows written before V237 added the column, where the client
-   * was unambiguous anyway — never on a new row, where {@code none} is a recorded answer rather
-   * than an absence.
+   * <p>{@code null} only on rows that predate the column; a new row always records a value.
    */
   @Nullable
   @Column(name = "client_id", length = 60)

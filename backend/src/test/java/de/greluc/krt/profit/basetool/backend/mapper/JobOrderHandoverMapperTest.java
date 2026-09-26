@@ -41,8 +41,6 @@ class JobOrderHandoverMapperTest {
 
   @BeforeEach
   void setUp() {
-    // The generated JobOrderHandoverMapperImpl receives the mappers it uses through its
-    // constructor (CentralMapperConfig: injectionStrategy = CONSTRUCTOR).
     mapper =
         new JobOrderHandoverMapperImpl(
             new MaterialMapperImpl(new MaterialCategoryMapperImpl()),
@@ -52,7 +50,6 @@ class JobOrderHandoverMapperTest {
 
   @Test
   void toDto_handover_shouldFlattenJobOrderIdAndCopyScalars() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     UUID handoverId = UUID.randomUUID();
     Instant when = Instant.parse("2026-05-13T08:00:00Z");
@@ -68,10 +65,8 @@ class JobOrderHandoverMapperTest {
     handover.setRecipientSquadron("Iridium");
     handover.setVersion(2L);
 
-    // When
     JobOrderHandoverDto dto = mapper.toDto(handover);
 
-    // Then
     assertNotNull(dto);
     assertEquals(handoverId, dto.id());
     assertEquals(
@@ -84,23 +79,19 @@ class JobOrderHandoverMapperTest {
 
   @Test
   void toDto_handover_withoutJobOrder_shouldHaveNullJobOrderId() {
-    // Given
     JobOrderHandover handover = new JobOrderHandover();
     handover.setId(UUID.randomUUID());
     handover.setHandoverTime(Instant.now());
     handover.setRecipientHandle("anonymous");
 
-    // When
     JobOrderHandoverDto dto = mapper.toDto(handover);
 
-    // Then
     assertNotNull(dto);
     assertNull(dto.jobOrderId());
   }
 
   @Test
   void toDto_item_shouldFlattenHandoverIdAndCopyScalars() {
-    // Given
     UUID handoverId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
@@ -123,10 +114,8 @@ class JobOrderHandoverMapperTest {
     item.setLocationName("Lorville HAB");
     item.setVersion(1L);
 
-    // When
     JobOrderHandoverItemDto dto = mapper.toDto(item);
 
-    // Then
     assertNotNull(dto);
     assertEquals(itemId, dto.id());
     assertEquals(handoverId, dto.jobOrderHandoverId());

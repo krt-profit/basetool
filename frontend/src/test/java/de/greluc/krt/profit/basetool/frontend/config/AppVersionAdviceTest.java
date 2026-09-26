@@ -27,38 +27,29 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.info.BuildProperties;
 
 /**
- * Unit tests for {@link AppVersionAdvice}. The advice has three observable states - present
- * BuildProperties with a real version, present BuildProperties whose version field is blank, and a
- * missing BuildProperties bean entirely (no auto-config, typical for sliced @WebMvcTest runs) - and
- * each must produce a non-{@code null} string so the Thymeleaf sidebar fragment never renders an
- * empty version chip.
+ * Unit tests for {@link AppVersionAdvice}: a real version, a blank version and a missing {@code
+ * BuildProperties} bean must each yield a non-{@code null} string.
  */
 class AppVersionAdviceTest {
 
   @Test
   void appVersion_withBuildPropertiesPresent_returnsVersionString() {
-    // Given
     Properties props = new Properties();
     props.setProperty("version", "1.2.3");
     BuildProperties buildProperties = new BuildProperties(props);
     AppVersionAdvice advice = new AppVersionAdvice(Optional.of(buildProperties));
 
-    // When
     String version = advice.appVersion();
 
-    // Then
     assertEquals("1.2.3", version, "Should return the version from BuildProperties");
   }
 
   @Test
   void appVersion_withBuildPropertiesAbsent_returnsFallback() {
-    // Given
     AppVersionAdvice advice = new AppVersionAdvice(Optional.empty());
 
-    // When
     String version = advice.appVersion();
 
-    // Then
     assertEquals(
         AppVersionAdvice.FALLBACK_VERSION,
         version,
@@ -67,16 +58,13 @@ class AppVersionAdviceTest {
 
   @Test
   void appVersion_withBlankVersion_returnsFallback() {
-    // Given
     Properties props = new Properties();
     props.setProperty("version", "   ");
     BuildProperties buildProperties = new BuildProperties(props);
     AppVersionAdvice advice = new AppVersionAdvice(Optional.of(buildProperties));
 
-    // When
     String version = advice.appVersion();
 
-    // Then
     assertEquals(
         AppVersionAdvice.FALLBACK_VERSION,
         version,

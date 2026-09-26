@@ -38,21 +38,12 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Per-employee per-account bank capability grant (epic #556, REQ-BANK-009, ADR-0011), persisted in
- * the {@code bank_account_grant} table created by Flyway V152.
+ * Per-employee, per-account bank capability grant (REQ-BANK-009, ADR-0011), keyed by {@link
+ * BankAccountGrantId}.
  *
- * <p>The row's <em>existence</em> gives the user view access to the account (a row with all flags
- * {@code false} is view-only); the three independent flags gate deposits, withdrawals and
- * transfers. This expresses every required combination — deposit-only, withdraw-only, both, and
- * separately assignable rebooking permission. Grants are evaluated by {@code BankSecurityService}
- * together with the two bank Keycloak roles and nothing else — org-unit memberships have zero
- * influence (REQ-BANK-008).
- *
- * <p>Composite-key pattern mirrors {@link OrgUnitMembership}: the PK is the {@code (user_id,
- * account_id)} pair via {@link BankAccountGrantId}; both halves are {@code @MapsId} relations so
- * Hibernate derives the key columns from the related entities. This entity does not extend {@link
- * AbstractEntity} because it owns a composite key rather than a single UUID surrogate; the audit
- * columns ({@code version}, {@code createdAt}, {@code updatedAt}) are reproduced directly.
+ * <p>The row's existence grants view access; its three flags gate deposits, withdrawals and
+ * transfers. Evaluated by {@code BankSecurityService} with the bank roles only, never with org-unit
+ * memberships (REQ-BANK-008).
  */
 @Entity
 @Table(name = "bank_account_grant")

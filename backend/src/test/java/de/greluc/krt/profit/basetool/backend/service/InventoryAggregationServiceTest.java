@@ -68,35 +68,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Coverage for the {@code catalog=ITEM} read family of {@link InventoryAggregationService} — {@link
+ * Unit tests for the item-catalog read family of {@link InventoryAggregationService} — {@link
  * InventoryAggregationService#getMyAggregatedItemInventory}, {@link
  * InventoryAggregationService#getAllAggregatedItemInventory}, {@link
  * InventoryAggregationService#getAggregatedItemInventory} and {@link
- * InventoryAggregationService#getAllItemInventory} (V220, REQ-INV-028/029) with the private item
- * assembly ({@code buildGroupedFromItemStacks} / {@code buildItemGroup} / {@code
- * mapItemAggregateRefs}). The sibling {@code InventoryItemServiceAggregateTest} pins the material
- * assembly only; the controller tests mock this service and the Testcontainers data tests stop at
- * the SQL projection, so the item grouping logic itself had no unit coverage. Verified over mocked
- * repositories:
- *
- * <ul>
- *   <li>filter routing: {@code gameItemIds} / {@code jobOrderIds} flip the corresponding {@code
- *       hasX} flag (an empty list counts as no filter), the mutually exclusive personal-narrowing
- *       toggles pass through unchanged, and the squadron-wide variants forward the caller's {@link
- *       ScopePredicate} triple verbatim;
- *   <li>assembly: the per-stack aggregates group into one {@link GroupedInventoryDto} per game item
- *       (summed total, per-stack entry counts, {@code null} quality figures — items carry no
- *       quality dimension), the items sort alphabetically by name, and the stacks reuse the shared
- *       material comparator whose quality key coalesces the item stacks' constant {@code null} to
- *       zero, degrading the order to location asc / amount desc without an NPE;
- *   <li>tuple mapping: the aggregated view projects raw {@code Object[]} rows into game-item {@link
- *       AggregatedInventoryDto}s with null-coalesced sums, and the flat list maps entities through
- *       the inventory-item mapper.
- * </ul>
- *
- * <p>The SQL grouping itself (catalog split, quality-less stack key, the appended {@code
- * gameItem.name} sort on Postgres) is a data-layer concern covered by {@code
- * InventoryItemStackQueryDataTest}, not by this mocked unit.
+ * InventoryAggregationService#getAllItemInventory} (REQ-INV-028/029) — over mocked repositories:
+ * filter routing and scope forwarding, grouping into one {@link GroupedInventoryDto} per game item
+ * with alphabetical order, and the mapping of raw rows into {@link AggregatedInventoryDto}s with
+ * null-coalesced sums.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryAggregationServiceTest {
@@ -112,14 +91,9 @@ class InventoryAggregationServiceTest {
 
   @InjectMocks private InventoryAggregationService service;
 
-  // ---------------------------------------------------------------------
-  // filter routing — item stack queries
-  // ---------------------------------------------------------------------
-
   @Nested
   class FilterRoutingTests {
 
-    // covers REQ-INV-029 (my grouped item view: null filters pass false flags and null lists)
     @Test
     void myItemStacks_allFiltersNull_passFalseFlagsAndNullLists() {
       UUID userId = UUID.randomUUID();
@@ -141,7 +115,6 @@ class InventoryAggregationServiceTest {
               eq(false));
     }
 
-    // covers REQ-INV-029 (my grouped item view: empty filter lists count as no filter)
     @Test
     void myItemStacks_emptyFilterLists_treatedAsNoFilter() {
       UUID userId = UUID.randomUUID();
@@ -163,7 +136,6 @@ class InventoryAggregationServiceTest {
               eq(false));
     }
 
-    // covers REQ-INV-029 (my grouped item view: ids set the flags, toggles pass through)
     @Test
     void myItemStacks_nonEmptyFilters_setFlagsAndForwardIdsWithToggles() {
       UUID userId = UUID.randomUUID();
@@ -188,7 +160,6 @@ class InventoryAggregationServiceTest {
               eq(false));
     }
 
-    // covers REQ-INV-029 (owner resolution precedes the stack query — unknown user is a 404)
     @Test
     void myItemStacks_unknownUser_throwsNotFound_withoutQuerying() {
       UUID userId = UUID.randomUUID();
@@ -201,7 +172,6 @@ class InventoryAggregationServiceTest {
       verifyNoInteractions(inventoryItemRepository);
     }
 
-    // covers REQ-INV-029 (squadron-wide grouped item view forwards the caller's scope triple)
     @Test
     void allItemStacks_forwardScopeTriple() {
       UUID activeOrgUnitId = UUID.randomUUID();
@@ -222,8 +192,6 @@ class InventoryAggregationServiceTest {
 
       service.getAllAggregatedItemInventory(null, null, null);
 
-      // The org-unit scope from OwnerScopeService is the only visibility gate of the wide read —
-      // the triple must reach the repository verbatim, never widened to an implicit admin scope.
       verify(inventoryItemRepository)
           .findGlobalItemStacks(
               eq(false),
@@ -237,7 +205,6 @@ class InventoryAggregationServiceTest {
               eq(Set.of(memberOrgUnitId)));
     }
 
-    // covers REQ-INV-034 (material select-all id query: empty filter lists count as no filter)
     @Test
     void myEntryIds_emptyFilterLists_treatedAsNoFilter() {
       UUID userId = UUID.randomUUID();
@@ -275,8 +242,6 @@ class InventoryAggregationServiceTest {
               eq(false));
     }
 
-    // covers REQ-INV-034 (material select-all id query: ids set the flags, minQuality + toggles
-    // pass through, forwarding the same filter surface as the grouped view)
     @Test
     void myEntryIds_nonEmptyFilters_setFlagsAndForwardIds() {
       UUID userId = UUID.randomUUID();
@@ -328,8 +293,6 @@ class InventoryAggregationServiceTest {
               eq(false));
     }
 
-    // covers REQ-INV-034 (material select-all resolves the owner before querying — unknown user
-    // 404)
     @Test
     void myEntryIds_unknownUser_throwsNotFound_withoutQuerying() {
       UUID userId = UUID.randomUUID();
@@ -342,8 +305,6 @@ class InventoryAggregationServiceTest {
       verifyNoInteractions(inventoryItemRepository);
     }
 
-    // covers REQ-INV-034 (item select-all id query: ids set the flags, personal toggle passes
-    // through; no quality/mission dimension exists for items)
     @Test
     void myItemEntryIds_nonEmptyFilters_setFlagsAndForwardIds() {
       UUID userId = UUID.randomUUID();
@@ -382,14 +343,9 @@ class InventoryAggregationServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // assembly — GameItem -> Stack grouping, ordering, null safety
-  // ---------------------------------------------------------------------
-
   @Nested
   class AssemblyTests {
 
-    // covers REQ-INV-028/029 (stacks of one item collapse into one group with the summed total)
     @Test
     void stacksOfOneGameItem_collapseIntoOneGroup_withSummedTotalAndEntryCounts() {
       GameItem coupling = gameItem("Coupling");
@@ -404,8 +360,6 @@ class InventoryAggregationServiceTest {
       assertEquals("Coupling", group.gameItem().name());
       assertNull(group.material(), "a game-item group carries no material reference");
       assertEquals(5.0, group.totalAmount());
-      // Items carry no quality dimension — the material group's quality figures stay null
-      // (REQ-INV-028) instead of surfacing a misleading 0.
       assertNull(group.averageQuality(), "no quality dimension on the item catalog");
       assertNull(group.maxQuality());
       assertEquals(2, group.stacks().size());
@@ -413,7 +367,6 @@ class InventoryAggregationServiceTest {
       assertEquals(1, group.stacks().get(1).entryCount());
     }
 
-    // covers REQ-INV-029 (item groups sort alphabetically by item name)
     @Test
     void groups_sortedAlphabeticallyByItemName_withPerItemTotals() {
       GameItem shield = gameItem("Shield");
@@ -430,7 +383,6 @@ class InventoryAggregationServiceTest {
       assertEquals(7.0, result.get(1).totalAmount());
     }
 
-    // covers REQ-INV-029 (shared stack comparator is null-quality safe for item stacks)
     @Test
     void stacksWithinItem_nullQualityKeyIsSafe_orderedByLocationAscAmountDesc() {
       GameItem coupling = gameItem("Coupling");
@@ -443,8 +395,6 @@ class InventoryAggregationServiceTest {
       List<InventoryStackDto> stacks =
           service.getAllAggregatedItemInventory(null, null, null).get(0).stacks();
 
-      // The shared STACK_ORDER comparator reads a constant null quality for item stacks and
-      // coalesces it to 0 — the order degrades to location asc / amount desc and never NPEs.
       assertEquals("A", stacks.get(0).location().name());
       assertEquals(20.0, stacks.get(0).totalAmount(), "location A, larger amount first");
       assertEquals("A", stacks.get(1).location().name());
@@ -454,7 +404,6 @@ class InventoryAggregationServiceTest {
           stacks.stream().allMatch(s -> s.quality() == null), "item stacks expose no quality key");
     }
 
-    // covers REQ-INV-029 (null SQL aggregates coalesce to zero instead of NPEing the roll-up)
     @Test
     void nullAggregateNumbers_coalesceToZero() {
       GameItem coupling = gameItem("Coupling");
@@ -468,7 +417,6 @@ class InventoryAggregationServiceTest {
       assertEquals(0, group.stacks().get(0).entryCount(), "a null COUNT coalesces to 0");
     }
 
-    // covers REQ-INV-029 (no stock in scope yields an empty group list, not a null/NPE)
     @Test
     void noStacks_yieldEmptyGroupList() {
       stubGlobalItemStacks();
@@ -476,7 +424,6 @@ class InventoryAggregationServiceTest {
       assertTrue(service.getAllAggregatedItemInventory(null, null, null).isEmpty());
     }
 
-    // covers REQ-INV-029 (the owner-scoped variant assembles the identical group shape)
     @Test
     void myItemStacks_assembleTheSameGroupShape() {
       UUID userId = UUID.randomUUID();
@@ -505,14 +452,9 @@ class InventoryAggregationServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // aggregated tuple view — Object[] -> AggregatedInventoryDto
-  // ---------------------------------------------------------------------
-
   @Nested
   class AggregatedTupleViewTests {
 
-    // covers REQ-INV-028 (aggregated item rows carry the game-item ref and null quality columns)
     @Test
     void mapsTuples_toGameItemRows_withNullQualityColumns() {
       GameItem coupling = gameItem("Coupling");
@@ -535,7 +477,6 @@ class InventoryAggregationServiceTest {
       assertEquals(5.0, row.amount());
     }
 
-    // covers REQ-INV-028 (a null SUM tuple coalesces to a 0.0 amount)
     @Test
     void nullSum_coalescesToZero() {
       GameItem coupling = gameItem("Coupling");
@@ -552,7 +493,6 @@ class InventoryAggregationServiceTest {
       assertEquals(0.0, page.getContent().get(0).amount());
     }
 
-    // covers REQ-INV-028/029 (the aggregated read forwards scope triple and pageable verbatim)
     @Test
     void forwardsScopeTripleAndPageable() {
       UUID activeOrgUnitId = UUID.randomUUID();
@@ -570,14 +510,9 @@ class InventoryAggregationServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // flat squadron-wide item list
-  // ---------------------------------------------------------------------
-
   @Nested
   class FlatItemListTests {
 
-    // covers REQ-INV-029 (flat catalog=ITEM /all: filter flags + scope triple + mapper projection)
     @Test
     void allItemInventory_forwardsFiltersAndMapsRows() {
       UUID gameItemId = UUID.randomUUID();
@@ -637,10 +572,6 @@ class InventoryAggregationServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------------
-
   /**
    * Stubs the user lookup so the owner-scoped methods resolve the given id to a managed {@link
    * User} carrying exactly that id (the services re-read {@code user.getId()} for the query).
@@ -692,11 +623,9 @@ class InventoryAggregationServiceTest {
   }
 
   /**
-   * Rigs the inventory-item mapper used by {@code mapItemAggregateRefs}: the service feeds it a
-   * transient probe {@link InventoryItem} carrying the item stack's identity entities, so the mock
-   * reads the probe's game item / location / personal flag back into the reference DTOs the
-   * assembly needs. The probe's material and quality are a constant {@code null} on the item path
-   * (REQ-INV-029) and stay null in the DTO; only the fields the assertions touch are projected.
+   * Stubs the inventory-item mapper so it reads the probe {@link InventoryItem}'s game item,
+   * location and personal flag back into the reference DTOs; material and quality stay {@code null}
+   * (REQ-INV-029).
    */
   private void stubItemRefMapper() {
     lenient()

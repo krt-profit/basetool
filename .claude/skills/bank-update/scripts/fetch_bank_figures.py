@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 """Collect one calendar month of Kartellbank figures from the production ledger.
 
-Runs a single **read-only** psql session on the production host over SSH and prints
-every figure the monthly bank update needs, already reconciled. It never writes:
-the session opens with ``SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY`` and
-the statement is one ``SELECT`` union.
-
-The production host address is deliberately **not** stored in this repository, which
-is public. Pass it with ``--host`` or set ``BASETOOL_PROD_HOST``; the address is in
-the knowledge base under ``60 Runbooks/Production Access.md``.
+Runs one read-only psql session on the production host over SSH and prints the
+reconciled figures. Pass the host with ``--host`` or set ``BASETOOL_PROD_HOST``.
 
 Usage:
     python .claude/skills/bank-update/scripts/fetch_bank_figures.py
@@ -25,19 +19,11 @@ import sys
 from datetime import date, timedelta
 from decimal import Decimal
 
-# The application database container and the port it listens on inside it.
 DB_CONTAINER = "db-backend"
 DB_PORT = "15432"
 
-# Since the 2026-09-22 cutover production runs rootless Podman: the containers belong to the
-# service user, so `podman` has to run as that user (the same `sudo -n -u <user> podman` form
-# scripts/lib/container-runtime.sh uses). There is no Docker daemon on the host any more.
 SERVICE_USER = "iri"
 
-# Windows-only detail that decides whether SSH authenticates at all: only the
-# Windows OpenSSH client reaches the ssh-agent service holding the key. The MSYS /
-# Git-Bash ssh fails "Permission denied (publickey)" even when pointed at the key
-# file, because there is no agent in that environment.
 WINDOWS_SSH = r"C:\Windows\System32\OpenSSH\ssh.exe"
 
 
@@ -64,15 +50,12 @@ def next_month(year: int, month: int) -> tuple[int, int]:
 def build_sql(year: int, month: int) -> str:
     """Build the labelled read-only figure query for one calendar month.
 
-    Month boundaries are resolved by PostgreSQL in ``Europe/Berlin`` rather than in
-    Python, so no timezone database is needed on the workstation and the report's
-    month matches the one a member would read off a calendar.
+    Month boundaries are resolved by PostgreSQL in ``Europe/Berlin``.
     """
     ny, nm = next_month(year, month)
     frm = f"{year:04d}-{month:02d}-01 00:00:00"
     to = f"{ny:04d}-{nm:02d}-01 00:00:00"
 
-    # Every row is "label|value"; psql -qAt prints exactly that with no decoration.
     return f"""SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;
 WITH b AS (
   SELECT (timestamp '{frm}' AT TIME ZONE 'Europe/Berlin') AS f,
@@ -84,7 +67,6 @@ UNION ALL SELECT 'accounts_active', COUNT(*)::text FROM bank_account WHERE statu
 UNION ALL SELECT 'accounts_moved', COUNT(DISTINCT p.account_id)::text
   FROM bank_posting p, b WHERE p.created_at >= b.f AND p.created_at < b.t
 
--- Balances: every posting strictly before the boundary.
 UNION ALL SELECT 'bank_open',  COALESCE(SUM(p.amount), 0)::text
   FROM bank_posting p, b WHERE p.created_at < b.f
 UNION ALL SELECT 'bank_close', COALESCE(SUM(p.amount), 0)::text
@@ -94,8 +76,6 @@ UNION ALL SELECT 'krt_open',   COALESCE(SUM(p.amount), 0)::text
 UNION ALL SELECT 'krt_close',  COALESCE(SUM(p.amount), 0)::text
   FROM bank_posting p JOIN krt k ON k.id = p.account_id, b WHERE p.created_at < b.t
 
--- Flows by kind. A split deposit fans out over many account legs, but the legs sum
--- to the gross exactly, so summing legs is the true inflow and never a double count.
 UNION ALL SELECT 'bank_dep_in', COALESCE(SUM(p.amount), 0)::text
   FROM bank_posting p JOIN bank_transaction t ON t.id = p.transaction_id, b
   WHERE t.type = 'DEPOSIT' AND p.created_at >= b.f AND p.created_at < b.t
@@ -126,7 +106,6 @@ UNION ALL SELECT 'krt_rev_net', COALESCE(SUM(p.amount), 0)::text
        JOIN bank_transaction t ON t.id = p.transaction_id, b
   WHERE t.type IN ('REVERSAL', 'WIPE_RESET') AND p.created_at >= b.f AND p.created_at < b.t
 
--- Counts are per transaction, not per leg.
 UNION ALL SELECT 'bank_dep_n', COUNT(*)::text FROM bank_transaction t, b
   WHERE t.type = 'DEPOSIT' AND t.created_at >= b.f AND t.created_at < b.t
 UNION ALL SELECT 'bank_wdr_n', COUNT(*)::text FROM bank_transaction t, b
@@ -144,7 +123,6 @@ UNION ALL SELECT 'krt_wdr_n', COUNT(DISTINCT t.id)::text
        JOIN krt k ON k.id = p.account_id, b
   WHERE t.type = 'WITHDRAWAL' AND t.created_at >= b.f AND t.created_at < b.t
 
--- The in-game transfer fee rides on the transaction, so it is summed per transaction.
 UNION ALL SELECT 'bank_fees', COALESCE(SUM(t.transfer_fee), 0)::text
   FROM bank_transaction t, b WHERE t.created_at >= b.f AND t.created_at < b.t
 UNION ALL SELECT 'krt_fees', COALESCE(SUM(t.transfer_fee), 0)::text
@@ -153,7 +131,6 @@ UNION ALL SELECT 'krt_fees', COALESCE(SUM(t.transfer_fee), 0)::text
     AND EXISTS (SELECT 1 FROM bank_posting p JOIN krt k ON k.id = p.account_id
                 WHERE p.transaction_id = t.id)
 
--- Booking requests ("Abrufe"), the paragraph the report has always carried.
 UNION ALL SELECT 'req_dep_ok_n', COUNT(*)::text FROM bank_booking_request r, b
   WHERE r.type = 'DEPOSIT' AND r.status = 'CONFIRMED'
     AND r.created_at >= b.f AND r.created_at < b.t
@@ -186,8 +163,6 @@ UNION ALL SELECT 'req_krt_rej_sum', COALESCE(SUM(r.amount), 0)::text
 def run_query(host: str, sql: str) -> dict[str, Decimal]:
     """Execute the query on the production host and return the labelled figures."""
     remote = (
-        # `cd /` first: the SSH session starts in /root, which the service user cannot enter, and
-        # podman refuses to run from a cwd it cannot chdir into.
         f'cd / && sudo -n -u {SERVICE_USER} podman exec -i {DB_CONTAINER} sh -c '
         f'"psql -qAt -U \\$POSTGRES_USER -d \\$POSTGRES_DB -p {DB_PORT} -f -"'
     )
@@ -209,7 +184,7 @@ def run_query(host: str, sql: str) -> dict[str, Decimal]:
         label, _, value = line.partition("|")
         try:
             figures[label.strip()] = Decimal(value.strip())
-        except Exception:  # noqa: BLE001 - a non-numeric row is never expected here
+        except Exception:  # noqa: BLE001
             sys.exit(f"Unparsable row from psql: {line!r}")
     if not figures:
         sys.exit("psql returned no rows — is the query or the container name right?")

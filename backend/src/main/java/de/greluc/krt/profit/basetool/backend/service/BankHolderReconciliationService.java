@@ -38,16 +38,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Keeps the bank-holder registry in sync with the bank roster (REQ-BANK-029, ADR-0040): every user
- * holding {@code ROLE_BANK_EMPLOYEE} or {@code ROLE_BANK_MANAGEMENT} is present as an
- * <strong>active</strong> holder, and a role-managed holder whose user has lost all bank roles is
- * auto-deactivated (its balance survives and must be reconciled to zero by a holder Umbuchung). The
- * sweep runs off the request path on the scheduled {@code UserSyncTask} cadence, so it never
- * burdens the authentication hot path; manually registered custodians ({@code role_managed =
- * false}) are never touched.
+ * with {@code ROLE_BANK_EMPLOYEE} or {@code ROLE_BANK_MANAGEMENT} is an active holder, and a
+ * role-managed holder whose user lost all bank roles is deactivated.
  *
- * <p>Org-unit independence (REQ-BANK-008) is untouched — membership is irrelevant; only the two
- * bank roles drive the roster. Idempotent by design: re-running it on an unchanged roster is a
- * no-op.
+ * <p>Runs on the {@code UserSyncTask} schedule, is idempotent, and never touches manually
+ * registered holders.
  */
 @Service
 @RequiredArgsConstructor

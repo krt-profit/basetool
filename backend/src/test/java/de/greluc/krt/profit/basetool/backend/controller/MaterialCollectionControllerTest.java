@@ -35,12 +35,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-method unit tests for {@link MaterialCollectionController}. The controller is a thin
- * delegation layer; the real sorting / aggregation logic lives in {@code
- * InventoryItemService.getMaterialCollection(...)} which has its own test coverage. Here we
- * guarantee delegation and the owner/location redaction wiring (REQ-ORDERS-029): a responsible-side
- * viewer gets the list unmodified, a requesting-side viewer ({@code canSeeJobOrderInventoryOwners
- * == false}) gets the redactor's output.
+ * Unit tests for {@link MaterialCollectionController}: delegation and the owner/location redaction
+ * for a requesting-side viewer (REQ-ORDERS-029).
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialCollectionControllerTest {
@@ -68,7 +64,6 @@ class MaterialCollectionControllerTest {
 
   @Test
   void getMaterialCollection_responsibleSideViewer_returnsListUnredacted() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     List<MaterialCollectionEntryDto> expected = List.of(sampleEntry());
     when(inventoryItemService.getMaterialCollection(jobOrderId)).thenReturn(expected);
@@ -83,7 +78,6 @@ class MaterialCollectionControllerTest {
 
   @Test
   void getMaterialCollection_requestingSideViewer_returnsRedactedList() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     List<MaterialCollectionEntryDto> raw = List.of(sampleEntry());
     List<MaterialCollectionEntryDto> redacted = List.of(sampleEntry());

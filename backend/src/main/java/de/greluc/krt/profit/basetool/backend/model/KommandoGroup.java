@@ -37,20 +37,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * A Kommandogruppe (command group) within a Staffel (epic #800, REQ-ROLE-003) — a first-class,
- * named sub-structure a {@link MembershipRole#KOMMANDOLEITER} leads, a {@link
- * MembershipRole#STELLV_KOMMANDOLEITER} deputises, and {@link MembershipRole#ENSIGN}s may be
- * assigned to. Persisted in the {@code kommando_group} table (Flyway V185).
+ * A Kommandogruppe (command group) within a Staffel, led by a {@link
+ * MembershipRole#KOMMANDOLEITER}, deputised by a {@link MembershipRole#STELLV_KOMMANDOLEITER}, with
+ * {@link MembershipRole#ENSIGN}s assigned (REQ-ROLE-003).
  *
- * <p>A squadron has at most four Kommandogruppen, enforced by the {@code
- * enforce_max_four_kommando_groups_per_squadron} counting trigger; the {@link #squadron} must be a
- * {@code SQUADRON}-kind {@link OrgUnit}, enforced by the {@code validate_kommando_group_squadron}
- * trigger. The link from a member to their group lives on {@link
- * OrgUnitMembership#getKommandoGroup()} (nullable — an Ensign with no group is "allgemein der
- * Staffelleitung").
- *
- * <p>This is descriptive structure only: a Kommandogruppe grants no rights by itself. The
- * rank-bearing authority sits on the member's {@link OrgUnitMembership#getRole()} row.
+ * <p>DB triggers cap a squadron at four groups and require {@link #squadron} to be a {@code
+ * SQUADRON}-kind {@link OrgUnit}. Membership is held on {@link
+ * OrgUnitMembership#getKommandoGroup()}. A group grants no rights by itself.
  */
 @Entity
 @Table(name = "kommando_group")

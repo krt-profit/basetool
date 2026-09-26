@@ -31,14 +31,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Read surface for the delegated Leitung page (epic #800, REQ-ROLE-004): {@code GET
- * /api/v1/leitung/view} returns the org units the caller may appoint into, grouped by tier, with
- * each unit's roster and capability flags.
+ * Read surface for the delegated Leitung page: returns the org units the caller may appoint into,
+ * grouped by tier, with each unit's roster and capability flags (REQ-ROLE-004).
  *
- * <p>The endpoint is gated only by {@code isAuthenticated()} on purpose: {@link LeitungViewService}
- * computes the manageable set from the caller's own delegated reach (admin sees all), so a plain
- * member receives empty tier lists and no cross-tenant data leaks. Every <em>write</em> is a
- * separate, individually authorised call to the Phase-3 appointment endpoints.
+ * <p>Gated only by {@code isAuthenticated()}: {@link LeitungViewService} limits the result to the
+ * caller's own delegated reach, so a plain member receives empty tier lists.
  */
 @RestController
 @RequiredArgsConstructor

@@ -23,14 +23,10 @@ import java.util.Locale;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Clamps and normalises the client-supplied board query parameters of the Materialbörse read model
- * (REQ-MARKET-001…) — the page index/size, the free-text search fragment, the minimum-quality floor
- * and the sort key. Extracted verbatim out of the material-exchange read service so the paging and
- * filter-normalisation idiom lives in one leaf helper rather than inline on the query path.
+ * Clamps and normalises the Materialb&ouml;rse board query parameters: page, size, search fragment,
+ * minimum quality and sort key.
  *
- * <p>Every method is null-tolerant and total: a {@code null} or out-of-range client value collapses
- * to the safe default (an unbounded search, an unfiltered quality, page 0, the {@value
- * #DEFAULT_PAGE_SIZE}-row default page, the {@code qual} default sort) rather than raising.
+ * <p>Every method is null-tolerant and falls back to a safe default instead of throwing.
  */
 public final class MaterialExchangeQueryParams {
 
@@ -90,20 +86,11 @@ public final class MaterialExchangeQueryParams {
   }
 
   /**
-   * Normalises a client board sort key to one of the whitelisted, non-null keys the board query's
-   * embedded {@code ORDER BY} understands — {@code menge} / {@code mat} / {@code neu}, else {@code
-   * qual} (the default, also for {@code null} or any unrecognised value). The query itself spans
-   * all offer kinds via an explicit {@code CASE} (not {@code COALESCE(LEAST(…))}, since PostgreSQL
-   * {@code LEAST} ignores {@code NULL} arguments): {@code menge} sorts on the effective offered
-   * quantity {@code CASE WHEN offeredAmount IS NOT NULL THEN LEAST(offeredAmount, item.amount) WHEN
-   * item.id IS NOT NULL THEN LEAST(itemQuantity, item.amount) ELSE itemQuantity END} — a material
-   * offer ranks by what is actually on offer (clamped to stock, ADR-0086), a stock-backed item
-   * offer by its stated quantity clamped to its backing stock (REQ-MARKET-014), a free-stated item
-   * offer by its stated quantity — always with a stable {@code releasedAt desc, id desc} tiebreaker
-   * so pagination stays deterministic.
+   * Normalises a board sort key to {@code menge}, {@code mat}, {@code neu} or the default {@code
+   * qual}.
    *
-   * @param key the raw client sort key, or {@code null}.
-   * @return the normalised sort key, never {@code null}.
+   * @param key the raw client sort key, or {@code null}
+   * @return the normalised sort key, never {@code null}
    */
   public static String normalizeSort(@Nullable String key) {
     if (key == null) {

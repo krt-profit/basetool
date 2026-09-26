@@ -65,10 +65,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Concurrency-sensitive coverage for {@link JobOrderService} priority/status transitions and the
- * priority-normalisation loop. CLAUDE.md flags these exact methods as bug-prone (optimistic locking
- * + bulk updates inside loops + {@code …WithinTransaction} pattern). Class-level coverage was 77%
- * line / 67% branch with the methods below at 0-50%.
+ * Unit tests for the priority and status transitions of {@link JobOrderService} and its priority
+ * normalisation loop.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderServicePriorityAndStatusTest {
@@ -86,30 +84,15 @@ class JobOrderServicePriorityAndStatusTest {
 
   @Mock private AuditService auditService;
 
-  // The stock/claim DTO projection and the priority queue were extracted to
-  // JobOrderStockProjectionService / JobOrderPriorityService (L2, #921); real instances (built from
-  // the same mocks) are wired into the CUT via reflection in setUp() — the priority service also
-  // gets the real projection chained in — so the delegated updateJobOrderPriority and the
-  // normalizePriorities calls on the status/complete paths keep exercising the real logic.
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
-  // of its arguments
   private JobOrderPriorityService jobOrderPriorityService;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
-  // co-built services
   private JobOrderService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
 
   @BeforeEach
   void stubMapper() {
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     jobOrderPriorityService =
         new JobOrderPriorityService(
             jobOrderRepository, auditService, jobOrderStockProjectionService);
@@ -118,18 +101,16 @@ class JobOrderServicePriorityAndStatusTest {
             jobOrderRepository,
             materialRepository,
             inventoryItemRepository,
-            null, // jobOrderAssigneeService
-            null, // orgUnitRepository
-            null, // jobOrderOrgUnitResolver
-            null, // authHelperService
-            null, // eventPublisher
+            null,
+            null,
+            null,
+            null,
+            null,
             materialClaimService,
             auditService,
-            null, // jobOrderItemService
+            null,
             jobOrderStockProjectionService,
             jobOrderPriorityService);
-    // Every return path goes through mapToDtoWithStock(). Return an empty-materials
-    // DTO so the stock-aggregation repository call is unnecessary.
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
         .thenAnswer(
@@ -158,19 +139,10 @@ class JobOrderServicePriorityAndStatusTest {
                   false);
             });
 
-    // Multi-tenant: createJobOrder + updateJobOrder resolve the caller's squadron through
-    // OwnerScopeService. Stub a lenient default so the update path (which touches the
-    // resolver when jobOrder.creatingSquadron is unset, as in these mock-built fixtures)
-    // does not NPE; read paths leave the stub unused and the lenient() suppresses the
-    // UnnecessaryStubbingException.
     Squadron testSquadron = new Squadron();
     testSquadron.setShorthand("Alpha");
     lenient().when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(testSquadron));
   }
-
-  // ---------------------------------------------------------------
-  // updateJobOrderStatus — terminal/active transitions + priority + 409
-  // ---------------------------------------------------------------
 
   @Nested
   class UpdateJobOrderStatusTests {
@@ -201,8 +173,6 @@ class JobOrderServicePriorityAndStatusTest {
 
     @Test
     void activeToTerminal_clearsPriority_andUnlinksInventory() {
-      // OPEN with priority=3 -> COMPLETED -> priority must be null,
-      // unlinkJobOrder must be called, normalizePriorities must run.
       JobOrder o = newOrder(JobOrderStatus.OPEN, 3, 1L);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(jobOrderRepository.save(o)).thenReturn(o);
@@ -216,7 +186,6 @@ class JobOrderServicePriorityAndStatusTest {
       verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
       verify(jobOrderRepository).save(o);
       verify(jobOrderRepository).flush();
-      // normalizePriorities was called -> lockAllJobOrders invoked
       verify(jobOrderRepository).lockAllJobOrders();
     }
 
@@ -237,10 +206,6 @@ class JobOrderServicePriorityAndStatusTest {
 
     @Test
     void completedToActive_restoresPriorityViaMaxPlusOne() {
-      // COMPLETED with priority=null transitions back to OPEN -> new priority
-      // = findMaxPriority + 1. The subsequent normalizePriorities sees only
-      // orders returned by lockAllJobOrders (stubbed to empty here), so the
-      // newly-set 6 is preserved as-is.
       JobOrder o = newOrder(JobOrderStatus.COMPLETED, null, 1L);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of());
@@ -261,8 +226,6 @@ class JobOrderServicePriorityAndStatusTest {
 
     @Test
     void completedToActive_findMaxPriorityEmpty_defaultsToZeroPlus1() {
-      // Edge case: no other active orders -> findMaxPriority returns empty
-      // -> getOrElse(0) + 1 = 1.
       JobOrder o = newOrder(JobOrderStatus.COMPLETED, null, 1L);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of());
@@ -279,8 +242,6 @@ class JobOrderServicePriorityAndStatusTest {
 
     @Test
     void terminalToTerminal_doesNotNormalize() {
-      // COMPLETED -> REJECTED (both terminal) -> no priority change, no
-      // normalisation, no unlink. Same-side-of-the-fence transition.
       JobOrder o = newOrder(JobOrderStatus.COMPLETED, null, 1L);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(jobOrderRepository.save(o)).thenReturn(o);
@@ -296,7 +257,6 @@ class JobOrderServicePriorityAndStatusTest {
 
     @Test
     void activeToActive_doesNotChangePriority() {
-      // OPEN -> IN_PROGRESS (both non-terminal) -> priority preserved.
       JobOrder o = newOrder(JobOrderStatus.OPEN, 3, 1L);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(jobOrderRepository.save(o)).thenReturn(o);
@@ -323,10 +283,6 @@ class JobOrderServicePriorityAndStatusTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // updateJobOrderPriority — reorder + clamp + normalize
-  // ---------------------------------------------------------------
-
   @Nested
   class UpdateJobOrderPriorityTests {
 
@@ -339,8 +295,6 @@ class JobOrderServicePriorityAndStatusTest {
 
     @Test
     void completedOrder_throwsBadRequest() {
-      // priority==null indicates a terminal order; updating its priority is
-      // a logical error -> BadRequest.
       JobOrder completed = newOrder(JobOrderStatus.COMPLETED, null, 1L);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(completed));
 
@@ -360,7 +314,6 @@ class JobOrderServicePriorityAndStatusTest {
 
     @Test
     void moveDown_reordersOtherEntries() {
-      // 3 active orders priorities [1,2,3]; move A (priority 1) to slot 3.
       JobOrder a = newOrderInstance(JobOrderStatus.OPEN, 1, "A");
       JobOrder b = newOrderInstance(JobOrderStatus.OPEN, 2, "B");
       JobOrder c = newOrderInstance(JobOrderStatus.OPEN, 3, "C");
@@ -369,7 +322,6 @@ class JobOrderServicePriorityAndStatusTest {
 
       service.updateJobOrderPriority(a.getId(), 3);
 
-      // Expected order: [b=1, c=2, a=3]
       assertEquals(Integer.valueOf(3), a.getPriority());
       assertEquals(Integer.valueOf(1), b.getPriority());
       assertEquals(Integer.valueOf(2), c.getPriority());
@@ -385,7 +337,6 @@ class JobOrderServicePriorityAndStatusTest {
 
       service.updateJobOrderPriority(c.getId(), -5);
 
-      // newIndex clamped to 0 -> C goes to the front: [C=1, A=2, B=3]
       assertEquals(Integer.valueOf(1), c.getPriority());
       assertEquals(Integer.valueOf(2), a.getPriority());
       assertEquals(Integer.valueOf(3), b.getPriority());
@@ -400,15 +351,10 @@ class JobOrderServicePriorityAndStatusTest {
 
       service.updateJobOrderPriority(a.getId(), 99);
 
-      // Clamped to end: [B=1, A=2]
       assertEquals(Integer.valueOf(1), b.getPriority());
       assertEquals(Integer.valueOf(2), a.getPriority());
     }
   }
-
-  // ---------------------------------------------------------------
-  // updateJobOrder — version + materials replacement + unlinks
-  // ---------------------------------------------------------------
 
   @Nested
   class UpdateJobOrderTests {
@@ -434,7 +380,6 @@ class JobOrderServicePriorityAndStatusTest {
 
     @Test
     void removedMaterials_areUnlinkedFromInventory() {
-      // existing has material X; update DTO has only Y -> X must be unlinked.
       UUID xId = UUID.randomUUID();
       UUID yId = UUID.randomUUID();
 
@@ -493,10 +438,6 @@ class JobOrderServicePriorityAndStatusTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // deleteJobOrder
-  // ---------------------------------------------------------------
-
   @Nested
   class DeleteJobOrderTests {
 
@@ -515,11 +456,8 @@ class JobOrderServicePriorityAndStatusTest {
 
       service.deleteJobOrder(ORDER_ID);
 
-      // The order's allocation slices vanish via the job_order_id ON DELETE CASCADE (V217), not an
-      // explicit call, so only the delete itself is verifiable here.
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository).flush();
-      // normalize called because priority was non-null -> 2nd lockAllJobOrders.
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
     }
 
@@ -531,14 +469,9 @@ class JobOrderServicePriorityAndStatusTest {
       service.deleteJobOrder(ORDER_ID);
 
       verify(jobOrderRepository).delete(o);
-      // Only the initial lockAllJobOrders call; normalize NOT invoked.
       verify(jobOrderRepository, times(1)).lockAllJobOrders();
     }
   }
-
-  // ---------------------------------------------------------------
-  // unlinkMaterial / unlinkInventoryItem
-  // ---------------------------------------------------------------
 
   @Nested
   class UnlinkTests {
@@ -593,17 +526,11 @@ class JobOrderServicePriorityAndStatusTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // completeJobOrderWithinTransaction
-  // ---------------------------------------------------------------
-
   @Nested
   class CompleteWithinTransactionTests {
 
     @Test
     void alreadyTerminal_skipsAllSideEffects() {
-      // wasTerminal=true -> no priority touch, no flush, no normalize,
-      // no unlink. Status is still set to COMPLETED (no-op if already so).
       JobOrder o = newOrder(JobOrderStatus.COMPLETED, null, 1L);
 
       service.completeJobOrderWithinTransaction(o);
@@ -637,28 +564,16 @@ class JobOrderServicePriorityAndStatusTest {
 
       assertEquals(JobOrderStatus.COMPLETED, o.getStatus());
       assertNull(o.getPriority());
-      // Even with null priority, the wasTerminal=false branch still
-      // flushes and normalises.
       verify(jobOrderRepository).flush();
       verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
     }
   }
-
-  // ---------------------------------------------------------------
-  // normalizePriorities — deterministic re-pack with createdAt tie-break
-  // ---------------------------------------------------------------
 
   @Nested
   class NormalizePrioritiesTests {
 
     @Test
     void equalPriorities_breaksTieByCreatedAt() {
-      // Concurrent drag-and-drops can momentarily leave two active orders sharing the same
-      // priority. The re-pack sorts by priority THEN createdAt (JobOrderPriorityService:145-147),
-      // so the secondary createdAt comparator is the only thing that makes the outcome
-      // deterministic when the primary key ties. lockAllJobOrders returns the pair in
-      // reverse-createdAt order to prove the sort — not the repository's result order — decides:
-      // without thenComparing(createdAt) the re-pack would blindly assign later=1, earlier=2.
       JobOrder earlier = new JobOrder();
       earlier.setId(UUID.randomUUID());
       earlier.setStatus(JobOrderStatus.OPEN);
@@ -685,10 +600,6 @@ class JobOrderServicePriorityAndStatusTest {
           "the later-createdAt order is re-packed to slot 2");
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private JobOrder newOrder(JobOrderStatus status, Integer priority, Long version) {
     JobOrder o = new JobOrder();

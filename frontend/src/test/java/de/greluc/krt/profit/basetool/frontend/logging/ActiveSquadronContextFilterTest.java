@@ -33,11 +33,9 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
- * Unit tests for {@link ActiveSquadronContextFilter}'s MDC contract (REQ-OBS-001, audit finding
- * M1): every frontend request must carry the {@code orgUnitId} correlation field, it must render
- * the pin's UUID (never the OrgUnit name), it must render the {@code none} sentinel when the caller
- * has no pin, and it must be gone again once the request completes so it cannot bleed onto the next
- * request served by the same pooled thread.
+ * Unit tests for the MDC contract of {@link ActiveSquadronContextFilter} (REQ-OBS-001): every
+ * request carries {@code orgUnitId} as the pin's UUID or the {@code none} sentinel, and the field
+ * is removed when the request completes.
  */
 class ActiveSquadronContextFilterTest {
 
@@ -94,7 +92,6 @@ class ActiveSquadronContextFilterTest {
             throw new IllegalStateException("boom");
           });
     } catch (Exception expected) {
-      // The filter must not swallow the failure; only the cleanup is under test here.
       assertThat(expected).isInstanceOf(IllegalStateException.class);
     }
 
@@ -155,10 +152,8 @@ class ActiveSquadronContextFilterTest {
   }
 
   /**
-   * The MDC binding only works because this filter runs <em>after</em> {@code CorrelationIdFilter}:
-   * the pin is read from the session here, so binding it one notch earlier would have recorded
-   * {@code null} forever. Pinning the two orders keeps a future reorder from silently reintroducing
-   * that.
+   * The filter runs after {@code CorrelationIdFilter}, so the session pin is resolvable when the
+   * MDC field is bound.
    */
   @Test
   void runsOneNotchAfterTheCorrelationIdFilterSoThePinIsAlreadyResolvable() {

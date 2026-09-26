@@ -39,13 +39,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Spring MVC controller backing the {@code /admin/blueprints} page: a paginated, filterable list of
- * the synced SC Wiki crafting blueprints with their ingredients and per-slot stat modifiers.
+ * Controller for the admin-only {@code /admin/blueprints} page: a paginated, filterable, read-only
+ * list of synced SC Wiki crafting blueprints with ingredients and stat modifiers.
  *
- * <p>Admin-only — class-level {@code @PreAuthorize("hasRole('ADMIN')")} matches the backend gate.
- * Read-only: the SC Wiki sync is the only writer. Filtering and paging are server-side (relayed to
- * {@code GET /api/v1/blueprints}); a backend failure collapses to an error banner with an empty
- * list rather than a 500.
+ * <p>Filtering and paging are relayed to {@code GET /api/v1/blueprints}; a backend failure renders
+ * an error banner with an empty list.
  */
 @Controller
 @UsesLayoutModel
@@ -73,16 +71,14 @@ public class AdminBlueprintsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Loads one page of blueprints, optionally filtered by an output-item-name / Wiki-key substring,
-   * and populates the model for the {@code admin/blueprints} view.
+   * Loads one page of blueprints, optionally filtered, for the {@code admin/blueprints} view.
    *
-   * @param search optional case-insensitive output-name / key filter
+   * @param search optional case-insensitive output-name or key filter
    * @param page zero-based page index
-   * @param fragment when {@code "results"} only the toolbar + table + pager fragment is rendered
-   *     (AJAX filter/paging swap, REQ-FE-002); otherwise the full page is returned
+   * @param fragment {@code "results"} to render only the toolbar, table and pager for an AJAX swap
+   *     (REQ-FE-002); otherwise the full page
    * @param model Thymeleaf model
-   * @return the {@code admin/blueprints} view name, or its {@code results} fragment for an AJAX
-   *     swap request
+   * @return the {@code admin/blueprints} view name, or its {@code results} fragment
    */
   @NotNull
   @GetMapping
@@ -102,10 +98,6 @@ public class AdminBlueprintsPageController {
             .append("&sort=outputName,asc");
     boolean hasSearch = trimmed != null;
     if (hasSearch) {
-      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
-      // exactly once across the frontend->backend hop. URLEncoder form-encoding (space -> '+')
-      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches
-      // (see BackendApiClient#get(String, ParameterizedTypeReference, Object...)).
       uri.append("&search={search}");
     }
 
@@ -124,16 +116,11 @@ public class AdminBlueprintsPageController {
         populateEmpty(model);
       }
     } catch (BackendServiceException e) {
-      // The search term is admin-typed free text: sanitised before it reaches the logger so a
-      // pasted newline cannot fabricate a second log line (CWE-117). Level unchanged — an
-      // unreachable backend is an expected, already-metered failure.
       log.debug(
           "Error loading blueprints data (search={})", LogSafe.text(trimmed, MAX_LOGGED_QUERY), e);
       model.addAttribute("error", "error.admin.blueprints.load");
       populateEmpty(model);
     } catch (Exception e) {
-      // Stays ERROR: this is the catch(Exception) catch-all for a genuinely unexpected failure,
-      // which REQ-OBS-001 sanctions at ERROR. Same sanitising as the branch above.
       log.error(
           "Error loading blueprints data (search={})", LogSafe.text(trimmed, MAX_LOGGED_QUERY), e);
       model.addAttribute("error", "error.admin.blueprints.load");

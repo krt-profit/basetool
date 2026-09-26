@@ -78,30 +78,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Lifecycle / CRUD test for {@link RefineryOrderService}, complementing the existing {@code
- * RefineryOrderServiceTest} which focuses on {@code storeRefineryOrder}. Covers:
- *
- * <ul>
- *   <li>{@link RefineryOrderService#getRefineryOrder} not-found path.
- *   <li>{@link RefineryOrderService#getMyRefineryOrders} (self list, with/without status filter).
- *   <li>{@link RefineryOrderService#getUserRefineryOrdersScoped} (cross-user oversight list — the
- *       org-unit-scoped path that closes finding SEC-01).
- *   <li>{@link RefineryOrderService#getAllRefineryOrders} (both overloads and with/without status
- *       filter).
- *   <li>{@link RefineryOrderService#getMissionRefineryOrdersScoped} (org-unit-scoped logistician
- *       path) and {@link RefineryOrderService#getMissionRefineryOrders(UUID, UUID)} (owner-filtered
- *       path).
- *   <li>{@link RefineryOrderService#createRefineryOrder} — every validation branch (User / Location
- *       / Mission / RefiningMethod lookups, location-must-have-refinery, goods validation including
- *       RAW-input-only, output-must-match-refined-of-input, output fallback chain), plus the {@code
- *       zeroToNull} normalisation of the optional money fields.
- *   <li>{@link RefineryOrderService#updateRefineryOrder} — version-check (which fires
- *       <em>before</em> the owner check), owner-check (non-logistician), logistician bypass,
- *       partial-update semantics (Location / Mission / RefiningMethod set or cleared), goods
- *       replacement.
- *   <li>{@link RefineryOrderService#deleteRefineryOrder} — actually a status flip to CANCELED, plus
- *       owner-check / logistician bypass.
- * </ul>
+ * Lifecycle and CRUD tests for {@link RefineryOrderService}: the not-found read, the self,
+ * cross-user, all-orders and mission lists, create validation, update with version and owner checks
+ * and partial semantics, and delete as a status flip to CANCELED.
  */
 @ExtendWith(MockitoExtension.class)
 class RefineryOrderServiceLifecycleTest {
@@ -152,10 +131,6 @@ class RefineryOrderServiceLifecycleTest {
     rawInput.setType(MaterialType.RAW);
   }
 
-  // --------------------------------------------------------------
-  // getRefineryOrder
-  // --------------------------------------------------------------
-
   @Nested
   class GetRefineryOrderTests {
 
@@ -175,10 +150,6 @@ class RefineryOrderServiceLifecycleTest {
       assertThrows(NotFoundException.class, () -> service.getRefineryOrder(ORDER_ID));
     }
   }
-
-  // --------------------------------------------------------------
-  // list / page methods
-  // --------------------------------------------------------------
 
   @Nested
   class ListAndPageTests {
@@ -220,9 +191,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void getUserRefineryOrdersScoped_adminAllScope_forwardsAdminAllScopeToScopedQuery() {
-      // SEC-01: the cross-user oversight list must go through the org-unit-scoped query, never the
-      // unscoped findByOwnerId. An admin with no active pin resolves to adminAllScope=true and sees
-      // every order the target owns.
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
@@ -235,10 +203,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void getUserRefineryOrdersScoped_nonAdminMemberUnion_forwardsOnlyTheCallersOrgUnits() {
-      // SEC-01 core regression: the caller (a logistician) is a member of exactly one Staffel. The
-      // service must forward ONLY that org unit to the scoped query, so the target's orders stamped
-      // to a second, foreign Staffel are never requested — even though the coarse
-      // canViewUserRefineryOrders gate let the caller through on the one shared Staffel.
       UUID callerStaffelA = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
       when(ownerScopeService.currentScopePredicate())
@@ -253,8 +217,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void getUserRefineryOrdersScoped_pinnedCaller_forwardsActiveOrgUnitId() {
-      // A caller pinned to a single org unit forwards activeOrgUnitId and an empty member set, so
-      // the scoped query narrows to the pinned unit only.
       UUID pinned = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
       when(ownerScopeService.currentScopePredicate())
@@ -269,9 +231,6 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_emptyStatusList_callsFindAll() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      // After Phase 3 the admin "all orders" list goes through the squadron-scoped variant; the
-      // test class has no squadron stub so currentScopePredicate() resolves to the admin-all
-      // shape and the service forwards adminAllScope=true / no IDs.
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
       when(refineryOrderRepository.findAllScoped(true, null, java.util.Set.of(), pageable))
@@ -311,11 +270,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void getMissionRefineryOrdersScoped_passesCallerScope_soForeignSquadronOrdersAreUnreachable() {
-      // SECURITY (BAC-004): a squadron-A logistician must only ever query within squadron A's
-      // scope. Squadron B never enters the predicate, so the scoped query (which filters on
-      // owning_org_unit) can never return squadron B's financials - not even for a public B
-      // mission the caller can otherwise see. Mirrors OwnerScopeServiceTest's squadron-A-vs-B
-      // refinery coverage (memberRejectsForeignSquadronRefineryOrder) at the mission-list layer.
       UUID squadronA = UUID.randomUUID();
       UUID squadronB = UUID.randomUUID();
       ScopePredicate squadronAscope = new ScopePredicate(false, null, Set.of(squadronA));
@@ -328,8 +282,6 @@ class RefineryOrderServiceLifecycleTest {
       List<RefineryOrder> result = service.getMissionRefineryOrdersScoped(MISSION_ID);
 
       assertEquals(List.of(squadronAorder), result);
-      // The repository was asked with squadron A's scope only - not all-scope, not squadron B, and
-      // not via the unscoped findByMissionId that the finance roll-up still uses internally.
       verify(refineryOrderRepository)
           .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronA));
       verify(refineryOrderRepository, never())
@@ -346,10 +298,6 @@ class RefineryOrderServiceLifecycleTest {
       assertEquals(List.of(o), service.getMissionRefineryOrders(MISSION_ID, OWNER_ID));
     }
   }
-
-  // --------------------------------------------------------------
-  // createRefineryOrder
-  // --------------------------------------------------------------
 
   @Nested
   class CreateRefineryOrderTests {
@@ -403,7 +351,6 @@ class RefineryOrderServiceLifecycleTest {
     void throwsIllegalArgument_whenLocationHasNoRefinery() {
       Location notARefinery = new Location();
       notARefinery.setId(LOCATION_ID);
-      // No city, no space station -> neither flag set.
 
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(notARefinery));
@@ -432,7 +379,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void locationWithSpaceStationRefinery_isAccepted() {
-      // refineryLocation seed already has a space-station-with-refinery.
       stubUserAndLocation();
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -493,8 +439,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void missionLinked_ownerNotParticipant_isRejectedWithoutSave() {
-      // REQ-SEC-042: the link feeds the operation payout, so an owner who is not on the mission
-      // may not attach an order to it — whoever the caller is.
       stubUserAndLocation();
       Mission mission = new Mission();
       mission.setId(MISSION_ID);
@@ -520,7 +464,6 @@ class RefineryOrderServiceLifecycleTest {
       stubUserAndLocation();
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      // Order with no mission attached at all.
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setMission(null);
 
@@ -580,8 +523,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void goodWithNonRawInputButManualRawFlagTrue_isAccepted() {
-      // Edge: type is REFINED but the operator manually flagged it as
-      // raw-usable -> creation must succeed.
       Material flagged = new Material();
       flagged.setId(INPUT_MATERIAL_ID);
       flagged.setType(MaterialType.REFINED);
@@ -602,7 +543,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void goodWithoutOutputMaterial_andNoRefinedMaterialOnInput_fallsBackToInputItself() {
-      // rawInput.refinedMaterial == null -> output := input
       stubUserAndLocation();
       when(materialRepository.findById(INPUT_MATERIAL_ID)).thenReturn(Optional.of(rawInput));
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -661,7 +601,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void goodWithExplicitOutputThatDoesNotMatchRefined_throwsIllegalArgument() {
-      // Input has refinedMaterial=A, but the good claims output=B -> rejected.
       Material refinedOf = new Material();
       refinedOf.setId(OUTPUT_MATERIAL_ID);
       rawInput.setRefinedMaterial(refinedOf);
@@ -765,10 +704,6 @@ class RefineryOrderServiceLifecycleTest {
     }
   }
 
-  // --------------------------------------------------------------
-  // updateRefineryOrder
-  // --------------------------------------------------------------
-
   @Nested
   class UpdateRefineryOrderTests {
 
@@ -795,8 +730,6 @@ class RefineryOrderServiceLifecycleTest {
       when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
-      // No version on the incoming DTO -> skip the explicit check; Hibernate's
-      // UPDATE-WHERE-VERSION fallback would still catch a stale write in prod.
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false);
 
       verify(refineryOrderRepository).save(existing);
@@ -858,7 +791,6 @@ class RefineryOrderServiceLifecycleTest {
 
       RefineryOrder incoming = new RefineryOrder();
       incoming.setMission(null);
-      // location and status untouched
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
       assertNull(existing.getMission());
@@ -887,8 +819,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void missionChanged_ownerNotParticipant_isRejectedEvenForALogistician() {
-      // The rule binds the order's OWNER, not the caller: a logistician editing someone else's
-      // order cannot attach it to a mission that owner is not on (no manager exception).
       RefineryOrder existing = newSavedOrder();
       Mission mission = new Mission();
       mission.setId(MISSION_ID);
@@ -911,8 +841,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void missionUnchanged_isNotRechecked() {
-      // A link that predates the rule — or an owner who has since left the mission — must not
-      // block an ordinary edit of the order's other fields.
       RefineryOrder existing = newSavedOrder();
       Mission linked = new Mission();
       linked.setId(MISSION_ID);
@@ -990,8 +918,6 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void goodsReplacement_clearsAndReadsAllValidatedGoods() {
-      // Existing order has one good; the update should clear it and re-add the
-      // good(s) from the DTO. Verified via the captor on .save.
       RefineryGood preexisting = new RefineryGood();
       RefineryOrder existing = newSavedOrder();
       existing.setGoods(new HashSet<>(Set.of(preexisting)));
@@ -1010,10 +936,6 @@ class RefineryOrderServiceLifecycleTest {
       assert !existing.getGoods().contains(preexisting);
     }
   }
-
-  // --------------------------------------------------------------
-  // deleteRefineryOrder (actually cancels)
-  // --------------------------------------------------------------
 
   @Nested
   class DeleteRefineryOrderTests {
@@ -1060,10 +982,6 @@ class RefineryOrderServiceLifecycleTest {
     }
   }
 
-  // --------------------------------------------------------------
-  // getOwnedOpenRefineryYieldSlices (blueprint craftability fold-in, #781)
-  // --------------------------------------------------------------
-
   @Nested
   class OwnedOpenRefineryYieldSlicesTests {
 
@@ -1072,19 +990,12 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void poolsConvertsScuAndMergesAcrossOrders() {
-      // Regression guard for the /100 SCU conversion AND the per-(material, quality) merge that the
-      // craftability calculator relies on: a drift in either would silently over- or under-count
-      // owned open refinery yield.
       Material scuMat = materialWithType(scuMaterialId, QuantityType.SCU);
       Material pieceMat = materialWithType(pieceMaterialId, QuantityType.PIECE);
 
-      // Order 1: 250 units of an SCU commodity (-> 2.5 SCU) at quality 100, plus a 7-unit non-SCU
-      // (PIECE) output at quality 50 that must pass through unconverted.
       RefineryOrder order1 = new RefineryOrder();
       order1.setGoods(new HashSet<>(Set.of(good(scuMat, 100, 250), good(pieceMat, 50, 7))));
 
-      // Order 2: another 150 units of the same SCU commodity (-> 1.5 SCU) at the SAME (material,
-      // quality) key, so the two orders must pool into one 4.0-SCU slice.
       RefineryOrder order2 = new RefineryOrder();
       order2.setGoods(new HashSet<>(Set.of(good(scuMat, 100, 150))));
 
@@ -1109,15 +1020,13 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void skipsNullMaterialNullQualityNullQuantityNonPositiveScuAndNullGoods() {
-      // Only the fully-populated, positive-SCU good must survive; every degenerate good is dropped
-      // and an order with a null goods collection must not NPE.
       Material scuMat = materialWithType(scuMaterialId, QuantityType.SCU);
 
-      RefineryGood valid = good(scuMat, 100, 300); // 300 / 100 = 3.0 SCU -> kept
+      RefineryGood valid = good(scuMat, 100, 300);
       RefineryGood nullMaterial = good(null, 100, 200);
       RefineryGood nullQuality = good(scuMat, null, 200);
       RefineryGood nullQuantity = good(scuMat, 100, null);
-      RefineryGood zeroScu = good(scuMat, 100, 0); // 0 / 100 = 0.0 -> non-positive, dropped
+      RefineryGood zeroScu = good(scuMat, 100, 0);
 
       RefineryOrder order = new RefineryOrder();
       order.setGoods(
@@ -1164,10 +1073,6 @@ class RefineryOrderServiceLifecycleTest {
       return null;
     }
   }
-
-  // --------------------------------------------------------------
-  // Helpers
-  // --------------------------------------------------------------
 
   private RefineryOrder newSavedOrder() {
     RefineryOrder o = new RefineryOrder();

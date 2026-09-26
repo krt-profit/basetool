@@ -37,12 +37,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-method unit tests for {@link JobOrderItemStockController} (REQ-ORDERS-028/029). The
- * controller is a thin delegation layer mirroring {@link MaterialCollectionControllerTest}; the
- * grouping / slice logic lives in {@code InventoryAggregationService.getItemStockForJobOrder(...)}
- * and is covered there. Here we guarantee delegation and the owner/location redaction wiring
- * (REQ-ORDERS-029): a responsible-side viewer gets the list unmodified, a requesting-side viewer
- * ({@code canSeeJobOrderInventoryOwners == false}) gets the redactor's output.
+ * Unit tests for {@link JobOrderItemStockController} (REQ-ORDERS-028/029): delegation and the
+ * owner/location redaction for a requesting-side viewer.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemStockControllerTest {
@@ -75,7 +71,6 @@ class JobOrderItemStockControllerTest {
 
   @Test
   void getItemStock_responsibleSideViewer_returnsListUnredacted() {
-    // covers REQ-ORDERS-028/029
     UUID jobOrderId = UUID.randomUUID();
     List<JobOrderItemStockGroupDto> expected = List.of(sampleGroup());
     when(inventoryItemService.getItemStockForJobOrder(jobOrderId)).thenReturn(expected);
@@ -90,7 +85,6 @@ class JobOrderItemStockControllerTest {
 
   @Test
   void getItemStock_requestingSideViewer_returnsRedactedList() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     List<JobOrderItemStockGroupDto> raw = List.of(sampleGroup());
     List<JobOrderItemStockGroupDto> redacted = List.of(sampleGroup());
@@ -106,7 +100,6 @@ class JobOrderItemStockControllerTest {
 
   @Test
   void getItemStock_emptyResult_isReturnedAsIs() {
-    // covers REQ-ORDERS-028
     UUID jobOrderId = UUID.randomUUID();
     when(inventoryItemService.getItemStockForJobOrder(jobOrderId)).thenReturn(List.of());
     when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);

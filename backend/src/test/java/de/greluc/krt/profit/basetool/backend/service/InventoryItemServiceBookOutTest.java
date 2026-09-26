@@ -78,14 +78,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Coverage for {@link InventoryItemService#bookOutInventoryItem} — the money- and security-critical
- * "check out" flow that combines optimistic locking, owner-vs-admin authorisation, amount
- * validation, CheckoutType inference (DISCARD / TRANSFER / SELL), partial-vs-full deletion, and the
- * {@code MissionFinanceEntry} side effect for SELL.
- *
- * <p>Coverage analysis flagged this as the largest concentrated branch gap in the service package
- * (19/28 branches uncovered). A bug here means wrong ownership decisions, lost inventory, or
- * double-counted income.
+ * Unit tests for {@link InventoryItemService#bookOutInventoryItem}: optimistic locking,
+ * owner-versus-admin authorisation, amount validation, {@code CheckoutType} inference (DISCARD /
+ * TRANSFER / SELL), partial versus full deletion, and the {@code MissionFinanceEntry} side effect
+ * of a SELL.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceBookOutTest {
@@ -129,16 +125,10 @@ class InventoryItemServiceBookOutTest {
     material.setId(UUID.randomUUID());
     material.setName("Quantanium");
 
-    // The mapper is called on the saved item; return a sentinel DTO so we can
-    // verify the return value identity.
     lenient()
         .when(inventoryItemMapper.toDto(any(InventoryItem.class)))
         .thenAnswer(inv -> sentinelDto(((InventoryItem) inv.getArgument(0)).getAmount()));
   }
-
-  // ---------------------------------------------------------------
-  // Up-front guards
-  // ---------------------------------------------------------------
 
   @Nested
   class GuardTests {
@@ -174,8 +164,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void nullVersion_bypassesOptimisticCheck() {
-      // dto.version() == null skips the explicit check; Hibernate's
-      // UPDATE-WHERE-VERSION fallback still catches stale writes in prod.
       InventoryItem item = newItem(10.0, 5L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -185,13 +173,11 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      // No exception -> the version check was bypassed.
       verify(inventoryItemRepository).saveAndFlush(item);
     }
 
     @Test
     void nonOwnerNonAdmin_throwsAccessDenied() {
-      // SECURITY: a normal user trying to book out someone else's item -> 403.
       InventoryItem item = newItem(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -218,7 +204,7 @@ class InventoryItemServiceBookOutTest {
           ITEM_ID,
           newDto(1.0, null, null, CheckoutType.DISCARD, null, null, 1L),
           otherUserId,
-          /* isAdmin= */ true);
+          true);
 
       verify(inventoryItemRepository).saveAndFlush(item);
     }
@@ -239,18 +225,11 @@ class InventoryItemServiceBookOutTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // CheckoutType inference (when type is null)
-  // ---------------------------------------------------------------
-
   @Nested
   class CheckoutTypeInferenceTests {
 
     @Test
     void nullType_withTargetUser_inferredAsTransfer() {
-      // dto.type == null + targetUserId != null -> infer TRANSFER.
-      // Verified indirectly: TRANSFER path saves a new InventoryItem;
-      // DISCARD path doesn't.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
@@ -262,17 +241,11 @@ class InventoryItemServiceBookOutTest {
           .thenAnswer(inv -> inv.getArgument(0));
 
       service.bookOutInventoryItem(
-          ITEM_ID,
-          newDto(1.0, targetUserId, null, /* type= */ null, null, null, 1L),
-          OWNER_ID,
-          false);
+          ITEM_ID, newDto(1.0, targetUserId, null, null, null, null, 1L), OWNER_ID, false);
 
-      // Partial TRANSFER -> the new target row is save()d, the reduced source row is
-      // saveAndFlush()ed (so its @Version stays current within the transaction; see change #7).
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(captor.capture());
       verify(inventoryItemRepository).saveAndFlush(item);
-      // The captured save = the new item with targetUser.
       assertSame(targetUser, captor.getValue().getUser());
     }
 
@@ -289,12 +262,8 @@ class InventoryItemServiceBookOutTest {
           .thenAnswer(inv -> inv.getArgument(0));
 
       service.bookOutInventoryItem(
-          ITEM_ID,
-          newDto(1.0, null, targetLocationId, /* type= */ null, null, null, 1L),
-          OWNER_ID,
-          false);
+          ITEM_ID, newDto(1.0, null, targetLocationId, null, null, null, 1L), OWNER_ID, false);
 
-      // Partial TRANSFER -> new target row save()d, reduced source row saveAndFlush()ed.
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(captor.capture());
       verify(inventoryItemRepository).saveAndFlush(item);
@@ -307,20 +276,13 @@ class InventoryItemServiceBookOutTest {
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       service.bookOutInventoryItem(
-          ITEM_ID, newDto(1.0, null, null, /* type= */ null, null, null, 1L), OWNER_ID, false);
+          ITEM_ID, newDto(1.0, null, null, null, null, null, 1L), OWNER_ID, false);
 
-      // DISCARD -> source updated, no transfer-side new item created.
       verify(inventoryItemRepository, org.mockito.Mockito.times(1))
           .saveAndFlush(any(InventoryItem.class));
-      // REQ-MARKET-013: the partial decrement ratchets any active offer on the source down to the
-      // remaining 9.0 — pins the clamp call site so dropping it fails here.
       verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(ITEM_ID), eq(9.0));
     }
   }
-
-  // ---------------------------------------------------------------
-  // SELL validation guards
-  // ---------------------------------------------------------------
 
   @Nested
   class SellGuardTests {
@@ -335,8 +297,7 @@ class InventoryItemServiceBookOutTest {
           () ->
               service.bookOutInventoryItem(
                   ITEM_ID,
-                  newDto(
-                      1.0, null, null, CheckoutType.SELL, /* terminal= */ null, BigDecimal.TEN, 1L),
+                  newDto(1.0, null, null, CheckoutType.SELL, null, BigDecimal.TEN, 1L),
                   OWNER_ID,
                   false));
     }
@@ -387,10 +348,6 @@ class InventoryItemServiceBookOutTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // TRANSFER subtree
-  // ---------------------------------------------------------------
-
   @Nested
   class TransferTests {
 
@@ -430,8 +387,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void transferToSelfAndSameLocation_throwsBadRequest() {
-      // BOTH targets resolve to the existing item's user + location -> no-op
-      // transfer must be rejected.
       InventoryItem item = newItem(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -449,11 +404,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void explicitTransferWithoutTargets_throwsBadRequestAndDestroysNothing() {
-      // REQ-INV-025: an explicit type=TRANSFER carrying neither a target user nor a target location
-      // has nowhere to move the stock to. It must be rejected with 400 up front — it must NOT fall
-      // through to the consume tail, which would silently decrement/delete the source and mislog it
-      // as INVENTORY_ITEM_CONSUMED with type=TRANSFER (the destructive fall-through this pins
-      // shut).
       InventoryItem item = newItem(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -468,18 +418,15 @@ class InventoryItemServiceBookOutTest {
                       false));
       assert ex.getMessage().toLowerCase().contains("target");
 
-      // Nothing is written: the source keeps its full amount, no row is inserted or deleted.
       assertEquals(10.0, item.getAmount(), "source amount must be unchanged");
       verify(inventoryItemRepository, never()).save(any());
       verify(inventoryItemRepository, never()).saveAndFlush(any());
       verify(inventoryItemRepository, never()).delete(any());
-      // And no audit event — a rejected request records nothing (no spurious CONSUMED event).
       verify(auditService, never()).record(any(), any(), any(), any(), any());
     }
 
     @Test
     void transferPartial_keepsSourceWithRemainingAmount() {
-      // amount=3 out of 10 -> source keeps 7, new item gets 3.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
@@ -496,8 +443,6 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      // Partial TRANSFER -> new target row save()d, reduced source row saveAndFlush()ed (change
-      // #7).
       ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
       ArgumentCaptor<InventoryItem> flushCaptor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(saveCaptor.capture());
@@ -509,13 +454,11 @@ class InventoryItemServiceBookOutTest {
       assertSame(item, source, "the flushed row is the original source");
       assertSame(targetUser, newItem.getUser());
       verify(inventoryItemRepository, never()).delete(any());
-      // REQ-MARKET-013: the reduced source row ratchets any active offer down to the remaining 7.0.
       verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(ITEM_ID), eq(7.0));
     }
 
     @Test
     void transferFull_deletesSourceItem() {
-      // amount == available -> remaining <= QUANTITY_EPSILON -> source deleted.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
@@ -533,25 +476,17 @@ class InventoryItemServiceBookOutTest {
           false);
 
       verify(inventoryItemRepository).delete(item);
-      // Only the new item save call (the source is deleted, not saved).
       verify(inventoryItemRepository, org.mockito.Mockito.times(1)).save(any(InventoryItem.class));
     }
 
     @Test
     void transferAlwaysInsertsNewRowAtTarget() {
-      // Append-only Lager: a transfer always inserts its own brand-new row at the target carrying
-      // the moved amount — it is never folded into an existing identical stack there. The source is
-      // decremented by the moved amount; the group-on-read view collapses same-identity rows for
-      // display, so no visible duplicate results.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
 
-      // Source: alice @ ARC-L1, Quantanium, quality 500, 10 units.
       InventoryItem source = newItem(10.0, 1L);
 
-      // An identical stack already exists at the target (same location/material/quality, 6 units) —
-      // it must be left untouched.
       InventoryItem existingTarget = new InventoryItem();
       existingTarget.setId(UUID.randomUUID());
       existingTarget.setUser(targetUser);
@@ -573,11 +508,8 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      // The existing target stack is never merged into and keeps its 6 units. Two saves happen: the
-      // new target row (amount 4, owned by targetUser) and the decremented source (10 - 4 = 6).
       assertEquals(6.0, existingTarget.getAmount(), "existing target stack must be left untouched");
       assertEquals(6.0, source.getAmount(), "source keeps the remainder");
-      // Partial TRANSFER -> new target row save()d, decremented source row saveAndFlush()ed.
       ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(saveCaptor.capture());
       InventoryItem newRow = saveCaptor.getValue();
@@ -589,9 +521,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void transferDoesNotMergeAcrossOwningOrgUnit() {
-      // Append-only Lager: the transfer never folds into a pre-existing stack, regardless of its
-      // owning org unit. An identical-looking target stack in a different org unit is left
-      // untouched and the moved stock is inserted as a brand-new row stamped with the resolved org.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
@@ -627,9 +556,7 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      // foreign-org target untouched; a brand-new row stamped org B is created instead.
       assertEquals(6.0, foreignOrgTarget.getAmount(), "foreign-org stack must be left untouched");
-      // Partial TRANSFER -> new target row save()d, decremented source row saveAndFlush()ed.
       ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(saveCaptor.capture());
       verify(inventoryItemRepository).saveAndFlush(source);
@@ -663,7 +590,6 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      // The reduced source row is flushed; the new target row is the only plain save().
       verify(inventoryItemRepository).saveAndFlush(source);
       verify(inventoryItemRepository, never()).save(source);
       ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
@@ -674,25 +600,17 @@ class InventoryItemServiceBookOutTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // SELL subtree — MissionFinanceEntry side effect
-  // ---------------------------------------------------------------
-
   @Nested
   class SellTests {
 
     @Test
     void sellDeductingFromMission_createsProportionalMissionFinanceEntryIncome() {
-      // Variante C (REQ-INV-027, coupled proceeds): the seller takes the sold SCU out of a mission
-      // earmark they participate in — one INCOME MissionFinanceEntry credited sellAmount *
-      // scu/sold.
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       MissionParticipant participant = new MissionParticipant();
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(10.0, 1L);
-      // Earmark part of the 10 SCU to the mission; the partial sell deducts the sold 1 SCU from it.
       InventoryAllocations.addMission(item, mission, 4.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -715,7 +633,6 @@ class InventoryItemServiceBookOutTest {
       verify(missionFinanceEntryRepository).save(captor.capture());
       MissionFinanceEntry entry = captor.getValue();
       assertEquals(FinanceType.INCOME, entry.getType());
-      // The whole sold 1 SCU came from the mission earmark -> 500 * 1.0 / 1.0 = 500.
       assertEquals(0, entry.getAmount().compareTo(BigDecimal.valueOf(500)));
       assertSame(mission, entry.getMission());
       assertSame(participant, entry.getParticipant());
@@ -725,8 +642,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void sellDeductingFromMultipleMissions_booksProportionalIncomePerMission() {
-      // The seller sources the sold SCU across two earmarked missions; each mission's income is
-      // proportional to the SCU taken from it, the rest of the sold SCU staying personal.
       Mission missionA = new Mission();
       missionA.setId(UUID.randomUUID());
       Mission missionB = new Mission();
@@ -746,7 +661,6 @@ class InventoryItemServiceBookOutTest {
       when(missionParticipantRepository.findByMissionIdAndUserId(missionB.getId(), OWNER_ID))
           .thenReturn(Optional.of(participantB));
 
-      // Sell 1 SCU, sourcing 0.6 from A and 0.3 from B (0.1 from the rest -> personal).
       service.bookOutInventoryItem(
           ITEM_ID,
           newSellDto(
@@ -760,7 +674,6 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      // 500 * 0.6 = 300 to A, 500 * 0.3 = 150 to B; the remaining 0.1 SCU (50) stays personal.
       ArgumentCaptor<MissionFinanceEntry> captor =
           ArgumentCaptor.forClass(MissionFinanceEntry.class);
       verify(missionFinanceEntryRepository, org.mockito.Mockito.times(2)).save(captor.capture());
@@ -772,18 +685,12 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void fullSellFromMission_createsIncomeAndDeletesRow() {
-      // A SELL of the WHOLE mission-linked stack (amount == available). The squadron INCOME
-      // MissionFinanceEntry must be created off the still-managed row BEFORE the depletion branch
-      // deletes it, the source row is delete()d (not saveAndFlush()ed), the method returns null so
-      // the frontend drops the depleted row, and the SOLD audit still carries the pre-delete id.
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       MissionParticipant participant = new MissionParticipant();
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(5.0, 1L);
-      // The whole 5 SCU is earmarked to the mission; the full sale sources all 5 SCU from it, so
-      // its whole earmark is deducted and the mission is credited the whole proceeds.
       InventoryAllocations.addMission(item, mission, 5.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -802,7 +709,6 @@ class InventoryItemServiceBookOutTest {
               OWNER_ID,
               false);
 
-      // INCOME finance entry created from the managed (not-yet-deleted) row.
       ArgumentCaptor<MissionFinanceEntry> captor =
           ArgumentCaptor.forClass(MissionFinanceEntry.class);
       verify(missionFinanceEntryRepository).save(captor.capture());
@@ -812,20 +718,16 @@ class InventoryItemServiceBookOutTest {
       assertSame(mission, entry.getMission());
       assertSame(participant, entry.getParticipant());
 
-      // Depleted -> source row deleted, null returned (frontend removes the row), never re-saved.
       verify(inventoryItemRepository).delete(item);
       assertNull(result, "a full sale depletes the stack and returns null");
       verify(inventoryItemRepository, never()).saveAndFlush(any());
 
-      // The SOLD audit carries the pre-delete source id snapshot and the owner as target user.
       verify(auditService)
           .record(eq(AuditEventType.INVENTORY_ITEM_SOLD), eq(ITEM_ID), any(), eq(OWNER_ID), any());
     }
 
     @Test
     void sellFromMission_callerNotParticipant_creditsPersonallyNoEntry() {
-      // Coupled proceeds: SCU sold out of a mission the seller is NOT part of cannot credit that
-      // mission (a finance entry needs a participant), so that share stays personal — no throw.
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
@@ -857,7 +759,6 @@ class InventoryItemServiceBookOutTest {
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // Deduct from a DIFFERENT mission the row does not earmark -> 400 while resolving the plan.
       assertThrows(
           BadRequestException.class,
           () ->
@@ -886,7 +787,6 @@ class InventoryItemServiceBookOutTest {
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // 0.6 + 0.6 = 1.2 SCU sourced for a 1.0 SCU sale -> 400 (the plan exceeds the sold amount).
       assertThrows(
           BadRequestException.class,
           () ->
@@ -914,7 +814,6 @@ class InventoryItemServiceBookOutTest {
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // The same mission appears twice in the deduct-from plan -> 400 while resolving.
       assertThrows(
           BadRequestException.class,
           () ->
@@ -935,9 +834,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void sellWithNoMissionReductions_isFullyPersonalSale_skipsFinanceEntry() {
-      // Variante C: a SELL that sources nothing from a mission earmark is a fully-personal sale
-      // that
-      // credits no mission — allowed even for a mission-earmarked row, never touching the ledger.
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
@@ -954,8 +850,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void sellWithoutMission_skipsFinanceEntry() {
-      // No mission earmarked and no attributions -> the SELL just decrements the item, no
-      // MissionFinanceEntry side-effect and no participant lookup.
       InventoryItem item = newItem(10.0, 1L);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -970,10 +864,6 @@ class InventoryItemServiceBookOutTest {
       verify(missionParticipantRepository, never()).findByMissionIdAndUserId(any(), any());
     }
   }
-
-  // ---------------------------------------------------------------
-  // DISCARD / partial-vs-full deletion (default branch)
-  // ---------------------------------------------------------------
 
   @Nested
   class DiscardTests {
@@ -1015,9 +905,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void depletionBoundary_subEpsilonResidualDeletesRow() {
-      // Gap 3: booking out 9.9999 of 10.0 leaves 0.0001, which roundAmount() rounds to 0.000 — at
-      // or below QUANTITY_EPSILON (1e-4), so the row is DELETED (no phantom near-zero sliver is
-      // stranded in the append-only Lager) and null is returned.
       InventoryItem item = newItem(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -1035,9 +922,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void smallResidualAboveEpsilon_keepsRow() {
-      // Gap 3: booking out 9.998 of 10.0 leaves 0.002 (> QUANTITY_EPSILON 1e-4), so the row is KEPT
-      // with the rounded 0.002 residual and saveAndFlush()ed — never deleted. Pins that the epsilon
-      // guard does not swallow a legitimate small remainder.
       InventoryItem item = newItem(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
@@ -1054,17 +938,11 @@ class InventoryItemServiceBookOutTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // REQ-AUDIT-001 Lager audit trail (Gap 2)
-  // ---------------------------------------------------------------
-
   @Nested
   class AuditTrailTests {
 
     @Test
     void discardBookOut_recordsConsumedAuditWithPreDeleteSnapshot() {
-      // Gap 2: a DISCARD that depletes the row still records INVENTORY_ITEM_CONSUMED carrying the
-      // pre-delete source id snapshot — the audit trail survives the row deletion.
       InventoryItem item = newItem(5.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -1079,15 +957,12 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void sellBookOut_recordsSoldAudit() {
-      // Gap 2: a SELL records INVENTORY_ITEM_SOLD against the source id and the owner.
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       MissionParticipant participant = new MissionParticipant();
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(10.0, 1L);
-      // Variante C: earmark only part of the 10 SCU to the mission so the row still fits its
-      // mission allocation after this partial sell decrements it (sum(mission) <= remaining, R5).
       InventoryAllocations.addMission(item, mission, 1.0);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -1111,8 +986,6 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void transferBookOut_recordsTransferredAuditToTargetUser() {
-      // Gap 2: a TRANSFER records INVENTORY_ITEM_TRANSFERRED against the source id, with the TARGET
-      // user (not the owner) as the audit's target user.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
@@ -1139,10 +1012,6 @@ class InventoryItemServiceBookOutTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // Variante C "deduct from" plan (REQ-INV-027)
-  // ---------------------------------------------------------------
-
   @Nested
   class ReductionPlanTests {
 
@@ -1151,11 +1020,10 @@ class InventoryItemServiceBookOutTest {
       JobOrder order = new JobOrder();
       order.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addJobOrder(item, order, 6.0, false); // rest = 4
+      InventoryAllocations.addJobOrder(item, order, 6.0, false);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
 
-      // Discard 3, all sourced from the order tag -> the tag drops 6 -> 3, the amount 10 -> 7.
       InventoryItemBookOutDto dto =
           new InventoryItemBookOutDto(
               3.0,
@@ -1181,10 +1049,9 @@ class InventoryItemServiceBookOutTest {
       JobOrder order = new JobOrder();
       order.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addJobOrder(item, order, 8.0, false); // rest = 2
+      InventoryAllocations.addJobOrder(item, order, 8.0, false);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // Discard 5 but source nothing from the tag: the rest (2) cannot absorb it -> 422.
       InventoryItemBookOutDto dto =
           new InventoryItemBookOutDto(
               5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, List.of(), null);
@@ -1212,7 +1079,6 @@ class InventoryItemServiceBookOutTest {
       when(inventoryItemRepository.save(any(InventoryItem.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
-      // Move 3 SCU, sourcing 3 from the order tag and 2 from the mission tag.
       InventoryItemBookOutDto dto =
           new InventoryItemBookOutDto(
               3.0,
@@ -1237,8 +1103,6 @@ class InventoryItemServiceBookOutTest {
               .findFirst()
               .orElseThrow(() -> new AssertionError("expected the moved row to be saved"));
 
-      // The moved row carries the reduced tags (order delivered flag inherited); the source
-      // shrinks.
       assertEquals(3.0, InventoryAllocations.jobOrderSlice(moved, order.getId()).getAmount(), 1e-9);
       org.junit.jupiter.api.Assertions.assertTrue(
           InventoryAllocations.jobOrderSlice(moved, order.getId()).getDelivered());
@@ -1250,22 +1114,14 @@ class InventoryItemServiceBookOutTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // game-item stock rows (V220, REQ-INV-029/031)
-  // ---------------------------------------------------------------
-
   @Nested
   class GameItemRowTests {
 
-    // covers REQ-INV-029 (item book-outs move whole units only)
     @Test
     void bookOut_itemRow_fractionalAmount_throwsBadRequest() {
-      // Given a game-item stock row
       InventoryItem item = newGameItemRow(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then — a fractional amount is rejected before any decrement, and the 400 detail
-      // names the row's actual catalog kind (item stock, not PIECE materials)
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
@@ -1281,15 +1137,12 @@ class InventoryItemServiceBookOutTest {
       verify(inventoryItemRepository, never()).delete(any());
     }
 
-    // covers REQ-INV-029 (the closed gap: PIECE-material book-outs are whole-number-validated too)
     @Test
     void bookOut_pieceMaterial_fractionalAmount_throwsBadRequest() {
-      // Given a PIECE-material row — before V220 the server accepted a fractional book-out here
       InventoryItem item = newItem(10.0, 1L);
       item.getMaterial().setQuantityType(QuantityType.PIECE);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then — the 400 detail keeps the material wording on a material row
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
@@ -1305,16 +1158,12 @@ class InventoryItemServiceBookOutTest {
       verify(inventoryItemRepository, never()).delete(any());
     }
 
-    // covers REQ-INV-029 (full-depletion escape: a legacy fractional PIECE row can be drained)
     @Test
     void bookOut_pieceMaterial_legacyFractionalRow_fullDepletion_isAllowed() {
-      // Given a PIECE-material row holding a legacy fractional amount (created before the
-      // whole-unit guard existed) — without the escape that remainder could never be drained
       InventoryItem item = newItem(1.5, 1L);
       item.getMaterial().setQuantityType(QuantityType.PIECE);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When — book out the row's EXACT remaining amount
       InventoryItemDto result =
           service.bookOutInventoryItem(
               ITEM_ID,
@@ -1322,21 +1171,17 @@ class InventoryItemServiceBookOutTest {
               OWNER_ID,
               false);
 
-      // Then — the fractional amount is exempt (full depletion): the row is drained and deleted
       assertNull(result, "a full depletion returns null");
       verify(inventoryItemRepository).delete(item);
       verify(inventoryItemRepository, never()).saveAndFlush(any());
     }
 
-    // covers REQ-INV-029 (a PARTIAL fractional book-out off a fractional PIECE row still 400s)
     @Test
     void bookOut_pieceMaterial_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
-      // Given the same legacy fractional PIECE row
       InventoryItem item = newItem(1.5, 1L);
       item.getMaterial().setQuantityType(QuantityType.PIECE);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
@@ -1351,15 +1196,11 @@ class InventoryItemServiceBookOutTest {
       verify(inventoryItemRepository, never()).delete(any());
     }
 
-    // covers REQ-INV-029 (full-depletion escape on an item row — the guard is row-kind driven)
     @Test
     void bookOut_itemRow_legacyFractionalRow_fullDepletion_isAllowed() {
-      // Given a game-item row holding a legacy fractional amount (only reachable via legacy data,
-      // but the guard is row-kind driven, so the escape must hold here too)
       InventoryItem item = newGameItemRow(1.5, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When — book out the row's EXACT remaining amount
       InventoryItemDto result =
           service.bookOutInventoryItem(
               ITEM_ID,
@@ -1367,21 +1208,16 @@ class InventoryItemServiceBookOutTest {
               OWNER_ID,
               false);
 
-      // Then — exempt from the whole-unit rule: the row is drained and deleted
       assertNull(result, "a full depletion returns null");
       verify(inventoryItemRepository).delete(item);
       verify(inventoryItemRepository, never()).saveAndFlush(any());
     }
 
-    // covers REQ-INV-029 (a PARTIAL fractional book-out off a fractional item row still 400s)
     @Test
     void bookOut_itemRow_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
-      // Given the same legacy fractional item row
       InventoryItem item = newGameItemRow(1.5, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
-      // with the item wording
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
@@ -1396,10 +1232,8 @@ class InventoryItemServiceBookOutTest {
       verify(inventoryItemRepository, never()).delete(any());
     }
 
-    // covers REQ-INV-031 (a mission "deduct from" plan on an item row is a contract violation)
     @Test
     void bookOut_itemRow_missionReductions_throwsBadRequest() {
-      // Given a game-item stock row and a book-out naming a mission reduction
       InventoryItem item = newGameItemRow(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       InventoryItemBookOutDto dto =
@@ -1416,8 +1250,6 @@ class InventoryItemServiceBookOutTest {
               null,
               List.of(new AllocationReductionDto(UUID.randomUUID(), 1.0)));
 
-      // When / Then — rejected explicitly (item rows carry no mission earmarks), never a silent
-      // empty no-op
       assertThrows(
           BadRequestException.class,
           () -> service.bookOutInventoryItem(ITEM_ID, dto, OWNER_ID, false));
@@ -1425,10 +1257,8 @@ class InventoryItemServiceBookOutTest {
       verify(inventoryItemRepository, never()).delete(any());
     }
 
-    // covers REQ-INV-029 (transfer copies the catalog reference pair as a unit)
     @Test
     void transfer_itemRow_copiesGameItemOntoMovedRow() {
-      // Given a game-item stock row transferred to another user
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
@@ -1438,16 +1268,12 @@ class InventoryItemServiceBookOutTest {
       when(inventoryItemRepository.save(any(InventoryItem.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
-      // When — move 4 whole units
       service.bookOutInventoryItem(
           ITEM_ID,
           newDto(4.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L),
           OWNER_ID,
           false);
 
-      // Then — the moved row carries the gameItem alongside null material/quality; without the
-      // copy it would violate the XOR CHECK (chk_inventory_item_catalog_xor, V220) -> 500 on
-      // every item transfer.
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
       InventoryItem moved =
@@ -1461,9 +1287,6 @@ class InventoryItemServiceBookOutTest {
       assertEquals(4.0, moved.getAmount());
     }
 
-    // covers REQ-ORDERS-031 (a full-amount item transfer — the Itemsammelübersicht page's only mode
-    // — carries the order earmark, jobOrder link + amount + delivered, onto the moved row, so
-    // collecting earmarked item stock never silently un-earmarks it from the order)
     @Test
     void transfer_itemRow_fullAmount_carriesJobOrderEarmarkOntoMovedRow() {
       UUID targetUserId = UUID.randomUUID();
@@ -1478,15 +1301,12 @@ class InventoryItemServiceBookOutTest {
       when(inventoryItemRepository.save(any(InventoryItem.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
-      // When — move the full 4 whole units with no explicit reduction plan (the collection page's
-      // only mode): the default plan is "all slices in full", so the earmark rides onto the target.
       service.bookOutInventoryItem(
           ITEM_ID,
           newDto(4.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L),
           OWNER_ID,
           false);
 
-      // Then — the moved row keeps the game item AND the order earmark with its delivered flag.
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
       InventoryItem moved =
@@ -1504,13 +1324,9 @@ class InventoryItemServiceBookOutTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
-
   /**
-   * Builds a game-item stock row sharing the fixture identity (owner, location, non-personal):
-   * gameItem set, material and quality {@code null} — the V220 catalog shape (REQ-INV-029).
+   * Builds a game-item stock row with the fixture identity: game item set, material and quality
+   * {@code null} (REQ-INV-029).
    *
    * @param amount the row's amount
    * @param version the row's optimistic-lock version
@@ -1593,8 +1409,6 @@ class InventoryItemServiceBookOutTest {
         null,
         missionReductions);
   }
-
-  // --- R5.d.g TRANSFER picker delegation -----------------------------------
 
   @Test
   void bookOutInventoryItem_transferWithTargetOwningOrgUnitId_routesThroughResolver() {

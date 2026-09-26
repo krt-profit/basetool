@@ -52,7 +52,6 @@ class DiscordAccountExistenceServiceTest {
     boolean exists = service.accountExistsForDiscordIdentity("Maverick", null, null);
 
     assertThat(exists).isTrue();
-    // E-mail was null → the e-mail query is never run.
     verify(userRepository).existsByLowerUsernameOrDisplayNameIn(any());
     verify(userRepository, org.mockito.Mockito.never()).existsByLowerEmail(any());
   }
@@ -61,7 +60,6 @@ class DiscordAccountExistenceServiceTest {
   void matchesOnEmail_whenOnlyEmailMatches() {
     when(userRepository.existsByLowerEmail(eq("mav@example.com"))).thenReturn(true);
 
-    // No name candidates → the name query is skipped; only the e-mail query runs.
     boolean exists = service.accountExistsForDiscordIdentity("   ", "Mav@Example.com", null);
 
     assertThat(exists).isTrue();
@@ -84,7 +82,6 @@ class DiscordAccountExistenceServiceTest {
     boolean exists = service.accountExistsForDiscordIdentity(null, "   ", "");
 
     assertThat(exists).isFalse();
-    // No candidates at all → no repository query is run (the IN clause never degenerates).
     verifyNoInteractions(userRepository);
   }
 
@@ -92,7 +89,6 @@ class DiscordAccountExistenceServiceTest {
   void normalisesCandidates_trimLowercaseAndDedupe() {
     when(userRepository.existsByLowerUsernameOrDisplayNameIn(any())).thenReturn(false);
 
-    // Username and server nickname both normalise to "maverick" → a single deduped candidate.
     service.accountExistsForDiscordIdentity("  Maverick  ", null, "MAVERICK");
 
     verify(userRepository)

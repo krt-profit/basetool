@@ -61,8 +61,6 @@ class StaticResourcesCachingTest {
   void setup() {
     mockMvc =
         MockMvcBuilders.webAppContextSetup(context)
-            // The application's own registration, with its own URL patterns — not a hand-added
-            // filter on /*, which would pass however EtagConfig were scoped (FE-PERF-03).
             .addFilter(
                 shallowEtagHeaderFilter.getFilter(),
                 shallowEtagHeaderFilter.getUrlPatterns().toArray(String[]::new))
@@ -71,10 +69,8 @@ class StaticResourcesCachingTest {
   }
 
   /**
-   * A static asset stays outside the ETag filter (owner decision 2026-09-23): it keeps its
-   * year-long {@code immutable} cache header and its {@code Last-Modified}, answers an {@code
-   * If-Modified-Since} with a {@code 304} from the resource handler itself, and carries no ETag —
-   * the header only the filter adds, so its absence is the proof the body was not buffered for one.
+   * Verifies that a static asset keeps its year-long {@code immutable} cache header and {@code
+   * Last-Modified}, answers {@code If-Modified-Since} with {@code 304}, and carries no ETag.
    *
    * @throws Exception if the MockMvc request fails
    */
@@ -100,10 +96,8 @@ class StaticResourcesCachingTest {
   }
 
   /**
-   * A page stylesheet (FE-PERF-02) is an ordinary static asset one directory down: served without a
-   * session — the error pages link theirs, and an error page must render for anyone — with the same
-   * year-long {@code immutable} header and no ETag. That header is what makes moving the page CSS
-   * out of the {@code no-store} HTML worth doing at all.
+   * Verifies that a page stylesheet is served without a session, with the year-long {@code
+   * immutable} header and no ETag (FE-PERF-02).
    *
    * @throws Exception if the MockMvc request fails
    */
@@ -142,10 +136,8 @@ class StaticResourcesCachingTest {
   }
 
   /**
-   * A page outside the filter's scope is not buffered by it (FE-PERF-03). The filter's buffer
-   * announces itself: copying the cached body out sets {@code Content-Length}, which a streamed
-   * Thymeleaf render never does. Under the former {@code /*} registration this page carried one,
-   * and never an ETag, because Spring Security marks it {@code no-store}.
+   * Verifies that a page outside the ETag filter's scope is not buffered, which shows as a missing
+   * {@code Content-Length} (FE-PERF-03).
    *
    * @throws Exception if the MockMvc request fails
    */

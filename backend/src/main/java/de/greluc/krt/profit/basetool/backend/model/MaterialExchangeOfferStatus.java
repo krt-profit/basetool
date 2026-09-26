@@ -20,13 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Lifecycle state of a {@link MaterialExchangeOffer} on the Materialbörse trade board.
- *
- * <p>An offer is {@link #ACTIVE} while it is publicly listed and {@link #DEACTIVATED} once the
- * owner takes it off the board (un-checking "Für Börse freigeben" or pressing "Angebot
- * deaktivieren"). The partial-unique constraint {@code (inventory_item_id) WHERE status = 'ACTIVE'}
- * allows exactly one active offer per Lager row, so re-releasing an item re-activates rather than
- * duplicates. The {@code MARKET} business-metric gauge counts {@link #ACTIVE} rows only.
+ * Lifecycle state of a {@link MaterialExchangeOffer}: {@link #ACTIVE} while listed, {@link
+ * #DEACTIVATED} once the owner takes it off the board. At most one active offer exists per Lager
+ * row.
  */
 public enum MaterialExchangeOfferStatus {
 

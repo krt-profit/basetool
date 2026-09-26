@@ -27,12 +27,8 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 /**
- * Binding test deserializing the frozen-contract example from {@code
- * docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 verbatim (#434) — including the 2026-06-10
- * contract amendments {@code quoted}, {@code rowIndex}, the header totals, {@code cropMode}, a
- * {@code null} {@code outputQuantity} on an un-quoted row, and the 2026-06-11 additive v1 field
- * {@code capturedAt} (REQ-REFINERY-017). A shape drift between the documented contract and these
- * records fails here before it fails in the field.
+ * Deserializes the documented refinery-extract contract example, including {@code capturedAt}
+ * (REQ-REFINERY-017), so a drift between the contract and the records fails here.
  */
 class RefineryExtractDtoJsonTest {
 
@@ -89,13 +85,10 @@ class RefineryExtractDtoJsonTest {
 
   @Test
   void deserializesContractExampleVerbatim() throws Exception {
-    // Given
     JsonMapper mapper = JsonMapper.builder().addModule(new JavaTimeModule()).build();
 
-    // When
     RefineryExtractDto extract = mapper.readValue(CONTRACT_EXAMPLE, RefineryExtractDto.class);
 
-    // Then — envelope & provenance
     assertThat(extract.schemaVersion()).isEqualTo(1);
     assertThat(extract.tool()).isEqualTo("basetool-sc-extractor");
     assertThat(extract.model()).isEqualTo("qwen3-vl:8b-instruct");
@@ -103,7 +96,6 @@ class RefineryExtractDtoJsonTest {
     assertThat(extract.clientLanguage()).isEqualTo("en");
     assertThat(extract.orders()).hasSize(1);
 
-    // Then — order incl. the amended header-total and quoted fields
     RefineryExtractOrderDto order = extract.orders().getFirst();
     assertThat(order.panelType()).isEqualTo("SETUP");
     assertThat(order.quoted()).isTrue();
@@ -120,7 +112,6 @@ class RefineryExtractDtoJsonTest {
     assertThat(order.sourceImages().getFirst().capturedAt())
         .isEqualTo(Instant.parse("2026-06-05T19:38:23Z"));
 
-    // Then — goods incl. rowIndex and the nullable outputQuantity (un-quoted row)
     assertThat(order.goods()).hasSize(2);
     RefineryExtractGoodDto quoted = order.goods().getFirst();
     assertThat(quoted.rowIndex()).isZero();

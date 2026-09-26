@@ -175,7 +175,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void accountGrantSelectorResolvesGrantHoldersOfTheEventsAccount() {
-    // Given the UC2 rule: bank management (ROLE) + employees granted on the account (ACCOUNT_GRANT)
     UUID accountId = UUID.fromString("00000000-0000-0000-0000-0000000000c2");
     UUID grantedEmployee = UUID.fromString("00000000-0000-0000-0000-0000000000a2");
     UUID manager = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
@@ -211,14 +210,12 @@ class RuleEvaluationServiceTest {
 
     Map<NotificationType, Set<UUID>> result = service.resolveRecipients(bankEvent);
 
-    // The requesting actor is excluded; manager + granted employee remain.
     assertThat(result.get(NotificationType.BANK_BOOKING_REQUEST_CREATED))
         .containsExactlyInAnyOrder(manager, grantedEmployee);
   }
 
   @Test
   void eventRecipientSelectorResolvesToTheEventsDirectedRecipient() {
-    // The decision-notification rule: notify the requester carried by the event (EVENT_RECIPIENT).
     UUID requester = UUID.fromString("00000000-0000-0000-0000-0000000000a4");
     UUID decider = UUID.fromString("00000000-0000-0000-0000-0000000000b4");
     NotificationRule rule =
@@ -243,18 +240,12 @@ class RuleEvaluationServiceTest {
 
     Map<NotificationType, Set<UUID>> result = service.resolveRecipients(confirmedEvent);
 
-    // The directed recipient is the requester; the deciding actor is not among the recipients.
     assertThat(result.get(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED))
         .containsExactly(requester);
   }
 
   @Test
   void accountResponsibleSelectorResolvesTheResponsibleHolderOfTheEventsAccount() {
-    // REQ-BANK-026/-034: the ACCOUNT_RESPONSIBLE selector notifies the account's responsible
-    // holder,
-    // resolved (via the org-unit seam) from the account carried by the event. Here on a confirm
-    // decision producing the account-centric RESPONSIBLE_CONFIRMED type; the deciding actor is
-    // excluded.
     UUID accountId = UUID.fromString("00000000-0000-0000-0000-0000000000c6");
     UUID requester = UUID.fromString("00000000-0000-0000-0000-0000000000a6");
     UUID responsible = UUID.fromString("00000000-0000-0000-0000-0000000000d6");
@@ -278,17 +269,12 @@ class RuleEvaluationServiceTest {
 
     Map<NotificationType, Set<UUID>> result = service.resolveRecipients(confirmedEvent);
 
-    // The responsible holder is notified; the deciding actor (ACTOR) is excluded.
     assertThat(result.get(NotificationType.BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED))
         .containsExactly(responsible);
   }
 
-  // --- Gap 1: null-context selector guards must each resolve to nobody, never NPE ---
-
   @Test
   void accountGrantSelectorWithNoAccountResolvesToNobody() {
-    // The job-order event carries no bank account (contextAccountId() defaults to null); an
-    // ACCOUNT_GRANT selector must resolve to nobody without ever consulting the grant resolver.
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -306,7 +292,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void accountResponsibleSelectorWithNoAccountResolvesToNobody() {
-    // Same missing-account guard for the ACCOUNT_RESPONSIBLE selector.
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -324,9 +309,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void eventRecipientWithNullRecipientResolvesToNobody() {
-    // The job-order event carries no directed recipient (contextRecipientUserId() defaults to
-    // null),
-    // so an EVENT_RECIPIENT selector must resolve to nobody rather than adding null.
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -341,8 +323,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void orgRelativeWithMissingContextOrgUnitResolvesToNobody() {
-    // The event exposes only RESPONSIBLE (requesting org unit is null), but the selector resolves
-    // against REQUESTING -> no matching org unit -> nobody, and the resolver is never consulted.
     JobOrderCreatedEvent noRequesting =
         new JobOrderCreatedEvent(
             UUID.randomUUID(),
@@ -374,8 +354,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void orgRelativeWithNullOrgRelativeRoleResolvesToNobody() {
-    // A malformed ORG_RELATIVE_ROLE selector (no org-relative role set) contributes nobody and
-    // never reaches the resolver, guarding against an NPE on the missing role.
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -396,7 +374,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void specificUserSelectorWithNullUserResolvesToNobody() {
-    // A SPECIFIC_USER selector with no target sub must contribute nobody instead of adding null.
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -411,7 +388,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void roleSelectorWithNullRoleCodeResolvesToNobody() {
-    // A ROLE selector with no role code must contribute nobody without hitting the role resolver.
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -427,12 +403,8 @@ class RuleEvaluationServiceTest {
     verify(recipientResolutionService, never()).resolveByRole(any());
   }
 
-  // --- Gap 2: recipient merge across multiple enabled rules ---
-
   @Test
   void unionsRecipientsAcrossTwoRulesOfSameType() {
-    // Two enabled rules for the same event both target JOB_ORDER_CREATED with disjoint recipients;
-    // the engine must union them under a single key (computeIfAbsent(...).addAll), not overwrite.
     NotificationRule ruleA =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -462,7 +434,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void twoRulesProducingDifferentTypesYieldTwoKeys() {
-    // Two enabled rules producing distinct notification types must yield two independent map keys.
     NotificationRule createdRule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -493,13 +464,8 @@ class RuleEvaluationServiceTest {
         .containsExactly(ADMIN_B);
   }
 
-  // --- Gap 3: empty-recipient guard and null-actor exclusion ---
-
   @Test
   void matchingRuleResolvingToNobodyProducesNoKey() {
-    // The rule matches and its single ORG_RELATIVE_ROLE selector is exercised, but the resolver
-    // returns nobody; the !recipients.isEmpty() guard must keep the type out of the map entirely
-    // (no key at all, not a key mapping to an empty set).
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,
@@ -522,8 +488,6 @@ class RuleEvaluationServiceTest {
 
   @Test
   void excludeActorWithNullActorKeepsAllRecipients() {
-    // Anonymous/guest actor: with excludeActor=true and a null actorSub the exclusion is skipped
-    // (event.actorSub() != null guard), so every resolved recipient survives.
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
             NotificationEventType.JOB_ORDER_CREATED))
         .thenReturn(List.of(ruleWithOfficerAndAdmin(true)));

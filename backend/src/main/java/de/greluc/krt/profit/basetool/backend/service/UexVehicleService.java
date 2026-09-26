@@ -45,33 +45,22 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * R2 UEX vehicle sync. Replaces the pre-R2 name-only matcher with the §8.5 UUID-first chain and
- * populates the 36 capability flags / dimensions / fuel / urls that the V111 migration added to
- * {@code ship_type}. The two description columns V111 added alongside them are <em>not</em> written
- * here — see the R9 paragraph below.
+ * Syncs UEX vehicles into {@code ship_type}, writing the capability flags, dimensions, fuel and
+ * URLs.
  *
- * <p>Resolution chain per SC_WIKI_SYNC_PLAN.md §8.5:
+ * <p>Resolution chain:
  *
  * <ol>
- *   <li>{@code findByExternalUuid(dto.uuid)} — strongest signal (Plan §3.6's 241-test invariant).
- *   <li>{@code findByUexVehicleId(dto.id)} — picks up rows the previous sync stamped without a UUID
- *       (~31% of UEX vehicles have no UUID).
- *   <li>{@code findByNameIgnoreCase(dto.name)} — legacy fallback that <b>backfills both</b> {@code
- *       external_uuid} (when UEX provides one) and {@code uex_vehicle_id} on hit. This is R2's
- *       substitute for the planned V112 data migration — the first sync after R2 deploys sets both
- *       columns on every match by name, and subsequent syncs never re-enter this path.
- *   <li>create a new row stamped {@link GameItemSourceSystem#UEX_ONLY}.
+ *   <li>{@code findByExternalUuid(dto.uuid)};
+ *   <li>{@code findByUexVehicleId(dto.id)}, for rows stamped without a UUID;
+ *   <li>{@code findByNameIgnoreCase(dto.name)}, which backfills {@code external_uuid} and {@code
+ *       uex_vehicle_id} on a hit;
+ *   <li>a new row stamped {@link GameItemSourceSystem#UEX_ONLY}.
  * </ol>
  *
- * <p>R9 Step 2: the legacy synthesized {@code description} column is no longer written — readers
- * source the ship-type description from {@code descriptionEn} / {@code descriptionDe} instead (the
- * column was dropped by V125 on 2026-06-01, R9 Step 4). Neither of those two is written
- * <em>here</em>: UEX serves no description at all, so both come from the SC-Wiki vehicle sync
- * (REQ-DATA-015) and, as a fill-if-null enrichment, from the P4K import.
- *
- * <p>Empty UEX response short-circuits without wiping local data. Orphan handling via {@link
- * ShipTypeRepository#markUexDeletedExcept(java.util.Collection, Instant)} gated on a non-empty
- * seen-id set.
+ * <p>Descriptions are not written here, as UEX serves none. An empty response writes nothing;
+ * orphans are marked via {@link ShipTypeRepository#markUexDeletedExcept(java.util.Collection,
+ * Instant)} only for a non-empty seen-id set.
  */
 @Slf4j
 @Service
@@ -80,9 +69,8 @@ import org.springframework.util.StringUtils;
 public class UexVehicleService {
 
   /**
-   * Cap for the upstream-supplied vehicle name in log lines. UEX is a third party we do not
-   * control, so the value is untrusted free text and goes through {@link LogSafe} first; 64
-   * characters comfortably fit any real ship name.
+   * Maximum length of the untrusted upstream vehicle name in log lines, which passes through {@link
+   * LogSafe}.
    */
   private static final int MAX_NAME_LOG_LENGTH = 64;
 
@@ -91,7 +79,7 @@ public class UexVehicleService {
   private final ManufacturerRepository manufacturerRepository;
   private final ManufacturerUexCompanyRepository manufacturerAliasRepository;
 
-  /** Writes the rows in short isolated transactions after the fetch (BE-PERF-09). */
+  /** Writes the rows in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
 
   /** Pulls the UEX vehicle catalogue and upserts each row. */
@@ -100,8 +88,6 @@ public class UexVehicleService {
     log.info("Starting synchronization of UEX vehicles (ships)...");
     UexClient.FetchResult<UexVehicleDto> fetched = uexClient.getVehicles();
     if (fetched.notModified()) {
-      // Catalogue byte-identical to the last run: nothing to upsert, and the orphan sweep below is
-      // skipped with it — every ship_type it would tombstone is still in the (unchanged) feed.
       log.info("UEX vehicle catalogue unchanged since the last sync (304) — nothing to import.");
       return;
     }
@@ -113,9 +99,6 @@ public class UexVehicleService {
 
     Instant now = Instant.now();
     Set<Integer> seenUexVehicleIds = new HashSet<>();
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch in chunk transactions of their own; a
-    // refused chunk is replayed row by row. The seen-id set may keep the id of a row that then
-    // failed on its own, which only spares that row the orphan sweep this run.
     SyncChunkWriter.Outcome<Boolean> outcome =
         chunkWriter.write(
             vehicles,
@@ -135,7 +118,6 @@ public class UexVehicleService {
     if (seenUexVehicleIds.isEmpty()) {
       log.warn("Skipping orphan sweep — no UEX vehicle was processed successfully.");
     } else {
-      // A bulk update needs a transaction, and the sync no longer holds one (BE-PERF-09).
       int marked =
           chunkWriter.inNewTransaction(
               () -> shipTypeRepository.markUexDeletedExcept(seenUexVehicleIds, now));
@@ -182,9 +164,6 @@ public class UexVehicleService {
       shipType.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
     }
 
-    // Backfill the cross-source keys. The legacy name-fallback rows get external_uuid +
-    // uex_vehicle_id
-    // on this run; subsequent syncs never re-enter the name path.
     if (externalUuid != null && shipType.getExternalUuid() == null) {
       shipType.setExternalUuid(externalUuid);
     }
@@ -202,7 +181,6 @@ public class UexVehicleService {
 
     shipType.setUexSyncedAt(now);
     shipType.setUexDeletedAt(null);
-    // Promote UEX_ONLY -> BOTH when Wiki already wrote this row (R4+).
     if (shipType.getSourceSystems() == GameItemSourceSystem.WIKI_ONLY) {
       shipType.setSourceSystems(GameItemSourceSystem.BOTH);
     }
@@ -212,9 +190,8 @@ public class UexVehicleService {
   }
 
   /**
-   * Copies every R2 column from the DTO onto the entity. Defensive: every setter receives the DTO
-   * value (possibly {@code null}) so a missing field on the UEX side clears the local row to {@code
-   * null} instead of stale-write surviving across schema migrations.
+   * Copies every UEX-sourced column from the DTO onto the entity; a field missing upstream clears
+   * the local value to {@code null}.
    *
    * @param shipType local row being updated
    * @param dto inbound DTO
@@ -223,8 +200,6 @@ public class UexVehicleService {
     shipType.setUexSlug(dto.slug());
     shipType.setNameFull(dto.nameFull());
     shipType.setScu(dto.scu());
-    // UEX serves the crew complement as one compact string ("1", "1,2"), not as crew_min/crew_max
-    // (REQ-DATA-015): binding those two decoded to null and cleared both columns on every run.
     UexValues.CrewRange crew = UexValues.parseCrew(dto.crew());
     shipType.setCrewMin(crew.min());
     shipType.setCrewMax(crew.max());
@@ -241,10 +216,6 @@ public class UexVehicleService {
     shipType.setUrlHotsite(dto.urlHotsite());
     shipType.setUrlPhoto(dto.urlPhoto());
     shipType.setUrlVideo(dto.urlVideo());
-    // NOT written here, because UEX's /vehicles payload does not carry them (REQ-DATA-015):
-    // mass_total, ore_capacity, max_medical_tier, health, shield_hp, url_wiki, description and
-    // description_de. Writing them cleared eight columns outright and — for vehicle_inventory_scu
-    // and description_en — undid what the SC-Wiki vehicle sync had filled in, every single run.
 
     shipType.setIsAddon(UexValues.asBooleanOrNull(dto.isAddon()));
     shipType.setIsBoarding(UexValues.asBooleanOrNull(dto.isBoarding()));
@@ -285,16 +256,12 @@ public class UexVehicleService {
   }
 
   /**
-   * Looks up the local manufacturer row from the inbound vehicle DTO. Resolves by the UEX {@code
-   * id_company} via the {@code manufacturer_uex_company} alias table first (so a brand UEX splits
-   * across several company records — e.g. the ships sit on {@code 278 "Esperia Incorporation"}
-   * while the items sit on {@code 87 "Esperia"} — still reunites on one manufacturer row,
-   * ADR-0023), falling back to a case-insensitive {@code company_name} match for rows without an
-   * id. Returns {@code null} when nothing matches — the linked manufacturer then stays whatever the
-   * previous sync set.
+   * Resolves the vehicle's local manufacturer: by UEX {@code id_company} via the {@code
+   * manufacturer_uex_company} alias table (ADR-0023), else by case-insensitive {@code
+   * company_name}.
    *
    * @param dto inbound vehicle row
-   * @return resolved manufacturer, or {@code null}
+   * @return resolved manufacturer, or {@code null}, leaving the linked manufacturer unchanged
    */
   @Nullable
   private Manufacturer resolveManufacturer(UexVehicleDto dto) {

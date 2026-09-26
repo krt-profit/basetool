@@ -43,22 +43,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.FieldSource;
 
 /**
- * Accessibility smoke check: logs in once and runs the axe-core WCAG 2.0/2.1 A+AA ruleset against
- * each core page, asserting there are no {@code critical}-impact violations. Read-only, so it
- * carries both {@code @Tag("smoke")} (staging smoke run) and {@code @Tag("e2e")} (the nightly /
- * label-gated ephemeral-stack run) — it mutates nothing and is safe in either.
+ * Accessibility smoke check: logs in once and runs the axe-core WCAG 2.0/2.1 A+AA rules against
+ * each core page, failing on {@code critical} and {@code serious} violations. Read-only, so tagged
+ * both {@code smoke} and {@code e2e}.
  *
- * <p>axe is injected and executed through Playwright's {@code evaluate}, which runs in an isolated
- * world that bypasses the app's strict Content-Security-Policy, so the scan works even though the
- * page blocks inline scripts.
- *
- * <p>The gate fails on {@code critical} <em>and</em> {@code serious} impacts — the two most severe
- * axe levels. It started {@code critical}-only at introduction; the {@code serious} backlog
- * (icon-only hamburger name, the missions filter date/time inputs, the chrome contrast nits and the
- * missing {@code <html lang>}) was cleared in #441, so the floor was tightened to {@code serious}.
- * Every violation at every impact level is still written to {@code build/e2e/a11y-<page>.txt} and
- * logged, so the remaining {@code moderate} / {@code minor} findings stay visible for triage and
- * can drive a future tightening to {@code moderate}.
+ * <p>Every violation is written to {@code build/e2e/a11y-<page>.txt}.
  */
 @Tag("smoke")
 @Tag("e2e")
@@ -187,12 +176,8 @@ class AccessibilitySmokeE2eTest {
   }
 
   /**
-   * Renders one violation as a human-readable block: impact, rule id, help text, and for every
-   * matching DOM node its selector, its markup (cut to 200 characters) and axe's failure summary —
-   * for {@code color-contrast} that summary carries the measured colours and ratio.
-   *
-   * <p>Until 2026-09-25 only the node count was printed, so a finding that depended on rows other
-   * test classes had created could not be traced to an element from the report.
+   * Renders one violation as a readable block: impact, rule id, help text, and per node its
+   * selector, markup (cut to 200 characters) and axe's failure summary.
    *
    * @param rule the axe violation
    * @return a multi-line description

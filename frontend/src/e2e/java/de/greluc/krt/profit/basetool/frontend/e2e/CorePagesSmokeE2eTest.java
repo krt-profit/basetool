@@ -35,28 +35,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.FieldSource;
 
 /**
- * Non-destructive smoke subset: log in once and confirm each core page renders the authenticated
- * app shell. Unlike the {@code @Tag("e2e")} flows, this suite is target-agnostic and read-only — it
- * creates and mutates nothing, so it is safe to run against a shared staging deployment.
+ * Read-only smoke suite: logs in once and asserts each route of {@link
+ * FrontendPageRoutes#CORE_SMOKE} renders the authenticated app shell ({@code nav-logout}).
  *
- * <p><b>The routes come from {@link FrontendPageRoutes#CORE_SMOKE}</b>, not from a list in this
- * file. Until 2026-09-13 this class, {@code AdminPagesSmokeE2eTest} and {@code
- * TouchClassLayoutE2eTest} each enumerated the frontend's page routes by hand, and the three
- * disagreed — the largest was short by seventeen. Which pages belong in <i>this</i> slice is still
- * a judgement (they must render for a member who may not be an administrator, because the base URL
- * can be a shared staging deployment), but every entry is now checked against the one catalogue by
- * {@code PageRouteCatalogueTest}, so a renamed route cannot leave this suite loading nothing.
- *
- * <p>Tagged {@code @Tag("smoke")}: the {@code smokeTest} Gradle task selects it, and it runs
- * against whatever {@link E2eStackExtension} resolves as the base URL — the ephemeral local stack
- * by default, or an external {@code E2E_BASE_URL} (staging) when set, with the user supplied via
- * {@code -Pe2e.username} / {@code -Pe2e.password} (CI secrets).
- *
- * <p>The assertion targets {@code nav-logout}, the authenticated-only sidebar logout control, so
- * its visibility proves the session is authenticated and the page neither errored nor bounced to
- * the identity provider. It replaced {@code nav-orders}: the nav links now live inside collapsed
- * {@code <details>} sections ({@code display:none} until expanded), whereas the logout control is
- * always rendered for a logged-in user.
+ * <p>Safe against a shared staging deployment; the {@code smokeTest} Gradle task runs it against
+ * the base URL {@link E2eStackExtension} resolves.
  */
 @Tag("smoke")
 class CorePagesSmokeE2eTest {

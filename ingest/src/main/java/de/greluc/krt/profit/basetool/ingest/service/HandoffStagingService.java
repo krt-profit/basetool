@@ -33,19 +33,11 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Stages the short-lived, single-use browser handoffs in Redis (REQ-INGEST-003). A staged entry is
- * keyed by {@code (sub, handoffId)}, expires after {@link IngestProperties#handoffTtl()}, and is
- * deleted on the first successful read — so a stolen or replayed id is useless, and the entry is
- * scoped to the user who created it.
+ * Stages single-use browser handoffs in Redis (REQ-INGEST-003).
  *
- * <p>Key schema (shared with the frontend, which performs the consuming read after login): {@code
- * ingest:handoff:&lt;sub&gt;:&lt;handoffId&gt;} → a {@link StagedHandoff} JSON document. No
- * screenshots and no raw image bytes are ever staged — only the already-matched draft.
- *
- * <p>The gateway only ever writes. The single-use consume is the frontend's ({@code
- * IngestHandoffService}); a gateway-side {@code consume} existed only for this module's tests and
- * now lives there, reading the literal key schema the frontend reads, so a drift on either side
- * fails a test.
+ * <p>Entries are keyed {@code ingest:handoff:&lt;sub&gt;:&lt;handoffId&gt;}, hold a {@link
+ * StagedHandoff} and expire after {@link IngestProperties#handoffTtl()}. The gateway only writes;
+ * the frontend consumes them.
  */
 @Slf4j
 @Service
@@ -70,8 +62,8 @@ public class HandoffStagingService {
   private final IngestProperties ingestProperties;
 
   /**
-   * Stages a draft for one-time pickup and returns a fresh, unguessable handoff id. The id is 160
-   * bits of {@link SecureRandom} entropy (URL-safe base64), comfortably above the 128-bit floor.
+   * Stages a draft for one-time pickup and returns a fresh handoff id of 160 bits of {@link
+   * SecureRandom} entropy, URL-safe base64.
    *
    * @param sub the authenticated caller's subject; the entry is readable only under this subject
    * @param kind which draft is being staged
@@ -85,10 +77,6 @@ public class HandoffStagingService {
     String handoffId = URL_ENCODER.encodeToString(raw);
     String value = objectMapper.writeValueAsString(new StagedHandoff(kind, draftJson));
 
-    // Size guard. The 2 MiB ingress cap is an ingress cap; it was never a staging policy, and using
-    // it as one let one caller park megabytes per stage in a Redis that is SHARED with the
-    // frontend's Spring Session store and runs `--maxmemory-policy noeviction` - where reaching the
-    // ceiling refuses writes rather than evicting, so the symptom is that nobody can log in.
     long stagedBytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
     if (stagedBytes > ingestProperties.maxHandoffBytes()) {
       log.warn(
@@ -102,17 +90,6 @@ public class HandoffStagingService {
 
     redisTemplate.opsForValue().set(key(sub, handoffId), value, ingestProperties.handoffTtl());
     trimSubjectIndex(sub, handoffId);
-    // Diagnostic correlator (REQ-OBS-004): log a NON-reversible hash of the subject and of the
-    // handoff id — never the raw subject (pseudonymous PII), the raw id (a bearer-grade secret that
-    // travels in the browser URL), or the draft. The frontend's consume logs the same two hashes,
-    // so
-    // a stage/consume pair can be lined up to tell a subject mismatch (different sub hash) apart
-    // from
-    // an expired / already-consumed handoff (matching sub hash, key absent) — the exact ambiguity
-    // behind the "Import-Link abgelaufen oder ungültig" reports.
-    // draftLen is the cheapest possible answer to "the pre-filled form came up empty": a two-byte
-    // draft is an empty backend response, a plausible size is a real draft and moves the search to
-    // the frontend's consume side. The draft itself is never logged.
     log.info(
         "Staged {} handoff (sub=u-{}, hid=h-{}, draftLen={}, ttl={})",
         kind,
@@ -124,18 +101,10 @@ public class HandoffStagingService {
   }
 
   /**
-   * Records the new handoff in the subject's index and evicts the oldest beyond the per-subject
-   * cap, deleting their payload keys with them.
+   * Records the new handoff in the subject's index and evicts the oldest entries beyond the
+   * per-subject cap, including their payload keys.
    *
-   * <p>The rate limiter bounds requests per minute; it does not bound how many entries are alive at
-   * once. At 30 requests/minute against a 30-minute TTL one subject could hold 900 - which, in a
-   * Redis shared with the session store and run under {@code noeviction}, is a login outage rather
-   * than a slow page. The index is itself given the handoff TTL so it cannot outlive what it
-   * tracks.
-   *
-   * <p>Best-effort by design: a lost race trims one entry late, never one too many, and the TTL is
-   * still the backstop. Redis being unavailable must not fail an ingest that already succeeded, so
-   * a failure here is logged and swallowed - the entry stays within its TTL.
+   * <p>Best-effort: failures are logged and swallowed, leaving the TTL as the backstop.
    *
    * @param sub the caller's subject
    * @param handoffId the id just staged
@@ -143,8 +112,6 @@ public class HandoffStagingService {
   private void trimSubjectIndex(@NotNull String sub, @NotNull String handoffId) {
     String indexKey = INDEX_PREFIX + sub;
     try {
-      // RPUSH answers the list's length after the push, so it is the size already — a separate
-      // LLEN was one more Redis round trip per stage for a number we had in hand.
       Long size = redisTemplate.opsForList().rightPush(indexKey, handoffId);
       redisTemplate.expire(indexKey, ingestProperties.handoffTtl());
       long excess = size == null ? 0L : size - ingestProperties.maxHandoffsPerSubject();
@@ -182,11 +149,8 @@ public class HandoffStagingService {
   }
 
   /**
-   * Produces a short, non-reversible correlation token for a subject or handoff id so the value can
-   * be logged without leaking the raw subject (pseudonymous PII) or the raw id (a bearer-grade
-   * secret) — REQ-OBS-004. Uses {@link String#hashCode()}, whose algorithm is JVM-independent, so
-   * the frontend's consume-side masking of the same input yields the same token and the two log
-   * lines line up.
+   * Produces a short, non-reversible log token for a subject or handoff id (REQ-OBS-004), matching
+   * the frontend's masking of the same input.
    *
    * @param value the subject or handoff id to mask; {@code null} yields the literal {@code "none"}
    * @return the lower-case hex of the value's hash, or {@code "none"} for a {@code null} input

@@ -36,12 +36,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Unit tests for {@link SpecialCommandAdminProxyController}. The controller forwards the per-SK
- * profit-eligibility toggle to the backend. {@code isProfitEligible} is carried on the cached
- * org-units owner-picker options and the admin switcher's SK catalogue, so the contract under test
- * (REQ-DATA-007) mirrors {@code SquadronAdminProxyController}: the toggle forwards the PATCH and
- * then evicts the {@code SQUADRON} + {@code ORG_UNIT} caches — in that order — so no cached surface
- * serves a stale flag up to the cache TTL.
+ * Unit tests for {@link SpecialCommandAdminProxyController}: the profit-eligibility toggle forwards
+ * the PATCH and then evicts the {@code SQUADRON} and {@code ORG_UNIT} caches, in that order
+ * (REQ-DATA-007).
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandAdminProxyControllerTest {
@@ -52,15 +49,11 @@ class SpecialCommandAdminProxyControllerTest {
 
   @Test
   void setProfitEligible_forwardsPatch_thenEvictsStaticDataCache() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("eligible", true);
 
-    // When
     ResponseEntity<Void> response = controller.setProfitEligible(id, body);
 
-    // Then — 204. Eviction runs AFTER the write so the cleared cache repopulates from the
-    // already-mutated backend state, never the reverse.
     assertEquals(204, response.getStatusCode().value());
     InOrder inOrder = inOrder(backendApiClient);
     inOrder

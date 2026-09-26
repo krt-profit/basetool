@@ -31,32 +31,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Publishes {@code basetool_ingest_gate_enforcing{gate}}, the configured posture of the four
- * client-discriminating gates of the ingest gateway (REQ-INGEST-011): {@code 1} while a gate
- * actually refuses callers, {@code 0} while it is unconfigured or only counting.
- *
- * <p><b>Why it exists.</b> Every one of these gates is inert by default and switched on by the
- * environment alone, so nothing in the code, the image or the deploy log says whether production is
- * protected. The one time it was read — 2026-08-28 — the audience check carried the backend's value
- * and the allowlist ran in audit-only, i.e. <em>neither</em> refused anything, and that was only
- * found by reading the host's environment by hand. This gauge makes the posture a scraped fact, so
- * {@code IngestAudienceGateOff} can say so without anybody logging in.
- *
- * <p>The {@code gate} label is one of four fixed literals, never a configured value (REQ-OBS-011):
+ * Publishes {@code basetool_ingest_gate_enforcing{gate}}: {@code 1} while a client gate refuses
+ * callers, {@code 0} while it is unconfigured or audit-only (REQ-INGEST-011).
  *
  * <ul>
- *   <li>{@code azp} — the client-id allowlist is non-empty and {@code audit-only} is off;
- *   <li>{@code scope} — a required scope is set and {@code audit-only} is off;
- *   <li>{@code tool} — the provenance allowlist is non-empty and {@code audit-only} is off;
- *   <li>{@code audience} — {@code app.security.jwt.expected-audiences} holds at least one value.
- *       {@code audit-only} does not apply to it: the audience lives in the {@code JwtDecoder} and
- *       refuses from the moment it is set.
+ *   <li>{@code azp} — client-id allowlist non-empty and not audit-only;
+ *   <li>{@code scope} — required scope set and not audit-only;
+ *   <li>{@code tool} — provenance allowlist non-empty and not audit-only;
+ *   <li>{@code audience} — at least one expected audience; audit-only does not apply.
  * </ul>
  *
- * <p>Modelled on {@link TracingEnabledMetric}: registered once at startup with constant values,
- * because every input is bound at startup and cannot change without a restart. The same facts —
- * booleans and list sizes, never the configured client ids, scopes, tools or audiences — are logged
- * once, here, and repeated in the startup banner.
+ * <p>Values are fixed at startup; the posture is also logged once, without configured values.
  */
 @Slf4j
 @Component
@@ -86,7 +71,7 @@ public class IngestGatePostureMetric {
    * @param registry the registry the gauges are published to
    * @param clientIdentityProperties the {@code azp} / scope / {@code tool} gate configuration
    * @param expectedAudiences the raw {@code app.security.jwt.expected-audiences}; blank entries are
-   *     ignored exactly as the decoder ignores them
+   *     ignored
    */
   public IngestGatePostureMetric(
       @NotNull MeterRegistry registry,
@@ -98,9 +83,8 @@ public class IngestGatePostureMetric {
   }
 
   /**
-   * Registers one gauge per gate and logs the posture once. At {@code WARN} while the audience
-   * check is off, because that is the one gate an operator must turn on by hand and the one whose
-   * absence the alert reports; at {@code INFO} otherwise.
+   * Registers one gauge per gate and logs the posture once, at WARN while the audience check is off
+   * and at INFO otherwise.
    */
   @PostConstruct
   public void register() {
@@ -143,8 +127,8 @@ public class IngestGatePostureMetric {
   }
 
   /**
-   * The configured posture of the ingest client gates: whether each refuses, plus the sizes of the
-   * configured lists. Holds no configured value, only counts and booleans, so it is safe to log.
+   * The configured posture of the ingest client gates, holding only booleans and counts so it is
+   * safe to log.
    *
    * @param azpEnforcing the client-id allowlist refuses unknown clients
    * @param scopeEnforcing the required-scope check refuses tokens without it

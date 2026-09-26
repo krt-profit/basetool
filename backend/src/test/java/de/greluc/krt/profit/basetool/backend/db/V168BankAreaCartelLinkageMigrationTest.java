@@ -34,18 +34,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the V168 bank-cascade migration (epic #692, REQ-ORG-019 / REQ-BANK-021): the relaxed
- * {@code chk_bank_account_owner_ref} CHECK that lets an {@code AREA} account carry its Bereich and
- * the {@code CARTEL} account carry the Organisationsleitung through the existing {@code
- * org_unit_id} FK, while the legacy free-form {@code area_name} form stays valid during the soak.
- * The test profile boots Postgres via Testcontainers and runs every migration at startup, so this
- * exercises the real DDL.
+ * Verifies the V168 bank-cascade migration against the real schema: the {@code
+ * chk_bank_account_owner_ref} CHECK lets an {@code AREA} account reference its Bereich and the
+ * {@code CARTEL} account the Organisationsleitung, while the free-form {@code area_name} form stays
+ * valid (REQ-BANK-021).
  *
- * <p>Cardinality is asserted at the DB level: the pre-existing partial unique index {@code
- * uq_bank_account_org_unit} (untouched by V168) already caps every org unit — including a Bereich
- * or the OL — at one account, so a second AREA account for the same Bereich is rejected. Throwaway
- * {@code org_unit} / {@code bank_account} rows are inserted directly and removed in a finally block
- * so the shared schema is left untouched.
+ * <p>Also asserts one account per org unit. Throwaway rows are removed in a finally block.
  */
 @SpringBootTest
 class V168BankAreaCartelLinkageMigrationTest {
@@ -71,25 +65,20 @@ class V168BankAreaCartelLinkageMigrationTest {
       insertOrgUnit(jdbc, olId, "ORGANISATIONSLEITUNG", "TEST_V168_OL", "TV8OL", null);
       insertOrgUnit(jdbc, bereichId, "BEREICH", "TEST_V168_BER", "TV8B", olId);
 
-      // AREA linked to its Bereich via the FK (no area_name) — accepted by the relaxed CHECK.
       insertAccount(jdbc, areaAcctId, "KB-V168-1", "Area Profit", "AREA", bereichId, null);
       assertThat(accountCount(jdbc, areaAcctId)).isOne();
       assertThat(orgUnitIdOf(jdbc, areaAcctId)).isEqualTo(bereichId);
 
-      // CARTEL linked to the OL via the FK — accepted.
       insertAccount(jdbc, cartelAcctId, "KB-V168-2", "Kartell", "CARTEL", olId, null);
       assertThat(orgUnitIdOf(jdbc, cartelAcctId)).isEqualTo(olId);
 
-      // Cardinality: a second account for the same Bereich is rejected by uq_bank_account_org_unit.
       assertThatThrownBy(
               () -> insertAccount(jdbc, dupAreaAcctId, "KB-V168-3", "Dup", "AREA", bereichId, null))
           .isInstanceOf(DataAccessException.class);
 
-      // The legacy free-form area_name form (no FK) is still accepted during the soak.
       insertAccount(jdbc, legacyAreaAcctId, "KB-V168-4", "Legacy", "AREA", null, "Legacy-Bereich");
       assertThat(accountCount(jdbc, legacyAreaAcctId)).isOne();
 
-      // An AREA account that carries NEITHER the FK nor an area_name violates the owner-ref CHECK.
       assertThatThrownBy(
               () ->
                   insertAccount(

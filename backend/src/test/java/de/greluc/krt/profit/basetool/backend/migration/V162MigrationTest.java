@@ -39,18 +39,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code
- * V162__manufacturer_uex_company_alias_and_dedup.sql}. Asserts the alias table ships with the
- * expected shape (PK on {@code uex_company_id}, FK to {@code manufacturer}, lookup index) and that
- * the one-time dedup SQL collapses two duplicate company rows of one brand onto the lowest-id
- * canonical row — repointing the child FK, carrying the SC Wiki / P4K links over, OR-ing the
- * surface flags and mapping both company ids in the alias table (ADR-0023 / REQ-DATA-004).
+ * Migration test for {@code V162__manufacturer_uex_company_alias_and_dedup.sql}: the alias table's
+ * shape and the dedup that merges duplicate company rows of one brand onto the lowest-id row
+ * (REQ-DATA-004).
  *
- * <p>The migration itself runs once at boot against an empty schema (a no-op for the dedup), so the
- * dedup half of the file cannot be exercised by Flyway here. {@link
- * #dedupCollapsesDuplicateBrandOntoCanonicalRow()} seeds a duplicate pair and runs the file's
- * step-2/3 statements verbatim to prove the destructive merge behaves; everything it creates is
- * removed in {@link #cleanup()} so the shared test container is not polluted.
+ * <p>{@link #dedupCollapsesDuplicateBrandOntoCanonicalRow()} seeds a duplicate pair and runs the
+ * dedup statements directly; {@link #cleanup()} removes the fixture.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -65,8 +59,6 @@ class V162MigrationTest {
 
   @AfterEach
   void cleanup() {
-    // game_item FK has no cascade — drop the child first, then the manufacturer (which cascades
-    // its alias rows via ON DELETE CASCADE). Idempotent so a half-failed test still cleans up.
     if (seededGameItemId != null) {
       jdbcTemplate.update("DELETE FROM game_item WHERE id = ?", seededGameItemId);
     }
@@ -105,7 +97,6 @@ class V162MigrationTest {
 
   @Test
   void dedupCollapsesDuplicateBrandOntoCanonicalRow() {
-    // Canonical (lowest id 9001): item-side record, no Wiki/P4K link yet.
     Manufacturer canonical = new Manufacturer();
     canonical.setName("Dedup Canonical 162");
     canonical.setAbbreviation(TEST_ABBR);
@@ -114,7 +105,6 @@ class V162MigrationTest {
     canonical.setIsVehicleManufacturer(false);
     canonical = manufacturerRepository.saveAndFlush(canonical);
 
-    // Duplicate (higher id 9002): the vehicle-side record, carrying the Wiki + P4K links.
     UUID scwikiUuid = UUID.fromString("a53bbc2b-0000-4000-8000-000000000162");
     UUID p4kUuid = UUID.fromString("a53bbc2b-0000-4000-8000-000000000163");
     Manufacturer duplicate = new Manufacturer();
@@ -128,7 +118,6 @@ class V162MigrationTest {
     duplicate.setP4kUuid(p4kUuid);
     duplicate = manufacturerRepository.saveAndFlush(duplicate);
 
-    // A child item linked to the loser row — it must end up on the canonical row, not orphaned.
     GameItem item = new GameItem();
     item.setName("Dedup Child Item 162");
     item.setKind(GameItemKind.GENERIC);
@@ -141,18 +130,15 @@ class V162MigrationTest {
 
     jdbcTemplate.execute(DEDUP_SQL);
 
-    // The loser row is gone; the canonical row survives.
     assertFalse(
         manufacturerRepository.existsById(duplicateId), "the duplicate row must be deleted");
     assertTrue(manufacturerRepository.existsById(canonicalId), "the canonical row must survive");
 
-    // The child item was repointed onto the canonical row.
     UUID childManufacturer =
         jdbcTemplate.queryForObject(
             "SELECT manufacturer_id FROM game_item WHERE id = ?", UUID.class, seededGameItemId);
     assertEquals(canonicalId, childManufacturer, "the child item must be repointed, not orphaned");
 
-    // Flags OR'd, Wiki/P4K links carried over to the canonical row.
     Map<String, Object> row =
         jdbcTemplate.queryForMap(
             "SELECT is_item_manufacturer, is_vehicle_manufacturer, scwiki_uuid, p4k_uuid "
@@ -163,7 +149,6 @@ class V162MigrationTest {
     assertEquals(scwikiUuid, row.get("scwiki_uuid"), "Wiki link carried onto the canonical row");
     assertEquals(p4kUuid, row.get("p4k_uuid"), "P4K link carried onto the canonical row");
 
-    // Both company ids map to the surviving canonical row in the alias table.
     assertEquals(canonicalId, aliasTarget(9001));
     assertEquals(canonicalId, aliasTarget(9002));
   }
@@ -188,10 +173,8 @@ class V162MigrationTest {
   }
 
   /**
-   * The step-2/3 dedup statements from {@code V162__manufacturer_uex_company_alias_and_dedup.sql},
-   * verbatim (the table + index already exist from the boot-time migration). Run as a single
-   * multi-statement batch so the {@code ON COMMIT DROP} temp tables live for its duration. Keep in
-   * sync with the migration file.
+   * The dedup statements of {@code V162__manufacturer_uex_company_alias_and_dedup.sql}, run as one
+   * batch; must match the migration file.
    */
   private static final String DEDUP_SQL =
       """

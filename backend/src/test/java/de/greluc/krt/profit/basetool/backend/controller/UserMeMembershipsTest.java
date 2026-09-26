@@ -47,23 +47,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins {@code GET /api/v1/users/me/memberships}, the me-scoped twin of {@code GET
- * /{id}/memberships} that the Android app's org-unit switcher reads (REQ-API-009 contract set).
- *
- * <p>Three properties are worth a test rather than a reading of the code:
+ * Tests {@code GET /api/v1/users/me/memberships} (REQ-API-009).
  *
  * <ul>
- *   <li><b>It cannot name another user.</b> That is the whole reason it exists — the id-taking
- *       sibling would otherwise have to be reachable from the public API vhost, which is a
- *       default-deny allow-list precisely so no path able to name a third party sits on it. The
- *       caller's id comes from the JWT subject and from nowhere else.
- *   <li><b>An account with no roles still gets a 200.</b> {@code /api/v1/users/**} is gated on
- *       {@code hasRole('ADMIN')} in SecurityConfig, and a path that fell into that catch-all would
- *       403 every non-admin at the URL filter — that exact defect once blanked the web sidebar and
- *       is what {@code UserMembershipsSecurityTest} was written for. Here it would break the app's
- *       shell, which frames every screen.
- *   <li><b>{@code allKinds} means what it means on the sibling.</b> Two endpoints with the same
- *       parameter and different semantics is worse than one.
+ *   <li>The user id comes only from the JWT subject.
+ *   <li>An account with no roles still gets a 200.
+ *   <li>{@code allKinds} behaves as on {@code GET /{id}/memberships}.
  * </ul>
  */
 @SpringBootTest
@@ -121,8 +110,6 @@ class UserMeMembershipsTest {
   @Test
   @DisplayName("an authenticated account with no roles is served, not refused")
   void aRolelessAccountIsServed() throws Exception {
-    // The app's switcher renders on the shell around every screen. A 403 here for a member whose
-    // only fault is having no unit yet would break the frame rather than one list.
     mockMvc
         .perform(get("/api/v1/users/me/memberships").with(callerJwt()))
         .andExpect(status().isOk());

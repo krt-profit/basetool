@@ -55,11 +55,8 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
   /**
    * Finds a role by its stable code, ignoring case.
    *
-   * <p>The codes are canonical and upper-case, and every match at read time is the case-sensitive
-   * {@code r.code = :roleCode}. This exists for the write side: a client that sends {@code admin}
-   * names a role that exists, and refusing it (or, worse, storing it) produces a rule that either
-   * cannot be saved or matches nobody. Callers resolve through this and then store the catalogue's
-   * own casing, so the two sides cannot drift.
+   * <p>For the write side: callers resolve through this and store the catalogue's own upper-case
+   * code, since every read-time match is case-sensitive.
    *
    * @param code the role code in any casing
    * @return the role, or empty when the catalogue knows no such code
@@ -69,17 +66,9 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
   /**
    * The whole role catalogue with each role's {@code permissions} already loaded.
    *
-   * <p>{@code Role.permissions} is a {@code LAZY @ElementCollection}, and the roles this returns
-   * outlive the transaction that read them: {@code UserReconciliationService.syncUser} maps them
-   * inside its own transaction and hands them to {@code
-   * CustomJwtGrantedAuthoritiesConverter.assembleFor}, which iterates {@code getPermissions()}
-   * afterwards. Touching the collection there is a {@code LazyInitializationException} - "no
-   * session" - and because that runs on the authentication path, it is a {@code 500} on <b>every
-   * login</b>. Fetching the collection with the roles is what makes the hand-off legal; it also
-   * removes a second N+1, since assembling a member's authorities reads every role's permissions
-   * anyway.
-   *
-   * <p>{@code DISTINCT} because the join multiplies each role by its permission rows.
+   * <p>The roles outlive the reading transaction and their permissions are iterated on the
+   * authentication path, where a lazy load would fail on every login. {@code DISTINCT} because the
+   * join multiplies each role by its permission rows.
    *
    * @return every role, with its permission set initialised
    */
@@ -87,14 +76,10 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
   List<Role> findAllWithPermissions();
 
   /**
-   * Returns the display {@code name} of every role in the local catalog. Backs the Keycloak user
-   * sync's role-indexed membership fetch: {@code KeycloakService.fetchUsers} queries {@code GET
-   * /roles/{name}/users} for exactly these names (the realm role name equals the local role name,
-   * the key {@code UserService.mapRoles} joins on), so ubiquitous default/technical realm roles are
-   * never walked. A lightweight scalar projection — no entity or {@code permissions} graph is
-   * loaded.
+   * Returns the {@code name} of every role in the local catalogue as a scalar projection; the
+   * Keycloak user sync fetches role memberships for exactly these names.
    *
-   * @return the set of role names; never {@code null}, possibly empty.
+   * @return the set of role names; never {@code null}, possibly empty
    */
   @Query("SELECT r.name FROM Role r")
   Set<String> findAllNames();

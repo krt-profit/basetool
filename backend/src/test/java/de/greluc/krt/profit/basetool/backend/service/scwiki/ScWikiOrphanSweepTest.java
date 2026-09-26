@@ -32,11 +32,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 
 /**
- * Unit tests for {@link ScWikiOrphanSweep}, pinning the two load-bearing data-safety gates that
- * keep a partial run from tombstoning an entire SC-Wiki catalogue table: the sweep must never be
- * invoked with an empty seen-set, and never after a page walk that could not enumerate the whole
- * feed (H5 — a half-walked feed still yields hundreds of real UUIDs, so the emptiness gate alone
- * waves it through and everything on the un-fetched pages gets soft-deleted).
+ * Unit tests for {@link ScWikiOrphanSweep}: the sweep never runs with an empty seen-set or after a
+ * page walk that could not enumerate the whole feed.
  */
 class ScWikiOrphanSweepTest {
 
@@ -92,9 +89,6 @@ class ScWikiOrphanSweepTest {
 
   @Test
   void incompleteFetch_refusesToSweep_andWarnsWhy() {
-    // The regression this gate exists for: a page walk that died after page 1 still hands the sync
-    // a non-empty seen-set, so the emptiness gate passes and every row on the pages that were never
-    // fetched would be tombstoned for never having been fetched.
     Set<UUID> seen = Set.of(UUID.randomUUID(), UUID.randomUUID());
     AtomicInteger sweepCalls = new AtomicInteger();
 

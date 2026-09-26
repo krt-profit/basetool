@@ -46,19 +46,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Imports the UEX refining-method catalog and the per-terminal refinery yield matrix.
+ * Imports the UEX refining-method catalogue and the per-terminal refinery yield matrix
+ * (REQ-DATA-005).
  *
- * <p>The two sync paths are independent and both idempotent. The yields path is the one that has
- * shipped bugs in the past: it must never auto-create placeholder materials or terminals — the
- * commodity catalog and the universe sync are the single sources of truth for those tables. A yield
- * row with an unknown commodity or terminal id is silently skipped (the row gets retried on the
- * next sync once the parent catalog catches up).
- *
- * <p><strong>Transactions (BE-PERF-09, REQ-DATA-005).</strong> Both feeds are fetched with no
- * transaction open and written through {@link SyncChunkWriter} — chunks in their own transactions,
- * a failed chunk replayed row by row. The yield matrix resolves the material, the terminal and the
- * existing yield row from three id maps read once per run instead of three lookups per row. The one
- * audit summary per run is written in a transaction of its own, after the rows.
+ * <p>Yield rows with an unknown commodity or terminal are skipped, never given placeholder parents.
+ * Both feeds are fetched without a transaction and written through {@link SyncChunkWriter}.
  */
 @Slf4j
 @Service
@@ -73,7 +65,7 @@ public class UexRefinerySyncService {
   private final TerminalRepository terminalRepository;
   private final AuditService auditService;
 
-  /** Writes the rows in short isolated transactions after the fetch (BE-PERF-09). */
+  /** Writes the rows in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
 
   /**
@@ -100,9 +92,6 @@ public class UexRefinerySyncService {
     int added = (int) outcome.results().stream().filter(Boolean::booleanValue).count();
     int updated = outcome.results().size() - added;
     log.info("Finished UEX Refining Methods sync: {} added, {} updated", added, updated);
-    // System-actor summary event (one per run, never per row); actor resolves to "system" as no
-    // security context exists on the scheduled path. AuditService.record is MANDATORY, so it gets
-    // a transaction of its own now that the sync holds none.
     chunkWriter.inNewTransaction(
         () ->
             auditService.record(
@@ -244,7 +233,6 @@ public class UexRefinerySyncService {
       lookups.rememberRow(entry.getKey().parentId(), entry.getKey().terminalId(), id);
       savedIds.put(entry.getKey(), id);
     }
-    // One result per row processed (the pre-2026-09-22 tally counted rows, not distinct pairs).
     return rowKeys.stream().map(savedIds::get).toList();
   }
 }

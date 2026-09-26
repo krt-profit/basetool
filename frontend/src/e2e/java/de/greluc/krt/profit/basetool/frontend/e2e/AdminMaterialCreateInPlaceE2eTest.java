@@ -38,21 +38,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the admin material-create modal on {@code /admin/materials} (FE-SEC-03 /
- * FE-PERF-06): the create used to be a hand-rolled {@code fetch} POST that reloaded the whole page
- * 400 ms after success. It now goes through {@code krtFetch.write} — which owns the CSRF header,
- * the bare-403 retry and the double-submit guard — and re-renders the material table in place.
- *
- * <p>The single test pins both halves of that change at once. The create button is
- * <strong>double-clicked</strong>, and exactly one {@code POST /admin/materials/ajax} may leave the
- * browser: {@code krtFetch} disables the submitter synchronously on the first click, so the second
- * click lands on a disabled button. The new material's row must then appear in {@code
- * #materialsTable} while a window marker set before the click survives, which a full navigation
- * would have wiped.
- *
- * <p>The actor is {@code test-admin}, who carries ADMIN through the seeded realm and may create
- * catalog materials. The material name is unique per run, so the test does not depend on the
- * catalog's seeded contents.
+ * The admin material-create modal on {@code /admin/materials} sends exactly one write on a
+ * double-click and renders the new row in {@code #materialsTable} without a page reload.
  */
 @Tag("e2e")
 class AdminMaterialCreateInPlaceE2eTest {
@@ -90,11 +77,8 @@ class AdminMaterialCreateInPlaceE2eTest {
   }
 
   /**
-   * Opens the create modal, double-clicks its create button and asserts that exactly one create
-   * POST was sent, that the new material's row appears in the table, and that the page was not
-   * reloaded. Red on the pre-fix frontend on two counts: its raw {@code fetch} had no in-flight
-   * guard beyond a manual disable, and its success path called {@code window.location.reload()},
-   * which clears the {@code __krtNoReload} marker.
+   * Double-clicks the create button and asserts one create POST, the new row in the table, and no
+   * page reload.
    */
   @Test
   void doubleClickedCreateSendsOneWriteAndRendersTheRowInPlace() {
@@ -119,7 +103,6 @@ class AdminMaterialCreateInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/admin/materials");
         page.waitForLoadState();
 
-        // A full navigation wipes this marker, so its survival proves the create stayed in place.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         page.locator("[data-trigger='materials-open-create-modal']").click();
@@ -133,10 +116,6 @@ class AdminMaterialCreateInPlaceE2eTest {
                 page.locator("#modal-create-material [data-trigger='materials-submit-create']")
                     .dblclick());
 
-        // The in-place refresh re-renders the table from a fresh GET of the page; the new row
-        // arriving is the signal that the whole round-trip — write and re-render — has finished.
-        // Match the row by its NAME cell only: every row also carries a per-row material <select>
-        // whose options list the whole catalog, so a row-wide hasText matches all of them.
         Locator newRow =
             page.locator("#materialsTable tbody tr")
                 .filter(

@@ -45,11 +45,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminAnnouncementPageController}'s in-place AJAX twins (epic #571 /
- * #582). Proves the {@code X-Requested-With} header routing: the update/delete twins are
- * {@code @ResponseBody} and return {@code 200} (the update echoing the re-fetched optimistic-lock
- * {@code version}), while the same URL POSTed without the header still hits the classic redirect
- * handler. Fails if the header gating or the version write-back breaks.
+ * MVC test for {@link AdminAnnouncementPageController}'s AJAX twins: with {@code X-Requested-With}
+ * the update and delete twins return {@code 200} (the update echoing the new {@code version});
+ * without it the classic redirect handler runs.
  */
 @SpringBootTest
 class AdminAnnouncementPageControllerMvcTest {
@@ -69,8 +67,6 @@ class AdminAnnouncementPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  // covers #582 — the update twin (X-Requested-With + JSON body) persists, then re-reads the admin
-  // record and returns the bumped version so the page can write it back into the hidden input.
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateAjax_withHeader_returns200AndEchoesVersion() throws Exception {
@@ -90,8 +86,6 @@ class AdminAnnouncementPageControllerMvcTest {
         .andExpect(content().string(containsString("7")));
   }
 
-  // covers #582 — the delete twin (X-Requested-With) returns 200 so the page clears the form in
-  // place rather than reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteAjax_withHeader_returns200() throws Exception {
@@ -105,8 +99,6 @@ class AdminAnnouncementPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — header routing: the same update URL WITHOUT the header still hits the classic
-  // form handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void update_withoutHeader_redirects() throws Exception {

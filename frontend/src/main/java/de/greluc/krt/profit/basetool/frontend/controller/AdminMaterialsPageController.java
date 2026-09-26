@@ -59,13 +59,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the admin material catalog ({@code /admin/materials}).
- *
- * <p>The materials list is the heaviest reference-data table in the app — every UEX commodity plus
- * the project-specific job-order materials. The page renders the list once (sorted
- * case-insensitively) and uses a dedicated AJAX endpoint for the field-by-field admin edits so a
- * single category re-assignment doesn't reload the whole table. Category create/delete still goes
- * through full-page redirects because both invalidate the materials cache.
+ * Controller for the admin material catalog ({@code /admin/materials}): renders the full material
+ * list and edits single fields in place via AJAX.
  */
 @Controller
 @UsesLayoutModel
@@ -86,23 +81,17 @@ public class AdminMaterialsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Loads the <em>complete</em> materials list — every page, not one capped chunk — plus the
-   * category dropdown source (REQ-ADMIN-001, ADR-0102). The "refined materials" model attribute is
-   * the same list sorted again case-insensitively — admins assign raw materials to a refined one
-   * even when the UEX flag is wrong, so the dropdown intentionally includes every material rather
-   * than filtering by {@code isRefined}. Should the page walk ever hit its safety cap, {@code
-   * catalogTruncated} renders a loud warning banner (REQ-ADMIN-002).
+   * Loads the complete materials list and the category dropdown source (REQ-ADMIN-001). The refined
+   * materials dropdown lists every material, not only those flagged refined. Hitting the page-walk
+   * cap sets {@code catalogTruncated} (REQ-ADMIN-002).
    *
-   * @param model Thymeleaf model populated with materials, refined-materials and categories
+   * @param model Thymeleaf model populated with materials, refined materials and categories
    * @return the {@code admin/materials} view name
    */
   @NotNull
   @GetMapping
   public String listMaterials(Model model) {
     try {
-      // includeHidden=true: the admin catalog must show wiki-only commodities imported invisible
-      // (§4.3) so they can be reviewed and unhidden. Trading pages call the same endpoint without
-      // the flag and get only visible rows.
       CompleteCatalog<MaterialDto> materialsCatalog =
           CatalogPages.fetchAll(
               page ->
@@ -112,8 +101,6 @@ public class AdminMaterialsPageController {
       List<MaterialDto> materials = new ArrayList<>(materialsCatalog.items());
       model.addAttribute("catalogTruncated", materialsCatalog.truncated());
 
-      // Provide a list of all materials for assignment to RAW materials
-      // (bypass UEX data errors where refined materials are not marked correctly)
       List<MaterialDto> refinedMaterials =
           materials.stream()
               .sorted(
@@ -145,10 +132,9 @@ public class AdminMaterialsPageController {
   }
 
   /**
-   * Creates a new material category. The backend returns the created record; the page only needs to
-   * flash a success/error toast and redirect to refresh the dropdown.
+   * Creates a material category and redirects back with a flash toast.
    *
-   * @param name category name (must be unique across categories — backend enforces)
+   * @param name category name, unique across categories
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/materials}
    */
@@ -172,9 +158,7 @@ public class AdminMaterialsPageController {
   }
 
   /**
-   * Deletes a material category. The backend's referential-integrity check refuses the call when
-   * any material still references the category — the resulting 409 surfaces as a generic delete
-   * error toast.
+   * Deletes a material category; the backend refuses with 409 while a material references it.
    *
    * @param id category id
    * @param redirectAttributes flash attributes carrier
@@ -197,14 +181,12 @@ public class AdminMaterialsPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #createCategory} — routed here ahead of the classic handler by
-   * the {@code X-Requested-With} header so the no-JS form keeps its redirect fallback. Returns the
-   * created {@link MaterialCategoryDto} so the page can append it to the category table and to
-   * every per-row category dropdown without reloading.
+   * In-place twin of {@link #createCategory}: returns the created {@link MaterialCategoryDto} so
+   * the page can add it to the table and every category dropdown.
    *
-   * @param request JSON body carrying the new category {@code name}
-   * @return the created {@link MaterialCategoryDto} on success, {@code 400} when the name is blank,
-   *     the relayed backend status on a domain conflict, {@code 500} on an unexpected error
+   * @param request body carrying the new category {@code name}
+   * @return the created {@link MaterialCategoryDto}, {@code 400} for a blank name, the relayed
+   *     backend status on a conflict, or {@code 500} on an unexpected error
    */
   @ResponseBody
   @PostMapping(value = "/categories", headers = "X-Requested-With=XMLHttpRequest")
@@ -228,14 +210,12 @@ public class AdminMaterialsPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #deleteCategory}. On success the page removes the category row
-   * and its dropdown options in place. The backend refuses the delete with a 409 when any material
-   * still references the category; that problem is relayed so the client shows the reason inline
-   * (no reload).
+   * In-place twin of {@link #deleteCategory}; a 409 for a still-referenced category is relayed so
+   * the client shows the reason.
    *
    * @param id category id
-   * @return {@code 200} on success, the relayed backend status on a referential-integrity conflict,
-   *     {@code 500} on an unexpected error
+   * @return {@code 200} on success, the relayed backend status on a conflict, or {@code 500} on an
+   *     unexpected error
    */
   @ResponseBody
   @PostMapping(value = "/categories/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
@@ -250,20 +230,14 @@ public class AdminMaterialsPageController {
   }
 
   /**
-   * AJAX endpoint that edits a single field on a material in place. The request's {@code
-   * updateType} discriminator selects which field is being touched ({@code CATEGORY}, {@code
-   * REFINED}, {@code QUANTITY_TYPE}, {@code MANUAL_RAW}, {@code JOB_ORDER}, {@code VISIBILITY});
-   * every other field on the material is preserved from the freshly-fetched current record. Every
-   * successful edit, whatever its {@code updateType}, additionally evicts the frontend's {@code
-   * CacheDomain.MATERIAL} catalogue cache so dependent pages (pickers, lookups) see the change
-   * without a full reload — unhiding a reviewed commodity must make it appear in trading flows
-   * immediately. Failures collapse to a generic 500 — the AJAX layer in the template renders a
-   * toast instead of relying on per-status semantics.
+   * Edits one field of a material in place, selected by {@code updateType} ({@code CATEGORY},
+   * {@code REFINED}, {@code QUANTITY_TYPE}, {@code MANUAL_RAW}, {@code JOB_ORDER}, {@code
+   * VISIBILITY}); other fields are copied from the current record. Evicts the {@code
+   * CacheDomain.MATERIAL} cache on success.
    *
    * @param id material id
    * @param request AJAX patch payload
-   * @return the freshly re-fetched material on success, 400 on unknown update type, 500 on backend
-   *     failure
+   * @return the re-fetched material, 400 on an unknown update type, 500 on backend failure
    */
   @ResponseBody
   @PutMapping("/{id}/ajax")
@@ -327,37 +301,25 @@ public class AdminMaterialsPageController {
               request.version());
 
       backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
-      // Every material edit changes the cached material catalogues (list, lookup, job-order,
-      // matrix)
-      // regardless of updateType, so evict the MATERIAL domain unconditionally (REQ-DATA-007). The
-      // former updateType guard missed CATEGORY / REFINED / QUANTITY_TYPE edits, leaving those
-      // lists
-      // stale up to the TTL.
       backendApiClient.evict(CacheDomain.MATERIAL);
       MaterialDto updatedMaterial =
           backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
       return ResponseEntity.ok(updatedMaterial);
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/materials", id, e);
-      // In case of OptimisticLocking, backend usually returns 409 Conflict
       return ResponseEntity.status(500).build();
     } catch (Exception e) {
       log.error("Ajax update material failed", e);
-      // In case of OptimisticLocking, backend usually returns 409 Conflict
       return ResponseEntity.status(500).build();
     }
   }
 
   /**
-   * AJAX endpoint that creates a new material manually. Relays the validated request to {@code POST
-   * /api/v1/materials}, which stamps {@code isManualEntry=true} server-side. Propagates the
-   * backend's HTTP status so the page can distinguish 400 (validation rejected — show problem
-   * detail in toast) from 500 (server failure — generic toast). Clears the frontend static-data
-   * cache on success so downstream pages (refinery picker, lookups) immediately see the new
-   * material.
+   * Creates a material manually via {@code POST /api/v1/materials}, which marks it as a manual
+   * entry, and clears the static-data cache on success.
    *
    * @param request validated create payload
-   * @return the persisted material on 200, an empty body with the backend's status on failure
+   * @return the persisted material, or an empty body with the backend's status on failure
    */
   @ResponseBody
   @PostMapping("/ajax")

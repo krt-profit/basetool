@@ -25,26 +25,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Inbound request payload for the add-participant operations — by {@code userId} for a registered
- * member, or by free-text {@code guestName} for an <b>external</b> participant, a named person
- * without an account (ADR-0159, decision D4).
+ * Request to add a mission participant, either a registered member by {@code userId} or an external
+ * person without an account by {@code guestName} (ADR-0159). Free-text fields are size-capped.
  *
- * <p>Named {@code AddParticipantPublicRequest} until ADR-0159, after the endpoint that was {@code
- * permitAll}. The {@code @Size} caps were written for that audience: without them an
- * unauthenticated caller could spam multi-megabyte {@code guestName} / {@code comment} payloads
- * until the {@code mission_participant} table was full (audit finding H-2). They stay — a member
- * can fill a table too, and a bound on a free-text column is cheap.
- *
- * <p>{@code orgUnitIds} is honoured only for an external entry, and then <b>as submitted</b>:
- * {@code MissionParticipantService.resolveSubmittedOrgUnits} applies no per-org-unit authorization
- * filter, because the affiliation is a roster label that grants no authority — the endpoint's own
- * gate is what decides who may record the participant. For a registered participant the
- * affiliations are auto-derived server-side from the user's memberships and any submitted list is
- * ignored.
- *
- * <p>{@code payoutPreference} optionally fixes the per-mission payout choice at sign-up time (the
- * "Auszahlungsart" select in the sign-up modal). When {@code null}, the registered user's profile
- * default (REQ-MISSION-002) respectively the entity default ({@code PAYOUT}) applies.
+ * <p>{@code orgUnitIds} is honoured only for an external entry and taken as submitted; for a
+ * registered member the affiliations are derived server-side. A {@code null} {@code
+ * payoutPreference} falls back to the user's profile default, else {@code PAYOUT}.
  */
 public record AddExternalParticipantRequest(
     UUID userId,

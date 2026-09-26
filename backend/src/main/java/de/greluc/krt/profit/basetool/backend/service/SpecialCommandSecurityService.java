@@ -31,18 +31,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Authorization helper for Spezialkommando-administration {@code @PreAuthorize} expressions.
- * Mirrors the {@link MissionSecurityService} pattern — methods on this bean are referenced from
- * SpEL ({@code @specialCommandSecurityService.canManageMembers(#id, authentication)}) and translate
- * the "can the caller manage members of this SK" question into a boolean by combining the caller's
- * authorities with the membership row on the target SK.
+ * SpEL authorization helper for Spezialkommando administration, used by the member-management
+ * {@code @PreAuthorize} expressions.
  *
- * <p>The rule, recorded in {@code SPEZIALKOMMANDO_PLAN.md} §2 (D2): an admin may manage any SK's
- * member list; a non-admin caller may manage a specific SK's members iff their membership on that
- * exact SK carries {@code role = SK_LEAD}. The same verdict also gates the single-SK read {@code
- * GET /api/v1/special-commands/{id}}, so the lead's member page can render its SK header. The lead
- * seat itself is set through a dedicated endpoint gated to admin or the Bereichsleiter of the SK's
- * parent Bereich, so a Lead cannot promote themselves or someone else to Lead.
+ * <p>An admin may manage any SK's members; a non-admin only those of an SK where their membership
+ * carries {@code SK_LEAD}.
  */
 @Service
 @RequiredArgsConstructor
@@ -54,28 +47,15 @@ public class SpecialCommandSecurityService {
   private final OrgUnitMembershipRepository membershipRepository;
 
   /**
-   * Answers the SpEL-level question whether the calling principal may manage members of the given
-   * Spezialkommando.
+   * Returns whether the caller may manage members of the given Spezialkommando: always for ADMIN,
+   * never for an unauthenticated caller, otherwise iff the caller's membership on exactly that SK
+   * carries {@code role = SK_LEAD}.
    *
-   * <ul>
-   *   <li>ADMIN — always {@code true}; SK lifecycle and per-SK admin actions are part of the global
-   *       admin surface.
-   *   <li>Anonymous / unauthenticated — always {@code false}; the endpoints under {@code
-   *       /api/v1/special-commands/{id}/members/**} are not part of the public surface.
-   *   <li>Authenticated non-admin — {@code true} iff the caller's membership on the exact SK
-   *       referenced by {@code specialCommandId} carries {@code role = SK_LEAD}. A Lead may NOT
-   *       manage members of any other SK they are merely a regular member of.
-   * </ul>
-   *
-   * <p>A non-existent SK id is treated as denied (no special-case 404 surface from the
-   * authorisation layer) — the controller layer will surface the 404 separately when the service
-   * call hits {@link SpecialCommandService#getSpecialCommandById} with the same id.
+   * <p>An unknown SK id is denied.
    *
    * @param specialCommandId the SK whose member list the caller wants to manage; never {@code
    *     null}.
-   * @param authentication current Spring Security authentication; may be {@code null} for anonymous
-   *     calls (the framework hands SpEL a non-null but anonymous principal in that case, so the
-   *     null check below is defensive).
+   * @param authentication current Spring Security authentication; may be {@code null}.
    * @return {@code true} iff the caller may manage members of {@code specialCommandId}.
    */
   public boolean canManageMembers(@NotNull UUID specialCommandId, Authentication authentication) {
@@ -90,8 +70,6 @@ public class SpecialCommandSecurityService {
         .flatMap(
             userId ->
                 membershipRepository.findById(new OrgUnitMembershipId(userId, specialCommandId)))
-        // SK-Lead now lives on the unified rank (epic #800, REQ-ROLE-001); is_lead was dropped in
-        // the Phase 5 cleanup (V187).
         .map(m -> m.getRole() == MembershipRole.SK_LEAD)
         .orElse(false);
   }

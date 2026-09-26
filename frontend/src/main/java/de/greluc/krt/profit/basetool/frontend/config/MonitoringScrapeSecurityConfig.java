@@ -26,7 +26,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.User;
@@ -37,33 +36,14 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Dedicated, fail-closed security filter chain for the Prometheus scrape endpoint {@code
- * /actuator/prometheus} (REQ-OBS-005, ADR-0072, epic #936 Phase 1). Mirrors the backend/ingest
- * configs of the same name.
+ * Dedicated, fail-closed security filter chain for {@code /actuator/prometheus} (REQ-OBS-005,
+ * ADR-0072).
  *
- * <p>Design decisions, all deliberate:
- *
- * <ul>
- *   <li><b>Own chain, ordered before the main chain</b> ({@code @Order(1)}, {@code securityMatcher}
- *       on exactly this path): the main {@link SecurityConfig} chain would answer an
- *       unauthenticated {@code /actuator/prometheus} request with an OAuth2 login redirect —
- *       useless for a scraper — and would let any logged-in browser session read the metrics
- *       payload. Only the dedicated basic-auth identity counts here.
- *   <li><b>Fail-closed:</b> when {@link MonitoringScrapeProperties#isConfigured()} is {@code false}
- *       (env vars unset — dev, test, e2e, prod before the monitoring rollout) the chain is built
- *       with {@code denyAll()}; there is no unauthenticated fallback.
- *   <li><b>Basic auth against an in-memory user:</b> the single scrape principal exists only in
- *       this chain's local {@link InMemoryUserDetailsManager}; it is not a bean, so it can never
- *       interfere with the OAuth2 login of the main chain. The plaintext env value is BCrypt-hashed
- *       at startup via the delegating encoder ({@code {bcrypt}} storage format).
- *   <li><b>Stateless, no CSRF, no request cache:</b> a Prometheus server scrapes every 30 s with
- *       credentials on each request — without {@code STATELESS} every scrape would mint a fresh
- *       Redis-backed session, and a saved request in the request cache could hijack a later user
- *       login redirect. CSRF does not apply to a credentialed GET with no browser session.
- *   <li><b>{@link BotProtectionFilter} interplay:</b> the bot filter blocks the whole {@code
- *       /actuator} prefix before any security chain runs; {@code /actuator/prometheus} is on its
- *       {@code LEGITIMATE_PATHS} whitelist so the scrape reaches this chain at all.
- * </ul>
+ * <p>Ordered before the main {@link SecurityConfig} chain, it accepts only basic auth against a
+ * chain-local {@link InMemoryUserDetailsManager} with a BCrypt-hashed password, and denies
+ * everything when {@link MonitoringScrapeProperties#isConfigured()} is {@code false}. Stateless and
+ * without request cache; CSRF stays on and never fires for a {@code GET} scrape. {@link
+ * BotProtectionFilter} must whitelist the path.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -78,9 +58,7 @@ public class MonitoringScrapeSecurityConfig {
   private final MonitoringScrapeProperties properties;
 
   /**
-   * Builds the scrape filter chain described in the class Javadoc. Ordered before the main {@link
-   * SecurityConfig} chain so {@code /actuator/prometheus} never falls through to the OAuth2 login
-   * rules.
+   * Builds the scrape filter chain, ordered before the main {@link SecurityConfig} chain.
    *
    * @param http the Spring Security builder for this chain
    * @return the configured chain — basic-auth-gated when credentials are configured, deny-all
@@ -92,12 +70,6 @@ public class MonitoringScrapeSecurityConfig {
   public SecurityFilterChain monitoringScrapeFilterChain(@NotNull HttpSecurity http)
       throws Exception {
     http.securityMatcher(PROMETHEUS_PATH)
-        // CSRF protection is deliberately off on this chain: it is a stateless, basic-auth-only
-        // machine endpoint with no session cookie, so there is no browser credential a forged
-        // cross-site request could ride on - the rule does not apply to this call site. A 30 s
-        // scrape interval must also not accumulate Redis sessions or saved requests.
-        // lgtm[java/spring-disabled-csrf-protection]
-        .csrf(AbstractHttpConfigurer::disable)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
@@ -112,8 +84,6 @@ public class MonitoringScrapeSecurityConfig {
           .httpBasic(Customizer.withDefaults())
           .authorizeHttpRequests(auth -> auth.anyRequest().hasRole(MONITORING_ROLE));
     } else {
-      // Fail-closed: no credentials configured -> nobody reaches the metrics payload. The
-      // default Http403ForbiddenEntryPoint answers every request with 403.
       http.authorizeHttpRequests(auth -> auth.anyRequest().denyAll());
     }
     return http.build();

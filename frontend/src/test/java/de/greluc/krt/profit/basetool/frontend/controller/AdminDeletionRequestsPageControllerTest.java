@@ -44,18 +44,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Mockito tests for {@link AdminDeletionRequestsPageController} (REQ-SEC-061, ADR-0181).
- *
- * <p>Two of these are the reason the class has tests at all.
- *
- * <p><b>A refusal without a reason is refused.</b> Art. 12(4) obliges the controller to tell the
- * requester <em>why</em>, so the note is mandatory in three layers — here, in the backend, and as a
- * CHECK constraint in the database. This class pins the outermost one, including the shapes a
- * hand-written client actually produces: the key missing, the value blank, the value not a string.
- *
- * <p><b>Refusing and carrying out are separate endpoints.</b> They are not one endpoint with a
- * decision parameter, because a parameter is a thing a mistake can flip and one of the two outcomes
- * is irreversible. The tests assert each path relays to its own backend URI.
+ * Mockito tests for {@link AdminDeletionRequestsPageController} (REQ-SEC-061, ADR-0181): a refusal
+ * without a reason (missing, blank or non-string note) is rejected, and refusing and carrying out
+ * relay to their own backend URIs.
  */
 class AdminDeletionRequestsPageControllerTest {
 
@@ -103,8 +94,6 @@ class AdminDeletionRequestsPageControllerTest {
 
   @Test
   void decline_withAReason_relaysItAndNeverGrantsTheHistoryErasure() {
-    // A refusal cannot also grant the extra wish; the flag is pinned false rather than read from
-    // the payload so a client cannot produce that combination at all.
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -147,8 +136,6 @@ class AdminDeletionRequestsPageControllerTest {
 
   @Test
   void execute_readsTheHistoryErasureFromTheAdminsPayload() {
-    // The member's wish is recorded on the request row; whether it is granted is the admin's
-    // answer, and that is what this flag carries (decision 6, greluc).
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -161,14 +148,8 @@ class AdminDeletionRequestsPageControllerTest {
     assertEquals(true, body.get("grantHistoryErasure"));
   }
 
-  // covers REQ-SEC-061 - an execution collects no note, because nothing can store one
   @Test
   void execute_relaysNoNoteEvenWhenTheClientSendsOne() {
-    // The dialog no longer offers a note field and the proxy no longer forwards one. There is
-    // nowhere durable to put it: the deletion_request row cascades away with the account, and
-    // REQ-AUDIT-001 keeps free text out of the audit payload. Asking an admin for a justification
-    // and discarding it is worse than not asking -- they believe they have recorded it. A refusal
-    // is the case where the reasoning survives, and /decline requires it.
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -180,8 +161,6 @@ class AdminDeletionRequestsPageControllerTest {
 
   @Test
   void execute_coercesAMissingOrMalformedFlagToFalse() {
-    // Anything that is not a literal true means "the admin did not grant the extra erasure", which
-    // is the conservative reading: the anonymisation it triggers cannot be undone.
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -219,8 +198,6 @@ class AdminDeletionRequestsPageControllerTest {
 
   @Test
   void page_rendersWithAnErrorBannerAndAnEmptyQueueWhenTheBackendIsDown() {
-    // A half-loaded admin page beats an error page here: the rest of the admin area's queues behave
-    // the same way, and the admin can still navigate.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(any(String.class), ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenThrow(new BackendServiceException("down", new RuntimeException(), 503));
@@ -237,12 +214,6 @@ class AdminDeletionRequestsPageControllerTest {
 
   @Test
   void rows_letsAFailurePropagateRatherThanPaintingAnEmptyQueue() {
-    // It used to catch and render an empty list, which paints "Keine offenen Loeschantraege" --
-    // telling the admin the Art. 12(3) queue is empty when the backend is merely unreachable. The
-    // banner its page() sibling sets could not have helped either: it sits OUTSIDE
-    // th:fragment="rows" and would never have rendered here. Propagating gives krtFetch a non-2xx,
-    // so the client toasts and leaves the table already on screen; stale-but-labelled beats
-    // empty-and-confident on a queue with a statutory deadline.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(any(String.class), ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenThrow(new BackendServiceException("down", new RuntimeException(), 503));

@@ -30,11 +30,8 @@ import org.mapstruct.Mapping;
 @Mapper(config = CentralMapperConfig.class, uses = MaterialCategoryMapper.class)
 public interface MaterialMapper {
   /**
-   * Maps a {@link Material} entity to its DTO. UEX-style {@code Integer} 0/1 flags ({@code
-   * isIllegal}, {@code isVolatileQt}, {@code isVolatileTime}) are normalised to {@code Boolean} for
-   * the client. {@code isManualEntry} is derived from {@code sourceSystems == MANUAL} (R9 Step 1):
-   * the legacy {@code is_manual_entry} column was dropped in R9 Step 4 — the canonical provenance
-   * lives in {@code source_systems} (V116 backfill).
+   * Maps a {@link Material} entity to its DTO, converting the 0/1 {@code Integer} flags to {@code
+   * Boolean} and deriving {@code isManualEntry} from {@code sourceSystems == MANUAL}.
    */
   @Mapping(
       target = "isIllegal",
@@ -53,15 +50,10 @@ public interface MaterialMapper {
   MaterialDto toDto(Material entity);
 
   /**
-   * Builds a new {@link Material} entity from the DTO. Boolean flags are converted back to
-   * UEX-style {@code Integer} 0/1 storage.
+   * Builds a {@link Material} entity from the admin-editable subset in the DTO, converting boolean
+   * flags back to 0/1 {@code Integer} storage.
    *
-   * <p>{@link MaterialDto} is the admin-editable subset, and its only consumer ({@code
-   * MaterialService.updateMaterial}) copies exactly that subset onto the managed row. Every other
-   * {@link Material} column — the UEX, SC Wiki and P4K catalogue data and the timestamps — is owned
-   * by the sync jobs, so this method maps nothing by default ({@code ignoreByDefault}) and names
-   * each field it does carry. A new {@link Material} column therefore stays unset here until
-   * someone decides it belongs to the admin edit.
+   * <p>Maps nothing by default; every sync-owned column stays unset.
    */
   @BeanMapping(ignoreByDefault = true)
   @Mapping(target = "id", source = "id")
@@ -87,16 +79,9 @@ public interface MaterialMapper {
   Material toEntity(MaterialDto dto);
 
   /**
-   * Strips server-managed fields and body-supplied foreign-key references from a freshly mapped
-   * entity for the POST/create flow, so a client cannot pre-set them (mass-assignment /
-   * over-posting). {@code id} stays null so JPA performs an INSERT instead of a merge against an
-   * existing row; {@code version} is left to the persistence provider; {@code refinedMaterial} and
-   * {@code category} are not accepted through the request body here. A future create flow that
-   * needs them should look the ids up via the service layer.
-   *
-   * <p>Declared as a static helper rather than a default mapping method so MapStruct does not
-   * consider it a candidate for nested {@code MaterialDto -> Material} mappings inside other
-   * mappers.
+   * Clears server-managed fields and body-supplied references ({@code id}, {@code version}, {@code
+   * refinedMaterial}, {@code category}) on a freshly mapped entity for the create flow, so a client
+   * cannot pre-set them.
    */
   static Material stripServerManaged(Material entity) {
     if (entity != null) {

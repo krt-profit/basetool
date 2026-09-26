@@ -52,13 +52,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Behaviour of the Terms-of-Use consent gate page (REQ-SEC-028).
- *
- * <p>Two of these are about not locking people out. A backend hiccup on the status read must still
- * render the page — the gate's job is to obtain consent, and failing closed there would mean nobody
- * can get through until the backend recovers. Conversely, a failure to <em>record</em> consent must
- * report an error rather than a silent success, because a user waved through without a stored row
- * is asked again on the next request and never understands why.
+ * Tests the Terms-of-Use consent gate page (REQ-SEC-028): a failed status read still renders the
+ * page, and a failure to record consent reports an error.
  */
 @SpringBootTest
 class TermsAcceptancePageControllerTest {
@@ -82,8 +77,6 @@ class TermsAcceptancePageControllerTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // Stubbed for every test rather than per case: the gate cannot render without the wording,
-    // so leaving it out would fail each test for a reason unrelated to what it asserts.
     when(backendApiClient.get(eq(DOCUMENT_URI), eq(TermsDocumentDto.class))).thenReturn(document());
   }
 
@@ -127,10 +120,8 @@ class TermsAcceptancePageControllerTest {
   }
 
   /**
-   * A gate whose wording cannot be read is an error, not an emptier gate.
-   *
-   * <p>Deliberately the opposite tolerance from the status read above: a stale "not accepted" costs
-   * one extra click, but consent to a text that was never displayed is not consent at all.
+   * A failure to load the terms wording is an error, because consent to text never shown is not
+   * consent.
    */
   @Test
   @WithMockUser
@@ -142,9 +133,6 @@ class TermsAcceptancePageControllerTest {
 
     mockMvc
         .perform(get("/terms/accept"))
-        // The error page, not the gate. Asserted on the resolved view rather than on the
-        // status: the advice renders error/error and MockMvc reports the pre-dispatch 200,
-        // so a status assertion here would pass for a gate that rendered perfectly fine.
         .andExpect(view().name("error/error"))
         .andExpect(content().string(not(containsString("4. Pflichten der Nutzer"))));
   }

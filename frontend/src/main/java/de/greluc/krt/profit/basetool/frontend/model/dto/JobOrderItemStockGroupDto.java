@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code JobOrderItemStockGroupDto} (REQ-ORDERS-028): one game-item
- * group of the order-detail Item-Bestand panel — the item stock earmarked to the order, grouped per
- * game item with the order's own line context ({@code orderedAmount} / {@code manufacturedAmount},
- * both 0 for an orphaned earmark) and the whole-unit sum of the entries' this-order slices.
+ * Frontend mirror of the backend {@code JobOrderItemStockGroupDto} (REQ-ORDERS-028): the item stock
+ * earmarked to an order for one game item, with the order's ordered and manufactured counts.
  *
  * @param gameItem the slim game-item reference (id, name, manufacturer, kind)
  * @param orderedAmount whole units of this game item the order requests (0 when not requested)

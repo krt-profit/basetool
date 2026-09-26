@@ -22,24 +22,16 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Squadron payload.
- *
- * <p>{@code isPromotionEnabled} is the per-squadron feature flag for the entire promotion subsystem
- * (topics, categories, level-contents, rank-requirements, member-evaluations). Flag is read-only on
- * the regular update path; admins toggle it through a dedicated {@code
- * /api/v1/squadrons/{id}/promotion-enabled} endpoint so the change is auditable and cannot be made
- * by accident as a side-effect of editing the squadron name/shorthand. {@code null} on the request
- * side is therefore meaningless — the value is always supplied on responses, and only the dedicated
- * toggle endpoint actually mutates it.
+ * Wire shape of a squadron.
  *
  * @param id squadron identifier; nullable on create-request payloads
  * @param name display name (case-insensitive unique)
  * @param shorthand short tag used on badges / column headers
  * @param description free-form text
  * @param active soft-delete flag; {@code true} for the active reference data
- * @param isPromotionEnabled per-squadron promotion-system feature flag (default {@code true})
- * @param isProfitEligible per-squadron Job-Order processor eligibility flag (default {@code
- *     false}); read-only on the regular update path and toggled only through {@code
+ * @param isPromotionEnabled whether the promotion subsystem is on for this squadron; changed only
+ *     through {@code /api/v1/squadrons/{id}/promotion-enabled}
+ * @param isProfitEligible whether the squadron may process job orders; changed only through {@code
  *     /api/v1/squadrons/{id}/profit-eligible}
  * @param version optimistic-lock counter
  */

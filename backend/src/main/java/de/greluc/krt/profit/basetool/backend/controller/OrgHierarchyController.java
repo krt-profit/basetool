@@ -55,15 +55,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin-only REST surface for the upper org-hierarchy tiers (epic #692, REQ-ORG-014): creating
- * Bereiche and the Organisationsleitung and wiring the {@code parent_org_unit_id} edges that make a
- * Staffel/SK belong to a Bereich and a Bereich belong to the OL. Every endpoint is {@code
- * hasRole('ADMIN')} — defining the hierarchy is org-unit lifecycle administration, exactly like the
- * Squadron/SK lifecycle controllers. The leadership-membership management of Bereiche/OL lives on a
- * separate membership surface (a later slice of this phase).
- *
- * <p>Lives under {@code /api/v1/org-hierarchy/**}, outside the per-kind {@code /squadrons} / {@code
- * /special-commands} spaces, so the new tiers have one auditable home.
+ * Admin-only REST surface for the upper org-hierarchy tiers (REQ-ORG-014): creating Bereiche and
+ * the Organisationsleitung and wiring the {@code parent_org_unit_id} edges between tiers.
  */
 @RestController
 @RequestMapping("/api/v1/org-hierarchy")
@@ -327,8 +320,6 @@ public class OrgHierarchyController {
    */
   @NotNull
   private BereichMemberResponse toBereichMember(@NotNull OrgUnitMembership m) {
-    // The three Bereich booleans are derived from the unified rank (epic #800, REQ-ROLE-001) — the
-    // is_bereichs* columns were dropped in the Phase 5 cleanup (V187).
     MembershipRole role = m.getRole();
     return new BereichMemberResponse(
         m.getId().getOrgUnitId(),
@@ -347,9 +338,6 @@ public class OrgHierarchyController {
    */
   @NotNull
   private OlMemberResponse toOlMember(@NotNull OrgUnitMembership m) {
-    // The OL-member boolean is derived from the unified rank (epic #800, REQ-ROLE-001) —
-    // is_ol_member
-    // was dropped in the Phase 5 cleanup (V187).
     return new OlMemberResponse(
         m.getId().getOrgUnitId(),
         m.getId().getUserId(),
@@ -358,9 +346,8 @@ public class OrgHierarchyController {
   }
 
   /**
-   * Maps an {@link OrgUnit} (any kind) to its flat hierarchy-node DTO for the management table. The
-   * parent id is read within the controller's transaction; {@code department} is read only for a
-   * {@link Bereich}, {@code null} for every other kind.
+   * Maps an {@link OrgUnit} of any kind to its flat hierarchy-node DTO; {@code department} is set
+   * only for a {@link Bereich}.
    *
    * @param u the entity; never {@code null}.
    * @return the node DTO.

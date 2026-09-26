@@ -49,18 +49,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level regressions for the §4.4 remediation list of the item-inventory design (V220,
- * REQ-INV-029, ADR-0101) against the real Postgres test schema: with {@code material_id} nullable,
- * every historically material-only read seam must exclude game-item rows explicitly, and the
- * runtime {@code material.name} sort — smuggled in via the Pageable rather than the JPQL — must not
- * decide row visibility through its implicit-join trap. Each test seeds a NULL-material (item) row
- * next to a material row and pins the seam to its own catalog population; before the remediation
- * several of these queries silently dropped rows (releasable picker, flat lists under the default
- * sort) or would have 500ed their consumer with a null material (Materialsammlung, order stock
- * index).
- *
- * <p>{@link Transactional} so each method rolls back — the seeded rows never commit to the shared
- * Testcontainers database.
+ * Verifies against PostgreSQL that material-only inventory reads exclude game-item rows and that a
+ * {@code material.name} sort does not drop rows (REQ-INV-029). Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -155,21 +145,16 @@ class InventoryItemCatalogQueryDataTest {
     return order.getId();
   }
 
-  // covers REQ-INV-029 (flat user list splits by catalog; default material.name sort is join-safe)
   @Test
   void flatUserLists_splitByCatalog_underTheirDefaultSorts() {
-    // When — the material flat list under its DEFAULT material.name sort (the runtime-appended
-    // attribute path whose implicit inner join decided row visibility before the NOT-NULL guard)
     Page<InventoryItem> materialRows =
         inventoryItemRepository.findMaterialRowsByUser(
             user, PageRequest.of(0, 50, Sort.by(Sort.Direction.ASC, "material.name")));
 
-    // Then — exactly the material row: present under the sort, with the item row excluded
     assertThat(materialRows.getContent())
         .extracting(InventoryItem::getId)
         .containsExactly(materialRow.getId());
 
-    // And the item flat list serves the game-item rows under its own gameItem.name sort
     Page<InventoryItem> itemRows =
         inventoryItemRepository.findItemRowsByUser(
             user, PageRequest.of(0, 50, Sort.by(Sort.Direction.ASC, "gameItem.name")));
@@ -178,10 +163,8 @@ class InventoryItemCatalogQueryDataTest {
         .containsExactly(itemRow.getId());
   }
 
-  // covers REQ-INV-029 (global flat list keeps the material-only contract under the default sort)
   @Test
   void findGlobalByFilters_excludesItemRows_underTheDefaultMaterialNameSort() {
-    // When — the admin-wide flat list under the default material.name sort
     Page<InventoryItem> page =
         inventoryItemRepository.findGlobalByFilters(
             false,
@@ -198,7 +181,6 @@ class InventoryItemCatalogQueryDataTest {
             Set.of(),
             PageRequest.of(0, 200, Sort.by(Sort.Direction.ASC, "material.name")));
 
-    // Then — the material row is visible under the sort and no returned row is an item row
     assertThat(page.getContent())
         .extracting(InventoryItem::getId)
         .contains(materialRow.getId())
@@ -206,43 +188,28 @@ class InventoryItemCatalogQueryDataTest {
     assertThat(page.getContent()).allSatisfy(row -> assertThat(row.getMaterial()).isNotNull());
   }
 
-  // covers REQ-MARKET-014 (design §8 shipped: the releasable picker returns BOTH material and
-  // game-item rows via the LEFT-JOIN + COALESCE(m.name, gi.name) rewrite — the former
-  // material-only guard is dropped, and the release service branches on the picked row's kind)
   @Test
   void findReleasableForUser_returnsBothMaterialAndItemRows() {
-    // When — the caller's releasable rows, unfiltered
     List<InventoryItem> releasable =
         inventoryItemRepository.findReleasableForUser(
             user.getId(), null, true, true, PageRequest.of(0, 50));
 
-    // Then — both kinds surface (item rows are no longer dropped by an implicit inner join)
     assertThat(releasable)
         .extracting(InventoryItem::getId)
         .containsExactlyInAnyOrder(materialRow.getId(), itemRow.getId());
   }
 
-  // covers REQ-MARKET-014 (the picker name filter matches the game-item name via the gi LEFT JOIN)
   @Test
   void findReleasableForUser_filtersByGameItemName() {
-    // When — filter by a fragment of the seeded game item's name (lower-cased %fragment%)
     List<InventoryItem> releasable =
         inventoryItemRepository.findReleasableForUser(
             user.getId(), "%quantum-drive%", true, true, PageRequest.of(0, 50));
 
-    // Then — only the item row matches (the material row's name does not contain the fragment)
     assertThat(releasable).extracting(InventoryItem::getId).containsExactly(itemRow.getId());
   }
 
-  // covers REQ-MARKET-014 (the MaterialboardItemStockOfferE2eTest #1344 investigation): a FULL,
-  // multi-word name search of a game-item stock row must find it at the REPOSITORY level. This
-  // proves the LEFT-JOIN + three-valued OR is sound for the exact e2e query shape (game item "E2E
-  // Boerse Item Stock Widget", pattern "%e2e boerse item stock widget%"), i.e. the e2e failure was
-  // NOT here but in the frontend proxy double-encoding the space (%2520) — see
-  // MaterialboersePageController.backendGetWithQuery.
   @Test
   void findReleasableForUser_filtersByFullGameItemName() {
-    // Given — a fresh game-item Lager row for the caller with the exact e2e item name
     GameItem widget = new GameItem();
     widget.setName("E2E Boerse Item Stock Widget");
     gameItemRepository.save(widget);
@@ -256,72 +223,50 @@ class InventoryItemCatalogQueryDataTest {
     inventoryItemRepository.save(widgetRow);
     entityManager.flush();
 
-    // When — the release picker's typed search (MaterialExchangeQueryParams.normalizeQuery shape)
     List<InventoryItem> releasable =
         inventoryItemRepository.findReleasableForUser(
             user.getId(), "%e2e boerse item stock widget%", true, true, PageRequest.of(0, 50));
 
-    // Then — the game-item row surfaces (the typed name search must not drop item rows)
     assertThat(releasable).extracting(InventoryItem::getId).contains(widgetRow.getId());
   }
 
-  // covers REQ-MARKET-014 (the picker name filter matches the MATERIAL name via the m LEFT JOIN —
-  // the COALESCE(m.name, gi.name) rewrite must keep the material-row search working too)
   @Test
   void findReleasableForUser_filtersByMaterialName() {
-    // When — filter by a fragment of the seeded material's name (lower-cased %fragment%)
     List<InventoryItem> releasable =
         inventoryItemRepository.findReleasableForUser(
             user.getId(), "%quantanium%", true, true, PageRequest.of(0, 50));
 
-    // Then — only the material row matches (the item row's name does not contain the fragment)
     assertThat(releasable).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
   }
 
-  // covers REQ-MARKET-002 (the release dialog's Material/Item radio narrows the picker by row kind
-  // in the DB query, before the row cap — a MATERIAL query returns only material rows, an ITEM
-  // query only game-item rows; the kind gate must live here so a wanted-kind row past the cap is
-  // never hidden by a post-query client/service filter)
   @Test
   void findReleasableForUser_kindFlagsRestrictRowsByCatalog() {
-    // When — material-only (includeMaterial=true, includeItem=false)
     List<InventoryItem> materialsOnly =
         inventoryItemRepository.findReleasableForUser(
             user.getId(), null, true, false, PageRequest.of(0, 50));
-    // And — item-only (includeMaterial=false, includeItem=true)
     List<InventoryItem> itemsOnly =
         inventoryItemRepository.findReleasableForUser(
             user.getId(), null, false, true, PageRequest.of(0, 50));
 
-    // Then — each flag combination returns exactly its own kind
     assertThat(materialsOnly).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
     assertThat(itemsOnly).extracting(InventoryItem::getId).containsExactly(itemRow.getId());
   }
 
-  // covers REQ-INV-029/031 (Materialsammlung stays material-only; item earmarks get their own seam)
   @Test
   void jobOrderRowSeams_splitEarmarksByCatalog() {
-    // Given both fixture rows earmarked to one ITEM order (the production auto-earmark shape)
     UUID orderId = seedOrderWithMixedEarmarks();
 
-    // When / Then — the Materialsammlung seam returns only the material earmark (its consumer
-    // dereferences material.getName() unconditionally, so an item row here would 500 the order
-    // page)...
     assertThat(inventoryItemRepository.findByJobOrderIdOrdered(orderId))
         .extracting(InventoryItem::getId)
         .containsExactly(materialRow.getId());
 
-    // ...and the game-item sibling returns only the item earmark (the orphaned-link warning's
-    // item branch).
     assertThat(inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(orderId))
         .extracting(InventoryItem::getId)
         .containsExactly(itemRow.getId());
   }
 
-  // covers REQ-INV-005/029 (item stacks drill down through their gameItem-keyed entry queries)
   @Test
   void itemStackEntryQueries_serveTheGameItemStack() {
-    // When — the owner's and the global item drill-downs for the fixture stack (no quality key)
     Page<InventoryItem> myEntries =
         inventoryItemRepository.findUserItemStackEntries(
             user.getId(),
@@ -341,7 +286,6 @@ class InventoryItemCatalogQueryDataTest {
             Set.of(),
             PageRequest.of(0, 20));
 
-    // Then — both return exactly the item row; the material sibling never leaks in
     assertThat(myEntries.getContent())
         .extracting(InventoryItem::getId)
         .containsExactly(itemRow.getId());
@@ -350,18 +294,13 @@ class InventoryItemCatalogQueryDataTest {
         .containsExactly(itemRow.getId());
   }
 
-  // covers REQ-INV-029 (order stock index: no null-materialId projection rows -> no 500)
   @Test
   void findMaterialStockRowsByJobOrderIds_excludesItemEarmarks() {
-    // Given both fixture rows earmarked to one order
     UUID orderId = seedOrderWithMixedEarmarks();
 
-    // When — the batched stock projection behind the paged order list
     List<JobOrderMaterialStockRow> rows =
         inventoryItemRepository.findMaterialStockRowsByJobOrderIds(List.of(orderId));
 
-    // Then — only the material allocation surfaces; a null materialId row would NPE the
-    // consumer's Collectors.groupingBy and 500 the paged order list (design §4.4)
     assertThat(rows).hasSize(1);
     assertThat(rows.get(0).materialId()).isEqualTo(material.getId());
     assertThat(rows).allSatisfy(row -> assertThat(row.materialId()).isNotNull());

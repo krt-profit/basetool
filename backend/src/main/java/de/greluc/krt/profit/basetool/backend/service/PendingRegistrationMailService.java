@@ -34,23 +34,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 /**
- * Composes and sends the "a new registration is awaiting approval" e-mail to every admin
- * (REQ-NOTIF-015).
+ * Composes and sends the "a new registration is awaiting approval" e-mail to every admin with an
+ * address on file (REQ-NOTIF-015).
  *
- * <p>Second consumer of the reusable transactional e-mail channel (REQ-NOTIF-013) after the account
- * decision mail (REQ-NOTIF-014): it mirrors, on the e-mail channel, the in-app admin notification
- * that REQ-NOTIF-012 already raises when a brand-new non-admin account enters {@code PENDING}. The
- * triggering {@link DiscordRegistrationPendingEvent} deliberately carries no PII beyond the new
- * user's display username, so this service resolves the admin <em>recipients</em> itself via {@link
- * UserRepository#findAllAdmins()} rather than from the event — one localized plain-text {@link
- * MailMessage} is sent per admin that has an e-mail address on file.
- *
- * <p>Localization uses the backend {@link MessageSource} and the {@link
- * MailProperties#resolveDefaultLocale() default locale} (no per-recipient locale is stored yet),
- * exactly like {@link UserApprovalMailService}. Each admin is greeted by their effective name; the
- * new registrant's username is interpolated into the body when present and a name-less variant is
- * used otherwise. Admins without an address are skipped. Nothing here logs an address, a name or
- * the username (all PII, REQ-OBS) — only the recipient <em>count</em>.
+ * <p>Recipients come from {@link UserRepository#findAllAdmins()}; the text is localized in the
+ * {@link MailProperties#resolveDefaultLocale() default locale}. Logs only the recipient count,
+ * never an address or name.
  */
 @Service
 @RequiredArgsConstructor
@@ -63,11 +52,8 @@ public class PendingRegistrationMailService {
   private final UserRepository userRepository;
 
   /**
-   * Composes and sends the pending-registration notice to every admin with an e-mail address,
-   * best-effort. The admin list is read fresh from the DB (the event carries no recipients); admins
-   * without an address on file are skipped, and when no admin can be mailed the method returns
-   * without sending. Each send is delegated to the best-effort {@link MailService}, so one failing
-   * recipient never aborts the rest.
+   * Sends the pending-registration notice to every admin with an e-mail address, best-effort; one
+   * failing recipient never aborts the rest.
    *
    * @param event the after-commit pending-registration event (carries the new user's id and
    *     username only)

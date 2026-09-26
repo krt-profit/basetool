@@ -34,20 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Browser flow for the collapsible Lager filter panels (REQ-INV-037) — "Mein Lager" and the shared
- * "Globales Lager", which run the same panel off two page-local scripts and two separate storage
- * keys.
- *
- * <p>The collapse exists entirely in the browser: the server always renders the panel expanded so a
- * client without JavaScript keeps its filters, and {@code inventory-my.js} / {@code
- * inventory-admin.js} apply the stored preference on load. Everything worth guarding is therefore
- * invisible to a MockMvc test — the rendering contract is pinned by {@code
- * InventoryPageControllerMvcTest}, the behaviour by this test.
- *
- * <p>Two failure modes motivate it. A broken {@code data-trigger} wiring turns the toggle into a
- * dead button that still looks right in the rendered HTML. And a collapse that forgets to surface
- * the active-filter count produces the one state the requirement forbids: a narrowed table whose
- * reason is folded out of sight.
+ * Verifies the collapsible Lager filter panels of "Mein Lager" and "Globales Lager" in a browser
+ * (REQ-INV-037): the toggle works, the choice persists, and a collapsed panel shows the
+ * active-filter count.
  */
 @Tag("e2e")
 class InventoryFilterPanelCollapseE2eTest {
@@ -88,11 +77,8 @@ class InventoryFilterPanelCollapseE2eTest {
   }
 
   /**
-   * Walks the whole preference lifecycle in one browser context, because each step's meaning
-   * depends on the one before it: the unfiltered first visit starts collapsed (no preference
-   * stored, nothing filtered), an explicit expand survives a reload, and an explicit collapse
-   * survives one too — the last step being the one that would regress if the toggle wrote its state
-   * only into the DOM.
+   * On "Mein Lager", an unfiltered first visit starts collapsed, and both an explicit expand and an
+   * explicit collapse survive a reload.
    */
   @Test
   void filterPanelCollapsesAndRemembersTheChoiceAcrossReloads() {
@@ -108,9 +94,6 @@ class InventoryFilterPanelCollapseE2eTest {
         E2eSupport.navigate(page, baseUrl + "/inventory/my");
         page.waitForLoadState();
 
-        // Fresh context => no stored preference, so the default applies: collapsed (REQ-FE-021;
-        // it no longer depends on whether anything is filtered). The toggle itself must of course
-        // be visible, or the filters would be unreachable rather than merely tidied away.
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator("#myFilterPanel")).isHidden();
@@ -120,9 +103,6 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .hasAttribute("aria-expanded", "true");
 
-        // The server always ships the panel expanded, so an "expanded after reload" assertion
-        // would pass even with persistence entirely broken. It is the collapsed leg below that
-        // carries the weight; this one only proves the reload did not throw the preference away.
         page.reload();
         page.waitForLoadState();
         assertThat(page.locator("#myFilterPanel"))
@@ -164,7 +144,6 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
 
-        // Nothing filtered yet: the chip must be absent rather than showing a zero.
         assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
 
         page.locator("[data-testid='lager-filter-toggle']").click();
@@ -182,15 +161,8 @@ class InventoryFilterPanelCollapseE2eTest {
   }
 
   /**
-   * The same lifecycle on the shared "Globales Lager". It is a separate page module with its own
-   * storage key, so nothing about a working "Mein Lager" panel proves this one is wired: an
-   * unregistered {@code data-trigger} or a preference written under the wrong key both leave the
-   * markup asserted by the MockMvc test perfectly intact.
-   *
-   * <p>The chip is checked in the same context at the end, after the collapse legs, so the
-   * "unfiltered first visit starts collapsed" leg still sees an untouched Lager. The
-   * minimum-quality select drives it because it needs no seeded stock — it renders on every Lager,
-   * empty or not.
+   * On "Globales Lager", the same collapse lifecycle holds under its own storage key, and a
+   * collapsed panel shows the active-filter count chip.
    */
   @Test
   void globalFilterPanelCollapsesRemembersTheChoiceAndCountsActiveFilters() {
@@ -206,8 +178,6 @@ class InventoryFilterPanelCollapseE2eTest {
         E2eSupport.navigate(page, baseUrl + "/inventory/all");
         page.waitForLoadState();
 
-        // Fresh context => no stored preference, and an untouched Lager has no active filter, so
-        // the default applies: collapsed, with no chip rather than a zero.
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator("#globalFilterPanel")).isHidden();
@@ -218,8 +188,6 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .hasAttribute("aria-expanded", "true");
 
-        // The collapsed leg is the one that carries the weight: the server always ships the panel
-        // expanded, so only a collapse surviving a reload proves the preference was persisted.
         page.locator("[data-testid='lager-filter-toggle']").click();
         assertThat(page.locator("#globalFilterPanel")).isHidden();
         page.reload();

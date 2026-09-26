@@ -72,9 +72,6 @@ class AuditReportProxyControllerTest {
 
   @Test
   void marketDomain_passesTheAllowlistGate() {
-    // Regression: the proxy kept its own copy of the tab list and never gained MARKET, so the
-    // Materialbörse tab rendered but its export / JSON / purge buttons answered 400. Both classes
-    // now read AuditDomains.ALL.
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,
@@ -91,8 +88,6 @@ class AuditReportProxyControllerTest {
 
   @Test
   void knownDomain_passesTheAllowlistGate() {
-    // A known tab passes validation and then fails downstream in the bare WebClient mock (wrapped
-    // 500), proving the 400 allowlist gate did not reject a legitimate domain.
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,

@@ -71,21 +71,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the local {@code app_user} mirror. The {@code /me} endpoints derive the user id
- * from the JWT — never from the URL — so a caller can never impersonate another user via this path.
- * {@code /sync}, {@code /attributes}, the membership write and detail endpoints and {@code DELETE}
- * are admin-scoped. The per-Staffel logistician/mission-manager flags are no longer toggled here;
- * they are patched on the membership row through {@link SquadronMembershipController}.
+ * REST surface for the local {@code app_user} mirror.
  *
- * <p>The class-level {@link Transactional} keeps the persistence session open across the {@code
- * userMapper.toDto} projection every endpoint returns: {@link UserMapper} resolves the caller's
- * Staffel + capability flags through {@code OrgUnitMembershipRepository} and reads the LAZY {@code
- * user.getRoles()} collection, both of which need an open session — the write endpoints that map
- * the just-saved user rely on it too. The membership mapping was moved into {@link
- * OrgUnitMembershipService} (L4, #923, ADR-0067), and the two membership endpoints project through
- * the service's own {@code …Dto} transactions without depending on this annotation — so it now
- * stands for {@code userMapper} alone, and retiring it only requires moving the {@code UserDto}
- * projection into the service layer as well.
+ * <p>{@code /me} endpoints derive the user from the JWT, never from the URL; {@code /sync}, {@code
+ * /attributes}, the membership write/detail endpoints and {@code DELETE} are admin-scoped. The
+ * class-level {@link Transactional} keeps the session open for the {@link UserMapper} projection.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -114,18 +104,12 @@ public class UserController {
   private final TaskMetrics taskMetrics;
 
   /**
-   * Admin-triggered manual run of the Keycloak user sync — the "Sync now" button on the
-   * member-management page. Runs the same reconciliation as the hourly {@link
-   * de.greluc.krt.profit.basetool.backend.task.UserSyncTask}, through {@link
-   * TaskMetrics#recordCountingRethrow} so it publishes the identical {@code user_sync} meters (and
-   * refreshes the {@code UserSyncStale} last-success gauge) yet still returns the synced count and
-   * surfaces a failure as an RFC 7807 problem response. The caller re-reads the member list after a
-   * 2xx to show the refreshed roster.
+   * Runs the Keycloak user sync on demand for the member-management "Sync now" button, publishing
+   * the same {@code user_sync} meters as {@link
+   * de.greluc.krt.profit.basetool.backend.task.UserSyncTask} via {@link
+   * TaskMetrics#recordCountingRethrow}.
    *
-   * <p>Runs {@code NOT_SUPPORTED} to opt out of the class-level {@link Transactional}: each {@code
-   * userReconciliationService.syncUser} and the bank-holder reconcile must open their OWN
-   * transaction (exactly as on the scheduled path) rather than sharing one page-spanning
-   * transaction whose first failure would poison the rest.
+   * <p>Runs {@code NOT_SUPPORTED} so each user reconciliation opens its own transaction.
    *
    * @return the number of users reconciled this run
    */
@@ -162,11 +146,9 @@ public class UserController {
   }
 
   /**
-   * Lightweight typeahead projection (id + username + displayName). Widened by {@code
-   * BANK_MANAGEMENT} (REQ-BANK-009): bank managers resolve grantees and holders via this lookup and
-   * need not hold any org role (REQ-BANK-008). Also widened by {@code BANK_EMPLOYEE}
-   * (REQ-BANK-044): bank employees resolve the deposit/withdrawal counterparty (Einzahler /
-   * Empf&auml;nger) from this lookup and likewise need not hold any org role.
+   * Lightweight typeahead projection (id, username, displayName) of all users, also available to
+   * {@code BANK_MANAGEMENT} and {@code BANK_EMPLOYEE} without an org role (REQ-BANK-009,
+   * REQ-BANK-044).
    *
    * @return all users as reference DTOs
    */
@@ -204,19 +186,11 @@ public class UserController {
   }
 
   /**
-   * Bank-audience twin of {@link #searchUsers}: the paged username/displayName substring search
-   * behind the bank pickers that resolve grantees / holders across the whole user base (register a
-   * holder, grant the Bank-Employee role, set an approval limit — ADR-0089, the {@code
-   * remoteSource} scaling switch of #1193 / ADR-0053). Query, scope and projection are identical to
-   * {@link #searchUsers} — {@link UserService#searchByUsername(String, Pageable)} already resolves
-   * the same {@code currentUserListScopeSquadronIds} scope, which for an org-role-less bank manager
-   * is the unfiltered all-users set. The ONLY difference is the widened role gate: it mirrors
-   * {@code /lookup} (adds {@code BANK_EMPLOYEE}, which covers {@code BANK_MANAGEMENT} via the role
-   * hierarchy) so a bank employee/manager who holds no org role can drive the picker. Kept as a
-   * separate path rather than widening {@code /search} so the ordinary picker's authorization
-   * regime stays unchanged (REQ-BANK-008/009/044).
+   * Bank-audience twin of {@link #searchUsers} for the bank grantee/holder pickers: identical
+   * query, scope and projection, with the role gate widened to {@code BANK_EMPLOYEE}
+   * (REQ-BANK-008/009/044).
    *
-   * @return paged user DTOs (peer-redacted for non-elevated callers, exactly as {@code /search})
+   * @return paged user DTOs, peer-redacted for non-elevated callers
    */
   @GetMapping("/search-bank")
   @PreAuthorize(
@@ -239,14 +213,12 @@ public class UserController {
   }
 
   /**
-   * Slim, paged picker search: the same query, scope and role gate as {@link #searchUsers}, but
-   * each hit is a {@link de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto} (id,
-   * username, display name, effective name, rank) projected in SQL, with no entity, role or
-   * membership load behind it (BE-PERF-06). Backs every {@code remote-users} combobox, which reads
-   * only the id and the name; {@code /search} keeps the full DTO for member management.
+   * Slim paged picker search with the same query, scope and role gate as {@link #searchUsers},
+   * returning SQL-projected {@link
+   * de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto} rows for the {@code
+   * remote-users} comboboxes.
    *
-   * <p>No peer redaction is applied because there is nothing to redact: the reference projection is
-   * exactly the field set {@code UserDtoRedaction.toPeerShape} keeps.
+   * <p>No peer redaction applies; the projection already is the peer field set.
    *
    * @param query free-text username/displayName filter, or {@code null}/blank to match all
    * @param page requested page index, or {@code null} for the first page
@@ -268,10 +240,8 @@ public class UserController {
   }
 
   /**
-   * Bank-audience twin of {@link #searchUserReferences}: identical projection and scope, with the
-   * widened role gate of {@link #searchUsersForBank} (adds {@code BANK_EMPLOYEE}, which covers
-   * {@code BANK_MANAGEMENT} through the role hierarchy) for the {@code remote-bank-users} pickers
-   * (REQ-BANK-008/009/044, BE-PERF-06).
+   * Bank-audience twin of {@link #searchUserReferences}, with the widened role gate of {@link
+   * #searchUsersForBank}, for the {@code remote-bank-users} pickers (REQ-BANK-008/009/044).
    *
    * @param query free-text username/displayName filter, or {@code null}/blank to match all
    * @param page requested page index, or {@code null} for the first page
@@ -320,17 +290,10 @@ public class UserController {
   }
 
   /**
-   * Shared body of the two user-search endpoints ({@link #searchUsers} / {@link
-   * #searchUsersForBank}): resolves the page request against the whitelisted sort fields, runs the
-   * squadron-scoped username/displayName search, and maps each hit through the peer redaction. The
-   * two endpoints differ only in their {@code @PreAuthorize} role gate, so the query + projection
-   * live here once.
+   * Shared body of {@link #searchUsers} and {@link #searchUsersForBank}: runs the squadron-scoped
+   * username/displayName search with whitelisted sort and applies peer redaction.
    *
-   * <p>A {@code null} query — the browse-mode empty {@code ?query=} that the global {@code
-   * emptyAsNull} string binder collapses to {@code null} — is normalised to the empty string, which
-   * the {@code LIKE '%%'} search treats as a match-all filter. This makes opening a {@code
-   * remoteSource} picker without typing return the scoped roster rather than 500ing on the required
-   * param (#1193).
+   * <p>A {@code null} query is treated as match-all.
    *
    * @param query free-text username/displayName filter, or {@code null}/blank to match all.
    * @param page requested page index, or {@code null} for the first page.
@@ -347,13 +310,8 @@ public class UserController {
   }
 
   /**
-   * Returns the user DTO. Multi-tenancy: a non-admin caller asking for a user that belongs to a
-   * foreign squadron always gets the peer-redacted shape, even when the caller carries {@code
-   * ROLE_LOGISTICIAN} or {@code ROLE_OFFICER}. Without the squadron-scope gate an officer of
-   * squadron A could fetch the email / real name of any user in squadron B by guessing a UUID (the
-   * list endpoints are squadron-scoped via {@link
-   * de.greluc.krt.profit.basetool.backend.service.UserService#findAll}; this {@code byId} path was
-   * the only multi-tenancy hole left after the 2026-05-20 audit, finding H-3).
+   * Returns a user by id; a non-admin caller asking for a user outside their squadrons always gets
+   * the peer-redacted shape, regardless of role.
    *
    * @param id user id
    * @return the user DTO, peer-redacted for cross-squadron non-admin callers
@@ -372,30 +330,17 @@ public class UserController {
   }
 
   /**
-   * Lists every org unit the given user is a member of, materialised as picker-optimised {@link
-   * OrgUnitMembershipOptionDto} rows. Backs the R5.d owner-picker fragment: a Thymeleaf form with
-   * an explicit target-user dropdown can populate its {@code <select>} of legal {@code
-   * owningOrgUnitId} values directly from this endpoint, without having to thread membership data
-   * through every page controller.
+   * Lists the org units a user belongs to as picker-optimised {@link OrgUnitMembershipOptionDto}
+   * rows for the owner picker.
    *
-   * <p>Access policy: open to every authenticated member, plus {@code BANK_EMPLOYEE} (REQ-BANK-044:
-   * the deposit/withdrawal counterparty's org-unit picker resolves the chosen user's memberships
-   * here, and a bank employee need not hold any org role per REQ-BANK-008). The endpoint reveals
-   * only the names and shorthands of org units a target user belongs to — equivalent in sensitivity
-   * to the {@code /lookup} typeahead, which is already broadly accessible. A non-admin cannot
-   * derive any personally identifying data from the response (no display name, no email, no rank).
-   * Keeping the surface symmetric with {@code /lookup} avoids forcing the picker fragment to branch
-   * on the caller's role at render time.
+   * <p>Open to every authenticated member and {@code BANK_EMPLOYEE} (REQ-BANK-044); the response
+   * carries only org-unit names and shorthands, no personal data.
    *
    * @param id the user id whose memberships to list; never {@code null}.
-   * @param allKinds when {@code true} the response spans <strong>all four</strong> org-unit kinds
-   *     (Staffel + SK + Bereich + Organisationsleitung) — the bank counterparty picker
-   *     (REQ-BANK-044) where a Bereich/OL member's unit must be selectable; the default ({@code
-   *     false}) keeps the legacy Staffel/SK-only owner-picker shape so the sidebar and Job-Order
-   *     pickers are unchanged.
-   * @return picker-friendly option DTOs sorted Staffel-first then SK alphabetical (default) or
-   *     top-down by kind across all four kinds ({@code allKinds=true}); never {@code null},
-   *     possibly empty when the user has no memberships.
+   * @param allKinds {@code true} to include all four org-unit kinds (Staffel, SK, Bereich,
+   *     Organisationsleitung); {@code false} for Staffel and SK only.
+   * @return option DTOs sorted Staffel-first then SK alphabetical, or top-down by kind when {@code
+   *     allKinds=true}; never {@code null}, possibly empty.
    */
   @GetMapping("/{id}/memberships")
   @PreAuthorize(
@@ -418,16 +363,8 @@ public class UserController {
   }
 
   /**
-   * Returns {@code true} when the caller is a non-admin and the target user belongs to NO squadron
-   * the caller can see via {@code OwnerScopeService}. Used to tighten {@link #getUserById} to "same
-   * squadron or admin" for full-PII access. Users without a squadron (admins, unassigned) are
-   * treated as cross-squadron for non-admin callers — full PII on an unassigned account remains
-   * admin-only.
-   *
-   * <p>REQ-ORG-017: the target may now hold up to two Staffeln, so the gate ORs across ALL of the
-   * target's Staffeln — the caller keeps full PII as soon as it can see ANY one of them, mirroring
-   * the caller-side membership union. A same-Staffel peer is therefore never over-redacted just
-   * because the shared Staffel happens not to be the target's name-sorted primary.
+   * Returns whether the caller is a non-admin who can see none of the target user's Staffeln via
+   * {@code OwnerScopeService}. A target without any squadron counts as cross-squadron.
    *
    * @param user target user resolved by id; never {@code null}
    * @return {@code true} if the caller is a non-admin and shares none of the user's squadrons
@@ -436,8 +373,6 @@ public class UserController {
     if (authHelperService.isAdmin()) {
       return false;
     }
-    // Post-R9 D3 (V101): the user's home Staffel(n) are sourced from org_unit_membership — the
-    // legacy User.squadron column was dropped.
     List<UUID> targetSquadronIds =
         orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(user.getId());
     if (targetSquadronIds.isEmpty()) {
@@ -447,14 +382,9 @@ public class UserController {
   }
 
   /**
-   * Returns the calling user's own record (derived from the JWT subject). The {@code @PreAuthorize}
-   * is redundant with the {@link de.greluc.krt.profit.basetool.backend.config.SecurityConfig} URL
-   * matcher that already gates {@code /api/v1/users/me} as {@code authenticated()}, but having it
-   * on the handler keeps the guarantee local to this method — if the URL pattern is ever
-   * refactored, the {@code @Jwt} binding here would NPE on anonymous instead of failing safely.
-   * Audit finding L-2 (2026-05-20).
+   * Returns the calling user's own record, derived from the JWT subject.
    *
-   * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}
+   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}
    * @return the user DTO
    */
   @NotNull
@@ -467,18 +397,12 @@ public class UserController {
   }
 
   /**
-   * Returns the calling user's <em>pickable</em> owning-org-unit options for the create/stamp forms
-   * (epic #692 Phase 5, REQ-ORG-016 / REQ-ORG-018): the caller's direct memberships plus their
-   * cascading leadership reach (a Bereichsleitung/OL leader's subordinate Staffeln/SKs and their
-   * own Bereich/OL). This is the drill-down counterpart of {@code GET /{id}/memberships}, which
-   * stays strictly the user's direct memberships and is shared by the admin member views and the
-   * refinery-store/transfer receiver picker. Resolved for the <em>current caller only</em> (never
-   * an arbitrary id) so it cannot enumerate another user's reach.
+   * Returns the calling user's pickable owning-org-unit options for create forms: direct
+   * memberships plus the units reachable through leadership (REQ-ORG-016, REQ-ORG-018).
    *
-   * <p>For an ordinary member the result equals their direct memberships, so the owner picker is
-   * unchanged for non-leaders.
+   * <p>Resolved for the caller only; for an ordinary member it equals their direct memberships.
    *
-   * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}.
+   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
    * @return the caller's pickable org-unit options across all reachable kinds; never {@code null}.
    */
   @GetMapping("/me/pickable-org-units")
@@ -490,31 +414,16 @@ public class UserController {
   }
 
   /**
-   * Lists the org units the <em>calling</em> user is a direct member of, as picker-optimised {@link
-   * OrgUnitMembershipOptionDto} rows — the me-scoped twin of {@code GET /{id}/memberships}, with
-   * the identical shape and the identical {@code allKinds} semantics.
+   * Lists the org units the calling user is a direct member of, as {@link
+   * OrgUnitMembershipOptionDto} rows; the JWT-resolved twin of {@code GET /{id}/memberships}.
    *
-   * <p>It exists because the org-unit switcher of a shipped client needs exactly this and nothing
-   * else. The web sidebar builds the same list from two calls ({@code GET /me} to resolve the
-   * principal's id, then {@code GET /{id}/memberships}), which is acceptable inside the data centre
-   * and is two round trips on a phone. More importantly, the id-taking path would have to be
-   * reachable from the public API vhost for the app to use it, and that vhost is a default-deny
-   * allow-list precisely so that a path able to name <em>another</em> user never has to be on it.
-   * This one is resolved from the JWT and cannot name anybody else.
+   * <p>Open to every authenticated caller; no memberships yield an empty list, not 403.
    *
-   * <p>Access policy: every authenticated caller, matching {@code GET /me/org-unit-ids} rather than
-   * the role-gated {@code /{id}/memberships}. An account with no memberships gets an empty list
-   * rather than a 403 — the switcher renders on the app's shell, and a 403 there would break the
-   * frame around every screen for a member whose only fault is having no unit yet. The response
-   * carries no PII: org-unit names, shorthands and kinds only, and only for the caller's own units.
-   *
-   * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}.
-   * @param allKinds when {@code true} the response spans <strong>all four</strong> org-unit kinds
-   *     (Staffel + SK + Bereich + Organisationsleitung); the default ({@code false}) keeps the
-   *     Staffel/SK-only shape the switcher uses. Mirrors the sibling endpoint's parameter so the
-   *     two cannot drift apart in meaning.
-   * @return picker-friendly option DTOs, sorted as the sibling endpoint sorts them; never {@code
-   *     null}, possibly empty.
+   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
+   * @param allKinds {@code true} to include all four org-unit kinds (Staffel, SK, Bereich,
+   *     Organisationsleitung); {@code false} for Staffel and SK only.
+   * @return option DTOs, sorted as the sibling endpoint sorts them; never {@code null}, possibly
+   *     empty.
    */
   @GetMapping("/me/memberships")
   @PreAuthorize("isAuthenticated()")
@@ -529,16 +438,13 @@ public class UserController {
   }
 
   /**
-   * Returns the org-unit ids the calling user is a <em>direct</em> member of, across every kind
-   * (Staffel / SK / Bereich / Organisationsleitung), with no leadership cascade. The home-page
-   * upcoming-missions grid uses it to flag a mission whose owning org unit the caller is directly
-   * assigned to with a "Meine Einheit" chip (REQ-MISSION-012). Resolved for the current caller only
-   * (never an arbitrary id), and — unlike {@code GET /{id}/memberships} — open to every
-   * authenticated user: a membership-less account simply gets an empty set rather than a 403. Only
-   * opaque ids leave the API (no name, shorthand or kind), so the response carries no PII.
+   * Returns the ids of every org unit the calling user is a direct member of, across all kinds and
+   * without leadership cascade (REQ-MISSION-012).
    *
-   * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}.
-   * @return the caller's direct org-unit ids across all kinds; never {@code null}, possibly empty.
+   * <p>Open to every authenticated caller; no memberships yield an empty set.
+   *
+   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
+   * @return the caller's direct org-unit ids; never {@code null}, possibly empty.
    */
   @GetMapping("/me/org-unit-ids")
   @PreAuthorize("isAuthenticated()")
@@ -630,12 +536,11 @@ public class UserController {
   }
 
   /**
-   * Sets whether the calling user opts into global blueprint sharing (REQ-INV-018). The JWT
-   * identifies the row — no impersonation possible. Carries the optimistic-lock version so a
-   * concurrent edit surfaces as a 409 instead of a silent overwrite. Enabling the flag makes the
-   * user's owned blueprints count toward the leadership availability overview and the item-order
-   * blueprint-coverage view for every org unit (read-only, name-only exposure); the viewer-access
-   * gates are unchanged.
+   * Sets whether the calling user opts into global blueprint sharing (REQ-INV-018), guarded by the
+   * optimistic-lock version.
+   *
+   * <p>When enabled, the user's blueprints count toward every org unit's availability and coverage
+   * views (read-only, name-only).
    *
    * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
    * @param request the new opt-in value plus the expected version.
@@ -694,17 +599,11 @@ public class UserController {
   }
 
   /**
-   * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta endpoint. Lets the admin member-edit
-   * page persist every Staffel-assignment + flag-toggle + SK add / remove / patch as one atomic
-   * transaction. Per-row optimistic-lock survives because every change record carries its own
-   * {@code version}; an inconsistent batch (one row stale, the rest fresh) rolls back the whole
-   * transaction and surfaces as a 409 — partial application is not exposed.
+   * Applies a membership delta (Staffel assignments, flag toggles, SK add/remove/patch) for a user
+   * in one atomic transaction.
    *
-   * <p>The response is re-read and mapped through {@link
-   * OrgUnitMembershipService#findAllMembershipDtosForUser(UUID)} rather than by projecting the
-   * entities the delta call returns: the projection then runs inside the membership service's own
-   * transaction, so this endpoint does not depend on the class-level {@link Transactional} staying
-   * open across the two service calls (ADR-0067) and survives its planned retirement.
+   * <p>Each change carries its own {@code version}; one stale row rolls back the whole batch with
+   * 409.
    *
    * @param id user primary key.
    * @param request the delta to apply; never {@code null}, but both halves may be {@code null} /
@@ -722,12 +621,8 @@ public class UserController {
   }
 
   /**
-   * Reads the user's complete membership set as full DTOs — each carrying its per-membership
-   * Logistician / Mission-Manager flags (REQ-SEC-005) and optimistic-lock {@code version} (ADMIN
-   * only). Backs the member-edit page, which seeds its editable Staffel slots (REQ-ORG-017 — up to
-   * two Staffeln, each with its own flags) from this view. Distinct from {@code GET
-   * /{id}/memberships}: that endpoint returns the lean picker-option projection consumed by the
-   * owner picker and carries neither flags nor version, so it cannot back an editable form.
+   * Returns the user's complete membership set as full DTOs with per-membership flags and {@code
+   * version}, backing the admin member-edit form (ADMIN only).
    *
    * @param id user primary key.
    * @return the user's memberships (Staffel + every SK) as full {@link OrgUnitMembershipDto}s,
@@ -754,22 +649,11 @@ public class UserController {
   }
 
   /**
-   * ADMIN-only: folds the duplicate account named in the path into the account the member keeps
-   * (REQ-SEC-055, #1828).
+   * Folds an approved duplicate account into the account the member keeps (REQ-SEC-055).
    *
-   * <p>The remedy for a member who ended up with two accounts once the duplicate has already been
-   * <em>approved</em>. While it sits in the approval queue the cheaper action applies -- {@code
-   * POST /admin/registrations/{id}/link} moves the Discord identity and discards a registration
-   * that cannot yet own anything (REQ-SEC-026). Approving it removes the row from that queue, and
-   * the link action guards on {@code PENDING} in the service too, so nothing on that surface
-   * reaches it any more. This endpoint does both halves: what the duplicate owns moves onto the
-   * survivor (REQ-SEC-046 decides which rows follow the member and which stay with the act), its
-   * Discord identity is re-linked in Keycloak, and both the duplicate's row and its Keycloak user
-   * are removed.
-   *
-   * <p><strong>The path names the account that is dissolved</strong>, the body the one that
-   * survives -- the opposite way round from the queue's merge endpoint, because here the admin acts
-   * on the duplicate's row in the member list and the URL should name the row they clicked.
+   * <p>Owned data moves to the survivor, the Discord identity is re-linked in Keycloak, and the
+   * duplicate's row and Keycloak user are removed. The path names the duplicate, the body the
+   * survivor. ADMIN-only.
    *
    * @param id the duplicate account to dissolve
    * @param adminUserId the acting admin, recorded as the audit actor
@@ -792,8 +676,6 @@ public class UserController {
   public static class UserAttributesRequest {
     @jakarta.validation.constraints.NotNull private Integer rank;
 
-    // Bound the free-text fields (security audit L1): description is a TEXT column with no DB
-    // backstop, so without @Size an authenticated caller could store a multi-MB blob per write.
     @Size(max = 10_000)
     private String description;
 
@@ -807,11 +689,6 @@ public class UserController {
   /** Body for {@link #updateMyDescription}. */
   @Data
   public static class UserDescriptionRequest {
-    // Bound the free-text self-service fields (security audit L1): description maps to a TEXT
-    // column
-    // with no DB length backstop. @Size only rejects over-length input; the fields stay nullable
-    // (a null description means "no change", a blank displayName clears it) so partial-update
-    // semantics are unchanged — do NOT add @NotBlank.
     @Size(max = 10_000)
     private String description;
 
@@ -867,23 +744,13 @@ public class UserController {
       @jakarta.validation.constraints.NotNull Long version) {}
 
   /**
-   * Strips the non-email PII that a peer (non-Officer, non-Admin) does not need to see. Officers
-   * and admins get the DTO unchanged; plain members get the slim peer shape. {@code email} is no
-   * longer governed here at all — {@link UserMapper#toDto(User)} omits it for every projection (it
-   * is re-added only on the {@code /me*} self path via {@link #withSelfEmail}), so even an
-   * officer/admin never receives a peer's email through this controller. This helper now only hides
-   * the remaining peer-irrelevant fields from plain members. Audit finding H-4: previously any
-   * KRT_MEMBER could paginate {@code /api/v1/users/search} and harvest every member's email.
+   * Reduces a user DTO to the peer shape for callers below logistician; logisticians and above get
+   * it unchanged.
    *
-   * <p>The peer view keeps {@code id}, {@code username}, {@code displayName}, {@code
-   * effectiveName}, {@code rank}, {@code inKeycloak}, {@code squadron}, {@code version} — enough
-   * for the participant pickers in the mission editor to identify peers visually; drops {@code
-   * description}, {@code roles}, {@code permissions}, {@code lastReadAnnouncementId}, {@code
-   * isLogistician}, {@code isMissionManager}, {@code joinDate} (and {@code email}, already {@code
-   * null} from the mapper).
+   * <p>Email is never present here, since {@link UserMapper#toDto(User)} omits it.
    *
    * @param dto the persisted user DTO
-   * @return the redacted DTO for non-elevated callers, or the original for officer/admin
+   * @return the redacted DTO for non-elevated callers, otherwise the original
    */
   private UserDto redactForPeerIfNeeded(UserDto dto) {
     if (dto == null || authHelperService.isLogisticianOrAbove()) {
@@ -893,20 +760,12 @@ public class UserController {
   }
 
   /**
-   * Returns the slim peer view of {@code dto} unconditionally — drops PII fields ({@code email},
-   * description, roles, permissions, flags, joinDate, lastReadAnnouncementId) and keeps the public
-   * callsign tuple. Used by {@link #getUserById} for the cross-squadron non-admin path (audit
-   * finding H-3), where role-based escalation does NOT widen the view — an officer of squadron A
-   * must not see PII of squadron B's members.
+   * Returns the slim peer view of {@code dto} unconditionally, regardless of the caller's role.
    *
    * @param dto persisted user DTO; never {@code null}
    * @return the slim peer-view DTO
    */
   private UserDto redactToPeerShape(@NotNull UserDto dto) {
-    // The projection itself moved to the shared support class: every surface that NESTS a UserDto
-    // must apply the same shape, and while it lived here as a private helper only this controller
-    // did - so the same caller got the slim record from GET /users/{id} and the full one from any
-    // aggregate that embedded it.
     return UserDtoRedaction.toPeerShape(dto);
   }
 

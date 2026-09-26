@@ -34,13 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.thymeleaf.standard.serializer.IStandardJavaScriptSerializer;
 
 /**
- * Pins down the behaviour of {@link
- * ThymeleafJavaScriptSerializerConfig.JavaTimeAwareJavaScriptSerializer}. The test reproduces the
- * exact failure that triggered a 500 on {@code /promotion/admin/rank-requirements} — a {@code
- * LinkedHashMap<String, List<PromotionCategoryDto>>} whose nested DTOs carry {@link Instant}
- * timestamps — and locks the surrounding XSS-protection escapes ({@code <}, {@code >}, {@code &},
- * {@code '}, {@code "}, {@code /}, {@code U+2028}, {@code U+2029}) in place so a future
- * "simplification" of the serializer cannot silently regress either side.
+ * Tests {@link ThymeleafJavaScriptSerializerConfig.JavaTimeAwareJavaScriptSerializer}: nested DTOs
+ * with {@link Instant} timestamps serialize, and the XSS-protection escapes stay in place.
  */
 class ThymeleafJavaScriptSerializerConfigTest {
 
@@ -72,7 +67,6 @@ class ThymeleafJavaScriptSerializerConfigTest {
 
   @Test
   void serializeDtoWithInstantField_doesNotThrowAndContainsTimestamp() {
-    // Reproduces the failing object shape: PromotionCategoryDto.createdAt/updatedAt are Instant.
     PromotionCategoryDto dto =
         new PromotionCategoryDto(
             UUID.randomUUID(),
@@ -95,8 +89,6 @@ class ThymeleafJavaScriptSerializerConfigTest {
 
   @Test
   void serializeMapOfListsOfDtos_reproducesOriginalFailureShapeWithoutThrowing() {
-    // This matches the exact reference chain from the original 500:
-    //   LinkedHashMap["<uuid>"] -> ArrayList[0] -> PromotionCategoryDto["createdAt"]
     UUID topicId = UUID.randomUUID();
     Map<String, List<PromotionCategoryDto>> categoriesByTopic =
         Map.of(
@@ -125,17 +117,9 @@ class ThymeleafJavaScriptSerializerConfigTest {
     serializer.serializeValue("<script>alert('xss')&\"/test\"</script>", writer);
 
     String result = writer.toString();
-    // The XSS guarantee Thymeleaf's stock serializer relies on is the slash escape: turning the
-    // closing-tag sequence "</script>" into "<\\/script>" defeats the HTML5 parser's script-end
-    // matcher (which looks for a literal "</", not "<\\/"). The raw "<" is NOT escaped by the
-    // stock serializer — the slash escape carries the safety property by itself.
     assertThat(result).doesNotContain("</script>");
     assertThat(result).contains("\\/");
-    // Ampersand is JSON-escaped via & so the value cannot interact with HTML entity decoding
-    // when it incidentally renders into an HTML attribute context.
     assertThat(result).containsIgnoringCase("\\u0026");
-    // Embedded double-quotes are JSON-escaped to \" so the value cannot terminate the surrounding
-    // JSON/JS string literal early.
     assertThat(result).contains("\\\"");
   }
 
@@ -144,8 +128,6 @@ class ThymeleafJavaScriptSerializerConfigTest {
     StringWriter writer = new StringWriter();
     serializer.serializeValue("a b c", writer);
 
-    // U+2028 / U+2029 are valid line terminators in JavaScript strings; if they survive
-    // unescaped the surrounding <script> block becomes a syntax error.
     String result = writer.toString();
     assertThat(result).containsIgnoringCase("\\u2028").containsIgnoringCase("\\u2029");
   }

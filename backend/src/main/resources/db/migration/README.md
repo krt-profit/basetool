@@ -318,28 +318,23 @@ the same contract as prod:
   `BackendApplicationTests` (or a more focused integration test) to verify
   the seeded state.
 
-## File header convention
+## Where the *why* goes
 
-Every migration file should open with a short SQL comment explaining *why*
-the change is happening, not just what. Future-you reading `V42__...sql`
-in five years will not remember the bug or feature request that motivated
-it. Example:
+A new migration file carries no comment ([ADR-0214](../../../../../../docs/adr/0214-code-carries-no-comments-besides-javadoc.md)).
+The reason for the change — the bug or feature request that motivated it,
+and the answer to the obvious "why now?" — goes into the commit message and
+the PR, where `git log -- V42__*` finds it. Durable facts about the schema
+belong in the spec.
 
-```sql
--- Stable, machine-readable identifier for roles. The display name (`name`) can
--- be renamed by an admin without changing the role's identity. `code` is what
--- the DataInitializer matches against on startup so a renamed role is no
--- longer silently re-created with default permissions on the next boot.
-ALTER TABLE role ADD COLUMN code VARCHAR(64);
-```
-
-A reader should be able to grep `git log -- V42__*` and find the PR; the
-comment should answer the obvious "why now?" question before they need to.
+Migrations that already shipped keep the header comments they were applied
+with: editing a `V*.sql` changes its checksum and fails Flyway `validate` on
+every existing database.
 
 ## Checklist before merging a migration
 
 - [ ] Filename is `V<next-unused-integer>__<snake_case>.sql`.
-- [ ] Top-of-file comment explains *why*, not just what.
+- [ ] The commit message and PR explain *why*, not just what; the file itself
+  carries no comment (ADR-0214).
 - [ ] No `DROP TABLE` / `DROP COLUMN` on data that's already in production
   without a phase-1 stop-writing predecessor in an earlier release.
 - [ ] Backfill (if any) is idempotent and inside the same migration file.

@@ -18,24 +18,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Promotion-overview page module (/promotion), extracted verbatim from the former inline script
- * of promotion-overview.html (ADR-0069, follow-up to #924).
- *
- * Wires the expand-all / collapse-all toolbar buttons for the rank-group <details> blocks through
- * the delegated window.krtEvents bus. Native <details> already handles the per-group toggle, so the
- * only added behaviour is the bulk action; there is no persistence.
- *
- * The block carried no Thymeleaf interpolation, so there is no inline bootstrap: the whole script
- * moved here unchanged (its `th:unless="${isAllSquadronsMode}"` gate now rides on the th:src tag).
- */
-
-/*
- * Expand-all / collapse-all helpers for the rank-group <details> blocks.
- * Native <details> already handles the per-group toggle; we only need to
- * automate the bulk action. No persistence — the "you are here" group is
- * always re-opened on load, which is the only state we want to remember.
- */
 function poToggleAll(openState) {
     const nodes = document.querySelectorAll('details.rank-group');
     nodes.forEach(function (d) {

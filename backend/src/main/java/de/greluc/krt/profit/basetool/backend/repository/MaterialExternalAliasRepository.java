@@ -47,11 +47,8 @@ public interface MaterialExternalAliasRepository
   List<MaterialExternalAlias> findAllByOrderByExternalNameAsc();
 
   /**
-   * Lookup used by the R3 Wiki commodity sync's resolution chain step 2 and as the service-layer
-   * pre-insert duplicate check. Case-insensitive by convention: external systems sometimes carry
-   * the same name with different casing across patch versions, so the lookup tolerates the drift.
-   * At most one row can match — the V146 unique index on {@code (source_system,
-   * LOWER(external_name))} folds case exactly like this query does (REQ-REFINERY-010).
+   * Finds the alias for an external commodity name within one source system, ignoring case; at most
+   * one row matches (REQ-REFINERY-010).
    *
    * @param sourceSystem catalogue the alias belongs to
    * @param externalName case-insensitive external commodity name
@@ -61,10 +58,7 @@ public interface MaterialExternalAliasRepository
       MaterialExternalAliasSource sourceSystem, String externalName);
 
   /**
-   * Returns every alias of one source system. The refinery import loads the {@code REFINERY_SCREEN}
-   * rows once per request so its truncation stage can test containment against the canonicalized
-   * alias names (REQ-REFINERY-004 stage 3) — the curated set is small (tens of rows), so no
-   * pagination is needed.
+   * Returns every alias of one source system, unpaged.
    *
    * @param sourceSystem catalogue the aliases belong to
    * @return all alias rows of that source, in no guaranteed order

@@ -23,27 +23,17 @@ import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import java.util.List;
 
 /**
- * One aggregation row of an item order's internal material view: the still-outstanding quantity of
- * a single material needed across the whole order at one quality level. A material required in both
- * qualities yields two rows (one {@code GOOD}, one {@code NONE}); the display formats {@code
- * totalQuantity} per {@code material.quantityType} (SCU vs Stück).
+ * One row of an item order's material view: the outstanding quantity of one material across the
+ * order at one quality bucket.
  *
- * @param material the aggregated material, with its {@code quantityType} for unit-aware formatting
- * @param qualityRequirement the quality bucket this row sums ({@code GOOD} or {@code NONE})
- * @param totalQuantity the summed <b>outstanding</b> required quantity across all item lines for
- *     this material+quality — only the demand of the units not yet manufactured ({@code
- *     requiredQuantity × (amount − manufacturedAmount) / amount} per line, REQ-ORDERS-025), so it
- *     shrinks as production is booked and is 0 once every line for this bucket is fully
- *     manufactured
- * @param currentStock the total stock of inventory linked to this order for this material at or
- *     above the bucket's quality floor ({@code GOOD} → 650, {@code NONE} → no floor); drives the
- *     collection-progress shown in the order-overview list, mirroring the MATERIAL requirement
- *     rows. {@code 0.0} when nothing is linked; {@code null} only on the neutral rows emitted by
- *     {@code JobOrderItemService.aggregateMaterials} before {@code JobOrderService} enriches them
- * @param claims the per-squadron claims on this bucket; populated only for public SK orders (Phase
- *     5, #345), empty otherwise
- * @param openAmount {@code totalQuantity − Σ claims} for the bucket; {@code null} for non-SK
- *     orders, a non-null value (possibly 0) for SK orders
+ * @param material the aggregated material, with its {@code quantityType} for unit formatting
+ * @param qualityRequirement the quality bucket ({@code GOOD} or {@code NONE})
+ * @param totalQuantity outstanding required quantity for units not yet manufactured
+ *     (REQ-ORDERS-025); {@code 0} once all lines are done
+ * @param currentStock linked stock at or above the bucket's quality floor; {@code null} only before
+ *     {@code JobOrderService} enriches the row
+ * @param claims per-squadron claims; populated only for public SK orders
+ * @param openAmount {@code totalQuantity} minus the claims; {@code null} for non-SK orders
  */
 public record AggregatedMaterialDto(
     MaterialDto material,

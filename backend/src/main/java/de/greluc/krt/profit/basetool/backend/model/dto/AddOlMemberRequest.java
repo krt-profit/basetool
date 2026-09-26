@@ -23,10 +23,9 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Request body to add an Organisationsleitung member (epic #692, REQ-ORG-017). The user must hold
- * no Staffel membership (enforced by the service guard and the V165 trigger). An OL member's reach
- * cascades over every org unit (REQ-ORG-015) but grants no admin rights.
+ * Request body to add an Organisationsleitung member (REQ-ORG-017). The user must hold no Staffel
+ * membership; the role reaches every org unit but grants no admin rights.
  *
- * @param userId the user to add to the Organisationsleitung; required.
+ * @param userId the user to add; required
  */
 public record AddOlMemberRequest(@NotNull UUID userId) {}

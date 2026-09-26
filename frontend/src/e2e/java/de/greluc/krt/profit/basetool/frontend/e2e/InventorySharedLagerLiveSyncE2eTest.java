@@ -36,20 +36,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the shared squadron Lager ({@code /inventory/all}, #1307,
- * REQ-FE-010 / REQ-FE-015): an allocation-chip change one logistician makes must update another
- * viewer who has the same stack expanded, without a manual reload — the opaque {@code stock}
- * section key crossing the global {@code inventory} room.
- *
- * <p>Two browser contexts as the same admin are two distinct {@code /ws/sync} sockets, so the
- * deterministic pre-mutation wait is context B's {@code window.krtLiveSync.subscribedTopics()}
- * containing {@code inventory} (the global room is authorized by the socket authentication alone).
- * A shared, job-order-eligible 100-SCU row is seeded; context A adds a job-order allocation chip
- * through the real "+ Zuordnen" combobox ({@code POST /inventory/{id}/allocation}, which broadcasts
- * {@code inventory/[stock]}), and context B — a passive viewer that never reloads — must show the
- * new chip in place, driven purely by the change signal (its own filtered fragment re-fetch
- * preserves the expanded tree). No stock data crosses the socket; B re-pulls its own authorized
- * view.
+ * Verifies live sync on the shared Lager {@code /inventory/all} (REQ-FE-010, REQ-FE-015): an
+ * allocation chip added in one browser context appears in a second context with the same stack
+ * expanded, without a reload.
  */
 @Tag("e2e")
 class InventorySharedLagerLiveSyncE2eTest {
@@ -138,14 +127,10 @@ class InventorySharedLagerLiveSyncE2eTest {
         expandToLeaf(pageA);
         expandToLeaf(pageB);
 
-        // B sees the row but not yet the order chip (the order is unallocated).
         assertThat(pageB.locator(chip)).hasCount(0);
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its `inventory` subscribe is
-        // acked.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -154,14 +139,8 @@ class InventorySharedLagerLiveSyncE2eTest {
                             + " window.krtLiveSync.subscribedTopics().indexOf('inventory') >="
                             + " 0)")));
 
-        // Context A earmarks 60 SCU of the row to the order (broadcasts inventory/[stock]).
         addOrderChip(pageA);
 
-        // The assertion under test: context B — which did nothing — shows the new chip in place,
-        // its
-        // filtered fragment re-fetched with the expanded tree restored (the global room coalesces
-        // at
-        // ~1.5 s), and never reloaded.
         assertThat(pageB.locator(chip))
             .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(30_000));
         assertEquals(
@@ -190,17 +169,13 @@ class InventorySharedLagerLiveSyncE2eTest {
         .click(new Locator.ClickOptions().setTimeout(20_000));
     page.locator("div.stack-header[data-material-id='" + materialId + "']")
         .click(new Locator.ClickOptions().setTimeout(20_000));
-    // 20 s, not the 5 s default: the lazy stack-entries fetch + render is slow on WebKit under
-    // load.
     assertThat(page.locator("div.tree-row--leaf[data-item-id='" + itemId + "']"))
         .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
   }
 
   /**
-   * Adds the seeded order as a job-order allocation chip on the expanded entry through the inline
-   * "+ Zuordnen" combobox: opens the JOB_ORDER split's popover, picks the order by its value, fills
-   * 60 and saves, waiting for the in-place {@code POST /inventory/{id}/allocation} to settle. Drops
-   * the fixed footer, which can otherwise intercept the trusted clicks.
+   * Adds the seeded order as a job-order allocation chip of 60 through the "+ Zuordnen" combobox
+   * and waits for the in-place {@code POST /inventory/{id}/allocation}.
    *
    * @param page the authenticated page expanded to the entry (see {@link #expandToLeaf})
    */
@@ -209,15 +184,6 @@ class InventorySharedLagerLiveSyncE2eTest {
         page.locator(
             "div.assoc-split[data-entry-id='" + itemId + "'][data-assoc-field='JOB_ORDER']");
     dropFooter(page);
-    // Centre the trigger BEFORE opening the popover, and never let the scroll position decide the
-    // rest. The popover is `position: fixed` and re-anchors to its trigger on every scroll
-    // (assocPositionPop / assocRepositionOpenPop), so Playwright's own scroll-into-view moves the
-    // very element it is trying to reach — a chase that ends in "element is outside of the
-    // viewport" after 60 retries even though the rendered page is correct. Anchored mid-viewport
-    // there is room below, the popover drops downward instead of flipping up, and every later
-    // target (combobox, option, amount, Speichern) is already on screen, so Playwright never
-    // scrolls again. The expanded leaf sits near the bottom of the tree, which is why this was
-    // load-bearing without anyone noticing until the footer's height changed (#1529).
     split.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'instant' })");
     split
         .locator("button[data-trigger='inv-admin-assoc-add-open']")
@@ -233,20 +199,8 @@ class InventorySharedLagerLiveSyncE2eTest {
   }
 
   /**
-   * Takes the {@code position:fixed} footer out of hit-testing, so it cannot intercept the trusted
-   * click on some engines (the WebKit/Firefox footer-overlap flake the other inventory e2es also
-   * guard against).
-   *
-   * <p>Deliberately {@code pointer-events: none} rather than the {@code display: none} the sibling
-   * suites use: hiding the footer makes {@code sidebar.js} re-measure it and publish {@code
-   * --krt-footer-height: 0px}, which shrinks {@code main}'s {@code padding-bottom} by the footer's
-   * full height, shortens the document and makes the browser clamp the scroll position. The
-   * allocation popover is {@code position: fixed} and re-anchors to its trigger on every scroll, so
-   * that clamp decides where it lands — and by how much depends on how tall the footer happens to
-   * be. When the Fan Kit band moved off the footer (#1529) the footer lost 52px, the clamp changed,
-   * and this test started failing with "element is outside of the viewport" while the rendered page
-   * was perfectly fine. Removing only the hit-testing keeps the layout byte-identical, so the test
-   * no longer depends on the footer's height at all.
+   * Excludes the fixed footer from hit-testing with {@code pointer-events: none} so it cannot
+   * intercept clicks; unlike hiding it, this leaves the layout and scroll position unchanged.
    *
    * @param page the active page
    */

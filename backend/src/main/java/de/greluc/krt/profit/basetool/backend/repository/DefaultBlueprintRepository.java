@@ -52,9 +52,7 @@ public interface DefaultBlueprintRepository extends JpaRepository<DefaultBluepri
   Optional<DefaultBlueprint> findByProductKey(String productKey);
 
   /**
-   * Returns just the normalized product keys of every default. Backs the cached default-key set
-   * ({@code DefaultBlueprintKeyService}) used to flag a personal blueprint as non-removable and to
-   * guard its deletion.
+   * Returns the normalized product keys of every default blueprint.
    *
    * @return every default product key; never {@code null}, possibly empty
    */

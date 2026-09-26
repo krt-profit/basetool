@@ -52,14 +52,13 @@ public class MaterialCollectionController {
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
-   * Returns the inventory contributions linked to the given job order. The per-entry owner and
-   * location are blanked when the caller is not entitled to the order's responsible side ({@code
-   * canSeeJobOrderInventoryOwners} is {@code false} — a requesting-side viewer of an SK-public
-   * order, REQ-ORDERS-029); material, quality, quantities and the delivered marker are always kept.
+   * Returns the inventory contributions linked to the given job order.
+   *
+   * <p>Owner and location are blanked when {@code canSeeJobOrderInventoryOwners} is {@code false}
+   * (REQ-ORDERS-029); all other fields are always kept.
    *
    * @param jobOrderId job order id
-   * @return inventory entries sorted by owner / location / material / quality / quantity, with
-   *     owner/location redacted for requesting-side viewers
+   * @return inventory entries sorted by owner, location, material, quality and quantity
    */
   @Operation(
       summary = "Get material collection for a job order",

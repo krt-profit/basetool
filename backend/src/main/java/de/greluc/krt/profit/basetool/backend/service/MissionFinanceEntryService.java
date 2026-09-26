@@ -52,17 +52,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD plus aggregation for mission finance entries (income / expense rows attached to a
- * participant).
+ * CRUD and aggregation for mission finance entries (income and expense rows of a participant).
+ * Totals include the profit of refinery orders linked to the mission.
  *
- * <p>The total-sum aggregation also folds in the profit/loss of refinery orders linked to the
- * mission (ore sales minus expenses minus other expenses). Refinery orders surface here because the
- * mission finance page is the single source of truth for a mission's bottom line — splitting
- * refinery-derived profit into its own page would force users to mentally combine two numbers.
- *
- * <p>Update and delete are gated by {@code @PreAuthorize} on {@link
- * MissionSecurityService#canEditFinanceEntry} — admins/officers can edit any entry, the
- * participant's user can edit only their own.
+ * <p>Update and delete are gated by {@link MissionSecurityService#canEditFinanceEntry}.
  */
 @Slf4j
 @Service
@@ -89,15 +82,8 @@ public class MissionFinanceEntryService {
   }
 
   /**
-   * Aggregated finance totals for a mission's summary strip: per-type sum + count of the finance
-   * entries computed by ONE SQL aggregate (never a row load-all) plus the refinery-order
-   * contribution. Under the multi-user mission-page live-update fan-out (ADR-0078) this must not
-   * scale with the ledger size — the previous {@code size=1000} load-all pinned a database
-   * connection per render. Refinery orders are a small, bounded per-mission list: each contributes
-   * its profit ({@code oreSales − expenses − otherExpenses}) to {@link
-   * MissionFinanceTotalsDto#total()} and its raw expenses (where &gt; 0) to the expense bucket,
-   * matching the previous in-frontend summation. Legacy refinery rows with null sales/expenses are
-   * treated as 0.
+   * Computes a mission's finance totals with one SQL aggregate plus the linked refinery orders'
+   * profit and expenses; {@code null} refinery figures count as 0.
    *
    * @param missionId mission id
    * @return the finance totals (sums coalesced to zero; expense bucket folds in refinery expenses)
@@ -110,10 +96,6 @@ public class MissionFinanceEntryService {
     BigDecimal financeExpenseSum = agg.expenseSum() != null ? agg.expenseSum() : BigDecimal.ZERO;
     long financeExpenseCount = agg.expenseCount() != null ? agg.expenseCount() : 0L;
 
-    // Refinery orders are bounded per mission (not the unbounded size=1000 ledger), so
-    // materializing
-    // them stays cheap. Each folds its profit into the signed total and its raw expenses (> 0) into
-    // the expense bucket, exactly as the previous frontend loop did.
     BigDecimal refineryProfit = BigDecimal.ZERO;
     BigDecimal refineryExpenseSum = BigDecimal.ZERO;
     long refineryExpenseCount = 0L;
@@ -142,10 +124,7 @@ public class MissionFinanceEntryService {
   }
 
   /**
-   * Signed bottom line for a mission (finance income − expense + refinery profit). Delegates to
-   * {@link #calculateTotals} so the value comes from the SQL aggregate rather than a finance-entry
-   * row load-all. Kept as its own method because {@code /finance-entries/sum} is a separately
-   * published endpoint reused by the operation finance rollup.
+   * Returns a mission's signed bottom line: income − expense + refinery profit.
    *
    * @param missionId mission id
    * @return signed total in mission credits
@@ -155,9 +134,7 @@ public class MissionFinanceEntryService {
   }
 
   /**
-   * Creates a finance entry. The participant must belong to the named mission; mismatched
-   * participant + mission pair surfaces as a 400 {@link BadRequestException} rather than a 500 —
-   * distinguishes "bad inputs" from "server bug" for client error handling.
+   * Creates a finance entry for a participant of the named mission.
    *
    * @param dto create payload
    * @return the persisted entry
@@ -198,10 +175,7 @@ public class MissionFinanceEntryService {
   }
 
   /**
-   * Updates an existing finance entry. Optimistic-lock check is explicit (the DTO carries the
-   * expected version) and surfaces as {@link BusinessConflictException} → 409 rather than Spring's
-   * automatic {@code ObjectOptimisticLockingFailureException}: this entity is only mutated through
-   * this service, so explicit checks keep the error path readable.
+   * Updates an existing finance entry after an explicit version check.
    *
    * @param entryId finance entry id
    * @param dto update payload (carries the expected version)
@@ -215,7 +189,6 @@ public class MissionFinanceEntryService {
     MissionFinanceEntry entry =
         Entities.require(financeEntryRepository.findById(entryId), "Finance entry not found");
 
-    // Optimistic Locking Check
     if (!entry.getVersion().equals(dto.version())) {
       throw new BusinessConflictException(
           "The entry has been updated by someone else. Please reload.");

@@ -37,20 +37,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the stale optimistic-lock {@code @Version} bug class on in-place writes (epic
- * #571), applied to the global blueprint-sharing toggle (REQ-INV-018): the profile
- * blueprint-sharing save ({@code POST /profile/blueprint-sharing} → {@code PUT
- * /api/v1/users/me/blueprint-sharing}) saves through {@code window.krtFetch.write} without a page
- * reload and must survive a SECOND consecutive in-place save.
+ * Verifies that the profile blueprint-sharing toggle (REQ-INV-018) saves in place and that a second
+ * consecutive in-place save does not 409 on a stale {@code @Version}.
  *
- * <p>The bug class: a stale user {@code version} returned after a real change would 409 the next
- * write with {@code OPTIMISTIC_LOCK}. The fix flushes (save → saveAndFlush) so the response carries
- * the fresh version that the page writes back via {@code syncAllVersions}.
- *
- * <p>Each save flips the toggle to its <em>opposite</em> boolean (false ↔ true), so both saves are
- * genuine changes that bump the {@code @Version}; re-saving the same value would be a no-op that
- * never exercises the bug. A window marker proves no reload happened between the two saves, and the
- * persisted flag is read back from the backend to confirm the second write actually landed.
+ * <p>Each save flips the toggle so both bump the version; a window marker proves no reload
+ * happened, and the persisted flag is read back from the backend.
  */
 @Tag("e2e")
 class ProfileBlueprintSharingInPlaceE2eTest {
@@ -110,9 +101,6 @@ class ProfileBlueprintSharingInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/profile");
         page.waitForLoadState();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // both saves stayed in place. The position:fixed footer can cover the bottom submit button,
-        // so it is dropped out of the way before the (non-navigating) AJAX clicks.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -122,11 +110,8 @@ class ProfileBlueprintSharingInPlaceE2eTest {
             page.locator("#profile-blueprint-sharing-form input[name='shareBlueprintsGlobally']");
         Locator submit = page.locator("#profile-blueprint-sharing-form button[type='submit']");
 
-        // Both saves are genuine boolean flips: start from the current state, flip to the opposite,
-        // then back — each is a real change and therefore a real @Version bump.
         boolean initial = checkbox.isChecked();
 
-        // First in-place save: the opposite value.
         checkbox.setChecked(!initial);
         saveInPlace(page, submit);
         assertEquals(
@@ -135,9 +120,6 @@ class ProfileBlueprintSharingInPlaceE2eTest {
             "Blueprint-sharing save must update in place — no page reload on success.");
         assertEquals(!initial, persistedBlueprintSharing(), "the first in-place save must persist");
 
-        // Second consecutive in-place save WITHOUT a reload, back to the initial value: only
-        // succeeds if the twin wrote the fresh @Version back (otherwise the stale version 409s
-        // OPTIMISTIC_LOCK).
         checkbox.setChecked(initial);
         saveInPlace(page, submit);
         assertEquals(
@@ -156,11 +138,8 @@ class ProfileBlueprintSharingInPlaceE2eTest {
   }
 
   /**
-   * Clears any prior toast, submits the blueprint-sharing form, waits for the in-place {@code POST
-   * /profile/blueprint-sharing} to settle, and asserts the success UX: a non-error success toast
-   * appeared, NO error toast surfaced, and the {@code OPTIMISTIC_LOCK} reload-confirm dialog
-   * ({@code .krt-confirm-overlay}) never opened. The latter two are the discriminators that turn a
-   * stale second save red on the pre-fix backend.
+   * Submits the blueprint-sharing form in place and asserts a success toast, no error toast and no
+   * {@code OPTIMISTIC_LOCK} reload-confirm dialog ({@code .krt-confirm-overlay}).
    *
    * @param page the authenticated profile page
    * @param submit the blueprint-sharing form's submit button

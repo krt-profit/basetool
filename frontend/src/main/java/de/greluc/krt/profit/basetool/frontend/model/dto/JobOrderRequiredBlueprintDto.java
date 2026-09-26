@@ -21,17 +21,15 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
  * Frontend mirror of the backend {@code JobOrderRequiredBlueprintDto}: one required variant family
- * of an item order with the count of responsible-org-unit members owning the blueprint for the
- * ordered item or any of its cosmetic variants. An {@code ownerCount} of zero marks a coverage gap
- * the template highlights; {@code variantInclusive} drives the "counts variants" hint.
+ * of an item order and how many responsible-org-unit members own its blueprint. A zero count marks
+ * a coverage gap.
  *
  * @param productKey the variant family key the order's item line resolves to
  * @param productName the display name of the ordered item (a variant name when a variant was
  *     ordered)
  * @param ownerCount the number of responsible-org-unit members owning the blueprint for this item
  *     or any variant of it
- * @param variantInclusive whether the count includes owners of cosmetic variants (false for an
- *     atomic magazine row)
+ * @param variantInclusive whether the count includes owners of cosmetic variants
  */
 public record JobOrderRequiredBlueprintDto(
     String productKey, String productName, int ownerCount, boolean variantInclusive) {}

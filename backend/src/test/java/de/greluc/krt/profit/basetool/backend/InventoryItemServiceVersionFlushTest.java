@@ -52,16 +52,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Regression tests for the optimistic-lock {@code @Version} write-back on the in-place inventory
- * edits (epic #571 / #577). The in-place edits ({@code updateNote} and the reducing {@code
- * bookOutInventoryItem}) return the item DTO whose version the frontend writes back onto every
- * control in the same row. Because the service is {@code @Transactional} (the commit — and thus the
- * {@code @Version} increment — happens after the method returns), the DTO must be mapped from a
- * {@code saveAndFlush}, not a plain {@code save}: a plain {@code save} leaves the version
- * unflushed, so the response carries the STALE version and the user's next in-place edit of the
- * same row fails with {@code ObjectOptimisticLockingFailureException} (HTTP 409). These tests pin
- * {@code saveAndFlush}, mirroring the {@code verify(...).flush()} guard in {@code
- * InventoryItemServiceBulkCheckoutTest}.
+ * Verifies that in-place inventory edits ({@code updateNote}, reducing {@code
+ * bookOutInventoryItem}) map their DTO from {@code saveAndFlush}, so the returned {@code @Version}
+ * is current and the next edit does not 409.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceVersionFlushTest {
@@ -80,17 +73,12 @@ class InventoryItemServiceVersionFlushTest {
 
   @Mock private AuditService auditService;
   @Mock private OwnerScopeService ownerScopeService;
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL checkout sub-service is
-  // one of its arguments
   private InventoryItemService inventoryItemService;
 
   private InventoryCheckoutService realCheckoutService;
 
   @BeforeEach
   void wireCheckoutDelegate() {
-    // The facade delegates the book-out flow to InventoryCheckoutService; Mockito does not inject
-    // one @InjectMocks target into another, so build the real sub-service from the same mocks and
-    // set it on the facade. updateNote stays on the facade and uses the mocks directly.
     realCheckoutService =
         new InventoryCheckoutService(
             inventoryItemRepository,
@@ -102,26 +90,20 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             ownerScopeService,
             auditService);
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     inventoryItemService =
         new InventoryItemService(
             inventoryItemRepository,
             userRepository,
             materialRepository,
-            null, // gameItemRepository
+            null,
             locationRepository,
             jobOrderRepository,
             missionRepository,
             inventoryItemMapper,
             ownerScopeService,
-            null, // jobOrderItemService
+            null,
             auditService,
-            null, // inventoryAggregationService
+            null,
             realCheckoutService);
   }
 
@@ -164,7 +146,6 @@ class InventoryItemServiceVersionFlushTest {
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
 
-    // DISCARD a partial amount so the row is reduced (not deleted) and its DTO is returned.
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
             3.0, null, null, CheckoutType.DISCARD, null, null, 0L, null, null, null, null);

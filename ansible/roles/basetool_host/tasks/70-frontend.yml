@@ -1,31 +1,9 @@
 ---
-# The L4 front end (ADR-0187).
-#
-# Rootless Podman's port forwarder replaces every client address with its own, which does not merely
-# degrade the per-client rate limiter but INVERTS the Keycloak admin allow-list. haproxy binds :80
-# and :443 on the host, forwards to the edge in `mode tcp` and prepends a PROXY v2 header; the edge
-# restores the address from it. TLS still terminates at the edge -- this is byte forwarding, so no
-# key exists in a second place and the certificate handover is untouched.
-#
-# Everything here was measured on the target platform before it was written. The two details that
-# look like style and are not:
-#
-#   * SEPARATE v4 and v6 binds. A single `bind :::80 v4v6` makes IPv4 clients arrive as
-#     `::ffff:10.9.0.15`, and every CIDR-based `allow` rule behind it silently stops matching. The
-#     connection works; only the address has the wrong shape.
-#   * A NARROW SELinux port label. Confined haproxy may not connect to an unlabelled port. Labelling
-#     the one loopback port is enough; the `haproxy_connect_any` boolean would permit connecting
-#     anywhere and is deliberately left off.
-
 - name: Install haproxy
   ansible.builtin.package:
     name: haproxy
     state: present
 
-# The first bind attempt on the testing host failed with "Permission denied" on a port ABOVE 1024,
-# which reads exactly like a privilege problem and is not: it is SELinux refusing a confined service
-# an unlabelled port. Recording it here so the next person does not go looking at
-# ip_unprivileged_port_start.
 - name: Allow haproxy to reach the edge's loopback port
   community.general.seport:
     ports: "{{ basetool_host_edge_loopback_ports | join(',') }}"
@@ -34,9 +12,6 @@
     state: present
   when: basetool_host_manage_selinux | bool
 
-# The variable became a LIST on 2026-09-22 and the singular is gone. An inventory that still
-# carries the old name would otherwise fall back to the default silently and pin the trust to
-# whatever the default happens to say, which is the failure this whole change exists to remove.
 - name: Refuse the retired singular front-end address variable
   ansible.builtin.assert:
     that:
@@ -63,10 +38,6 @@
       list of literals is the opposite of a range, not a step toward one -- each entry is checked on
       its own here, and the edge's own render-and-run.sh checks them again at start.
 
-# One gather, read twice: the reload handler needs to know whether haproxy is already running, and
-# the firewall block below needs to know whether firewalld is. This used to shell out to
-# `systemctl is-active` on the grounds that it was cheaper than gathering the whole inventory --
-# which stopped being true the moment the firewall block needed the inventory anyway.
 - name: Read the service states without shelling out to systemctl
   ansible.builtin.service_facts:
 
@@ -75,7 +46,6 @@
     basetool_host_haproxy_active: >-
       {{ ansible_facts.services['haproxy.service'] is defined
          and ansible_facts.services['haproxy.service'].state == 'running' }}
-
 
 - name: Write the front-end configuration
   ansible.builtin.template:
@@ -87,9 +57,6 @@
     validate: haproxy -c -f %s
   notify: Reload haproxy
 
-# Enabled, but NOT started here. This role provisions a host that is not serving traffic yet, and a
-# front end with no backend behind it would answer every request with a connection error for as long
-# as the gap lasts. `deploy.sh` brings the stack up; the front end comes with the boot after it.
 - name: Enable haproxy for the next boot
   ansible.builtin.systemd_service:
     name: haproxy
@@ -104,30 +71,10 @@
       EDGE_TRUSTED_PROXY={{ basetool_host_edge_trusted_proxies | join(' ') }} in its environment,
       or its listeners stay plain and the PROXY header this front end sends will be rejected.
 
-# --- the firewall the hardening profile brings with it ---------------------------------------------
-#
-# MEASURED 2026-09-16, and it is the reason this section exists: this host had no firewalld at all in
-# the morning. The CIS remediation INSTALLS it, enables it, and leaves the default `public` zone
-# allowing ssh, cockpit and dhcpv6-client -- and nothing else. After the reboot, :80 and :443 were
-# listening locally and timed out from another machine.
-#
-# That is the exact failure the hardening section warns about in words: an oscap report showing a
-# perfect score on a host whose edge is unreachable. Every health check inside the host stays green,
-# because every health check inside the host is inside the host.
-#
-# So the ports are opened explicitly, here, next to the service that binds them -- not left to
-# whoever notices the outage.
-
 - name: Open the ports the front end binds
-  # `ansible_facts.services` comes from service_facts, gathered in 65-firewall.yml. Reading it is
-  # the module-shaped way to ask what `systemctl is-active` used to be shelled out for.
   when: >-
     ansible_facts.services['firewalld.service'] is defined
     and ansible_facts.services['firewalld.service'].state == 'running'
-  # One module call per port, idempotent, reporting `changed` from what it did. The three tasks
-  # this replaces -- query, add, reload -- each needed a hand-written `changed_when`, and the
-  # reload ran behind a `when: ... is changed` that ansible-lint correctly reads as a handler in
-  # the wrong place.
   ansible.posix.firewalld:
     port: "{{ item.public }}/tcp"
     state: enabled

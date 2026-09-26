@@ -77,8 +77,6 @@ class LiveSyncControllerTest {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<LiveSyncTopic>> accepted = ArgumentCaptor.forClass(List.class);
     verify(streamService).subscribe(eq(ALICE), accepted.capture());
-    // A stream that asked for three rooms and got two opens with two — the client is told which,
-    // and treats the third as poll-only rather than believing it is live.
     assertThat(accepted.getValue())
         .extracting(LiveSyncTopic::canonical)
         .containsExactly("inventory", "materialboard");
@@ -118,8 +116,6 @@ class LiveSyncControllerTest {
       many.add("mission:" + new UUID(0L, i));
     }
 
-    // Truncating would leave the tail screens silently non-live, which is the failure shape this
-    // whole design is trying to avoid.
     assertThatExceptionOfType(ResponseStatusException.class)
         .isThrownBy(() -> controller.stream(ALICE, String.join(",", many), response()))
         .satisfies(error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
@@ -128,10 +124,6 @@ class LiveSyncControllerTest {
   @Test
   @DisplayName("a member moving through the app accumulates rooms and still gets a stream")
   void aMultiScreenUnionIsAccepted() {
-    // The client holds ONE stream and asks for the union of every screen currently observing, so
-    // rooms accumulate from screens still on the back stack. Twelve is what that looks like in
-    // practice; the first revision's cap of 8 refused it — and refuses the whole request, so live
-    // sync went dead on every screen at once and stayed dead behind the reconnect backoff.
     when(authorizer.maySubscribe(any())).thenReturn(true);
     when(streamService.subscribe(eq(ALICE), anyList())).thenReturn(new SseEmitter());
     List<String> union = new ArrayList<>();
@@ -167,8 +159,6 @@ class LiveSyncControllerTest {
 
     controller.stream(ALICE, "inventory", response);
 
-    // Without it an nginx buffers a body that trickles a few bytes every twenty seconds, and the
-    // symptom reads as "live sync does not work on this network".
     assertThat(response.getHeader("X-Accel-Buffering")).isEqualTo("no");
   }
 

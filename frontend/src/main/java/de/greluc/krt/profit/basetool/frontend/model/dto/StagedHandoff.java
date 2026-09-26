@@ -20,11 +20,9 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Mirror of the ingest gateway's staged-handoff value (epic #639): the draft kind plus the
- * backend's import draft verbatim as a JSON string. The gateway writes this under the Redis key
- * {@code ingest:handoff:<sub>:<handoffId>}; the frontend reads it once (single-use) after the user
- * lands on {@code ?handoff=<id>}, deserialises {@code draftJson} into the kind-specific draft DTO,
- * and pre-fills the existing review surface.
+ * Mirror of the ingest gateway's staged-handoff value: the draft kind plus the backend import draft
+ * as JSON, stored in Redis under {@code ingest:handoff:<sub>:<handoffId>} and read once by the
+ * frontend to pre-fill the review page.
  *
  * @param kind which draft this is ({@code REFINERY} / {@code BLUEPRINT})
  * @param draftJson the backend draft response, stored verbatim as JSON text

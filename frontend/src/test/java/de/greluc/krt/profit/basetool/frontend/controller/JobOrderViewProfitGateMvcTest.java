@@ -41,11 +41,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies the viewer-side profit gate on the order pages: a non-admin caller who is not a member
- * of any profit-eligible org unit ({@code canViewJobOrders=false}) is redirected from the order
- * list and the order detail to the create form — the only order surface open to them — without the
- * backend list/detail ever being queried. The profit-eligible / admin path (rendering the list and
- * detail) is covered by the other order MVC tests, which stub the capability {@code true}.
+ * Verifies that a non-admin without a profit-eligible membership is redirected from the order list
+ * and detail to the create form, without the backend being queried.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -64,12 +61,6 @@ class JobOrderViewProfitGateMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // Non-profit viewer with NO own placed orders (canViewJobOrders=false AND
-    // canViewOwnJobOrders=false): the caller may neither browse the queue nor track own orders, so
-    // both order pages route to the create form. A non-profit member WITH placed orders
-    // (canViewOwnJobOrders=true) instead sees their "Meine Auftraege" list (REQ-ORDERS-023),
-    // covered
-    // by the backend gate tests + e2e.
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(false, false, false));
   }

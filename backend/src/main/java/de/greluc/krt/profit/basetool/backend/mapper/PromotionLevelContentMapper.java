@@ -31,12 +31,11 @@ import org.mapstruct.MappingTarget;
 public interface PromotionLevelContentMapper {
 
   /**
-   * Converts a {@link PromotionLevelContent} into its {@link PromotionLevelContentResponse} DTO,
-   * flattening the owning category's id and name so the client can render the rank-level
-   * expectation without a follow-up call.
+   * Converts a {@link PromotionLevelContent} into its {@link PromotionLevelContentResponse},
+   * flattening the owning category's id and name.
    *
-   * @param entity the managed level content to convert
-   * @return the response DTO mirroring the entity's fields
+   * @param entity the level content to convert
+   * @return the response DTO
    */
   @Mapping(target = "categoryId", source = "category.id")
   @Mapping(target = "categoryName", source = "category.name")

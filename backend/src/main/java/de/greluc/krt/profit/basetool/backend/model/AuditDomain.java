@@ -20,11 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * The functional area an {@link AuditEvent} belongs to (REQ-AUDIT-001). The shared {@code
- * audit_event} table is one physical store; this discriminator keeps the per-area logs
- * <em>logically</em> separate so the admin viewer can switch between them and each can be exported
- * on its own (ADR-0037). The bank audit trail is deliberately <strong>not</strong> a value here —
- * it keeps its own {@code bank_audit_event} table and is surfaced on the same page as its own tab.
+ * The functional area an {@link AuditEvent} belongs to, keeping the per-area logs in the shared
+ * {@code audit_event} table logically separate (REQ-AUDIT-001, ADR-0037). The bank trail is not a
+ * value here; it has its own {@code bank_audit_event} table.
  */
 public enum AuditDomain {
 
@@ -49,28 +47,22 @@ public enum AuditDomain {
   OPERATION,
 
   /**
-   * Org-unit role &amp; membership management — the {@code org_unit_membership} aggregate (epic
-   * #800): who is a member of which org unit, the leadership ranks granted/changed/revoked
-   * (Bereichsleitung, OL, SK-Lead and, from Phase 3, the squadron ranks) and the Logistician /
-   * Mission-Manager capability flags (Rollen &amp; Mitglieder).
+   * Org-unit role and membership management (Rollen &amp; Mitglieder): memberships, leadership
+   * ranks and the Logistician / Mission-Manager capability flags.
    */
   ROLE,
 
   /**
-   * Promotion system — the per-Staffel promotion catalogue and member grading (Beförderung): the
-   * {@code PromotionTopic} / {@code PromotionCategory} / {@code PromotionLevelContent} subtree, the
-   * {@code RankRequirement} promotion-rules catalogue, and the per-member {@code MemberEvaluation}
-   * gradings. Every catalogue or evaluation mutation is captured here. For an evaluation the
-   * subject is the graded category (its non-personal label); the member is the target reference.
+   * Promotion system (Beförderung): the per-Staffel promotion catalogue, the rank-requirement rules
+   * and the per-member evaluations. For an evaluation the subject is the graded category and the
+   * member is the target.
    */
   PROMOTION,
 
   /**
-   * Materialbörse — the material-exchange trade board (Flotte &amp; Logistik, REQ-MARKET-001…): a
-   * player releasing a Lager row for trade, editing its remark, deactivating the offer, and members
-   * registering or withdrawing interest. The subject is the offer (labelled by material, a
-   * non-personal value); the anbieter is the target reference. Interessenten identities are never
-   * recorded — only counts and lengths.
+   * Materialbörse, the material-exchange trade board (REQ-MARKET-001): offers, requests and
+   * interest registrations. The subject is the offer and the anbieter the target; interested
+   * members are recorded only as counts.
    */
   MARKET
 }

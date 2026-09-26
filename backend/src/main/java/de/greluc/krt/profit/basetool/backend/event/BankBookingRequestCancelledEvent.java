@@ -30,17 +30,15 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published right after a requester withdraws (cancels) their own still-pending bank
- * booking request (REQ-BANK-022, REQ-NOTIF-018). Unlike the confirm/reject events it is
- * <strong>directed at nobody</strong> — the withdrawing requester is the {@link #actorSub()} — so
- * it seeds no notification rule and creates no new notification. Its sole notification-pipeline
- * effect is to {@linkplain #resolvesNotificationTypes() clear} the now-stale {@code
- * BANK_BOOKING_REQUEST_CREATED} items the bank staff were shown for this request. Carries only
- * scalars so the after-commit listener never touches the managed request.
+ * Domain event published when a requester cancels their own pending bank booking request
+ * (REQ-BANK-022, REQ-NOTIF-018).
+ *
+ * <p>Directed at nobody: it only {@linkplain #resolvesNotificationTypes() clears} the stale {@code
+ * BANK_BOOKING_REQUEST_CREATED} items shown to the bank staff. Carries only scalars.
  *
  * @param requestId the cancelled request's id (also the notification's loose entity id)
  * @param accountId the target bank account id
- * @param actorSub the withdrawing requester's sub (the actor)
+ * @param actorSub the withdrawing requester's sub
  */
 public record BankBookingRequestCancelledEvent(
     UUID requestId, UUID accountId, @Nullable UUID actorSub) implements BankBookingRequestEvent {

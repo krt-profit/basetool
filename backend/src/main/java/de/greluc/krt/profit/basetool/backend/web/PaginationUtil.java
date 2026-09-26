@@ -28,20 +28,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Static helpers that translate query-string pagination parameters into a Spring Data {@link
- * Pageable} while enforcing the project's invariants: every list endpoint sorts against a fixed
- * whitelist (no user-supplied JPA paths), every page request gets {@code id} appended as a
- * tiebreaker so pages remain stable, and the {@code size} parameter is clamped so a single request
- * cannot fetch an arbitrarily large result set.
+ * Translates pagination query parameters into a {@link Pageable}: sorting only on whitelisted
+ * fields, {@code id} appended as tiebreaker, and {@code size} clamped to {@value #MAX_PAGE_SIZE}.
  *
- * <p><b>Why the clamp is {@value #MAX_PAGE_SIZE} and not smaller (SEC-03):</b> several surfaces
- * deliberately "load all" in one request — the material &times; terminal price matrix ({@code
- * /api/v1/materials/matrix?size=100000}), the admin material / member / UEX lists, and the sidebar
- * org-unit pickers. Lowering the ceiling would silently truncate those, so it stays high enough to
- * cover them. The complementary defence against a heavy fetch <em>pinning</em> a database
- * connection is the global statement-execution timeout (REQ-DATA-009, {@code
- * jakarta.persistence.query.timeout}), which bounds how long any query may run regardless of how
- * many rows it asks for.
+ * <p>The ceiling is high because some views load everything in one request; long-running queries
+ * are bounded by the statement timeout instead (REQ-DATA-009).
  */
 public final class PaginationUtil {
 
@@ -61,12 +52,9 @@ public final class PaginationUtil {
   /**
    * Builds a {@link Pageable} from raw query parameters.
    *
-   * <p>{@code page} defaults to 0 and is clamped to a non-negative value. {@code size} defaults to
-   * 50 and is clamped to {@code [1, 100000]}. {@code sort} is parsed as a semicolon-separated list
-   * of {@code field,asc|desc} tokens; unknown fields cause an {@link IllegalArgumentException}
-   * which the global error handler maps to a 400. If {@code id} is whitelisted but not already in
-   * the sort, it is appended as a tiebreaker so two equal primary-sort rows always come back in a
-   * deterministic order across pages.
+   * <p>{@code page} defaults to 0 and is clamped to at least 0; {@code size} defaults to 50 and is
+   * clamped to {@code [1, 100000]}. {@code sort} is a semicolon-separated list of {@code
+   * field,asc|desc} tokens; {@code id} is appended as tiebreaker when whitelisted.
    *
    * @param pageParam zero-based page index, may be {@code null}
    * @param sizeParam page size, may be {@code null}
@@ -91,7 +79,6 @@ public final class PaginationUtil {
             : Math.min(sizeParam, MAX_PAGE_SIZE);
 
     Sort sort = resolveSort(sortParam, allowedSortFields, defaultSortField);
-    // Ensure stability: always add a secondary sort by id if not already included
     if (!containsProperty(sort, "id") && allowedSortFields.contains("id")) {
       sort = sort.and(Sort.by("id"));
     }
@@ -99,13 +86,8 @@ public final class PaginationUtil {
   }
 
   /**
-   * Builds an <em>unsorted</em> {@link Pageable} (page + size only) for endpoints whose ordering is
-   * baked into the repository query's own {@code ORDER BY} rather than a caller-supplied {@code
-   * Sort} whitelist — e.g. the personal hangar's rich multi-key comparator (REQ-HANGAR-002), whose
-   * computed insurance-tier bucket cannot be expressed as a column {@code Sort}. Passing a sorted
-   * Pageable to such a query would only append redundant ORDER BY terms, so callers use this helper
-   * to get the same {@code page}/{@code size} clamping ({@code page} clamped to {@code >= 0},
-   * {@code size} to {@code [1, 100000]}) without any sort.
+   * Builds an unsorted {@link Pageable} with the same page and size clamping, for queries that
+   * define their own {@code ORDER BY}.
    *
    * @param pageParam zero-based page index, may be {@code null}
    * @param sizeParam page size, may be {@code null}
@@ -134,7 +116,6 @@ public final class PaginationUtil {
       return Sort.by(defaultField).ascending();
     }
     List<Sort.Order> orders = new ArrayList<>();
-    // Support multiple fields separated by semicolon or repeated commas: field,asc;other,desc
     String[] parts = sortParam.split("[;]");
     for (String part : parts) {
       String[] tokens = part.split(",");
@@ -158,9 +139,8 @@ public final class PaginationUtil {
   }
 
   /**
-   * Renders a {@link Sort} back into the {@code field,direction} string form that the controllers
-   * echo into the {@code PageResponse.sort} field, so the client receives the same syntax it sent
-   * in and can reuse it verbatim on the next page request.
+   * Renders a {@link Sort} back into the {@code field,direction} form echoed in {@code
+   * PageResponse.sort}.
    *
    * @param sort sort object as built by {@link #createPageRequest}
    * @return list of {@code field,asc|desc} tokens in declaration order

@@ -37,24 +37,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Debug filter that logs detailed information about the Spring Session / Redis Session lifecycle.
+ * Debug filter that logs the Spring Session / Redis session lifecycle at DEBUG level, active only
+ * in the {@code dev} and {@code test} profiles because it logs the username.
  *
- * <p>This filter is intentionally verbose at DEBUG level to help diagnose issues with the
- * Redis-backed Spring Session store, such as sessions not surviving frontend restarts, unexpected
- * session creation, or authentication loss after restart.
- *
- * <p>The filter logs a session <em>fingerprint</em> ({@link SessionIdFingerprint}, a truncated
- * SHA-256 that correlates lines of one session without being usable to resume it) — never the raw
- * session id, which is a bearer credential (APPSEC-12) — and {@code Authentication#getName()} (the
- * Keycloak username). The username is PII — audit finding M-15 restricts the filter to the {@code
- * dev} and {@code test} Spring profiles so a misconfigured production log level cannot accidentally
- * emit usernames to disk / log shipper. Enable in dev/test via:
- *
- * <pre>
- * logging:
- *   level:
- *     de.greluc.krt.profit.basetool.frontend.config.SessionDebugFilter: DEBUG
- * </pre>
+ * <p>Sessions are identified by a {@link SessionIdFingerprint}, never by the raw session id.
  */
 @Component
 @org.springframework.context.annotation.Profile({"dev", "test"})
@@ -62,11 +48,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class SessionDebugFilter extends OncePerRequestFilter {
 
   /**
-   * Reads the Authentication from the Spring Security context stored in the given session. This is
-   * necessary in POST-filter checks because Spring Security clears the ThreadLocal SecurityContext
-   * after processing a request (especially on 302 redirects), so {@link
-   * SecurityContextHolder#getContext()} returns null/anonymous at that point. Reading directly from
-   * the session attribute gives the correct persisted authentication state.
+   * Reads the Authentication from the security context stored in the given session, which stays
+   * accurate after Spring Security has cleared the thread-local context.
    */
   @Contract("null -> null")
   @Nullable
@@ -74,7 +57,6 @@ public class SessionDebugFilter extends OncePerRequestFilter {
     if (session == null) {
       return null;
     }
-    // Spring Security stores the context under this well-known attribute name
     Object ctx = session.getAttribute("SPRING_SECURITY_CONTEXT");
     if (ctx instanceof SecurityContext secCtx) {
       return secCtx.getAuthentication();
@@ -97,9 +79,7 @@ public class SessionDebugFilter extends OncePerRequestFilter {
     String uri = request.getRequestURI();
     String method = request.getMethod();
 
-    // --- PRE-filter: log session state BEFORE Spring Security processes the request ---
     HttpSession sessionBefore = request.getSession(false);
-    // PRE: read from ThreadLocal — Spring Security has loaded it from the session at this point
     Authentication authBefore = SecurityContextHolder.getContext().getAuthentication();
 
     if (sessionBefore != null) {
@@ -130,14 +110,9 @@ public class SessionDebugFilter extends OncePerRequestFilter {
           authBefore != null && authBefore.isAuthenticated());
     }
 
-    // --- Execute filter chain ---
     filterChain.doFilter(request, response);
 
-    // --- POST-filter: log session state AFTER Spring Security processed the request ---
     HttpSession sessionAfter = request.getSession(false);
-    // POST: Spring Security has already cleared the ThreadLocal after processing (especially on
-    // redirects).
-    // Read the authentication from the session attribute directly to get the true persisted state.
     Authentication authAfter = getAuthFromSession(sessionAfter);
 
     if (sessionAfter != null) {
@@ -157,7 +132,6 @@ public class SessionDebugFilter extends OncePerRequestFilter {
             authAfter.getName(),
             authAfter.getClass().getSimpleName());
       }
-      // Warn if authentication was present before but lost from session after the request
       boolean hadAuthBefore = authBefore != null && authBefore.isAuthenticated();
       boolean hasAuthAfter = authAfter != null && authAfter.isAuthenticated();
       if (hadAuthBefore && !hasAuthAfter) {

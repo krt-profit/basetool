@@ -24,37 +24,25 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shared free-text normalization primitives for the frontend module, mirroring the backend's {@code
- * support.StringNormalization} (#906 Q6). Holds the single authoritative free-text length cap, the
- * NFC-normalize-and-length-check step, the full trim + empty-policy + normalize {@link
- * #normalize(String, int, boolean) pipeline} that {@code NormalizedStringEditor} delegates to, and
- * the {@link #blankToNull(String)} collapse the admin page controllers reuse instead of re-inlining
- * a private {@code blankToNull}/{@code emptyToNull} at each site.
- *
- * <p>The frontend keeps its own copy because the two Spring Boot modules share no library for this;
- * the semantics are identical to the backend so a value normalizes the same regardless of which
- * module bound it.
+ * Free-text normalization primitives for the frontend, identical in behavior to the backend's
+ * {@code support.StringNormalization}: the length cap, NFC normalization, the {@link
+ * #normalize(String, int, boolean) pipeline} behind {@code NormalizedStringEditor}, and {@link
+ * #blankToNull(String)}.
  */
 public final class StringNormalization {
 
-  /**
-   * The single free-text length cap, matching the backend's {@code MAX_FREE_TEXT_LENGTH} and the
-   * longest free-text column in the schema, declared once instead of as a bare {@code 8000} literal
-   * at each binding site.
-   */
+  /** The free-text length cap, matching the backend's {@code MAX_FREE_TEXT_LENGTH}. */
   public static final int MAX_FREE_TEXT_LENGTH = 8000;
 
   /** Non-instantiable holder of static normalization helpers. */
   private StringNormalization() {}
 
   /**
-   * NFC-normalizes {@code value} and enforces {@code maxLength}. NFC collapses Unicode combining
-   * sequences into precomposed code points so equivalent spellings compare equal once persisted.
-   * The caller is responsible for trimming and its own null/blank handling; {@code value} must be
-   * non-null.
+   * NFC-normalizes {@code value} and enforces {@code maxLength}; trimming and null handling are the
+   * caller's.
    *
-   * @param value the already-trimmed, non-null value to canonicalize
-   * @param maxLength the inclusive maximum allowed length after normalization
+   * @param value the trimmed, non-null value to canonicalize
+   * @param maxLength the inclusive maximum length after normalization
    * @return the NFC-normalized value
    * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}
    */
@@ -67,17 +55,11 @@ public final class StringNormalization {
   }
 
   /**
-   * Collapses a {@code null} or blank string to {@code null}, otherwise returns it unchanged.
-   *
-   * <p>"Blank" is {@link String#isBlank()} — a {@link Character#isWhitespace(int)}-based test — so
-   * a value made up only of spaces, tabs or other Unicode whitespace maps to {@code null} while a
-   * non-breaking space (U+00A0, deliberately not {@code isWhitespace}) counts as content. The
-   * returned value is not stripped: this is the plain "empty means absent" collapse the alias /
-   * blueprint admin controllers apply to optional external keys, codes and notes.
+   * Maps a {@code null} or {@link String#isBlank() blank} string to {@code null}, otherwise returns
+   * it unchanged (not stripped).
    *
    * @param value the candidate value, may be {@code null}
    * @return {@code null} when {@code value} is {@code null} or blank, otherwise {@code value}
-   *     unchanged
    */
   @Contract(value = "null -> null", pure = true)
   public static @Nullable String blankToNull(@Nullable String value) {
@@ -85,14 +67,8 @@ public final class StringNormalization {
   }
 
   /**
-   * Strips leading/trailing (Unicode) whitespace and collapses a {@code null} or blank result to
-   * {@code null} — {@code value == null || value.isBlank() ? null : value.strip()}.
-   *
-   * <p>The trim-then-empty-to-{@code null} collapse the material-alias admin form applies to its
-   * optional external key / code / note fields. Those values are already trimmed, NFC-normalized
-   * and length-capped by the global {@code NormalizedStringEditor} before the controller sees them,
-   * so this only re-asserts the "blank means cleared" invariant; standardizing on {@link
-   * String#strip()} matches the backend's {@code StringNormalization.trimToNull}.
+   * Strips surrounding whitespace with {@link String#strip()} and maps a {@code null} or blank
+   * result to {@code null}.
    *
    * @param value the candidate value, may be {@code null}
    * @return the stripped value, or {@code null} when {@code value} is {@code null} or blank
@@ -103,17 +79,13 @@ public final class StringNormalization {
   }
 
   /**
-   * Full inbound-string pipeline: trim, optional empty-to-{@code null}, then NFC-normalize and cap.
-   *
-   * <p>Mirrors {@code NormalizedStringEditor}'s form-binding path exactly so the editor is a
-   * one-line delegate: a {@code null} input stays {@code null}; the value is trimmed with {@link
-   * String#trim()}; when {@code emptyAsNull} is set and the trimmed value is ASCII-empty it becomes
-   * {@code null}; otherwise it is passed through {@link #normalizeAndCap(String, int)}.
+   * Full inbound-string pipeline: {@link String#trim()}, optionally empty-to-{@code null}, then
+   * {@link #normalizeAndCap(String, int)}; {@code null} stays {@code null}.
    *
    * @param value the raw inbound value, may be {@code null}
-   * @param maxLength the inclusive maximum length enforced after normalization
-   * @param emptyAsNull whether a trimmed-empty value collapses to {@code null}
-   * @return the trimmed, NFC-normalized, length-checked value, or {@code null}
+   * @param maxLength the inclusive maximum length after normalization
+   * @param emptyAsNull whether a trimmed-empty value becomes {@code null}
+   * @return the trimmed, normalized, length-checked value, or {@code null}
    * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}
    */
   @Contract(value = "null, _, _ -> null", pure = true)

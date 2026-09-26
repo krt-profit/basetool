@@ -75,8 +75,6 @@ class MissionSecurityRenderingTest {
 
   @Test
   @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
-  // REQ-SEC-052: the detail page needs a login to render. What the case asserts — a member
-  // may not change a registered participant's payout dropdown — is unchanged.
   void missionDetail_AsPeer_ShouldDisableRegisteredParticipantPayoutDropdown() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
@@ -166,16 +164,11 @@ class MissionSecurityRenderingTest {
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
-    // Anonymously access the mission detail page: a registered participant's payout select must be
-    // disabled for guests, and guests never get the edit-participant button on a registered row.
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(PAYOUT_SELECT_DISABLED)))
         .andExpect(content().string(containsString("payout-preference")))
-        // The rendered edit-participant button element must be absent for a guest viewing a
-        // registered participant (the "edit-participant-btn" token still appears in the page's
-        // JS, so assert on the full rendered class attribute, not the bare CSS class name).
         .andExpect(
             content().string(not(containsString("class=\"btn btn-ghost edit-participant-btn\""))));
   }
@@ -271,7 +264,6 @@ class MissionSecurityRenderingTest {
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
-    // Authenticated as Admin
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
@@ -369,10 +361,6 @@ class MissionSecurityRenderingTest {
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
-    // Authenticated as another user. The OIDC subject (the Keycloak sub, which equals app_user.id)
-    // differs from the participant's user id, and preferred_username deliberately differs from the
-    // sub to mirror production — the self-edit carve-out must key off the sub (authUserId), never
-    // authentication.name (the preferred_username). A foreign member must see the select disabled.
     mockMvc
         .perform(
             get("/missions/" + missionId)
@@ -477,10 +465,6 @@ class MissionSecurityRenderingTest {
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
-    // Authenticated as the participant themselves via an OIDC login whose subject (sub) equals the
-    // participant's app_user.id. preferred_username is intentionally different from the sub so this
-    // test fails if the template ever regresses to comparing against authentication.name. The
-    // member's own payout select must be enabled even though they cannot edit the mission itself.
     String expectedUrl =
         "/missions/" + missionId + "/participants/" + participantId + "/payout-preference";
     mockMvc

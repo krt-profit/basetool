@@ -53,49 +53,14 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Spring Boot {@link HealthIndicator} that probes the backend's {@code /actuator/health/readiness}
- * endpoint and surfaces backend unavailability as a {@code DOWN} contribution to the frontend's
- * {@code /actuator/health}.
+ * Health indicator that probes the backend's {@code /actuator/health/readiness} endpoint and
+ * reports {@code DOWN} when the backend is unavailable, so the frontend's readiness reflects its
+ * upstream.
  *
- * <p>The frontend is a Thymeleaf SSR shell: every data-bearing page issues an outbound call to the
- * backend, so a backend outage breaks the user-facing surface even though the JVM, Tomcat and the
- * Resilience4j circuit breakers are still nominally healthy. The auto-configured {@code
- * CircuitBreakerHealthIndicator} from {@code resilience4j-spring-boot3} only goes {@code DOWN} once
- * enough requests have failed to trip the breaker — useful for runtime degradation, useless during
- * the startup window when no real traffic has flowed yet. This indicator closes that gap with an
- * explicit probe: hit the same readiness endpoint that Docker Compose uses for the {@code backend}
- * service's {@code service_healthy} gate, so the frontend's own readiness reflects an end-to-end
- * "the upstream I depend on is ready" check.
- *
- * <p><b>The probe target is the backend's ACTUATOR base URL, which is not always its API base
- * URL.</b> It comes from {@code app.backend-health-url} and falls back to {@code app.backend-url}
- * when that key is unset — right for every profile that serves both from one connector (dev, test,
- * e2e). Production is not one of them: ADR-0134 moved the backend's Actuator to the internal-only
- * management port {@code 11271}, so {@code https://backend:11261/actuator/health/readiness} answers
- * 404 there. Because this indicator sits in the readiness group that gates the Docker HEALTHCHECK,
- * that 404 made the frontend container permanently unhealthy and the deploy loop rolled v1.5.47
- * back twice before the cause was found. Whenever the backend's management port moves, this
- * property moves with it — {@code BackendHealthUrlProdParityTest} fails if the two drift apart. The
- * backend serves HTTPS with a self-signed certificate whose SAN is {@code localhost}, not the
- * Docker alias {@code backend} the probe connects to; the probe's TLS trust mirrors {@link
- * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig} (see {@link
- * #backendTls(SslBundles, Environment, boolean)}): trust-all in dev/test, and pinned to the {@code
- * backend-trust} bundle in prod with TLS endpoint identity (hostname) verification skipped.
- * Relaxing the certificate-to-hostname binding — never the chain validation, on the prod pinned
- * path — is safe ONLY because the connection lives entirely inside the Compose-internal {@code
- * net-backend-frontend} bridge: the public-facing TLS surface is terminated at NPM, the backend's
- * keystore is never exposed beyond the Docker network, and the URL is fully under our control (no
- * user-supplied host).
- *
- * <p>Bean name is {@code backendHealthIndicator}; Spring Boot strips the {@code HealthIndicator}
- * suffix, so the indicator key in health-group includes is {@code backend}. Setting {@code
- * management.health.backend.enabled=false} disables the bean entirely (used by the frontend's
- * {@code test} profile to keep {@code @SpringBootTest} runs from waiting on the placeholder backend
- * URL).
- *
- * <p>HTTP probe details: a synchronous {@link RestClient} with a 2&nbsp;s connect timeout and
- * 3&nbsp;s read timeout — kept well inside the Docker {@code HEALTHCHECK}'s 5&nbsp;s overall budget
- * so a slow backend surfaces as {@code DOWN} before {@code curl} itself gives up.
+ * <p>The probe targets {@code app.backend-health-url}, the backend's Actuator base URL, falling
+ * back to {@code app.backend-url}. TLS trust follows {@link #backendTls(SslBundles, Environment,
+ * boolean)}. Probes use a 2&nbsp;s connect and 3&nbsp;s read timeout. The indicator key is {@code
+ * backend}; {@code management.health.backend.enabled=false} disables it.
  */
 @Component
 @ConditionalOnEnabledHealthIndicator("backend")
@@ -112,23 +77,15 @@ public class BackendHealthIndicator implements HealthIndicator {
   private final RestClient client;
 
   /**
-   * Production constructor used by Spring; resolves the backend Actuator base URL from the {@code
-   * app.backend-health-url} property and builds a {@link RestClient} with indicator-specific
-   * timeouts and the backend trust policy resolved by {@link #backendTls(SslBundles, Environment,
-   * boolean)} — pinned to the {@code backend-trust} bundle (hostname check skipped) in prod,
-   * trust-all in dev/test and as the prod fallback when no bundle is configured (audit L-5). {@link
-   * Autowired} is required because the class declares a second (package-private, test-only)
-   * constructor; without it Spring 4+'s constructor-selection logic falls back to a non-existent
-   * default constructor and fails at startup with {@code NoSuchMethodException: <init>()}.
+   * Creates the indicator with the backend Actuator URL, the indicator timeouts and the TLS trust
+   * policy from {@link #backendTls(SslBundles, Environment, boolean)}.
    *
-   * @param backendHealthUrl base URL of the backend's <em>Actuator</em>, {@code
-   *     app.backend-health-url}, defaulting to the API base URL {@code app.backend-url} for every
-   *     profile that serves both from one connector; the readiness probe path is appended verbatim
-   * @param sslBundles the application's configured SSL bundles, source of the {@code backend-trust}
-   *     truststore used to pin the probe's TLS trust in prod
+   * @param backendHealthUrl base URL of the backend's Actuator ({@code app.backend-health-url},
+   *     defaulting to {@code app.backend-url}); the readiness path is appended verbatim
+   * @param sslBundles the configured SSL bundles, source of the {@code backend-trust} truststore
    * @param environment the active environment, used to pick the trust policy per profile
-   * @param verifyHostname {@code app.http.verify-backend-hostname}: keep the certificate-to-host
-   *     check on the pinned prod path (REQ-SEC-070), exactly as the API client does
+   * @param verifyHostname {@code app.http.verify-backend-hostname}: keep hostname verification on
+   *     the pinned path (REQ-SEC-070)
    */
   @Autowired
   public BackendHealthIndicator(
@@ -159,15 +116,8 @@ public class BackendHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * Shared constructor that wires the {@link RestClient} from a resolved backend {@link
-   * SSLContext}.
-   *
-   * <p>No {@link javax.net.ssl.SSLParameters} hostname override is applied here: the JDK {@link
-   * HttpClient} forces {@code endpointIdentificationAlgorithm=HTTPS} and ignores attempts to clear
-   * it through parameters, so hostname verification is governed entirely by the supplied context's
-   * trust managers. Trust-all (dev/test and the prod no-bundle fallback) skips it inherently; the
-   * pinned prod context wraps its trust managers to validate the chain while skipping endpoint
-   * identity (see {@link #backendTls(SslBundles, Environment, boolean)}).
+   * Builds the {@link RestClient} from a resolved backend {@link SSLContext}, whose trust managers
+   * alone govern hostname verification.
    *
    * @param backendUrl backend base URL (trailing slash trimmed)
    * @param connectTimeout TCP connect timeout for the probe
@@ -190,17 +140,11 @@ public class BackendHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * Issues a {@code GET} against the backend's {@code /actuator/health/readiness} endpoint and maps
-   * the outcome to a {@link Health} contribution. A 2xx response yields {@code UP}; any HTTP error
-   * response yields {@code DOWN} with the upstream status code; any I/O failure (DNS, connection
-   * refused, timeout, TLS handshake) yields {@code DOWN} with the exception class name. Details
-   * land in the {@link Health} object for logging but are not exposed externally because {@code
-   * management.endpoint.health.show-details=never} keeps the response body to {@code
-   * {"status":"UP"|"DOWN"}} only.
+   * Probes the backend's readiness endpoint: a 2xx yields {@code UP}; an HTTP error yields {@code
+   * DOWN} with the status code, and an I/O failure {@code DOWN} with the exception class name.
    *
    * @return {@link Health#up()} when the backend's readiness endpoint replied with a 2xx status;
-   *     {@link Health#down()} otherwise (HTTP error or transport failure), with diagnostic details
-   *     attached for log correlation
+   *     {@link Health#down()} otherwise, with diagnostic details attached
    */
   @Override
   public @NotNull Health health() {
@@ -227,13 +171,8 @@ public class BackendHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * Builds a JDK {@link SSLContext} backed by Netty's {@link InsecureTrustManagerFactory} -- the
-   * same trust-all utility the application's main reactive {@code WebClient} uses against the
-   * backend's self-signed certificate (see {@link
-   * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig}). Routing through the existing
-   * factory rather than declaring an anonymous {@code X509TrustManager} sidesteps CodeQL's {@code
-   * java/insecure-trustmanager} query, which targets hand-rolled empty trust managers. See the
-   * class Javadoc for the trust-boundary justification.
+   * Builds an {@link SSLContext} that trusts every certificate chain, using Netty's {@link
+   * InsecureTrustManagerFactory}.
    *
    * @return a TLS {@link SSLContext} whose trust managers accept every certificate chain
    *     unconditionally
@@ -249,30 +188,15 @@ public class BackendHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * Resolves the backend TLS trust policy for the probe, mirroring {@code WebClientConfig} (audit
-   * L-5). The policy branches by profile and configuration:
+   * Resolves the probe's TLS trust policy, matching {@code WebClientConfig}.
    *
    * <ul>
-   *   <li>{@code dev} / {@code test}: trust-all (self-signed bootstrap / ephemeral test cert).
-   *   <li>otherwise WITH a {@code backend-trust} SSL bundle (prod, the normal case): pin trust to
-   *       the bundle's truststore — the backend's self-signed cert — but skip TLS endpoint identity
-   *       (hostname) verification via {@link #pinnedTrustSkippingHostname(TrustManager[])}. The
-   *       cert SAN is {@code localhost}, not the Docker alias {@code backend} the probe connects
-   *       to, and the JDK {@link HttpClient} cannot disable hostname verification through {@code
-   *       SSLParameters} (it forces {@code HTTPS}); without skipping it the pinned probe fails with
-   *       "No subject alternative DNS name matching backend found". {@code WebClientConfig} reaches
-   *       the same result on its Netty client by disabling endpoint identification on the SSL
-   *       handler.
-   *   <li>otherwise WITHOUT the bundle (prod fallback): trust-all, matching the WebClient that
-   *       carries the real frontend-to-backend traffic, plus a WARN nudging the operator to
-   *       configure the bundle. The previous default-JVM-trust fallback was removed: it can never
-   *       validate the backend's self-signed internal certificate, so a missing bundle silently
-   *       forced the probe {@code DOWN} and flapped the deploy.
+   *   <li>{@code dev} / {@code test}: trust-all.
+   *   <li>Otherwise with a {@code backend-trust} bundle: pinned to its truststore, skipping
+   *       hostname verification via {@link #pinnedTrustSkippingHostname(TrustManager[])} unless
+   *       {@code verifyHostname} is set (REQ-SEC-070).
+   *   <li>Otherwise: trust-all, with a WARN to configure the bundle.
    * </ul>
-   *
-   * <p>With {@code verifyHostname} (REQ-SEC-070) the pinned path keeps the certificate-to-host
-   * check: once every service carries its own leaf from the internal CA, the pinned anchor vouches
-   * for all of them and only the name tells the backend's certificate apart.
    *
    * @param sslBundles the application's configured SSL bundles
    * @param environment the active environment, for profile detection
@@ -292,8 +216,6 @@ public class BackendHealthIndicator implements HealthIndicator {
           TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
       tmf.init(truststore);
       SSLContext context = SSLContext.getInstance("TLS");
-      // The JDK client always asks for HTTPS endpoint identification, so the plain PKIX managers
-      // verify the hostname by themselves; only the wrapper takes that check away.
       context.init(
           null,
           verifyHostname
@@ -314,15 +236,8 @@ public class BackendHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * Wraps PKIX trust managers so the pinned chain validation is kept but TLS endpoint identity
-   * (hostname) verification is skipped, by routing the {@link SSLEngine}/{@link Socket} {@code
-   * checkServerTrusted} overloads — the ones that perform the hostname check — through the
-   * host-agnostic two-argument variant. This is the only reliable way to drop hostname verification
-   * on the JDK {@link HttpClient}, which forces {@code endpointIdentificationAlgorithm=HTTPS} and
-   * ignores {@code SSLParameters} overrides. Chain trust is unchanged (still validated against the
-   * pinned truststore), so this is NOT an insecure trust-all manager — only the certificate-to-host
-   * binding is relaxed, matching the {@code WebClientConfig} pinned path and justified by the same
-   * Docker-internal trust boundary.
+   * Wraps PKIX trust managers in {@link HostnameAgnosticTrustManager}s, which keep the pinned chain
+   * validation but skip hostname verification.
    *
    * @param delegates the PKIX trust managers produced from the {@code backend-trust} truststore
    * @return trust managers that pin the chain but do not enforce hostname verification
@@ -338,14 +253,9 @@ public class BackendHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * {@link X509ExtendedTrustManager} that delegates certificate-chain validation to a wrapped
-   * {@link X509TrustManager} but skips TLS endpoint identity (hostname) verification: the {@link
-   * SSLEngine}- and {@link Socket}-aware {@code checkServerTrusted} overloads (which normally
-   * perform the hostname check) are routed to the two-argument variant, which only validates the
-   * chain. Used by the probe's pinned prod path so the JDK {@link HttpClient} accepts the backend's
-   * self-signed cert despite its SAN not listing the Docker alias {@code backend}. The chain is
-   * still fully validated against the pinned truststore, so this is not a trust-all manager.
-   * Package-private for the unit test that pins this routing behaviour.
+   * {@link X509ExtendedTrustManager} that validates the certificate chain through a wrapped {@link
+   * X509TrustManager} but skips hostname verification, by routing the {@link SSLEngine}- and {@link
+   * Socket}-aware {@code checkServerTrusted} overloads to the two-argument variant.
    */
   static final class HostnameAgnosticTrustManager extends X509ExtendedTrustManager {
 

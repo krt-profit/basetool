@@ -41,12 +41,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Frontend controller for the Itemsammelübersicht (item-collection) page of an ITEM job order — the
- * item sibling of the {@link MaterialCollectionPageController} (REQ-ORDERS-031). It surfaces the
- * game-item stock earmarked to the order (the same {@code GET /api/v1/orders/{id}/item-stock} read
- * that backs the order-detail inline stock, REQ-ORDERS-028) so a user can collect the manufactured
- * units — reassign owner/location (a full-amount transfer that carries the earmark) and mark each
- * this-order slice delivered.
+ * Frontend controller for the Itemsammelübersicht of an ITEM job order (REQ-ORDERS-031): lists the
+ * game-item stock earmarked to the order so users can reassign it and mark slices delivered.
  */
 @Controller
 @UsesLayoutModel
@@ -69,20 +65,12 @@ public class ItemCollectionPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the item-collection page for a single ITEM job order ({@code
+   * Renders the item-collection page of an ITEM job order ({@code
    * /orders/{jobOrderId}/item-collection}).
    *
-   * <p>Loads two independent datasets and tolerates partial failure: the earmarked item stock
-   * (grouped per game item) and the cached location lookup. A {@link BackendServiceException} on
-   * either is logged and that section degrades to an empty list — partial-success rendering is much
-   * more useful here than a single full-page error. The per-row owner reassignment picker is a
-   * server-side searchable combobox (remote-users) that seeds each row's current owner; the roster
-   * is searched on demand.
-   *
-   * <p>When called with {@code ?fragment=results} it returns only the {@code collectionResults}
-   * fragment (the entries table / empty state) rather than the full page — the live-sync receiver
-   * ({@code item-collection.js}, REQ-FE-010) re-fetches it to swap the table in place when a peer
-   * flips a delivered flag or moves a row.
+   * <p>The item stock and the location lookup each degrade to an empty list on a backend failure.
+   * {@code ?fragment=results} returns only the {@code collectionResults} fragment for live sync
+   * (REQ-FE-010).
    *
    * @param jobOrderId job order id passed through to the template
    * @param fragment when {@code results}, render only the {@code collectionResults} fragment

@@ -67,7 +67,6 @@ class RateLimitingTest {
 
   @Test
   void adminRoles_ShouldBeRateLimited_AfterQuota() throws Exception {
-    // First request (allowed)
     mockMvc
         .perform(
             get("/api/v1/admin/roles")
@@ -86,7 +85,6 @@ class RateLimitingTest {
         .andExpect(status().isOk())
         .andExpect(header().string("X-Rate-Limit-Limit", "2"));
 
-    // Second request (allowed, remaining 0)
     mockMvc
         .perform(
             get("/api/v1/admin/roles")
@@ -106,7 +104,6 @@ class RateLimitingTest {
         .andExpect(header().string("X-Rate-Limit-Limit", "2"))
         .andExpect(header().string("X-Rate-Limit-Remaining", "0"));
 
-    // Third request (should be 429)
     mockMvc
         .perform(
             get("/api/v1/admin/roles")

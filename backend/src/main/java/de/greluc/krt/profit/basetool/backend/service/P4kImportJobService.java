@@ -45,17 +45,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Lifecycle and persistence for asynchronous P4K catalog-import runs ({@link P4kImportJob} + {@link
- * P4kImportJobPayload}). It owns the transactional state machine — create, the {@code PENDING →
- * RUNNING → SUCCEEDED | FAILED} transitions, payload load/copy/delete, and the prune /
- * startup-reconcile housekeeping — while the heavy parse-and-reconcile work and the orchestration
- * across these transactions live in {@code P4kImportJobRunner} (which runs them on a single-thread
- * {@code @Async} executor, off the request path).
+ * Transactional lifecycle and persistence of asynchronous P4K catalog-import jobs ({@link
+ * P4kImportJob} + {@link P4kImportJobPayload}): creation, the {@code PENDING → RUNNING → SUCCEEDED
+ * | FAILED} transitions, payload handling, pruning and startup reconciliation.
  *
- * <p>Each transition is its own short transaction so that polling sees {@code RUNNING} immediately
- * and a rolled-back apply (the reconciliation is all-or-nothing) never reverts the status write.
- * The uploaded catalog lives in the 1:1 payload side table; an APPLY run gets its own database-side
- * copy of the PREVIEW's payload so it is self-contained, and reclaims it once it finishes.
+ * <p>Each transition is its own short transaction, so polling sees it immediately and a rolled-back
+ * apply never reverts it. An APPLY job works on its own copy of the preview's payload.
  */
 @Service
 @RequiredArgsConstructor
@@ -305,10 +300,8 @@ public class P4kImportJobService {
   }
 
   /**
-   * Increments {@code basetool_p4k_import_jobs_total} for a job that just reached a terminal state,
-   * tagged by the bounded terminal {@code outcome} and the job {@code kind}. This makes a
-   * consistently-failing import observable — the pending-queue gauge alone drains back to zero and
-   * looks healthy even while every run fails.
+   * Increments {@code basetool_p4k_import_jobs_total} for a job that reached a terminal state,
+   * tagged by {@code outcome} and job {@code kind}.
    *
    * @param job the job that reached its terminal state (source of the bounded {@code kind} tag)
    * @param outcome {@link MetricNames#OUTCOME_SUCCEEDED} or {@link MetricNames#OUTCOME_FAILED}

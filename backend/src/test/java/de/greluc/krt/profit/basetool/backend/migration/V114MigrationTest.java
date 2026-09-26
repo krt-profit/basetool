@@ -82,8 +82,6 @@ class V114MigrationTest {
 
   @Test
   void v114IngredientCheck_permitsUnresolvedResourceLine() {
-    // A RESOURCE line with a NULL material_id (unresolved) + NULL game_item_id must be allowed —
-    // this is the forensic-persistence case (§8.2). The insert must succeed.
     java.util.UUID bpId = insertBlueprint();
     assertDoesNotThrow(
         () ->
@@ -96,7 +94,6 @@ class V114MigrationTest {
 
   @Test
   void v114IngredientCheck_rejectsResourceWithGameItemFk() {
-    // A RESOURCE line carrying a game_item_id violates kind/FK exclusivity — must be rejected.
     java.util.UUID bpId = insertBlueprint();
     assertThrows(
         Exception.class,

@@ -55,13 +55,8 @@ class CurrentUserArgumentResolverTest {
   private static final int UNANNOTATED = 2;
 
   /**
-   * Reflection target whose <b>parameters</b> are the point: a {@link MethodParameter} can only be
-   * built from a real signature, so the annotations under test have to sit on one.
-   *
-   * <p>It is never invoked, and invoking it is a mistake rather than a harmless no-op — hence the
-   * throw, which also reads the parameters. A parameter that is never read is a defect everywhere
-   * except in a carrier like this one, and saying so in code costs less than teaching every
-   * analyser the exception.
+   * Reflection target supplying annotated {@link MethodParameter}s; it is never invoked and throws
+   * if it is.
    *
    * @param id the shape the resolver claims
    * @param idOnWrongType the right annotation on the wrong type, which it must not claim
@@ -91,12 +86,8 @@ class CurrentUserArgumentResolverTest {
   }
 
   /**
-   * An authentication that carries a subject with no token behind it.
-   *
-   * <p>What the ingest gateway's identity swap installs (ADR-0129), and the case this test class
-   * was blind to: every one of its other cases uses a JWT or a bare {@code Principal}, so all of
-   * them would still pass if the removed {@code instanceof JwtAuthenticationToken} demand were
-   * reintroduced tomorrow.
+   * An authentication that carries a subject with no token behind it, as installed by the ingest
+   * gateway's identity swap (ADR-0129).
    */
   private static final class TokenlessSubject extends AbstractAuthenticationToken
       implements SubjectAuthentication {
@@ -154,13 +145,7 @@ class CurrentUserArgumentResolverTest {
     assertThat(resolved).isEqualTo(expected);
   }
 
-  /**
-   * The acting member resolves — a subject, no token.
-   *
-   * <p>The regression test for the finding that every ingest-gateway call was 403'd during argument
-   * resolution. Reintroducing the type demand turns this red, which none of the other cases in this
-   * class would do.
-   */
+  /** A tokenless subject resolves as the acting member. */
   @Test
   void resolvesATokenlessSubjectForCurrentUserId() throws Exception {
     UUID id = UUID.randomUUID();
@@ -178,12 +163,8 @@ class CurrentUserArgumentResolverTest {
   }
 
   /**
-   * A principal that is not a token-backed identity is refused — and specifically NOT read for its
-   * name.
-   *
-   * <p>The name here would be the member's callsign, which REQ-OBS-004 keeps out of logs. Since
-   * ADR-0129 the resolver asks {@code AuthenticatedSubject}, which only accepts a JWT subject or an
-   * authentication that explicitly advertises one; a bare {@code Principal} qualifies as neither.
+   * A principal that is not a token-backed identity is refused without its name being read
+   * (REQ-OBS-004).
    */
   @Test
   void throwsWhenPrincipalIsNotAJwt() throws Exception {

@@ -35,12 +35,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
- * The enumeration both anonymous-surface sweeps stand on.
- *
- * <p><b>Why this file exists.</b> A sweep that enumerates nothing passes every assertion it makes.
- * Before #1804 this engine lived twice and was only ever exercised through its two callers — so a
- * bug in it would have turned both guards green at the same moment, on a surface whose whole point
- * is exhaustiveness. Each case below is one way that could happen.
+ * Unit tests for the endpoint enumeration both anonymous-surface sweeps rely on, since a sweep that
+ * enumerates nothing passes every assertion.
  */
 class EndpointEnumerationTest {
 
@@ -48,11 +44,7 @@ class EndpointEnumerationTest {
   private static final String NIL_UUID = "00000000-0000-4000-8000-000000000000";
 
   /** A placeholder mapping target; the enumeration reads the registry's keys, never its values. */
-  void handlerMethod() {
-    // Intentionally empty.
-  }
-
-  // ---------------------------------------------------------------- substituteVariables
+  void handlerMethod() {}
 
   @Test
   @DisplayName("a path with no variables comes back untouched")
@@ -64,9 +56,6 @@ class EndpointEnumerationTest {
   @Test
   @DisplayName("an id-shaped variable becomes a nil UUID, anything else becomes x")
   void variablesAreSubstitutedByShape() {
-    // The distinction is what keeps a substituted path routable: a UUID-typed @PathVariable rejects
-    // "x" at the binder, which answers 400 — and a 400 is not the refusal these sweeps ask about,
-    // so the path would read as "not served" for the wrong reason.
     assertThat(EndpointEnumeration.substituteVariables("/api/v1/missions/{id}"))
         .isEqualTo("/api/v1/missions/" + NIL_UUID);
     assertThat(EndpointEnumeration.substituteVariables("/api/v1/missions/{missionId}/participants"))
@@ -90,15 +79,11 @@ class EndpointEnumerationTest {
   @Test
   @DisplayName("a pattern with no single concrete spelling is dropped rather than guessed")
   void unroutablePatternsAreDropped() {
-    // Substituting these would assert a path the application never routes, which is worse than not
-    // asserting at all: the sweep would report a refusal it invented.
     assertThat(EndpointEnumeration.substituteVariables("/assets/**")).isNull();
     assertThat(EndpointEnumeration.substituteVariables("/**/*.map")).isNull();
     assertThat(EndpointEnumeration.substituteVariables("/x/{id:[0-9]+}")).isNull();
     assertThat(EndpointEnumeration.substituteVariables("/x/{unclosed")).isNull();
   }
-
-  // ---------------------------------------------------------------- isUnder
 
   @Test
   @DisplayName("a subtree root covers itself and everything below it")
@@ -110,10 +95,6 @@ class EndpointEnumerationTest {
   @Test
   @DisplayName("a neighbour that merely shares the opening characters is NOT under it")
   void isUnderDoesNotSwallowANeighbour() {
-    // The 2026-09-06 defect, pinned. A `startsWith` comparison silently removed a neighbouring path
-    // from a sweep whose entire value is that it covers everything — and it did so in both copies
-    // of
-    // this engine at once, which is why the engine is shared now and why this case lives here.
     assertThat(EndpointEnumeration.isUnder("/internal-facing", "/internal")).isFalse();
     assertThat(EndpointEnumeration.isUnder("/errors", "/error")).isFalse();
     assertThat(EndpointEnumeration.isUnder("/api/v1/missions", "/api/v1/mission")).isFalse();
@@ -124,8 +105,6 @@ class EndpointEnumerationTest {
   void isUnderRejectsUnrelatedPaths() {
     assertThat(EndpointEnumeration.isUnder("/api/v1/missions", "/internal")).isFalse();
   }
-
-  // ---------------------------------------------------------------- mappings
 
   @Test
   @DisplayName("every declared verb of a mapping becomes its own call")
@@ -148,7 +127,6 @@ class EndpointEnumerationTest {
   @Test
   @DisplayName("a mapping that declares no verb is swept as GET")
   void verblessMappingBecomesGet() throws Exception {
-    // Rare but legal, and such a mapping answers EVERY verb — so the read is the one that leaks.
     StaticWebApplicationContext context =
         registryWith(
             register ->
@@ -170,9 +148,6 @@ class EndpointEnumerationTest {
                       .methods(RequestMethod.GET)
                       .options(parsedPatterns())
                       .build());
-              // Distinct mappings — Spring would refuse to register the same one twice — that
-              // collapse onto the same concrete path once the variables are substituted. Without
-              // the de-duplication the sweep would issue this call twice and report it twice.
               register.accept(
                   RequestMappingInfo.paths("/alpha/{id}")
                       .methods(RequestMethod.POST)
@@ -229,8 +204,6 @@ class EndpointEnumerationTest {
         .hasMessageContaining("requestMappingHandlerMapping");
   }
 
-  // ---------------------------------------------------------------- fixtures
-
   /**
    * Builds a context holding one {@code requestMappingHandlerMapping} with the given mappings.
    *
@@ -252,13 +225,8 @@ class EndpointEnumerationTest {
   }
 
   /**
-   * Builder options that produce a parsed {@code PathPattern} condition.
-   *
-   * <p>Spelled out rather than left to a default: the enumeration reads {@code
-   * getPathPatternsCondition()}, and a {@link RequestMappingInfo} built by hand without a parser
-   * carries none — so the fixture would hand it an empty pattern set and every assertion here would
-   * pass against zero calls. That is the exact failure this class exists to prevent, and a fixture
-   * is no better a place for it than the engine.
+   * Builder options that give a hand-built {@link RequestMappingInfo} a parsed path-pattern
+   * condition, without which the enumeration would see no patterns.
    *
    * @return options pinned to the {@link PathPatternParser}
    */

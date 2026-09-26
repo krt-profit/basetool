@@ -69,17 +69,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for the bulk rebooking (Massen-Umbuchen, REQ-INV-036) in {@link
- * InventoryCheckoutService}.
- *
- * <p>The behaviour under test is the skip-vs-abort split that separates this action from the
- * all-or-nothing {@link InventoryCheckoutService#bulkCheckout}: a row already sitting in the
- * requested target state is skipped and counted, while an unknown id, a foreign row or an earmark
- * blocking a personalize aborts the whole transaction so nothing is written.
- *
- * <p>Every row here carries an {@code SCU} material and the requests leave {@code mergeStock}
- * unset, so {@code mergeStockIfRequested} returns at its "SCU without the per-action opt-in stays
- * append-only" branch — the merge path has its own tests and is not re-exercised here.
+ * Unit tests for bulk rebooking (Massen-Umbuchen, REQ-INV-036) in {@link InventoryCheckoutService}:
+ * rows already at the target are skipped and counted, while an unknown id, a foreign row or a
+ * blocking earmark aborts the whole action.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryCheckoutServiceBulkRebookTest {
@@ -100,16 +92,10 @@ class InventoryCheckoutServiceBulkRebookTest {
 
   @BeforeEach
   void stubSaveEcho() {
-    // The service reads the saved row back (it is the merge survivor), so the mock must echo it
-    // instead of Mockito's default null.
     lenient()
         .when(inventoryItemRepository.save(any(InventoryItem.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
   }
-
-  // -------------------------------------------------------------------------
-  // Helpers
-  // -------------------------------------------------------------------------
 
   private static User user(UUID id) {
     User u = new User();
@@ -157,14 +143,8 @@ class InventoryCheckoutServiceBulkRebookTest {
     return new BulkRebookRequest(ids, mode, null, null, null, null);
   }
 
-  // -------------------------------------------------------------------------
-  // LOCATION mode
-  // -------------------------------------------------------------------------
-
   @Test
   void bulkRebook_location_movesRowsAndSkipsThoseAlreadyAtTheTarget() {
-    // The core REQ-INV-036 contract: "Alle markieren" routinely marks rows that already sit at the
-    // destination, and those must be skipped rather than fail the whole action.
     Location here = location(UUID.randomUUID(), "Area18");
     Location there = location(UUID.randomUUID(), "Lorville");
     InventoryItem moving = row(UUID.fromString("00000000-0000-0000-0000-000000000001"), here, 12.0);
@@ -180,7 +160,6 @@ class InventoryCheckoutServiceBulkRebookTest {
 
     assertEquals(1, result.rebooked(), "only the row not yet at the target moves");
     assertEquals(1, result.skipped(), "the row already at the target is skipped, not failed");
-    // Exactly one new row was inserted and exactly the moved source removed.
     ArgumentCaptor<InventoryItem> saved = ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(saved.capture());
     assertEquals(there.getId(), saved.getValue().getLocation().getId());
@@ -191,8 +170,6 @@ class InventoryCheckoutServiceBulkRebookTest {
 
   @Test
   void bulkRebook_location_withoutAnyTargetIsRejected() {
-    // REQ-INV-025 parity: a target-less transfer would silently move nothing, so it must not be
-    // reported as an all-skipped success.
     InventoryItem item = row(UUID.randomUUID(), location(UUID.randomUUID(), "Area18"), 3.0);
     given(item);
 
@@ -204,8 +181,6 @@ class InventoryCheckoutServiceBulkRebookTest {
 
   @Test
   void bulkRebook_location_carriesEarmarksOntoTheMovedRow() {
-    // "Marken mitnehmen" (REQ-INV-027): a full move with no explicit deduct-from plan resolves to
-    // "every slice in full", so the moved row must arrive carrying the source's earmark.
     Location here = location(UUID.randomUUID(), "Area18");
     Location there = location(UUID.randomUUID(), "Lorville");
     InventoryItem item = row(UUID.randomUUID(), here, 8.0);
@@ -248,10 +223,6 @@ class InventoryCheckoutServiceBulkRebookTest {
     assertEquals(pool.getId(), saved.getValue().getOwningOrgUnit().getId());
   }
 
-  // -------------------------------------------------------------------------
-  // Abort paths — every non-"already at target" obstacle rolls the whole action back
-  // -------------------------------------------------------------------------
-
   @Test
   void bulkRebook_unknownIdAbortsBeforeAnyWrite() {
     UUID missing = UUID.randomUUID();
@@ -282,8 +253,6 @@ class InventoryCheckoutServiceBulkRebookTest {
 
   @Test
   void bulkRebook_personalizeAbortsWhenAnySelectedRowIsEarmarked() {
-    // A personal row may never carry a job-order/mission link, so personalizing an earmarked row is
-    // impossible rather than already-done: it aborts the whole action instead of being skipped.
     Location here = location(UUID.randomUUID(), "Area18");
     InventoryItem plain = row(UUID.fromString("00000000-0000-0000-0000-000000000001"), here, 3.0);
     InventoryItem earmarked =
@@ -307,10 +276,6 @@ class InventoryCheckoutServiceBulkRebookTest {
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
   }
-
-  // -------------------------------------------------------------------------
-  // Personal modes
-  // -------------------------------------------------------------------------
 
   @Test
   void bulkRebook_personalizeSkipsRowsThatAreAlreadyPersonal() {
@@ -361,10 +326,6 @@ class InventoryCheckoutServiceBulkRebookTest {
         "the shared row is stamped onto the picked pool");
   }
 
-  // -------------------------------------------------------------------------
-  // Audit (REQ-AUDIT-001)
-  // -------------------------------------------------------------------------
-
   @Test
   void bulkRebook_recordsOneSummaryAuditEventWithModeAndCounts() {
     Location here = location(UUID.randomUUID(), "Area18");
@@ -396,7 +357,6 @@ class InventoryCheckoutServiceBulkRebookTest {
 
   @Test
   void bulkRebook_recordsNoAuditEventWhenEverythingWasSkipped() {
-    // An all-skipped run mutated no state, so it must not appear in the audit log as a change.
     Location there = location(UUID.randomUUID(), "Lorville");
     InventoryItem already = row(UUID.randomUUID(), there, 5.0);
     given(already);
@@ -410,15 +370,8 @@ class InventoryCheckoutServiceBulkRebookTest {
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
-  // -------------------------------------------------------------------------
-  // Robustness
-  // -------------------------------------------------------------------------
-
   @Test
   void bulkRebook_deduplicatesRepeatedIds() {
-    // The bulk bar holds a Set, but the endpoint must not move a row twice if a duplicate reaches
-    // it
-    // — the second pass would operate on an already-deleted row.
     Location here = location(UUID.randomUUID(), "Area18");
     Location there = location(UUID.randomUUID(), "Lorville");
     InventoryItem item = row(UUID.randomUUID(), here, 4.0);

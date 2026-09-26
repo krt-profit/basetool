@@ -39,19 +39,11 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One signed leg of the bank's <strong>holder</strong> ledger (ADR-0039, REQ-BANK-003), persisted
- * in the {@code bank_holder_posting} table created by Flyway V180.
+ * One signed leg of the bank's holder ledger (ADR-0039, REQ-BANK-003).
  *
- * <p>Decoupled counterpart of {@link BankPosting}: where {@code bank_posting} carries the account
- * dimension, this carries the holder dimension. A holder's balance is the <strong>global</strong>
- * {@code SUM(amount)} over this table across the whole bank — never partitioned by account — and
- * may be negative (a custodian fronting his own money, REQ-BANK-006). Insert-only like the account
- * ledger: no {@code @Version}, never updated or deleted; corrections are {@code REVERSAL}
- * transactions. Amounts are signed whole-aUEC {@code NUMERIC(19,4)} values (ADR-0002) and never
- * zero (V180 CHECK).
- *
- * <p>A {@code DEPOSIT}/{@code WITHDRAWAL} books one holder leg, a {@code TRANSFER} and a {@code
- * HOLDER_TRANSFER} two (summing to zero), and a {@code WIPE_RESET} one per non-zero global balance.
+ * <p>A holder's balance is the global {@code SUM(amount)} across the whole bank and may be
+ * negative. Insert-only: never updated or deleted; corrections are {@code REVERSAL} transactions.
+ * Amounts are signed, whole-aUEC and never zero.
  */
 @Entity
 @Table(name = "bank_holder_posting")

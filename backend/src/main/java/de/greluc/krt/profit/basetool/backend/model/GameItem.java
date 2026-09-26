@@ -39,20 +39,11 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Joint UEX + SC Wiki item entity, keyed by the shared in-game asset {@link #externalUuid}.
+ * Joint UEX and SC Wiki item, keyed by the shared in-game asset {@link #externalUuid}.
  *
- * <p>Created by R2's {@code UexItemSyncService} (writes the UEX-side columns, sets {@link
- * #sourceSystems} to {@link GameItemSourceSystem#UEX_ONLY}); R4's {@code ScWikiItemSyncService}
- * (Wiki side) joins the same row by {@code external_uuid} and fills the Wiki-sourced columns
- * ({@link #scwikiSlug}, {@link #classification}, {@link #mass}, {@link #dimensionX}/Y/Z, {@link
- * #descriptionEn}/De), flipping {@code sourceSystems} to {@link GameItemSourceSystem#BOTH}.
- *
- * <p>{@link #kind} is the joint discriminator with the §6.3.1 tie-breaker rule ({@code
- * WEAPON_ATTACHMENT > WEAPON > VEHICLE_WEAPON > VEHICLE_ITEM > GENERIC}). {@link #manufacturer} is
- * sticky on the UEX value when UEX and Wiki disagree (§6.3.3) — UEX is the trading-data source and
- * its manufacturer link drives the inventory / refinery flows.
- *
- * <p>R2 ships with the Wiki-sourced columns NULL on every row; the R4 PR populates them in place.
+ * <p>The UEX sync writes the UEX-side columns, the Wiki sync joins the same row and fills the
+ * Wiki-sourced ones, updating {@link #sourceSystems}. {@link #kind} follows the more-specific-wins
+ * rule; {@link #manufacturer} keeps the UEX value when the sources disagree.
  */
 @Entity
 @Table(name = "game_item")
@@ -69,14 +60,8 @@ public class GameItem extends AbstractEntity<UUID> {
   private UUID id;
 
   /**
-   * In-game RSI asset UUID. Identical between UEX {@code /items[].uuid} and SC Wiki {@code
-   * /api/items/{uuid}} when both systems carry one. The cross-source join key — UNIQUE across the
-   * table so a UEX row and a Wiki row for the same asset never coexist on two rows.
-   *
-   * <p>NULLABLE in R2: ~30% of UEX items ship with an empty uuid; those rows stay with {@code
-   * external_uuid = NULL} until R3's Wiki slug-fallback resolves the missing UUIDs. Resolution on a
-   * re-sync uses {@link #uexItemId} as the primary fast-path so the NULL gap does not break
-   * idempotency.
+   * In-game RSI asset UUID, the unique cross-source join key between UEX and SC Wiki. Nullable when
+   * no source provides one; re-syncs then match on {@link #uexItemId}.
    */
   @Column(name = "external_uuid", unique = true)
   private UUID externalUuid;
@@ -99,8 +84,6 @@ public class GameItem extends AbstractEntity<UUID> {
   @Enumerated(EnumType.STRING)
   @Column(name = "source_systems", nullable = false, length = 16)
   private GameItemSourceSystem sourceSystems = GameItemSourceSystem.UEX_ONLY;
-
-  // ───── Wiki-sourced columns (R4 writes; R2 leaves NULL) ─────
 
   /** SC Wiki URL slug (e.g. {@code "venture-helmet-white-2"}). R4. */
   @Column(name = "scwiki_slug")
@@ -190,8 +173,6 @@ public class GameItem extends AbstractEntity<UUID> {
   @Column(name = "scwiki_game_version_seen")
   private String scwikiGameVersionSeen;
 
-  // ───── UEX-sourced columns (R2 writes) ─────
-
   /** UEX integer item id. Unique across the table; the fastest re-resolution key. */
   @Column(name = "uex_item_id", unique = true)
   private Integer uexItemId;
@@ -278,14 +259,9 @@ public class GameItem extends AbstractEntity<UUID> {
   @Column(name = "uex_game_version_seen")
   private String uexGameVersionSeen;
 
-  // ───── KRT P4K Reader source lane (catalog import) ─────
-
   /**
-   * DataForge {@code __ref} asset GUID observed by the KRT P4K Reader import for this item. Kept
-   * alongside (not in place of) {@link #externalUuid}: the importer backfills {@code external_uuid}
-   * only when it is null and no other row holds the GUID, but always records the P4K-observed GUID
-   * here so a UUID disagreement between UEX/Wiki and the game DCB stays auditable. Not UNIQUE —
-   * conflicting rows may legitimately carry the same P4K GUID until reconciled.
+   * DataForge asset GUID observed by the P4K Reader import, recorded alongside {@link
+   * #externalUuid} so a disagreement stays auditable. Not unique.
    */
   @Column(name = "p4k_uuid")
   private UUID p4kUuid;

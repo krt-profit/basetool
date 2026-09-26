@@ -36,18 +36,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the Kartellbank staff request queue (#1102, REQ-FE-015 /
- * ADR-0094): a staff decision one bank employee makes on {@code /bank/requests} must update another
- * employee's queue without a manual reload — the {@code requestQueue} section key crossing the
- * global {@code bank} room.
- *
- * <p>Two browser contexts as the same bank employee are two distinct {@code /ws/sync} sockets, so
- * the deterministic pre-mutation wait is {@code window.krtLiveSync.subscribedTopics()} becoming
- * non-empty (the {@code bank} staff room is authorized by a local role check against the
- * handshake-captured authorities). A pending request is seeded through the backend; context A
- * <em>rejects</em> it (which books nothing and needs no holder, yet still broadcasts {@code
- * bank/[requestQueue,grid]}) and context B — a passive viewer — must drop the now-decided request
- * from its default pending-only queue in place.
+ * Two-context live-sync test of the bank staff request queue (REQ-FE-015): rejecting a request in
+ * one context removes it from the other context's pending queue without a reload.
  */
 @Tag("e2e")
 class BankRequestsLiveSyncE2eTest {
@@ -85,7 +75,6 @@ class BankRequestsLiveSyncE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // The officer oversees IRIDIUM (so they may raise a request against its account).
     String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
     seeder.assignStaffelMembership(
         ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false, false);
@@ -94,9 +83,6 @@ class BankRequestsLiveSyncE2eTest {
         seeder.ensureOrgUnitBankAccount(
             MGMT_USER, MGMT_PASSWORD, "E2E Requests Sync Account", IRIDIUM_SQUADRON_ID);
 
-    // The employee may act on the account, so its pending requests show in their staff queue.
-    // Idempotent: an org-unit account already auto-grants some members, so a plain create would 409
-    // "already holds a grant"; either way the employee ends up able to act on the account.
     String employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
     seeder.ensureBankGrant(MGMT_USER, MGMT_PASSWORD, employeeId, accountId, true, true, false);
   }
@@ -145,14 +131,11 @@ class BankRequestsLiveSyncE2eTest {
         E2eSupport.navigate(pageB, baseUrl + "/bank/requests");
         pageB.waitForLoadState();
 
-        // Both employees see the pending request initially.
         assertThat(pageB.locator(rejectBtn))
             .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its `bank` subscribe is acked.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -160,7 +143,6 @@ class BankRequestsLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // Context A rejects the request with a reason (books nothing; broadcasts requestQueue).
         pageA.locator(rejectBtn).click(new Locator.ClickOptions().setTimeout(20_000));
         pageA.locator("[data-testid='bank-reject-reason']").fill("E2E live-sync rejection");
         dropFooter(pageA);
@@ -171,8 +153,6 @@ class BankRequestsLiveSyncE2eTest {
             new Page.WaitForResponseOptions().setTimeout(60_000),
             () -> pageA.locator("[data-testid='bank-reject-submit']").click());
 
-        // The assertion under test: context B — which did nothing — drops the now-rejected request
-        // from its default pending-only queue in place (the global bank room coalesces at ~1.5 s).
         assertThat(pageB.locator(rejectBtn))
             .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(30_000));
         assertEquals(
@@ -188,12 +168,8 @@ class BankRequestsLiveSyncE2eTest {
   }
 
   /**
-   * Regression guard for the bank decision-modal reopen bug: after a bank employee decides one
-   * request, the shared decision modal must re-open for the very next request in the same session —
-   * without a page reload. The success path once closed the modal by writing an inline {@code
-   * style.display = 'none'}, which outranks the class-based {@code open-modal-display} re-open (a
-   * modal is shown via the {@code krtm-modal-open} class since the CSP class migration, ADR-0093),
-   * so the second request's button silently did nothing until the page was reloaded (REQ-UI-013).
+   * Asserts that after deciding one request the shared decision modal reopens for the next request
+   * without a reload (REQ-UI-013).
    */
   @Test
   void decidingOneRequestReopensTheModalForTheNextInPlace() {
@@ -219,18 +195,13 @@ class BankRequestsLiveSyncE2eTest {
         E2eSupport.navigate(page, baseUrl + "/bank/requests");
         page.waitForLoadState();
 
-        // Both pending requests are visible initially.
         assertThat(page.locator(firstRejectBtn))
             .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
         assertThat(page.locator(secondRejectBtn)).hasCount(1);
 
-        // A full reload would reset this marker; the in-place swap after the decision leaves it
-        // set,
-        // so it also proves the second open goes through the live path, not an accidental reload.
         page.evaluate("window.__krtNoReload = true;");
         dropFooter(page);
 
-        // Decide the first request (a rejection books nothing and needs no holder).
         page.locator(firstRejectBtn).click(new Locator.ClickOptions().setTimeout(20_000));
         page.locator("[data-testid='bank-reject-reason']").fill("E2E first rejection");
         page.waitForResponse(
@@ -240,16 +211,10 @@ class BankRequestsLiveSyncE2eTest {
             new Page.WaitForResponseOptions().setTimeout(60_000),
             () -> page.locator("[data-testid='bank-reject-submit']").click());
 
-        // The decided request drops from the default pending-only queue in place; the second stays.
         assertThat(page.locator(firstRejectBtn))
             .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(30_000));
         assertThat(page.locator(secondRejectBtn)).hasCount(1);
 
-        // The regression assertion: clicking the second request's button must re-open the
-        // shared reject modal. Before the fix the inline display:none left from closing it after
-        // the
-        // first decision outranked the class-based re-open, so it stayed hidden and nothing
-        // happened.
         page.locator(secondRejectBtn).click(new Locator.ClickOptions().setTimeout(20_000));
         assertThat(page.locator("#bank-reject-request-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));

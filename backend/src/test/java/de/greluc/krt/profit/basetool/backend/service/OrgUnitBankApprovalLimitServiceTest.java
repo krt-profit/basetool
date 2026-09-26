@@ -49,18 +49,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link OrgUnitBankApprovalLimitService} — the approval-limit write mechanics split
- * out of {@code OrgUnitBankAccessService} (L3, #922, REQ-BANK-041/-048). These close the coverage
- * gap left by {@code OrgUnitBankAccessServiceTest}, which wires the real collaborator but never
- * drives its {@code set*}/{@code clear*} paths.
- *
- * <p>The tests pin three regression-prone behaviours: (1) every mutation records its {@code
- * APPROVAL_LIMIT_SET} / {@code APPROVAL_LIMIT_CLEARED} audit event (REQ-AUDIT-001) with the exact
- * details payload; (2) the idempotent {@code upsertLimit} updates the existing tier row in place
- * (no duplicate insert against the V193 partial unique index) and selects the row through the
- * kind-correct finder branch; (3) each {@code set*} first takes the account row lock via {@link
- * BankAccountRepository#findByIdForUpdate} before the find-or-insert, and each {@code clear*}
- * records the cleared event only when a row was actually deleted ({@code removed > 0}).
+ * Unit tests for {@link OrgUnitBankApprovalLimitService} (REQ-BANK-041): the audit events of every
+ * mutation, the in-place upsert, the account row lock via {@link
+ * BankAccountRepository#findByIdForUpdate}, and the cleared event only when a row was deleted.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitBankApprovalLimitServiceTest {
@@ -92,8 +83,6 @@ class OrgUnitBankApprovalLimitServiceTest {
 
     service.setRole(account, "ENSIGN", new BigDecimal("1000"));
 
-    // The find-or-insert saw no existing row (Mockito default empty Optional), so a fresh row is
-    // inserted carrying exactly the role-tier payload.
     ArgumentCaptor<BankAccountApprovalLimit> saved =
         ArgumentCaptor.forClass(BankAccountApprovalLimit.class);
     verify(approvalLimitRepository).save(saved.capture());
@@ -104,8 +93,6 @@ class OrgUnitBankApprovalLimitServiceTest {
     assertThat(row.getAccount()).isSameAs(account);
     assertThat(row.getLimitAmount()).isEqualByComparingTo("1000");
 
-    // The account row lock must be taken BEFORE the find-or-insert so two racing set-limit calls
-    // cannot both insert into the V193 partial unique index.
     InOrder inOrder = inOrder(bankAccountRepository, approvalLimitRepository);
     inOrder.verify(bankAccountRepository).findByIdForUpdate(accountId);
     inOrder
@@ -138,7 +125,6 @@ class OrgUnitBankApprovalLimitServiceTest {
 
     service.setRole(account, "ENSIGN", new BigDecimal("2000"));
 
-    // The SAME managed row is re-saved with its amount raised — never a second insert.
     verify(approvalLimitRepository).save(same(existing));
     assertThat(existing.getLimitAmount()).isEqualByComparingTo("2000");
     assertThat(existing.getGranteeKind()).isEqualTo(BankAccountViewGranteeKind.MEMBERSHIP_ROLE);
@@ -181,7 +167,6 @@ class OrgUnitBankApprovalLimitServiceTest {
 
     service.clearRole(account, "ENSIGN");
 
-    // No row was removed, so no phantom APPROVAL_LIMIT_CLEARED may be written (REQ-AUDIT-001).
     verifyNoInteractions(bankAuditService);
   }
 
@@ -195,7 +180,6 @@ class OrgUnitBankApprovalLimitServiceTest {
     assertThrows(
         NotFoundException.class, () -> service.setUser(account, userId, new BigDecimal("250")));
 
-    // A missing user must abort before the row lock, the upsert and the audit event.
     verifyNoInteractions(bankAccountRepository, approvalLimitRepository, bankAuditService);
   }
 
@@ -208,7 +192,6 @@ class OrgUnitBankApprovalLimitServiceTest {
 
     service.setUser(account, userId, new BigDecimal("250"));
 
-    // The USER tier must be resolved by grantee user id (not by role code), then inserted fresh.
     verify(approvalLimitRepository).findByAccountIdAndGranteeUserId(accountId, userId);
     verify(bankAccountRepository).findByIdForUpdate(accountId);
     ArgumentCaptor<BankAccountApprovalLimit> saved =
@@ -251,7 +234,6 @@ class OrgUnitBankApprovalLimitServiceTest {
 
     service.setAllMembers(account, new BigDecimal("1000"));
 
-    // The payload-less ALL_MEMBERS tier must be resolved by kind alone.
     verify(approvalLimitRepository)
         .findByAccountIdAndGranteeKind(accountId, BankAccountViewGranteeKind.ALL_MEMBERS);
     verify(bankAccountRepository).findByIdForUpdate(accountId);

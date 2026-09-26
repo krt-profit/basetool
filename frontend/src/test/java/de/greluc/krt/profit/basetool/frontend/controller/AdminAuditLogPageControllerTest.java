@@ -89,7 +89,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void bankTab_readsBankEndpointAndAdaptsAccountNoAsSubject() {
-    // Given
     Model model = new ConcurrentModel();
     BankAuditEventDto bankRow =
         new BankAuditEventDto(
@@ -106,10 +105,8 @@ class AdminAuditLogPageControllerTest {
     when(backendApiClient.get(contains("/api/v1/bank/admin/audit"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(bankRow), 0, 50, 1, 1, List.of()));
 
-    // When
     String view = controller.auditLog("BANK", null, null, null, null, null, 0, null, model);
 
-    // Then
     assertEquals("admin/audit-log", view);
     assertEquals("BANK", model.getAttribute("activeDomain"));
     assertEquals("/api/proxy/audit/BANK/export", model.getAttribute("exportEndpoint"));
@@ -125,7 +122,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void inventoryTab_readsGenericEndpointAndAdaptsSubjectLabel() {
-    // Given
     Model model = new ConcurrentModel();
     AuditEventDto genericRow =
         new AuditEventDto(
@@ -142,10 +138,8 @@ class AdminAuditLogPageControllerTest {
     when(backendApiClient.get(contains("/api/v1/audit/INVENTORY"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
 
-    // When
     String view = controller.auditLog("INVENTORY", null, null, null, null, null, 0, null, model);
 
-    // Then
     assertEquals("admin/audit-log", view);
     assertEquals("INVENTORY", model.getAttribute("activeDomain"));
     assertEquals("/api/proxy/audit/INVENTORY/export", model.getAttribute("exportEndpoint"));
@@ -158,7 +152,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void promotionTab_readsGenericEndpointAndAdaptsSubjectLabel() {
-    // Given
     Model model = new ConcurrentModel();
     AuditEventDto genericRow =
         new AuditEventDto(
@@ -175,10 +168,8 @@ class AdminAuditLogPageControllerTest {
     when(backendApiClient.get(contains("/api/v1/audit/PROMOTION"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
 
-    // When
     String view = controller.auditLog("PROMOTION", null, null, null, null, null, 0, null, model);
 
-    // Then
     assertEquals("admin/audit-log", view);
     assertEquals("PROMOTION", model.getAttribute("activeDomain"));
     assertEquals("/api/proxy/audit/PROMOTION/export", model.getAttribute("exportEndpoint"));
@@ -191,19 +182,14 @@ class AdminAuditLogPageControllerTest {
     assertTrue(eventTypes.contains("PROMOTION_EVALUATION_CREATED"));
   }
 
-  // The Rollen area audits every role/permission mutation (REQ-AUDIT-001). The role-permission-set
-  // change must be selectable in that tab's filter and carry a label, or it renders as a raw key.
   @Test
   void roleTab_offersRolePermissionsChangedFilterWithLabel() throws Exception {
-    // Given
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
-    // When
     controller.auditLog("ROLE", null, null, null, null, null, 0, null, model);
 
-    // Then
     List<String> eventTypes = (List<String>) model.getAttribute("eventTypes");
     assertNotNull(eventTypes);
     assertTrue(
@@ -218,41 +204,29 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void unknownDomain_fallsBackToBankTab() {
-    // Given
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
-    // When
     controller.auditLog("NONSENSE", null, null, null, null, null, 0, null, model);
 
-    // Then
     assertEquals("BANK", model.getAttribute("activeDomain"));
   }
 
   @Test
   void fragmentResults_returnsResultsFragmentSelector() {
-    // Given
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
-    // When
     String view =
         controller.auditLog("REFINERY", null, null, null, null, null, 0, "results", model);
 
-    // Then
     assertEquals("admin/audit-log :: auditResults", view);
   }
 
-  // Guard against the recurrence the review caught (a new event type produced at runtime but not
-  // wired into the viewer): every bank audit event type the backend can emit — the openapi enum of
-  // BankAuditEventDto.eventType, the cross-module contract — must appear in the BANK filter list
-  // AND
-  // carry an i18n label, or it would render as a raw key (CLAUDE.md audited-area rule).
   @Test
   void everyProducedBankAuditEventType_isFilterableAndLabelled() throws Exception {
-    // Given: the produced set (from openapi) and the viewer's BANK filter list + the label bundle
     Set<String> produced = bankAuditEventTypesFromOpenApi();
     assertTrue(produced.contains("HOLDER_TRANSFER"), "sanity: openapi should list HOLDER_TRANSFER");
 
@@ -264,7 +238,6 @@ class AdminAuditLogPageControllerTest {
     assertNotNull(filterTypes);
     Properties labels = loadDefaultBundle();
 
-    // Then: each produced type is both filterable and labelled
     for (String type : produced) {
       assertTrue(
           filterTypes.contains(type),
@@ -276,12 +249,8 @@ class AdminAuditLogPageControllerTest {
     }
   }
 
-  // The same guard for the nine generic areas: a type the backend can emit but that no area tab
-  // offers is invisible in the viewer's filter, and one without a label renders as a raw key. This
-  // is the defect M8 hit when ROLE_PERMISSIONS_CHANGED was added to the Rollen area.
   @Test
   void everyProducedGenericAuditEventType_isFilterableAndLabelled() throws Exception {
-    // Given: the produced set (from openapi) and the union of the nine area filter lists
     Set<String> produced = genericAuditEventTypesFromOpenApi();
     assertTrue(
         produced.contains("MEMBERSHIP_GRANTED"),
@@ -299,7 +268,6 @@ class AdminAuditLogPageControllerTest {
     }
     Properties labels = loadDefaultBundle();
 
-    // Then: each produced type is offered by some area tab and carries a label
     for (String type : produced) {
       assertTrue(
           filterable.contains(type),
@@ -312,8 +280,7 @@ class AdminAuditLogPageControllerTest {
 
   /**
    * The bank audit event types the backend can emit, read from the {@code BankAuditEventDto
-   * .eventType} enum in the committed openapi document — the cross-module contract between the
-   * (backend) enum and the (frontend) viewer.
+   * .eventType} enum in the committed openapi document.
    *
    * @return the produced bank audit event-type names
    * @throws Exception when the spec cannot be located or parsed
@@ -324,9 +291,8 @@ class AdminAuditLogPageControllerTest {
 
   /**
    * The generic-area audit event types the backend can emit, read from the {@code
-   * AuditEventDto.eventType} enum in the committed openapi document. Covers all nine non-bank
-   * domains at once — the document does not say which domain a type belongs to, so the assertion
-   * above checks membership in the union of the nine per-tab lists.
+   * AuditEventDto.eventType} enum in the committed openapi document, across all nine non-bank
+   * domains.
    *
    * @return the produced generic audit event-type names
    * @throws Exception when the spec cannot be located or parsed
@@ -336,9 +302,8 @@ class AdminAuditLogPageControllerTest {
   }
 
   /**
-   * Reads the {@code eventType} enum of one audit DTO schema out of the committed openapi document,
-   * walking up from the working directory until {@code backend/src/main/resources/api/openapi.json}
-   * is found (the test runs from the module directory, the spec lives in the sibling module).
+   * Reads the {@code eventType} enum of one audit DTO schema from the committed openapi document,
+   * located by walking up from the working directory.
    *
    * @param schema the openapi schema name, {@code BankAuditEventDto} or {@code AuditEventDto}
    * @return the enum constant names declared for that schema's {@code eventType}
@@ -391,13 +356,8 @@ class AdminAuditLogPageControllerTest {
     return bundle;
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // Originating-client filter (REQ-AUDIT-005, GHSA-2vq5-8p8w-5r64)
-  // ---------------------------------------------------------------------------------------------
-
   @Test
   void genericTab_forwardsTheClientFilterAndRendersTheRowsClient() {
-    // Given
     Model model = new ConcurrentModel();
     AuditEventDto row =
         new AuditEventDto(
@@ -414,17 +374,14 @@ class AdminAuditLogPageControllerTest {
     when(backendApiClient.get(contains("/api/v1/audit/ROLE"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
 
-    // When
     controller.auditLog("ROLE", null, null, null, null, "basetool-android", 0, null, model);
 
-    // Then the filter reaches the backend as a query parameter ...
     ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
     verify(backendApiClient).get(uri.capture(), anyTypeRef());
     assertTrue(
         uri.getValue().contains("clientId=basetool-android"),
         "the client filter must reach the backend, not just the page: " + uri.getValue());
 
-    // ... the tab offers it, and the row carries the client through to the template.
     assertEquals("basetool-android", model.getAttribute("filterClientId"));
     PageResponse<AuditRowView> events = (PageResponse<AuditRowView>) model.getAttribute("events");
     assertNotNull(events);
@@ -433,9 +390,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void unknownClientFilter_isDroppedRatherThanRelayed() {
-    // The client filter is relayed straight into the backend query, so it is narrowed to the very
-    // list the page renders as <select> options (REQ-SEC-051). Anything else is not a filter the UI
-    // can produce, and a crafted one must not be able to append a second query parameter.
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
@@ -452,8 +406,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void eventTypeFilter_isNarrowedToTheActiveTabsOwnTypes() {
-    // Same narrowing for the event type, and it is per-tab: a type that belongs to another tab is
-    // not a filter this tab can produce either.
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
@@ -470,9 +422,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void periodAndActorFilters_areRelayedInTheirCanonicalForm() {
-    // from/to and actorUserId are bound as Instant / UUID — the same types the backend's own
-    // AuditAdminController declares — so what is relayed is a canonical rendering of a parsed
-    // value, never the caller's string.
     Model model = new ConcurrentModel();
     Instant from = Instant.parse("2026-01-01T00:00:00Z");
     Instant to = Instant.parse("2026-02-01T00:00:00Z");
@@ -491,8 +440,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void genericTab_keepsTheClientFilterAcrossPaging() {
-    // Paging rebuilds the page URL from the filters; a filter dropped there silently widens the
-    // result set on page 2, which reads as the trail contradicting itself between pages.
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
@@ -508,16 +455,12 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void bankTab_offersAndForwardsTheClientFilterToo() {
-    // The bank trail records the client since V238, through the same ClientAttribution seam, so
-    // this tab is no longer the exception it was when the column shipped for audit_event alone.
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
-    // When
     controller.auditLog("BANK", null, null, null, null, "basetool-android", 0, null, model);
 
-    // Then
     assertEquals("basetool-android", model.getAttribute("filterClientId"));
     assertFalse(((List<String>) model.getAttribute("clientIds")).isEmpty());
     ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
@@ -530,8 +473,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void bankTab_carriesTheRowsClientThroughTheAdapter() {
-    // The uniform row view is shared by both trails; the bank adapter used to hardcode null here,
-    // which would now silently blank a value the backend does send.
     Model model = new ConcurrentModel();
     BankAuditEventDto bankRow =
         new BankAuditEventDto(
@@ -557,9 +498,6 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void everyOfferedClientFilterValue_carriesALabel() throws Exception {
-    // Mirrors the event-type parity check above: a filter option with no bundle entry renders as a
-    // raw key. The template falls back to the id itself, which is legible but not translated —
-    // this keeps the shipped list actually labelled.
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
@@ -580,15 +518,12 @@ class AdminAuditLogPageControllerTest {
 
   @Test
   void backendFailure_setsErrorAttribute() {
-    // Given
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenThrow(new RuntimeException("down"));
 
-    // When
     controller.auditLog("JOB_ORDER", null, null, null, null, null, 0, null, model);
 
-    // Then
     assertEquals("admin.audit.error.load", model.getAttribute("error"));
   }
 }

@@ -1,22 +1,4 @@
-/*
- * KRT Keycloak ACCOUNT-console theme.
- *
- * DESIGN-TOKEN SOURCE OF TRUTH: frontend/src/main/resources/static/css/styles.css :root.
- * This file mirrors those tokens; the shared design-token VALUES (colors,
- * semantic colors, fonts, glows) and the body background (flat black + top
- * bloom) are kept identical with login/krt-login-v3.css so the login screen and
- * account console share one identity across the SSO redirect.
- *
- * MAINTENANCE RULE: any token change in colors_and_type.css / styles.css must be
- * reflected in BOTH Keycloak CSS files in the SAME commit.
- */
 
-/* Fonts */
-/*
- * WOFF2 first (~40% the size of TTF/OTF), TTF as a fallback for legacy
- * browsers. `font-display: swap` shows the system fallback immediately and
- * swaps in the brand font once it has arrived. Matches frontend/static/css/styles.css.
- */
 @font-face {
     font-family: 'Lato';
     src: url('../fonts/Lato-Light.woff2') format('woff2');
@@ -42,7 +24,6 @@
 }
 
 :root {
-    /* KRT Base Colors */
     --color-primary: #E77E23;
     --color-bg-black: #000000;
     --color-bg-dark-gray: #141414;
@@ -56,13 +37,7 @@
     --color-gray-4: #141414;
     --color-surface-input: #1C1C1C;
 
-    /* Semantic tokens — REQUIRED so validation errors render red, not the brand
-       orange. Keep these values identical with login/krt-login-v3.css :root. */
     --color-danger: #A3000A;
-    /* Accessible danger as TEXT — the canonical #A3000A is ~2.3:1 on black and
-       fails WCAG as small text; use this lighter tint when the colour IS the
-       error text. Keep #A3000A for borders/blooms/fills. Mirror of frontend
-       styles.css --color-danger-text. Keep identical with login :root. */
     --color-danger-text: #F2564B;
     --color-success: #239E33;
     --color-warning: #FFD23F;
@@ -71,15 +46,10 @@
     --font-headline: 'Lato', sans-serif;
     --font-body: 'Lato', sans-serif;
 
-    /* Glows — orange bloom for the primary CTA, red bloom for error fields. */
     --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
     --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
 }
 
-/* PatternFly variable overrides live in their own block so the :root above holds
-   only the KRT design tokens — its token declarations stay identical to
-   login/krt-login-v3.css :root (token-sync rule). Same :root selector as before,
-   so the cascade is unchanged. */
 :root {
     --pf-v5-global--FontFamily--sans-serif: var(--font-body);
     --pf-v5-global--FontFamily--heading--sans-serif: var(--font-headline);
@@ -92,9 +62,6 @@
     --pf-v5-global--Color--200: var(--color-gray-2);
 }
 
-/* Flat black + a soft top bloom, matching the app login and the login theme so
-   the account console shares one identity. The PF grid stays hard-reset below;
-   only <body> carries the bloom gradient. */
 body {
     background-color: var(--color-bg-black);
     background-image:
@@ -103,8 +70,6 @@ body {
     background-attachment: fixed;
 }
 
-/* Hard reset for all backgrounds to remove the orange grid completely.
-   NOTE: `body` is intentionally NOT in this list — it carries the top bloom. */
 html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section,
 .pf-v5-c-page, .pf-v5-c-page__main, .pf-v5-c-page__main-section, 
 .pf-v6-c-page, .pf-v6-c-page__main, .pf-v6-c-page__main-section,
@@ -149,7 +114,6 @@ html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section,
     --pf-v6-c-background-image--Filter: none !important;
 }
 
-/* Typography Overrides */
 h1, h2, h3, h4, h5, h6, .pf-v5-c-title, .pf-v6-c-title {
     font-family: var(--font-headline) !important;
     color: var(--color-primary) !important;
@@ -167,7 +131,6 @@ a:hover, .pf-v5-c-button--m-link:hover {
     color: var(--color-accent-light) !important;
 }
 
-/* Sidebar / Navigation styling to match KRT frontend */
 .pf-v5-c-nav__link, .pf-v6-c-nav__link {
     color: var(--color-gray-1) !important;
     font-family: var(--font-headline) !important;
@@ -188,7 +151,6 @@ a:hover, .pf-v5-c-button--m-link:hover {
     border-left: 3px solid var(--color-primary) !important;
 }
 
-/* Force override of PatternFly active state pseudo elements which cause the blue border */
 .pf-v5-c-nav__link.pf-m-current::after,
 .pf-v6-c-nav__link.pf-m-current::after,
 .pf-v5-c-nav__item.pf-m-current > .pf-v5-c-nav__link::after,
@@ -197,13 +159,11 @@ a:hover, .pf-v5-c-button--m-link:hover {
     display: none !important;
 }
 
-/* Sidebar container */
 .pf-v5-c-page__sidebar, .pf-v6-c-page__sidebar {
     background-color: var(--color-bg-dark-gray) !important;
     border-right: 1px solid var(--color-gray-3) !important;
 }
 
-/* Form Container */
 .pf-v5-c-form, .pf-v6-c-form {
     background-color: var(--color-bg-dark-gray) !important;
     border: 1px solid var(--color-gray-3) !important;
@@ -214,7 +174,6 @@ a:hover, .pf-v5-c-button--m-link:hover {
     margin-bottom: 30px !important;
 }
 
-/* Form HUD corners */
 .pf-v5-c-form::before, .pf-v5-c-form::after, 
 .pf-v6-c-form::before, .pf-v6-c-form::after {
     content: '' !important;
@@ -233,7 +192,6 @@ a:hover, .pf-v5-c-button--m-link:hover {
     border-left: none !important; border-top: none !important;
 }
 
-/* Form Labels */
 .pf-v5-c-form__label, .pf-v6-c-form__label {
     color: var(--color-gray-1) !important;
     text-transform: uppercase !important;
@@ -241,7 +199,6 @@ a:hover, .pf-v5-c-button--m-link:hover {
     letter-spacing: 1px !important;
 }
 
-/* Form Inputs */
 .pf-v5-c-form-control, .pf-v6-c-form-control,
 .pf-v5-c-form-control input, .pf-v6-c-form-control input,
 .pf-v5-c-text-input, .pf-v6-c-text-input,
@@ -261,7 +218,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     box-shadow: 0 0 8px rgba(231, 126, 35, 0.2) !important;
 }
 
-/* Buttons */
 .pf-v5-c-button.pf-m-primary, .pf-v6-c-button.pf-m-primary {
     background-color: var(--color-primary) !important;
     color: var(--color-bg-black) !important;
@@ -272,12 +228,11 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     border: none !important;
     letter-spacing: 1px !important;
     padding: 12px 25px !important;
-    /* The single filled-orange CTA per screen carries the brand bloom. */
     box-shadow: var(--glow-primary) !important;
 }
 
 .pf-v5-c-button.pf-m-primary:hover, .pf-v6-c-button.pf-m-primary:hover {
-    background-color: var(--color-accent-light) !important; /* lighten — system-standard primary hover */
+    background-color: var(--color-accent-light) !important;
 }
 
 .pf-v5-c-button.pf-m-secondary, .pf-v6-c-button.pf-m-secondary {
@@ -295,22 +250,17 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     background-color: rgba(231, 126, 35, 0.1) !important;
 }
 
-/* Cards (if any) */
 .pf-v5-c-card, .pf-v6-c-card {
     background-color: var(--color-bg-dark-gray) !important;
     border: 1px solid var(--color-gray-3) !important;
     border-radius: 0 !important;
 }
 
-/* Brand/Header */
 .pf-v5-c-page__header, .pf-v6-c-page__header {
     background-color: var(--color-bg-dark-gray) !important;
     border-bottom: 2px solid var(--color-primary) !important;
 }
 
-/* Validation errors — semantic red across PF v5 / v6 / legacy (mirror of the
-   login theme). Orange is reserved for actions + identity; an error in orange
-   reads as a call-to-action instead of a problem. */
 #input-error,
 .kc-error-message,
 .kc-feedback-text,
@@ -331,7 +281,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     color: var(--color-danger-text) !important;
 }
 
-/* Invalid fields get a red bottom border + red glow (overriding the orange focus). */
 input[aria-invalid="true"],
 textarea[aria-invalid="true"],
 select[aria-invalid="true"],
@@ -345,10 +294,6 @@ select[aria-invalid="true"],
     box-shadow: var(--glow-danger) !important;
 }
 
-/* ---- Keyboard focus (A11y) -------------------------------------------------
-   Inputs already glow orange on focus; give buttons, links, checkboxes and the
-   nav a visible focus ring too. PF's blue focus is suppressed elsewhere — this
-   is the KRT replacement. */
 .pf-v5-c-button:focus-visible,
 .pf-v6-c-button:focus-visible,
 a:focus-visible,

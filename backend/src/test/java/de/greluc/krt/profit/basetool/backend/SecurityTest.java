@@ -81,8 +81,6 @@ class SecurityTest {
 
   @Test
   void testSecurityHeaders() throws Exception {
-    // Rides /v3/api-docs because it is a plain GET with a body; the path is admin-gated since
-    // REQ-SEC-052, and the headers under test are set by the filter chain for every response.
     mockMvc
         .perform(
             get("/v3/api-docs").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
@@ -92,11 +90,8 @@ class SecurityTest {
   }
 
   /**
-   * Pins the hardened Content-Security-Policy for the JSON-only backend. The backend serves no HTML
-   * (Swagger UI was removed), so the policy locks down to {@code default-src 'none'}. This test
-   * fails loudly if a future change re-introduces the Swagger-era relaxations ({@code
-   * 'unsafe-inline'} on {@code style-src}, {@code data:} img/font sources) or otherwise loosens the
-   * lockdown — those would silently re-open a (would-be) XSS surface.
+   * Verifies that the JSON-only backend sends a locked-down Content-Security-Policy ({@code
+   * default-src 'none'}) without {@code 'unsafe-inline'} or {@code data:} relaxations.
    *
    * @throws Exception if the MockMvc request fails
    */
@@ -116,9 +111,6 @@ class SecurityTest {
 
   @Test
   void testRateLimiting() throws Exception {
-    // First request should pass. Admin-gated since REQ-SEC-052: the document enumerates every
-    // path, parameter and DTO field the API has, which is the most efficient description of the
-    // attack surface the project can produce.
     mockMvc
         .perform(
             get("/v3/api-docs")
@@ -161,30 +153,15 @@ class SecurityTest {
   }
 
   /**
-   * The material x terminal price matrix is the largest single response the API can produce, and it
-   * used to fall into the catalog {@code permitAll} through {@code /api/v1/materials/**} — the
-   * cheapest amplification lever an unauthenticated caller had. Its only consumer is an
-   * {@code @PreAuthorize("isAuthenticated()")} page controller, so requiring a token costs nothing
-   * (A6, REQ-SEC-032).
-   *
-   * <p>Kept after REQ-SEC-052 closed the whole catalogue, which makes the explicit carve-out
-   * redundant — and that is exactly why the assertion stays: the rule it pinned is gone from {@code
-   * SecurityConfig}, so nothing but this test now says the path must not answer anonymously.
+   * Verifies that the material x terminal price matrix, the API's largest response, is not
+   * reachable anonymously (REQ-SEC-032).
    */
   @Test
   void materialsMatrixIsNotAnonymouslyReachable() throws Exception {
     mockMvc.perform(get("/api/v1/materials/matrix")).andExpect(status().isUnauthorized());
   }
 
-  /**
-   * The per-material slice of that same matrix, which the carve-out above was missing.
-   *
-   * <p>Its only consumer is the inventory page's "where can I sell this" suggestion, which is
-   * authenticated — so the reasoning of {@code /materials/matrix} applies unchanged, and leaving it
-   * anonymous published UEX trade prices per material to the internet from the API vhost. The
-   * nightly {@code edge-deny-probe} asserted {@code 401} for it from the day the phase-3 paste
-   * landed and got {@code 200}; the expectation was right and the rule was simply absent.
-   */
+  /** Verifies that the per-material terminal prices are not reachable anonymously. */
   @Test
   void materialTerminalPricesAreNotAnonymouslyReachable() throws Exception {
     mockMvc
@@ -193,15 +170,8 @@ class SecurityTest {
   }
 
   /**
-   * The same two paths, asked for with {@code HEAD}.
-   *
-   * <p>The carve-out that used to sit above was registered with {@code HttpMethod.GET}, and Spring
-   * Security compares the verb with {@code String.equals} - so a {@code HEAD} missed it and fell
-   * through to the all-verb catalogue {@code permitAll} underneath. Spring MVC then answers {@code
-   * HEAD} from the {@code @GetMapping} handler, so the query ran anonymously and the {@code
-   * Content-Length} came back. The lesson outlived the rule: the two remaining anonymous reads are
-   * {@code GET}-scoped on purpose, and {@code AnonymousSurfaceSweepTest} asks {@code HEAD} of every
-   * {@code GET} mapping for exactly this reason.
+   * Verifies that the material matrix and per-material prices are not reachable anonymously with
+   * {@code HEAD}, which Spring MVC answers from the {@code GET} handler.
    */
   @Test
   void materialsMatrixIsNotAnonymouslyReachableWithHead() throws Exception {
@@ -215,24 +185,11 @@ class SecurityTest {
         .andExpect(status().isUnauthorized());
   }
 
-  /**
-   * The rest of the material catalogue is not anonymous either (REQ-SEC-052).
-   *
-   * <p>This test used to assert the opposite, and its comment gave the reason: "the anonymous order
-   * form's material picker still needs the ordinary catalog list". That form went with ADR-0149 and
-   * the picker now rides a member's bearer, so the carve-out no longer has to be surgical — the
-   * whole family requires a login.
-   */
+  /** Verifies that the rest of the material catalogue is not anonymous either (REQ-SEC-052). */
   @Test
   void theRestOfTheMaterialCatalogIsNotAnonymousEither() throws Exception {
     mockMvc.perform(get("/api/v1/materials")).andExpect(status().isUnauthorized());
   }
-
-  // The anonymous page-size ceiling (A6, REQ-SEC-032) and its six cases stood here. The filter
-  // and the ceiling are gone with ADR-0159: it bounded what an unauthenticated caller could ask a
-  // paginated endpoint for, and no paginated endpoint answers one any more. The two reads that do
-  // are unpaginated. The per-subject limiter that used to be anchored behind the filter now hangs
-  // off TermsAcceptanceAccessFilter, pinned by SecurityFilterChainOrderTest.
 
   @Test
   void testAnonymousAccessToLocations() throws Exception {
@@ -260,26 +217,17 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
-        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
-        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
-        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
-        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
         .andExpect(status().isForbidden());
   }
 
   @Test
   void testAuthenticatedAccessWithNullSub() throws Exception {
-    // We create a JWT without a sub claim
     org.springframework.security.oauth2.jwt.Jwt jwt =
         org.springframework.security.oauth2.jwt.Jwt.withTokenValue("token")
             .header("alg", "none")
             .claim("preferred_username", "testuser")
             .build();
 
-    // Reaches a handler no longer: a token that resolves to no application role is refused with
-    // 403 NO_ROLE (REQ-SEC-053) before dispatch. It used to answer 200 because /api/v1/missions was
-    // permitAll and the odd sub only produced a WARN.
     mockMvc
         .perform(
             get("/api/v1/missions")
@@ -287,26 +235,17 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
-        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
-        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
-        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
-        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
         .andExpect(status().isForbidden());
   }
 
   @Test
   void testAuthenticatedAccessWithBothNullSubAndUsername() throws Exception {
-    // We create a JWT without sub and without preferred_username, but with some other claim to
-    // satisfy Jwt.Builder
     org.springframework.security.oauth2.jwt.Jwt jwt =
         org.springframework.security.oauth2.jwt.Jwt.withTokenValue("token")
             .header("alg", "none")
             .claim("foo", "bar")
             .build();
 
-    // Logs ERROR as before, and is then refused with 403 NO_ROLE (REQ-SEC-053) — it used to
-    // answer 200 because /api/v1/missions was permitAll.
     mockMvc
         .perform(
             get("/api/v1/missions")
@@ -314,22 +253,12 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
-        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
-        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
-        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
-        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
         .andExpect(status().isForbidden());
   }
 
   /**
-   * The Terms-of-Use wording is readable without a token (ADR-0138, REQ-SEC-028).
-   *
-   * <p>Pinned here rather than left to the SecurityConfig entry, because the whole design depends
-   * on it: the public {@code /terms} page fetches this anonymously, and the Android app has to be
-   * able to show the wording before the member has agreed to anything. Should the rule be reordered
-   * behind the authenticated catch-all, the page and the app both go blank while every other test
-   * stays green.
+   * Verifies that the Terms-of-Use wording is readable without a token, as the public {@code
+   * /terms} page and the Android app require (ADR-0138, REQ-SEC-028).
    */
   @Test
   void termsDocumentIsReadableAnonymously() throws Exception {
@@ -342,12 +271,7 @@ class SecurityTest {
   }
 
   /**
-   * Consent itself stays behind authentication.
-   *
-   * <p>The counterpart to the test above, and the reason the two live in separate controllers:
-   * opening the wording must not open the record of who agreed to it. A permitAll that had been
-   * written one path segment too short -- {@code /api/v1/terms/**} -- would pass the test above and
-   * fail this one.
+   * Verifies that the consent status stays behind authentication even though the wording is public.
    */
   @Test
   void termsStatusStaysAuthenticated() throws Exception {

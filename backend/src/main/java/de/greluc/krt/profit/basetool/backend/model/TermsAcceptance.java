@@ -32,19 +32,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * One user's acceptance of one version of the Terms of Use (REQ-SEC-028, V229).
+ * One user's acceptance of one Terms of Use version, the evidence that enforcement of a clause
+ * rests on (REQ-SEC-028).
  *
- * <p>The row is the evidence that a specific person agreed to a specific wording at a specific
- * time, which is what makes enforcing a clause against them — for instance the section 4 obligation
- * to use only operator-approved client software (REQ-SEC-027) — rest on something more than
- * "continued use counts as consent".
- *
- * <p><strong>Append-only.</strong> A row is inserted when the user accepts and is never updated
- * afterwards; re-consent after a terms change writes a <em>new</em> row so the history survives.
- * That is why the entity carries no {@code @Version} — there is no second writer to race with, and
- * an optimistic-lock field on an insert-only table would only be misleading. The {@code
- * uq_terms_acceptance_user_version} constraint makes a duplicate submit a no-op at the database
- * level rather than a second history entry.
+ * <p>Append-only: re-consent after a terms change inserts a new row, so the entity has no
+ * {@code @Version}; a unique constraint on user and version makes a duplicate submit a no-op.
  */
 @Entity
 @Table(name = "terms_acceptance")
@@ -71,9 +63,8 @@ public class TermsAcceptance {
   private UUID userId;
 
   /**
-   * The terms version that was accepted — a content digest of the wording, derived at build time by
-   * the root Gradle task {@code generateTermsVersion}. Storing the version rather than a boolean is
-   * what lets a later wording change re-prompt without erasing the earlier consent.
+   * The accepted terms version, a content digest of the wording generated at build time by the
+   * {@code generateTermsVersion} Gradle task.
    */
   @Column(name = "terms_version", nullable = false, length = 64)
   private String termsVersion;

@@ -55,11 +55,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Mockito unit tests for {@link OrgRoleManagementSecurityService} — the delegated appointment
- * ladder (epic #800, REQ-ROLE-004). Pins the strictly-higher-tier rule (so self-promotion is
- * impossible), the parent-Bereich-derived-from-the-edge scoping (so a foreign unit is denied), and
- * that the verdict <em>never</em> consults {@code isAdmin()} (admin is decided at the
- * {@code @PreAuthorize} layer).
+ * Unit tests for {@link OrgRoleManagementSecurityService} (REQ-ROLE-004): the strictly-higher-tier
+ * rule, parent-Bereich scoping from the persisted edge, and that {@code isAdmin()} is never
+ * consulted.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgRoleManagementSecurityServiceTest {
@@ -119,8 +117,6 @@ class OrgRoleManagementSecurityServiceTest {
         .thenReturn(List.of(membership(callerId, orgUnitId, role)));
   }
 
-  // --- squadron ranks -------------------------------------------------------
-
   @Test
   void staffelleiter_appointedByBereichsleiterOfParent_allowed() {
     UUID squadronId = UUID.randomUUID();
@@ -139,8 +135,6 @@ class OrgRoleManagementSecurityServiceTest {
     when(orgUnitRepository.findById(squadronId))
         .thenReturn(Optional.of(squadronUnder(squadronId, bereich(bereichId))));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    // The caller is NOT the parent Bereich's Bereichsleiter — a Staffelleiter has no membership row
-    // on the parent Bereich, so the appointment is denied.
     when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
 
     assertFalse(service.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, authed));
@@ -188,8 +182,6 @@ class OrgRoleManagementSecurityServiceTest {
     assertTrue(service.canRemoveSquadronRank(squadronId, targetUser, authed));
   }
 
-  // --- Bereich ranks --------------------------------------------------------
-
   @Test
   void bereichsleiter_appointedByPureOlMember_allowed() {
     UUID bereichId = UUID.randomUUID();
@@ -228,8 +220,6 @@ class OrgRoleManagementSecurityServiceTest {
     assertFalse(service.canAppointBereichRole(bereichId, BereichLeadershipRole.OPERATOR, authed));
   }
 
-  // --- SK lead --------------------------------------------------------------
-
   @Test
   void skLead_appointedByBereichsleiterOfParent_allowed() {
     UUID skId = UUID.randomUUID();
@@ -253,8 +243,6 @@ class OrgRoleManagementSecurityServiceTest {
     assertFalse(service.canAppointSkLead(skId, authed));
   }
 
-  // --- Kommandogruppe management + the never-admin invariant -----------------
-
   @Test
   void manageKommandoGroups_byOwnStaffelleiter_allowed() {
     UUID squadronId = UUID.randomUUID();
@@ -270,11 +258,8 @@ class OrgRoleManagementSecurityServiceTest {
 
     service.canAssignSquadronRank(squadronId, MembershipRole.ENSIGN, authed);
 
-    // The delegated verdict is rank-derived only; admin is decided at @PreAuthorize, never here.
     verify(authHelperService, never()).isAdmin();
   }
-
-  // --- Bereich role removal (routing by the target's current rank) -----------
 
   @Test
   void removeBereichRole_bereichsleiterRemovableByPureOlMember_allowed() {
@@ -310,14 +295,10 @@ class OrgRoleManagementSecurityServiceTest {
         .thenReturn(
             Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSOPERATOR)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    // The caller does not lead this Bereich (no membership row on it), so removing an Operator of a
-    // Bereich they do not lead is denied.
     when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
 
     assertFalse(service.canRemoveBereichRole(bereichId, targetUser, authed));
   }
-
-  // --- singular Kommandogruppe management (squadron from the group's edge) ----
 
   @Test
   void manageKommandoGroup_byStaffelleiterOfGroupsSquadron_allowed() {
@@ -337,8 +318,6 @@ class OrgRoleManagementSecurityServiceTest {
     when(kommandoGroupRepository.findById(groupId))
         .thenReturn(Optional.of(kommandoGroupOf(squadronId)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    // The squadron is read from the group's persisted edge; the caller is not that squadron's
-    // Staffelleiter (no membership row on it), so renaming / deleting a foreign group is denied.
     when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
 
     assertFalse(service.canManageKommandoGroup(groupId, authed));
@@ -351,8 +330,6 @@ class OrgRoleManagementSecurityServiceTest {
 
     assertFalse(service.canManageKommandoGroup(groupId, authed));
   }
-
-  // --- squadron rank removal: the STAFFELLEITER target routes to the parent ---
 
   @Test
   void removeSquadronRank_staffelleiterRemovableByParentBereichsleiter_allowed() {
@@ -378,9 +355,6 @@ class OrgRoleManagementSecurityServiceTest {
     when(orgUnitRepository.findById(squadronId))
         .thenReturn(Optional.of(squadronUnder(squadronId, bereich(bereichId))));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    // Removing a Staffelleiter routes to the parent Bereichsleiter, never the squadron's own
-    // Staffelleiter — a caller who only leads the squadron has no membership row on the parent
-    // Bereich and is denied (no self / peer demotion at the same tier).
     when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
 
     assertFalse(service.canRemoveSquadronRank(squadronId, targetUser, authed));
@@ -388,8 +362,6 @@ class OrgRoleManagementSecurityServiceTest {
 
   @Test
   void callerMemberships_areReadOncePerRequest_acrossVerdictsAndUnits() {
-    // BE-PERF-15 (REQ-DATA-003): the Leitung view asks these verdicts for every unit in turn; the
-    // caller's membership rows are read once per request, not once per unit and verdict.
     UUID bereichA = UUID.randomUUID();
     UUID bereichB = UUID.randomUUID();
     callerIs(bereichA, MembershipRole.BEREICHSLEITER);

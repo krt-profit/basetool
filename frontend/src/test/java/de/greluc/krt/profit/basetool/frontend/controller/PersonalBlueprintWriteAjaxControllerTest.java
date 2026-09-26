@@ -47,11 +47,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #578 header-gated personal-blueprint write twins ({@link
- * PersonalInventoryBlueprintsPageController#updateNoteAjax}/{@code deleteAjax}). They assert that a
- * note edit returns the fresh blueprint as JSON (so the page patches the row + version in place), a
- * backend optimistic-lock failure is relayed as {@code 409} {@code problem+json} carrying its
- * {@code code}, and that a remove forwards to the backend and answers {@code 204}.
+ * MVC tests for the personal-blueprint write twins ({@link
+ * PersonalInventoryBlueprintsPageController#updateNoteAjax}/{@code deleteAjax}): a note edit
+ * returns the fresh blueprint as JSON, an optimistic-lock failure is relayed as {@code 409} {@code
+ * problem+json} with its {@code code}, and a remove answers {@code 204}.
  */
 @SpringBootTest
 class PersonalBlueprintWriteAjaxControllerTest {

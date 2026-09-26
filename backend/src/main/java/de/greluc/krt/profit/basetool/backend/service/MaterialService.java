@@ -54,13 +54,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service for materials plus the admin-mutable subset of fields.
- *
- * <p>The catalog itself comes from {@link UexCommodityService}; this service owns the
- * project-specific fields that admins maintain by hand: category, refined-material mapping, the
- * manual {@code isJobOrder} and {@code isManualRawMaterial} flags (overrides when UEX gets the
- * refinable/refined classification wrong). Cache eviction is {@code allEntries=true} because the
- * materials catalog drives many downstream views — surgical eviction is not worth the complexity.
+ * Reads materials and maintains their admin-owned fields: category, refined-material mapping and
+ * the manual {@code isJobOrder} / {@code isManualRawMaterial} flags. The catalog itself comes from
+ * {@link UexCommodityService}; every write evicts all material caches.
  */
 @Service
 @RequiredArgsConstructor
@@ -72,10 +68,7 @@ public class MaterialService {
   private final MaterialCategoryRepository materialCategoryRepository;
 
   /**
-   * Returns cached paged list of all materials. Distinct cache key prefix ({@code all-}) so this
-   * admin/full view never collides with {@link #getVisibleMaterials(Pageable)} — both share {@code
-   * MATERIALS_CACHE} and the default {@code SimpleKeyGenerator} keys solely on the {@code Pageable}
-   * argument, which would otherwise serve one method's result for the other.
+   * Returns the cached page of all materials, including hidden ones.
    *
    * @param pageable page request
    * @return cached paged list of all materials
@@ -86,12 +79,8 @@ public class MaterialService {
   }
 
   /**
-   * Returns the cached paged list of <b>visible</b> materials only ({@code is_visible = true}).
-   * Drives the public/trading catalog list: wiki-only commodities imported invisible (§4.3) are
-   * excluded so they don't pollute trading flows until an admin reviews them. The admin catalog
-   * passes {@code includeHidden=true} and goes through {@link #getAllMaterials(Pageable)} instead.
-   * The {@code visible-} key prefix keeps it from colliding with {@code getAllMaterials} in the
-   * shared cache.
+   * Returns the cached page of visible materials ({@code is_visible = true}) for the public and
+   * trading catalog.
    *
    * @param pageable page request
    * @return cached paged list of visible materials
@@ -113,8 +102,7 @@ public class MaterialService {
   }
 
   /**
-   * Projection used by the materials-overview page: per-material best buy / best sell summary
-   * (filtered by name).
+   * Returns the per-material best buy and best sell summary for the materials-overview page.
    *
    * @param name optional case-insensitive substring filter (empty = all)
    * @param pageable page request
@@ -126,10 +114,7 @@ public class MaterialService {
   }
 
   /**
-   * Lightweight projection used by typeaheads — only id, name and quantity type. Deliberately
-   * complete (no silent bound): a truncated list would make materials beyond the bound unreachable
-   * in every consumer. Payload-bounded pickers use {@link #searchPicker(String, boolean, boolean,
-   * Pageable)} instead.
+   * Returns id, name and quantity type of every visible material for typeaheads, unbounded.
    *
    * @return all visible materials as reference DTOs
    */
@@ -138,13 +123,10 @@ public class MaterialService {
   }
 
   /**
-   * Live search for the material pickers (REQ-FE-016): pages visible materials whose name contains
-   * {@code search} (case-insensitive, LIKE metacharacters escaped so user input matches literally),
-   * optionally narrowed to the job-order subset (orders material lines) or to refinery inputs (RAW
-   * or manually raw-flagged). Deliberately uncached: query strings are user-typed and would pollute
-   * the shared materials cache, and the repository read is cheap at picker page sizes.
+   * Pages visible materials whose name contains {@code search} literally and case-insensitively,
+   * for the material pickers (REQ-FE-016). Uncached.
    *
-   * @param search the raw name fragment, or {@code null}/blank for the unfiltered first page
+   * @param search the name fragment, or {@code null}/blank for the unfiltered first page
    * @param jobOrderOnly when true, only {@code isJobOrder = true} materials
    * @param rawOnly when true, only refinery inputs (RAW type or manually raw-flagged)
    * @param pageable page request from the whitelisted picker sort
@@ -157,12 +139,8 @@ public class MaterialService {
   }
 
   /**
-   * Returns the material. Cached in the dedicated {@link CacheConfig#MATERIAL_BY_ID_CACHE} (not the
-   * list catalogue) so a by-id lookup and a paged-list read cannot evict each other under a shared
-   * size budget. The returned entity is cache-shared — callers must treat it read-only and map it
-   * to a DTO before returning; the write paths re-load a managed instance via Spring
-   * self-invocation (which bypasses this cache proxy) so they never re-save this cached copy
-   * (L4/CACHE-03).
+   * Returns the material from the by-id cache. The instance is shared across callers and must be
+   * treated as read-only.
    *
    * @param id material primary key
    * @return the material
@@ -196,11 +174,8 @@ public class MaterialService {
   }
 
   /**
-   * Returns the material × terminal matrix used by the matrix overview page, applying the four
-   * optional server-side filters (ADR-0105, REQ-UI-014). Each dimension is unconstrained when its
-   * argument is absent: an {@code IN} filter is skipped when its collection is {@code null} <em>or
-   * empty</em> (an empty {@code IN ()} would match nothing), and a boolean filter is skipped when
-   * its flag is {@code null}. An all-absent call returns the full matrix, exactly as before.
+   * Returns the material × terminal matrix with up to four optional filters (REQ-UI-014); a {@code
+   * null} or empty filter argument leaves that dimension unconstrained.
    *
    * @param materialNames material names to keep, or {@code null}/empty for all
    * @param starSystems star-system names to keep, or {@code null}/empty for all
@@ -220,9 +195,7 @@ public class MaterialService {
   }
 
   /**
-   * Normalises an {@code IN}-filter collection so an empty selection becomes {@code null} ("no
-   * filter") — the repository's {@code :param IS NULL OR x IN :param} idiom treats {@code null} as
-   * unconstrained but would emit an invalid {@code IN ()} for an empty collection.
+   * Maps an empty {@code IN}-filter collection to {@code null}, the repository's "no filter" value.
    *
    * @param values the filter values, possibly {@code null} or empty
    * @param <T> the element type
@@ -244,25 +217,15 @@ public class MaterialService {
   }
 
   /**
-   * Persists a manually-entered material from the admin UI. Used when UEX has not (yet) published a
-   * commodity that the squadron needs — e.g. a refinery raw input that exists in-game but is
-   * missing from {@code get_commodities_prices_all/}. The server unconditionally stamps {@code
-   * sourceSystems=MANUAL} on the persisted row (Audit + UI badge, surfaced via the derived {@code
-   * isManualEntry} wire field); the next UEX sync flips it off {@code MANUAL} automatically once
-   * UEX picks the commodity up (see {@code UexCommodityService}).
-   *
-   * <p>UEX-imported columns ({@code idCommodity}, {@code code}, {@code slug}, {@code priceBuy} …)
-   * are left {@code null} — they get populated by the sync's name-match fallback once UEX exposes
-   * the commodity. {@code refinedMaterialId} is only honoured when the entity is classified as a
-   * raw material (either {@code type=RAW} or {@code isManualRawMaterial=true}); otherwise the
-   * request is rejected so a non-raw material cannot accidentally point at a refined output.
+   * Persists a manually entered material that UEX does not provide, stamped {@code
+   * sourceSystems=MANUAL}. UEX-imported columns stay {@code null}; {@code refinedMaterialId} is
+   * only accepted for a raw material.
    *
    * @param dto validated create payload
    * @return the persisted material
    * @throws BadRequestException when {@code type}/{@code quantityType} cannot be parsed, or when
    *     {@code refinedMaterialId} is set on a non-raw material
-   * @throws NotFoundException when {@code refinedMaterialId} or {@code categoryId} reference a row
-   *     that does not exist
+   * @throws NotFoundException when {@code refinedMaterialId} or {@code categoryId} does not exist
    */
   @Transactional
   @EvictAllMaterialCaches
@@ -319,16 +282,11 @@ public class MaterialService {
   }
 
   /**
-   * Updates the admin-maintained fields on a material (name, type, description, quantity type,
-   * manual flags, visibility, refined-material link, category). UEX-imported fields are NOT mutable
-   * here — those come from {@link UexCommodityService} and any manual override would be silently
-   * overwritten on the next sync.
-   *
-   * <p>Refined-material and category references are resolved by id; unknown ids fall back to {@code
-   * null} rather than raising (legacy data may carry stale references).
+   * Updates the admin-maintained fields of a material; UEX-imported fields are not changed. Unknown
+   * refined-material or category ids resolve to {@code null}.
    *
    * @param id material primary key
-   * @param materialDetails transient entity carrying the new values (also the expected version)
+   * @param materialDetails the new values, including the expected version
    * @return the persisted material
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
    *     version is stale
@@ -347,8 +305,6 @@ public class MaterialService {
     material.setQuantityType(materialDetails.getQuantityType());
     material.setIsManualRawMaterial(materialDetails.getIsManualRawMaterial());
     material.setIsJobOrder(materialDetails.getIsJobOrder());
-    // Visibility is admin-toggleable (§4.3 review of wiki-only commodities). Null-guarded so a DTO
-    // that omits the field cannot null the NOT NULL column on an unrelated edit.
     if (materialDetails.getIsVisible() != null) {
       material.setIsVisible(materialDetails.getIsVisible());
     }

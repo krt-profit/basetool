@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
@@ -67,29 +66,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Membership-management service for Spezialkommandos — adds / removes / patches members of an SK
- * through the endpoints under {@code /api/v1/special-commands/{id}/members}. The service is
- * intentionally scoped to {@link OrgUnitKind#SPECIAL_COMMAND} memberships: every entry point loads
- * the parent SK through {@link SpecialCommandService#getSpecialCommandById(UUID)} first, which
- * already filters via the JPA discriminator. A Squadron UUID accidentally routed through the SK
- * endpoints therefore lands as a clean 404 before any membership row is touched, never as a
- * corrupted Staffel membership.
+ * Writes org-unit memberships: Spezialkommando members, Staffel membership reconciliation and
+ * flags, squadron ranks, Bereichsleitung, OL and Grand Admiral.
  *
- * <p>Staffel membership add / remove / flag changes flow through {@link
- * #reconcileStaffelMemberships(User, java.util.List)} (the member-edit membership-delta path, up to
- * two Staffeln per REQ-ORG-017) and the version-aware {@link #patchSquadronMemberFlags(UUID, UUID,
- * MembershipFlagsPatchRequest)}. The legacy {@code app_user.is_logistician} / {@code
- * app_user.is_mission_manager} columns were dropped in V101 (R9 Step 5) — the membership row is the
- * single source of truth.
- *
- * <p>Concurrency: every write method checks the inbound {@code version} against the membership
- * row's {@code @Version} field, throwing {@link ObjectOptimisticLockingFailureException} → 409 on
- * mismatch so two concurrent admin edits do not silently lose either flag flip.
- *
- * <p>The read-only picker/option enumerations and the membership accessors that back the
- * authorization gates were split into {@link OrgUnitMembershipQueryService} (audit Thema 7, #14);
- * this service keeps only the audit-, {@code @Version}- and bank-responsibility-bearing writes plus
- * the {@code …Dto} projections of those writes.
+ * <p>SK entry points load the SK via {@link SpecialCommandService#getSpecialCommandById(UUID)}
+ * first, so a non-SK id yields 404. Versioned writes throw {@link
+ * ObjectOptimisticLockingFailureException} (409) on a stale version. Staffel memberships change
+ * through {@link #reconcileStaffelMemberships(User, java.util.List)} and {@link
+ * #patchSquadronMemberFlags(UUID, UUID, MembershipFlagsPatchRequest)}; read queries live in {@link
+ * OrgUnitMembershipQueryService}.
  */
 @Service
 @RequiredArgsConstructor
@@ -108,28 +93,19 @@ public class OrgUnitMembershipService {
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
 
   /**
-   * The OwnerScope-free responsible-holder audit seam, injected as an {@link ObjectProvider} and
-   * resolved lazily around each leadership mutation to audit a change of the affected accounts'
-   * derived responsible holder(s) (Kontoverantwortliche/r, REQ-BANK-034/ADR-0070). All bank access
-   * stays inside {@link OrgUnitBankResponsibilityService} — this service only brackets its mutation
-   * with a before/after snapshot.
+   * Lazily resolved seam that audits changes to the accounts' responsible holders around each
+   * leadership mutation (REQ-BANK-034); all bank access stays in {@link
+   * OrgUnitBankResponsibilityService}.
    */
   private final ObjectProvider<OrgUnitBankResponsibilityService>
       orgUnitBankResponsibilityServiceProvider;
 
   /**
-   * Adds the given user as a member of the given Spezialkommando. Returns the persisted membership
-   * row with the V95 trigger-derived {@code kind} value pre-populated on the in-memory entity (the
-   * actual DB column is written by the BEFORE-INSERT trigger; we mirror the value on the entity so
-   * the immediate DTO mapping reads the right discriminator without an extra refresh).
-   *
-   * <p>Idempotency: an attempt to add a user who is already a member raises {@link
-   * DuplicateEntityException} → 409 rather than silently no-op. The admin UI is expected to use a
-   * dedicated "already member" detection instead of leaning on add as a re-attach.
+   * Adds the user as a member of the Spezialkommando.
    *
    * @param specialCommandId the SK to add the user to; never {@code null}.
    * @param userId the user to add; never {@code null}.
-   * @return the persisted membership row.
+   * @return the persisted membership row, with its {@code kind} set on the entity.
    * @throws NotFoundException if no SK matches the given id, or no user matches the given id.
    * @throws DuplicateEntityException if the user is already a member of this SK.
    */
@@ -146,16 +122,10 @@ public class OrgUnitMembershipService {
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(userId, sc.getId()));
     membership.setUser(user);
-    // The kind column is managed by the V95 sync_org_unit_membership_kind trigger
-    // (insertable=false on the @Column mapping). We mirror the value on the in-memory entity so
-    // the immediate DTO mapping reads the right discriminator without re-fetching the row.
     membership.setKind(OrgUnitKind.SPECIAL_COMMAND);
     membership.setJoinedAt(Instant.now());
     OrgUnitMembership saved = membershipRepository.save(membership);
 
-    // First org-unit membership for this user → their ownerless-personal inventory adopts this SK
-    // (the auto-promote lifecycle policy). No-op when the user already had memberships or owns no
-    // ownerless inventory.
     if (wasMembershipless) {
       inventoryReconciler.onUserGainedFirstOrgUnit(userId, sc);
     }
@@ -184,19 +154,11 @@ public class OrgUnitMembershipService {
     if (!membershipRepository.existsById(id)) {
       throw new NotFoundException("Membership not found");
     }
-    // Removing an SK member who is the SK-Lead drops the SK account's derived responsible holder,
-    // so
-    // snapshot before the delete and re-diff after it (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(sc.getId());
     membershipRepository.deleteById(id);
-    // Drop any mirrored SK chart seat (an SK-Leiter losing the membership) in the same transaction
-    // so no stale seat lingers (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(sc.getId(), userId);
 
-    // Last org-unit membership removed → the user's org-stamped inventory falls back to
-    // ownerless-personal (the auto-demote lifecycle policy). The count query auto-flushes the
-    // delete first, so it reflects the just-removed row.
     if (membershipRepository.countByIdUserId(userId) == 0) {
       inventoryReconciler.onUserLostLastOrgUnit(userId);
     }
@@ -212,14 +174,10 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Grants a user an explicit, reach-bearing Bereichsleitung role on the given Bereich (epic #692,
-   * REQ-ORG-017) — distinct from the SK-Leiter's derived (computed, not stored) Bereichsleitung
-   * seat, which has no membership row. If the user already has a membership row on this Bereich
-   * (from a prior explicit grant), its role flag is updated in place; otherwise a fresh membership
-   * is created. Exactly one of the three Bereich role flags ends up set. The user must hold no
-   * Staffel membership — the service guard returns a clean 400 before the V165 trigger would 500.
-   * Unlike a Staffel/SK join this does <em>not</em> adopt the user's ownerless inventory (a Bereich
-   * is not a personal-inventory home).
+   * Grants a user a Bereichsleitung role on the Bereich (REQ-ORG-017), updating an existing
+   * membership row in place or creating one; exactly one Bereich role flag ends up set.
+   *
+   * <p>The user must hold no Staffel membership. The user's ownerless inventory is not adopted.
    *
    * @param bereichId the Bereich to add the leader to; must be a {@code BEREICH} org unit.
    * @param userId the user to grant the role to; never {@code null}.
@@ -249,31 +207,18 @@ public class OrgUnitMembershipService {
       m = new OrgUnitMembership();
       m.setId(new OrgUnitMembershipId(userId, bereichId));
       m.setUser(user);
-      // kind is trigger-managed (insertable=false); mirror it so the in-memory row is consistent.
       m.setKind(OrgUnitKind.BEREICH);
       m.setJoinedAt(Instant.now());
     }
-    // Snapshot the Bereich account's (and, for a Profit Bereich, the CARTEL/CARTEL_BANK accounts')
-    // derived responsible holder(s) before the role changes, to audit the change (REQ-BANK-034,
-    // ADR-0070). Bank access is confined to the seam; the ObjectProvider breaks the DI cycle.
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
-    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); the legacy boolean
-    // leadership flags (is_bereichsleiter / -koordinator / -operator) were dropped in the Phase 5
-    // cleanup (V187).
     m.setRole(
         switch (role) {
           case LEITER -> MembershipRole.BEREICHSLEITER;
           case KOORDINATOR -> MembershipRole.BEREICHSKOORDINATOR;
           case OPERATOR -> MembershipRole.BEREICHSOPERATOR;
         });
-    // saveAndFlush (not save): on the upsert-onto-existing-row branch this is an UPDATE, so without
-    // an explicit flush the @Version increment would land after the controller maps the response
-    // and the caller would get a stale version. Flushing also surfaces the V165 trigger as a clean
-    // in-transaction failure rather than at commit.
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Mirror the account-linked seat onto the descriptive chart in the same transaction
-    // (REQ-ROLE-006); the chart still grants nothing.
     orgChartService.mirrorBereichRole(bereich.getId(), userId, role);
     final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
     auditService.record(
@@ -304,7 +249,6 @@ public class OrgUnitMembershipService {
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);
-    // Remove the mirrored chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(bereichId, userId);
     auditService.record(
         AuditEventType.ROLE_REVOKED,
@@ -318,9 +262,8 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Adds a user to the Organisationsleitung (epic #692, REQ-ORG-017), setting the {@code
-   * is_ol_member} flag. The user must hold no Staffel membership (service guard + V165 trigger). A
-   * duplicate add is rejected with 409.
+   * Adds a user to the Organisationsleitung (REQ-ORG-017); the user must hold no Staffel
+   * membership.
    *
    * @param organisationsleitungId the OL org unit; must be of kind {@code ORGANISATIONSLEITUNG}.
    * @param userId the user to add; never {@code null}.
@@ -352,20 +295,12 @@ public class OrgUnitMembershipService {
     m.setUser(user);
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
-    // Snapshot the CARTEL account's collegial responsible holders (all OL members) before the add,
-    // to audit the change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider
             .getObject()
             .snapshotResponsibleHolders(organisationsleitungId);
-    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_ol_member was
-    // dropped in the Phase 5 cleanup (V187).
     m.setRole(MembershipRole.OL_MEMBER);
-    // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
-    // in-transaction failure and keeps the flushed @Version in the response under the
-    // class-@Transactional controller.
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Mirror the OL seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorOlMember(ol.getId(), userId);
     auditService.record(
         AuditEventType.ROLE_GRANTED,
@@ -398,10 +333,7 @@ public class OrgUnitMembershipService {
             .getObject()
             .snapshotResponsibleHolders(organisationsleitungId);
     membershipRepository.delete(m);
-    // Remove the mirrored OL chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
-    // If the removed member held the Grand Admiral post, vacate it too — the designation must never
-    // point at a non-member (REQ-ORG-021).
     orgUnitRepository
         .findById(organisationsleitungId)
         .filter(
@@ -423,26 +355,20 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Designates a user as the Grand Admiral (REQ-ORG-021) — the single OL member the org chart
-   * renders at the very top of the Organisationsleitung. The holder keeps the {@code OL_MEMBER}
-   * rank, so their rights are entirely unchanged; this only records the title. When the user is not
-   * yet an OL member they are added as one first (auto-promote via {@link #addOlMember}, which runs
-   * the Staffel-exclusion guard, mirrors the OL seat and audits the grant). Setting a new Grand
-   * Admiral replaces any previous holder, who stays a plain OL member — the single {@code
-   * grand_admiral_user_id} column is itself the org-wide "at most one" guarantee. Idempotent when
-   * the user already holds the post.
+   * Designates a user as the Grand Admiral (REQ-ORG-021), a title that changes no rights; a user
+   * not yet in the OL is added first via {@link #addOlMember}. Replaces any previous holder, who
+   * stays an OL member; idempotent.
    *
    * @param organisationsleitungId the OL org unit; never {@code null}.
    * @param userId the user to designate; never {@code null}.
    * @throws NotFoundException if the OL or the user does not exist.
    * @throws BadRequestException if the id is not the Organisationsleitung, or the user belongs to a
-   *     Staffel (surfaced from {@link #addOlMember}).
+   *     Staffel.
    */
   @Transactional
   public void setGrandAdmiral(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
     Entities.require(userRepository.findPlainById(userId), "User not found");
-    // Auto-promote to OL member first when needed; an existing OL member is left untouched.
     if (!membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, organisationsleitungId)) {
       addOlMember(organisationsleitungId, userId);
     }
@@ -451,7 +377,6 @@ public class OrgUnitMembershipService {
       return;
     }
     ol.setGrandAdmiralUserId(userId);
-    // An account Grand Admiral supersedes any free-text one (account XOR free-text, REQ-ORG-020).
     ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
     if (previous != null) {
@@ -489,8 +414,6 @@ public class OrgUnitMembershipService {
     ol.setGrandAdmiralUserId(null);
     ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
-    // Only the account designation is a membership-relevant event; a free-text Grand Admiral is a
-    // descriptive chart holder that grants nothing, so its removal is not audited (REQ-AUDIT-001).
     if (previousUser != null) {
       auditService.record(
           AuditEventType.ROLE_CHANGED,
@@ -502,12 +425,8 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Sets a <b>free-text</b> Grand Admiral (REQ-ORG-021): a typed name for an OL member who has no
-   * Basetool account yet, the same account-XOR-freetext holder model every other chart position
-   * uses (REQ-ORG-020). Grants nothing — it is a descriptive chart entry — so it makes no
-   * membership change and is not audited. Supersedes any existing Grand Admiral (account or
-   * free-text); the single {@code grand_admiral_*} column pair is the org-wide "at most one"
-   * guarantee.
+   * Sets a free-text Grand Admiral (REQ-ORG-021) for an OL member without a Basetool account,
+   * replacing any existing holder. Grants nothing, changes no membership and is not audited.
    *
    * @param organisationsleitungId the OL org unit; never {@code null}.
    * @param displayName the typed holder name; must not be blank.
@@ -548,10 +467,8 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Flips the per-membership Logistician / Mission Manager flags on the membership row. Either flag
-   * may be {@code null} in the request — that means "leave the current value alone". The inbound
-   * {@code version} is checked against the row's {@code @Version} to surface concurrent admin edits
-   * as 409 instead of silently losing one of them.
+   * Updates the Logistician / Mission Manager flags of an SK membership; a {@code null} flag leaves
+   * the current value.
    *
    * @param specialCommandId the SK whose membership to patch; never {@code null}.
    * @param userId the user whose membership to patch; never {@code null}.
@@ -573,24 +490,14 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    // saveAndFlush (not save): the DTO wrapper maps the response inside this transaction, and
-    // without an explicit flush the @Version bump would land at commit — after the mapping — so
-    // the client would echo the stale pre-bump version and 409 on its next edit (REQ-FE-003).
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     recordCapabilityFlagsChanged(specialCommandId, userId, saved);
     return saved;
   }
 
   /**
-   * R6.e — Squadron-side counterpart of {@link #patchFlags(UUID, UUID,
-   * MembershipFlagsPatchRequest)}. Same payload contract (boxed {@code Boolean} flags, mandatory
-   * {@code version}) and same optimistic-lock semantics; only the existence check up front is
-   * different — Squadrons live in the {@link SquadronRepository}, not the {@link
-   * SpecialCommandRepository}. ADMIN-gated at the controller layer per plan §5.6 ({@code PATCH
-   * /api/v1/squadrons/{id}/members/{userId}}). Used to migrate the legacy {@code
-   * UserController.updateLogisticianStatus} / {@code updateMissionManagerStatus} writes from the
-   * {@code app_user.is_logistician} / {@code is_mission_manager} columns onto the per-membership
-   * row (R6.e write-side completion of plan D3).
+   * Updates the Logistician / Mission Manager flags of a Staffel membership, with the same contract
+   * as {@link #patchFlags(UUID, UUID, MembershipFlagsPatchRequest)}.
    *
    * @param squadronId the Squadron whose membership to patch; never {@code null}.
    * @param userId the user whose membership to patch; never {@code null}.
@@ -617,8 +524,6 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
-    // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     auditService.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
@@ -631,40 +536,19 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Reconciles the user's Staffel memberships to the supplied desired set (epic multi-Staffel,
-   * REQ-ORG-017 — a user may belong to up to two Staffeln, each carrying its own per-squadron
-   * Logistician / Mission-Manager flags per REQ-SEC-005). Backs the member-edit membership-delta
-   * endpoint: the admin form posts the complete desired Staffel set, and this method adds the
-   * squadrons that are not yet a membership, removes the current Staffel memberships absent from
-   * the set, and patches the flags of the ones that stay — all in the caller's transaction.
+   * Reconciles the user's Staffel memberships to the desired set (at most two, REQ-ORG-017): adds
+   * missing ones, removes absent ones and patches the flags of the rest, auditing only real
+   * changes.
    *
-   * <p>Reconcile order matters: removals are deleted and flushed <em>before</em> any insert so the
-   * V164 {@code enforce_max_two_squadron_memberships} counting trigger never miscounts an
-   * about-to-be-removed row as a third Staffel during a re-point (e.g. {@code [A,B] → [A,C]}).
-   * Additions and flag patches then run; a flag patch only writes (and only audits) when a value
-   * actually changes, so re-posting an unchanged set is a clean no-op.
-   *
-   * <p>Guards (defence in depth ahead of the DB triggers, surfacing clean 400s):
-   *
-   * <ul>
-   *   <li>duplicate squadron in the desired set → 400;
-   *   <li>more than two desired squadrons → 400;
-   *   <li>the user holds a silo-leader role (SK-Lead / Bereichsleitung / OL) while at least one
-   *       Staffel is desired → 400 (a leader belongs to no Staffel, REQ-ORG-017).
-   * </ul>
-   *
-   * <p>Inventory lifecycle: if this reconcile grants the user their first-ever org-unit membership
-   * the ownerless-personal inventory adopts the name-sorted <em>primary</em> of the newly added
-   * Staffeln (the same deterministic primary {@code UserDto.squadron} / the create-time auto-stamp
-   * use, rather than whichever Staffel the client happened to list first); if it removes the user's
-   * last remaining membership the inventory demotes back to ownerless-personal.
+   * <p>Removals are flushed before inserts. A first-ever membership moves the user's ownerless
+   * inventory to the primary new Staffel; removing the last membership makes it ownerless again.
    *
    * @param user the user whose Staffel memberships to reconcile; never {@code null}.
    * @param desired the complete desired Staffel membership set (0–2 entries); never {@code null},
    *     possibly empty (which removes every Staffel membership).
    * @throws NotFoundException if a desired squadron id does not resolve to a Squadron.
-   * @throws BadRequestException on a duplicate squadron, more than two squadrons, or a leadership
-   *     conflict.
+   * @throws BadRequestException on a duplicate squadron, more than two squadrons, or a user holding
+   *     a silo-leader role.
    */
   @Transactional
   public void reconcileStaffelMemberships(
@@ -678,15 +562,12 @@ public class OrgUnitMembershipService {
     if (distinctIds.size() > 2) {
       throw new BadRequestException("A user may belong to at most two Staffeln (REQ-ORG-017)");
     }
-    // REQ-ORG-017: a silo leader (SK-Leiter / Bereichsleitung / OL) belongs to no Staffel. Reject a
-    // Staffel assignment with a clean 400 before the V165 DB trigger turns it into a 500.
     if (!desired.isEmpty() && userHoldsLeadershipRole(user.getId())) {
       throw new BadRequestException(
           "User holds a leadership role (SK-Lead/Bereichsleitung/OL) and cannot be assigned to a"
               + " Staffel — remove the leadership role first (REQ-ORG-017)");
     }
 
-    // Resolve every desired squadron up front so an unknown id fails before any row is mutated.
     Map<UUID, Squadron> targetSquadrons = new LinkedHashMap<>();
     for (UUID id : distinctIds) {
       Squadron sq =
@@ -703,18 +584,11 @@ public class OrgUnitMembershipService {
       currentById.put(m.getId().getOrgUnitId(), m);
     }
 
-    // 1. Removals: current Staffel memberships not in the desired set. Delete + flush BEFORE any
-    // insert so the V164 counting trigger sees the post-removal state.
     List<OrgUnitMembership> toRemove =
         currentStaffel.stream()
             .filter(m -> !distinctIds.contains(m.getId().getOrgUnitId()))
             .toList();
     if (!toRemove.isEmpty()) {
-      // A removed Staffel membership that carried the Staffelleiter rank drops that Staffel
-      // account's
-      // derived responsible holder — snapshot the affected accounts before the delete and re-diff
-      // after it (REQ-BANK-034, ADR-0070). A Staffel is never a Profit Bereich, so there is no
-      // ripple.
       final Map<UUID, Set<UUID>> responsibleBefore = new LinkedHashMap<>();
       for (OrgUnitMembership removed : toRemove) {
         responsibleBefore.putAll(
@@ -726,8 +600,6 @@ public class OrgUnitMembershipService {
       membershipRepository.flush();
       for (OrgUnitMembership removed : toRemove) {
         recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
-        // A squadron rank held on the removed row leaves a stale chart seat — clear it
-        // (REQ-ROLE-006).
         orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
       }
       orgUnitBankResponsibilityServiceProvider
@@ -735,7 +607,6 @@ public class OrgUnitMembershipService {
           .recordResponsibleHolderChanges(responsibleBefore);
     }
 
-    // 2. Additions + in-place flag patches.
     List<Squadron> addedSquadrons = new ArrayList<>();
     for (MembershipDeltaRequest.StaffelChange change : desired) {
       UUID squadronId = change.squadronId();
@@ -771,12 +642,6 @@ public class OrgUnitMembershipService {
       }
     }
 
-    // 3. Inventory lifecycle: a first-ever membership adopts the name-sorted PRIMARY of the newly
-    // added Staffeln (REQ-ORG-017) — not the request-order-first — so the inventory's owning
-    // Staffel
-    // matches the deterministic primary every other surface (UserDto.squadron, the create-time
-    // auto-stamp, officer oversight) derives from the same name sort. The last membership removed
-    // demotes the org-stamped inventory back to ownerless-personal.
     if (membershipsBefore == 0 && !addedSquadrons.isEmpty()) {
       Squadron primaryAdded =
           addedSquadrons.stream()
@@ -789,9 +654,7 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Flips the {@code is_lead} flag on the membership row. ADMIN-only at the controller layer — a
-   * member-managing Lead cannot promote themselves or someone else to Lead. Carries an
-   * optimistic-lock version like {@link #patchFlags}.
+   * Flips the {@code is_lead} flag on an SK membership.
    *
    * @param specialCommandId the SK whose membership to update; never {@code null}.
    * @param userId the user whose membership to update; never {@code null}.
@@ -807,28 +670,17 @@ public class OrgUnitMembershipService {
       @NotNull MembershipLeadToggleRequest request) {
     OrgUnitMembership m = loadMembership(specialCommandId, userId);
     assertVersionMatches(m, request.version());
-    // REQ-ORG-017: an SK-Leiter holds no Staffel membership. Reject promoting a user who still
-    // belongs to a Staffel with a clean 400 before the V165 DB trigger turns it into a 500.
     if (request.isLead() && userHoldsStaffelMembership(userId)) {
       throw new BadRequestException(
           "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel membership"
               + " first (REQ-ORG-017)");
     }
-    // Snapshot the SK account's derived responsible holder (its SK-Lead) before the toggle, to
-    // audit
-    // the change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider
             .getObject()
             .snapshotResponsibleHolders(specialCommandId);
-    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_lead was dropped
-    // in
-    // the Phase 5 cleanup (V187). The request's isLead boolean is the API verb (promote/demote).
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
-    // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
-    // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Mirror the SK-Leiter seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
     auditService.record(
         request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
@@ -843,14 +695,11 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Assigns (or changes) a squadron leadership rank on an existing Staffel member (epic #800,
-   * REQ-ROLE-003/004): Staffelleiter / Kommandoleiter / stellv. Kommandoleiter / Ensign, optionally
-   * bound to a Kommandogruppe. The target user must already be a member of the Staffel; the rank
-   * must be a squadron rank; the Kommandogruppe pairing and the cardinality caps (&le;1
-   * Staffelleiter per squadron, &le;1 Kommandoleiter + &le;1 stellv. per group, &le;4 Ensigns per
-   * squadron) are enforced here with clean 400s, complementing the V185 DB CHECK. Squadron ranks
-   * are exempt from the V165 {@code enforce_leader_excludes_squadron} trigger (they <em>are</em>
-   * Staffel members) — they set only the {@code role} and the {@code kommandoGroup}.
+   * Assigns a squadron rank (Staffelleiter, Kommandoleiter, stellv. Kommandoleiter or Ensign) to an
+   * existing Staffel member, optionally bound to a Kommandogruppe (REQ-ROLE-003).
+   *
+   * <p>Enforces the group pairing and the caps: &le;1 Staffelleiter per squadron, &le;1
+   * Kommandoleiter and &le;1 stellv. per group, &le;4 Ensigns per squadron.
    *
    * @param squadronId the Staffel; must be a {@code SQUADRON} org unit.
    * @param userId the member to assign the rank to; must already be a member of this Staffel.
@@ -886,16 +735,11 @@ public class OrgUnitMembershipService {
     assertSquadronRankCardinality(squadronId, userId, rank, group);
 
     final MembershipRole previousRole = m.getRole();
-    // Snapshot the Staffel account's derived responsible holder (its Staffelleiter) before the rank
-    // change, to audit a change of the account holder (REQ-BANK-034, ADR-0070). Only a
-    // Staffelleiter assignment/clearing actually moves the set; the seam no-ops otherwise.
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(rank);
     m.setKommandoGroup(group);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Mirror the squadron seat onto the descriptive chart in the same transaction (REQ-ROLE-006):
-    // Staffelleiter / Kommandoleiter (vacates+fills the group node) / stellv. / Ensign.
     orgChartService.mirrorSquadronRank(squadronId, userId, rank, group);
 
     final boolean firstGrant = previousRole == MembershipRole.MEMBER;
@@ -912,9 +756,8 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Clears a member's squadron leadership rank back to plain {@link MembershipRole#MEMBER} (and
-   * unbinds any Kommandogruppe) without removing the Staffel membership itself (epic #800,
-   * REQ-ROLE-004).
+   * Resets a member's squadron rank to {@link MembershipRole#MEMBER} and unbinds any
+   * Kommandogruppe, keeping the Staffel membership (REQ-ROLE-004).
    *
    * @param squadronId the Staffel; never {@code null}.
    * @param userId the member whose rank to clear; never {@code null}.
@@ -936,15 +779,11 @@ public class OrgUnitMembershipService {
     if (!previousRole.isSquadronRank()) {
       throw new BadRequestException("Member holds no squadron rank to remove");
     }
-    // Snapshot the Staffel account's derived responsible holder before clearing the rank, to audit
-    // a
-    // Staffelleiter (account holder) change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(MembershipRole.MEMBER);
     m.setKommandoGroup(null);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Clear the mirrored squadron chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveSquadronRank(squadronId, userId);
     auditService.record(
         AuditEventType.ROLE_REVOKED,
@@ -957,25 +796,6 @@ public class OrgUnitMembershipService {
         .recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
-
-  // -------------------------------------------------------------------------------------------
-  // Controller-facing DTO projections (L4, #923, ADR-0067)
-  //
-  // These map the just-persisted membership to its OrgUnitMembershipDto response *inside* the
-  // service transaction, so the membership controllers no longer need a class-level
-  // @Transactional to keep the persistence session open for the lazy user.effectiveName read
-  // the mapper performs. The entity-returning methods above stay authoritative for internal
-  // callers (UserService reuses the managed addMember row to flip flags in-place) and for the
-  // full-fidelity unit tests, because OrgUnitMembershipDto is a lossy projection (it carries
-  // only isLead, not the full role) and could not verify an assigned squadron rank.
-  //
-  // Each write wrapper is @Transactional so the (self-invoked) write and the mapping share one
-  // read-write transaction, and the underlying entity methods persist with saveAndFlush so the
-  // mapped DTO carries the bumped @Version (REQ-FE-003). Two ArchitectureTest rules pin this
-  // seam: mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional (write wrappers must
-  // escape the class readOnly default) and controllersMustNotInjectTheLazyMembershipMapper
-  // (DTO projection stays in this service; no controller maps the entity itself).
-  // -------------------------------------------------------------------------------------------
 
   /**
    * DTO projection of {@link #addMember(UUID, UUID)}: adds the user and returns the persisted
@@ -1100,9 +920,9 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Resolves and validates the Kommandogruppe binding for a squadron rank against the V185 pairing
-   * CHECK: Kommandoleiter / stellv. Kommandoleiter MUST reference a group; Ensign MAY;
-   * Staffelleiter MUST NOT. A referenced group must exist and belong to the same squadron.
+   * Resolves and validates the Kommandogruppe for a squadron rank: Kommandoleiter and stellv.
+   * Kommandoleiter must reference a group, Ensign may, Staffelleiter must not. The group must exist
+   * and belong to the same squadron.
    *
    * @param squadronId the Staffel the rank is on; never {@code null}.
    * @param rank the squadron rank being assigned; never {@code null}.
@@ -1136,16 +956,12 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Enforces the squadron-rank cardinality caps against the current roster, excluding the target
-   * user so re-assigning the same user is idempotent: &le;1 Staffelleiter per squadron, &le;1
-   * Kommandoleiter + &le;1 stellv. Kommandoleiter per group, &le;4 Ensigns per squadron.
+   * Enforces the squadron-rank caps against the current roster, excluding the target user: &le;1
+   * Staffelleiter per squadron, &le;1 Kommandoleiter and &le;1 stellv. Kommandoleiter per group,
+   * &le;4 Ensigns per squadron.
    *
-   * <p>This in-memory check gives a clean 4xx for the common case; the three singleton caps are
-   * additionally backstopped by the {@code V188} partial unique indexes ({@code
-   * uq_org_unit_membership_one_staffelleiter} / {@code _one_kommandoleiter_per_group} / {@code
-   * _one_stellv_per_group}), so a concurrent double-assign that slips past the roster scan fails on
-   * the constraint rather than committing a duplicate. The &le;4 Ensign cap stays
-   * service-layer-only (a count, not a uniqueness rule), like the org chart's own &le;4 ENSIGN cap.
+   * <p>The three singleton caps are also backed by unique indexes; the Ensign cap is enforced only
+   * here.
    *
    * @param squadronId the Staffel; never {@code null}.
    * @param userId the user being (re)assigned, excluded from the roster scan; never {@code null}.
@@ -1230,11 +1046,9 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * {@code true} iff the user holds a <em>silo-leader</em> rank on any membership — an SK-Leiter
-   * ({@link MembershipRole#SK_LEAD}), a Bereichsleitung rank, or the OL ({@link
-   * MembershipRole#isAreaOrOl()}). The four squadron ranks are deliberately <b>exempt</b>: they are
-   * held by Staffel members, so they must not trip this guard. Backs the REQ-ORG-017 guard that a
-   * silo leader is never (also) assigned to a Staffel.
+   * Answers whether the user holds a silo-leader rank: {@link MembershipRole#SK_LEAD}, a
+   * Bereichsleitung rank or the OL ({@link MembershipRole#isAreaOrOl()}). Squadron ranks do not
+   * count.
    *
    * @param userId the user to check; never {@code null}.
    * @return {@code true} when any of the user's membership rows carries a silo-leader rank.
@@ -1246,8 +1060,7 @@ public class OrgUnitMembershipService {
 
   /**
    * Records a {@link AuditEventType#MEMBERSHIP_REVOKED} event for a removed Staffel membership
-   * (epic #800, REQ-AUDIT-001). Extracted so the {@link #reconcileStaffelMemberships} delete
-   * branches stay readable; the details payload carries only the org-unit kind (no PII).
+   * (REQ-AUDIT-001); the details carry only the org-unit kind.
    *
    * @param squadronOrgUnitId the Staffel the removed membership pointed at; never {@code null}.
    * @param userId the user whose Staffel membership was removed; never {@code null}.
@@ -1263,9 +1076,8 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Records a {@link AuditEventType#CAPABILITY_FLAGS_CHANGED} event capturing the resulting
-   * Logistician / Mission-Manager flag values on a membership (epic #800, REQ-AUDIT-001). The
-   * details payload holds only the two boolean values (no PII / no free text).
+   * Records a {@link AuditEventType#CAPABILITY_FLAGS_CHANGED} event with the resulting Logistician
+   * / Mission-Manager flag values of a membership (REQ-AUDIT-001).
    *
    * @param orgUnitId the org unit the membership belongs to; never {@code null}.
    * @param userId the affected user; never {@code null}.
@@ -1283,12 +1095,11 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Loads an org unit by id and resolves its audit {@code subjectLabel} via {@link
-   * OrgUnitLabels#shorthandOrName(OrgUnit)}, or {@code null} when the org unit cannot be resolved
-   * (e.g. already deleted). Used by the delete / patch audit paths that hold only the org-unit id.
+   * Resolves an org unit's audit {@code subjectLabel} via {@link
+   * OrgUnitLabels#shorthandOrName(OrgUnit)}.
    *
    * @param orgUnitId the org unit id; never {@code null}.
-   * @return the org unit's shorthand/name label, or {@code null}.
+   * @return the org unit's shorthand/name label, or {@code null} when it cannot be resolved.
    */
   private @Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
     return orgUnitRepository.findById(orgUnitId).map(OrgUnitLabels::shorthandOrName).orElse(null);

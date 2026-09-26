@@ -23,16 +23,12 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Response payload for the account-detail balance chart (REQ-BANK-049): the end-of-bucket running
- * balance series over a caller-chosen period plus the account's balance target so the frontend can
- * draw the target reference line. Computed on demand from the append-only ledger (opening balance
- * before the period + the period's postings, mirroring the statement math REQ-BANK-014); never
- * persisted. Series-only by design — no holder or counterparty data crosses the wire, so it needs
- * no redaction on the org-unit surface.
+ * Account-detail balance chart payload (REQ-BANK-049): the end-of-bucket balance series over the
+ * chosen period plus the balance target for the reference line. Computed on demand from the ledger;
+ * carries no holder or counterparty data.
  *
- * @param points the end-of-bucket balances over the period, oldest first (possibly empty when the
- *     account has no postings and a zero opening balance)
- * @param balanceTarget the account's configured balance target (REQ-BANK-036) for the target line,
- *     or {@code null} when no target is set
+ * @param points the end-of-bucket balances, oldest first; possibly empty
+ * @param balanceTarget the account's balance target (REQ-BANK-036), or {@code null} when none is
+ *     set
  */
 public record BankBalanceSeriesDto(List<BankBalancePointDto> points, BigDecimal balanceTarget) {}

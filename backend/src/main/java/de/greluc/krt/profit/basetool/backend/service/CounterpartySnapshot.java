@@ -24,17 +24,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Immutable snapshot of a deposit/withdrawal counterparty (REQ-BANK-044, #994) threaded from {@link
- * BankLedgerService}'s counterparty resolution onto the transaction header stamped by {@link
- * BankPostingWriter#persistTransaction} — the far-side party and, optionally, the org unit they
- * belong to, each captured with a deletion-proof name snapshot.
+ * Immutable snapshot of a deposit or withdrawal counterparty and optionally their org unit, each
+ * with a deletion-proof name snapshot (REQ-BANK-044).
  *
  * @param userId the registered counterparty user id, or {@code null} for an external free-text
- *     counterparty (#994) — the handle then carries the entered name and no FK is stored
- * @param handle the party's name snapshot (a registered user's effective name, or the external
- *     free-text name)
+ *     counterparty
+ * @param handle the party's name snapshot
  * @param orgUnitId the chosen org unit id, or {@code null}
- * @param orgUnitName the org unit's name snapshot, or {@code null} when no org unit was chosen
+ * @param orgUnitName the org unit's name snapshot, or {@code null} when none was chosen
  */
 public record CounterpartySnapshot(
     @Nullable UUID userId,

@@ -53,26 +53,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Pins the multi-user concurrency guarantee for the participant signup flow: {@code N} users may
- * sign up to the same mission in parallel without any thread seeing an {@link
- * ObjectOptimisticLockingFailureException}, and {@link Mission#getVersion()} stays unchanged across
- * the whole batch.
+ * Verifies that {@code N} users can sign up to the same mission in parallel without any {@link
+ * ObjectOptimisticLockingFailureException} and without changing {@link Mission#getVersion()}.
  *
- * <p>The guarantee is the load-bearing reason why {@link
- * de.greluc.krt.profit.basetool.backend.model.Mission#getParticipants()} carries
- * {@code @OptimisticLock(excluded = true)} and why {@link MissionService#addParticipant}
- * deliberately does not call {@code missionRepository.save(mission)} (see the inline comment on the
- * service method). A future change that removes either of those by accident would re-introduce 409s
- * on every concurrent "Anmelden" click — this test catches the regression at build time.
- *
- * <p>Sibling guard {@code ArchitectureTest#missionParticipantsCollectionMustExcludeOptimisticLock}
- * and {@code ArchitectureTest#missionServiceAddParticipantMustNotSaveMission} encode the same
- * invariants as static bytecode checks; this {@code @SpringBootTest} additionally proves the
- * dynamic behaviour against a real Hibernate session.
- *
- * <p>Modelled after {@link ConcurrencyTest}: deliberately NOT {@code @Transactional} so each worker
- * thread runs in its own session, and the seed rows are cleaned up via {@code @AfterEach} so
- * adjacent tests inherit a clean baseline.
+ * <p>Guards the {@code @OptimisticLock(excluded = true)} on {@link
+ * de.greluc.krt.profit.basetool.backend.model.Mission#getParticipants()} and the absence of a
+ * mission save in {@link MissionService#addParticipant}. Not {@code @Transactional}, so each worker
+ * runs in its own session.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -114,19 +101,8 @@ class MissionParticipantConcurrencyTest {
   }
 
   /**
-   * {@value THREADS} threads add {@value THREADS} distinct users to the same mission in lockstep.
-   * The {@code go} latch synchronises every worker so the {@code INSERT mission_participant}
-   * statements race against the database, mirroring the realistic case of multiple users hitting
-   * the "Anmelden" button within the same millisecond.
-   *
-   * <p>The expected outcome is {@value THREADS} successes and zero conflicts because the parent
-   * {@code mission} row is never updated (only the inverse-side {@code mission_participant} child
-   * rows are inserted), so Hibernate has no version column to race on. Any thread throwing {@link
-   * ObjectOptimisticLockingFailureException} indicates a regression in the
-   * {@code @OptimisticLock(excluded = true)} annotation on {@link
-   * de.greluc.krt.profit.basetool.backend.model.Mission#getParticipants()} or in the {@link
-   * MissionService#addParticipant} body (e.g. a stray {@code missionRepository.save(mission)} call
-   * that dirties the parent row).
+   * {@value THREADS} threads add {@value THREADS} distinct users to the same mission in lockstep;
+   * all must succeed, because only child {@code mission_participant} rows are inserted.
    */
   @Test
   void addParticipant_underRealConcurrentContention_allThreadsSucceed() throws Exception {
@@ -224,24 +200,12 @@ class MissionParticipantConcurrencyTest {
   }
 
   /**
-   * {@value THREADS} threads add the <em>same</em> user to the same mission in lockstep. The
-   * in-memory duplicate check in {@link MissionService#addParticipant} uses each thread's own
-   * snapshot of {@code mission.getParticipants()} and is therefore unable to see the participant
-   * row the winning thread inserts in parallel — the check is best-effort against a stale view. The
-   * Stufe-2 DB-level backstop is the partial unique index {@code uq_mission_participant_user}
-   * (Flyway V96), which rejects the second {@code INSERT} at commit time; Spring wraps the
-   * underlying SQL {@code unique_violation} as a {@link DataIntegrityViolationException} and the
-   * {@code GlobalExceptionHandler} maps it to HTTP 409 — the same status the in-memory branch
-   * produces via {@code DuplicateEntityException}, so the frontend toast (status-code-based) is the
-   * same for both paths.
+   * {@value THREADS} threads add the same user to the same mission in lockstep; exactly one wins.
    *
-   * <p>Thread interleaving is non-deterministic: a thread that loads the mission <em>before</em>
-   * the winner commits passes the in-memory check and ends up at the DB index ({@code
-   * DataIntegrityViolationException}); a thread that loads <em>after</em> the winner commits sees
-   * the participant in its snapshot and is rejected by the in-memory check ({@code
-   * DuplicateEntityException}). Both are correct outcomes — the test accepts either and asserts on
-   * the load-bearing invariant: exactly one signup wins, the rest are rejected, and the DB ends up
-   * with exactly one participant row for the (mission, user) pair.
+   * <p>Losers are rejected either by the in-memory duplicate check ({@code
+   * DuplicateEntityException}) or by the unique index {@code uq_mission_participant_user} ({@link
+   * DataIntegrityViolationException}), both mapped to HTTP 409; exactly one participant row
+   * remains.
    */
   @Test
   void addParticipant_sameUserParallelClicks_exactlyOneWinsRestRejectedByUniqueIndex()
@@ -284,12 +248,8 @@ class MissionParticipantConcurrencyTest {
                     missionService.addParticipant(missionId, userId, null, null, null, null, null);
                     successCount.incrementAndGet();
                   } catch (DuplicateEntityException expected) {
-                    // Thread loaded the mission AFTER the winner committed and the in-memory
-                    // check at the top of addParticipant fired.
                     rejectedByInMemoryCheck.incrementAndGet();
                   } catch (DataIntegrityViolationException expected) {
-                    // Thread loaded the mission BEFORE any commit, passed the in-memory check,
-                    // raced to INSERT and hit the V96 partial unique index at commit time.
                     rejectedByDbIndex.incrementAndGet();
                   } catch (Throwable t) {
                     otherErrorCount.incrementAndGet();

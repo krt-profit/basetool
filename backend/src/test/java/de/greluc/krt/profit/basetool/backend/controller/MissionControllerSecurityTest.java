@@ -71,7 +71,6 @@ class MissionControllerSecurityTest {
 
     when(missionSecurityService.canManageMission(any(UUID.class), ArgumentMatchers.any()))
         .thenReturn(true);
-    // The slim answer is the one crew entry, so the mission has to contain it.
     de.greluc.krt.profit.basetool.backend.model.MissionCrew crew =
         new de.greluc.krt.profit.basetool.backend.model.MissionCrew();
     crew.setId(crewId);
@@ -169,8 +168,6 @@ class MissionControllerSecurityTest {
   void updateOwningOrgUnit_WhenNotAllowed_ShouldReturn403() throws Exception {
     UUID missionId = UUID.randomUUID();
 
-    // canChangeOwner defaults to false (unstubbed): the owning-org-unit endpoint shares the
-    // owner-change gate, so a plain member is rejected before the service is reached.
     mockMvc
         .perform(
             put("/api/v1/missions/{id}/owning-org-unit", missionId)

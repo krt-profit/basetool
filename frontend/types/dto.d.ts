@@ -1,20 +1,9 @@
 /**
  * Backend DTO shapes, published as global type aliases.
  *
- * The types come from `build/generated/ts/api.d.ts`, which the
- * `:frontend:generateApiTypes` Gradle task derives from the backend's OpenAPI
- * spec on every build. Nothing here is hand-maintained and the generated file
- * is never committed, so the frontend's idea of a DTO cannot drift away from
- * the contract the backend actually publishes: rename a field in a backend DTO
- * and the JSDoc annotation that reads it stops compiling.
- *
- * `declare global` is what makes this usable from the static scripts. Those are
- * classic non-module scripts sharing one global scope (ADR-0069), and a bare
- * `import` in one of them would turn it into an ES module and change that
- * scope. Publishing the aliases globally lets a page module annotate with
- * `ApiDto<'MaterialDto'>` and no import at all.
- *
- * See ADR-0125 and REQ-FE-018.
+ * The types come from `build/generated/ts/api.d.ts`, which `:frontend:generateApiTypes` derives
+ * from the backend's OpenAPI spec. `declare global` lets the classic non-module scripts use them
+ * without an import (REQ-FE-018).
  */
 
 import type { components, operations, paths } from '../build/generated/ts/api';
@@ -27,10 +16,8 @@ declare global {
     type ApiDto<K extends keyof ApiSchemas> = ApiSchemas[K];
 
     /**
-     * The paged envelope wrapping a DTO — `ApiPage<'BankBookingDto'>` resolves
-     * to `PageResponseBankBookingDto`. Valid only for DTOs the backend really
-     * exposes a paged endpoint for; anything else resolves to `never`, which is
-     * the point.
+     * The paged envelope wrapping a DTO — `ApiPage<'BankBookingDto'>` resolves to
+     * `PageResponseBankBookingDto`; `never` for a DTO without a paged endpoint.
      */
     type ApiPage<K extends string & keyof ApiSchemas> = `PageResponse${K}` extends keyof ApiSchemas
         ? ApiSchemas[`PageResponse${K}`]

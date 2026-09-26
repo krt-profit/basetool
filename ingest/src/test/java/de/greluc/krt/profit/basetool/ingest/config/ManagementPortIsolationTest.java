@@ -35,15 +35,9 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the ADR-0090 management-port isolation: with {@code management.server.port} set to a
- * separate port, Actuator is served ONLY there and is absent from the public application connector,
- * and the management-port endpoints are unauthenticated (Boot's management-context security
- * auto-config backs off given the custom {@link SecurityConfig} chains).
- *
- * <p>The prod {@code application-prod.yml} additionally serves this port over HTTPS with the shared
- * keystore; that is declarative SSL config not exercised here (the {@code test} profile disables
- * the server connector's TLS), so the management port runs plain HTTP for the probe. What this test
- * pins is the load-bearing behaviour: the public port no longer exposes {@code /actuator/**}.
+ * Integration tests for the management-port isolation (ADR-0090): with {@code
+ * management.server.port} set, Actuator is served only on that port, unauthenticated, and not on
+ * the public connector.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -62,9 +56,6 @@ class ManagementPortIsolationTest {
   @Value("${local.management.port}")
   private int managementPort;
 
-  // HTTP/1.1 explicitly: the JDK client defaults to HTTP/2, whose stream-capacity handling can
-  // RST_STREAM ("Processing capacity exceeded") against the freshly-started Tomcat under full-suite
-  // load. These probes are trivial one-shot GETs, so HTTP/1.1 is both sufficient and robust.
   private final HttpClient http =
       HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
@@ -92,7 +83,6 @@ class ManagementPortIsolationTest {
 
   @Test
   void actuatorHealthIsNotServedOnThePublicApplicationPort() throws Exception {
-    // The public connector NPM fronts must not expose Actuator at all — 404, not 200.
     assertThat(get(appPort, "/actuator/health").statusCode())
         .as("/actuator/health must be absent from the public application connector")
         .isEqualTo(404);
@@ -100,8 +90,6 @@ class ManagementPortIsolationTest {
 
   @Test
   void actuatorPrometheusIsNotServedOnThePublicApplicationPort() throws Exception {
-    // On the app port the scrape path is owned by MonitoringScrapeSecurityConfig's fail-closed
-    // chain (deny-all when no scrape creds are set), so it is 401/403 — never a reachable payload.
     assertThat(get(appPort, "/actuator/prometheus").statusCode())
         .as("/actuator/prometheus must never return a payload on the public application connector")
         .isNotEqualTo(200);
@@ -109,10 +97,6 @@ class ManagementPortIsolationTest {
 
   @Test
   void actuatorHealthIsServedOnTheManagementPort() throws Exception {
-    // The Docker HEALTHCHECK reaches health on the management port unauthenticated. In this test
-    // context Redis/backend health indicators are DOWN (no live dependencies), so the aggregate is
-    // 503 — but "served, not 401/404" is the point: the endpoint IS present and needs no auth. In
-    // prod the readiness group is UP and returns 200.
     int status = get(managementPort, "/actuator/health").statusCode();
     assertThat(status)
         .as(
@@ -123,8 +107,6 @@ class ManagementPortIsolationTest {
 
   @Test
   void actuatorPrometheusIsServedUnauthenticatedOnTheManagementPort() throws Exception {
-    // ADR-0090: the management context's security auto-config backs off, so the internal-only
-    // scrape endpoint is reachable without credentials — the Keycloak port-9000 posture.
     HttpResponse<String> response = get(managementPort, "/actuator/prometheus");
     assertThat(response.statusCode())
         .as("Prometheus scrapes /actuator/prometheus on the internal management port without auth")

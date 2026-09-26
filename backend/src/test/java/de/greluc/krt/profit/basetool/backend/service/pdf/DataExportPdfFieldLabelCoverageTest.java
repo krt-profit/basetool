@@ -35,25 +35,11 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Every column the Art. 15 PDF prints by name has a German label (REQ-SEC-058, i18n rule).
+ * Verifies that every column the Art. 15 PDF prints by name has a German {@code pdf.export.field.*}
+ * label (REQ-SEC-058).
  *
- * <p><b>The defect this exists for.</b> The four verbatim sections render one row per column as a
- * FELD/WERT pair, and the FELD cell was the projection's own alias — so a member exercising their
- * right of access read {@code discord_guild_nickname}, {@code user_rank}, {@code join_date} and
- * {@code share_blueprints_globally}. Every other string in that document comes from the bundle;
- * these twenty-six did not, and no {@code pdf.export.field.*} key existed at all. In a document
- * answering a legal request a schema identifier is wrong twice over: it is untranslated
- * user-visible text, and it is not intelligible to the person it is addressed to.
- *
- * <p><b>Why a gate and not just the keys.</b> {@code DataExportReportService} resolves a missing
- * key to the key itself, deliberately, so a forgotten label shows up rather than throwing
- * mid-document. That fallback is what let the raw aliases through in the first place: adding a
- * column to one of these projections silently reintroduces the same defect. The check runs against
- * the projections themselves, so it fails the moment a statement selects something the bundle
- * cannot name.
- *
- * <p>A plain unit test: it parses the statements with {@link DataExportProjection} and reads the
- * bundle off disk, so there is no container and no schema.
+ * <p>Checked against the section projections parsed with {@link DataExportProjection}, since the
+ * report falls back to the raw key for a missing label; no container or schema is needed.
  */
 class DataExportPdfFieldLabelCoverageTest {
 
@@ -83,7 +69,6 @@ class DataExportPdfFieldLabelCoverageTest {
     return out;
   }
 
-  // covers REQ-SEC-058 - a printed column name the bundle cannot name renders as the raw alias
   @Test
   void everyPrintedFieldNameHasAGermanLabel() throws IOException {
     Properties bundle = bundle();
@@ -104,7 +89,6 @@ class DataExportPdfFieldLabelCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-058 - and a label nothing prints is a stale line that reads as a decision
   @Test
   void everyFieldLabelIsAColumnSomethingPrints() throws IOException {
     Set<String> printed = printedFieldNames();

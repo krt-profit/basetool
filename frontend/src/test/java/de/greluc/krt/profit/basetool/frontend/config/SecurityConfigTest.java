@@ -34,13 +34,9 @@ class SecurityConfigTest {
 
   @Test
   void userAuthoritiesMapper_shouldMapRealmRoles() {
-    // Arrange
     RequestLoggingFilter loggingFilter = mock(RequestLoggingFilter.class);
     BackendRoleSyncFilter roleSyncFilter = mock(BackendRoleSyncFilter.class);
     BotProtectionFilter botProtectionFilter = mock(BotProtectionFilter.class);
-    // M-15: SessionDebugFilter is now wired via ObjectProvider so prod (where the bean does not
-    // exist) doesn't break. The userAuthoritiesMapper code path under test doesn't touch the
-    // filter, so an empty mock provider is sufficient.
     @SuppressWarnings("unchecked")
     org.springframework.beans.factory.ObjectProvider<SessionDebugFilter> sessionDebugFilter =
         org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
@@ -68,11 +64,9 @@ class SecurityConfigTest {
     OidcIdToken idToken = new OidcIdToken("token-value", null, null, claims);
     OidcUserAuthority oidcAuth = new OidcUserAuthority(idToken);
 
-    // Act
     Collection<? extends GrantedAuthority> mappedAuthorities =
         mapper.mapAuthorities(List.of(oidcAuth));
 
-    // Assert
     Set<String> authorityStrings =
         mappedAuthorities.stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
 

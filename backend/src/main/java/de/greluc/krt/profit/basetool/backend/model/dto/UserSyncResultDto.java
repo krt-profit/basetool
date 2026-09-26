@@ -20,14 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Result of an admin-triggered manual Keycloak user sync ({@code POST /api/v1/users/sync}).
+ * Result of an admin-triggered Keycloak user sync ({@code POST /api/v1/users/sync}); a failure
+ * surfaces as a problem response instead.
  *
- * <p>Carries only the number of users the run reconciled, which the member-management page shows in
- * its success toast before re-rendering the (now-refreshed) member list. A failure of the sync is
- * NOT represented here — it surfaces as an RFC 7807 problem response, so a 2xx with this body
- * always means the run completed. A {@code syncedCount} of {@code 0} means Keycloak returned an
- * empty roster (the reconciliation treats that as a no-op skip, never a wipe).
- *
- * @param syncedCount the number of users successfully synced this run
+ * @param syncedCount the number of users synced; {@code 0} when Keycloak returned an empty roster
  */
 public record UserSyncResultDto(int syncedCount) {}

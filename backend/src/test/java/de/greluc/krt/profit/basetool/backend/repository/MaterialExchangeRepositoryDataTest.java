@@ -46,18 +46,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for the Materialbörse repositories ({@link MaterialExchangeOfferRepository} /
- * {@link MaterialExchangeInterestRepository}) against the real Postgres test schema (Testcontainers
- * + Flyway V210…V213 via the {@code test} profile). Validates the board JPQL (the COALESCE-based
- * cross-kind filters/sort spanning both material and item offers, REQ-MARKET-012, and the effective
- * {@code LEAST(offeredAmount, stock)} amount filter/sort of ADR-0086), the anonymity-safe grouped
- * interest counts, and the DB invariants the migrations enforce: one {@code ACTIVE} offer per Lager
- * row (partial-unique), one interest registration per {@code (offer, user)}, and the V213
- * exactly-one-branch {@code CHECK} on an offer's kind.
- *
- * <p>{@link Transactional} so each method rolls back — the seeded rows must never commit to the
- * shared Testcontainers database. Reads still see the rows because they are flushed within the test
- * transaction.
+ * Verifies the Materialbörse offer and interest repositories against PostgreSQL: board filters and
+ * sort across material and item offers (REQ-MARKET-012), grouped interest counts, and the schema
+ * invariants. Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -172,17 +163,10 @@ class MaterialExchangeRepositoryDataTest {
         .isEqualTo(1);
   }
 
-  /**
-   * The board clamps to live stock (ADR-0086): after part of a row is booked out, the min-amount
-   * filter uses the effective {@code LEAST(offeredAmount, stock)} — so a partially-booked-out offer
-   * is filtered by what actually remains, not what was originally stated. (A <em>fully</em>
-   * booked-out row is deleted and its offer cascade-deleted, so it never reaches the board — no
-   * separate hide is needed.)
-   */
+  /** The board's min-amount filter uses the remaining stock of a partially booked-out offer. */
   @Test
   void findBoard_clampsAmountFilterToRemainingStock() {
     User owner = persistUser("clamp-anbieter");
-    // Stated 200 SCU, but the row has been booked out to 80 SCU since release.
     InventoryItem partly = persistItem(owner, "Titanium", 700, 80.0);
     MaterialExchangeOffer partialOffer =
         persistOffer(partly, owner, MaterialExchangeOfferStatus.ACTIVE, 200.0);
@@ -327,19 +311,14 @@ class MaterialExchangeRepositoryDataTest {
   }
 
   /**
-   * A <b>stock-backed</b> item offer (REQ-MARKET-014, ADR-0108) persists with a non-null {@code
-   * inventory_item_id} (V221 relaxed the V213 CHECK) and the board clamps its quantity to the
-   * backing row's current stock: an offer that stated 6 on a game-item row since booked down to 2
-   * is kept by a min-amount of 2 but dropped by a min-amount of 3 — mirroring the material offer's
-   * {@code LEAST} clamp, and proving the board never breaks on the new inventoryItem on an ITEM
-   * offer.
+   * A stock-backed item offer is filtered by its quantity clamped to the backing stock
+   * (REQ-MARKET-014).
    */
   @Test
   void findBoard_stockBackedItemOffer_quantityClampedToStock() {
-    // covers REQ-MARKET-014
     User owner = persistUser("stock-item");
-    InventoryItem row = persistItemStockRow(owner, "Quantum Drive", 2.0); // booked down to 2
-    MaterialExchangeOffer stockBacked = persistStockBackedItemOffer(row, owner, 6); // stated 6
+    InventoryItem row = persistItemStockRow(owner, "Quantum Drive", 2.0);
+    MaterialExchangeOffer stockBacked = persistStockBackedItemOffer(row, owner, 6);
     entityManager.flush();
 
     var all =
@@ -365,21 +344,14 @@ class MaterialExchangeRepositoryDataTest {
   }
 
   /**
-   * A <b>stock-backed</b> item offer whose stated quantity is <em>below</em> its backing stock must
-   * be filtered and sorted by the <b>stated quantity</b>, not the full stock (REQ-MARKET-014). This
-   * is the regression guard for the PostgreSQL {@code LEAST}-ignores-NULL trap: because {@code
-   * LEAST(offeredAmount [NULL], ii.amount)} returns the stock (Postgres drops the NULL argument), a
-   * {@code COALESCE(LEAST(...), ...)} effective amount would advertise/sort the full stock; the
-   * query uses an explicit {@code CASE} instead. Here a row with 10 in stock offered at 3 is kept
-   * by a min-amount of 3 but dropped by 4, and sorts below a material offer of 4 (whereas the buggy
-   * expression would rank it as 10, i.e. first).
+   * A stock-backed item offer stated below its stock is filtered and sorted by the stated quantity,
+   * not the stock (REQ-MARKET-014).
    */
   @Test
   void findBoard_stockBackedItemOffer_offeredBelowStock_usesStatedQuantity() {
-    // covers REQ-MARKET-014
     User owner = persistUser("under-offer");
-    InventoryItem itemRow = persistItemStockRow(owner, "Power Plant", 10.0); // 10 in stock
-    MaterialExchangeOffer understated = persistStockBackedItemOffer(itemRow, owner, 3); // offered 3
+    InventoryItem itemRow = persistItemStockRow(owner, "Power Plant", 10.0);
+    MaterialExchangeOffer understated = persistStockBackedItemOffer(itemRow, owner, 3);
     InventoryItem matRow = persistItem(owner, "Agricium", 500, 4.0);
     MaterialExchangeOffer material =
         persistOffer(matRow, owner, MaterialExchangeOfferStatus.ACTIVE, 4.0);

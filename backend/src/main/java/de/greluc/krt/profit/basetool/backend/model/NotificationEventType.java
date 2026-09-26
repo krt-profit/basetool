@@ -20,13 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Identifies the domain trigger that a {@link NotificationRule} reacts to.
+ * The domain trigger a {@link NotificationRule} reacts to, as opposed to the rendered {@link
+ * NotificationType} the rule produces.
  *
- * <p>Distinct from {@link NotificationType}: an event type names <em>what happened</em> (the
- * trigger a rule matches on) while a notification type names <em>what is shown</em> (the rendered
- * message a rule produces). They coincide for the first use case but are kept separate so a single
- * trigger can drive differently-rendered notifications in future. The constant is persisted via
- * {@code @Enumerated(STRING)} and matched against {@code notification_rule.event_type}.
+ * <p>Persisted by name and matched against {@code notification_rule.event_type}.
  */
 public enum NotificationEventType {
 
@@ -34,49 +31,44 @@ public enum NotificationEventType {
   JOB_ORDER_CREATED,
 
   /**
-   * The requesting owner (Auftraggeber) edited one of their own job orders — changed quantities,
-   * added/removed not-yet-delivered items or materials, or edited the comment (REQ-ORDERS-023). The
-   * default rule notifies the officers and leads of the processing (responsible) org unit; the
-   * editing actor is excluded.
+   * The requester (Auftraggeber) edited one of their own job orders (REQ-ORDERS-023). The default
+   * rule notifies the officers and leads of the processing org unit, excluding the actor.
    */
   JOB_ORDER_UPDATED_BY_REQUESTER,
 
   /**
-   * An org-unit officer/lead raised a confirm-before-post bank deposit/withdrawal request (epic
-   * #666 F2, REQ-BANK-026). The default rule notifies the bank management and the employees granted
-   * on the target account.
+   * An org-unit officer/lead raised a confirm-before-post bank booking request (REQ-BANK-026). The
+   * default rule notifies the bank management and the employees granted on the target account.
    */
   BANK_BOOKING_REQUEST_CREATED,
 
   /**
-   * A bank employee confirmed a booking request (epic #666 F2, REQ-BANK-026). The default rule
-   * notifies the requesting officer/lead.
+   * A bank employee confirmed a booking request (REQ-BANK-026). The default rule notifies the
+   * requester.
    */
   BANK_BOOKING_REQUEST_CONFIRMED,
 
   /**
-   * A bank employee rejected a booking request (epic #666 F2, REQ-BANK-026). The default rule
-   * notifies the requesting officer/lead.
+   * A bank employee rejected a booking request (REQ-BANK-026). The default rule notifies the
+   * requester.
    */
   BANK_BOOKING_REQUEST_REJECTED,
 
   /**
-   * A requester withdrew (cancelled) their own still-pending bank booking request (REQ-BANK-022,
-   * REQ-NOTIF-018). No default rule notifies anyone — the requester is the actor; the event exists
-   * solely so the pipeline clears the now-stale {@code BANK_BOOKING_REQUEST_CREATED} items the bank
-   * staff were shown.
+   * A requester cancelled their own pending bank booking request (REQ-BANK-022). Notifies nobody;
+   * it clears the stale {@code BANK_BOOKING_REQUEST_CREATED} items shown to bank staff.
    */
   BANK_BOOKING_REQUEST_CANCELLED,
 
   /**
-   * A new Discord user registered and is awaiting admin approval (epic #720, Track 1,
-   * REQ-NOTIF-012). The default rule notifies every admin.
+   * A new Discord user registered and awaits admin approval (REQ-NOTIF-012). The default rule
+   * notifies every admin.
    */
   DISCORD_REGISTRATION_PENDING,
 
   /**
-   * A member registered interest in a Materialbörse offer (#1187, REQ-MARKET-011). The default rule
-   * notifies the offer's owner (the Anbieter) via the {@code EVENT_RECIPIENT} selector.
+   * A member registered interest in a Materialbörse offer (REQ-MARKET-011). The default rule
+   * notifies the offer's owner via the {@code EVENT_RECIPIENT} selector.
    */
   MATERIAL_EXCHANGE_INTEREST_REGISTERED,
 
@@ -103,13 +95,10 @@ public enum NotificationEventType {
   ACCOUNT_DELETION_REQUEST_DECLINED,
 
   /**
-   * A member's erasure request reached a terminal state that notifies nobody — a withdrawal, or the
-   * execution itself (REQ-SEC-061, REQ-NOTIF-018).
+   * A member's erasure request was withdrawn or executed (REQ-SEC-061).
    *
-   * <p>Seeds no rule and creates no notification. It exists so the administrators' {@code
-   * ACCOUNT_DELETION_REQUESTED} items are cleared on <b>every</b> terminal path, not only the
-   * refusal — and so the member's handle stops sitting in other people's inbox payloads the moment
-   * the request is decided rather than until the 180-day unread sweep.
+   * <p>Creates no notification; it clears the administrators' {@code ACCOUNT_DELETION_REQUESTED}
+   * items on every terminal path.
    */
   ACCOUNT_DELETION_REQUEST_RESOLVED
 }

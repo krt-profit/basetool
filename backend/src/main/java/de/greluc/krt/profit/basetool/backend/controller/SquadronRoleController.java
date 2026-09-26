@@ -38,19 +38,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the in-squadron leadership ranks (epic #800, REQ-ROLE-003/004): Staffelleiter,
- * Kommandoleiter, stellvertretender Kommandoleiter and Ensign on an existing Staffel member. Each
- * write is delegated through {@code OrgRoleManagementSecurityService} on top of the admin
- * short-circuit: a Staffelleiter appointment needs the Bereichsleiter of the squadron's parent
- * Bereich, while the lower ranks (and their Kommandogruppe binding) are appointed by the squadron's
- * own Staffelleiter — never by the appointee themselves (no self-promotion).
+ * REST surface for the in-squadron leadership ranks (Staffelleiter, Kommandoleiter,
+ * stellvertretender Kommandoleiter, Ensign) of existing Staffel members (REQ-ROLE-003/004).
  *
- * <p>The response DTO is projected inside the service transaction ({@link
- * OrgUnitMembershipService#assignSquadronRankDto}/{@code removeSquadronRankDto}), so this
- * controller needs no class-level {@code @Transactional}: the lazy {@code user.effectiveName} read
- * the mapper performs happens while the persistence session is still open (L4, #923). This closes
- * the {@code /organisation/leitung} "assign Kommandoleiter" 500 regression at its root — the
- * mapping can no longer run after the transaction has committed.
+ * <p>A Staffelleiter is appointed by the parent Bereichsleiter, the lower ranks by the squadron's
+ * Staffelleiter, never by the appointee; admins may always act. Response DTOs are projected inside
+ * the service transaction.
  */
 @RestController
 @RequiredArgsConstructor

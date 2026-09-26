@@ -37,14 +37,11 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One dismantle-return line of a {@link Blueprint} (SC_WIKI_SYNC_PLAN.md §6.3.4): the commodity
- * (and SCU quantity) recovered when the blueprint's output is dismantled. RESOURCE-only — the Wiki
- * schema only returns commodity dismantle yields, so there is no {@code kind} discriminator or
- * game-item FK here.
+ * One dismantle-return line of a {@link Blueprint}: the commodity and SCU quantity recovered when
+ * its output is dismantled.
  *
- * <p>As with {@link BlueprintIngredient}, the resolved {@link #material} may be {@code null} while
- * unresolved; {@link #wikiResourceUuid} / {@link #wikiNameSnapshot} are always persisted for
- * forensic re-resolution.
+ * <p>{@link #material} may be {@code null} while unresolved; {@link #wikiResourceUuid} and {@link
+ * #wikiNameSnapshot} are always persisted for later re-resolution.
  */
 @Entity
 @Table(name = "blueprint_dismantle_return")

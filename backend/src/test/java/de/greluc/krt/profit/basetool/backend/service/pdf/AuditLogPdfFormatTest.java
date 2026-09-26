@@ -35,16 +35,10 @@ import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
 
 /**
- * Render-zone unit tests for {@link AuditLogPdfFormat}: they pin the timestamp-fidelity invariant
- * of every activity/bank audit-log PDF (an audited-area document, REQ-AUDIT-001) that the two
- * report-service tests never exercise because they always pass {@code userZone=null}. The
- * renderer's per-row / per-period timestamps are formatted in the supplied {@code userZone}
- * (falling back to UTC when {@code null}), while {@link KrtPdfSupport#addFooter} always stamps the
- * generation time in UTC as the documented, zone-independent audit anchor. The PDF is rendered into
- * raw bytes and read back via {@code PdfTextExtractor}, the same channel the sibling {@link
- * BankPdfFormatTest} uses; the message resolver is stubbed as an identity {@link UnaryOperator} so
- * the meta/column labels stay literal bundle keys and never collide with the asserted timestamp
- * strings.
+ * Unit tests for {@link AuditLogPdfFormat} (REQ-AUDIT-001): row and period timestamps render in the
+ * supplied {@code userZone} (UTC when {@code null}), while the {@link KrtPdfSupport#addFooter}
+ * generation stamp stays UTC. The PDF is read back via {@code PdfTextExtractor}, with an identity
+ * {@link UnaryOperator} as message resolver.
  */
 class AuditLogPdfFormatTest {
 
@@ -61,12 +55,8 @@ class AuditLogPdfFormatTest {
   private static final Instant TO = Instant.parse("2026-01-31T23:00:00Z");
 
   /**
-   * Gap 1: a non-null, non-UTC {@code userZone} shifts the event-row wall-clock time into that zone
-   * (Europe/Berlin = +01:00 in January, so the 10:30 UTC instant renders as 11:30) while the footer
-   * generation stamp stays in UTC. The Berlin wall-clock proves the {@code zone = userZone} branch
-   * is taken (a regression that always renders UTC would print 10:30, never 11:30), and the
-   * isolated footer line proves the generation stamp is NOT re-zoned into the user's zone (a
-   * regression there would drop the Berlin-now string into the footer instead of the UTC-now one).
+   * Verifies that a non-UTC {@code userZone} shifts the event-row time (10:30 UTC renders as 11:30
+   * in Europe/Berlin in January) while the footer generation stamp stays in UTC.
    *
    * @throws IOException when the rendered PDF cannot be parsed
    */
@@ -89,19 +79,14 @@ class AuditLogPdfFormatTest {
 
     String text = extractText(pdf);
 
-    // The event row is rendered in the user zone: 10:30 UTC becomes 11:30 CET, and the raw UTC
-    // wall-clock (10:30) appears nowhere.
     assertTrue(
         text.contains("15.01.2026 11:30"), "event row time is shifted into the user zone (CET)");
     assertFalse(
         text.contains("15.01.2026 10:30"),
         "the raw UTC wall-clock is not printed when a user zone is supplied");
 
-    // The footer generation stamp stays UTC, independent of the user zone. Isolate the footer line
-    // so the meta 'generated' row (which IS rendered in the user zone) cannot leak into the check.
     String footer = footerLine(text);
     assertTrue(footer.contains(" UTC"), "footer keeps its UTC marker");
-    // Set.copyOf (unlike Set.of) tolerates a duplicate when before/after land in the same minute.
     Set<String> utcNow =
         Set.copyOf(
             List.of(

@@ -1,31 +1,9 @@
-# promtool unit test for the three container families that do NOT come from the cgroup collector.
-#
-# WHY THIS TEST EXISTS
-# --------------------
-# Every other `basetool:container:*` rule reads the container's own cgroup files, and the cgroup
-# collector labels by `name`. Network counters and a start time are not in those files at all: they
-# come from prometheus-podman-exporter, which labels by `id` AND NOTHING ELSE. Each of these three
-# rules therefore has to JOIN against `podman_container_info` to learn the name the dashboards and
-# every alert are keyed on — the only rules in the file that do.
-#
-# A join is the part that fails quietly. `group_left(name)` against the wrong label, or an `on()`
-# that happens to match one series and not another, yields an empty result rather than an error —
-# which is indistinguishable from a container that transmitted nothing. That is the failure this
-# whole family was introduced to END: before 2026-09-22 the dashboard queried
-# `container_start_time_seconds` and `container_network_*` directly, cAdvisor is deleted on this
-# runtime (ADR-0163), and two panels read "No data" about containers that were running and serving.
-#
-# So both halves of each `or` are locked here, separately: the cAdvisor host, and the Podman host.
-#
-# Run it the way the other tests in this directory are run — see monitoring/README.md.
-
 rule_files:
   - ../alerts/containers-runtime.yml
 
 evaluation_interval: 1m
 
 tests:
-  # --- the Podman host: only the exporter exists, and it labels by id ---------------------------
   - name: podman - the exporter's id-labelled counters come out keyed on name
     interval: 1m
     input_series:
@@ -42,7 +20,6 @@ tests:
       - series: 'podman_container_started_seconds{id="28fc90dfa123",pod_id="",pod_name=""}'
         values: "1000x10"
     promql_expr_test:
-      # The whole point: `id` is gone and `name` is present.
       - expr: basetool:container:network_receive_bytes_total
         eval_time: 5m
         exp_samples:
@@ -61,10 +38,6 @@ tests:
           - labels: 'basetool:container:start_time_seconds{name="redis"}'
             value: 1000
 
-  # A container the exporter reports metrics for but has no info series about must not silently
-  # become an unlabelled row on the dashboard. group_left drops it, which is the wanted behaviour --
-  # asserted rather than assumed, because the alternative is a legend full of container ids, which
-  # is what the mass restart on 2026-09-22 briefly produced from the other collector.
   - name: podman - a counter with no matching info series is dropped, not emitted unlabelled
     interval: 1m
     input_series:

@@ -45,17 +45,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Integration coverage for the Phase 3 (#343) visibility scope of {@link
- * JobOrderRepository#findScopedJobOrders}, exercised against the real Postgres test container so
- * the {@code TYPE(...) = SpecialCommand} discriminator predicate, the membership {@code IN} clause
- * and the SK-public escape are verified end-to-end rather than mocked.
- *
- * <p>Three orders are created — one responsible to squadron A (private), one to squadron B
- * (private), one to a Spezialkommando (public). The four caller classes from the acceptance matrix
- * are then replayed by feeding the corresponding {@link ScopePredicate} triple into the repository
- * query. The test container is shared across the suite and other tests commit job-order rows, so
- * the assertions use {@code contains} / {@code doesNotContain} on the freshly-created ids rather
- * than exact result counts.
+ * Integration tests for the visibility scope of {@link JobOrderRepository#findScopedJobOrders}
+ * against the Postgres test container: orders of two squadrons (private) and one Spezialkommando
+ * (public) are queried with each caller class's {@link ScopePredicate}. Assertions check only the
+ * freshly created ids, since the container is shared.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -90,9 +83,6 @@ class JobOrderScopeQueryIntegrationTest {
           squadronBId = sqB.getId();
           skId = sk.getId();
 
-          // Every order's requester is squadron A, so the squadron-B display filter can only match
-          // the order that is *responsible* to B — isolating the display-filter semantics from the
-          // requester side.
           orderRespA = newOrder(sqA, sqA).getId();
           orderRespB = newOrder(sqB, sqA).getId();
           orderRespSk = newOrder(sk, sqA).getId();
@@ -124,9 +114,6 @@ class JobOrderScopeQueryIntegrationTest {
 
   @Test
   void squadronDisplayFilter_narrowsWithinScope() {
-    // Admin all-scope so the security filter is wide open; the squadronId display filter then keeps
-    // only orders whose responsible OR requesting side is squadron B — that is the B-responsible
-    // order alone (all requesters are squadron A here).
     Set<UUID> visible =
         jobOrderRepository
             .findScopedJobOrders(
@@ -152,10 +139,6 @@ class JobOrderScopeQueryIntegrationTest {
 
   @Test
   void countProfitEligibleByIdIn_countsProfitEligibleAcrossBothKinds() {
-    // Backs OwnerScopeService.canViewJobOrders(): a profit-eligible Squadron and a profit-eligible
-    // SK both count, a default (non-profit) Squadron does not. Validates the JPQL attribute name
-    // and
-    // the single-table cross-kind reach end-to-end against the real schema.
     String tag = UUID.randomUUID().toString().substring(0, 8);
     Squadron profit = new Squadron();
     profit.setName("Profit-" + tag);

@@ -29,27 +29,13 @@ import org.springframework.session.data.redis.config.ConfigureNotifyKeyspaceEven
 import org.springframework.session.data.redis.config.ConfigureRedisAction;
 
 /**
- * Enables Redis keyspace notifications at startup the way Spring Session always did, and carries on
- * when the frontend's Redis user is not allowed to (REQ-SEC-068, ADR-0207).
+ * Enables Redis keyspace notifications at startup and carries on when the Redis user may not run
+ * {@code CONFIG} (REQ-SEC-068, ADR-0207).
  *
- * <p>Spring Session needs {@code notify-keyspace-events} to include {@code Egx} so it hears about
- * expired and deleted session keys. Its default {@link ConfigureNotifyKeyspaceEventsAction} runs
- * {@code CONFIG GET} and, when a flag is missing, {@code CONFIG SET} on every startup — which is
- * why the frontend used to need the all-powerful {@code default} user. {@code CONFIG SET} can move
- * Redis's working directory and snapshot file name, so it is exactly what a per-service ACL user
- * must not hold.
- *
- * <p>The server therefore carries {@code --notify-keyspace-events Egx} on its own command line, and
- * this action degrades to "the server is configured already" when the ACL refuses {@code CONFIG}
- * with {@code NOPERM}. Anything else — Redis unreachable, a timeout — is rethrown, so a frontend
- * that cannot reach its session store still fails its startup exactly as before (ADR-0084: Redis is
- * mandatory for the frontend).
- *
- * <p>Since 2026-09-25 this action runs only under the shared {@code default} user: a frontend
- * configured with its own ACL user gets {@link ServerConfiguredKeyspaceNotificationsAction} instead
- * ({@code RedisSessionConfig.selectConfigureRedisAction}), because every refused {@code CONFIG GET}
- * is counted by Redis and fed {@code RedisAclDenials} on each restart. The {@code NOPERM} tolerance
- * stays as a safety net for a {@code default} user that has been narrowed by hand.
+ * <p>A {@code NOPERM} refusal is taken to mean the server already runs with {@code
+ * --notify-keyspace-events Egx}; any other failure is rethrown, so an unreachable Redis still fails
+ * startup. Used only with the shared {@code default} user; a dedicated ACL user gets {@link
+ * ServerConfiguredKeyspaceNotificationsAction}.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -87,12 +73,11 @@ public final class TolerantKeyspaceNotificationsAction implements ConfigureRedis
   }
 
   /**
-   * Tells an ACL refusal apart from every other failure by the {@code NOPERM} error code Redis puts
-   * into the reply, looked for on every message along the cause chain — Spring Data Redis wraps the
-   * Lettuce exception, and the wrapper's message may or may not repeat it.
+   * Whether a failure is an ACL refusal, detected by the {@code NOPERM} code anywhere on the cause
+   * chain.
    *
-   * @param failure what the delegate threw.
-   * @return {@code true} when a message on the cause chain contains {@code NOPERM}.
+   * @param failure what the delegate threw
+   * @return {@code true} when a message on the cause chain contains {@code NOPERM}
    */
   static boolean isAclRefusal(@Nullable Throwable failure) {
     for (Throwable cursor = failure; cursor != null; cursor = cursor.getCause()) {

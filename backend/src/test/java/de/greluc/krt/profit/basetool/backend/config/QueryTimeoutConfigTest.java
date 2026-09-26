@@ -33,18 +33,9 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Verifies the SEC-03 global statement-execution timeout (REQ-DATA-009) is wired and actually
- * cancels a long-running query, against the real Postgres test schema (Testcontainers + Flyway via
- * the {@code test} profile).
- *
- * <p>The production default is 30 s; this test overrides {@code
- * spring.jpa.properties.jakarta.persistence.query.timeout} to 1 s via {@link TestPropertySource} so
- * a {@code SELECT pg_sleep(...)} that exceeds it is cancelled in about a second rather than making
- * the test wait. Because the override and production use the identical property path, a passing
- * test also proves the production YAML binding form reaches Hibernate.
- *
- * <p>Without the timeout the {@code pg_sleep} would run to completion and hold its pooled
- * connection for the full duration — exactly the connection-pinning DoS vector SEC-03 closes.
+ * Verifies the global statement timeout (REQ-DATA-009) cancels a long-running query against real
+ * Postgres. Overrides the timeout to 1 s on the same property path production uses, so a passing
+ * test also proves the production binding reaches Hibernate.
  */
 @SpringBootTest
 @ActiveProfiles("test")

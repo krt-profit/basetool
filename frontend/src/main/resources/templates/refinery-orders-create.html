@@ -37,26 +37,10 @@
             <p th:text="#{__${errorToast}__}">Fehler</p>
         </div>
 
-        <!--/* Screenshot-extract import (#435): file picker posts the RefineryExtract JSON to the
-             proxy, which flashes the pre-filled form + review flags back onto this page.
-             no-track: picking the file must not arm the unsaved-changes guard - the import
-             replaces the form wholesale, so there is nothing on this page worth protecting.
-             No-reload carve-out (#575 -> #591): this is the one refinery interaction still doing a
-             classic POST->redirect. It is not a write (persists nothing) and the reload is benign
-             (the form is replaced wholesale); converting it in place needs an idempotent per-group
-             re-init seam in the shared datetime-splitter.js plus the other one-shot enhancers, so it
-             is tracked separately. Every refinery WRITE is already navigate-after-AJAX (REQ-FE-006). */-->
         <div class="import-extract-bar" data-testid="refinery-import-box">
             <form id="refineryImportForm" class="no-track" th:action="@{/refinery-orders/import}" method="post" enctype="multipart/form-data">
                 <input type="file" id="refineryImportFile" name="file" accept=".json,application/json" hidden data-trigger="rfc-import-file" data-testid="refinery-import-file">
                 <button type="button" class="btn btn-outline" data-trigger="rfc-import-pick" data-testid="refinery-import-button" th:text="#{refineryImport.button}">Aus Screenshot-Extract importieren (JSON)</button>
-                <!--/* The extract consumed above is produced by the desktop Basetool SC
-                     Extractor, so the way to obtain it sits next to the import trigger it
-                     feeds (REQ-REFINERY-021, twin of the Blueprints add bar's REQ-INV-038).
-                     It lives INSIDE the form because .import-extract-bar puts the flex row on
-                     the form, not the bar - a sibling of the form would drop out of the row.
-                     Points at GitHub's canonical "latest release" redirect and opens in a new
-                     tab, so a draft already flashed onto this page is never discarded. */-->
                 <a id="refineryExtractorLink" class="btn btn-ghost"
                    href="https://github.com/krt-profit/basetool-sc-extractor/releases/latest"
                    target="_blank" rel="noopener noreferrer"
@@ -69,15 +53,8 @@
             </form>
         </div>
 
-        <!--/* #591: the import error alerts + review banner + the form are the swappable region the
-             AJAX import twin re-renders in place. The stable #refineryImportFormContainer is the swap
-             target; its inner th:block (refineryImportFormBody) is exactly what the twin returns and
-             the client injects via innerHTML. The .import-extract-bar file picker above stays OUTSIDE
-             the fragment so its document-delegated rfc-import-* triggers survive every swap. */-->
         <div id="refineryImportFormContainer">
         <th:block th:fragment="refineryImportFormBody">
-        <!--/* Import error states (#435): local key-based errors and verbatim localized backend
-             problem details (e.g. unsupported schemaVersion) use separate attributes. */-->
         <div th:if="${importErrorKey != null}" class="alert alert-danger mt-1" data-testid="refinery-import-error">
             <p class="mb-0" th:text="#{__${importErrorKey}__}">Import fehlgeschlagen.</p>
         </div>
@@ -85,8 +62,6 @@
             <p class="mb-0" th:text="${importErrorText}">Import fehlgeschlagen.</p>
         </div>
 
-        <!--/* Import review banner (#435): match counters + every finding that has no form row to
-             anchor to (order-level fields, skipped/un-quoted source rows). */-->
         <div th:if="${importGoodsTotal != null}" class="alert alert-warning mt-1" data-testid="refinery-import-banner">
             <p th:text="#{refineryImport.banner(${importGoodsMatched}, ${importGoodsTotal}, ${importRowsSkipped})}">X von Y Zeilen zugeordnet, Z übersprungen – bitte markierte Felder prüfen.</p>
             <p th:if="${importGoodsTotal > 0 and importGoodsMatched == 0}" class="import-flag-danger" th:text="#{refineryImport.banner.zeroMatches}">Keine Zeile konnte zugeordnet werden.</p>
@@ -106,9 +81,6 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group flex-2 mb-0">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
-                        <!--/* Server-side searchable combobox (remote-users, #1193): seed only the
-                             current owner (the caller by default); the roster is searched on demand.
-                             Non-logisticians keep the disabled plain select. */-->
                         <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}"
                                 th:attr="data-krt-combobox=${isLogistician ? 'remote-users' : null}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -234,18 +206,12 @@
                 </div>
 
                 <div id="materials-container">
-                    <!--/* importRowIssues is keyed by the STRING form of the goods index: the flash
-                         map round-trips through the JSON Redis session, which stringifies map
-                         keys — an Integer key would silently never match after the redirect. */-->
                     <div th:each="good, stat : *{goods}" class="material-entry krtm-border-1px-solid-var-color-gray-3-padding-1r-9df9" th:classappend="${importRowIssues != null and importRowIssues.containsKey('' + stat.index)} ? 'import-flagged-row'">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
                             <button th:if="${stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon krtm-padding-0-25rem-0-5rem-font-size-0-8rem-ba3b" data-trigger="rfc-remove-material" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
 
-                        <!--/* Inline import review flags (#435): findings anchored to this draft row,
-                             incl. the derived read confidence (accessible text tints, REQ-UI-006)
-                             and one-click suggestion chips for unmatched/fuzzy materials. */-->
                         <div th:if="${importRowIssues != null and importRowIssues.containsKey('' + stat.index)}" class="import-row-flags" th:attr="data-testid='refinery-import-row-flags-' + ${stat.index}">
                             <div th:each="rowIssue : ${importRowIssues.get('' + stat.index)}" class="import-row-flag"
                                  th:classappend="${rowIssue.severity().name() == 'BLOCKING'} ? 'import-flag-danger' : (${rowIssue.severity().name() == 'INFO'} ? 'import-flag-info' : 'import-flag-warning')">
@@ -268,10 +234,6 @@
                         <div class="material-row">
                             <div class="form-group flex-2 mb-0">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <!--/* Server-side searchable combobox (remote-materials-raw, REQ-FE-016): the raw
-                                     catalog is searched on demand, so only the row's already-chosen material is
-                                     seeded (redisplay/import path) with the refined-output metadata the enhancer
-                                     harvests; a fresh row renders just the placeholder. */-->
                                 <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rfc-update-output" data-krt-combobox="remote-materials-raw">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                     <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
@@ -327,32 +289,20 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    // Thymeleaf-interpolated i18n strings and server values only; all imperative logic lives in
-    // the refinery-orders-create.js page module loaded immediately after this bootstrap
-    // (ADR-0069). Keys and fallbacks are byte-identical to the former inline block.
     const ROUNDING_MODE = /*[[${roundingMode}]]*/ 'UP';
 
-    // Server-rendered yield-bonus map (empty until a refinery is picked) + the badge help text;
-    // the page module feeds both into window.krtRefineryYield.init(...) at parse time.
     const MATERIAL_YIELD_BONUSES = /*[[${materialYieldBonuses}]]*/ {};
     const MATERIAL_YIELD_BONUS_HELP = /*[[#{refineryorder.form.material.yieldBonus.help}]]*/ '';
     const MATERIAL_ENTRY_TITLE_LABEL = /*[[#{refineryorder.form.material.entryTitle}]]*/ 'Material';
     const MATERIAL_REMOVE_LABEL = /*[[#{refineryorder.form.material.remove}]]*/ 'Entfernen';
 
-    // In-place create/import submit error toasts (#575 / #591).
     const MSG_RFC_MATERIAL_INVALID = /*[[#{error.refineryorder.material.invalid}]]*/ 'Add a material.';
     const MSG_RFC_CREATE_FAILED = /*[[#{error.refineryorder.create.failed}]]*/ 'Create failed.';
     const MSG_RFC_MISSION_PARTICIPANT_REQUIRED = /*[[#{error.refineryorder.mission.participant_required}]]*/ 'The order owner does not take part in this mission.';
     const MSG_RFC_IMPORT_FAILED = /*[[#{refineryImport.error.failed}]]*/ 'Import failed.';
 
-    // One-click ingest (epic #639, REQ-INGEST-004): the id of a pending handoff, or null. The GET
-    // render is prefetch-safe (it never consumes the single-use token); the page module POSTs this
-    // id to /refinery-orders/import-handoff once on load to perform the consume and swap in the
-    // pre-filled form. See refinery-orders-create.js#_loadRefineryHandoff.
     const REFINERY_HANDOFF_ID = /*[[${pendingHandoffId}]]*/ null;
 
-    // Refining-method rating/speed labels, hoisted from updateMethodRatings() so the page module's
-    // imperative code carries no Thymeleaf interpolation.
     const RATING_LEVELS = {
         1: /*[[#{refining.rating.level.1}]]*/ 'Niedrig',
         2: /*[[#{refining.rating.level.2}]]*/ 'Mittel',

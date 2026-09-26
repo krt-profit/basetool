@@ -54,12 +54,11 @@ public final class BankSparkline {
   public record Spark(@Nullable String points, boolean flat) {}
 
   /**
-   * Scales an end-of-day balance series into the 96×26 sparkline polyline (D1 mockup). A flat
-   * series renders as the muted mid-height line, mirroring the mockup's zero-delta card; an empty
-   * or {@code null} series yields {@code points == null} (and {@code flat == true}) so the caller
-   * omits the SVG entirely.
+   * Scales an end-of-day balance series into the 96×26 sparkline polyline. A flat series renders as
+   * a mid-height line; an empty or {@code null} series yields {@code points == null} and {@code
+   * flat == true}, so the caller omits the SVG.
    *
-   * @param series the backend end-of-day balances, oldest first; may be {@code null} or empty
+   * @param series the end-of-day balances, oldest first; may be {@code null} or empty
    * @return the scaled polyline points and the flat flag
    */
   @NotNull

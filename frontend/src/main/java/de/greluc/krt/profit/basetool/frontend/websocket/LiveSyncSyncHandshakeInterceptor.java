@@ -42,37 +42,11 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 /**
  * Prepares a multiplexed {@code /ws/sync} live-sync handshake (REQ-FE-015, ADR-0094).
  *
- * <p>Unlike the legacy per-resource sockets, {@code /ws/sync} binds no topic at handshake: it marks
- * the future session {@linkplain LiveSyncWebSocketHandler#ATTR_MULTIPLEXED multiplexed} and lets
- * the client {@code subscribe} to individual topics afterwards, each authorized when its frame
- * arrives. Authentication itself is already enforced by the Spring Security chain ({@code /ws/sync}
- * requires an authenticated principal); this interceptor's job is only to capture, <b>on the
- * servlet thread where the request context still exists</b>, the two things a later
- * subscribe-authorization probe needs but cannot obtain from a WebSocket message thread:
- *
- * <ul>
- *   <li>the OAuth2 access token (read <b>read-only</b> from the authorized-client store, exactly
- *       like {@code NotificationPageController.stream} — never triggering a refresh that Keycloak's
- *       reuse-detection would punish, REQ-SEC-012); and
- *   <li>the active-org-unit pin ({@link ActiveSquadronContext}), so a probe scopes exactly like the
- *       page's own reads; and
- *   <li>the caller's authorities, so a subscribe to a locally role-gated global room (the {@code
- *       bank} staff and {@code orgunit-bank} rooms) can be authorized without a backend call on a
- *       message thread that has no {@code SecurityContext}.
- * </ul>
- *
- * <p>It also carries one verdict rather than capturing it: the consent gate marks a handshake from
- * a user without accepted Terms of Use instead of redirecting it (a redirect is invisible to a
- * WebSocket, which sees only {@code 1006} and reconnects forever), and {@link #relayTermsGate} puts
- * that mark on the session so the handler can close the socket with a terminal code — REQ-SEC-028's
- * fourth answer shape, after the navigation redirect, the XHR header and the SSE event.
- *
- * <p>Both are stashed in the future session's attributes for {@code LiveSyncSubscriptionAuthorizer}
- * to replay as explicit headers. The captured token lives in memory for the socket's lifetime and
- * is never logged; when it expires, subscribe probes 401 and {@linkplain
- * LiveSyncSubscriptionAuthorizer fail open} (opaque keys only). A missing token or pin is tolerated
- * — the handshake still proceeds and the affected subscribes fail open — so a transient
- * authorized-client hiccup never blocks the socket.
+ * <p>Marks the future session {@linkplain LiveSyncWebSocketHandler#ATTR_MULTIPLEXED multiplexed}
+ * and captures, on the servlet thread, what later subscribe authorization needs: the OAuth2 access
+ * token (read-only, never refreshed), the active-org-unit pin ({@link ActiveSquadronContext}) and
+ * the caller's authorities. It also relays the consent gate's mark via {@link #relayTermsGate}. A
+ * missing token or pin never blocks the handshake; the affected subscribes fail open.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -84,17 +58,14 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
   private final OAuth2AuthorizedClientRepository authorizedClientRepository;
 
   /**
-   * Marks the future session multiplexed and captures the OAuth2 token and active-org-unit pin for
-   * later subscribe authorization. Always proceeds — a capture failure only means the socket's
-   * subscribes fail open.
+   * Marks the future session multiplexed and captures the token, pin and authorities for later
+   * subscribe authorization; always proceeds.
    *
    * @param request the handshake (HTTP upgrade) request
-   * @param response the handshake response (unused; the security chain already gated
-   *     authentication)
+   * @param response the handshake response (unused)
    * @param wsHandler the target handler (unused)
-   * @param attributes the future WebSocket-session attributes; the multiplexed flag, token and pin
-   *     are stored here
-   * @return always {@code true} — authentication is enforced upstream
+   * @param attributes the future WebSocket-session attributes that receive the captured values
+   * @return always {@code true}; authentication is enforced upstream
    */
   @Override
   public boolean beforeHandshake(
@@ -111,10 +82,6 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
     try {
       Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
       if (authentication != null) {
-        // Capture the caller's authorities verbatim (the frontend does a literal authority match —
-        // no role hierarchy) so a later subscribe to a locally role-gated global room (the bank
-        // staff / orgunit-bank rooms) can be authorized on a WebSocket message thread that has no
-        // SecurityContext. Never logged.
         Set<String> authorities =
             authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -131,23 +98,15 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
         }
       }
     } catch (RuntimeException e) {
-      // A best-effort token capture: a failure only degrades subscribe-auth to fail-open, so it
-      // must
-      // never abort the handshake. Logged without the token.
       log.debug("Live-sync /ws/sync token capture failed; subscribes will fail open", e);
     }
     return true;
   }
 
   /**
-   * Copies the consent gate's mark from the handshake request onto the future session, when {@code
-   * TermsAcceptanceGateFilter} let this upgrade through only so it could be refused on the socket
+   * Copies the consent gate's mark from the handshake request onto the future session, so {@link
+   * LiveSyncWebSocketHandler#afterConnectionEstablished} can close the socket with a terminal code
    * (REQ-SEC-028).
-   *
-   * <p>The handshake still proceeds — refusing it here would produce the very {@code 1006} the mark
-   * exists to avoid. {@link LiveSyncWebSocketHandler#afterConnectionEstablished} is where the
-   * socket is closed with the terminal code, because that is the first point at which a close code
-   * exists at all.
    *
    * @param request the handshake request, carrying the gate's mark as a request attribute
    * @param attributes the future WebSocket-session attributes
@@ -176,7 +135,5 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
       @NotNull ServerHttpRequest request,
       @NotNull ServerHttpResponse response,
       @NotNull WebSocketHandler wsHandler,
-      Exception exception) {
-    // intentionally empty
-  }
+      Exception exception) {}
 }

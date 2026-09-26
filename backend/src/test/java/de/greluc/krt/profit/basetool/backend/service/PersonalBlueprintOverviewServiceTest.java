@@ -52,14 +52,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Mockito unit tests for {@link PersonalBlueprintOverviewService} — the in-Java
- * <em>variant-family</em> aggregation (a base item and its cosmetic variants collapse onto one
- * availability row) and the family-aware, scope-driven owner drill-down (the family key is expanded
- * to its product keys via a mocked {@link BlueprintVariantFamilyCatalog}, then owners are fetched
- * by that product-key set). The real {@link BlueprintVariantFamilyResolver} is wired in so the
- * family grouping runs end-to-end; the oversight {@link ScopePredicate} is supplied by a mocked
- * {@link OwnerScopeService} (its persona-specific construction is covered by {@code
- * OwnerScopeServiceTest}).
+ * Unit tests for {@link PersonalBlueprintOverviewService}: variant-family aggregation through the
+ * real {@link BlueprintVariantFamilyResolver}, and the owner drill-down via a mocked {@link
+ * BlueprintVariantFamilyCatalog} with the {@link ScopePredicate} from a mocked {@link
+ * OwnerScopeService}.
  */
 @ExtendWith(MockitoExtension.class)
 class PersonalBlueprintOverviewServiceTest {
@@ -74,8 +70,6 @@ class PersonalBlueprintOverviewServiceTest {
 
   @BeforeEach
   void setUp() {
-    // Real family resolver (so grouping is exercised) + mocked family catalog (so the drill-down's
-    // family-expansion is controllable); constructed after Mockito populates the mocks.
     service =
         new PersonalBlueprintOverviewService(
             ownerScopeService,
@@ -118,9 +112,6 @@ class PersonalBlueprintOverviewServiceTest {
   void list_adminAllScope_aggregatesEveryOwner_includingOrgUnitLess() {
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    // Admin "all org units" must span EVERY blueprint owner — including USER_2, who holds no
-    // org-unit membership. Resolving via the org-unit member list (the #371 bug) silently dropped
-    // such owners, so a squadron-less admin's own blueprints went missing.
     when(personalBlueprintRepository.findAllDistinctOwnerUserIds())
         .thenReturn(Set.of(USER_1, USER_2));
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
@@ -143,7 +134,6 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(personalBlueprintRepository.findAllDistinctOwnerUserIds())
         .thenReturn(Set.of(USER_1, USER_2));
-    // USER_1 owns the base, USER_2 owns a cosmetic variant — one family row, count 2, base label.
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(
             List.of(op("Fresnel Energy LMG", USER_1), op("Fresnel \"Molten\" Energy LMG", USER_2)));
@@ -200,8 +190,6 @@ class PersonalBlueprintOverviewServiceTest {
     assertEquals("Aurora MR", page.getContent().get(1).productName());
   }
 
-  // covers REQ-INV-013 — the search filters the aggregated entries BEFORE pagination, so the
-  // returned totals describe the filtered set and the filter spans every entry, not one page.
   @Test
   void list_search_filtersByProductNameCaseInsensitive_beforePagination() {
     when(ownerScopeService.currentOversightScope())
@@ -214,8 +202,6 @@ class PersonalBlueprintOverviewServiceTest {
     Page<BlueprintOverviewEntryDto> page =
         service.listAvailableBlueprints(PageRequest.of(0, 1, Sort.by("productName")), "CAT");
 
-    // Two of three products match "CAT" (case-insensitive substring); page size 1 still reports
-    // the FILTERED total of 2, proving the filter ran before the page was cut.
     assertEquals(2, page.getTotalElements());
     assertEquals(1, page.getContent().size());
     assertEquals("Caterpillar", page.getContent().get(0).productName());
@@ -223,8 +209,6 @@ class PersonalBlueprintOverviewServiceTest {
 
   @Test
   void owners_scoped_expandsFamilyAndListsVariantOwnersByDisplayNameSorted() {
-    // The family "custodian smg" expands to its base + a cosmetic variant; USER_1 owns the base,
-    // USER_2 owns the variant — both surface for the family, sorted by display name.
     when(familyCatalog.familyIndex())
         .thenReturn(Map.of("custodian smg", Set.of("custodian smg", "custodian \"midnight\" smg")));
     when(ownerScopeService.currentOversightScope())
@@ -248,8 +232,6 @@ class PersonalBlueprintOverviewServiceTest {
 
   @Test
   void owners_unknownFamily_returnsEmptyWithoutScopeOrQueries() {
-    // The family is absent from the cached index (e.g. owned only via a soft-deleted variant) — the
-    // drill-down short-circuits before resolving scope or querying owners.
     when(familyCatalog.familyIndex()).thenReturn(Map.of());
 
     assertTrue(service.listOwnersForProduct("gone").isEmpty());
@@ -285,16 +267,11 @@ class PersonalBlueprintOverviewServiceTest {
     verify(userRepository, never()).findAllById(any());
   }
 
-  // covers REQ-INV-012 — the admin drill-down queries by the family's product-key set, without the
-  // all-owners pre-scan that made every expand click slow.
   @Test
   void owners_adminAllScope_listsOwnersAcrossEveryOrgUnit_byFamilyProductKeys() {
     when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    // The drill-down for the admin "all org units" scope still spans every blueprint owner, not
-    // just
-    // org-unit members (#371 fix) — but via the bounded product-key-set lookup.
     when(personalBlueprintRepository.findAllByProductKeyIn(any()))
         .thenReturn(
             List.of(bp("aurora mr", "Aurora MR", USER_1), bp("aurora mr", "Aurora MR", USER_2)));
@@ -306,7 +283,6 @@ class PersonalBlueprintOverviewServiceTest {
     assertEquals(
         List.of("Alpha", "Bravo"),
         owners.stream().map(BlueprintOverviewOwnerDto::ownerName).toList());
-    // Admin "all org units" has no single unit, so no owner is flagged external (no hint).
     assertTrue(owners.stream().allMatch(BlueprintOverviewOwnerDto::orgUnitMember));
     verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
     verify(personalBlueprintRepository, never()).findAllDistinctOwnerUserIds();
@@ -314,16 +290,12 @@ class PersonalBlueprintOverviewServiceTest {
         .findAllByProductKeyInAndOwnerUserIdIn(any(), any());
   }
 
-  // covers REQ-INV-018 — a user who opted into global sharing is counted in the availability
-  // overview even when they are not a member of any of the caller's oversight org units; the
-  // service unions their sub into the owner-set passed to the blueprint lookup.
   @Test
   void list_globalSharerOutsideOversight_isUnionedIntoOwnerSet() {
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
-    // USER_2 is not a member of ORG_A but opted into global sharing — they must still be counted.
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
     ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds.capture()))
@@ -337,8 +309,6 @@ class PersonalBlueprintOverviewServiceTest {
     assertTrue(ownerUserIds.getValue().contains(USER_2));
   }
 
-  // covers REQ-INV-018 — the owner drill-down includes a global sharer who is not an oversight
-  // member, so the listed owners stay consistent with the bumped availability count.
   @Test
   void owners_globalSharerOutsideOversight_appearsInDrillDown() {
     when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
@@ -361,8 +331,6 @@ class PersonalBlueprintOverviewServiceTest {
         List.of("Alpha", "Bravo"),
         owners.stream().map(BlueprintOverviewOwnerDto::ownerName).toList());
     assertTrue(ownerUserIds.getValue().contains(USER_2));
-    // The global sharer (USER_2 → "Alpha") is flagged not-a-member; the oversight member
-    // (USER_1 → "Bravo") is flagged a member, so the UI marks only the former.
     BlueprintOverviewOwnerDto alpha = ownerByName(owners, "Alpha");
     BlueprintOverviewOwnerDto bravo = ownerByName(owners, "Bravo");
     assertFalse(alpha.orgUnitMember(), "the global sharer is not an oversight member");

@@ -54,22 +54,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages the local {@code app_user} mirror of Keycloak users: the identity seam, the squadron-
- * scoped user reads that back the pickers/lists, the self-service profile edits (rank, description,
- * displayName, joinDate, payout preference, blueprint-sharing, read-announcement state) and the
- * single-POST membership-delta orchestrator.
+ * Manages the local {@code app_user} mirror of Keycloak users: the caller-identity seam, the
+ * squadron-scoped user reads, the self-service profile edits and the membership-delta orchestrator.
  *
- * <p>The service is the architectural seam where the project's "every read filters by JWT sub" rule
- * (CLAUDE.md) is enforced — {@link #getUserIdFromJwt(Jwt)} / {@link #getCurrentUser()} are the
- * canonical source for the calling user's id and most other services delegate here rather than
- * reaching for {@code SecurityContextHolder} (which is forbidden outside this seam by the ArchUnit
- * rule). JWT subject parsing is fail-closed: a missing {@code sub} or a non-UUID subject is
- * rejected rather than falling back to a derived identifier — silently mapping different Keycloak
- * realms onto the same local id is a worse failure mode than refusing the request.
- *
- * <p>The Keycloak reconciliation (per-login JWT sync + scheduled Admin-API sync + soft-delete
- * reconcile) lives in {@link UserReconciliationService}, and the registration approval lifecycle in
- * {@link UserRegistrationService}; both consult this seam for the JWT-subject resolution.
+ * <p>{@link #getUserIdFromJwt(Jwt)} and {@link #getCurrentUser()} are the canonical source of the
+ * caller's id; subject parsing is fail-closed and rejects a missing or non-UUID {@code sub}.
  */
 @Service
 @RequiredArgsConstructor
@@ -84,9 +73,7 @@ public class UserService {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   /**
-   * Convenience predicate: does any user have this exact name (case-insensitive) as either username
-   * or displayName? Used by participant-add flows to detect "this guest name is actually a known
-   * member".
+   * Checks whether any user has this exact name, case-insensitively, as username or display name.
    *
    * @param name candidate name
    * @return true when at least one match exists
@@ -96,13 +83,9 @@ public class UserService {
   }
 
   /**
-   * Resolves a free-text participant name to existing users by case-insensitive exact match on
-   * {@code username} or {@code displayName}. The input is trimmed. An empty or blank name yields an
-   * empty result without hitting the database.
-   *
-   * <p>Used by participant-add flows to translate free-text input (when the user did not pick an
-   * entry from the autocomplete dropdown) into a concrete user reference, so that a member is
-   * correctly linked instead of being (wrongly) rejected as a duplicate guest name.
+   * Resolves a free-text participant name to users by case-insensitive exact match on {@code
+   * username} or {@code displayName}. The input is trimmed; a blank name yields an empty list
+   * without a query.
    */
   @NotNull
   public List<User> findMatchesByExactName(@NotNull String name) {
@@ -114,13 +97,8 @@ public class UserService {
   }
 
   /**
-   * Extracts the user id from the JWT's {@code sub} claim.
-   *
-   * <p>Fail-closed validation: a missing {@code sub} or a non-UUID value throws {@link
-   * org.springframework.security.authentication.AuthenticationServiceException} rather than falling
-   * back to a derived id. Silently mapping different Keycloak realms (or two realms with similar
-   * usernames) onto the same local id is a worse failure mode than refusing the request — see the
-   * explicit AGENTS.md / CLAUDE.md guidance on stable identity.
+   * Extracts the user id from the JWT's {@code sub} claim, failing closed on a missing or non-UUID
+   * value.
    *
    * @param jwt validated JWT
    * @return the {@code sub} parsed as UUID
@@ -131,14 +109,6 @@ public class UserService {
   public UUID getUserIdFromJwt(@NotNull Jwt jwt) {
     String sub = jwt.getSubject();
     if (sub == null) {
-      // The OIDC standard requires `sub` on every ID token. A missing subject
-      // indicates a misconfigured authorization server. Refuse rather than
-      // falling back to a different claim and silently identifying users by
-      // a value an admin might rename in Keycloak.
-      // Audit finding H-10: only log the claim keys, never the values. The claims map still
-      // carries PII (preferred_username / email — and, on a Keycloak that has not yet had its
-      // name mappers removed, possibly given_name / family_name) which PiiMasker only partially
-      // scrubs — the keys still help diagnose a Keycloak mapper misconfiguration.
       log.error(
           "JWT has no subject (sub). Refusing the request. Claim keys: {}",
           jwt.getClaims().keySet());
@@ -148,10 +118,6 @@ public class UserService {
     try {
       return UUID.fromString(sub);
     } catch (IllegalArgumentException e) {
-      // Standard Keycloak issues UUIDs as subjects. A non-UUID sub is a
-      // configuration deviation; deriving a UUID via UUID.nameUUIDFromBytes
-      // would mix up identities (renaming the underlying value, two realms
-      // with similar usernames, casing differences, ...). Fail-closed.
       log.error(
           "JWT subject is not a valid UUID: '{}'. Refusing the request to avoid identity mix-up.",
           sub);
@@ -160,14 +126,10 @@ public class UserService {
   }
 
   /**
-   * Updates a user's editable attributes (rank, description, displayName, joinDate). Optimistic-
-   * lock check is explicit when {@code version} is non-null; admins can override by passing {@code
-   * null}.
-   *
-   * <p>Rank validation enforces the role-based range: officers get 1–12, squadron members get
-   * 13–20. Out-of-range rank throws {@link IllegalArgumentException} → 400. {@code joinDate} can be
-   * explicitly set to {@code null} to clear the field; the other nullable fields are only updated
-   * when supplied.
+   * Updates a user's rank, description, display name and join date. The version is checked when
+   * non-null; a {@code null} version (admin override) skips it. Rank must lie in the role's range
+   * (officers 1–12, members 13–20); {@code joinDate} may be cleared with {@code null}, the other
+   * fields change only when supplied.
    *
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
    *     unknown
@@ -211,15 +173,12 @@ public class UserService {
       requireAssignableDisplayName(displayName, id);
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
-    // joinDate can be explicitly set to null (clear the date)
     user.setJoinDate(joinDate);
     return userRepository.save(user);
   }
 
   /**
-   * Narrower update than {@link #updateUserAttributes}: covers only the profile-page editable
-   * subset (description + displayName). Used by the user's own profile-edit form so a regular user
-   * cannot bump their rank.
+   * Updates only the self-editable profile fields (description and display name).
    *
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
    *     unknown
@@ -240,30 +199,20 @@ public class UserService {
       requireAssignableDisplayName(displayName, id);
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
-    // saveAndFlush so the bumped @Version is in the response — the profile page writes the returned
-    // version back onto every hidden version input in place via syncAllVersions (no reload), so a
-    // stale save() version 409s the next consecutive profile edit.
     return userRepository.saveAndFlush(user);
   }
 
   /**
-   * Sets the calling user's personal default payout preference — the value pre-filled into the
-   * per-participant {@code payoutPreference} at mission sign-up ({@link
-   * MissionService#addParticipant}). Mirrors {@link #updateUserDescription}'s optimistic-lock
-   * contract: a stale {@code version} surfaces as a 409. Unlike the description fields the
-   * preference is set unconditionally (the request DTO enforces {@code @NotNull}), so this never
-   * silently no-ops. Changing it is forward-only — it does not rewrite existing {@code
-   * MissionParticipant} rows.
+   * Sets the caller's default payout preference, pre-filled at mission sign-up ({@link
+   * MissionService#addParticipant}). Existing participations are not changed.
    *
-   * @param id the calling user's id, resolved from the JWT (never from the URL); never {@code
-   *     null}.
-   * @param preference the new default payout preference; never {@code null}.
-   * @param version the optimistic-lock version the caller last read; {@code null} bypasses the
-   *     check, matching {@link #updateUserDescription}.
-   * @return the persisted user with the updated default and bumped version.
+   * @param id the caller's id from the JWT; never {@code null}
+   * @param preference the new default payout preference; never {@code null}
+   * @param version the version the caller last read; {@code null} skips the check
+   * @return the persisted user
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown.
-   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale.
+   *     unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
   public User updateUserDefaultPayoutPreference(
@@ -271,29 +220,20 @@ public class UserService {
     User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setDefaultPayoutPreference(preference);
-    // saveAndFlush so the bumped @Version reaches the response — the profile payout-preference
-    // dropdown writes the returned version back in place via syncAllVersions (no reload), so a
-    // stale save version 409s the next consecutive change.
     return userRepository.saveAndFlush(user);
   }
 
   /**
-   * Sets the calling user's opt-in flag for global blueprint sharing. When {@code true}, the user's
-   * owned blueprints are counted in the leadership blueprint-availability overview and the
-   * item-order blueprint-coverage view for <em>every</em> org unit, not only the ones they belong
-   * to (REQ-INV-018). Mirrors {@link #updateUserDefaultPayoutPreference}'s optimistic-lock
-   * contract: a stale {@code version} surfaces as a 409. The flag is set unconditionally; the
-   * widening is read-only and the viewer-access gates are unchanged.
+   * Sets the caller's opt-in for global blueprint sharing, which counts their blueprints in the
+   * availability views of every org unit (REQ-INV-018).
    *
-   * @param id the calling user's id, resolved from the JWT (never from the URL); never {@code
-   *     null}.
-   * @param shareBlueprintsGlobally the new opt-in value.
-   * @param version the optimistic-lock version the caller last read; {@code null} bypasses the
-   *     check, matching {@link #updateUserDefaultPayoutPreference}.
-   * @return the persisted user with the updated flag and bumped version.
+   * @param id the caller's id from the JWT; never {@code null}
+   * @param shareBlueprintsGlobally the new opt-in value
+   * @param version the version the caller last read; {@code null} skips the check
+   * @return the persisted user
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown.
-   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale.
+   *     unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
   public User updateUserShareBlueprintsGlobally(
@@ -301,9 +241,6 @@ public class UserService {
     User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
-    // saveAndFlush so the bumped @Version reaches the response — the profile blueprint-sharing
-    // toggle writes the returned version back in place via syncAllVersions (no reload), so a stale
-    // save version 409s the next consecutive change.
     return userRepository.saveAndFlush(user);
   }
 
@@ -325,12 +262,10 @@ public class UserService {
   }
 
   /**
-   * Returns all users sorted case-insensitively by username, scoped to the caller's squadron
-   * context. Admin in "all squadrons" mode receives the cross-staffel list; everyone else sees the
-   * members of <em>every</em> Staffel they belong to (REQ-ORG-017 — up to two), plus unassigned
-   * admins/guests. Reads {@link OwnerScopeService#currentUserListScopeSquadronIds()} once per call.
+   * Returns the users in the caller's squadron scope (REQ-ORG-017), sorted case-insensitively by
+   * username; admins in "all squadrons" mode get every user.
    *
-   * @return scoped user list, case-insensitively sorted by username
+   * @return scoped user list, sorted by username
    */
   public List<User> findAll() {
     Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
@@ -350,18 +285,12 @@ public class UserService {
   }
 
   /**
-   * Returns paged squadron members eligible to be evaluated in the promotion system, scoped to the
-   * caller's squadron context and excluding both admins and officers — the promotion system
-   * assesses only the simple members of a squadron (issue #817). An Officer sees the ordinary
-   * members of <em>every</em> Staffel they belong to (REQ-ORG-017 — up to two); an Admin in "all
-   * squadrons" mode sees every squadron's ordinary members; an Admin/officer with the sidebar
-   * switcher pinned to one Staffel sees that Staffel's ordinary members. Admins and officers
-   * themselves are never returned — admins are squadron-less by design, and officers run the
-   * Bewertungsverwaltung rather than being its subject. Delegates the filter to {@link
-   * UserRepository#findEvaluatableMembers(java.util.Collection, Pageable)}.
+   * Returns the caller-scoped squadron members the promotion system evaluates, excluding admins and
+   * officers; delegates to {@link UserRepository#findEvaluatableMembers(java.util.Collection,
+   * Pageable)}.
    *
    * @param pageable page request
-   * @return paged evaluatable members (squadron-scoped, admin- and officer-free)
+   * @return paged evaluatable members
    */
   @NotNull
   public Page<User> findEvaluatableMembers(@NotNull Pageable pageable) {
@@ -407,10 +336,9 @@ public class UserService {
   }
 
   /**
-   * Paged username/displayName substring search projected to slim {@link
-   * de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto}s, squadron-scoped exactly
-   * like {@link #searchByUsername(String, Pageable)} — the user pickers' source (BE-PERF-06). One
-   * statement for the page plus one for its count; no entity is hydrated.
+   * Squadron-scoped substring search projected to {@link
+   * de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto}s for the user pickers,
+   * without loading entities.
    *
    * @param query free-text filter; blank matches every user in scope
    * @param pageable page request
@@ -435,30 +363,14 @@ public class UserService {
   }
 
   /**
-   * Looks up the calling user from the current {@link Authentication}. The single canonical
-   * accessor for "who is calling" — other services delegate here instead of reaching for {@code
-   * SecurityContextHolder} (the architectural seam enforced by ArchUnit).
-   *
-   * <p>Reads the subject through {@code AuthenticatedSubject}, so it answers for a bearer token and
-   * for the token-less identity the ingest gateway installs alike (ADR-0129). Empty means "no
-   * caller" — a guest; a caller whose subject is present but malformed is refused rather than
-   * reported as absent.
+   * Looks up the calling user from the current {@link Authentication}, for bearer tokens and the
+   * ingest gateway's token-less identity alike (ADR-0129).
    *
    * @return the calling user, or empty for unauthenticated requests
    * @throws org.springframework.security.authentication.AuthenticationServiceException if the
    *     caller's subject is not a UUID
    */
   public Optional<User> getCurrentUser() {
-    // Asked of AuthenticatedSubject, not of the type. This is the canonical "who is calling"
-    // accessor, and a Jwt-principal test made it answer "nobody" for an acting member (ADR-0129) —
-    // latent today because neither ACTING_PATH reaches it, and an ownership check silently
-    // evaluated against no current user the moment a third endpoint joins that list.
-    //
-    // NOT idOf(). That would fold "there is no caller" and "the caller's subject is malformed" into
-    // the same empty Optional, and those must stay apart: the first is a guest, the second is a
-    // misconfigured realm. Callers act on the difference — MissionService does
-    // getCurrentUser().ifPresent(mission::setOwner), so a silent empty would persist an OWNERLESS
-    // mission where this used to refuse the request outright.
     Optional<String> subject = AuthenticatedSubject.of(authHelperService.rawAuthentication());
     if (subject.isEmpty()) {
       return Optional.empty();
@@ -469,11 +381,6 @@ public class UserService {
   /**
    * Parses a subject claim into a member id, refusing anything that is not a UUID.
    *
-   * <p>The same fail-closed rule {@link #getUserIdFromJwt(Jwt)} applies, reached from the
-   * token-less identity the ingest gateway installs (ADR-0129) as well as from a bearer token.
-   * Deriving an id from a non-UUID subject — via {@code UUID.nameUUIDFromBytes} or otherwise —
-   * would mix up identities across realms, so a deviation is refused rather than mapped.
-   *
    * @param subject the caller's non-blank subject claim
    * @return the parsed member id
    * @throws AuthenticationServiceException if the subject is not a UUID
@@ -483,44 +390,26 @@ public class UserService {
     try {
       return UUID.fromString(subject);
     } catch (IllegalArgumentException malformed) {
-      // Deliberately without the value: it reaches the log unfiltered otherwise, and a subject from
-      // a deviating realm can be a username (REQ-OBS-004).
       log.error("Authenticated subject is not a UUID. Refusing to avoid an identity mix-up.");
       throw new AuthenticationServiceException("Authenticated subject must be a UUID");
     }
   }
 
   /**
-   * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta orchestrator. Applies the supplied
-   * Staffel + SK change set in one transaction so the admin member-edit page can persist every
-   * change with one Save button click.
-   *
-   * <p>Resolution order matters and is fixed by this method:
+   * Applies a Staffel and Spezialkommando membership change set in one transaction; any failure
+   * rolls back the whole delta.
    *
    * <ol>
-   *   <li>Staffel side first — the {@code staffeln} list (the desired complete Staffel membership
-   *       set, REQ-ORG-017 allows up to two) is reconciled against the current state by {@link
-   *       OrgUnitMembershipService#reconcileStaffelMemberships}: squadrons are added / removed and
-   *       per-squadron flags patched in one pass. A {@code null} list leaves the Staffel side
-   *       untouched; a non-null (possibly empty) list is the authoritative target.
-   *   <li>SK side second, in the order the client sent them. ADD adopts initial flags inline (no
-   *       second {@code save}); REMOVE deletes by composite PK; PATCH validates the per-row
-   *       {@code @Version} before writing. {@code is_lead} is intentionally not part of this
-   *       payload — Lead toggles stay isolated in the SK detail page workflow per Plan D2 so the
-   *       audit trail keeps clear per-toggle attribution.
+   *   <li>A non-null {@code staffeln} list is the target Staffel set, reconciled by {@link
+   *       OrgUnitMembershipService#reconcileStaffelMemberships}; {@code null} leaves it untouched.
+   *   <li>SK changes (ADD, REMOVE, PATCH) are then applied in request order; {@code is_lead} is not
+   *       part of the payload.
    * </ol>
    *
-   * <p>If any step throws (NotFoundException on a stale id, OptimisticLockingFailureException on a
-   * stale version, DuplicateEntityException on an ADD for an existing membership,
-   * BadRequestException on a Staffel-cardinality / leadership conflict) the entire transaction
-   * rolls back — partial application is not exposed.
-   *
-   * @param userId the user whose memberships to mutate; never {@code null}.
-   * @param delta the delta to apply; never {@code null}, but both halves may be {@code null} /
-   *     empty (no-op delta is allowed and just returns the current state).
-   * @return the user's complete post-write membership list (Staffel + every SK), never {@code
-   *     null}.
-   * @throws java.util.NoSuchElementException when the user does not exist.
+   * @param userId the user whose memberships to change; never {@code null}
+   * @param delta the delta to apply; never {@code null}, either half may be empty
+   * @return the user's complete membership list after the write; never {@code null}
+   * @throws java.util.NoSuchElementException when the user does not exist
    */
   @Transactional
   public List<OrgUnitMembership> applyMembershipDelta(UUID userId, MembershipDeltaRequest delta) {
@@ -541,15 +430,12 @@ public class UserService {
   }
 
   /**
-   * SK-side half of {@link #applyMembershipDelta}. Dispatches on the action discriminator and
-   * forwards to the existing membership-service primitives. ADD adopts initial flags via a single
-   * {@code save} on the freshly-created row (avoiding the intra-transaction double-version-bump
-   * trap from CLAUDE.md "Concurrency" section); PATCH delegates to {@link
-   * OrgUnitMembershipService#patchFlags} which does its own optimistic-lock check; REMOVE delegates
-   * to {@link OrgUnitMembershipService#removeMember}.
+   * Applies one SK-side change of {@link #applyMembershipDelta}: ADD creates the row with its
+   * initial flags in one save, PATCH delegates to {@link OrgUnitMembershipService#patchFlags},
+   * REMOVE to {@link OrgUnitMembershipService#removeMember}.
    *
-   * @param userId target user id.
-   * @param change the SK-side change record.
+   * @param userId target user id
+   * @param change the SK-side change record
    */
   private void applySpecialCommandChange(
       UUID userId, MembershipDeltaRequest.SpecialCommandChange change) {
@@ -558,10 +444,6 @@ public class UserService {
         OrgUnitMembership fresh = orgUnitMembershipService.addMember(change.orgUnitId(), userId);
         if (Boolean.TRUE.equals(change.isLogistician())
             || Boolean.TRUE.equals(change.isMissionManager())) {
-          // The freshly-created row has version 0 and is still managed in this transaction.
-          // Mutate it in place; Hibernate dirty-checking flushes the second update on commit
-          // without a second explicit save call (avoiding the intra-transaction @Version race
-          // documented in CLAUDE.md).
           if (Boolean.TRUE.equals(change.isLogistician())) {
             fresh.setLogistician(true);
           }
@@ -584,31 +466,11 @@ public class UserService {
   }
 
   /**
-   * Rejects a display name a member must not be able to give themselves.
+   * Rejects a display name that is the erasure sentinel or already another account's username or
+   * display name, since the Art. 17 erasure matches on this field (REQ-SEC-062). Re-saving one's
+   * own unchanged name is allowed.
    *
-   * <p>Two reserved cases, and both are about the Art. 17 erasure (REQ-SEC-062), whose text-matched
-   * statements are driven by exactly this field and carry no owner predicate.
-   *
-   * <ul>
-   *   <li><b>The erasure sentinel.</b> It is only meaningful because nothing else equals it; a
-   *       member naming themselves {@code #ANONYMISED#} would put it into their own audit rows and
-   *       make a live account read as an erased one.
-   *   <li><b>Another live account's name.</b> Without this a departing member could set their
-   *       display name to a victim's handle, tick "also erase my history", and have an admin
-   *       rewrite the <em>victim's</em> job orders, handover receipts and audit labels to the
-   *       sentinel — which every viewer renders as "this person requested erasure". A false
-   *       statement about a data subject who never asked, recoverable only from a backup plus
-   *       knowledge of the attacker's now-deleted display name.
-   * </ul>
-   *
-   * <p>Deliberately <b>not</b> a general uniqueness constraint on the column. Two members who
-   * happen to share a spelling is a situation the system has always tolerated and the erasure
-   * documents as acceptable over-matching; what is rejected is <em>changing</em> a name into a
-   * collision, which is the only way to aim it. Existing collisions stay editable in every other
-   * respect, and a member re-saving their own unchanged name is not a collision.
-   *
-   * @param displayName the candidate, as the client sent it; a blank one clears the field and is
-   *     never a collision
+   * @param displayName the candidate; a blank one clears the field and never collides
    * @param selfId the account being edited
    * @throws IllegalArgumentException when the name is reserved or already somebody else's
    */

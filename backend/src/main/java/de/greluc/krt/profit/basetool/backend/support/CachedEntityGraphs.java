@@ -32,26 +32,15 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Initialises the lazy to-one associations of an entity <em>before</em> it enters a Caffeine
- * {@code @Cacheable} cache (BE-PERF-11).
+ * Initialises the lazy to-one associations of an entity before it enters a Caffeine
+ * {@code @Cacheable} cache, so the cache only holds complete graphs.
  *
- * <p>A cached entity outlives the persistence context that loaded it and is handed to every later
- * caller, on any thread. While these associations were EAGER the whole graph was loaded before the
- * cache stored it. Made LAZY, an association nobody happened to touch would be cached as an
- * uninitialised proxy bound to a session that has since closed, and the first later reader to touch
- * it — the next request's mapper, or a write path that attaches the cached entity to a new row —
- * would fail with {@code LazyInitializationException}, or, worse, race the loading session from
- * another thread. So every cached read of these four types passes its result through here, inside
- * the service's own read-only transaction, and the cache only ever holds complete graphs.
- *
- * <p>Initialisation goes through Hibernate's batch fetching ({@code default_batch_fetch_size}), so
- * a page of materials costs one statement per association level, not one per row.
+ * <p>Must run inside the service's read-only transaction; initialisation uses Hibernate batch
+ * fetching.
  */
 public final class CachedEntityGraphs {
 
-  private CachedEntityGraphs() {
-    // Static helpers — not instantiable.
-  }
+  private CachedEntityGraphs() {}
 
   /**
    * Initialises a material's category and its whole {@code refinedMaterial} chain, each link with
@@ -138,9 +127,7 @@ public final class CachedEntityGraphs {
   }
 
   /**
-   * Initialises a job type's whole {@code parent} chain. The mappers read only {@code parent.id},
-   * which a proxy answers without loading, but a cached graph is complete or it is a trap for the
-   * next reader.
+   * Initialises a job type's whole {@code parent} chain.
    *
    * @param jobType the job type about to be cached; {@code null} passes through
    * @return {@code jobType}, for chaining

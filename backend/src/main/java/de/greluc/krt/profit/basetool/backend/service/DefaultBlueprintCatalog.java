@@ -22,16 +22,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 import java.util.List;
 
 /**
- * The known set of blueprint products that every Star Citizen account starts with unlocked
- * (REQ-INV-016). Used <strong>only</strong> as the one-time seed for the admin-managed {@code
- * default_blueprint} table (REQ-INV-017): once seeded, the table is the source of truth and admins
- * curate it through the admin surface, so this list is not consulted at runtime afterwards.
+ * The blueprint products every Star Citizen account starts with unlocked (REQ-INV-016), used only
+ * as the one-time seed of the admin-managed {@code default_blueprint} table (REQ-INV-017).
  *
- * <p>The names are the display spellings reported by the external blueprint manager (scmbd.net).
- * The seeder normalizes each through {@code BlueprintNameNormalizer} and resolves it against the
- * live blueprint catalog to stamp the canonical product key + output item; an entry that does not
- * resolve is still seeded (degraded, key = normalized name) so the default is granted regardless,
- * and an admin can re-resolve it through the picker.
+ * <p>Names are the display spellings of the external blueprint manager (scmbd.net).
  */
 public final class DefaultBlueprintCatalog {
 
@@ -50,7 +44,5 @@ public final class DefaultBlueprintCatalog {
           "S-38 Pistol",
           "P4-AR Rifle");
 
-  private DefaultBlueprintCatalog() {
-    // Constants holder — not instantiable.
-  }
+  private DefaultBlueprintCatalog() {}
 }

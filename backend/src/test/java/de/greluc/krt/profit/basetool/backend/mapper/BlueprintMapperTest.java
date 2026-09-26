@@ -78,8 +78,6 @@ class BlueprintMapperTest {
     assertEquals(1, dto.requirementGroups().get(0).modifiers().size());
     assertEquals("Impact Force", dto.requirementGroups().get(0).modifiers().get(0).label());
     assertEquals(1.05, dto.requirementGroups().get(0).modifiers().get(0).modifierAtMaxQuality());
-    // The flat ingredient list takes its display name from the Wiki snapshot and the kind enum
-    // name.
     assertEquals(1, dto.ingredients().size());
     assertEquals("Hadanite", dto.ingredients().get(0).name());
     assertEquals("ITEM", dto.ingredients().get(0).kind());
@@ -96,15 +94,12 @@ class BlueprintMapperTest {
 
     BlueprintRequirementModifierDto dto = mapper.toModifierDto(modifier);
 
-    // No segments: the effective band equals the raw endpoint band.
     assertEquals(0.0, dto.effectiveQualityMin());
     assertEquals(1000.0, dto.effectiveQualityMax());
   }
 
   @Test
   void toModifierDto_steppedModifierSpansUnionOfSegmentBoundsNotFirstSegmentOnly() {
-    // Mirrors the live SC Wiki "Durango" Integrity modifier: the raw quality_range only carries the
-    // first segment's bounds (0..500), while the segments together cover the full 0..1000 band.
     BlueprintRequirementModifier modifier = new BlueprintRequirementModifier();
     modifier.setQualityMin(0.0);
     modifier.setQualityMax(500.0);
@@ -127,10 +122,8 @@ class BlueprintMapperTest {
 
     BlueprintRequirementModifierDto dto = mapper.toModifierDto(modifier);
 
-    // Raw band stays as the Wiki delivered it (first segment only)...
     assertEquals(0.0, dto.qualityMin());
     assertEquals(500.0, dto.qualityMax());
-    // ...but the effective band spans every segment so the slider reaches quality 1000.
     assertEquals(0.0, dto.effectiveQualityMin());
     assertEquals(1000.0, dto.effectiveQualityMax());
   }

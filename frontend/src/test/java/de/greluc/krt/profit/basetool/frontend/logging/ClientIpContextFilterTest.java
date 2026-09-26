@@ -52,14 +52,8 @@ class ClientIpContextFilterTest {
     ClientIpContext.clear();
   }
 
-  // --------------------------------------------------------------
-  // resolveClientIp — the spoofing-resistant resolution
-  // --------------------------------------------------------------
-
   @Test
   void resolveClientIp_trustedPeerAppendedChain_returnsRealClientNotForgedLeftmost() {
-    // NPM appends the real peer on the right ($proxy_add_x_forwarded_for): the attacker-supplied
-    // leftmost entry must be ignored.
     String resolved =
         ClientIpContextFilter.resolveClientIp(NPM_PEER, "1.2.3.4, " + REAL_CLIENT, DOCKER_PROXIES);
 
@@ -68,7 +62,6 @@ class ClientIpContextFilterTest {
 
   @Test
   void resolveClientIp_rotatingForgedLeftmost_yieldsSameClientIp() {
-    // The core SEC-02 property: rotating the forged value per request must NOT mint a new bucket.
     String first =
         ClientIpContextFilter.resolveClientIp(NPM_PEER, "9.9.9.9, " + REAL_CLIENT, DOCKER_PROXIES);
     String second =
@@ -80,8 +73,6 @@ class ClientIpContextFilterTest {
 
   @Test
   void resolveClientIp_forgedEntryShapedLikeADockerIp_isStillIgnored() {
-    // An attacker who forges a value that looks like an internal proxy cannot help themselves: it
-    // sits left of the NPM-appended real client and is never reached.
     String resolved =
         ClientIpContextFilter.resolveClientIp(
             NPM_PEER, "172.18.0.9, " + REAL_CLIENT, DOCKER_PROXIES);
@@ -91,7 +82,6 @@ class ClientIpContextFilterTest {
 
   @Test
   void resolveClientIp_npmReplacesHeaderWithSingleRealClient_returnsIt() {
-    // NPM configured to replace XFF with $remote_addr: a single, real value.
     String resolved = ClientIpContextFilter.resolveClientIp(NPM_PEER, REAL_CLIENT, DOCKER_PROXIES);
 
     assertThat(resolved).isEqualTo(REAL_CLIENT);
@@ -99,8 +89,6 @@ class ClientIpContextFilterTest {
 
   @Test
   void resolveClientIp_untrustedPeerWithClientSuppliedHeader_ignoresHeaderUsesPeer() {
-    // An attacker reaching the container directly (not via NPM) cannot spoof: their X-Forwarded-For
-    // is not honoured because the peer is not a trusted proxy.
     String attackerPeer = "203.0.113.50";
     String resolved =
         ClientIpContextFilter.resolveClientIp(attackerPeer, "10.0.0.1, 1.2.3.4", DOCKER_PROXIES);
@@ -117,7 +105,6 @@ class ClientIpContextFilterTest {
 
   @Test
   void resolveClientIp_emptyTrustedProxies_devProfile_ignoresHeader() {
-    // Dev/test default: no proxy trusted, so even a present X-Forwarded-For is ignored.
     String resolved = ClientIpContextFilter.resolveClientIp("127.0.0.1", "1.2.3.4", List.of());
 
     assertThat(resolved).isEqualTo("127.0.0.1");
@@ -125,7 +112,6 @@ class ClientIpContextFilterTest {
 
   @Test
   void resolveClientIp_multipleTrustedHops_skipsThemAndReturnsFirstUntrustedFromRight() {
-    // A two-proxy internal chain: both internal hops are skipped, the real client is returned.
     String resolved =
         ClientIpContextFilter.resolveClientIp(
             NPM_PEER, REAL_CLIENT + ", 172.19.0.4, 172.18.0.5", DOCKER_PROXIES);
@@ -135,8 +121,6 @@ class ClientIpContextFilterTest {
 
   @Test
   void resolveClientIp_nonIpTokenInChain_treatedAsUntrusted() {
-    // Some proxies emit the literal "unknown"; it never matches a CIDR rule. The real client is to
-    // its right (NPM-appended), so it is returned and the token is never reached.
     String resolved =
         ClientIpContextFilter.resolveClientIp(NPM_PEER, "unknown, " + REAL_CLIENT, DOCKER_PROXIES);
 
@@ -147,10 +131,6 @@ class ClientIpContextFilterTest {
   void resolveClientIp_nullRemoteAddr_returnsNull() {
     assertThat(ClientIpContextFilter.resolveClientIp(null, "1.2.3.4", DOCKER_PROXIES)).isNull();
   }
-
-  // --------------------------------------------------------------
-  // filter wiring — the resolved IP is bound into ClientIpContext
-  // --------------------------------------------------------------
 
   @Test
   void doFilterInternal_bindsResolvedClientIpForTheChainAndClearsAfter() throws Exception {

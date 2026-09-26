@@ -1,110 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  OWASP Dependency-Check suppression file.
-
-  Wired into the `org.owasp.dependencycheck` plugin in the root build.gradle.kts
-  via `dependencyCheck { suppressionFile = ... }`. Every entry below MUST carry
-  a `notes` block that explains *why* the finding is suppressed so the next
-  weekly Monday scan does not require re-deriving the justification from
-  scratch.
-
-  Categories accepted:
-    1. CPE confusion - the NVD entry refers to a different product that shares
-       a token (e.g. "line", "spring boot tools") with the dependency we ship.
-    2. Build-time-only path - the affected JAR is on the buildscript /
-       checkstyle / pitest plugin classpath, never reaches the
-       runtime classpath of the deployed Spring Boot fat JAR.
-    3. Nested JAR inside a build-time tool - same as #2 but the SHA-1 match
-       happens because OWASP unpacks a fat tool JAR and inspects the
-       embedded JARs.
-
-  Real production CVEs are NEVER suppressed; they are fixed by upgrading the
-  dependency to a patched version (see build.gradle.kts dependency overrides).
-
-  Every entry EXPIRES (audit item SEC-16). `until="YYYY-MM-DDZ"` is Dependency-Check's own
-  mechanism: past that date the entry is ignored, the finding is reported again, and one at or
-  above the CVSS 7.0 gate fails `dependencyCheckAggregate`. Before this, a suppression written for
-  a build-time jar outlived the reason it was written for: nothing asked whether the tool was
-  still on that version, still build-time only, or still confused with the same product.
-
-  Renewing one is a review, not a date bump:
-    1. Re-check the `notes` against the current build: is the coordinate still resolved, still on
-       a build-time classpath only (the module's `dependencyInsight` task, run against its
-       `runtimeClasspath` configuration for that artifact, must find nothing), and is the CPE
-       confusion still the reason NVD matches it?
-    2. If the dependency moved past the affected range, or left the build, DELETE the entry.
-    3. Otherwise move `until` to today + 90 days in the same commit that records the re-check in
-       the `notes`, and run `./gradlew dependencyCheckAggregate` once to see the gate green.
-  All entries were set to 2026-12-22 on 2026-09-23 (+90 days); give a new entry today + 90 days.
-  Keep command-line flags out of these comments: a double hyphen is illegal inside an XML comment
-  and makes the whole file unreadable to the scan.
--->
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
-  <!--
-    pitest-command-line carries the artifact id "pitest" but the OWASP CPE
-    matcher attributes CVE-2015-0897 (a MITM bug in the "LINE" Android/iOS
-    messenger app) to it because the messenger's vendor/product CPE happens
-    to be "cpe:2.3:a:line:line". The library has no relation to LINE Corp;
-    it is a JVM mutation testing tool. CVSS for this CVE is 5.9 (under our
-    7.0 fail-build gate) but the SARIF report would still surface the
-    finding noisily to GitHub Security every week.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: CPE confusion. CVE-2015-0897 targets the "LINE" Android/iOS messenger app (cpe:2.3:a:line:line) and has nothing to do with the pitest mutation testing library.</notes>
     <packageUrl regex="true">^pkg:maven/org\.pitest/pitest-command-line@.*$</packageUrl>
     <cve>CVE-2015-0897</cve>
   </suppress>
 
-  <!--
-    spring-boot-devtools (Spring Boot 4.x) is wrongly matched against the
-    `cpe:2.3:a:vmware:spring_boot_tools` / `cpe:2.3:a:vmware:spring_tools`
-    CPEs. CVE-2022-31691 is a deserialization gadget in **Spring Tools 4
-    for Eclipse** plus the VSCode "Spring Boot Tools", "Concourse CI Pipeline
-    Editor", "Bosh Editor" and "Cloudfoundry Manifest YML Support" extensions
-    - none of which we ship. The Spring Boot runtime devtools module is a
-    distinct artifact and is gated to the `development` profile only.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: CPE confusion. CVE-2022-31691 affects Spring Tools 4 for Eclipse and a set of VSCode plugins; it does not apply to the Spring Boot runtime devtools dependency.</notes>
     <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/spring-boot-devtools@.*$</packageUrl>
     <cve>CVE-2022-31691</cve>
   </suppress>
 
-  <!--
-    The io.opentelemetry.semconv jars (opentelemetry-semconv /
-    opentelemetry-semconv-incubating, pulled by the Boot 4 OpenTelemetry
-    starter and by the Keycloak server SPI compile classpath) contain only
-    generated semantic-convention CONSTANTS - no network, parsing or
-    process-spawning code. The NVD matcher maps them onto the umbrella CPE
-    `cpe:2.3:a:opentelemetry:opentelemetry`, which aggregates the whole
-    OpenTelemetry product family across languages; every CVE filed against
-    the *Go* SDK whose version range happens to contain 1.37/1.41 then
-    lights up these Java jars. Concretely flagged in week 2026-W27:
-    CVE-2026-29181 (Go baggage-header DoS, fixed in otel-go 1.41.0),
-    CVE-2026-24051 and CVE-2026-39883 (Go macOS/BSD PATH-hijack in
-    host-resource detection, fixed in otel-go 1.40.0/1.43.0). Suppressing
-    the CPE mapping itself (not individual CVEs) is the documented
-    dependency-check remedy for CPE confusion and keeps every future
-    Go/Collector CVE from re-triggering this false positive. Real CVEs
-    against the io.opentelemetry *Java* artifacts use distinct CPEs and
-    remain visible.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: CPE confusion. The opentelemetry-semconv Java jars are constants-only; the umbrella cpe:/a:opentelemetry:opentelemetry attributes OpenTelemetry-Go SDK CVEs (CVE-2026-29181, CVE-2026-24051, CVE-2026-39883) to them by pure version-number overlap.</notes>
     <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv.*@.*$</packageUrl>
     <cpe>cpe:/a:opentelemetry:opentelemetry</cpe>
   </suppress>
 
-  <!--
-    Belt-and-braces companion to the CPE suppression above: the same five
-    OpenTelemetry-GO SDK CVEs pinned by id, in case a future
-    dependency-check version changes how partial-CPE matching works. All
-    five are Go-SDK-only (baggage-header DoS and macOS/BSD PATH-hijack in
-    host-resource detection - see the notes above); none has any Java
-    counterpart. CVE-2026-39882 and CVE-2026-41178 sit below the 7.0 gate
-    but would still spam the weekly SARIF upload.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: CPE confusion (companion to the CPE-level entry). CVE-2026-29181, CVE-2026-24051, CVE-2026-39883, CVE-2026-39882 and CVE-2026-41178 are OpenTelemetry-Go SDK vulnerabilities attributed to the constants-only Java semconv jars.</notes>
     <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv.*@.*$</packageUrl>
@@ -115,125 +29,24 @@
     <cve>CVE-2026-41178</cve>
   </suppress>
 
-  <!--
-    CVE-2026-53914 is an unsafe-deserialization bug in the Kotlin BUILD
-    TOOLCHAIN (< 2.4.20): malicious build-cache metadata can execute code
-    during compilation. JetBrains' own CNA vector is local/high-privilege
-    (CVSS 6.7); the NVD auto-score of 9.8 CRITICAL is what trips our gate.
-    The artifact we actually ship is the RUNTIME kotlin-stdlib jar
-    (transitive via okhttp/okio, the OTLP exporter's HTTP sender) which
-    contains no build-cache handling code, and basetool compiles zero
-    Kotlin sources - the vulnerable toolchain path cannot be reached.
-    CVE-scoped (not CPE-scoped) on purpose: a future CVE against the
-    stdlib itself must still fail the build.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: CVE-2026-53914 targets the Kotlin build toolchain's build-cache metadata deserialization, not the runtime kotlin-stdlib jar we ship transitively via okhttp/okio; this project compiles no Kotlin sources.</notes>
     <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib@.*$</packageUrl>
     <cve>CVE-2026-53914</cve>
   </suppress>
 
-  <!--
-    CVE-2026-54285 is an OpenTelemetry-JAVASCRIPT vulnerability: W3CBaggagePropagator.extract()
-    in @opentelemetry/core enforced the W3C Baggage size limits on the outbound inject() path
-    only, so an oversized inbound baggage header allocated without a cap. It affects
-    opentelemetry-js before 2.8.0.
-
-    Corrected 2026-09-23: this note used to say the CVE "has no Java counterpart" because the Java
-    W3CBaggagePropagator had always capped extraction. That was wrong. The Java SDK had the same
-    gap and it has its own advisory, CVE-2026-45292 / GHSA-rcgg-9c38-7xpx (opentelemetry-api and
-    opentelemetry-extension-trace-propagators up to 1.61.0: no size or entry limit on W3C, Jaeger
-    or OT baggage extraction), fixed in 1.62.0 by opentelemetry-java PR 8380. It reached us as
-    Dependabot alert #14. The suppression below is still right, but for a narrower reason: the JS
-    CVE's version range is matched against Java jars by CPE confusion, and both jars the Java
-    advisory names resolve 1.62.0 everywhere in this build, past the Java fix. The note also had
-    the two sources swapped: the
-    Boot 4.1.1 BOM supplies 1.62.0 to backend/frontend/ingest, and it was the Keycloak SPI compile
-    classpath that carried 1.57.0 - now floored at 1.62.0 by the `opentelemetry` catalog entry.
-
-    It lands on our io.opentelemetry Java jars through the same umbrella
-    cpe:2.3:a:opentelemetry:opentelemetry the semconv entries above document: the CPE aggregates
-    the whole OpenTelemetry product family across languages, and 2.8.0 sorts below both of our
-    version numbers, so every artifact in the family matches. 28 alerts in week 2026-W36, one per
-    jar, all of them the same false positive.
-
-    Suppressed by CVE id rather than by CPE so a genuine future Java-SDK CVE on these coordinates
-    still fails the build - the semconv entries can suppress the CPE wholesale because those jars
-    are constants-only, which the SDK and exporter jars here are not.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: CPE confusion. CVE-2026-54285 is an inbound-baggage size-limit gap in opentelemetry-JS (@opentelemetry/core before 2.8.0); the umbrella cpe:/a:opentelemetry:opentelemetry attributes it to every io.opentelemetry Java jar by version-number overlap. The Java SDK's own counterpart, CVE-2026-45292, is fixed in 1.62.0, which opentelemetry-api and opentelemetry-extension-trace-propagators resolve on every classpath of this build (2026-09-23).</notes>
     <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-.*@.*$</packageUrl>
     <cve>CVE-2026-54285</cve>
   </suppress>
 
-  <!--
-    CVE-2026-42582 is an allocation-DoS in the QPACK decoder of
-    netty-codec-http3 4.2.0.Alpha1 - 4.2.12 (fixed 4.2.13.Final). The
-    netty 4.1.x line does not contain the HTTP/3 codec at all - it lives
-    in the 4.2+ line - so ANY 4.1.x jar is outside the affected range;
-    the broad cpe:2.3:a:netty:netty match flags them anyway. Our 4.1.x jars
-    (4.1.138.Final since the 2026-09-22 `netty41` floor) additionally sit only
-    on the keycloak-spi compile/test classpaths (Keycloak server internals,
-    container-provided at runtime); the app modules resolve netty 4.2.18.Final,
-    which is above the fixed version.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: CPE confusion. CVE-2026-42582 affects netty-codec-http3 in the 4.2.0-4.2.12 range; the netty 4.1.x line ships no HTTP/3 codec, and these jars are Keycloak-container-provided compile-time deps anyway.</notes>
     <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4\.1\..*$</packageUrl>
     <cve>CVE-2026-42582</cve>
   </suppress>
 
-  <!--
-    The CVE-2026-62380 entry (netty SOCKS4/SOCKS5 client-encoder injection, fixed in 4.1.137.Final)
-    that stood here was deleted on 2026-09-22: the keycloak-spi module now imports a netty 4.1.x BOM
-    floor (`netty41` in gradle/libs.versions.toml), so its compile and test classpaths resolve
-    4.1.138.Final - above that fix, and above the fixes for CVE-2026-75595/75596 (4.1.137.Final) and
-    CVE-2026-89044 (4.1.138.Final) that the same 4.1.136.Final jars had picked up since. Upgraded
-    rather than suppressed, so there is nothing left to suppress.
-  -->
-
-  <!--
-    The CVE-2024-7254 entry (protobuf-java 3.25.1, unbounded recursion on nested groups, fixed in
-    3.25.5) that stood here was deleted on 2026-09-23: the keycloak-spi module now imports a
-    protobuf 3.x BOM floor (`protobuf3` in gradle/libs.versions.toml), so its compile and test
-    classpaths resolve 3.25.9 instead of the 3.25.1 that Keycloak 26.7.4 -> Quarkus ->
-    grpc-protobuf 1.65.0 drags in. The same finding had reached GitHub as Dependabot alert #12 once
-    the dependency-submission workflow started reporting the Gradle graph. Upgraded rather than
-    suppressed, so there is nothing left to suppress.
-
-    The CVE-2025-67030 entry (plexus-utils 3.3.0 via Checkstyle's doxia-core) was deleted on the
-    same day because it had stopped matching anything: Checkstyle 14 no longer depends on doxia, and
-    no configuration of any module resolves plexus-utils at all (checked with the `dependencies`
-    report of every project). The only plexus-utils left in the build is on the Gradle buildscript
-    classpaths, which this scan does not read; there it is held at 3.6.1, above that CVE's fix, by
-    the `plexusUtils` constraint in the root build script (Dependabot alert #13).
-  -->
-
-  <!--
-    CVE-2026-54399 (HTTP/1.1 message parser DoS) and CVE-2026-54428 (HTTP/2
-    HPACK decoder unbounded header-list DoS) are both filed against Apache
-    HttpComponents *Core 5.x* (httpcore5 / httpcore5-h2, groupId
-    `org.apache.hc.core5`), affected range "<= 5.4.2, plus 5.5-beta1". The NVD
-    matcher attributes them to our `org.apache.httpcomponents:httpcore` 4.4.14 /
-    4.4.16 jars purely because the two product lines share the CPE
-    `cpe:2.3:a:apache:httpcomponents_core` and 4.4.x sorts below the 5.4.2 upper
-    bound. The legacy 4.4.x line is a distinct codebase:
-      - it ships NO HTTP/2 support at all (HTTP/2 / HPACK lives only in the
-        5.x httpcore5-h2 artifact), so CVE-2026-54428 is structurally
-        inapplicable, and
-      - 4.4.16 is the terminal 4.x release - there is and will be no "fixed"
-        4.4.x version, because the 4.x parser is not the affected code.
-    Confirmed via `./gradlew :keycloak-spi:dependencies`: httpcore 4.4.x is
-    dragged in ONLY by `org.apache.httpcomponents:httpclient` on the
-    keycloak-spi module's `checkstyle`, `compileClasspath` and `test*`
-    configurations (Keycloak server SPI internals the module compiles/tests
-    against; container-provided at runtime). It is absent from every basetool
-    RUNTIME classpath, and no httpcore5 5.x jar exists anywhere in the build,
-    so nothing we ship can reach the vulnerable code. CVE-scoped (not
-    CPE-scoped) and pinned to the 4.x line so a genuinely-vulnerable httpcore5
-    5.x ever entering the build still fails the gate.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: CPE confusion + build-time-only. CVE-2026-54399/CVE-2026-54428 affect Apache HttpComponents Core 5.x (httpcore5/httpcore5-h2, HTTP/1.1 parser and HTTP/2 HPACK decoder); our httpcore 4.4.x jars are the legacy 4.x line (no HTTP/2 code path), present only on the keycloak-spi compile/checkstyle/test classpaths and on no basetool runtime classpath. No httpcore5 5.x is shipped.</notes>
     <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents/httpcore@4\..*$</packageUrl>
@@ -241,52 +54,11 @@
     <cve>CVE-2026-54428</cve>
   </suppress>
 
-  <!--
-    CVE-2026-15075 (the vertx-core HttpClient DefaultRedirectHandler forwards
-    Authorization / Cookie / custom headers verbatim across a cross-origin 30x
-    redirect - an OUTBOUND HttpClient credential leak) and CVE-2026-15076 (the
-    vertx-web-client WebClientSession accepts a Set-Cookie `Domain` for an
-    unrelated host - cross-domain cookie injection) both affect Eclipse Vert.x
-    4.5.29 and earlier (fixed in 4.5.30). The NVD CPE fans the generic
-    "Eclipse Vert.x" product out onto the plain io.vertx:vertx-core / vertx-grpc*
-    coordinates; CVE-2026-15076's vulnerable class actually lives in
-    io.vertx:vertx-web-client, which is not on any classpath in this build at all.
-
-    Re-verified on 2026-09-17 against Keycloak 26.7.4, which moved NONE of these
-    transitives: the 26.7.3 -> 26.7.4 bump does move Quarkus, 3.33.3.1 -> 3.33.3.2,
-    but every io.vertx coordinate below comes out at the same version it did under
-    26.7.3. vertx-core and the vertx-grpc* jars still resolve to 4.5.31 - ABOVE the
-    fixed 4.5.30, so those coordinates remain outside the affected range. What keeps
-    this suppression load-bearing is io.vertx:vertx-codegen, still selected at 4.5.26
-    (pulled by smallrye-mutiny-vertx-core -> quarkus-vertx), which the
-    4.5.29-and-earlier CPE range still covers. Confirmed with
-    `./gradlew :keycloak-spi:dependencies` over the compileClasspath configuration
-    (spelled out rather than as a flag: an XML comment may not contain a double
-    hyphen, so the usual invocation cannot be quoted here). Every one of these jars
-    is dragged in ONLY by org.keycloak:keycloak-services:26.7.4 -> keycloak-config-api ->
-    Quarkus (quarkus-vertx / quarkus-grpc-common / quarkus-opentelemetry) on the
-    keycloak-spi module's compileOnly classpath, and vertx-codegen is absent from
-    every basetool RUNTIME classpath (backend / frontend / ingest / keycloak-spi
-    runtimeClasspath all report "No dependencies matching"). At runtime the SPI
-    runs inside the Keycloak (Quarkus) container, which supplies its own
-    Red Hat-patched Vert.x, so nothing we ship can reach the vulnerable HttpClient
-    redirect or WebClientSession code. CVE-scoped and pinned to the 4.5.x line so a
-    genuinely-vulnerable Vert.x ever entering a real classpath still fails the gate.
-  -->
   <suppress until="2026-12-22Z">
     <notes>False positive: build-time-only + CPE expansion. CVE-2026-15075 (vertx-core HttpClient cross-origin redirect header leak) and CVE-2026-15076 (vertx-web-client WebClientSession cross-domain cookie injection, whose vulnerable class is not even on the classpath) affect Eclipse Vert.x 4.5.29 and earlier. Under Keycloak 26.7.4 our vertx-core / vertx-grpc* jars resolve to 4.5.31, above the 4.5.30 fix; the only coordinate still inside the affected range is vertx-codegen 4.5.26. All of them are compileOnly transitives of keycloak-services 26.7.4 (via Quarkus) on the keycloak-spi module only, absent from every basetool runtime classpath and container-provided by Keycloak at runtime (re-verified 2026-09-17).</notes>
     <packageUrl regex="true">^pkg:maven/io\.vertx/vertx-.*@4\.5\..*$</packageUrl>
     <cve>CVE-2026-15075</cve>
     <cve>CVE-2026-15076</cve>
   </suppress>
-
-  <!--
-    The CVE-2025-48924 entry (commons-lang3 3.8.1 on the `:keycloak-spi:checkstyle` configuration,
-    via checkstyle 13.9.0 -> doxia-core 1.12.0) was deleted on 2026-09-23 for the same reason as the
-    plexus-utils entry above: Checkstyle 14 no longer pulls doxia, and the `dependencies` report of
-    every project shows commons-lang3 only at 3.20.0 (above the 3.18.0 fix), never at 3.8.1. A
-    suppression that matches nothing hides nothing, but it reads as a live exposure to whoever
-    audits this file.
-  -->
 
 </suppressions>

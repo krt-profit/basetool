@@ -46,7 +46,6 @@ class TomcatRelaxedCharsTest {
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
-      // Sending a request with unencoded curly braces and asterisk
       out.println("GET /?id={{{11}}*{{11}}} HTTP/1.1");
       out.println("Host: localhost:" + port);
       out.println("Connection: close");
@@ -54,13 +53,9 @@ class TomcatRelaxedCharsTest {
 
       String firstLine = in.readLine();
 
-      // If relaxed, Tomcat should parse it and return a standard HTTP response
-      // (e.g., 200 OK, 302 Found/Redirect to login, or 404 Not Found)
-      // but NOT 400 Bad Request which is Tomcat's default for invalid characters.
       assertThat(firstLine).isNotNull();
       assertThat(firstLine).doesNotContain("HTTP/1.1 400");
 
-      // It should be a valid HTTP response
       assertThat(firstLine).startsWith("HTTP/1.1");
     }
   }

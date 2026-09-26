@@ -1,48 +1,20 @@
 #!/bin/sh
-#
-# Profit Basetool - mint the internal TLS material: one private CA, one leaf certificate per
-# service, and a CA-only truststore (REQ-SEC-070, ADR-0211).
-#
-# WHY
-#   Until this existed every service served the SAME key: one self-signed keystore.p12 was the
-#   identity of backend, frontend, ingest and Keycloak and, because it was self-signed, also the
-#   trust anchor every client pinned. A key read out of the internet-facing ingest container
-#   could therefore impersonate the backend and Keycloak to every peer (ING-SEC-04). Here each
-#   service gets its own key, signed by a CA whose key is DESTROYED at the end of the run, and
-#   clients trust only the CA.
-#
-# WHAT IT WRITES into --out (nothing else, and nothing it would overwrite without --force):
-#   <prefix>ca.crt           the CA certificate (PEM). The only thing a client needs.
-#   <prefix><svc>.p12        per service: alias `basetool` = the service's key and its chain (leaf,
-#                            CA); alias `ca` = the CA as a trusted entry, so the file still works
-#                            as a truststore for tools pointed at it (kcadm).
-#   <prefix>truststore.p12   alias `ca` only: what a client pins. No key.
-#
-# THE CA KEY does not survive the run: it lives in a temporary store inside --out and is deleted
-# at the end, so no further certificate can ever chain to this CA. A rotation mints a new CA and
-# new leaves together -- the same coordinated change the old single keystore always was.
-#
-# PORTABLE ON PURPOSE: POSIX sh and keytool, nothing else, so it runs unchanged inside the
-# backend image (Alpine, BusyBox sh, a JRE) on a host that has no JDK, and on a workstation.
-#
-# USAGE
-#   TLS_STORE_PASSWORD=... mint-internal-tls.sh --out DIR \
-#       --service backend=dns:backend,dns:localhost,ip:127.0.0.1 \
-#       --service frontend=dns:frontend,dns:localhost,ip:127.0.0.1 [...] \
-#       [--days 3650] [--prefix NAME-] [--ca-cn TEXT] [--leaf-cn-suffix TEXT] [--force]
-#
-#   The password comes from the environment only, never an argument (argv is world-readable).
-#   On the production host, run through the backend image -- docs/deployment.md, "Internal TLS".
-#
-# Exit codes: 0 done, 1 refused or failed (nothing half-written is left behind), 2 bad invocation.
 
 set -eu
-# Everything this writes starts private; the operator opens up the truststore and the CA afterwards
-# (they hold no key). A default umask of 022 would leave every private key world-readable until then.
 umask 077
 
 usage() {
-  sed -n '/^# USAGE/,/^# Exit codes/p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' >&2 || true
+  cat >&2 <<'EOT'
+USAGE
+  TLS_STORE_PASSWORD=... mint-internal-tls.sh --out DIR \
+      --service backend=dns:backend,dns:localhost,ip:127.0.0.1 \
+      --service frontend=dns:frontend,dns:localhost,ip:127.0.0.1 [...] \
+      [--days 3650] [--prefix NAME-] [--ca-cn TEXT] [--leaf-cn-suffix TEXT] [--force]
+
+  The password comes from the environment only, never an argument.
+
+Exit codes: 0 done, 1 refused or failed (nothing half-written is left behind), 2 bad invocation.
+EOT
   exit 2
 }
 
@@ -76,7 +48,6 @@ case "$DAYS" in ''|*[!0-9]*) echo "mint-internal-tls: --days must be a number" >
 command -v keytool >/dev/null 2>&1 || { echo "mint-internal-tls: keytool not found (run it in the backend image)" >&2; exit 1; }
 [ -d "$OUT" ] || { echo "mint-internal-tls: --out $OUT is not a directory" >&2; exit 1; }
 
-# Every name the run will write, checked before anything is written.
 targets="${PREFIX}ca.crt ${PREFIX}truststore.p12"
 for spec in $SERVICES; do
   name="${spec%%=*}"
@@ -97,12 +68,9 @@ if [ "$FORCE" -ne 1 ]; then
   done
 fi
 
-# MSYS/Git-Bash rewrites anything that looks like a path, which mangles the DNs and the SAN list.
 export MSYS_NO_PATHCONV=1
 
 WORK="$OUT/.mint-$$"
-# 0700 through the umask above rather than `mkdir -m`: Git Bash on NTFS refuses the explicit chmod
-# and aborts the run.
 mkdir "$WORK"
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT INT TERM
@@ -133,8 +101,6 @@ for spec in $SERVICES; do
   KS -gencert -alias ca -keystore "$WORK/ca.p12" \
     -infile "$WORK/${name}.csr" -outfile "$WORK/${name}.crt" -rfc -validity "$DAYS" \
     -ext "san=${sans}" -ext 'ku:c=digitalSignature,keyEncipherment' -ext 'eku=serverAuth' >/dev/null
-  # The CA first: importing the signed reply fails ("Failed to establish chain from reply")
-  # while its issuer is unknown to this store.
   KS -importcert -noprompt -alias ca -file "$WORK/ca.crt" -keystore "$WORK/${name}.p12" >/dev/null
   KS -importcert -noprompt -alias basetool -file "$WORK/${name}.crt" -keystore "$WORK/${name}.p12" >/dev/null
 done
@@ -146,7 +112,6 @@ for spec in $SERVICES; do
   name="${spec%%=*}"
   mv -f "$WORK/${name}.p12" "$OUT/${PREFIX}${name}.p12"
 done
-# cleanup (trap) removes $WORK, and with it ca.p12 -- the only copy of the CA key.
 
 echo
 echo "Done: $targets in $OUT. The CA key no longer exists."

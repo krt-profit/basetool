@@ -31,49 +31,28 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Inventory Item Create payload.
+ * Create payload for a new inventory entry, either a material row or a game-item row.
  *
- * <p>The optional {@link #owningOrgUnitId} field is the R5.d picker output: when present, it tells
- * the service which {@link de.greluc.krt.profit.basetool.backend.model.OrgUnit} the new inventory
- * row should be stamped onto. The service validates that the resolved org unit is one the target
- * user actually belongs to (looked up via {@code OrgUnitMembershipRepository}). When {@code null},
- * the service falls back to the legacy "stamp the target user's home Staffel" behaviour — every
- * user has exactly one Staffel membership today, so the field is effectively optional for the
- * single-membership case and required only once users belong to multiple org units.
- *
- * @param userId target user the inventory row is created for; may be {@code null} for self-entries
- *     (the service substitutes the JWT subject).
- * @param materialId Material UUID for a material row; exactly one of {@code materialId} / {@code
- *     gameItemId} must be set (REQ-INV-029).
- * @param gameItemId GameItem UUID for a game-item stock row (REQ-INV-029, ADR-0101); mutually
- *     exclusive with {@code materialId}. A game-item row carries no quality, holds positive
- *     whole-unit amounts and rejects mission references.
- * @param locationId Storage location UUID; required.
- * @param quality Quality percentage in {@code [0, 1000]}; required for a material row, forbidden
- *     for a game-item row.
- * @param amount Quantity; required, non-negative (further constrained per catalog kind via {@link
- *     de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmount}).
- * @param personal {@code true} marks the row as a personal entry not visible in the global Lager
- *     view; cannot be combined with mission/job-order references.
- * @param missionId optional mission reference.
- * @param jobOrderId optional job-order reference.
- * @param owningOrgUnitId optional R5.d owner-picker output: the {@link
- *     de.greluc.krt.profit.basetool.backend.model.OrgUnit} on whose stock this row should land.
- *     When present, must point at an org unit the target user is a member of (validated
- *     server-side). When {@code null}, the service stamps the target user's home Staffel —
- *     preserving today's behaviour for the single-membership case.
- * @param mergeStock per-action stock-merge opt-in (REQ-INV-026). For a {@code PIECE} material the
- *     new row is merged into a matching existing stack unconditionally, so this flag is ignored;
- *     for an {@code SCU} material the merge happens only when this is {@code true} — the user ticks
- *     the modal checkbox for this single book-in. {@code null} is treated as {@code false}. It is
- *     never persisted: it governs only this one transaction.
- * @param jobOrderAllocations optional Variante-C split-at-check-in (REQ-INV-027, R4): earmark parts
- *     of the new entry to several job orders with their own amounts. When non-empty it supersedes
- *     {@link #jobOrderId}; the Σ of the amounts must stay within {@link #amount} (R5) and every
- *     target's material requirement is checked. {@code null}/empty falls back to the single {@link
- *     #jobOrderId}.
- * @param missionAllocations optional Variante-C split-at-check-in for missions — the mission
- *     counterpart of {@link #jobOrderAllocations}; supersedes {@link #missionId} when non-empty.
+ * @param userId the target user; {@code null} for a self-entry (the caller)
+ * @param materialId the material for a material row; exactly one of {@code materialId} / {@code
+ *     gameItemId} is set (REQ-INV-029)
+ * @param gameItemId the game item for an item row; mutually exclusive with {@code materialId}
+ * @param locationId the storage location; required
+ * @param quality the quality in {@code [0, 1000]}; required for a material row, forbidden for a
+ *     game-item row
+ * @param amount the quantity; required, non-negative
+ * @param personal {@code true} for a personal entry; cannot be combined with mission/job-order
+ *     references
+ * @param missionId optional mission reference
+ * @param jobOrderId optional job-order reference
+ * @param owningOrgUnitId optional owner-picker output; must be an org unit the target user belongs
+ *     to, {@code null} auto-stamps
+ * @param mergeStock per-action stock-merge opt-in for an {@code SCU} material (REQ-INV-026); {@code
+ *     null} means {@code false}, ignored for {@code PIECE}
+ * @param jobOrderAllocations optional split across several job orders (REQ-INV-027); supersedes
+ *     {@link #jobOrderId} when non-empty, sum must not exceed {@link #amount}
+ * @param missionAllocations optional split across several missions; supersedes {@link #missionId}
+ *     when non-empty
  */
 @ValidQuantityAmount
 public record InventoryItemCreateDto(
@@ -93,17 +72,8 @@ public record InventoryItemCreateDto(
     implements QuantityAware {
 
   /**
-   * Bean-validation guard for the catalog XOR (REQ-INV-029): exactly one of {@link #materialId} /
-   * {@link #gameItemId} must be present — mirrors the DB CHECK {@code
-   * chk_inventory_item_catalog_xor} so the violation surfaces as a 400 validation error instead of
-   * a 500 integrity failure.
-   *
-   * <p>{@code @Schema(hidden = true)} keeps this derived guard out of the generated OpenAPI
-   * document: it is computed from {@link #materialId} / {@link #gameItemId} and is never part of
-   * the request payload, so documenting it would invite clients to send a field the server ignores
-   * — and springdoc harvests accessors in {@code Class#getDeclaredMethods()} order, which the JVM
-   * does not guarantee, so the three guards on this record permuted between runs and rewrote {@code
-   * openapi.json} on every build (see {@code OpenApiDerivedPropertyTest}).
+   * Validates that exactly one of {@link #materialId} / {@link #gameItemId} is set (REQ-INV-029),
+   * so the violation surfaces as a 400 instead of a DB integrity failure.
    *
    * @return {@code true} when exactly one catalog reference is set
    */
@@ -114,12 +84,8 @@ public record InventoryItemCreateDto(
   }
 
   /**
-   * Bean-validation guard pairing {@link #quality} with the catalog kind (REQ-INV-029): a material
-   * row requires a quality, a game-item row forbids one. Skipped while the XOR guard above already
-   * fails, so a payload with neither reference reports only the XOR violation.
-   *
-   * <p>Hidden from the OpenAPI document for the reasons given on {@link
-   * #isCatalogReferenceValid()}.
+   * Validates that {@link #quality} is present for a material row and absent for a game-item row
+   * (REQ-INV-029); skipped while the catalog XOR check fails.
    *
    * @return {@code true} when the quality presence matches the catalog kind
    */
@@ -133,11 +99,7 @@ public record InventoryItemCreateDto(
   }
 
   /**
-   * Bean-validation guard rejecting mission references on a game-item payload (REQ-INV-031): item
-   * rows are allocatable only to ITEM job orders, never to missions.
-   *
-   * <p>Hidden from the OpenAPI document for the reasons given on {@link
-   * #isCatalogReferenceValid()}.
+   * Validates that a game-item payload carries no mission reference (REQ-INV-031).
    *
    * @return {@code true} when a game-item payload carries no mission reference
    */

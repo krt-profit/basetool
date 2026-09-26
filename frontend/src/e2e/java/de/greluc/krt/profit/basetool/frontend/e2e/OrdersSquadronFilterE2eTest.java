@@ -34,18 +34,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Drives the orders-overview multi-squadron filter (REQ-ORDERS-027): the former mine/all scope
- * toggle is now a localStorage-backed multi-select dropdown of every active squadron, applied
- * SERVER-side (matching an order's responsible OR requesting side) and re-applied on reload.
+ * Verifies the orders-overview multi-squadron filter (REQ-ORDERS-027): deselecting IRIDIUM hides an
+ * order responsible to it, and the selection survives a reload from localStorage.
  *
- * <p>The dropdown is populated from the frontend's <b>squadron catalogue cache</b> (2-hour TTL), so
- * a squadron created mid-suite is not offered as a checkbox — the fixture therefore keys on the
- * bootstrap-cached IRIDIUM squadron, which is always present. It seeds one OPEN order responsible
- * to IRIDIUM, deselects IRIDIUM in the filter, and asserts that order drops out of the queue — then
- * reloads and asserts the deselection survives from localStorage without any manual re-filtering.
- * The absence assertion keys on the order's own {@code data-id} and holds regardless of pagination
- * (a filtered-out order is on no page); the initial visibility check uses {@code size=200} so the
- * freshly seeded order is on the first page. The actor is {@code test-admin} (an IRIDIUM member).
+ * <p>Keys on IRIDIUM because the dropdown comes from a cached squadron catalogue; runs as {@code
+ * test-admin}.
  */
 @Tag("e2e")
 class OrdersSquadronFilterE2eTest {
@@ -118,19 +111,13 @@ class OrdersSquadronFilterE2eTest {
         page.waitForLoadState();
         E2eSupport.openFilterPanel(page);
         assertThat(page.getByTestId("nav-logout")).isVisible();
-        // The multi-select renders for the full queue (admin is not the requester-only view), and
-        // with every squadron checked (the default) the IRIDIUM order is visible.
         assertThat(page.locator("#squadronFilterContainer")).isVisible();
         assertVisible(page, iridiumOrderId);
 
-        // Deselect IRIDIUM: a single checkbox change fires one server-side re-fetch (no rapid
-        // multi-swap race), dropping the IRIDIUM order from the queue.
         page.locator("#squadronHeader").click();
         page.locator("input.sqCheck[value='" + IRIDIUM_ID + "']").uncheck();
         assertAbsent(page, iridiumOrderId);
 
-        // The deselection persists: a full reload restores it from localStorage and re-applies it,
-        // so the IRIDIUM order stays hidden without any manual re-filtering.
         E2eSupport.navigate(page, baseUrl + QUEUE_URL_SUFFIX);
         page.waitForLoadState();
         E2eSupport.openFilterPanel(page);

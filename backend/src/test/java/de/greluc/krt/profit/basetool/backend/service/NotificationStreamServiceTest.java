@@ -50,11 +50,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Unit tests for {@link NotificationStreamService}: the registry must emit the {@code connected},
- * {@code heartbeat} and {@code notification} signals as <b>named</b> SSE events. The heartbeat in
- * particular must NOT be an SSE comment — browsers' {@code EventSource} swallow comments, so only a
- * named event lets the frontend reset its liveness watchdog and detect a half-open stream
- * (REQ-NOTIF-010, REQ-SEC-012).
+ * Unit tests for {@link NotificationStreamService}: {@code connected}, {@code heartbeat} and {@code
+ * notification} are sent as named SSE events, never as comments (REQ-NOTIF-010).
  */
 class NotificationStreamServiceTest {
 
@@ -82,9 +79,8 @@ class NotificationStreamServiceTest {
   }
 
   /**
-   * A service whose {@link #newEmitter()} yields a fresh distinct mock per subscription, recorded
-   * in {@link #created} in subscription order — so a test can assert WHICH emitter the per-user cap
-   * retires (#1156).
+   * Service whose {@link #newEmitter()} returns a distinct mock per subscription, recorded in
+   * {@link #created} in order.
    */
   private static final class DistinctEmitterStreamService extends NotificationStreamService {
     private final List<SseEmitter> created = new ArrayList<>();
@@ -116,15 +112,12 @@ class NotificationStreamServiceTest {
 
   @Test
   void heartbeat_sendsNamedHeartbeatEvent_notAComment() throws Exception {
-    // Given a registered subscriber
     CapturingStreamService service = new CapturingStreamService();
     service.subscribe(UUID.randomUUID());
-    clearInvocations(service.emitter); // drop the `connected` send from subscribe()
+    clearInvocations(service.emitter);
 
-    // When the scheduled heartbeat fires
     service.heartbeat();
 
-    // Then a NAMED `heartbeat` event is sent (not a `:heartbeat` comment that EventSource swallows)
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
@@ -144,11 +137,9 @@ class NotificationStreamServiceTest {
 
   @Test
   void subscribe_sendsNamedConnectedEvent() throws Exception {
-    // Given/When a browser subscribes
     CapturingStreamService service = new CapturingStreamService();
     service.subscribe(UUID.randomUUID());
 
-    // Then a named `connected` handshake event is sent
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
@@ -157,16 +148,13 @@ class NotificationStreamServiceTest {
 
   @Test
   void publish_sendsNamedNotificationEventToSubscribersOfThatRecipient() throws Exception {
-    // Given a subscriber for a specific recipient
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
     service.subscribe(recipientUserId);
-    clearInvocations(service.emitter); // drop the `connected` send from subscribe()
+    clearInvocations(service.emitter);
 
-    // When a notification is published to that recipient
     service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
 
-    // Then a named `notification` event is pushed so the client refreshes its unread state
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
@@ -175,17 +163,13 @@ class NotificationStreamServiceTest {
 
   @Test
   void publish_refreshOnlySignal_keepsTheHistoricPayload() throws Exception {
-    // Given a subscriber
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
     service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
 
-    // When an event that only CLEARED stale items is published
     service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
 
-    // Then the payload is still the literal the event carried before it carried anything, so a
-    // client written against the old contract sees no change at all.
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
@@ -194,14 +178,12 @@ class NotificationStreamServiceTest {
 
   @Test
   void publish_signalWithAType_carriesKindEntityAndParams() throws Exception {
-    // Given a subscriber
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
     UUID entityId = UUID.randomUUID();
     service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
 
-    // When a real notification is pushed
     service.publish(
         List.of(recipientUserId),
         new NotificationSignal(
@@ -210,8 +192,6 @@ class NotificationStreamServiceTest {
             entityId,
             Map.of("username", "newbie")));
 
-    // Then the event carries what the client needs to file it under a channel and open the right
-    // screen without a second request. The event NAME is unchanged -- that is the frozen part.
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
@@ -224,33 +204,23 @@ class NotificationStreamServiceTest {
 
   @Test
   void onTimeout_completesEmitter_soSpringRecordsCleanCompletionNotPhantom503() {
-    // Given a subscribed emitter, capture the timeout callback the registry registered on it.
     CapturingStreamService service = new CapturingStreamService();
     service.subscribe(UUID.randomUUID());
     ArgumentCaptor<Runnable> timeoutCallback = ArgumentCaptor.forClass(Runnable.class);
     verify(service.emitter).onTimeout(timeoutCallback.capture());
 
-    // When the 30-minute SSE timeout fires
     timeoutCallback.getValue().run();
 
-    // Then the emitter is completed, so Spring MVC finalizes the async request as a NORMAL
-    // completion
-    // instead of raising AsyncRequestTimeoutException — which Micrometer would otherwise book as a
-    // phantom 503 on http.server.requests even though the client had a clean stream
-    // (REQ-NOTIF-010).
     verify(service.emitter).complete();
   }
 
   @Test
   void subscribe_reflectsLiveConnectionsInSseConnectionsGauge() {
-    // Given a fresh registry the gauge reads zero
     CapturingStreamService service = new CapturingStreamService();
     assertEquals(0.0, sseConnections(service));
 
-    // When a subscriber connects (the mock emitter's `connected` send succeeds by default)
     service.subscribe(UUID.randomUUID());
 
-    // Then the summed-emitter gauge reports one live connection
     assertEquals(1.0, sseConnections(service));
   }
 
@@ -258,16 +228,14 @@ class NotificationStreamServiceTest {
   void publish_sendFailure_recordsSseSendFailureCounterAndDropsEmitter() throws Exception {
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
-    service.subscribe(recipientUserId); // `connected` send succeeds, emitter registered
+    service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
     doThrow(new IOException("broken pipe"))
         .when(service.emitter)
         .send(any(SseEmitter.SseEventBuilder.class));
 
-    // When the notification push fails on a dead emitter
     service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
 
-    // Then the failure is counted under the `notification` event and the emitter is dropped
     assertEquals(
         1.0,
         service
@@ -281,7 +249,6 @@ class NotificationStreamServiceTest {
 
   @Test
   void subscribe_capsEmittersPerSub_retiresOldestWithNamedReplacedEvent() throws Exception {
-    // #1156: one subscription past the per-user cap (all of a user's tabs/devices on one sub).
     DistinctEmitterStreamService service = new DistinctEmitterStreamService();
     UUID sub = UUID.randomUUID();
     int count = NotificationStreamService.MAX_EMITTERS_PER_SUB + 1;
@@ -289,14 +256,10 @@ class NotificationStreamServiceTest {
       service.subscribe(sub);
     }
 
-    // The registry holds exactly the cap — the extra subscription evicted the oldest, not grew it.
     assertEquals(
         (double) NotificationStreamService.MAX_EMITTERS_PER_SUB,
         service.registry.get(MetricNames.SSE_CONNECTIONS).gauge().value());
 
-    // The OLDEST emitter (first subscribed) is retired: a terminal named `replaced` event (which
-    // the
-    // client treats as do-not-reconnect) followed by complete().
     SseEmitter oldest = service.created.get(0);
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
@@ -305,22 +268,18 @@ class NotificationStreamServiceTest {
         .anySatisfy(builder -> assertThat(render(builder)).contains("event:replaced"));
     verify(oldest).complete();
 
-    // The newest (retained) emitter is not retired.
     verify(service.created.get(count - 1), never()).complete();
   }
 
   @Test
   void subscribe_connectedSendFailure_countsUnderConnectedAndDoesNotRegister() throws Exception {
-    // Given the very first `connected` handshake send throws (stream dead at handshake).
     CapturingStreamService service = new CapturingStreamService();
     doThrow(new IOException("broken pipe"))
         .when(service.emitter)
         .send(any(SseEmitter.SseEventBuilder.class));
 
-    // When a browser subscribes
     service.subscribe(UUID.randomUUID());
 
-    // Then the failure is counted under the `connected` event...
     assertEquals(
         1.0,
         service
@@ -329,26 +288,21 @@ class NotificationStreamServiceTest {
             .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_CONNECTED)
             .counter()
             .count());
-    // ...and the dead-at-handshake emitter is dropped, so it cannot linger in the registry
-    // permanently inflating basetool_sse_connections and starving the per-user cap.
     assertEquals(0.0, sseConnections(service));
   }
 
   @Test
   void heartbeat_sendFailure_countsUnderHeartbeatAndDropsEmitter() throws Exception {
-    // Given a registered subscriber whose stream then goes half-open.
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
-    service.subscribe(recipientUserId); // `connected` send succeeds, emitter registered
-    clearInvocations(service.emitter); // drop the `connected` send from subscribe()
+    service.subscribe(recipientUserId);
+    clearInvocations(service.emitter);
     doThrow(new IOException("broken pipe"))
         .when(service.emitter)
         .send(any(SseEmitter.SseEventBuilder.class));
 
-    // When the scheduled heartbeat fires on the now-dead emitter
     service.heartbeat();
 
-    // Then the failure is counted under the `heartbeat` event...
     assertEquals(
         1.0,
         service
@@ -357,15 +311,11 @@ class NotificationStreamServiceTest {
             .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_HEARTBEAT)
             .counter()
             .count());
-    // ...and the dead emitter is reaped immediately instead of leaking until the 30-min timeout,
-    // which would inflate the gauge that drives the SsePushChannelDead alert.
     assertEquals(0.0, sseConnections(service));
   }
 
   @Test
   void sendFailure_tagsTheCauseAndLeavesTheThrowableInADebugLine() throws Exception {
-    // The three push branches used to catch `e` and never reference it: an ordinary client
-    // hang-up and a registry lifecycle bug were the same, unattributable number.
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
     service.subscribe(recipientUserId);
@@ -387,8 +337,6 @@ class NotificationStreamServiceTest {
             .counter()
             .count());
     ILoggingEvent logged = events.getLast();
-    // DEBUG and nothing louder: a broken pipe fires on every closed tab, so any higher level is a
-    // client-triggerable log flood (REQ-OBS-001).
     assertEquals(Level.DEBUG, logged.getLevel());
     assertNotNull(logged.getThrowableProxy(), "the caught exception must reach the log line");
     assertTrue(logged.getFormattedMessage().contains(recipientUserId.toString()));
@@ -396,8 +344,6 @@ class NotificationStreamServiceTest {
 
   @Test
   void sendFailure_onAnAlreadyCompletedEmitter_isCountedAsIllegalStateNotIo() throws Exception {
-    // A write against a completed emitter is a registry lifecycle race, not a dead client — the
-    // whole point of the bounded cause tag is telling the two apart without flipping a logger.
     CapturingStreamService service = new CapturingStreamService();
     UUID recipientUserId = UUID.randomUUID();
     service.subscribe(recipientUserId);
@@ -442,8 +388,6 @@ class NotificationStreamServiceTest {
 
   @Test
   void subscribe_capEviction_countsAndLogsTheRetirement() {
-    // M6: the cap holding is exactly why basetool_sse_connections stays FLAT while a user's tab
-    // silently loses its push channel — so the eviction needs its own counter and line.
     DistinctEmitterStreamService service = new DistinctEmitterStreamService();
     UUID sub = UUID.randomUUID();
 

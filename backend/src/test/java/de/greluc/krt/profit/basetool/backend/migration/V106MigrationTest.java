@@ -30,11 +30,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V106__add_scwiki_columns_to_material.sql}.
- * Asserts that every column declared by the migration is present on the {@code material} table with
- * the right defaults — specifically that {@code is_visible} and {@code source_systems} carry the
- * post-migration backfill defaults that preserve existing UEX-sourced catalogue visibility
- * (SC_WIKI_SYNC_AGENT_PROMPT.md §5 pitfall #5).
+ * Migration test for {@code V106__add_scwiki_columns_to_material.sql}: every added column exists on
+ * {@code material}, with {@code is_visible} and {@code source_systems} defaults that keep
+ * UEX-sourced materials visible.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -88,8 +86,6 @@ class V106MigrationTest {
         "UNIQUE constraint uk_material_scwiki_uuid must exist on material(scwiki_uuid)");
   }
 
-  // ─── helpers shared with the other V*MigrationTest classes ──────────────
-
   private Map<String, ColumnInfo> columnsOf(String tableName) {
     List<Map<String, Object>> rows =
         jdbcTemplate.queryForList(
@@ -117,8 +113,7 @@ class V106MigrationTest {
   }
 
   /**
-   * Minimal {@code information_schema.columns} projection used by the migration assertions. Kept as
-   * a record so the test code reads top-down without intermediate {@code Map.get} chains.
+   * Minimal {@code information_schema.columns} projection used by the migration assertions.
    *
    * @param dataType {@code information_schema.columns.data_type}
    * @param isNullable {@code "YES"} / {@code "NO"}

@@ -45,12 +45,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
 /**
- * Unit tests for {@link BankSecurityService}: the capability matrix (REQ-BANK-009/-010) and the
- * org-unit-independence contract (REQ-BANK-008) — the service consults exactly two inputs (bank
- * roles via {@link AuthHelperService} and the grant table) and nothing else, so org-unit
- * memberships, contextual authorities and the admin pin cannot influence any decision by
- * construction. {@code ArchitectureTest} pins the absence of an {@code OwnerScopeService}
- * dependency at the bytecode level; the matrix e2e test pins it end to end.
+ * Unit tests for {@link BankSecurityService}: the capability matrix (REQ-BANK-009) and its
+ * independence from org-unit membership (REQ-BANK-008).
  */
 @ExtendWith(MockitoExtension.class)
 class BankSecurityServiceTest {
@@ -72,49 +68,39 @@ class BankSecurityServiceTest {
 
   @Test
   void canSee_deniesNonBankStaff_evenWithOrgRoles() {
-    // Given: a caller with arbitrary org roles but no bank role
     when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(false);
 
-    // When / Then: denied, and the grant table is never consulted
     assertFalse(bankSecurityService.canSee(accountId, authentication));
     verifyNoInteractions(grantRepository);
   }
 
   @Test
   void canSee_allowsManagementWithoutAnyGrantRow() {
-    // Given
     when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
     when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
 
-    // When / Then: management sees everything (REQ-BANK-010), no grant lookup needed
     assertTrue(bankSecurityService.canSee(accountId, authentication));
     verify(grantRepository, never()).findById(any(BankAccountGrantId.class));
   }
 
   @Test
   void canSee_allowsEmployeeWithViewOnlyGrantRow() {
-    // Given: a grant row with all flags false = view-only (REQ-BANK-009)
     employeeWithGrant(false, false, false);
 
-    // When / Then
     assertTrue(bankSecurityService.canSee(accountId, authentication));
   }
 
   @Test
   void canSee_deniesEmployeeWithoutGrantRow() {
-    // Given
     employeeWithoutGrant();
 
-    // When / Then
     assertFalse(bankSecurityService.canSee(accountId, authentication));
   }
 
   @Test
   void capabilityFlags_gateExactlyTheirBooking() {
-    // Given: deposit-only grant
     employeeWithGrant(true, false, false);
 
-    // When / Then
     assertTrue(bankSecurityService.canDeposit(accountId, authentication));
     assertFalse(bankSecurityService.canWithdraw(accountId, authentication));
     assertFalse(bankSecurityService.canTransfer(accountId, authentication));
@@ -122,10 +108,8 @@ class BankSecurityServiceTest {
 
   @Test
   void canWithdraw_and_canTransfer_followTheirFlags() {
-    // Given: withdraw+transfer grant
     employeeWithGrant(false, true, true);
 
-    // When / Then
     assertFalse(bankSecurityService.canDeposit(accountId, authentication));
     assertTrue(bankSecurityService.canWithdraw(accountId, authentication));
     assertTrue(bankSecurityService.canTransfer(accountId, authentication));
@@ -133,11 +117,9 @@ class BankSecurityServiceTest {
 
   @Test
   void capabilities_allowManagementUnrestricted() {
-    // Given
     when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
     when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
 
-    // When / Then
     assertTrue(bankSecurityService.canDeposit(accountId, authentication));
     assertTrue(bankSecurityService.canWithdraw(accountId, authentication));
     assertTrue(bankSecurityService.canTransfer(accountId, authentication));
@@ -145,10 +127,8 @@ class BankSecurityServiceTest {
 
   @Test
   void canSee_deniesNullOrUnauthenticatedCallers() {
-    // Given
     when(authentication.isAuthenticated()).thenReturn(false);
 
-    // When / Then
     assertFalse(bankSecurityService.canSee(accountId, null));
     assertFalse(bankSecurityService.canSee(accountId, authentication));
     verifyNoInteractions(grantRepository);
@@ -161,13 +141,10 @@ class BankSecurityServiceTest {
    */
   @Test
   void decision_consultsOnlyRolesAndGrantTable() {
-    // Given
     employeeWithGrant(true, true, true);
 
-    // When
     bankSecurityService.canDeposit(accountId, authentication);
 
-    // Then: exactly these collaborators were consulted
     verify(authHelperService).hasReachableRole("ROLE_BANK_EMPLOYEE");
     verify(authHelperService).hasReachableRole("ROLE_BANK_MANAGEMENT");
     verify(authHelperService).currentUserId();
@@ -176,31 +153,26 @@ class BankSecurityServiceTest {
 
   @Test
   void canSeeHolder_allowsManagementForAnyHolder() {
-    // Given: management — sees any holder, no holder lookup needed (REQ-BANK-032)
     when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
     when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
 
-    // When / Then
     assertTrue(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
     verifyNoInteractions(holderRepository);
   }
 
   @Test
   void canSeeHolder_allowsEmployeeForTheirOwnHolder() {
-    // Given: a plain employee whose user id links the requested holder row
     UUID holderId = UUID.randomUUID();
     when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
     when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holderLinkedTo(userId)));
 
-    // When / Then
     assertTrue(bankSecurityService.canSeeHolder(holderId, authentication));
   }
 
   @Test
   void canSeeHolder_deniesEmployeeForSomeoneElsesHolder() {
-    // Given: the holder belongs to a different user
     UUID holderId = UUID.randomUUID();
     when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
     when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
@@ -208,39 +180,32 @@ class BankSecurityServiceTest {
     when(holderRepository.findById(holderId))
         .thenReturn(Optional.of(holderLinkedTo(UUID.randomUUID())));
 
-    // When / Then
     assertFalse(bankSecurityService.canSeeHolder(holderId, authentication));
   }
 
   @Test
   void canSeeHolder_deniesEmployeeWhenHolderMissing() {
-    // Given
     UUID holderId = UUID.randomUUID();
     when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
     when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     when(holderRepository.findById(holderId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertFalse(bankSecurityService.canSeeHolder(holderId, authentication));
   }
 
   @Test
   void canSeeHolder_deniesNonBankStaff_withoutAnyHolderLookup() {
-    // Given
     when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(false);
 
-    // When / Then
     assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
     verifyNoInteractions(holderRepository);
   }
 
   @Test
   void canSeeHolder_deniesUnauthenticatedCaller() {
-    // Given
     when(authentication.isAuthenticated()).thenReturn(false);
 
-    // When / Then
     assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), null));
     assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
     verifyNoInteractions(holderRepository);

@@ -25,26 +25,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Maps a UEX planet name to a stable CSS class used to tint terminal columns on the materials
- * matrix.
+ * Maps a UEX planet name to a stable CSS class that tints terminal columns on the materials matrix.
  *
- * <p>The resolver is intentionally pure: it has no dependencies, no caching, and no per-request
- * state. Two paths produce a class:
- *
- * <ol>
- *   <li><b>Canonical map</b> - well-known Star Citizen planets (Stanton, Pyro, Terra, Nyx) map to a
- *       hand-picked, semantically appropriate class (e.g. Hurston gets a rust tint). Lookup is
- *       case-insensitive on the planet name; the star-system name is currently unused but kept on
- *       the API so future name collisions across systems can be disambiguated without a signature
- *       change.
- *   <li><b>Hash fallback</b> - for any planet not in the canonical map, the (system, planet) tuple
- *       is hashed into one of {@link #HASH_PALETTE_SIZE} numbered classes ({@code planet-hash-0} ..
- *       {@code planet-hash-N-1}). Same tuple always produces the same class across requests so the
- *       UI stays visually stable.
- * </ol>
- *
- * <p>{@code null} / blank planet names resolve to {@link #UNKNOWN_CLASS}, which the stylesheet
- * leaves unstyled (terminal keeps the default neutral header background).
+ * <p>Known planets use a hand-picked class; others hash (system, planet) into one of {@link
+ * #HASH_PALETTE_SIZE} {@code planet-hash-*} classes. A blank planet yields {@link #UNKNOWN_CLASS}.
  */
 final class PlanetColorResolver {
 
@@ -62,12 +46,10 @@ final class PlanetColorResolver {
    */
   private static final Map<String, String> CANONICAL =
       Map.ofEntries(
-          // Stanton
           Map.entry("hurston", "hurston"),
           Map.entry("crusader", "crusader"),
           Map.entry("arccorp", "arccorp"),
           Map.entry("microtech", "microtech"),
-          // Pyro
           Map.entry("pyro i", "pyro-1"),
           Map.entry("pyro ii", "pyro-2"),
           Map.entry("monox", "pyro-2"),
@@ -79,23 +61,18 @@ final class PlanetColorResolver {
           Map.entry("vatra", "pyro-5"),
           Map.entry("pyro vi", "pyro-6"),
           Map.entry("adir", "pyro-6"),
-          // Other notable systems
           Map.entry("terra", "terra"),
           Map.entry("delamar", "delamar"));
 
-  private PlanetColorResolver() {
-    // utility class - no instances
-  }
+  private PlanetColorResolver() {}
 
   /**
-   * Resolves a CSS class name for the planet tint of a terminal column.
+   * Resolves the CSS class of a terminal column's planet tint.
    *
-   * @param starSystemName parent star system; reserved for future disambiguation, may be {@code
-   *     null} or blank
-   * @param planetName effective planet name as resolved by the backend matrix query (direct, via
-   *     moon, or via like-named orbit); {@code null}/blank yields {@link #UNKNOWN_CLASS}
-   * @return a CSS class name like {@code planet-hurston}, {@code planet-hash-3}, or {@link
-   *     #UNKNOWN_CLASS}; never {@code null} and never blank
+   * @param starSystemName parent star system; may be {@code null} or blank
+   * @param planetName effective planet name; {@code null} or blank yields {@link #UNKNOWN_CLASS}
+   * @return a class such as {@code planet-hurston}, {@code planet-hash-3} or {@link
+   *     #UNKNOWN_CLASS}; never blank
    */
   @NotNull
   static String cssClassFor(@Nullable String starSystemName, @Nullable String planetName) {
@@ -112,12 +89,11 @@ final class PlanetColorResolver {
   }
 
   /**
-   * Computes a non-negative, stable bucket index from the (system, planet) tuple by mixing the two
-   * strings via {@code String.hashCode()} and taking the absolute value modulo {@code buckets}.
-   * Deterministic across JVM runs because {@link String#hashCode()} is specified.
+   * Computes a deterministic, non-negative bucket index from the (system, planet) tuple via {@link
+   * String#hashCode()}.
    *
-   * @param starSystemName star-system part of the key; may be {@code null}/blank (treated as empty)
-   * @param normalisedPlanet pre-normalised planet name; must not be {@code null}
+   * @param starSystemName star-system part of the key; {@code null} or blank counts as empty
+   * @param normalisedPlanet the normalized planet name
    * @param buckets palette size; must be positive
    * @return bucket index in {@code [0, buckets)}
    */

@@ -29,22 +29,15 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Validated configuration of the two-window notification retention sweep (REQ-NOTIF-009, prefix
- * {@code app.notifications.retention}, fed by {@code APP_NOTIFICATIONS_RETENTION_*}).
+ * {@code app.notifications.retention}). A violation refuses to start the context.
  *
- * <p>Bound through {@code @Value}, both windows accepted {@code P0D} and negative values, either of
- * which would empty every inbox on the next run (BE-MOD-03). Each window now has a one-day floor —
- * a guard against a slip, not a retention policy: the policy is the 90/180-day default — and the
- * spec's "a notification is never reaped sooner for being unread" is checked at startup instead of
- * holding only for the defaults. A violation refuses to start the context.
- *
- * @param enabled whether the sweep bean exists at all ({@code @ConditionalOnProperty} on the task
- *     reads the same key; default {@code true}, {@code false} under the {@code test} profile)
+ * @param enabled whether the sweep bean exists (default {@code true}, {@code false} under the
+ *     {@code test} profile)
  * @param maxAge how long a READ notification is kept after it was read; at least one day, default
  *     {@code P90D}
  * @param unreadMaxAge how long an UNREAD notification is kept after it was raised; at least one day
  *     and never shorter than {@code maxAge}, default {@code P180D}
- * @param interval the pause between two sweeps ({@code fixedDelay}); at least one minute, default
- *     {@code PT24H}
+ * @param interval the pause between two sweeps; at least one minute, default {@code PT24H}
  */
 @Validated
 @ConfigurationProperties("app.notifications.retention")
@@ -55,11 +48,10 @@ public record NotificationRetentionProperties(
     @DefaultValue("PT24H") @NotNull @DurationMin(minutes = 1) Duration interval) {
 
   /**
-   * Whether the unread window is at least as long as the read one, so an unread notification is
-   * never reaped sooner than it would have been once read (REQ-NOTIF-009).
+   * Whether the unread window is at least as long as the read one (REQ-NOTIF-009).
    *
-   * @return {@code true} when {@code unreadMaxAge >= maxAge}, or when either is {@code null} — that
-   *     case is reported by the component's own {@code @NotNull}, not duplicated here
+   * @return {@code true} when {@code unreadMaxAge >= maxAge}, or when either is {@code null}
+   *     (reported by its own {@code @NotNull})
    */
   @AssertTrue(
       message =

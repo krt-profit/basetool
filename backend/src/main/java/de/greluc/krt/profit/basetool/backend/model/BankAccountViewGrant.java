@@ -38,23 +38,12 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Holder-configured additional read access to one {@link BankAccount} (REQ-BANK-035/-038),
- * persisted in the {@code bank_account_view_grant} table created by Flyway V189.
+ * Holder-configured read access to one {@link BankAccount} (REQ-BANK-035/-038): the row's existence
+ * lets its audience view the balance and the read-only detail.
  *
- * <p>The row's <em>existence</em> grants the named audience the right to view the account's balance
- * on the org-unit bank page and to open its read-only detail (history + redacted statement). There
- * are no capability flags — booking stays a bank-staff surface (REQ-BANK-008/-010). This is
- * deliberately separate from {@link BankAccountGrant} (the bank-staff capability grant): view
- * grants are evaluated by the org-unit-aware {@code OrgUnitBankAccessService} seam, never by {@code
- * BankSecurityService}.
- *
- * <p>The audience is polymorphic on {@link #granteeKind} (V189 {@code chk_bank_view_grant_payload}
- * enforces the column combination): a {@link MembershipRole} on the owning unit ({@code
- * MEMBERSHIP_ROLE}), a global role code ({@code GLOBAL_ROLE}, for {@link BankAccountType#SPECIAL}
- * accounts), a single user ({@code USER}), or all members ({@code ALL_MEMBERS}). Toggling a bucket
- * is an idempotent insert/delete (partial unique indexes prevent duplicates), so the row carries no
- * client-echoed version of its own — the inherited {@code @Version} only guards a rare concurrent
- * write to the same row.
+ * <p>Separate from the bank-staff {@link BankAccountGrant} and evaluated by {@code
+ * OrgUnitBankAccessService}; the audience is polymorphic on {@link #granteeKind}. Toggling is an
+ * idempotent insert/delete.
  */
 @Entity
 @Table(name = "bank_account_view_grant")

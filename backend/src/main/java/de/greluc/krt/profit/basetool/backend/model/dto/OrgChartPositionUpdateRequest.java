@@ -24,29 +24,18 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Inbound payload for {@code PUT /api/v1/org-chart/positions/{id}} — edits an existing position.
- * The functional rank, the scope (OrgUnit) and the parent are immutable after creation — moving a
- * position to a different parent is done by removing it and re-adding it — so only the holder, the
- * Kommando name and the display order may change. A {@code null} field on the wire means "leave
- * unchanged"; for {@code name}, an empty/blank string clears it back to the unnamed state.
+ * Payload of {@code PUT /api/v1/org-chart/positions/{id}}, which changes a position's holder,
+ * Kommando name or display order. A {@code null} field leaves the value unchanged; rank, scope and
+ * parent are immutable.
  *
- * @param userId an account to assign as the new holder, or {@code null} to keep the current holder.
- *     Supplying a {@code userId} always clears any free-text {@link #displayName} on the row in the
- *     same transaction — this is the regression-free "free-text member now has an account" swap.
- *     Assigning a holder to a leaderless Kommando is just a reassign of its {@code COMMAND_LEAD}
- *     row through this field.
- * @param name the new Kommando name, or {@code null} to keep the current one; only honoured for a
- *     {@code COMMAND_LEAD} row (rejected otherwise). A blank value clears the name.
- * @param sortIndex the new display order, or {@code null} to keep the current one.
- * @param version current optimistic-lock version held by the client; required so concurrent edits
- *     surface as a 409.
- * @param displayName a free-text holder name to set (replacing an account holder), {@code null} to
- *     keep the current holder, or blank to clear the typed name. Supplying both a {@code userId}
- *     and a non-blank {@code displayName} in one call is rejected (a position is held by an account
- *     or a free-text name, never both) — to swap a free-text holder for an account, send the {@code
- *     userId} alone and the typed name is cleared automatically. Clearing the only holder of a
- *     non-{@code COMMAND_LEAD} rank is rejected. Placed last so it stays optional on every existing
- *     call shape.
+ * @param userId new account holder, or {@code null} to keep the current one; clears any {@link
+ *     #displayName}
+ * @param name new Kommando name, or {@code null} to keep it; blank clears it; only for {@code
+ *     COMMAND_LEAD}
+ * @param sortIndex new display order, or {@code null} to keep it
+ * @param version the client's optimistic-lock version; required
+ * @param displayName free-text holder to set, {@code null} to keep, blank to clear; rejected
+ *     together with a {@code userId}
  */
 public record OrgChartPositionUpdateRequest(
     UUID userId,

@@ -30,14 +30,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service behind the Lager item-catalog picker ({@code GET /api/v1/inventory/item-catalog},
- * REQ-INV-029, design §5.3/§5.4): the game items that are <em>bookable</em> as Lager item stock.
- * Bookable means "output of at least one active blueprint" ({@link
- * BlueprintRepository#findItemsWithActiveBlueprint(String, Pageable)}) — deliberately a superset of
- * the order picker's orderable-items predicate, which additionally requires a resolved RESOURCE
- * ingredient. Kept as its own tiny service (rather than a method on the order-side item service)
- * because the Lager picker is role-gated where the order picker is anonymous, and the two
- * predicates must be allowed to diverge without coupling.
+ * Read service behind the Lager item-catalog picker (REQ-INV-029): lists game items bookable as
+ * Lager item stock, i.e. the output of at least one active blueprint ({@link
+ * BlueprintRepository#findItemsWithActiveBlueprint(String, Pageable)}).
  */
 @Service
 @RequiredArgsConstructor
@@ -48,8 +43,8 @@ public class InventoryItemCatalogService {
   private final InventoryItemMapper inventoryItemMapper;
 
   /**
-   * Pages the game items bookable as Lager item stock, optionally narrowed by a case-insensitive
-   * name fragment, projected into the slim Lager reference shape (id, name, manufacturer, kind).
+   * Pages the game items bookable as Lager item stock, optionally filtered by name, as slim Lager
+   * references (id, name, manufacturer, kind).
    *
    * @param search case-insensitive name substring, or {@code null}/blank for no filter
    * @param pageable page request (whitelisted {@code name} sort)
@@ -58,8 +53,6 @@ public class InventoryItemCatalogService {
   @NotNull
   public Page<InventoryGameItemReferenceDto> findBookableItems(
       String search, @NotNull Pageable pageable) {
-    // Empty string (not null) for "no filter": a null bind into the query's LOWER(CONCAT(...))
-    // makes PostgreSQL infer bytea and fail; "" matches every row via the %% pattern.
     String q = search != null && !search.isBlank() ? search.strip() : "";
     return blueprintRepository
         .findItemsWithActiveBlueprint(q, pageable)

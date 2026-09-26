@@ -1,13 +1,4 @@
 ---
-# The Basetool host bootstrap. ADR-0188.
-#
-#   ansible-playbook site.yml --limit testing --check --diff     # see what would change
-#   ansible-playbook site.yml --limit testing                    # do it
-#
-# It provisions; deploy.sh deploys. Run it in full only against a host that is not serving yet.
-# Afterwards it runs only for a deliberate host change, usually limited with --tags
-# (e.g. --tags deploy,scripts), and on production every such run is an owner-approved host
-# write, --check --diff first. See ansible/README.md -> "When it runs".
 - name: Prepare a host to run the Basetool stack under rootless Podman
   hosts: basetool_hosts
   gather_facts: true

@@ -35,14 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Cross-Staffel job-order flow (UC-08): Staffel A creates a job order, and a member of Staffel B
- * links B-owned inventory to it. The linked item must surface in A's order context (so A can fulfil
- * the order) but must NOT leak into A's org-scoped Lager-View — the {@code findByJobOrderIdOrdered}
- * (ungated) vs {@code findByMaterialAndPersonalFalseScoped} (org-scoped) repository split.
- *
- * <p>Multi-user: an Officer homed in IRIDIUM (Staffel A) drives the UI; the B-owned item is seeded
- * via the REST API as {@code test-member} homed in a freshly created Staffel B, so the resolver
- * stamps the item's owner as B.
+ * Cross-Staffel job-order flow (UC-08): inventory Staffel B links to Staffel A's order appears in
+ * A's order context but not in A's org-scoped Lager view.
  */
 @Tag("e2e")
 class CrossStaffelJobOrderE2eTest {
@@ -96,8 +90,6 @@ class CrossStaffelJobOrderE2eTest {
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E CrossStaffel Mat");
       String bLocationId =
           seeder.createLocation(ADMIN_USER, ADMIN_PASSWORD, "E2E CrossStaffel Loc");
-      // Staffel A's order: A (IRIDIUM) is named the responsible (processing) unit, so the order is
-      // private to A + admins — which the Officer-of-A view in the test below relies on.
       jobOrderId =
           seeder.createJobOrder(
               ADMIN_USER,
@@ -107,7 +99,6 @@ class CrossStaffelJobOrderE2eTest {
               materialId,
               650,
               80);
-      // B's supply: created as test-member (homed in B) so the resolver stamps the owner as B.
       bInventoryItemId =
           seeder.createInventoryItemForJobOrder(
               MEMBER_USER, MEMBER_PASSWORD, materialId, bLocationId, jobOrderId, 750, 60);
@@ -134,15 +125,12 @@ class CrossStaffelJobOrderE2eTest {
   void foreignStaffelItemSurfacesInOrderButNotInAStaffelLager() {
     String baseUrl = STACK.baseUrl();
 
-    // 1) Order context (UI): B's item is offered in A's order handover item dropdown.
     try (BrowserContext context =
         browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId + "?tab=handovers");
-        // Opening the modal lazily fetches the order's linked inventory per material; gate on that
-        // response (page-side eval is blocked by the strict CSP).
         page.waitForResponse(
             response ->
                 response.url().contains("/materials/") && response.url().contains("/inventory"),
@@ -160,7 +148,6 @@ class CrossStaffelJobOrderE2eTest {
       }
     }
 
-    // 2) Lager-View (API, org-scoped): B sees its own item; A (Officer) does not.
     BackendSeeder seeder = new BackendSeeder();
     String lagerPath = "/api/v1/inventory/material/" + materialId;
     String bLager = seeder.getBody(MEMBER_USER, MEMBER_PASSWORD, lagerPath);

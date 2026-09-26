@@ -48,12 +48,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Render-level coverage for the personal hangar's server-side pagination + search (REQ-HANGAR-002),
- * mirroring the order/refinery pagination tests added in #772. The {@code BackendApiClient} is
- * mocked with a deterministic {@link PageResponse} envelope (content intentionally empty — the
- * pagination chrome is driven by the envelope, not the rows), so these assertions verify the
- * frontend renders the shared pagination component, snaps an out-of-set size to the default, clamps
- * a negative page, and threads the active {@code search} term through every page/size link.
+ * Render tests for the personal hangar's server-side pagination and search (REQ-HANGAR-002): the
+ * shared pagination component renders, an invalid size snaps to the default, a negative page is
+ * clamped, and the {@code search} term is kept in every page and size link.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -90,10 +87,8 @@ class HangarPaginationMvcTest {
         .perform(get("/hangar").param("page", "1"))
         .andExpect(status().isOk())
         .andExpect(view().name("hangar"))
-        // page-nav: first/prev jump to page 0, next to page 2, all at the active size 50
         .andExpect(content().string(containsString("/hangar?page=0&amp;size=50")))
         .andExpect(content().string(containsString("/hangar?page=2&amp;size=50")))
-        // size picker: 10/50/100, the inactive sizes re-enter at page 0
         .andExpect(content().string(containsString("page-size-picker")))
         .andExpect(content().string(containsString("/hangar?page=0&amp;size=10")))
         .andExpect(content().string(containsString("/hangar?page=0&amp;size=100")));
@@ -102,8 +97,6 @@ class HangarPaginationMvcTest {
   @Test
   @WithMockUser
   void withSearch_keepsSearchInPaginationLinksAndOffersClear() throws Exception {
-    // With an active search the my-ships fetch rides the term as a single-encoded URI variable
-    // ({search}) through the 3-arg get overload (#1344 re-encoding trap), so stub that overload.
     when(backendApiClient.get(
             contains("/api/v1/hangar/my-ships"),
             anyTypeRef(),
@@ -114,12 +107,10 @@ class HangarPaginationMvcTest {
         .perform(get("/hangar").param("search", "Cutlass").param("page", "1"))
         .andExpect(status().isOk())
         .andExpect(view().name("hangar"))
-        // the active filter rides along on every page/size link
         .andExpect(
             content().string(containsString("/hangar?search=Cutlass&amp;page=2&amp;size=50")))
         .andExpect(
             content().string(containsString("/hangar?search=Cutlass&amp;page=0&amp;size=10")))
-        // the clear-filter link drops the search but keeps the active page size
         .andExpect(content().string(containsString("href=\"/hangar?size=50\"")));
   }
 
@@ -144,7 +135,6 @@ class HangarPaginationMvcTest {
 
     mockMvc.perform(get("/hangar").param("size", "5000")).andExpect(status().isOk());
 
-    // A crafted ?size= outside 10/50/100 must never reach the backend as an unbounded page.
     verify(backendApiClient).get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef());
   }
 
@@ -162,8 +152,6 @@ class HangarPaginationMvcTest {
   @Test
   @WithMockUser
   void fragmentResults_rendersPaginationInsideTheSwapFragment() throws Exception {
-    // The pagination controls live INSIDE the hangarResults fragment so an in-place filter/page
-    // change re-renders them (REQ-HANGAR-002).
     when(backendApiClient.get(contains("/api/v1/hangar/my-ships"), anyTypeRef()))
         .thenReturn(page(1, 50, 300));
 
@@ -172,7 +160,6 @@ class HangarPaginationMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("hangar :: hangarResults"))
         .andExpect(content().string(containsString("class=\"pagination\"")))
-        // the modals live outside the fragment and must not appear in the swap body
         .andExpect(content().string(not(containsString("id=\"ship-modal\""))));
   }
 }

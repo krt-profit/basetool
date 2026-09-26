@@ -64,35 +64,17 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Imports the UEX universe topology — factions, jurisdictions, planets, moons, orbits, cities,
+ * Imports the UEX universe topology: factions, jurisdictions, planets, moons, orbits, cities,
  * outposts, points of interest, space stations and terminals.
  *
- * <p>The order in which {@link de.greluc.krt.profit.basetool.backend.service.UexScheduler} calls
- * the sync methods matters: factions/jurisdictions first (no parent), then planets, then
- * moons/orbits/POI (parented by planet), then cities (parented by planet/moon), then outposts and
- * space stations (parented by city). Calling them out of order means a child row references a
- * parent that does not yet exist in the local mirror, and the child is silently dropped (the
- * scheduler retries the full sweep on the next tick so missed children eventually land).
+ * <p>Parents must be synced before their children; a child whose parent is not yet mirrored is
+ * dropped until the next sweep. {@link #syncTerminals()} has no parent constraint and runs first
+ * (REQ-REFINERY-020).
  *
- * <p>{@link #syncTerminals()} is the exception and deliberately runs <em>first</em>
- * (REQ-REFINERY-020). Terminals resolve no parent entity at all — UEX ships the parent as a
- * denormalised name string that is stored verbatim — so they have no ordering constraint, and
- * running them ahead of every step that can abort the tick is what keeps {@code terminal.type}, the
- * refinery picker's only source, from staying unpopulated for a full 24-hour sweep interval.
- *
- * <p><strong>Transactions (BE-PERF-09, REQ-DATA-005).</strong> A sync method holds no transaction
- * across its HTTP fetch: it fetches with none open, then writes the rows through {@link
- * SyncChunkWriter} in chunk transactions of their own, a refused chunk replayed row by row. Until
- * 2026-09-22 each method was one transaction around the fetch and every row, so a pooled connection
- * idled while UEX answered and one refused row rolled the whole catalogue back.
- *
- * <p>Every sync method follows the same pattern: pull the full UEX catalog for that entity, upsert
- * by UEX id (with name-based fallback for legacy rows missing the id), per-field dirty checking to
- * minimize write traffic. Empty UEX responses short-circuit without wiping local data. An
- * <em>unchanged</em> catalogue ({@code 304 Not Modified}, served from the {@link UexClient}
- * conditional-GET cache) short-circuits the same way but is reported at INFO instead of WARN — a
- * fully-cached run is the healthy steady state and must not read like the outage the WARN
- * describes.
+ * <p>Each method fetches outside any transaction and writes through {@link SyncChunkWriter} in
+ * chunk transactions of their own (REQ-DATA-005), upserting by UEX id with a name fallback. An
+ * empty response writes nothing; an unchanged ({@code 304 Not Modified}) catalogue does the same
+ * and is logged at INFO rather than WARN.
  */
 @Slf4j
 @Service
@@ -134,8 +116,6 @@ public class UexUniverseSyncService {
       log.warn("No cities received from UEX API. Aborting city synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -246,8 +226,6 @@ public class UexUniverseSyncService {
       log.warn("No factions received from UEX API. Aborting faction synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -276,12 +254,6 @@ public class UexUniverseSyncService {
                                       return factionRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code / is_available_live: UEX's /factions payload carries neither (REQ-DATA-015).
-            // The
-            // absent flag decoded to null, which checkIsAvailableLive() turned into a hard `false`
-            // — a
-            // value UEX never stated — so the column is now left to whatever a source that knows
-            // writes.
             entity.setWiki(dto.wiki());
             entity.setIsPiracy(dto.checkIsPiracy());
             entity.setIsBountyHunting(dto.checkIsBountyHunting());
@@ -312,8 +284,6 @@ public class UexUniverseSyncService {
       log.warn("No jurisdictions received from UEX API. Aborting jurisdiction synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -342,8 +312,6 @@ public class UexUniverseSyncService {
                                       return jurisdictionRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code: UEX's /jurisdictions payload has no `code` field (it carries `nickname`,
-            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
 
             entity.setNickname(dto.nickname());
@@ -372,8 +340,6 @@ public class UexUniverseSyncService {
       log.warn("No moons received from UEX API. Aborting moon synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -435,8 +401,6 @@ public class UexUniverseSyncService {
       log.warn("No orbits received from UEX API. Aborting orbit synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -497,8 +461,6 @@ public class UexUniverseSyncService {
       log.warn("No outposts received from UEX API. Aborting outpost synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -527,8 +489,6 @@ public class UexUniverseSyncService {
                                       return outpostRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code: UEX's /outposts payload has no `code` field (it carries `nickname`,
-            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
             entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -587,8 +547,6 @@ public class UexUniverseSyncService {
       log.warn("No planets received from UEX API. Aborting planet synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -653,8 +611,6 @@ public class UexUniverseSyncService {
       log.warn("No points of interest received from UEX API. Aborting POI synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -683,8 +639,6 @@ public class UexUniverseSyncService {
                                       return poiRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code: UEX's /poi payload has no `code` field (it carries `nickname`,
-            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
             entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -747,8 +701,6 @@ public class UexUniverseSyncService {
       log.warn("No space stations received from UEX API. Aborting space station synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -777,8 +729,6 @@ public class UexUniverseSyncService {
                                       return spacestationRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code: UEX's /space_stations payload has no `code` field (it carries `nickname`,
-            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
             entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -848,10 +798,8 @@ public class UexUniverseSyncService {
   }
 
   /**
-   * Syncs UEX terminals (trade kiosks at any parent location type). Last in the universe sweep
-   * because every terminal references a parent (city, space station or outpost) that the earlier
-   * sync methods produce. Unknown-parent terminals are upserted with the parent reference cleared —
-   * the next sweep usually fixes the row.
+   * Syncs UEX terminals (trade kiosks at any parent location type). The parent is stored as a
+   * denormalised name, so terminals have no ordering constraint and run first in the sweep.
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncTerminals() {
@@ -867,8 +815,6 @@ public class UexUniverseSyncService {
       return;
     }
     Instant syncedAt = Instant.now();
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -898,16 +844,11 @@ public class UexUniverseSyncService {
                                     }));
             entity.setName(dto.name());
             entity.setCode(dto.code());
-            // The terminal kind is what actually proves a refinery exists at the parent location;
-            // the
-            // parent's own has_refinery flag is unreliable upstream (REQ-REFINERY-020).
             entity.setType(dto.type());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
             entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
             entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
-            // The raw UEX state is recorded on every sweep, regardless of the override flags,
-            // so the admin UI can show what UEX currently claims even while a pin is active.
             Boolean uexLoadingDock =
                 dto.hasLoadingDock() == null ? null : dto.hasLoadingDock() == 1;
             Boolean uexAutoLoad = dto.isAutoLoad() == null ? null : dto.isAutoLoad() == 1;
@@ -943,47 +884,16 @@ public class UexUniverseSyncService {
 
   /**
    * Recomputes {@code city.has_refinery_terminal} / {@code space_station.has_refinery_terminal}
-   * from the terminals just synced: a parent is flagged iff it hosts at least one live {@code type
-   * = 'refinery'} terminal (REQ-REFINERY-020).
+   * from the synced terminals: a parent is flagged iff it hosts at least one live {@code type =
+   * 'refinery'} terminal (REQ-REFINERY-020).
    *
-   * <p>This is the correction step for an upstream inconsistency. UEX's parent-level {@code
-   * has_refinery} claim disagrees with its own terminal list in both directions — it misses MIC-L5,
-   * ARC-L4 and Patch City, and claims four People's Service Stations that host no refinery. The raw
-   * claim stays in {@code has_refinery} for diagnostics; the derived flag is what the
-   * refinery-order picker and its create/update gate read.
+   * <p>Corrects UEX's unreliable parent-level {@code has_refinery} claim, which stays stored for
+   * diagnostics. Called once per sweep from {@code UexScheduler}'s {@code finally}, after all sync
+   * steps, and issues no network call. Matches by the terminal's parent-name columns; a station
+   * within a city does not flag the city.
    *
-   * <p>Called once per sweep from {@code UexScheduler}'s {@code finally}, after every sync step has
-   * had its turn — deliberately NOT at the end of {@link #syncTerminals()}, where it used to sit.
-   * Two reasons, both load-bearing:
-   *
-   * <ul>
-   *   <li>It must see BOTH tables current. It matches terminals against {@code city} / {@code
-   *       space_station} rows by name, so running it inside {@code syncTerminals()} — which now
-   *       leads the sweep — would reconcile against parents that this tick has not synced yet.
-   *   <li>Running it in the {@code finally} means a later step aborting the sweep no longer costs
-   *       the refinery feature its flags: terminals are already committed by then, so the derived
-   *       truth still lands. This mirrors the master-data cache eviction that shares that block.
-   * </ul>
-   *
-   * <p>It issues no network call — a pure local derivation over already-committed rows — so it is
-   * safe in a {@code finally} even when the sweep aborted because UEX was unreachable.
-   *
-   * <p>Deriving the flag here (rather than resolving it per read) is what keeps the order write
-   * path free of an extra query — see the V226 migration note.
-   *
-   * <p>Matching is by the terminal's denormalised parent-name columns, mirroring {@code
-   * RefineryYieldRepository.findAllForLocation}: the city branch additionally requires {@code
-   * spaceStationName IS NULL} so a refinery at a station <em>within</em> a city does not promote
-   * the city itself.
-   *
-   * <p><strong>{@code @Transactional} here is load-bearing — do not drop it.</strong> The class
-   * default is {@code @Transactional(readOnly = true)}. While this method was private and called
-   * from inside {@link #syncTerminals()} it simply ran in that method's read-write transaction; now
-   * that the scheduler calls it from outside, the Spring proxy applies the class default and starts
-   * a genuinely read-only transaction, in which Hibernate switches to {@code FlushMode.MANUAL} and
-   * <em>silently discards</em> the {@code save} calls below. No test would catch that: {@code
-   * UexUniverseSyncRefineryFlagTest} is {@code @Transactional} itself, so this method would merely
-   * join the test's read-write transaction and pass while production wrote nothing.
+   * <p>The explicit {@code @Transactional} must stay: the class default is read-only, in which
+   * Hibernate silently discards the writes.
    */
   @Transactional
   public void reconcileRefineryTerminalFlags() {

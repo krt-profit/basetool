@@ -33,7 +33,6 @@ class TerminalMapperTest {
 
   @Test
   void toDto_shouldMapExposedFields() {
-    // Given — only the fields that TerminalDto actually exposes.
     UUID id = UUID.randomUUID();
     java.time.Instant syncedAt = java.time.Instant.parse("2026-05-16T12:34:56Z");
     Terminal entity = new Terminal();
@@ -53,10 +52,8 @@ class TerminalMapperTest {
     entity.setUexSyncedAt(syncedAt);
     entity.setHidden(true);
 
-    // When
     TerminalDto dto = mapper.toDto(entity);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals("Area 18 Trade & Development Division", dto.name());
@@ -69,8 +66,6 @@ class TerminalMapperTest {
     assertFalse(dto.isAutoLoad());
     assertTrue(dto.hasLoadingDockOverridden());
     assertFalse(dto.isAutoLoadOverridden());
-    // The raw UEX mirror columns are exposed independently of the override flags so
-    // the admin UI can show what UEX currently claims even while a pin is active.
     assertFalse(dto.uexHasLoadingDock());
     assertTrue(dto.uexIsAutoLoad());
     assertEquals(syncedAt, dto.uexSyncedAt());

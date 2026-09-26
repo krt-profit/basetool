@@ -47,12 +47,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Renders the bank audit trail as a KRT-design PDF for a chosen period (REQ-AUDIT-001 unified
- * viewer) and records the export in the bank audit log. The bank keeps its own {@code
- * bank_audit_event} table, so this is a thin sibling of {@link AuditReportService} that feeds the
- * shared {@link AuditLogPdfFormat} renderer — the bank tab on the admin audit page exports through
- * here. Write transaction on purpose: {@link BankAuditService#record} runs {@code MANDATORY}
- * inside.
+ * Exports the bank audit trail for a period as a KRT-design PDF or JSON and records the export in
+ * the bank audit log (REQ-AUDIT-001).
  */
 @Service
 @RequiredArgsConstructor
@@ -98,11 +94,8 @@ public class BankAuditReportService {
                 e ->
                     new AuditLogPdfFormat.Row(
                         e.getOccurredAt(),
-                        // Erased by an Art. 17 request -> the placeholder, not the raw sentinel
-                        // (REQ-SEC-062).
                         HandleAnonymisation.humanise(
                             e.getActorHandle(), label("general.anonymisedHandle")),
-                        // Raw event code (the on-screen viewer shows the localized label).
                         e.getEventType().name(),
                         e.getAccountId() != null
                             ? accountNos.getOrDefault(e.getAccountId(), "—")
@@ -125,13 +118,11 @@ public class BankAuditReportService {
   }
 
   /**
-   * Returns the bank audit events for a period as DTOs (the JSON export, REQ-AUDIT-003) and records
-   * the export as a bank audit event. The affected accounts' display numbers are resolved
-   * batch-wise, exactly as the on-screen viewer does.
+   * Returns the bank audit events for a period as DTOs (REQ-AUDIT-003) and records the export.
    *
    * @param from period start (inclusive)
    * @param to period end (inclusive); must not be before {@code from}
-   * @return the period's bank audit events as DTOs, oldest first
+   * @return the period's bank audit events, oldest first
    * @throws BadRequestException when the period is inverted
    */
   @Transactional

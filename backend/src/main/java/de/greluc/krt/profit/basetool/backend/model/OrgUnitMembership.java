@@ -40,43 +40,12 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 /**
- * Join entity linking a {@link User} to an {@link OrgUnit} they belong to. Persisted in the {@code
- * org_unit_membership} table created by Flyway migration V95.
+ * Membership of a {@link User} in an {@link OrgUnit}, keyed by the composite {@link
+ * OrgUnitMembershipId} {@code (user_id, org_unit_id)}.
  *
- * <p>Why a dedicated entity rather than a plain {@code @ManyToMany} on {@link User}: the membership
- * carries its own per-link state (the capability flags {@code is_logistician} / {@code
- * is_mission_manager}, the unified {@link #role} leadership rank, plus the {@code joined_at}
- * timestamp and an optimistic-lock {@code @Version} counter) that a pure join table cannot express.
- * The membership row is the source of truth for "what may this user do in this org unit" — far more
- * expressive than a flat {@code Set<OrgUnit>}.
- *
- * <p>Composite-key pattern: the primary key is the {@code (user_id, org_unit_id)} pair, expressed
- * via the {@link OrgUnitMembershipId} embeddable. The {@code @ManyToOne user} reference uses
- * {@code @MapsId("userId")} so Hibernate derives the {@code user_id} value from the related entity,
- * sparing the service layer from having to mirror the id into the embedded key by hand. The {@code
- * org_unit_id} half of the key is intentionally NOT a JPA relation — it is a plain UUID column —
- * because the {@code org_unit} table currently holds {@code kind = 'SQUADRON'} rows that have no
- * Java subclass in the inheritance hierarchy yet (Squadron still maps to the legacy {@code
- * squadron} table during the R2.a soak window). Resolving a SQUADRON-discriminated org-unit id
- * through Hibernate's polymorphic load would raise {@code WrongClassException}; treating it as an
- * opaque UUID keeps the membership row readable regardless of which kind it references. R2.b will
- * promote this to a proper {@code @ManyToOne OrgUnit} once Squadron joins the hierarchy.
- *
- * <p>The denormalised {@link #kind} column mirrors {@code org_unit.kind} so the partial unique
- * index "at most one Staffel membership per user" (V95: {@code uq_org_unit_membership_one_squadron}
- * on {@code (user_id) WHERE kind = 'SQUADRON'}) and the rank kind-scoping CHECK "{@code role} only
- * on the matching kind" (V184: {@code chk_org_unit_membership_role_kind}) can be expressed without
- * crossing tables. The BEFORE INSERT/UPDATE trigger {@code sync_org_unit_membership_kind} keeps the
- * value aligned with the referenced {@code org_unit.kind} — application code MUST NOT write to this
- * column directly, so it is mapped as {@code insertable = false, updatable = false}. Hibernate
- * reads it back from the trigger output via the RETURNING clause Spring Data emits on insert.
- *
- * <p>This entity does not extend {@link AbstractEntity} because it owns a composite key rather than
- * a single UUID surrogate: {@link AbstractEntity}'s {@code @Id} contract is fundamentally
- * single-column. The audit columns ({@link #version}, {@link #createdAt}, {@link #updatedAt}) are
- * reproduced on this class directly. The Spring Data {@code Persistable#isNew} contract is left at
- * the JPA default (Hibernate determines persisted-vs-transient by checking whether the
- * {@code @Version} field is {@code null}).
+ * <p>Carries the per-link state that decides what the user may do in the org unit: the capability
+ * flags, the {@link #role} rank, the Kommandogruppe and {@code joined_at}. The {@link #kind} column
+ * mirrors {@code org_unit.kind} via a database trigger and is read-only here.
  */
 @Entity
 @Table(name = "org_unit_membership")
@@ -88,11 +57,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 public class OrgUnitMembership {
 
   /**
-   * Composite primary key combining {@link OrgUnitMembershipId#getUserId()} and {@link
-   * OrgUnitMembershipId#getOrgUnitId()}. Created on insert (the service layer constructs the
-   * embeddable with both UUIDs filled in); the {@code @ManyToOne user} reference's
-   * {@code @MapsId("userId")} synchronises the {@code userId} half from the {@link User} entity, so
-   * service code only has to set {@link #user} and the {@link #id}'s {@code orgUnitId} half.
+   * Composite primary key; the {@code userId} half is derived from {@link #user} via
+   * {@code @MapsId}, so callers set {@link #user} and the {@code orgUnitId} half.
    */
   @EmbeddedId private OrgUnitMembershipId id;
 
@@ -109,74 +75,47 @@ public class OrgUnitMembership {
   private User user;
 
   /**
-   * Denormalised discriminator of the referenced {@code org_unit} row, kept in sync by the V95
-   * {@code sync_org_unit_membership_kind} trigger. Read-only at the JPA layer ({@code insertable =
-   * false, updatable = false}) so application code cannot drift it out of sync with {@code
-   * org_unit.kind}. Stored as a string ({@link EnumType#STRING}) so the column value reads the same
-   * as the matching {@link OrgUnit#getKind()} discriminator across Flyway scripts, JPA, and the
-   * CHECK constraints.
+   * Denormalised {@code org_unit.kind} of the referenced org unit, maintained by a database trigger
+   * and read-only at the JPA layer.
    */
   @Enumerated(EnumType.STRING)
   @Column(name = "kind", nullable = false, length = 32, insertable = false, updatable = false)
   private OrgUnitKind kind;
 
   /**
-   * {@code true} when the membership grants the Logistician role within the referenced org unit.
-   * Replaces the previous global {@code app_user.is_logistician} flag once R2.b switches the
-   * authorisation layer onto scoped roles — until then, both columns coexist (the V95 backfill
-   * copied the user-level flag onto every Staffel membership) and the global flag remains
-   * authoritative.
+   * {@code true} when the membership grants the Logistician capability within the referenced org
+   * unit.
    */
   @Column(name = "is_logistician", nullable = false)
   private boolean isLogistician = false;
 
   /**
-   * {@code true} when the membership grants the Mission Manager role within the referenced org
-   * unit. Same dual-write semantics as {@link #isLogistician}: copied from the global {@code
-   * app_user.is_mission_manager} flag at V95 backfill time, but the global flag stays the source of
-   * truth until R2.b.
+   * {@code true} when the membership grants the Mission Manager capability within the referenced
+   * org unit.
    */
   @Column(name = "is_mission_manager", nullable = false)
   private boolean isMissionManager = false;
 
   /**
-   * Unified leadership rank of this membership (epic #800, REQ-ROLE-001) — the <strong>single
-   * source of truth</strong> for the user's standing in this org unit. It superseded the five
-   * mutually-exclusive boolean leadership flags ({@code is_lead}, {@code is_bereichsleiter}, {@code
-   * is_bereichskoordinator}, {@code is_bereichsoperator}, {@code is_ol_member}), which were dropped
-   * in the epic #800 Phase 5 cleanup ({@code V187}); the SK-Lead and Bereichsleitung wire shapes
-   * now derive their booleans from this rank. Kind-scoped by the V184 {@code
-   * chk_org_unit_membership_role_kind} CHECK (squadron ranks only on {@code SQUADRON}, area ranks
-   * only on {@code BEREICH}, {@link MembershipRole#OL_MEMBER} only on {@code ORGANISATIONSLEITUNG},
-   * {@link MembershipRole#SK_LEAD} only on {@code SPECIAL_COMMAND}).
-   *
-   * <p>The whole authorisation layer ({@code CustomJwtGrantedAuthoritiesConverter}, {@code
-   * OrgUnitCascadeService}, {@code OwnerScopeService}) and the V165 {@code
-   * enforce_leader_excludes_squadron} trigger read this column. Defaults to {@link
-   * MembershipRole#MEMBER}.
+   * The leadership rank of this membership and the single source of truth for the user's standing
+   * in the org unit (REQ-ROLE-001). Each rank is allowed only on its matching org-unit kind;
+   * defaults to {@link MembershipRole#MEMBER}.
    */
   @Enumerated(EnumType.STRING)
   @Column(name = "role", nullable = false, length = 40)
   private MembershipRole role = MembershipRole.MEMBER;
 
   /**
-   * The Kommandogruppe this membership is assigned to (epic #800, REQ-ROLE-003), or {@code null}.
-   * Non-null only for the squadron ranks {@link MembershipRole#KOMMANDOLEITER} / {@link
-   * MembershipRole#STELLV_KOMMANDOLEITER} / {@link MembershipRole#ENSIGN}; an Ensign with a {@code
-   * null} group is "allgemein der Staffelleitung". The {@code
-   * chk_org_unit_membership_kommando_group_role} CHECK (V185) enforces this pairing. Lazy-fetched.
+   * The Kommandogruppe of this membership (REQ-ROLE-003), or {@code null}. Set only for {@link
+   * MembershipRole#KOMMANDOLEITER}, {@link MembershipRole#STELLV_KOMMANDOLEITER} and {@link
+   * MembershipRole#ENSIGN}; an Ensign without a group reports to the Staffelleitung.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "kommando_group_id")
   @ToString.Exclude
   private KommandoGroup kommandoGroup;
 
-  /**
-   * Timestamp when the membership was granted. Backfilled by V95 from {@link User#getJoinDate()}
-   * for pre-existing Staffel memberships; defaults to {@code now()} for new memberships at the DB
-   * layer (the V95 column carries {@code DEFAULT NOW()}). Stored as {@link Instant} (UTC) per the
-   * project convention "all times in UTC" from CLAUDE.md.
-   */
+  /** When the membership was granted (UTC); defaults to the insert time at the database layer. */
   @Column(name = "joined_at", nullable = false)
   private Instant joinedAt;
 

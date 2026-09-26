@@ -33,14 +33,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V219__add_job_order_item_manufactured_amount.sql}
- * (REQ-ORDERS-025, "Herstellung"). Asserts the new {@code job_order_item.manufactured_amount}
- * column ships as a {@code NOT NULL INTEGER DEFAULT 0} and that the three invariant CHECK
- * constraints guarding {@code 0 <= delivered_amount <= manufactured_amount <= amount} — {@code
- * chk_job_order_item_manufactured} (>= 0), {@code chk_job_order_item_manufactured_ge_delivered} and
- * {@code chk_job_order_item_manufactured_le_amount} — exist. The context boots the full migration
- * chain and Hibernate {@code ddl-auto=validate}, so a mismatch between the {@code
- * JobOrderItem.manufacturedAmount} mapping and this migration also fails the test.
+ * Migration test for {@code V219__add_job_order_item_manufactured_amount.sql} (REQ-ORDERS-025): the
+ * {@code manufactured_amount} column and the CHECK constraints enforcing {@code 0 <=
+ * delivered_amount <= manufactured_amount <= amount}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -80,9 +75,6 @@ class V219MigrationTest {
 
   @Test
   void v219DoesNotLeaveTheManufacturedColumnNullable() {
-    // A regression guard alongside the column shape: an absent NOT NULL flag would let the
-    // production-booking counter go null and silently break the delivery gate (delivered <=
-    // manufactured), so pin the nullability explicitly rather than only asserting the type.
     String isNullable =
         jdbcTemplate.queryForObject(
             "SELECT is_nullable FROM information_schema.columns "

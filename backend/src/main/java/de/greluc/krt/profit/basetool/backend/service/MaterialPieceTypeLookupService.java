@@ -27,15 +27,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * Service-layer implementation of the {@link MaterialPieceTypeLookup} seam the quantity-amount
- * constraint validator depends on. Lives here (not in {@code validation}) precisely so the {@code
- * repository} / {@code model} dependency stays in the {@code service} layer and the {@code
- * validation} package remains a dependency leaf — the constraint annotations in {@code model.dto}
- * reference {@code validation}, so a {@code validation} &rarr; {@code repository} / {@code model}
- * edge would close a package cycle.
- *
- * <p>One DB hit per validated DTO: the material is resolved by id and mapped to "is it PIECE?". An
- * unknown id resolves to {@code false} (see {@link MaterialPieceTypeLookup#isPieceQuantity(UUID)}).
+ * Service-layer implementation of {@link MaterialPieceTypeLookup} for the quantity-amount
+ * constraint validator, keeping the {@code validation} package free of repository dependencies.
  */
 @Service
 @RequiredArgsConstructor

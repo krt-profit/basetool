@@ -41,12 +41,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * A single fulfilment event on an {@link JobOrderType#ITEM} {@link JobOrder}: the hand-over of one
- * or more finished-item quantities to a recipient. Mirrors {@link JobOrderHandover} (the material
- * counterpart) including the cross-staffel audit trail — {@link #executingUser} plus an {@link
- * #executingSquadron} snapshot record who carried out the write, since a logistician from one
- * squadron may fulfil an order on behalf of another. Each delivered line is itemised in {@link
- * #entries}.
+ * A single fulfilment event on an {@link JobOrderType#ITEM} {@link JobOrder}: the hand-over of
+ * finished items to a recipient, itemised in {@link #entries}.
+ *
+ * <p>Records {@link #executingUser} and an {@link #executingSquadron} snapshot, since a logistician
+ * may fulfil an order on behalf of another squadron.
  */
 @Entity
 @Getter

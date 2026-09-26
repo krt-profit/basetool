@@ -49,12 +49,6 @@ class MissionUnitColorIndexTest {
 
   @Test
   void paletteSizeShouldBeAtLeast20() {
-    // Build the actual CSS class set the template would emit for indices 0..19 and
-    // assert that all 20 are distinct. This is functionally equivalent to a static
-    // {@code PALETTE_SIZE >= 20} check (the modulo would collapse two indices into
-    // the same class if PALETTE_SIZE were < 20) but it executes at runtime instead
-    // of comparing a compile-time constant against a literal — CodeQL flagged the
-    // previous form as a "Useless comparison test" (always true).
     Set<String> distinctClasses =
         IntStream.range(0, 20)
             .mapToObj(MissionUnitColorIndexTest::unitColorClass)
@@ -72,13 +66,10 @@ class MissionUnitColorIndexTest {
   @ParameterizedTest(name = "Index {0} -> unit-color-{1}")
   @CsvSource({"0,  0", "1,  1", "23, 23", "24, 0", "25, 1", "47, 23", "48, 0", "100, 4"})
   void colorClassShouldWrapAroundPaletteSize(int index, int expectedColorIndex) {
-    // Given
     String expectedClass = "unit-color-" + expectedColorIndex;
 
-    // When
     String actualClass = unitColorClass(index);
 
-    // Then
     assertEquals(
         expectedClass,
         actualClass,
@@ -87,10 +78,8 @@ class MissionUnitColorIndexTest {
 
   @Test
   void firstTwentyIndicesShouldProduceDistinctClasses() {
-    // Given
     int count = 20;
 
-    // When / Then
     for (int i = 0; i < count; i++) {
       for (int j = i + 1; j < count; j++) {
         String classI = unitColorClass(i);

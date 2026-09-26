@@ -23,20 +23,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 
 /**
- * Inbound JSON record for UEX Corp's item-price endpoint ({@code /items_prices_all}), mapped onto
- * {@code game_item_price} rows by the R7 {@code UexItemPriceSyncService}; downstream code consumes
- * the entity, not this DTO.
+ * UEX Corp {@code /items_prices_all} row, mapped onto {@code game_item_price} by {@code
+ * UexItemPriceSyncService}.
  *
- * <p>Binds only the fields the live feed (game 4.8.0) carries — {@code id_item}, {@code
- * id_terminal}, {@code price_buy}, {@code price_sell}, {@code date_modified}. The endpoint also
- * returns {@code id} / {@code id_category} / {@code date_added} / {@code item_name} / {@code
- * item_uuid} / {@code terminal_name}, which the lenient UEX codec mapper ignores. There is no rent
- * or buy/sell-status field in this feed (see the reserved-null columns on {@code GameItemPrice}).
- *
- * <p>Component {@code idItem} is the UEX integer item id (joins to {@code game_item.uex_item_id});
- * {@code idTerminal} is the UEX integer terminal id (joins to {@code terminal.id_terminal}); {@code
- * priceBuy} and {@code priceSell} are buy/sell prices in credits or {@code null}; {@code
- * dateModified} is the UEX unix timestamp (seconds) of the last price change, or {@code null}.
+ * <p>{@code idItem} joins {@code game_item.uex_item_id} and {@code idTerminal} joins {@code
+ * terminal.id_terminal}; {@code priceBuy} / {@code priceSell} are in credits and {@code
+ * dateModified} is a unix timestamp in seconds, each possibly {@code null}.
  */
 @Builder
 public record UexItemPriceDto(

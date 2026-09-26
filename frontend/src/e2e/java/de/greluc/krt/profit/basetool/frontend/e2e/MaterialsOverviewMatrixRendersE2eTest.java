@@ -38,30 +38,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the price-overview matrix that stopped rendering after the CSP hardening of
- * ADR-0093 ("eliminate inline {@code style=""} attributes so the CSP can pin {@code style-src-attr
- * 'none'}"). That migration converted the {@code /materials/overview} skeleton's {@code
- * style="display:none"} on {@code #tableContainer} / {@code #matrixError} into the {@code
- * krtm-display-none-5790} class but left {@code materials-matrix.js} unchanged, so its {@code
- * wrapper.style.display = ''} no longer revealed the table (clearing an already-empty inline style
- * leaves the class's {@code display:none} in force) and its virtual-scroll spacer rows kept an
- * inline {@code style="height:.."} attribute that {@code style-src-attr 'none'} now blocks. The
- * page therefore showed only the filter bar — exactly the shipped v1.3.2 defect.
+ * Verifies that the {@code /materials/overview} price matrix becomes visible and that no {@code
+ * style-src-attr} CSP violation is logged (ADR-0093).
  *
- * <p>The fix toggles the visibility class instead of writing {@code style.display}, and applies the
- * spacer height via the CSSOM ({@code data-krtm-height} → {@code style.height}), which {@code
- * style-src-attr} does not govern. This test drives the real page and asserts the matrix container
- * becomes visible while the loading and error boxes are hidden — the buggy frontend leaves {@code
- * #tableContainer} hidden, so it turns this red.
- *
- * <p>Data-independent: the frontend data endpoint always answers {@code 200} (an empty grid on any
- * backend failure), so the success path — and therefore the un-hiding of {@code #tableContainer} —
- * runs even on an ephemeral stack with no seeded UEX terminals. It additionally captures console
- * output and asserts no {@code style-src-attr} CSP violation was logged; that guards the spacer fix
- * wherever the matrix is large enough to materialize spacer rows (e.g. a populated staging target).
- *
- * <p>Read-only and target-agnostic: it navigates and asserts, mutating nothing, so it is safe
- * against a shared deployment. The actor is {@code test-admin}, who may open the trade pages.
+ * <p>Read-only, so safe against a shared deployment; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class MaterialsOverviewMatrixRendersE2eTest {
@@ -113,17 +93,11 @@ class MaterialsOverviewMatrixRendersE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/materials/overview");
 
-        // The core regression: the client un-hides the matrix once the data load resolves. On the
-        // pre-fix frontend #tableContainer stays display:none (its krtm-display-none-5790 class was
-        // never removed), so this visibility assertion is the discriminator.
         assertThat(page.locator("#tableContainer"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
         assertThat(page.locator("#matrixLoading")).isHidden();
         assertThat(page.locator("#matrixError")).isHidden();
 
-        // Guards the spacer fix: a blocked inline style attribute is reported to the console. With
-        // real data the virtual scroller emits spacer rows, so a reintroduced style="height:.." (or
-        // any other blocked inline style on this page) would surface here.
         List<String> cspStyleViolations =
             consoleLog.stream().filter(line -> line.contains("style-src-attr")).toList();
         assertTrue(

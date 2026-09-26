@@ -50,19 +50,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read-only query/projection half of the org-unit membership domain, split out of {@link
- * OrgUnitMembershipService} (audit Thema 7, #14). It owns every picker/option enumeration and every
- * membership accessor the controllers and downstream services read — active-org-unit option lists,
- * per-user direct/descendant membership options, the SK roster projection, and the name-sorted
- * Staffel accessors that back the authorization gates (REQ-ORG-017) — while the audit-,
- * {@code @Version}- and bank-responsibility-bearing add / remove / patch writes stay in {@link
- * OrgUnitMembershipService}. Carrying no mutation, it wires none of the write half's audit,
- * inventory-reconcile, org-chart-mirror or bank-seam collaborators.
+ * Read-only queries of the org-unit membership domain: picker options, membership projections and
+ * the Staffel accessors behind the authorization gates (REQ-ORG-017). Writes live in {@link
+ * OrgUnitMembershipService}.
  *
- * <p>The class-level {@code @Transactional(readOnly = true)} keeps the persistence session open for
- * the LAZY {@code user.effectiveName} read the {@code …Dto} projection wrappers perform (L4, #923,
- * ADR-0067); a projection reached from within an existing write transaction simply joins it, so the
- * membership-management flows that map the just-persisted row are unaffected.
+ * <p>Read-only transactional so the DTO projections can read the lazy {@code user.effectiveName}.
  */
 @Service
 @RequiredArgsConstructor
@@ -79,17 +71,10 @@ public class OrgUnitMembershipQueryService {
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
 
   /**
-   * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
-   * caller / target-user memberships. Backs the {@code GET /api/v1/org-units/active} endpoint that
-   * the R5.d.c Job Order create form consumes — Job Orders are cross-staffel workspaces, so the
-   * picker for {@code requestingOrgUnitId} is sourced from the full active-org-unit list rather
-   * than the order owner's memberships.
+   * Lists every active Staffel and Spezialkommando as picker options, independent of memberships;
+   * backs {@code GET /api/v1/org-units/active}. Sorted like {@link #listOptionsForUser}.
    *
-   * <p>The result is sorted Staffel-first then Spezialkommandos alphabetical, mirroring {@link
-   * #listOptionsForUser}'s order so the two endpoints render identically in the picker.
-   *
-   * @return active Squadron + SpecialCommand options; never {@code null}, possibly empty when the
-   *     system has zero active org units.
+   * @return active Squadron + SpecialCommand options; never {@code null}, possibly empty.
    */
   @NotNull
   public List<OrgUnitMembershipOptionDto> listAllActiveOptions() {
@@ -122,15 +107,11 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Lists every active org unit of <em>all four</em> kinds (Staffel + Spezialkommando + Bereich +
-   * Organisationsleitung) as picker options (epic #692 Phase 6, REQ-ORG-019). Unlike {@link
-   * #listAllActiveOptions()} — which stays Staffel/SK-only because the public Job-Order form must
-   * not offer a Bereich/OL as a requesting/responsible unit — this also surfaces the Bereiche and
-   * the OL so the bank-management create form can link an {@code AREA} account to its Bereich and
-   * the {@code CARTEL} account to the Organisationsleitung. Bereich/OL options carry {@code
-   * isProfitEligible = false} (only Staffeln/SKs process orders). Ordered Staffel → SK → Bereich →
-   * OL, each alphabetical, so the picker groups by tier; the consumer filters by {@link
-   * OrgUnitMembershipOptionDto#kind()} per account type.
+   * Lists every active org unit of all four kinds as picker options, ordered Staffel, SK, Bereich,
+   * OL and alphabetically within each (REQ-ORG-019).
+   *
+   * <p>Bereich and OL options carry {@code isProfitEligible = false}; consumers filter by {@link
+   * OrgUnitMembershipOptionDto#kind()}.
    *
    * @return active org-unit options across all four kinds; never {@code null}, possibly empty.
    */
@@ -159,21 +140,9 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Every active org unit an <strong>admin</strong> may pin in the active-context switcher, in the
-   * same top-down order {@link #listPickerOptionsWithDescendants(UUID)} uses for everybody else (OL
-   * &rarr; Bereich &rarr; Staffel &rarr; SK). Backs the admin branch of {@code GET
-   * /api/v1/me/org-units}.
-   *
-   * <p>Kept separate from {@link #listAllActiveOptions()} rather than widening it: that list is
-   * also the public Job-Order form's requesting/responsible-unit picker, which must stay
-   * Staffel/SK-only because only those process orders. It is the ordering — not the contents — that
-   * separates this from {@link #listAllActiveOrgUnitOptionsAllKinds()}, whose bank-account consumer
-   * expects Staffel first.
-   *
-   * <p><strong>Why an admin is given all four kinds.</strong> The switcher's pin narrows a read to
-   * one owning org unit, and a Bereich or the OL may own an aggregate in its own right (REQ-ORG-016
-   * — the create-time stamping applies no kind filter). An admin who could only pin a Staffel or an
-   * SK would therefore be unable to reach rows an OL member can, which inverts the hierarchy.
+   * Lists every active org unit an admin may pin in the active-context switcher, in the top-down
+   * order of {@link #listPickerOptionsWithDescendants(UUID)} (OL &rarr; Bereich &rarr; Staffel
+   * &rarr; SK). Backs the admin branch of {@code GET /api/v1/me/org-units}.
    *
    * @return every active org unit as a pinnable option; never {@code null}, possibly empty.
    */
@@ -186,24 +155,11 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Lists every org unit the given user is a member of, materialised as the picker-optimised {@link
-   * OrgUnitMembershipOptionDto} wire shape. Backs the {@code GET
-   * /api/v1/users/{userId}/memberships} endpoint that the R5.d owner-picker fragment consumes.
+   * Lists the user's Staffel and Spezialkommando memberships as picker options, Staffel first then
+   * SKs by name; backs {@code GET /api/v1/users/{userId}/memberships}.
    *
-   * <p>The result is sorted Staffel-first (because a user has at most one Staffel membership, and
-   * keeping it at the top of the dropdown is the highest-frequency choice), then Spezialkommandos
-   * alphabetical by name. Returns an empty list when the user has no memberships at all (typical
-   * for admin / guest users that exist in {@code app_user} without a Staffel join), and also when
-   * the user id itself is unknown — the picker treats both cases the same.
-   *
-   * <p>Inheritance look-up: the membership row carries an opaque {@code org_unit_id} plus the
-   * denormalised {@code kind} discriminator. All rows are resolved in <em>one</em> batch through
-   * the polymorphic {@link OrgUnitRepository} and matched back against the row's {@code kind} —
-   * deliberately NOT via subclass-typed {@code SquadronRepository} / {@code
-   * SpecialCommandRepository} loads, which would force Hibernate to narrow an org-unit id the
-   * surrounding transaction already holds as a base-typed proxy (HHH000179, breaks ==). The
-   * kind-match keeps the old discriminator-filter semantics: a row whose denormalised kind drifted
-   * from the org-unit row is skipped, as is any non-Staffel/non-SK membership.
+   * <p>Bereich and OL memberships, and rows whose stored kind disagrees with the org unit, are
+   * skipped. An unknown user yields an empty list.
    *
    * @param userId the user whose memberships to enumerate; never {@code null}.
    * @return picker-friendly DTOs for each membership; never {@code null}, possibly empty.
@@ -242,14 +198,8 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Returns the org-unit ids the user is a <em>direct</em> member of, across every kind (Staffel /
-   * SK / Bereich / Organisationsleitung), with no leadership cascade. Unlike {@link
-   * #listOptionsForUser(UUID)} — which materialises only the {@code SQUADRON} / {@code
-   * SPECIAL_COMMAND} options the owner picker renders and deliberately skips {@code BEREICH} /
-   * {@code ORGANISATIONSLEITUNG} rows — this is kind-agnostic: it reads the raw org-unit id off
-   * every membership row, so a direct Bereich or OL assignment is included. It also avoids the
-   * per-row org-unit lookups of the option list, because the home-page "Meine Einheit" highlight
-   * (REQ-MISSION-012) only needs the id set, not the labelled options.
+   * Returns the org-unit ids the user is a direct member of, across all kinds and without the
+   * leadership cascade.
    *
    * @param userId the user whose direct memberships to enumerate; never {@code null}.
    * @return the org-unit ids of the user's direct memberships across all kinds; never {@code null},
@@ -265,16 +215,9 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Lists every org unit the given user is a <em>direct</em> member of across <strong>all four
-   * kinds</strong> (Staffel + SK + Bereich + Organisationsleitung), materialised as the
-   * picker-optimised {@link OrgUnitMembershipOptionDto} wire shape with names. Unlike {@link
-   * #listOptionsForUser(UUID)} — which deliberately materialises only the {@code SQUADRON} / {@code
-   * SPECIAL_COMMAND} options the owner picker renders — this surfaces a direct Bereich or OL
-   * membership too, resolving names through the kind-safe {@link OrgUnitRepository#findAllById}.
-   * Backs the bank deposit/withdrawal counterparty org-unit picker (REQ-BANK-044), where a
-   * depositor/recipient who is a Bereich/OL member must be able to record that unit. Ordered
-   * top-down by kind (OL → Bereich → Staffel → SK) then by name, so the first element is the user's
-   * deterministic primary unit.
+   * Lists the user's direct memberships across all four kinds as named picker options, ordered OL,
+   * Bereich, Staffel, SK and then by name, so the first element is the primary unit. Backs the bank
+   * counterparty org-unit picker (REQ-BANK-044).
    *
    * @param userId the user whose direct memberships to enumerate; never {@code null}.
    * @return picker-friendly DTOs across all four kinds; never {@code null}, possibly empty.
@@ -300,11 +243,8 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Resolves the user's <em>primary</em> direct org-unit membership id (REQ-BANK-044) — the first
-   * of {@link #listDirectMembershipOptions(UUID)} in the deterministic top-down order, i.e. a
-   * regular member's name-sorted primary Staffel, or a leader's Bereich / OL. Used to record the
-   * requester's org unit when a booking <em>request</em> is confirmed (the requester is not present
-   * to pick one).
+   * Resolves the user's primary direct org-unit membership: the first of {@link
+   * #listDirectMembershipOptions(UUID)} (REQ-BANK-044).
    *
    * @param userId the user whose primary membership to resolve; never {@code null}.
    * @return the primary org-unit id, or empty when the user has no direct membership at all.
@@ -316,19 +256,12 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Picker options for the <em>owning-org-unit</em> drill-down (epic #692 Phase 5, REQ-ORG-016 /
-   * REQ-ORG-018): the caller's direct memberships <em>plus</em> the cascading leadership reach
-   * (delegated to {@link OrgUnitCascadeService#expandWithDescendants(java.util.Collection)}).
-   * Unlike {@link #listOptionsForUser(UUID)} — which stays strictly the user's DIRECT memberships
-   * and is shared by the admin member views, the refinery-store/transfer receiver picker and the
-   * active-context union — this widens the set so a Bereichsleitung/OL leader can pick their own
-   * Bereich/OL <em>or</em> a subordinate Staffel/SK they oversee when stamping a new aggregate.
+   * Lists the owning-org-unit picker options: the caller's direct memberships plus the cascaded
+   * leadership reach from {@link OrgUnitCascadeService#expandWithDescendants(java.util.Collection)}
+   * (REQ-ORG-016).
    *
-   * <p>For a caller with no leadership flag the expansion collapses to their direct memberships, so
-   * the picker is byte-identical to {@link #listOptionsForUser(UUID)} for an ordinary member. The
-   * returned set may legitimately contain {@code BEREICH} / {@code ORGANISATIONSLEITUNG} options (a
-   * leader owning their own level's data) — the picker fragment groups them by kind. Options are
-   * sorted top-down by hierarchy kind (OL → Bereich → Staffel → SK) then by name.
+   * <p>Without a leadership membership this equals {@link #listOptionsForUser(UUID)}. Options may
+   * include Bereich and OL entries and are sorted OL, Bereich, Staffel, SK, then by name.
    *
    * @param userId the caller whose reachable org units to enumerate; never {@code null}.
    * @return picker-friendly DTOs across all reachable kinds; never {@code null}, possibly empty
@@ -390,9 +323,7 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Lists every membership of the given Spezialkommando. Used by the admin roster page to render
-   * the member chip list. The SK existence is validated via {@link SpecialCommandService} so a
-   * stale id surfaces as 404 instead of an empty list (which would mask a wrong URL).
+   * Lists every membership of the given Spezialkommando.
    *
    * @param specialCommandId the Spezialkommando id; never {@code null}.
    * @return the (possibly empty) list of memberships in repository insertion order.
@@ -417,10 +348,8 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * DTO projection of {@link #findAllMembershipsForUser(UUID)}: the user's complete membership set
-   * (Staffel + every SK) as full response DTOs, mapped inside the read transaction so the lazy
-   * {@code user.effectiveName} read succeeds. Backs {@code GET
-   * /api/v1/users/{id}/memberships/detail}.
+   * Lists the user's complete membership set as response DTOs, mapped inside the read transaction;
+   * backs {@code GET /api/v1/users/{id}/memberships/detail}.
    *
    * @param userId the user whose memberships to project; never {@code null}.
    * @return the user's memberships as DTOs; never {@code null}, possibly empty.
@@ -430,11 +359,8 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Projects the given membership rows to their response DTOs. Deliberately {@code private}: the
-   * mapper reads {@code user.effectiveName} through the LAZY user association, so the rows must
-   * still be attached to the session that loaded them — a contract only same-transaction callers
-   * inside this service can guarantee. External callers use the public {@code …Dto} projections,
-   * which load and map inside one service transaction (L4, #923, ADR-0067).
+   * Maps membership rows to their response DTOs; the rows must still be attached to the session,
+   * because the mapper reads the lazy {@code user.effectiveName}.
    *
    * @param memberships the membership rows to project; never {@code null}.
    * @return the membership DTOs in the same order; never {@code null}, possibly empty.
@@ -444,15 +370,9 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Returns every Staffel OrgUnit id the user belongs to (REQ-ORG-017 — up to two), sorted
-   * case-insensitively by squadron name so the first element is the deterministic <em>primary</em>
-   * Staffel — the same primary definition {@code UserMapper.resolveSquadron} / {@code
-   * UserDto.squadron} use. Backs the authorization gates that must consider ALL of a target's
-   * Staffeln (grant on any overlap), and the single-valued callers that want a stable primary. The
-   * name-sort (and the single-Staffel fast path that skips the squadron load) lives in {@link
-   * StaffelMembershipResolver#resolveNameSortedStaffelIds(List)}, the single owner of the primary
-   * definition; a dangling membership (a row whose squadron no longer resolves) is skipped there,
-   * so the accessor never throws.
+   * Returns the user's Staffel ids (up to two, REQ-ORG-017), sorted case-insensitively by name so
+   * the first is the primary Staffel, as resolved by {@link
+   * StaffelMembershipResolver#resolveNameSortedStaffelIds(List)}. Dangling memberships are skipped.
    *
    * @param userId the user whose Staffel memberships to resolve; never {@code null}.
    * @return the user's Staffel ids, name-sorted (primary first); never {@code null}, possibly
@@ -465,11 +385,8 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Returns the user's deterministic <em>primary</em> Staffel OrgUnit id — the name-sorted first of
-   * {@link #findStaffelMembershipOrgUnitIds(UUID)} (REQ-ORG-017: a user may now hold up to two
-   * Staffeln). Stable across requests and consistent with {@code UserDto.squadron}. Callers that
-   * must consider BOTH Staffeln (e.g. authorization gates) use {@link
-   * #findStaffelMembershipOrgUnitIds(UUID)} instead of this single-valued accessor.
+   * Returns the user's primary Staffel id, the first of {@link
+   * #findStaffelMembershipOrgUnitIds(UUID)}; consistent with {@code UserDto.squadron}.
    *
    * @param userId the user whose primary Staffel to resolve; never {@code null}.
    * @return the primary Staffel's id when the user belongs to one, empty otherwise.
@@ -480,11 +397,8 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Resolves the executing user's Staffel to snapshot on a cross-staffel audit trail (Job-Order
-   * handover), <em>order-aligned</em> per REQ-ORG-017: when the user holds two Staffeln and one of
-   * them is the order's own (responsible) org unit, that Staffel is recorded — it is the unit the
-   * user was actually acting under; otherwise the user's deterministic name-sorted primary Staffel.
-   * Returns empty only when the user holds no Staffel at all.
+   * Resolves the Staffel to record for the executing user on a job-order handover: the order's own
+   * org unit when the user belongs to it, otherwise the user's primary Staffel (REQ-ORG-017).
    *
    * @param userId the executing user; never {@code null}.
    * @param orderOrgUnitId the order's responsible org-unit id, or {@code null} when the order names
@@ -502,10 +416,8 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * SPEZIALKOMMANDO_PLAN.md §7.4 helper — returns every membership row of the given user (Staffel +
-   * every SK) in the same order {@link #listOptionsForUser} sorts the picker options (Staffel
-   * first, then SKs alphabetical). The delta-endpoint return path uses this to render the
-   * post-write state without a follow-up GET on the frontend side.
+   * Returns every membership row of the user, ordered like {@link #listOptionsForUser}: Staffel
+   * first, then SKs by name.
    *
    * @param userId the user whose memberships to enumerate; never {@code null}.
    * @return the membership rows; never {@code null}, possibly empty.
@@ -516,12 +428,6 @@ public class OrgUnitMembershipQueryService {
     if (rows.isEmpty()) {
       return List.of();
     }
-    // One polymorphic batch load feeds the name sort — the previous per-row subclass-typed
-    // findById calls inside the comparator were both an N+1 and a proxy-narrowing source
-    // (HHH000179) whenever the transaction already held one of the ids as a base-typed proxy.
-    // The kind-match preserves the old discriminator-filter semantics (a drifted or
-    // non-Staffel/non-SK row sorts under the empty name, exactly as its typed lookup missed
-    // before).
     Map<UUID, OrgUnit> units = loadOrgUnitsById(rows);
     List<OrgUnitMembership> sorted = new ArrayList<>(rows);
     sorted.sort(
@@ -541,11 +447,8 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Resolves the org units behind the given membership rows in one polymorphic {@link
-   * OrgUnitRepository} batch, keyed by id. The base-typed query reuses any org-unit instance the
-   * surrounding transaction already tracks (instead of narrowing it through a subclass-typed load,
-   * HHH000179) and drops dangling ids — a membership whose org unit no longer resolves is simply
-   * absent from the map.
+   * Loads the org units behind the membership rows in one polymorphic {@link OrgUnitRepository}
+   * batch, keyed by id; dangling ids are absent from the result.
    *
    * @param rows the membership rows whose org units to load; never {@code null}, non-empty.
    * @return the resolved org units keyed by id; never {@code null}, possibly smaller than {@code

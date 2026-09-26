@@ -74,12 +74,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Mockito unit tests for {@link OrgUnitMembershipService}. Pins the CRUD contract that the SK
- * member-management UI relies on: listing through the SK existence guard, add/remove happy paths
- * plus the duplicate-409 and not-found-404 paths, the flag-patch semantics including
- * optimistic-lock failures, and the dedicated lead toggle. The {@code …Dto} projection wrappers
- * (L4, #923, ADR-0067) are covered against the real MapStruct mapper so the wire shape — incl. the
- * flushed {@code @Version} the client must echo back (REQ-FE-003) — is asserted, not mocked.
+ * Unit tests for {@link OrgUnitMembershipService}: SK member listing, add and remove including the
+ * 409 and 404 paths, flag patches with optimistic-lock failures, the lead toggle, and the DTO
+ * projections through the real mapper including the flushed {@code @Version}.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitMembershipServiceTest {
@@ -94,19 +91,11 @@ class OrgUnitMembershipServiceTest {
   @Mock private AuditService auditService;
   @Mock private OrgChartService orgChartService;
 
-  // The responsible-holder audit seam is injected as an ObjectProvider (ADR-0070); the leadership
-  // mutations resolve it to snapshot/record a responsible-holder change. Stubbed lenient below so
-  // the
-  // non-leadership tests do not trip strict-stubs; the seam mock's default (null snapshot, no-op
-  // record) leaves those flows unaffected.
   @Mock
   private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
 
   @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
 
-  // Real MapStruct implementation (not a mock): the …Dto projection tests below assert the actual
-  // entity→DTO mapping the controllers ship to the client, incl. the user.effectiveName read and
-  // the derived isLead flag (L4, #923, ADR-0067).
   @Spy
   private OrgUnitMembershipMapper orgUnitMembershipMapper =
       Mappers.getMapper(OrgUnitMembershipMapper.class);
@@ -135,20 +124,13 @@ class OrgUnitMembershipServiceTest {
 
     id = new OrgUnitMembershipId(userId, scId);
 
-    // The leadership mutations resolve the bank seam through the provider (ADR-0070). Lenient so
-    // the
-    // many non-leadership tests do not trip strict-stubs; the seam mock no-ops the snapshot/record.
     lenient()
         .when(orgUnitBankResponsibilityServiceProvider.getObject())
         .thenReturn(orgUnitBankResponsibilityService);
-    // The membership-removal paths (removeMember, reconcileStaffelMemberships) merge the seam's
-    // per-org-unit snapshot; a non-null map keeps the reconcile putAll from NPE-ing on the mock.
     lenient()
         .when(orgUnitBankResponsibilityService.snapshotResponsibleHolders(any()))
         .thenReturn(Map.of());
   }
-
-  // --- addMember ------------------------------------------------------------
 
   @Test
   void addMember_freshUser_persistsMembership() {
@@ -227,8 +209,6 @@ class OrgUnitMembershipServiceTest {
     verify(inventoryReconciler, never()).onUserGainedFirstOrgUnit(any(), any());
   }
 
-  // --- removeMember ---------------------------------------------------------
-
   @Test
   void removeMember_existing_deletes() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
@@ -273,8 +253,6 @@ class OrgUnitMembershipServiceTest {
     verify(inventoryReconciler, never()).onUserLostLastOrgUnit(any());
   }
 
-  // --- patchFlags -----------------------------------------------------------
-
   @Test
   void patchFlags_bothFlagsSet_updatesBoth() {
     OrgUnitMembership m = new OrgUnitMembership();
@@ -299,7 +277,7 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setVersion(0L);
     m.setLogistician(false);
-    m.setMissionManager(true); // pre-existing true
+    m.setMissionManager(true);
     MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, null, 0L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
@@ -334,8 +312,6 @@ class OrgUnitMembershipServiceTest {
     assertThrows(
         NotFoundException.class, () -> membershipService.patchFlags(scId, userId, request));
   }
-
-  // --- toggleLead -----------------------------------------------------------
 
   @Test
   void toggleLead_promotes() {
@@ -387,8 +363,6 @@ class OrgUnitMembershipServiceTest {
 
   @Test
   void toggleLead_userHoldsStaffel_throwsBadRequest() {
-    // REQ-ORG-017: an SK-Leiter holds no Staffel — promoting a user who still belongs to a Staffel
-    // is rejected with a clean 400 (the V165 trigger is the DB backstop).
     OrgUnitMembership m = new OrgUnitMembership();
     m.setVersion(0L);
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
@@ -401,8 +375,6 @@ class OrgUnitMembershipServiceTest {
         BadRequestException.class, () -> membershipService.toggleLead(scId, userId, request));
     verify(membershipRepository, never()).saveAndFlush(any());
   }
-
-  // --- reconcileStaffelMemberships (REQ-ORG-017: up to two Staffeln) ---------
 
   @Test
   void reconcileStaffelMemberships_addsFirstStaffel_promotesInventoryAndAuditsGranted() {
@@ -427,10 +399,6 @@ class OrgUnitMembershipServiceTest {
 
   @Test
   void reconcileStaffelMemberships_addsTwoStaffelnToZeroMembership_adoptsNameSortedPrimary() {
-    // REQ-ORG-017: a brand-new member assigned two Staffeln at once must have their ownerless
-    // inventory adopted by the name-sorted PRIMARY of the two — not whichever Staffel the client
-    // listed first — so inventory ownership matches UserDto.squadron and the create-time
-    // auto-stamp.
     UUID squadronZeta = UUID.randomUUID();
     UUID squadronAlpha = UUID.randomUUID();
     Squadron sqZeta = new Squadron();
@@ -446,8 +414,6 @@ class OrgUnitMembershipServiceTest {
     when(squadronRepository.findById(squadronZeta)).thenReturn(Optional.of(sqZeta));
     when(squadronRepository.findById(squadronAlpha)).thenReturn(Optional.of(sqAlpha));
 
-    // Client lists Zeta FIRST, Alpha second: the request-order-first is Zeta, but Alpha is the
-    // name-sorted primary — the inventory must adopt Alpha.
     membershipService.reconcileStaffelMemberships(
         user,
         List.of(
@@ -507,7 +473,6 @@ class OrgUnitMembershipServiceTest {
     UUID squadronA = UUID.randomUUID();
     OrgUnitMembership rowA = new OrgUnitMembership();
     rowA.setId(new OrgUnitMembershipId(userId, squadronA));
-    // before = 1, after the delete = 0 → the inventory demotes back to ownerless-personal.
     when(membershipRepository.countByIdUserId(userId)).thenReturn(1L, 0L);
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(rowA));
@@ -547,8 +512,6 @@ class OrgUnitMembershipServiceTest {
         .record(
             eq(AuditEventType.CAPABILITY_FLAGS_CHANGED), eq(squadronA), any(), eq(userId), any());
   }
-
-  // --- Bereich / OL leadership membership -----------------------------------
 
   @Test
   void addBereichLeader_setsExactlyOneRoleFlag() {
@@ -593,7 +556,6 @@ class OrgUnitMembershipServiceTest {
 
     membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
 
-    // An existing leadership rank changed (BEREICHSLEITER -> BEREICHSKOORDINATOR) records CHANGED.
     verify(auditService)
         .record(eq(AuditEventType.ROLE_CHANGED), eq(bereichId), any(), eq(userId), any());
   }
@@ -612,7 +574,6 @@ class OrgUnitMembershipServiceTest {
         BadRequestException.class,
         () -> membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.LEITER));
     verify(membershipRepository, never()).saveAndFlush(any());
-    // A rejected assignment must not write an audit event.
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
@@ -678,7 +639,6 @@ class OrgUnitMembershipServiceTest {
     membershipService.setGrandAdmiral(olId, userId);
 
     assertEquals(userId, ol.getGrandAdmiralUserId());
-    // Already an OL member (REQ-ORG-021 keeps the OL_MEMBER rank) — no auto-add membership write.
     verify(membershipRepository, never()).saveAndFlush(any());
     verify(auditService)
         .record(eq(AuditEventType.ROLE_CHANGED), eq(olId), any(), eq(userId), any());
@@ -704,18 +664,15 @@ class OrgUnitMembershipServiceTest {
     UUID olId = UUID.randomUUID();
     Organisationsleitung ol = new Organisationsleitung();
     ol.setId(olId);
-    ol.setGrandAdmiralUserId(userId); // was an account Grand Admiral
+    ol.setGrandAdmiralUserId(userId);
     when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
 
     membershipService.setGrandAdmiralFreeText(olId, "  Admiral ohne Account  ");
 
     assertEquals("Admiral ohne Account", ol.getGrandAdmiralDisplayName());
     assertNull(ol.getGrandAdmiralUserId());
-    // Free-text is a descriptive chart entry: no membership write (REQ-ORG-021).
     verify(membershipRepository, never()).saveAndFlush(any());
   }
-
-  // --- assign/remove squadron rank (epic #800 Phase 3) ----------------------
 
   /** A Staffel membership row for {@link #userId} on the given squadron with the given rank. */
   private OrgUnitMembership squadronMember(UUID squadronId, MembershipRole role) {
@@ -861,11 +818,6 @@ class OrgUnitMembershipServiceTest {
     verify(membershipRepository, never()).saveAndFlush(any());
   }
 
-  // --- …Dto projections (L4, #923, ADR-0067) ---------------------------------
-  // These run the REAL MapStruct mapper (see the @Spy field) so they pin the wire shape the
-  // controllers ship: userDisplayName from user.effectiveName, isLead derived from the unified
-  // rank, and — for the write wrappers — the @Version the flush bumped (REQ-FE-003).
-
   @Test
   void addMemberDto_mapsThePersistedRow() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
@@ -894,8 +846,6 @@ class OrgUnitMembershipServiceTest {
     MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, true, 3L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
-    // Simulate the flush bumping the row's @Version — the DTO must carry the bumped value, not
-    // the stale pre-flush one, or the client's next echo 409s (REQ-FE-003).
     when(membershipRepository.saveAndFlush(m))
         .thenAnswer(
             inv -> {

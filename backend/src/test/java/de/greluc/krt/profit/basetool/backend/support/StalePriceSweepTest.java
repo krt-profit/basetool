@@ -31,13 +31,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link StalePriceSweep}.
- *
- * <p>The sweep replaced a single {@code WHERE id NOT IN :seenIds} bulk update whose bind-parameter
- * count scaled with the feed — 23 770 rows today, padded to 32 768, against PostgreSQL's 65 535
- * ceiling (REQ-DATA-014). These tests pin the two properties that make the replacement safe: the
- * same rows are cleared as before, and the per-statement parameter count stays bounded however
- * large the matrix grows.
+ * Unit tests for {@link StalePriceSweep}: pins that it clears the right rows and keeps the
+ * per-statement bind-parameter count bounded however large the price matrix grows (REQ-DATA-014).
  */
 class StalePriceSweepTest {
 
@@ -85,8 +80,6 @@ class StalePriceSweepTest {
   @Test
   @DisplayName("the per-statement id count stays bounded no matter how large the matrix is")
   void splitsIntoBoundedChunks() {
-    // The whole point: 2.5 chunks' worth of stale rows must never become one statement with 2 500
-    // bind parameters, because that is the shape that ends at the 65 535 protocol limit.
     int staleCount = StalePriceSweep.CHUNK_SIZE * 2 + 500;
     Set<UUID> priced = new LinkedHashSet<>();
     for (int i = 0; i < staleCount; i++) {

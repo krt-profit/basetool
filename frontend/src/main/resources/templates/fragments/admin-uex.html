@@ -1,17 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <body>
-<!--/*
-    Re-usable terminal row fragment for /admin/uex-data. Mirrors the column
-    structure of the old /admin/terminals page so admins keep the same controls
-    (LoadingDock override + AutoLoad override + Hidden toggle) on every
-    terminal regardless of where it sits in the hierarchy.
-
-    Lives in its own template file so the fragment body is not evaluated as
-    part of the parent page's normal flow — when it sat at the document root
-    of admin/uex.html, Thymeleaf evaluated ${term.name} with `term` unbound
-    on every page render and threw EL1007E.
-*/-->
 <table><tbody>
     <tr th:fragment="terminalRow(term)" th:id="'terminal-' + ${term.id}" class="uex-row-terminal" th:attr="data-name=${term.name}">
         <td th:text="${term.name}">Name</td>

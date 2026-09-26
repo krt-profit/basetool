@@ -202,8 +202,6 @@ class BlueprintProductServiceTest {
 
   @Test
   void resolveByGameItem_derivesProductFromTheRowsGameItem() {
-    // covers REQ-MARKET-014 — the stock-backed item-offer identity bridge: a game item resolves to
-    // the same canonical product a free-stated offer of that item would carry.
     UUID gameItemId = UUID.randomUUID();
     UUID outputItemId = UUID.randomUUID();
     when(blueprintRepository.findByOutputItemId(gameItemId))
@@ -221,10 +219,6 @@ class BlueprintProductServiceTest {
 
   @Test
   void resolveByGameItem_multipleBlueprints_picksLowestKeyRegardlessOfRowOrder() {
-    // covers REQ-MARKET-014 / finding #3 — findByOutputItemId has no ORDER BY, so a game item
-    // produced by several active blueprints whose names normalize to different keys must resolve
-    // deterministically: the candidate keys are sorted and the lowest ("alpha widget") wins in
-    // BOTH row orders.
     UUID itemForwardOrder = UUID.randomUUID();
     UUID itemReverseOrder = UUID.randomUUID();
     when(blueprintRepository.findByOutputItemId(itemForwardOrder))
@@ -259,8 +253,6 @@ class BlueprintProductServiceTest {
 
   @Test
   void scwikiKeyToProductKeyIndex_mapsLowercasedKeyToProductKey() {
-    // covers REQ-INV-019 — the index lower-cases the scwiki_key and maps it to the normalized
-    // product key, so the scmdb.net tag (a lower-cased DataForge key) resolves the product.
     when(blueprintRepository.findActiveProductRows(""))
         .thenReturn(
             List.of(
@@ -276,8 +268,6 @@ class BlueprintProductServiceTest {
 
   @Test
   void scwikiKeyToProductKeyIndex_excludesAmbiguousKeys() {
-    // covers REQ-INV-019 — a scwiki_key (not UNIQUE) shared by two recipes with diverging output
-    // names is ambiguous and excluded, so the tag match never picks an arbitrary product.
     when(blueprintRepository.findActiveProductRows(""))
         .thenReturn(
             List.of(

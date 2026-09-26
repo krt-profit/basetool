@@ -54,25 +54,9 @@ import org.springframework.web.servlet.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.servlet.resource.ResourceUrlProvider;
 
 /**
- * Pins the narrow static-resource handler set of {@link WebMvcConfig} against the asset trees that
- * actually exist on the classpath.
- *
- * <p><strong>Why this test exists.</strong> The handler used to be registered on a catch-all
- * pattern with all four of Spring Boot's default locations, which made it match every URL in the
- * application. With {@code spring.web.resources.chain.strategy.content.enabled} on, {@code
- * ResourceUrlEncodingFilter} routes every Thymeleaf {@code @{...}} link through {@link
- * ResourceUrlProvider}, so each link to a controller route — the shared chrome fragments alone emit
- * 77 of them, on every page — was probed against all four classpath locations on the way out.
- * {@code CachingResourceResolver} caches only non-{@code null} results, so those lookups missed
- * again on every single render: 267 us each, measured. Narrowing the patterns is the fix, and the
- * risk it carries is the mirror image: a tree that loses its pattern stops being served, and a
- * missing stylesheet degrades quietly rather than loudly.
- *
- * <p>{@link #registeredPatternsMatchTheClasspathExactly()} is therefore the load-bearing assertion:
- * it derives the expected pattern set from the classpath rather than from a hand-written list, so
- * adding {@code static/audio/} without a handler fails here instead of 404ing in production, and a
- * reintroduced catch-all — for example by dropping {@code spring.web.resources.add-mappings:
- * false}, which puts Boot's own into the same registry — fails here too.
+ * Pins the narrow static-resource handler set of {@link WebMvcConfig} against the asset trees on
+ * the classpath, so a controller route never walks the {@link ResourceUrlProvider} chain and every
+ * asset tree is still served.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -107,11 +91,8 @@ class StaticResourceHandlerMappingTest {
   }
 
   /**
-   * The registered patterns are exactly the asset trees on the classpath — no more, no less.
-   *
-   * <p>Derived from {@code classpath*:} rather than hard-coded, so both ways this configuration can
-   * break fail here: a new asset tree with no handler (which would 404), and a reintroduced
-   * catch-all (which would restore the per-render chain walk).
+   * The registered patterns are exactly the asset trees on the classpath, derived from {@code
+   * classpath*:}; fails on an unserved tree and on a catch-all pattern.
    *
    * @throws IOException if the classpath cannot be scanned
    */
@@ -124,7 +105,6 @@ class StaticResourceHandlerMappingTest {
       for (Resource resource : resolver.getResources(location)) {
         String name = resource.getFilename();
         assertNotNull(name, () -> "unnamed classpath entry under " + location);
-        // A directory is served as a tree; a bare file at the root as itself (robots.txt).
         expected.add(resource.getFile().isDirectory() ? "/" + name + "/**" : "/" + name);
       }
     }
@@ -140,13 +120,8 @@ class StaticResourceHandlerMappingTest {
   }
 
   /**
-   * No asset tree lies inside the ETag filter's scope, and the filter is not back on {@code /*}
-   * (FE-PERF-03, owner decision 2026-09-23).
-   *
-   * <p>The assets are content-hashed and {@code immutable}; an ETag there would only buffer every
-   * font, image and script in memory. A tree added to {@link EtagConfig#ETAG_URL_PATTERNS} fails
-   * here, and so does a return to {@code /*}, which would put the buffer back in front of every
-   * page render and the notification stream.
+   * No asset tree lies inside the ETag filter's scope, and the filter is not on {@code /*}
+   * (FE-PERF-03).
    */
   @Test
   void noAssetTreeIsInsideTheEtagFilterScope() {
@@ -171,10 +146,6 @@ class StaticResourceHandlerMappingTest {
   /**
    * {@link ResourceUrlProvider} does not walk the resource chain for a controller route.
    *
-   * <p>This is the property the narrowing buys. The lookup returned {@code null} before the change
-   * too — the difference is that it now returns {@code null} because no pattern matches, instead of
-   * after probing four classpath locations and then declining to cache the miss.
-   *
    * @param lookupPath a route served by a controller, never by a file
    */
   @ParameterizedTest
@@ -187,9 +158,6 @@ class StaticResourceHandlerMappingTest {
 
   /**
    * One real file per asset tree is served, with the immutable cache header.
-   *
-   * <p>Each row is a different tree and a different backing location, so a pattern pointed at the
-   * wrong {@code classpath:} directory fails here rather than in a browser.
    *
    * @param path the asset URL to fetch
    * @throws Exception if the request cannot be performed
@@ -214,20 +182,8 @@ class StaticResourceHandlerMappingTest {
   }
 
   /**
-   * A path that names no file still answers 404 — not 500.
-   *
-   * <p>This is the regression the narrowing very nearly shipped. While the handler was a catch-all
-   * it matched every unmapped URL, so a missing file raised {@code NoResourceFoundException} and
-   * {@code GlobalExceptionHandler} rendered the 404 page. Once the patterns became narrow, a path
-   * outside every tree matched no handler at all, the dispatcher raised {@code
-   * NoHandlerFoundException} instead — reachable for the first time because {@code
-   * spring.web.resources.add-mappings} is now {@code false} — and it fell through to the {@code
-   * Exception} catch-all as a 500. Both exceptions are mapped to the 404 page now, and both shapes
-   * are exercised here: {@code /css/typo.css} matches a tree and misses the file, the other two
-   * match no pattern.
-   *
-   * <p>All three are {@code permitAll} in {@link SecurityConfig}, so a redirect here would mean a
-   * different defect — the one {@code SecurityConfigStaticAssetPermitAllTest} guards.
+   * A path that names no file answers 404, not 500, both inside an asset tree and outside every
+   * pattern.
    *
    * @param path a path that names no file
    * @throws Exception if the request cannot be performed
@@ -240,22 +196,8 @@ class StaticResourceHandlerMappingTest {
   }
 
   /**
-   * Every tree still resolves its files to a content-hashed URL.
-   *
-   * <p>The hash is what makes the one-year {@code immutable} cache header safe, so a tree that lost
-   * its {@link org.springframework.web.servlet.resource.VersionResourceResolver} is the expensive
-   * mistake this configuration can make: its URLs would then be cached for a year with no way to
-   * revise them. One file per tree, because the resolver is attached per registration.
-   *
-   * <p>Asserted against {@link ResourceUrlProvider} rather than against a rendered page, because
-   * that provider is precisely what {@code ResourceUrlEncodingFilter} consults when it rewrites a
-   * {@code @{...}} link — and MockMvc does not reproduce the filter-plus-interceptor pairing that
-   * makes the rewrite happen in a real container, so a page-level assertion here would pass or fail
-   * for reasons that have nothing to do with this configuration.
-   *
-   * <p>{@code /robots.txt} is absent on purpose: it is registered as an exact pattern, so no
-   * wildcard remains for the version strategy to hash, and it is fetched by crawlers at its literal
-   * path anyway.
+   * Every asset tree resolves its files to a content-hashed URL through {@link
+   * ResourceUrlProvider}, which the one-year {@code immutable} cache header relies on.
    *
    * @param path an asset path, one per registered tree
    */

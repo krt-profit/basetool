@@ -42,12 +42,10 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Verifies {@link CsrfTokenController} against the real {@link
- * de.greluc.krt.profit.basetool.frontend.config.SecurityConfig} filter chain (covers REQ-FE-004 /
- * REQ-SEC-010): an authenticated session is handed the active CSRF header name + token, while an
- * anonymous caller is bounced to the OIDC entry point and never receives a token. The full filter
- * chain is exercised (via {@code springSecurity()}) so the {@code CsrfFilter} actually populates
- * the {@code CsrfToken} request attribute the controller resolves.
+ * Tests {@link CsrfTokenController} against the real {@link
+ * de.greluc.krt.profit.basetool.frontend.config.SecurityConfig} filter chain (REQ-FE-004,
+ * REQ-SEC-010): an authenticated session receives the CSRF header name and token, an anonymous
+ * caller receives none.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -83,12 +81,9 @@ class CsrfTokenControllerMvcTest {
   }
 
   /**
-   * An anonymous GET /csrf must not hand out a token. It falls under the {@code authenticated()}
-   * catch-all, so {@link
-   * de.greluc.krt.profit.basetool.frontend.config.SsoReAuthenticationEntryPoint} responds (a
-   * redirect to the OIDC login) rather than 200 — asserting "not 200" keeps the test robust to the
-   * exact entry-point status while still pinning the security-relevant contract: anonymous callers
-   * get no token.
+   * An anonymous GET /csrf is answered by {@link
+   * de.greluc.krt.profit.basetool.frontend.config.SsoReAuthenticationEntryPoint} and receives no
+   * token; the test asserts only "not 200".
    */
   @Test
   @WithAnonymousUser

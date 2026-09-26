@@ -25,50 +25,24 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Regex-based PII / secret masking behind every appender of all three applications: {@link
- * PiiMaskingPatternLayout} for the console and plain-text file sinks and {@link
- * PiiMaskingLogstashEncoder} for the prod JSON sink (REQ-OBS-004). One implementation, so the
- * backend, the frontend and the ingest gateway cannot scrub different patterns (ADR-0205).
- *
- * <p>Patterns:
+ * Regex-based PII and secret masking behind {@link PiiMaskingPatternLayout} and {@link
+ * PiiMaskingLogstashEncoder} in all three applications (REQ-OBS-004, ADR-0205).
  *
  * <ul>
- *   <li>JWTs (three Base64URL segments separated by dots, header prefix {@code eyJ}) -&gt; {@code
- *       JWT_***}.
- *   <li>RFC 5322-ish e-mail addresses -&gt; {@code ***@***.***}.
- *   <li>Values introduced by the keywords {@code bearer}, {@code token}, {@code session-id} or
- *       {@code authorization} keep the keyword and replace the trailing value with {@code ***}. The
- *       keyword only counts when a separator follows it ({@code :}, {@code =} or whitespace), so an
- *       identifier that merely contains one of them -&gt; a {@code BearerTokenAuthenticationFilter}
- *       stack frame, an {@code AuthorizationFilter} class name -&gt; survives intact instead of
- *       being truncated at the keyword.
+ *   <li>JWTs become {@code JWT_***}.
+ *   <li>E-mail addresses become {@code ***@***.***}.
+ *   <li>Values after {@code bearer}, {@code token}, {@code session-id} or {@code authorization}
+ *       followed by a separator become {@code ***}.
  * </ul>
  *
- * <p>All replacements are alphanumeric only, never quotes or backslashes, so applying the masker on
- * top of a serialized JSON document leaves the JSON syntactically valid.
+ * <p>Replacements contain no quotes or backslashes, so masked JSON stays valid.
  */
 public final class PiiMasker {
 
   private static final String JWT_PATTERN =
       "(eyJ[a-zA-Z0-9_-]{5,}\\.eyJ[a-zA-Z0-9_-]{5,}\\.[a-zA-Z0-9_-]{5,})";
-  // Domain uses possessive label groups (?:label\.)++TLD so adjacent quantifiers cannot overlap —
-  // avoids the O(n^2) backtracking the previous [a-zA-Z0-9.-]+\.[a-zA-Z]{2,} exhibited on long
-  // no-TLD '@'-strings, which run on every log line (security audit L5).
-  // The LOCAL part is possessive and length-bounded too, and the L5 fix was incomplete without it:
-  // it stayed a greedy `+`, so Matcher.find() restarting at every index still walked a long
-  // local-part run quadratically. {1,64}+ is RFC 5321's local-part limit, so bounding it rejects
-  // nothing real (security audit MEDIUM-8).
   private static final String EMAIL_PATTERN =
       "([a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]{1,64}+@(?:[a-zA-Z0-9-]++\\.)++[a-zA-Z]{2,})";
-  // Value class includes the standard-base64 alphabet (+, /, =) so a base64 secret logged next to
-  // one of these keywords is masked in full, not truncated at the first +/=/ (security audit L6).
-  // The keyword must be followed by a real separator - ":", "=" or whitespace. With the
-  // separator optional, every identifier that merely CONTAINS one of the keywords was eaten
-  // together with everything after it: a stack frame
-  // "BearerTokenAuthenticationFilter.doFilter" reached the log as "BearerToken***" and
-  // "...intercept.AuthorizationFilter.doFilter" as "Authorization***", which is exactly the
-  // information an incident needs. Requiring the separator loses no secret: a token is logged as
-  // "token=x", "token: x" or "Bearer x", never as "tokenx".
   private static final String KEYWORD_TOKEN_PATTERN =
       "(?i)(bearer\\s+|(?:token|session[-_]?id|authorization)"
           + "(?:\\s*[:=]\\s*|\\s+)(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.+/=]+)";
@@ -79,13 +53,11 @@ public final class PiiMasker {
   private PiiMasker() {}
 
   /**
-   * Returns {@code input} with all detected PII / secret occurrences replaced by fixed
-   * placeholders. {@code null}, empty and PII-free inputs are returned as the very same instance,
-   * which is what lets {@link PiiMaskingLogstashEncoder} hand the original bytes back for the
-   * common, PII-free event without a re-encode.
+   * Replaces all detected PII and secret occurrences with fixed placeholders.
    *
-   * @param input the raw log line or serialized JSON document to scrub; may be {@code null}.
-   * @return the masked text, or {@code input} unchanged when it is {@code null} / empty / PII-free.
+   * @param input the raw log line or serialized JSON to scrub; may be {@code null}
+   * @return the masked text, or the same {@code input} instance when it is {@code null}, empty or
+   *     PII-free
    */
   @Contract(value = "null -> null; !null -> !null", pure = true)
   public static @Nullable String mask(@Nullable String input) {

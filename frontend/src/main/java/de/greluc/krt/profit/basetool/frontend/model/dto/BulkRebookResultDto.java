@@ -21,8 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
  * Frontend mirror of the backend {@code BulkRebookResultDto}: the outcome of a Massen-Umbuchen
- * (REQ-INV-036). The page reports both numbers so a selection that was largely a no-op does not
- * read as a full success.
+ * (REQ-INV-036).
  *
  * @param rebooked the number of rows that were moved
  * @param skipped the number of rows that already sat in the requested target state

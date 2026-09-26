@@ -33,19 +33,11 @@
 
         <link rel="stylesheet" th:href="@{/css/pages/hangar-squadron.css}">
 
-        <!--/* Org-unit overview aggregates ship counts per ship-type across every org unit the
-             caller can see (REQ-HANGAR-003): without a pin a member sees their own Staffeln/SKs,
-             a Bereichsleitung the units of their Bereich, and the OL every ship. In admin "all
-             org units" mode the bucket merges ships from every unit - tell the admin the totals
-             span all of them. An active pin narrows the view back to the pinned unit. */-->
         <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted krtm-display-block-padding-0-6rem-0-9rem-margin-b-3373"
              th:text="#{hangar.squadron.all_squadrons_notice}">
             Aggregation across all org units. Select a single org unit to filter.
         </div>
 
-        <!--/* Server-side filter: the form GETs back to this page (search resets to page 0 by
-             omitting the page param). It stays visible while a search yields nothing -
-             otherwise the filter could never be cleared. */-->
         <form th:if="${!#lists.isEmpty(overview) or search != null}"
               id="squadron-filter-form" class="squadron-filter-form" role="search"
               method="get" th:action="@{/hangar/squadron}">
@@ -119,9 +111,6 @@
         </table>
         </div>
 
-        <!--/* Footer bar: size picker left, page-nav right (same pattern as the blueprint
-             overview). The base URL keeps the active search so paging and re-sizing
-             never drop the filter. */-->
         <div class="pagination-controls" th:if="${overviewPage != null}">
             <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
             <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl})}"></nav>

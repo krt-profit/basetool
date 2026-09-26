@@ -78,7 +78,6 @@ class NotificationServiceTest {
 
   @Test
   void markReadMarksUnreadAndSavesAndFlush() {
-    // Given
     UUID id = UUID.randomUUID();
     Notification n = unread(id);
     NotificationDto dto = dummyDto(id);
@@ -86,10 +85,8 @@ class NotificationServiceTest {
     when(repository.saveAndFlush(n)).thenReturn(n);
     when(mapper.toDto(n)).thenReturn(dto);
 
-    // When
     NotificationDto result = service.markRead(RECIPIENT, id);
 
-    // Then
     assertTrue(n.isRead());
     assertNotNull(n.getReadAt());
     assertSame(dto, result);
@@ -98,7 +95,6 @@ class NotificationServiceTest {
 
   @Test
   void markReadAlreadyReadKeepsReadAt() {
-    // Given
     UUID id = UUID.randomUUID();
     Notification n = unread(id);
     Instant readAt = Instant.parse("2026-01-01T00:00:00Z");
@@ -108,45 +104,36 @@ class NotificationServiceTest {
     when(repository.saveAndFlush(n)).thenReturn(n);
     when(mapper.toDto(n)).thenReturn(dummyDto(id));
 
-    // When
     service.markRead(RECIPIENT, id);
 
-    // Then
     assertEquals(readAt, n.getReadAt());
   }
 
   @Test
   void markReadForeignOrUnknownThrowsNotFound() {
-    // Given
     UUID id = UUID.randomUUID();
     when(repository.findByIdAndRecipientUserId(id, RECIPIENT)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(EntityNotFoundException.class, () -> service.markRead(RECIPIENT, id));
     verify(repository, never()).saveAndFlush(any());
   }
 
   @Test
   void deleteOwnDeletesWhenFound() {
-    // Given
     UUID id = UUID.randomUUID();
     Notification n = unread(id);
     when(repository.findByIdAndRecipientUserId(id, RECIPIENT)).thenReturn(Optional.of(n));
 
-    // When
     service.deleteOwn(RECIPIENT, id);
 
-    // Then
     verify(repository).delete(n);
   }
 
   @Test
   void deleteOwnForeignOrUnknownThrowsNotFound() {
-    // Given
     UUID id = UUID.randomUUID();
     when(repository.findByIdAndRecipientUserId(id, OTHER)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(EntityNotFoundException.class, () -> service.deleteOwn(OTHER, id));
     verify(repository, never()).delete(any());
   }
@@ -193,9 +180,6 @@ class NotificationServiceTest {
     assertEquals(1, captor.getValue().getPageSize());
   }
 
-  // covers REQ-NOTIF-019 — the inbox-list sort whitelist includes id, so PaginationUtil appends it
-  // as a stable tiebreaker. Without a total order, two notifications sharing a createdAt instant
-  // could reorder between page fetches and the load-more would silently skip a row at the boundary.
   @Test
   void listSortWhitelistYieldsStableCreatedAtDescWithIdTiebreaker() {
     org.springframework.data.domain.Sort sort =

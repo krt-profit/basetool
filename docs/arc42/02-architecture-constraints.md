@@ -39,10 +39,13 @@ even though they are style rules on paper:
   console write in `src/main` fails a CI job (ADR-0193).
 - **Javadoc is mandatory and gate-enforced** on every type and public member. Checkstyle enforces
   the form; the substance is on the author.
+- **No comments besides Javadoc** (ADR-0214). Javadoc is short and carries no history; reasoning
+  goes into the commit message and the PR, durable facts into the spec, the ADR or the knowledge
+  base. Nothing gates this beyond review.
 - **Google Java Style**, applied by Spotless and checked by Checkstyle; SpotBugs runs on `main`.
 - **Every user-visible string is translated**, and German umlauts are `\uXXXX`-escaped inside
   `.properties` and literal UTF-8 everywhere else.
-- **English for all developer-facing prose** — commits, PRs, issues, Javadoc, comments. The German
+- **English for all developer-facing prose** — commits, PRs, issues, Javadoc. The German
   end-user wiki is the single deliberate exception.
 
 ## 2.4 The documentation constraint

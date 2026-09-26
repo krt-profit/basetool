@@ -24,18 +24,11 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 
 /**
- * The fixed RFC&nbsp;7807 identity (status, stable code, i18n keys, problem-type suffix, WARN/ERROR
- * log label, disclosure policy) for every {@link AppException} subtype whose wire contract is a
- * per-<em>type</em> constant rather than computed per-instance (S4, #910).
+ * The fixed RFC&nbsp;7807 identity (status, stable code, i18n keys, problem-type suffix, log label,
+ * disclosure policy) of every {@link AppException} subtype whose wire contract is constant per
+ * type.
  *
- * <p>{@code BankConflictException} is the sole exception excluded from this enum: its code, i18n
- * keys and problem-type suffix are chosen per-<em>instance</em> from one of its {@code CODE_BANK_*}
- * constants, so it implements {@link AppException}'s abstract accessors directly instead of
- * delegating to a fixed {@code AppExceptionKind} constant.
- *
- * <p>Values are byte-identical to the literals the corresponding {@code
- * GlobalExceptionHandler.handle*} method used to hardcode before S4 — this enum only relocates them
- * next to the exception types they describe, it does not change any of them.
+ * <p>{@code BankConflictException} is not listed: its identity is chosen per instance.
  */
 @RequiredArgsConstructor
 public enum AppExceptionKind {
@@ -51,12 +44,8 @@ public enum AppExceptionKind {
       ErrorDisclosurePolicy.STANDARD),
 
   /**
-   * {@code NotFoundException}. Its {@code GlobalExceptionHandler} handler stays a dedicated,
-   * standalone {@code @ExceptionHandler} (not the generic {@code AppException} dispatch) because it
-   * also covers three non-{@code AppException} JPA/JDK types ({@code EntityNotFoundException},
-   * {@code NoSuchElementException}, {@code NoResourceFoundException}) that cannot be sealed under
-   * this hierarchy. This constant exists so {@code NotFoundException} still exposes the uniform
-   * accessor contract like every other sealed member, even though the handler does not consult it.
+   * {@code NotFoundException}. Its dedicated handler also covers JPA/JDK not-found types and does
+   * not consult this constant.
    */
   NOT_FOUND(
       HttpStatus.NOT_FOUND,
@@ -78,11 +67,9 @@ public enum AppExceptionKind {
       ErrorDisclosurePolicy.STANDARD),
 
   /**
-   * {@code OverAllocationException} — a well-formed, version-current request whose amount would
-   * push a dimension's Σ over the inventory entry's own amount (Variante C, REQ-INV-027 rule R5).
-   * The {@code 422} status is deliberately distinct from a {@code 400} validation error and a
-   * {@code 409} lock conflict so the frontend can render an inline toast rather than a reload
-   * prompt.
+   * {@code OverAllocationException}: an amount would push a dimension's sum over the inventory
+   * entry's own amount (REQ-INV-027). A {@code 422}, distinct from {@code 400} and {@code 409}, so
+   * the frontend renders an inline toast.
    */
   OVER_ALLOCATION(
       HttpStatus.UNPROCESSABLE_CONTENT,
@@ -109,19 +96,12 @@ public enum AppExceptionKind {
       ErrorDisclosurePolicy.STANDARD),
 
   /**
-   * {@code OwnerOrgUnitRequiredException} — the caller belongs to more than one org unit, supplied
-   * no {@code owningOrgUnitId} and has no honourable active-context pin, so §5.5.1's "pin, else
-   * choose" rule cannot resolve an owner for the aggregate being created (REQ-ORG-017).
+   * {@code OwnerOrgUnitRequiredException}: a caller in several org units supplied no {@code
+   * owningOrgUnitId} and has no usable active-context pin, so no owner can be resolved
+   * (REQ-ORG-017).
    *
-   * <p>Split out of {@link #BAD_REQUEST} because this is the one 400 on that path the member can
-   * actually fix, and only if they are told how. Under the generic code the frontend had nothing to
-   * branch on and fell through to echoing the backend's own English {@code detail} into a German
-   * toast — "User belongs to multiple org units; owningOrgUnitId is required" — which is both an
-   * i18n violation and an instruction nobody can act on. A stable code lets each picker surface
-   * render its own localized "please choose an org unit" and point at the field (REQ-ORG-023).
-   *
-   * <p>Still a {@code 400}: the request is malformed for this caller, not a conflict and not a
-   * permission refusal. A pick the caller may not make stays an {@code AccessDeniedException}.
+   * <p>A separate code from {@link #BAD_REQUEST} so the frontend can ask the member to choose an
+   * org unit (REQ-ORG-023).
    */
   OWNER_ORG_UNIT_REQUIRED(
       HttpStatus.BAD_REQUEST,
@@ -133,14 +113,10 @@ public enum AppExceptionKind {
       ErrorDisclosurePolicy.STANDARD),
 
   /**
-   * {@code MissionParticipantRequiredException} — a refinery order is being linked to a mission its
-   * owner does not take part in (REQ-SEC-042).
+   * {@code MissionParticipantRequiredException}: a refinery order is linked to a mission its owner
+   * does not take part in (REQ-SEC-042).
    *
-   * <p>Split out of {@link #BAD_REQUEST} for the same reason as {@link #OWNER_ORG_UNIT_REQUIRED}:
-   * it is a 400 the member can fix, but only if the form says which field is wrong. The refinery
-   * create form otherwise maps every 400 to "add a material", which would send the member hunting
-   * in the goods editor for a problem that sits in the mission dropdown. A stable code lets the
-   * create and detail pages render their own localized message.
+   * <p>A separate code from {@link #BAD_REQUEST} so the form can point at the mission field.
    */
   MISSION_PARTICIPANT_REQUIRED(
       HttpStatus.BAD_REQUEST,

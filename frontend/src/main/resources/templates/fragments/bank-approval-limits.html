@@ -1,20 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  Bank per-account approval-limit fragments (REQ-BANK-041), shared by both account-detail surfaces.
-
-  limitsDisplay(limits): read-only list of the configured per-tier ceilings, shown to every viewer
-  who cannot edit (a manager sees the editor instead). Rendered only when at least one limit is set.
-
-  limitsEditor(acct, limits, refresh): the per-tier set/clear editor for a caller who may edit
-  (responsible holder / bank management / admin). Mirrors the visibility-settings vis-row pattern:
-  each tier carries a compact number input + "set" (PUT) and, when a limit is set, a "clear" (DELETE)
-  against /api/proxy/org-units/bank/accounts/{id}/approval-limit/... . The `refresh` parameter is the
-  bank.js data-refresh token, so the same fragment swaps the bank-staff body (accountBody) or the
-  org-unit settings region (orgUnitBankSettings). No version field — a limit set/clear is an
-  idempotent upsert (last-writer-wins on the tier row).
-*/-->
 <th:block th:fragment="limitsDisplay(limits)">
     <div class="hud-box mt-2" th:if="${limits != null and limits.hasAny() and !limits.canEdit()}"
          data-testid="bank-approval-limits-display">
@@ -52,7 +38,6 @@
         <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.approvalLimit.hint}">
             Bis zu diesem Betrag darf die Stufe ohne zus&auml;tzliche Freigabe buchen; dar&uuml;ber braucht es deine Freigabe.</p>
 
-        <!--/* Role buckets */-->
         <div th:if="${!#lists.isEmpty(limits.availableRoleCodes())}">
             <div class="vis-row" th:each="role : ${limits.availableRoleCodes()}"
                  th:with="current=${limits.roleLimits().get(role)}">
@@ -81,7 +66,6 @@
             </div>
         </div>
 
-        <!--/* All members */-->
         <div th:if="${limits.allMembersSupported()}" class="vis-row" th:with="current=${limits.allMembersLimit()}">
             <span class="v-label" th:text="#{bank.approvalLimit.tier.allMembers}">Alle Mitglieder der Org-Einheit</span>
             <span class="vis-state bank-limit-edit">
@@ -108,7 +92,6 @@
             </span>
         </div>
 
-        <!--/* Mitglieder des Bereichs (whole area cascade, AREA accounts only, REQ-BANK-048) */-->
         <div th:if="${limits.areaMembersSupported()}" class="vis-row" th:with="current=${limits.areaMembersLimit()}">
             <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
             <span class="vis-state bank-limit-edit">
@@ -135,7 +118,6 @@
             </span>
         </div>
 
-        <!--/* Individual users */-->
         <h3 class="sub-h" th:text="#{bank.approvalLimit.users}">Einzelne Nutzer</h3>
         <div th:if="${!#lists.isEmpty(limits.userLimits())}">
             <div class="vis-row" th:each="u : ${limits.userLimits()}" data-testid="bank-approval-limit-user-row">
@@ -162,10 +144,6 @@
             <div class="field-row">
                 <div class="bank-form-row grow">
                     <label for="bank-limit-user-select" th:text="#{bank.approvalLimit.user.add}">Limit f&uuml;r Nutzer</label>
-                    <!--/* Server-side searchable combobox (remote-users, #1193): the roster is no longer
-                         preloaded. Typing queries /users/search on demand; this editor renders only on
-                         the org-unit bank page (MEMBER_OR_ABOVE), so the squadron-scoped endpoint fits.
-                         Add-only picker, only the placeholder is seeded. */-->
                     <select id="bank-limit-user-select" name="_userId" required data-krt-combobox="remote-users" data-testid="bank-limit-user-select">
                         <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
                     </select>

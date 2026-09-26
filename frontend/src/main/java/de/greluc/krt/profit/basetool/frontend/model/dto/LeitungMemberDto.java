@@ -22,13 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of one Leitung roster row (epic #800, REQ-ROLE-004). The {@code role} is the
- * functional-rank enum name (kept as a {@code String} — the page renders it via the {@code
- * leitung.rank.*} message keys and never needs the enum type).
+ * Frontend mirror of one Leitung roster row (REQ-ROLE-004).
  *
  * @param userId the member's account id.
  * @param userDisplayName the member's display label.
- * @param role the functional-rank enum name ({@code MEMBER}, {@code STAFFELLEITER}, …).
+ * @param role the functional-rank enum name ({@code MEMBER}, {@code STAFFELLEITER}, …), rendered
+ *     via the {@code leitung.rank.*} message keys.
  * @param kommandoGroupId the bound Kommandogruppe id for an in-Kommando rank, or {@code null}.
  * @param version the membership row's optimistic-lock version, echoed on a squadron-rank write.
  */

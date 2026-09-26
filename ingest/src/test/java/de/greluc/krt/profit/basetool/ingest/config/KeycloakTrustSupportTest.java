@@ -50,7 +50,6 @@ class KeycloakTrustSupportTest {
 
   @Test
   void returnsNullWhenNoSuchBundleIsRegistered() {
-    // dev/test reach Keycloak over plain HTTP; the caller then uses its default client.
     ClientHttpRequestFactory factory =
         KeycloakTrustSupport.trustedRequestFactory(
             new DefaultSslBundleRegistry(), KeycloakTrustSupport.KEYCLOAK_TRUST_BUNDLE);
@@ -60,8 +59,6 @@ class KeycloakTrustSupportTest {
 
   @Test
   void looksUpTheBundleByTheNameItIsAskedFor() {
-    // The lookup is by name, so a bundle registered under a different name must not be picked up —
-    // that would silently pin the JWKS fetch to the wrong trust anchor.
     ClientHttpRequestFactory factory =
         KeycloakTrustSupport.trustedRequestFactory(
             new DefaultSslBundleRegistry(), "some-other-bundle");

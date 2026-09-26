@@ -1,42 +1,17 @@
 #!/usr/bin/env python3
 """Profit Basetool - render the per-service environment files from their templates.
 
-``scripts/generate-quadlet.py`` emits ``quadlet/env.d/<service>.env.tmpl``: the compose
-``environment:`` map with every right-hand side **verbatim**. This renders those templates against
-the host ``.env`` into ``/var/iri/code/env.d/<service>.env``, which is what the Quadlet units name
-in ``EnvironmentFile=``.
+Renders ``quadlet/env.d/<service>.env.tmpl`` against the host ``.env`` into the files the Quadlet
+units name in ``EnvironmentFile=``, one per service. Compose interpolation semantics, nesting
+included::
 
-Why this exists as its own tool
--------------------------------
-The templates were introduced on 2026-09-17 and nothing filled them. ``deploy.sh`` is the Docker-era
-deployer and hands the whole ``.env`` to compose, which does this interpolation itself. Under Quadlet
-there is no compose, so the interpolation has to happen somewhere -- and doing it ad hoc in a shell
-loop is how the *first* bring-up of this stack silently produced empty values: ``set -e`` is inert
-inside an ``if`` condition, so a failed ``.`` of the ``.env`` reported success.
-
-What it preserves
------------------
-**The closed allow-list.** One file per service, each holding only the variables that service's own
-compose map named. A single shared ``EnvironmentFile=`` would hand every container every secret.
-
-**Compose's interpolation semantics**, including the nesting the templates actually contain::
-
-    ${NAME}              unset -> empty, like compose
-    ${NAME:-default}     default when unset OR empty
+    ${NAME}              unset -> empty
+    ${NAME:-default}     default when unset or empty
     ${NAME-default}      default only when unset
-    ${NAME:?message}     REFUSE when unset OR empty
-    ${NAME?message}      REFUSE only when unset
+    ${NAME:?message}     refuse when unset or empty
+    ${NAME?message}      refuse only when unset
 
-``${A:-${B:-fallback}}`` nests, and ``IRI_KEYCLOAK_ISSUER_URI`` in the real templates is exactly
-that shape, so the parser counts braces rather than matching a regex.
-
-What it refuses to do
----------------------
-It **fails rather than writing a half-rendered file**: a ``${NAME:?...}`` with nothing behind it
-aborts the whole run before any file is written, naming every variable that is missing rather than
-the first. A container started against a partially rendered environment is the failure mode this
-tool exists to prevent, and it is not visible from the outside -- postgres comes up on its built-in
-defaults, in the wrong directory, on the wrong port.
+A refusal names every missing variable and writes nothing. Stale ``*.env`` files are removed.
 
 Usage
 -----
@@ -51,25 +26,21 @@ Exit codes: ``0`` clean, ``1`` a refusal or (under ``--check``) drift, ``2`` bad
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 from typing import Sequence
 
 
 class Refusal(Exception):
-    """Raised when a template cannot be rendered correctly.
-
-    Carries a message naming the template and the variable, because the operator reading it is
-    standing on a host with no application logs yet.
-    """
+    """Raised when a template cannot be rendered correctly; the message names template and variable."""
 
 
 def parse_env_file(path: str) -> dict[str, str]:
     """Read a ``.env`` into a mapping, the way compose reads one.
 
-    Blank lines and ``#`` comments are skipped, a leading ``export`` is tolerated, and one layer of
-    matching single or double quotes is stripped from the value. Values are taken **literally** --
-    no interpolation happens inside the ``.env`` itself, so a ``$`` in a password survives.
+    Skips blanks and ``#`` comments, tolerates ``export``, strips one layer of matching quotes, and
+    takes values literally.
 
     Args:
         path: absolute path to the ``.env``.
@@ -109,7 +80,7 @@ def parse_env_file(path: str) -> dict[str, str]:
 def _matching_brace(text: str, open_index: int) -> int:
     """Return the index of the ``}`` closing the ``{`` at ``open_index``.
 
-    Counts nesting so ``${A:-${B}}`` resolves to the outer brace rather than the first one seen.
+    Counts nesting, so ``${A:-${B}}`` resolves to the outer brace.
 
     Args:
         text: the string being scanned.
@@ -162,8 +133,7 @@ def expand(text: str, env: dict[str, str], where: str, missing: list[str]) -> st
         text: the template text, one line or whole file.
         env: the host ``.env`` mapping.
         where: template name, used in refusal messages.
-        missing: accumulator -- a required variable that is absent is appended rather than raised,
-            so one run reports every missing variable instead of the first.
+        missing: accumulator that absent required variables are appended to.
 
     Returns:
         The interpolated text.
@@ -205,8 +175,7 @@ def expand(text: str, env: dict[str, str], where: str, missing: list[str]) -> st
 def render_one(tmpl_path: str, env: dict[str, str], missing: list[str]) -> str:
     """Render a single template file.
 
-    Comment lines pass through untouched: the generated header explains the ``${...}`` forms and
-    would otherwise be mangled by its own examples.
+    Comment and blank lines pass through untouched.
 
     Args:
         tmpl_path: path to the ``.env.tmpl``.
@@ -232,19 +201,7 @@ def render_one(tmpl_path: str, env: dict[str, str], missing: list[str]) -> str:
 def _stale(out_dir: str, produced: dict[str, str]) -> list[str]:
     """Rendered environment files in ``out_dir`` that no template produces any more.
 
-    ``--check`` only ever compared templates that still exist against their rendered
-    counterparts, so a ``<service>.env`` whose template had been retired was never looked at: it
-    was not reported as drift, a plain run did not remove it, and the check printed
-    ``N file(s) match the templates and the .env`` over the top of it. What stayed behind is a
-    ``0640`` file holding that service's rendered **secrets**, on the host, indefinitely.
-
-    The sibling tool gets this right -- ``generate-quadlet.py --check`` walks its output
-    directories and reports anything it did not generate -- and the same loop belongs here, where
-    the leftovers carry credentials rather than unit text.
-
-    Only ``*.env`` files directly in ``out_dir`` are considered. Nothing recurses, and no other
-    extension is ever named, so the caller that acts on this list cannot reach anything but the
-    files this tool writes.
+    Only ``*.env`` files directly in ``out_dir`` are considered.
 
     Args:
         out_dir: the directory the rendered files live in.
@@ -265,24 +222,10 @@ def _stale(out_dir: str, produced: dict[str, str]) -> list[str]:
 
 
 def _write_env_file(path: str, content: str, mode: int) -> None:
-    """Write one rendered ``<service>.env`` so the write cannot fail on the old file's owner.
+    """Write one rendered ``<service>.env`` atomically via a sibling file and ``os.replace``.
 
-    A sibling plus ``os.replace`` rather than ``O_TRUNC`` on the target, and it is not a style
-    preference. Opening an existing file for writing needs permission on **that file**; replacing it
-    needs permission on the **directory**. The deploy account owns `env.d` (``deploy:iri 2750``)
-    and does not own files an earlier hand-run left behind — measured on the testing host
-    2026-09-20, where eighteen ``iri:iri 0640`` files from the manual bring-up made every deploy
-    abort with ``PermissionError: '/var/iri/code/env.d/acme.env'`` after the signatures had already
-    verified and the bundle had already been staged.
-
-    It also makes the write atomic, which matters for its own reason: these files are systemd
-    ``EnvironmentFile``s, and a unit that starts while one is half-written reads a truncated
-    environment rather than failing — the quietest possible way to run a service with a missing
-    secret.
-
-    The temporary file is created in the same directory, so the rename stays within one filesystem
-    and the setgid bit on ``env.d`` gives it group ``iri`` — which is what lets the service user
-    read the result.
+    Replacing needs write permission on the directory only, not on the old file; the sibling
+    inherits the directory's setgid group.
 
     Args:
         path: the final ``<service>.env`` path.
@@ -301,13 +244,8 @@ def _write_env_file(path: str, content: str, mode: int) -> None:
         os.chmod(tmp, mode)
         os.replace(tmp, path)
     except OSError:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            # The sibling may never have been created -- the open itself is what usually fails
-            # here. Either way the original error is the one worth reporting, so it is re-raised
-            # below rather than replaced by this one.
-            pass
         raise
 
 
@@ -387,10 +325,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         path = os.path.join(args.out, f"{service}.env")
         _write_env_file(path, content, mode)
 
-    # And take the leftovers away. Retiring a service from compose used to leave its rendered
-    # `<service>.env` -- a 0640 file holding that service's secrets -- on the host forever, while
-    # --check printed "N file(s) match the templates and the .env". Removal is named file by file
-    # rather than counted, because deleting something on a deployment host is not a detail.
     for name in sorted(stale):
         os.unlink(os.path.join(args.out, name))
         print(f"render-env-d: removed {name} - no template produces it any more")

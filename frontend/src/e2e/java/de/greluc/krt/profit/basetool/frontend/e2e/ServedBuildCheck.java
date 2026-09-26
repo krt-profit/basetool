@@ -38,31 +38,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Makes an ephemeral E2E stack provably this checkout's (2026-09-23).
- *
- * <p>Until then the stack tagged its locally built images {@code :e2e-local} — one name for every
- * checkout on a machine. Two checkouts running the suite at once (parallel worktrees, several
- * agents on one workstation) raced for that tag: one built, the other built after it, and the first
- * then booted {@code up --build}'s result under a tag that already pointed at the other checkout's
- * image. The suite went green against code it was never meant to test, with nothing in the output
- * saying so. That is the failure this class closes, in two halves:
+ * Makes an ephemeral E2E stack provably this checkout's.
  *
  * <ul>
- *   <li><strong>Names that cannot collide.</strong> A locally built stack uses an image tag and a
- *       compose project name derived from the checkout's own path ({@link #localImageTag}, {@link
- *       #composeProjectName}), so no two checkouts share images, containers, networks or volumes.
- *       The prebuilt CI path keeps its fixed tag: one runner, one checkout, and the build and
- *       matrix jobs must agree on a name ({@code E2ePrebuiltImageParityTest}).
- *   <li><strong>A check that asks the running stack.</strong> After {@code up}, {@link
- *       #assertServesThisCheckout} reads the landing page and compares the content hash in every
- *       {@code /js/} and {@code /css/} URL it links — Spring's content version strategy puts the
- *       MD5 of the served file there — with the MD5 of the same file in this checkout. A stack
- *       serving anything else fails the bring-up before a single test runs.
+ *   <li>A locally built stack uses an image tag and compose project name derived from the
+ *       checkout's path ({@link #localImageTag}, {@link #composeProjectName}), so parallel
+ *       checkouts never share images, containers, networks or volumes; the prebuilt CI path keeps
+ *       its fixed tag.
+ *   <li>After {@code up}, {@link #assertServesThisCheckout} compares the content hash of every
+ *       linked {@code /js/} and {@code /css/} asset with this checkout's file.
  * </ul>
  *
- * <p>Ports and Docker subnets stay fixed, deliberately: two stacks at once fail at {@code up} with
- * "port is already allocated" or "Pool overlaps", which is loud. {@link #assertPortFree} turns that
- * into a message naming the other stack.
+ * <p>Ports and subnets stay fixed, so two stacks at once fail loudly; {@link #assertPortFree} names
+ * the other stack.
  */
 final class ServedBuildCheck {
 
@@ -117,15 +105,12 @@ final class ServedBuildCheck {
   }
 
   /**
-   * Reads the landing page of the stack and fails unless every content-hashed script and stylesheet
-   * it links is byte for byte this checkout's file.
+   * Reads the stack's landing page and fails unless every content-hashed script and stylesheet it
+   * links is byte for byte this checkout's file.
    *
-   * <p>Scripts are served as they are in {@code src/main/resources/static/js}. Stylesheets are
-   * served as {@code minifyStaticCss} writes them, so they are compared with that task's own output
-   * under {@code build/generated/minified-css}, which the Playwright tasks depend on and so have
-   * just produced from the same sources. Not {@code build/resources/main}: {@code processResources}
-   * copies the minified files there, but nothing on the e2e path runs it, so that copy can be a
-   * build behind the sources.
+   * <p>Scripts are compared with {@code src/main/resources/static/js}; stylesheets with the output
+   * of {@code minifyStaticCss} under {@code build/generated/minified-css}, not {@code
+   * build/resources/main}, which the e2e path does not refresh.
    *
    * @param baseUrl the frontend origin
    * @param root the checkout's root directory

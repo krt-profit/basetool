@@ -58,25 +58,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit coverage for {@link NotificationRuleService}'s admin-CRUD guards: the optimistic-lock check
- * on {@code update} and the per-kind selector validation applied on {@code create}/{@code update}.
- *
- * <p>Pins that a stale client version raises a 409 (lost-update protection) while a matching or
- * absent persisted version proceeds to {@code saveAndFlush}, that the column-configured selector
- * kinds ({@code SPECIFIC_USER}, {@code ROLE}, {@code ORG_RELATIVE_ROLE}) reject missing required
- * fields before any row is written, and that the three event-derived kinds ({@code ACCOUNT_GRANT},
- * {@code ACCOUNT_RESPONSIBLE}, {@code EVENT_RECIPIENT}) are accepted on create and update and
- * stored with every selector column null even when the request carried stray values — so every
- * seeded rule stays editable from the admin screen (REQ-NOTIF-007).
+ * Unit tests for the admin-CRUD guards of {@link NotificationRuleService}: the optimistic-lock
+ * check on update and the per-kind selector validation, including event-derived kinds stored with
+ * null selector columns (REQ-NOTIF-007).
  */
 @ExtendWith(MockitoExtension.class)
 class NotificationRuleServiceTest {
 
   @Mock private NotificationRuleRepository notificationRuleRepository;
 
-  // REQ-SEC-053: a ROLE selector's code is validated against the catalogue now, so the service
-  // reads the role table. The admin screen used to offer GUEST, and a rule pointed at a role that
-  // does not exist addresses nobody for ever without ever saying so.
   @Mock private RoleRepository roleRepository;
 
   @Mock private NotificationRuleMapper notificationRuleMapper;
@@ -134,7 +124,6 @@ class NotificationRuleServiceTest {
   void updateWithMatchingVersionReplacesSelectorsAndFlushes() {
     UUID id = UUID.randomUUID();
     NotificationRule persisted = ruleWithVersion(id, 2L);
-    // A pre-existing stale selector that the full-replace update must clear out.
     persisted.addSelector(
         NotificationRuleSelector.builder()
             .kind(SelectorKind.SPECIFIC_USER)
@@ -163,7 +152,6 @@ class NotificationRuleServiceTest {
   @Test
   void updateWithNullPersistedVersionSkipsCheckAndFlushes() {
     UUID id = UUID.randomUUID();
-    // A never-versioned rule: OptimisticLock.check skips when the persisted version is null.
     NotificationRule persisted = ruleWithVersion(id, null);
     when(notificationRuleRepository.findByIdWithSelectors(id)).thenReturn(Optional.of(persisted));
     when(notificationRuleRepository.saveAndFlush(persisted)).thenReturn(persisted);
@@ -171,7 +159,6 @@ class NotificationRuleServiceTest {
     when(notificationRuleMapper.toDto(persisted)).thenReturn(dto);
     catalogueKnows("ADMIN");
 
-    // A non-null client version must NOT trip a 409 when the persisted version is absent.
     NotificationRuleDto result =
         notificationRuleService.update(id, writeRequest(7L, roleSelector("ADMIN")));
 
@@ -227,8 +214,6 @@ class NotificationRuleServiceTest {
       value = SelectorKind.class,
       names = {"ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE"})
   void createAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
-    // REQ-NOTIF-007: these kinds used to be refused as "seed-only", so no seeded rule carrying one
-    // (every bank booking-request rule among them) could be saved from the editor at all.
     NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
     when(notificationRuleRepository.saveAndFlush(any(NotificationRule.class))).thenReturn(saved);
     NotificationRuleDto dto = dtoFor(saved);
@@ -243,7 +228,6 @@ class NotificationRuleServiceTest {
     assertThat(persisted.getValue().getSelectors())
         .singleElement()
         .satisfies(selector -> assertStoredWithoutColumns(selector, kind));
-    // The stray roleCode must not be looked up either: the kind reads no role.
     verify(roleRepository, never()).findByCodeIgnoreCase(any());
   }
 
@@ -260,7 +244,6 @@ class NotificationRuleServiceTest {
     NotificationRuleDto dto = dtoFor(persisted);
     when(notificationRuleMapper.toDto(persisted)).thenReturn(dto);
 
-    // Disabling a seeded rule is the edit the old "seed-only" refusal made impossible.
     NotificationRuleWriteRequest disable =
         new NotificationRuleWriteRequest(
             NotificationEventType.BANK_BOOKING_REQUEST_CREATED,
@@ -325,9 +308,6 @@ class NotificationRuleServiceTest {
 
   @Test
   void aDifferentlyCasedRoleCodeIsAcceptedAndStoredCanonically() {
-    // The recipient query is the case-sensitive `r.code = :roleCode`, so the two sides have to
-    // agree: refusing `admin` rejects a role that exists, and storing `admin` produces a rule that
-    // validates, saves, displays - and matches nobody, for ever, without saying so.
     Role role = new Role();
     role.setCode("ADMIN");
     when(roleRepository.findByCodeIgnoreCase("admin")).thenReturn(Optional.of(role));
@@ -346,9 +326,6 @@ class NotificationRuleServiceTest {
 
   @Test
   void createWithUnknownRoleCodeIsRejected() {
-    // REQ-SEC-053: the admin screen offered GUEST until V239 deleted it. A rule addressed at a
-    // role the catalogue does not have would have been saved happily and then matched nobody, for
-    // ever — a notification silently not sent is the hardest kind of defect to notice.
     when(roleRepository.findByCodeIgnoreCase("GUEST")).thenReturn(Optional.empty());
 
     assertThatThrownBy(

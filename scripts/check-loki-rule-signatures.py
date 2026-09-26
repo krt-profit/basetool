@@ -1,21 +1,10 @@
 #!/usr/bin/env python3
 """Assert that the Loki alerts keyed on a JVM's own wording still match that wording.
 
-Two alerts in ``monitoring/loki/rules/fake/basetool-log-alerts.yml`` fire on lines that HotSpot
-writes outside logback, into the ``<svc>-stdout`` streams: ``JvmNativeThreadExhaustion`` and
-``JvmStartupCacheRejected``. Their line filters were written against lines reproduced on the pinned
-Temurin image, and those lines are recorded verbatim below. ``scripts/check-loki-rules.sh`` proves
-the rules PARSE; nothing proved they MATCH -- a filter edited into a regex that is valid LogQL and
-matches nothing keeps deploying and can never fire again, which is the dead-alert shape REQ-OBS-014
-exists for.
-
-So each alert names lines it must fire on and lines it must stay silent on. The pipeline's line
-filters (``|~``, ``|=``, ``!~``, ``!=``) are applied in order, as Loki applies them. Python's ``re``
-stands in for RE2: for the alternations and literals used here the two agree, and the self-test
-covers the one construct that could differ (a case-insensitive flag).
-
-When a Temurin bump changes the wording, re-record the lines here from the new image (the procedure
-is in monitoring/README.md, "After a Temurin bump") -- never edit the expectation to fit the filter.
+Each alert in :data:`SIGNATURES` lists HotSpot lines, recorded verbatim from the pinned Temurin
+image, that it must fire on and must stay silent on (REQ-OBS-014). The line filters are applied in
+pipeline order, with Python's ``re`` standing in for RE2. After a Temurin bump, re-record the lines
+from the new image rather than editing them to fit the filter.
 
 Usage:
     check-loki-rule-signatures.py            # check the committed rules
@@ -34,14 +23,11 @@ import yaml
 REPO = Path(__file__).resolve().parents[1]
 RULES = REPO / "monitoring" / "loki" / "rules" / "fake" / "basetool-log-alerts.yml"
 
-# alert -> (lines that must fire it, lines that must not). Verbatim, as the JVM printed them.
 SIGNATURES: dict[str, tuple[list[str], list[str]]] = {
     "JvmStartupCacheRejected": (
         [
-            # AOT cache, object layout mismatch -- Temurin 25.0.4+7, 2026-09-23.
             "[0.005s][warning][aot] Unable to use AOT cache.",
             "[0.005s][error  ][aot] Loading static archive failed.",
-            # AppCDS, the same mismatch -- verified for ADR-0180 on 2026-09-15.
             "[warning][cds] Unable to use shared archive file.",
             "[error  ][cds] Loading dynamic archive failed.",
         ],
@@ -53,12 +39,10 @@ SIGNATURES: dict[str, tuple[list[str], list[str]]] = {
     ),
     "JvmNativeThreadExhaustion": (
         [
-            # Temurin 25.0.4+7 under --pids-limit 60, re-verified 2026-09-22 (rule comment).
             '[0.053s][warning][os,thread] Failed to start thread "Unknown thread" - pthread_create failed (EAGAIN) for attributes: stacksize: 1024k, guardsize: 0k, detached.',
             'Exception in thread "main" java.lang.OutOfMemoryError: unable to create native thread: possibly out of memory or process/resource limits reached',
         ],
         [
-            # Printed between the two above, never alone -- deliberately not matched.
             '[0.055s][warning][os,thread] Failed to start the native thread for java.lang.Thread "Thread-47"',
         ],
     ),
@@ -146,7 +130,7 @@ def check(exprs: dict[str, str], signatures: dict[str, tuple[list[str], list[str
 
 
 def selftest() -> int:
-    """Prove the matcher discriminates, so the real check cannot pass vacuously.
+    """Check that the matcher discriminates and that a dead filter or a missing alert is reported.
 
     :return: 0 when every case holds, 1 otherwise.
     """
@@ -164,7 +148,6 @@ def selftest() -> int:
         ok = got == expected
         failures += not ok
         print(f"  [{'ok ' if ok else 'FAIL'}] {line!r} -> {got}")
-    # A filter that matches nothing must be reported, and a missing alert too.
     broken = {"JvmStartupCacheRejected": 'sum(count_over_time({app="x"} |~ "nothing like it" [5m]))'}
     if not check(broken, {k: v for k, v in SIGNATURES.items() if k == "JvmStartupCacheRejected"}):
         print("  [FAIL] a filter that matches none of the recorded lines was not reported")

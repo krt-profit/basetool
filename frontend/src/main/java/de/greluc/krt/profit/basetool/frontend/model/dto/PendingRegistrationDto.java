@@ -23,17 +23,17 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One row in the admin registration-approval queue (epic #720, Track 1).
+ * One row in the admin registration-approval queue.
  *
  * @param id the pending user's id
  * @param username the user's effective display name
  * @param serverNickname the user's per-guild Discord server nickname (REQ-DATA-018), or {@code
  *     null} when none was captured
  * @param registeredAt when the registration first appeared
- * @param decidedAt when an admin last decided this registration, i.e. the rejection time for a row
- *     in the rejected list (REQ-SEC-034); {@code null} for a row awaiting a decision
- * @param callsignCollision whether another account already holds this callsign — approving the row
- *     then creates a <b>second</b> account for it rather than admitting a new member (#1639)
+ * @param decidedAt when an admin last decided this registration (REQ-SEC-034); {@code null} for a
+ *     row awaiting a decision
+ * @param callsignCollision whether another account already holds this callsign, so approving
+ *     creates a second account for it
  * @param version optimistic-lock version, echoed back on approve/reject
  */
 public record PendingRegistrationDto(

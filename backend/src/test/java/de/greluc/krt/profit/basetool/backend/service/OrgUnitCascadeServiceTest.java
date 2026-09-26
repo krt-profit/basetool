@@ -45,12 +45,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Mockito unit tests for {@link OrgUnitCascadeService} — the single, shared definition of the
- * org-hierarchy scope cascade (epic #692, REQ-ORG-015). Verifies the exact reach a leadership
- * membership confers downward, the strict-silo isolation between Bereiche, the OL "everything"
- * branch, that an SK-Lead does <em>not</em> cascade (REQ-ORG-017), the per-request memoisation of
- * the hierarchy reads, and — most importantly for the zero-regression mandate — that a caller with
- * no leadership flag is expanded to exactly their direct memberships with no hierarchy read at all.
+ * Unit tests for {@link OrgUnitCascadeService} (REQ-ORG-015): the reach of each leadership kind,
+ * isolation between Bereiche, no cascade for an SK-Lead, per-request memoisation, and no hierarchy
+ * read for a caller without leadership.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitCascadeServiceTest {
@@ -87,7 +84,6 @@ class OrgUnitCascadeServiceTest {
 
     assertEquals(Set.of(STAFFEL_A1_ID), reach);
     assertTrue(service.cascadedOfficerReach(List.of(staffel)).isEmpty());
-    // Zero-regression guarantee: a flag-less caller triggers no hierarchy expansion query at all.
     verify(orgUnitRepository, never()).findChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
     verify(orgUnitRepository, never()).findAllOrgUnitIds();
   }
@@ -128,8 +124,6 @@ class OrgUnitCascadeServiceTest {
 
   @Test
   void flagLessBereichSeat_doesNotCascade() {
-    // The organisational, chart-only Bereichsleitung seat an SK-Leiter holds (REQ-ORG-017, Q1):
-    // it is a BEREICH membership with NO leadership flag, so it must NOT widen reach.
     OrgUnitMembership seat = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
 
     assertEquals(Set.of(BEREICH_A_ID), service.expandWithDescendants(List.of(seat)));
@@ -145,13 +139,11 @@ class OrgUnitCascadeServiceTest {
 
     Set<UUID> reach = service.expandWithDescendants(List.of(leadA));
 
-    // Only Bereich A and its child — never Bereich B, its child, or a foreign Staffel.
     assertTrue(reach.contains(BEREICH_A_ID));
     assertTrue(reach.contains(STAFFEL_A1_ID));
     org.junit.jupiter.api.Assertions.assertFalse(reach.contains(BEREICH_B_ID));
     org.junit.jupiter.api.Assertions.assertFalse(reach.contains(STAFFEL_B1_ID));
     org.junit.jupiter.api.Assertions.assertFalse(reach.contains(FOREIGN_STAFFEL_ID));
-    // The other Bereich's children are never queried.
     verify(orgUnitRepository, never()).findChildOrgUnitIds(BEREICH_B_ID);
   }
 
@@ -174,7 +166,6 @@ class OrgUnitCascadeServiceTest {
     assertEquals(
         Set.of(OL_ID, BEREICH_A_ID, BEREICH_B_ID, STAFFEL_A1_ID, STAFFEL_B1_ID, FOREIGN_STAFFEL_ID),
         reach);
-    // OL short-circuits to the all-ids query and never walks individual Bereich children.
     verify(orgUnitRepository, never()).findChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
   }
 
@@ -194,7 +185,6 @@ class OrgUnitCascadeServiceTest {
 
   @Test
   void mixedMemberships_combineDirectAndCascade() {
-    // A user who both belongs to a Staffel directly AND leads a Bereich.
     OrgUnitMembership ownStaffel = membership(FOREIGN_STAFFEL_ID, OrgUnitKind.SQUADRON);
     OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
@@ -203,16 +193,12 @@ class OrgUnitCascadeServiceTest {
     Set<UUID> reach = service.expandWithDescendants(List.of(ownStaffel, lead));
 
     assertEquals(Set.of(FOREIGN_STAFFEL_ID, BEREICH_A_ID, STAFFEL_A1_ID), reach);
-    // The direct Staffel is NOT part of the cascade reach (it confers no downward leadership).
     org.junit.jupiter.api.Assertions.assertFalse(
         service.cascadedOfficerReach(List.of(ownStaffel, lead)).contains(FOREIGN_STAFFEL_ID));
   }
 
   @Test
   void skLeadMembership_doesNotCascade_keepsSkOnlyReach() {
-    // REQ-ORG-017 (owner decision Q1): an SK-Lead keeps SK-only reach. is_lead promotes them to the
-    // flat officer role in the JWT converter, but it must NOT widen the cascade — their SK's
-    // contextual authority comes from the per-row loop, not from cascadedOfficerReach.
     OrgUnitMembership skLead = membership(SK_A1_ID, OrgUnitKind.SPECIAL_COMMAND);
     skLead.setRole(MembershipRole.SK_LEAD);
 
@@ -229,8 +215,6 @@ class OrgUnitCascadeServiceTest {
     when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
     bindRequest();
 
-    // Mirrors a real request: the converter computes the reach, then OwnerScopeService re-derives
-    // it (directly and via expandWithDescendants).
     Set<UUID> first = service.cascadedOfficerReach(List.of(lead));
     Set<UUID> viaExpand = service.expandWithDescendants(List.of(lead));
     Set<UUID> third = service.cascadedOfficerReach(List.of(lead));
@@ -238,7 +222,6 @@ class OrgUnitCascadeServiceTest {
     assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), first);
     assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), third);
     assertTrue(viaExpand.containsAll(Set.of(BEREICH_A_ID, STAFFEL_A1_ID)));
-    // Three cascade calls in one request, but the hierarchy is queried exactly once.
     verify(orgUnitRepository, times(1)).findChildOrgUnitIds(BEREICH_A_ID);
   }
 
@@ -249,18 +232,13 @@ class OrgUnitCascadeServiceTest {
     when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
     bindRequest();
 
-    // Mutate the set returned by the cache-STORE path (first, cache-miss call): must not corrupt
-    // the stored set.
     Set<UUID> first = service.cascadedOfficerReach(List.of(lead));
     first.clear();
 
-    // Mutate the set returned by the cache-HIT path (second call): must also not corrupt the
-    // stored set — otherwise dropping the hit-path defensive copy would slip through.
     Set<UUID> second = service.cascadedOfficerReach(List.of(lead));
     assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), second);
     second.clear();
 
-    // A third read must still see the intact reach despite both prior hostile mutations.
     assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), service.cascadedOfficerReach(List.of(lead)));
   }
 
@@ -272,8 +250,6 @@ class OrgUnitCascadeServiceTest {
         .thenReturn(List.of(OL_ID, BEREICH_A_ID, STAFFEL_A1_ID));
     bindRequest();
 
-    // The OL branch hits the most expensive query (the whole org-unit table); three consults in
-    // one request must collapse to a single findAllOrgUnitIds() read.
     service.cascadedOfficerReach(List.of(ol));
     service.expandWithDescendants(List.of(ol));
     Set<UUID> third = service.cascadedOfficerReach(List.of(ol));
@@ -284,8 +260,6 @@ class OrgUnitCascadeServiceTest {
 
   @Test
   void withoutBoundRequest_cascadeDoesNotMemoise_recomputesEachCall() {
-    // The "degrades to direct computation" half of the memoisation contract: with no request bound
-    // there is no per-request slot and no instance-level cache, so each call recomputes.
     OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
@@ -310,7 +284,6 @@ class OrgUnitCascadeServiceTest {
     Set<UUID> reachB = service.cascadedOfficerReach(List.of(leadB));
 
     assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), reachA);
-    // A different membership set must recompute — never reuse the cached reachA.
     assertEquals(Set.of(BEREICH_B_ID, STAFFEL_B1_ID), reachB);
   }
 

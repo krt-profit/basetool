@@ -1,29 +1,10 @@
 #!/usr/bin/env python3
 """Profit Basetool - render the Redis ACL file from its committed template and the host .env.
 
-``scripts/redis-users.acl.tmpl`` holds the rules: one ACL user per service (REQ-SEC-068,
-ADR-0207). This renders it against the host ``.env`` into ``/var/iri/redis/users.acl``, the file
-the ``redis`` unit mounts read-only and loads with ``--aclfile``.
-
-Why it exists
--------------
-The ACL file used to be written by hand from a two-line recipe, with the ``default`` password in
-**plain text**, and nothing checked its shape. That is how the 2026-07-10 incident happened: a file
-without a ``default`` line makes Redis reset ``default`` to ``nopass ~* &* +@all``, and the session
-store stood open on the internal network. Per-service users make the file five users long, which is
-past what a recipe should be trusted with.
-
-What it guarantees
-------------------
-* **Hashes, never passwords.** Every ``{{hash:NAME}}`` becomes ``#`` + the SHA-256 of NAME's value,
-  which Redis accepts in place of ``>password``. The rendered file can be read by the ``redis``
-  container user and captured by every backup without disclosing a credential.
-* **All or nothing.** A missing or empty variable refuses the whole render, naming every one, and
-  nothing is written. A half-rendered ACL is a Redis that refuses its clients, or worse.
-* **A ``default`` line, always.** The output is refused if it does not carry exactly one.
-* **Atomic.** Written to a temporary file in the same directory, then renamed over the target, so
-  ``ACL LOAD`` never reads a half-written file. Mode ``0644``: the container's ``redis`` user must be
-  able to read the read-only mount (see docs/deployment.md), and the content is hashes only.
+One ACL user per service (REQ-SEC-068, ADR-0207), rendered into the file the ``redis`` unit loads
+with ``--aclfile``. Every ``{{hash:NAME}}`` becomes ``#`` + the SHA-256 of NAME's value; a missing
+or empty variable, or a result without exactly one ``default`` user, refuses the whole render. The
+file is written atomically with mode ``0644``.
 
 Usage
 -----
@@ -32,10 +13,9 @@ Usage
     render-redis-acl.py --env /var/iri/code/.env \\
         --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl
     render-redis-acl.py ... --check       # report drift, write nothing
-    render-redis-acl.py --selftest        # the regression tests below, no files touched
+    render-redis-acl.py --selftest        # the regression tests, no files touched
 
-After writing, apply it live with ``ACL LOAD`` (atomic; a malformed file is rejected and the
-running ACL stays), and run ``restorecon -F`` on the file on an SELinux host.
+Apply it live with ``ACL LOAD``; run ``restorecon -F`` on the file on an SELinux host.
 
 Exit codes: ``0`` clean, ``1`` a refusal or (under ``--check``) drift, ``2`` bad invocation.
 """
@@ -43,9 +23,11 @@ Exit codes: ``0`` clean, ``1`` a refusal or (under ``--check``) drift, ``2`` bad
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import os
 import re
+import stat
 import sys
 import tempfile
 from typing import Sequence
@@ -60,9 +42,8 @@ class Refusal(Exception):
 def parse_env_file(path: str) -> dict[str, str]:
     """Read a ``.env`` the way compose and ``render-env-d.py`` read one.
 
-    Blank lines and ``#`` comments are skipped, a leading ``export`` is tolerated, one layer of
-    matching quotes is stripped, a key assigned twice keeps its last value, and nothing inside a
-    value is interpolated.
+    Skips blanks and ``#`` comments, tolerates ``export``, strips one layer of matching quotes,
+    keeps the last value of a repeated key, and interpolates nothing.
 
     Args:
         path: path to the ``.env``.
@@ -118,12 +99,11 @@ def render(template: str, env: dict[str, str]) -> str:
         env: the host environment.
 
     Returns:
-        The ACL file's content: one ``user`` line per template rule, comments dropped, ending in a
-        newline.
+        One ``user`` line per template rule, comments dropped, ending in a newline.
 
     Raises:
-        Refusal: naming every missing variable and every invalid state at once, or when the result
-            does not carry exactly one ``default`` user.
+        Refusal: on missing variables or invalid states (all named at once), or without exactly
+            one ``default`` user.
     """
     problems: list[str] = []
 
@@ -164,18 +144,28 @@ def render(template: str, env: dict[str, str]) -> str:
 
 
 def write_atomically(path: str, content: str) -> None:
-    """Replace ``path`` with ``content`` in one rename, mode ``0644``.
+    """Replace ``path`` with ``content`` in one rename.
+
+    An existing target keeps its mode and, when running as root, its owner, so the file redis reads
+    stays readable to it. A new file is owner-only (``0600``): it holds password hashes.
 
     Args:
         path: the target file.
         content: what it must contain.
     """
     directory = os.path.dirname(os.path.abspath(path))
+    try:
+        existing = os.stat(path)
+    except FileNotFoundError:
+        existing = None
     fd, tmp = tempfile.mkstemp(prefix=".users.acl.", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(content)
-        os.chmod(tmp, 0o644)
+        if existing is not None:
+            os.chmod(tmp, stat.S_IMODE(existing.st_mode))
+            if hasattr(os, "geteuid") and os.geteuid() == 0:
+                os.chown(tmp, existing.st_uid, existing.st_gid)
         os.replace(tmp, path)
     except BaseException:
         if os.path.exists(tmp):
@@ -215,31 +205,21 @@ def selftest() -> int:
         ({**env, "SVC_PASSWORD": ""}, "empty variable refuses"),
         ({**env, "REDIS_DEFAULT_USER": "maybe"}, "invalid state refuses"),
     ):
-        try:
+        with contextlib.suppress(Refusal):
             render(template, broken)
             failures.append(label)
-        except Refusal:
-            pass
-    try:
+    with contextlib.suppress(Refusal):
         render("user svc on {{hash:SVC_PASSWORD}} -@all\n", env)
         failures.append("missing default refuses")
-    except Refusal:
-        pass
-    try:
+    with contextlib.suppress(Refusal):
         render(template + "user default on nopass\n", env)
         failures.append("two defaults refuse")
-    except Refusal:
-        pass
-    try:
+    with contextlib.suppress(Refusal):
         render("default on\n", env)
         failures.append("a non-user line refuses")
-    except Refusal:
-        pass
-    try:
+    with contextlib.suppress(Refusal):
         render(template.replace("{{hash:SVC_PASSWORD}}", "{{secret:SVC_PASSWORD}}"), env)
         failures.append("an unknown placeholder refuses")
-    except Refusal:
-        pass
     with tempfile.TemporaryDirectory() as scratch:
         target = os.path.join(scratch, "users.acl")
         write_atomically(target, out)

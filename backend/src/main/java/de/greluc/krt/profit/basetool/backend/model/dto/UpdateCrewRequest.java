@@ -23,13 +23,10 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Inbound request payload for the Update Crew operation.
+ * Request payload replacing a mission crew's job types.
  *
- * <p>{@code jobTypeIds} is the full replacement set of job types for the crew. {@code version} is
- * the {@code MissionCrew.@Version} the client last saw, echoed back so a stale save is rejected
- * with a 409 rather than silently reverting a concurrent edit of the same crew (#1131). {@code
- * version} is nullable so a legacy caller that omits it skips the check via {@link
- * de.greluc.krt.profit.basetool.backend.support.OptimisticLock#checkOptionalClient}; a present,
- * mismatching value 409s.
+ * <p>{@code jobTypeIds} is the full replacement set. A present {@code version} that does not match
+ * the crew's current version yields 409; {@code null} skips the check via {@link
+ * de.greluc.krt.profit.basetool.backend.support.OptimisticLock#checkOptionalClient}.
  */
 public record UpdateCrewRequest(Set<UUID> jobTypeIds, Long version) {}

@@ -20,14 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * One owner row of the blueprint availability drill-down (#364): the display name of an in-scope
- * member who owns the selected blueprint. Deliberately carries the display name only — never the
- * Keycloak {@code sub} or e-mail — so the overview cannot leak account identifiers.
+ * One owner row of the blueprint availability drill-down; carries only the display name, never an
+ * account identifier.
  *
- * @param ownerName the member's effective display name (display name, or username fallback)
- * @param orgUnitMember {@code true} when this owner is a member of the caller's oversight org
- *     unit(s) (always {@code true} for an admin "all org units" scope, where no single unit
- *     applies); {@code false} when they appear only because they opted into global blueprint
- *     sharing (REQ-INV-018), so the UI can mark them with a discreet "not a unit member" hint
+ * @param ownerName the member's effective display name
+ * @param orgUnitMember {@code true} when the owner belongs to the caller's oversight org unit(s) or
+ *     the scope is all org units; {@code false} when listed only via global sharing (REQ-INV-018)
  */
 public record BlueprintOverviewOwnerDto(String ownerName, boolean orgUnitMember) {}

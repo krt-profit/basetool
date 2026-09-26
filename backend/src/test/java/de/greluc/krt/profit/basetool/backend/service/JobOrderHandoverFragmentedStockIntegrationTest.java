@@ -50,21 +50,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Worst-case reproduction of the JobOrder handover Optimistic-Locking bug for <b>fragmented
- * stock</b>: two materials, each split across {@value #STACKS_PER_MATERIAL} separate {@link
- * InventoryItem} rows, all handed over (and thus the JobOrder fully completed) in a SINGLE handover
- * request as a MEMBER+LOGISTIKER.
- *
- * <p>This is the constellation that the live-log MEMBER failure (JobOrder #40) actually had —
- * multiple {@link InventoryItem}s per {@link Material} cause the per-item loop in {@link
- * JobOrderHandoverService#createHandover(UUID, JobOrderHandoverCreateDto)} to iterate multiple
- * times over the SAME {@link JobOrderMaterial}, which (before the fix) was the trigger for a
- * mid-loop persistence-context detach + implicit {@code merge()} → second {@code @Version} bump →
- * 409.
- *
- * <p>Earlier integration tests used a 1:1 mapping (one InventoryItem per Material) and therefore
- * could not reproduce this exact failure path. This test guarantees the structural fix holds even
- * when stocks are fragmented as they typically are in production after multiple mining sessions.
+ * Integration test: a single handover by a Logistiker of two materials, each split across {@value
+ * #STACKS_PER_MATERIAL} {@link InventoryItem} rows, completes the job order without an optimistic
+ * lock conflict, although {@link JobOrderHandoverService#createHandover(UUID,
+ * JobOrderHandoverCreateDto)} visits the same {@link JobOrderMaterial} several times.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -145,10 +134,6 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
           jobOrder.addMaterial(m2);
           jobOrder = jobOrderRepository.save(jobOrder);
 
-          // Split each required amount across STACKS_PER_MATERIAL inventory rows
-          // so the per-item handover loop iterates multiple times over the SAME
-          // JobOrderMaterial — exactly the production constellation that triggered
-          // the original 409.
           List<Double> aslariteAmounts = splitEvenly(ASLARITE_REQUIRED, STACKS_PER_MATERIAL);
           List<Double> ouratiteAmounts = splitEvenly(OURATITE_REQUIRED, STACKS_PER_MATERIAL);
 
@@ -164,10 +149,6 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
             inv.setMaterial(aslarite);
             inv.setQuality(800);
             inv.setAmount(a);
-            // Variante C (REQ-INV-027): earmark the entry's full amount to the order via a
-            // job-order allocation slice (the scalar jobOrder column + soak mirror were dropped in
-            // V218). The handover's pre-write guard requires the item to carry a slice for this
-            // order.
             InventoryAllocations.addJobOrder(inv, jobOrder, a, false);
             inv = inventoryItemRepository.save(inv);
             aslariteIds.add(inv.getId());
@@ -185,10 +166,6 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
             inv.setMaterial(ouratite);
             inv.setQuality(900);
             inv.setAmount(a);
-            // Variante C (REQ-INV-027): earmark the entry's full amount to the order via a
-            // job-order allocation slice (the scalar jobOrder column + soak mirror were dropped in
-            // V218). The handover's pre-write guard requires the item to carry a slice for this
-            // order.
             InventoryAllocations.addJobOrder(inv, jobOrder, a, false);
             inv = inventoryItemRepository.save(inv);
             ouratiteIds.add(inv.getId());
@@ -200,16 +177,13 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
   }
 
   /**
-   * Splits {@code total} into {@code n} non-equal positive doubles whose sum equals {@code total}.
-   * We deliberately use varying chunk sizes to stress the per-iteration delete-vs-update branch of
-   * the handover service (some chunks are fully consumed, some are partially consumed within the
-   * same handover request).
+   * Splits {@code total} into {@code n} unequal positive parts summing to {@code total}, so a
+   * handover consumes some rows fully and others partially.
    */
   private static List<Double> splitEvenly(double total, int n) {
     List<Double> result = new ArrayList<>(n);
     double remaining = total;
     for (int i = 0; i < n - 1; i++) {
-      // alternating chunk sizes around total/n
       double chunk = (total / n) * (1.0 + (i % 2 == 0 ? -0.2 : 0.2));
       chunk = Math.round(chunk * 1000.0) / 1000.0;
       if (chunk <= 0) chunk = total / n;
@@ -250,11 +224,8 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
     JobOrderHandoverCreateDto dto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", "KARTELL", items);
 
-    // When — must NOT throw ObjectOptimisticLockingFailureException even though
-    // the same JobOrderMaterial is touched STACKS_PER_MATERIAL times in this request.
     jobOrderHandoverService.createHandover(f.jobOrderId(), dto);
 
-    // Then — JobOrder COMPLETED, all materials at zero, all inventory rows fully consumed.
     transactionTemplate.executeWithoutResult(
         status -> {
           JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();

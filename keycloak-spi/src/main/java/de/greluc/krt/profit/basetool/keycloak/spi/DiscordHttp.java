@@ -23,19 +23,8 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 
 /**
- * The one HTTP client every call to the public Discord API goes through: the profile read and the
- * guild-display-name capture in {@link DiscordIdentityProvider}, and the guild-member read in the
- * first-login gate ({@link DiscordMembershipChecker}).
- *
- * <p>There used to be three of them, each built with the same connect timeout: one static in the
- * identity provider, and two in the authenticator factory for the membership checker and the
- * nickname reader. A {@link HttpClient} owns a connection pool and a selector thread, so three
- * clients meant three pools to the same host, none of them reusing another's connection. One shared
- * client keeps a single warm pool to {@code discord.com} for the whole Keycloak JVM.
- *
- * <p>The backend account-existence precheck keeps its own client ({@code BackendTrustSupport}): it
- * talks to a different host with a pinned, self-signed trust anchor, which must never leak into the
- * client that talks to the public Discord API.
+ * The single HTTP client for all calls to the public Discord API, shared by {@link
+ * DiscordIdentityProvider} and {@link DiscordMembershipChecker} to keep one connection pool.
  */
 final class DiscordHttp {
 
@@ -45,7 +34,5 @@ final class DiscordHttp {
   /** The shared client; default trust (Discord presents a publicly-trusted certificate). */
   static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
 
-  private DiscordHttp() {
-    // Constant holder — not instantiable.
-  }
+  private DiscordHttp() {}
 }

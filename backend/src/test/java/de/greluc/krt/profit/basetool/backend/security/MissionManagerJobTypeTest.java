@@ -82,7 +82,6 @@ class MissionManagerJobTypeTest {
     manager.setId(UUID.randomUUID());
     manager.setUsername("manager");
     userRepository.save(manager);
-    // Post-R9 D3 (V101): MissionManager flag lives on the Staffel membership row only.
     OrgUnitMembership iridiumMembership = new OrgUnitMembership();
     iridiumMembership.setId(new OrgUnitMembershipId(manager.getId(), Squadron.IRIDIUM_ID));
     iridiumMembership.setUser(manager);
@@ -106,8 +105,6 @@ class MissionManagerJobTypeTest {
     mission.setName("Test Mission");
     mission.setOwner(manager);
     mission.setPlannedStartTime(Instant.now().plusSeconds(3600));
-    // V99 made owning_org_unit_id NOT NULL — anchor the mission to IRIDIUM so the direct save
-    // does not trip the constraint.
     mission.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     missionRepository.save(mission);
 

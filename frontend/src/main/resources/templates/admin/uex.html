@@ -76,7 +76,6 @@
             </summary>
             <div class="uex-system-body">
 
-                <!--/* Cities */-->
                 <h3 class="uex-subsection-title">
                     <span th:text="#{admin.uex_locations.cities}">Staedte</span>
                     (<span th:text="${system.cities.size()}">0</span>)
@@ -138,7 +137,6 @@
                     </div>
                 </details>
 
-                <!--/* Space stations */-->
                 <h3 class="uex-subsection-title">
                     <span th:text="#{admin.uex_locations.spaceStations}">Raumstationen</span>
                     (<span th:text="${system.spaceStations.size()}">0</span>)
@@ -200,7 +198,6 @@
                     </div>
                 </details>
 
-                <!--/* Outposts */-->
                 <h3 class="uex-subsection-title">
                     <span th:text="#{admin.uex_locations.outposts}">Aussenposten</span>
                     (<span th:text="${system.outposts.size()}">0</span>)
@@ -242,7 +239,6 @@
                     </table>
                 </div>
 
-                <!--/* POIs */-->
                 <h3 class="uex-subsection-title">
                     <span th:text="#{admin.uex_locations.pois}">POIs</span>
                     (<span th:text="${system.pois.size()}">0</span>)
@@ -284,10 +280,6 @@
                     </table>
                 </div>
 
-                <!--/* Orphan terminals: free-floating UEX terminals that lack both
-                     a cityName and a spaceStationName, so they cannot be nested
-                     under any parent. Rendered as a flat sub-table at the bottom
-                     of the system so they remain reachable for overrides. */-->
                 <th:block th:if="${!system.orphanTerminals.isEmpty()}">
                     <h3 class="uex-subsection-title">
                         <span th:text="#{admin.uex.orphanTerminals}">Sonstige Terminals</span>

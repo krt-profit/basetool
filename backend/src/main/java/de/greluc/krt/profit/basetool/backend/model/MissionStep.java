@@ -36,13 +36,10 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One step of a mission's "Ablauf" (procedure timeline). Steps form an ordered, reorderable
- * checklist shown read-only on the mission overview and authored in the Verwaltung tab. Each step
- * carries a required {@link #title}, an optional free-text {@link #meta} (a "Zeit / Ort" hint), a
- * shared {@link #done} flag that every viewer sees, and an explicit {@link #orderIndex} that pins
- * the position independently of insertion order. The whole collection is guarded by the mission's
- * manual {@code stepsVersion} section counter, so editing the Ablauf never collides with a
- * concurrent core / schedule / flags edit of the same mission.
+ * One step of a mission's "Ablauf" (procedure timeline): a title, an optional "Zeit / Ort" hint in
+ * {@link #meta}, a shared {@link #done} flag and an explicit {@link #orderIndex}.
+ *
+ * <p>The collection is guarded by the mission's {@code stepsVersion} section counter.
  */
 @Entity
 @Getter

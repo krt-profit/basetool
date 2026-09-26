@@ -35,34 +35,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Authorizes a {@code /ws/sync} <em>subscribe</em> to a resource-scoped live-sync topic
- * (REQ-FE-015, ADR-0094).
+ * Authorizes a {@code /ws/sync} subscribe to a live-sync topic (REQ-FE-015, ADR-0094), replaying
+ * the access token and org-unit pin captured at the handshake as explicit headers.
  *
- * <p>The multiplexed {@code /ws/sync} socket authorizes each topic when its {@code subscribe} frame
- * arrives — on a WebSocket message / auth-executor thread that has <b>no servlet request
- * context</b>, so the request-context-bound {@code
- * ServletOAuth2AuthorizedClientExchangeFilterFunction} of the normal client cannot resolve a bearer
- * there. This authorizer therefore replays the OAuth2 access token and the active-org-unit pin that
- * {@code LiveSyncSyncHandshakeInterceptor} captured on the handshake's servlet thread as explicit
- * headers on a filter-less {@code liveSyncAuthWebClient} — the same read-only-snapshot pattern the
- * notification SSE relay uses ({@code NotificationPageController.stream}).
- *
- * <p><b>Decision.</b> For a resource-scoped class the authorizer issues the class's {@link
- * LiveSyncTopicClass#authProbePath()} read (e.g. {@code GET /api/v1/operations/{id}}): a 2xx allows
- * the subscribe, an explicit {@code 403}/{@code 404} denies it, and anything <em>indeterminate</em>
- * — a {@code 401} from an expired captured token, a {@code 5xx}, a timeout, a transport error — is
- * resolved by {@link #failOpen(LiveSyncTopic)}: <b>open</b> for a non-presence class, <b>closed</b>
- * for a presence-enabled one. Failing open is safe for a non-presence class because no resource
- * data ever crosses the socket — a subscriber only receives opaque section keys, and every fragment
- * it then re-pulls is independently authorized per viewer through the servlet path (with a fresh
- * token and pin), so a stale-token or backend-blip false allow leaks at most "some section of
- * resource X changed", never its contents. A presence-enabled class ({@link
- * LiveSyncTopicClass#MISSION}) fails <b>closed</b> instead: its allowed subscribe immediately emits
- * an editor-presence snapshot (ids + callsigns), which is cross-user identity data the opaque-keys
- * argument does not cover (F1). A global-room class either requires a capability (a capabilities
- * read whose {@link LiveSyncTopicClass#capabilityField} must be {@code true} — a withheld flag,
- * e.g. a non-profit requester lacking {@code canViewJobOrders}, denies; a failed read fails open)
- * or, with no probe path at all, is authorized by the socket's authentication alone.
+ * <p>Resource-scoped classes probe {@link LiveSyncTopicClass#authProbePath()}: 2xx allows, 403 or
+ * 404 denies, anything else is resolved by {@link #failOpen(LiveSyncTopic)} (open, except closed
+ * for presence-enabled classes). Global classes either require a {@link
+ * LiveSyncTopicClass#capabilityField} or are authorized by the socket's authentication alone.
  */
 @Slf4j
 @Component
@@ -70,15 +49,9 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 public class LiveSyncSubscriptionAuthorizer {
 
   /**
-   * The outcome of a subscribe-authorization check.
-   *
-   * <p>The two refusals are kept apart because they mean opposite things operationally: {@link
-   * #DENY} is a real permission verdict a user hit, {@link #DENY_INDETERMINATE} is the tool failing
-   * closed while it could not tell. Both refuse the subscribe, so callers gate on {@link #denied()}
-   * rather than comparing constants; what differs is the deny metric's {@code reason} tag, the log
-   * level, and — since the flavour also rides the {@code denied} control frame — what the client
-   * does next: an indeterminate refusal earns one retry on the next reconnect, an authorization
-   * refusal is terminal for that tab.
+   * The outcome of a subscribe-authorization check. {@link #DENY} is a permission verdict and
+   * terminal for the tab; {@link #DENY_INDETERMINATE} is a fail-closed refusal the client retries
+   * once. Callers use {@link #denied()}.
    */
   public enum Decision {
     /** The subscribe is authorized (or failed open on an indeterminate outcome). */
@@ -89,20 +62,13 @@ public class LiveSyncSubscriptionAuthorizer {
      */
     DENY,
     /**
-     * The subscribe is refused because the authorization outcome was <em>indeterminate</em> (no
-     * captured token, a transient 401/5xx/timeout/transport failure, auth-executor saturation, or a
-     * probe that threw) and the topic class is presence-enabled, so it fails <b>closed</b> (F1).
-     * Not a permission verdict: a rising rate here is a backend/token availability problem, and one
-     * such deny costs the tab live updates for that topic until it reconnects — the client retries
-     * this flavour once (and only once) on its next reconnect, so a blip that outlasts the retry
-     * still leaves that tab on the manual-refresh pill for the session.
+     * Refusal because the outcome was indeterminate and the topic class is presence-enabled, so it
+     * fails closed; indicates a backend or token availability problem, not a permission verdict.
      */
     DENY_INDETERMINATE;
 
     /**
-     * Whether this verdict refuses the subscribe, i.e. is either refusal rather than {@link
-     * #ALLOW}. Call sites that only need "join the room or not" use this so a further deny flavour
-     * can be added without them silently starting to admit it.
+     * Checks whether this verdict refuses the subscribe.
      *
      * @return {@code true} for {@link #DENY} and {@link #DENY_INDETERMINATE}, {@code false} for
      *     {@link #ALLOW}
@@ -113,22 +79,9 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * The verdict for an <em>indeterminate</em> authorization outcome — no captured token, a
-   * transient backend failure (401/5xx/timeout/transport), auth-executor saturation, or a probe
-   * that threw: fail <b>open</b> for a non-presence class, fail <b>closed</b> for a
-   * presence-enabled one (F1).
-   *
-   * <p>Failing open is safe for a non-presence class because only opaque section keys ever cross
-   * the socket and every fragment the subscriber then re-pulls is independently re-authorized per
-   * viewer. But a presence-enabled class ({@link LiveSyncTopicClass#MISSION}) immediately emits a
-   * presence snapshot carrying each editor's pseudonymous id and callsign, so an indeterminate
-   * <em>allow</em> there would disclose <em>who</em> is editing a resource the caller may not be
-   * able to read — a cross-user identity leak the opaque-keys argument does not cover. Such a topic
-   * therefore fails closed: an indeterminate verdict denies rather than admits.
-   *
-   * <p>The fail-closed refusal is {@link Decision#DENY_INDETERMINATE}, never {@link Decision#DENY}:
-   * it is an availability symptom, not a permission verdict, and collapsing the two makes a backend
-   * outage read exactly like users hitting permission boundaries.
+   * Returns the verdict for an indeterminate authorization outcome: open for a non-presence class,
+   * closed for a presence-enabled one ({@link LiveSyncTopicClass#MISSION}), whose snapshot would
+   * disclose who is editing.
    *
    * @param topic the topic whose class decides the fail direction
    * @return {@link Decision#ALLOW} for a non-presence class, {@link Decision#DENY_INDETERMINATE}
@@ -153,21 +106,17 @@ public class LiveSyncSubscriptionAuthorizer {
   private final WebClient liveSyncAuthWebClient;
 
   /**
-   * Decides whether a subscribe to {@code topic} is authorized for the socket owner, replaying the
-   * captured OAuth2 token and active-org-unit pin as explicit headers. Dispatches by class: a
-   * resource-scoped topic runs a per-resource read; a global topic with a {@link
-   * LiveSyncTopicClass#capabilityField()} runs a capabilities read and requires that flag; any
-   * other global topic (no probe path) is authorized by the socket authentication alone.
+   * Decides whether a subscribe to {@code topic} is authorized: a per-resource read for
+   * resource-scoped topics, a capability read for global topics with a {@link
+   * LiveSyncTopicClass#capabilityField()}, and socket authentication alone otherwise.
    *
    * @param topic the parsed topic being subscribed to
-   * @param accessToken the OAuth2 access token captured at handshake, or {@code null} if none was
-   *     available (then the subscribe fails open)
-   * @param activeOrgUnitId the active-org-unit pin captured at handshake, relayed as {@code
-   *     X-Active-Org-Unit-Id} so the probe scopes exactly like the page's own read, or {@code null}
-   * @return {@link Decision#ALLOW} to accept the subscribe (including every fail-open case), {@link
-   *     Decision#DENY} on an explicit backend 403/404 (resource topic) or a withheld capability
-   *     (global topic), or {@link Decision#DENY_INDETERMINATE} when a presence-enabled class failed
-   *     closed on an indeterminate outcome
+   * @param accessToken the access token captured at handshake, or {@code null} (then fails open)
+   * @param activeOrgUnitId the org-unit pin captured at handshake, relayed as {@code
+   *     X-Active-Org-Unit-Id}, or {@code null}
+   * @return {@link Decision#ALLOW}, including every fail-open case; {@link Decision#DENY} on an
+   *     explicit 403/404 or withheld capability; or {@link Decision#DENY_INDETERMINATE} when a
+   *     presence-enabled class failed closed
    */
   @NotNull
   public Decision authorize(
@@ -176,20 +125,17 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * Decides whether a subscribe to {@code topic} is authorized, additionally consulting the
-   * authorities captured at handshake for a locally role-gated global room (the {@code bank} staff
-   * and {@code orgunit-bank} rooms).
+   * Decides whether a subscribe to {@code topic} is authorized, additionally checking the captured
+   * authorities for the locally role-gated {@code bank} and {@code orgunit-bank} rooms.
    *
    * @param topic the parsed topic being subscribed to
-   * @param accessToken the OAuth2 access token captured at handshake, or {@code null}
-   * @param activeOrgUnitId the active-org-unit pin captured at handshake, or {@code null}
-   * @param authorities the authorities captured at handshake for a local role check, or {@code
-   *     null} when none were captured (then a locally role-gated room fails open)
-   * @return {@link Decision#ALLOW} to accept the subscribe (including every fail-open case), {@link
-   *     Decision#DENY} on an explicit backend refusal (resource/dual-resource topic), a withheld
-   *     capability (capability topic) or a missing required role (local topic), or {@link
-   *     Decision#DENY_INDETERMINATE} when a presence-enabled class failed closed on an
-   *     indeterminate outcome
+   * @param accessToken the access token captured at handshake, or {@code null}
+   * @param activeOrgUnitId the org-unit pin captured at handshake, or {@code null}
+   * @param authorities the authorities captured at handshake, or {@code null} (then a role-gated
+   *     room fails open)
+   * @return {@link Decision#ALLOW}, including every fail-open case; {@link Decision#DENY} on an
+   *     explicit backend refusal, withheld capability or missing role; or {@link
+   *     Decision#DENY_INDETERMINATE} when a presence-enabled class failed closed
    */
   @NotNull
   public Decision authorize(
@@ -199,10 +145,6 @@ public class LiveSyncSubscriptionAuthorizer {
       @Nullable Set<String> authorities) {
     Set<String> requiredAnyRole = topic.topicClass().requiredAnyRole();
     if (requiredAnyRole != null) {
-      // Local, backend-free role check against the handshake-captured authorities (bank staff /
-      // orgunit-bank). A missing capture is indeterminate — fail open for these non-presence rooms
-      // (opaque keys only; each fragment re-pull re-authorizes per viewer through the servlet
-      // path).
       if (authorities == null) {
         return failOpen(topic);
       }
@@ -219,16 +161,9 @@ public class LiveSyncSubscriptionAuthorizer {
     }
     String probePath = topic.topicClass().authProbePath();
     if (probePath == null) {
-      // Authenticated-only global room: nothing to probe.
       return Decision.ALLOW;
     }
     if (accessToken == null || accessToken.isBlank()) {
-      // No captured token snapshot (e.g. a session whose token lapsed — the snapshot is never
-      // refreshed, so this is a steady state, not a blip): indeterminate. Non-presence classes fail
-      // open (opaque keys only; each fragment re-pull re-authorizes); a presence class fails closed
-      // so a lapsed-token caller cannot pull the editor-identity snapshot of a mission it can't
-      // read
-      // (F1).
       return failOpen(topic);
     }
     if (topic.resourceId() != null) {
@@ -243,20 +178,14 @@ public class LiveSyncSubscriptionAuthorizer {
     if (capabilityField != null) {
       return probeCapability(topic, probePath, capabilityField, accessToken, activeOrgUnitId);
     }
-    // A global class with a probe path but neither an id nor a capability field is a
-    // misconfiguration
-    // rather than a runtime state; authenticated access suffices.
     return Decision.ALLOW;
   }
 
   /**
-   * Runs a per-resource authorization read, with a fallback: the primary read decides unless it
-   * <b>explicitly</b> refuses (403/404), in which case the {@code fallbackUri} (when present)
-   * decides — so a dual-read class ({@link LiveSyncTopicClass#BANK_ACCOUNT}) is denied only when
-   * both reads explicitly refuse. A primary 2xx or a primary transient failure (fail-open) short-
-   * circuits without touching the fallback.
+   * Runs the primary authorization read and, only when it explicitly refuses (403/404), the
+   * fallback read ({@link LiveSyncTopicClass#BANK_ACCOUNT}), which then decides.
    *
-   * @param topic the topic (for logging)
+   * @param topic the topic, for logging
    * @param primaryUri the resolved primary resource read URI
    * @param fallbackUri the resolved fallback read URI, or {@code null} when the class has none
    * @param accessToken the captured bearer
@@ -271,11 +200,8 @@ public class LiveSyncSubscriptionAuthorizer {
       UUID activeOrgUnitId) {
     Decision primary = probeOne(topic, primaryUri, accessToken, activeOrgUnitId);
     if (primary != Decision.DENY || fallbackUri == null) {
-      // ALLOW (2xx or a transient fail-open) is final; an explicit DENY with no fallback is final.
       return primary;
     }
-    // The primary explicitly refused (403/404); the org-unit fallback read decides — a 2xx there
-    // allows, a second explicit refusal denies, a transient failure fails open.
     return probeOne(topic, fallbackUri, accessToken, activeOrgUnitId);
   }
 
@@ -323,13 +249,10 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * Runs a capability authorization read (a global class): reads the capabilities response and
-   * requires {@code field} to be {@code true}. A withheld capability is an explicit DENY; any
-   * failure to read the capabilities (401/5xx/timeout/transport) fails open — the DENY signal is
-   * the flag being {@code false}, not the HTTP status, and the queue fragment re-authorizes per
-   * viewer anyway.
+   * Runs a capability read and requires {@code field} to be {@code true}; a withheld capability
+   * denies, and a failed read fails open.
    *
-   * @param topic the topic (for logging)
+   * @param topic the topic, for logging
    * @param path the capabilities endpoint
    * @param field the boolean capability field that must be {@code true}
    * @param accessToken the captured bearer

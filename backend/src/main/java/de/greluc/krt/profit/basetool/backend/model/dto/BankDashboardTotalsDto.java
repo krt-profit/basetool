@@ -22,8 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.math.BigDecimal;
 
 /**
- * The management-only aggregate strip of the bank dashboard ({@code .kpi-total} tiles, D1 mockup,
- * REQ-BANK-016).
+ * The management-only aggregate strip of the bank dashboard (REQ-BANK-016).
  *
  * @param totalBalance sum of all account balances
  * @param inflow30d sum of all positive postings in the last 30 days

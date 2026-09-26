@@ -35,23 +35,17 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Builds the {@link HttpClient} the {@link BackendAccountChecker} uses to call the Basetool backend
- * over HTTPS (REQ-SEC-022). The backend serves a self-signed certificate that the default JVM
- * truststore inside the Keycloak container does not trust, so this loads an explicit PKCS#12
- * truststore (path + password from configuration) and pins it as the client's {@code SSLContext}.
+ * Builds the {@link HttpClient} with which {@link BackendAccountChecker} calls the backend over
+ * HTTPS (REQ-SEC-022), trusting a configured PKCS#12 truststore.
  *
- * <p>Certificate validation is <strong>never disabled</strong> — there is deliberately no
- * trust-all/insecure path here. When no truststore is configured, or it cannot be loaded, the
- * client falls back to the default JVM truststore; a TLS handshake against the self-signed backend
- * certificate then fails, which the checker maps to {@link BackendAccountChecker.Result#UNKNOWN}
- * (fail open) rather than admitting an unverified connection.
+ * <p>Certificate validation is never disabled: without a usable truststore the client uses the
+ * default JVM truststore, and a failing handshake maps to {@link
+ * BackendAccountChecker.Result#UNKNOWN}.
  */
 @JBossLog
 final class BackendTrustSupport {
 
-  private BackendTrustSupport() {
-    // Utility class — not instantiable.
-  }
+  private BackendTrustSupport() {}
 
   /**
    * Builds an HTTP client trusting the configured backend truststore, falling back to the default
@@ -104,8 +98,6 @@ final class BackendTrustSupport {
       context.init(null, trustManagerFactory.getTrustManagers(), null);
       return context;
     } catch (GeneralSecurityException | IOException e) {
-      // Misconfigured / unreadable truststore — fall back to default trust. The HTTPS call then
-      // fails against the self-signed cert and the precheck fails open; never trust-all.
       log.warn(
           "Failed to load the backend truststore; the Discord account-existence precheck will fail"
               + " open until it is fixed.",

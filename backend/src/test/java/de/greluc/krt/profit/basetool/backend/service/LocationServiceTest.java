@@ -56,7 +56,6 @@ class LocationServiceTest {
 
   @Test
   void createLocation_ShouldSaveDirectly() {
-    // Given
     Location inputLocation = new Location();
     inputLocation.setName("Port Olisar");
 
@@ -64,10 +63,8 @@ class LocationServiceTest {
     when(locationRepository.save(any(Location.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     Location savedLocation = locationService.createLocation(inputLocation);
 
-    // Then
     assertNotNull(savedLocation);
     assertEquals("Port Olisar", savedLocation.getName());
     verify(locationRepository, times(1)).save(inputLocation);
@@ -103,44 +100,35 @@ class LocationServiceTest {
 
   @Test
   void findAllReference_returnsTheCompleteUnboundedProjection() {
-    // Given
     LocationReferenceDto ref = new LocationReferenceDto(UUID.randomUUID(), "Port Olisar");
     when(locationRepository.findAllReference()).thenReturn(List.of(ref));
 
-    // When
     List<LocationReferenceDto> result = locationService.findAllReference();
 
-    // Then
     assertEquals(List.of(ref), result);
     verify(locationRepository, times(1)).findAllReference();
   }
 
   @Test
   void searchReference_escapesLikeMetacharactersAndPagesTheRepositoryQuery() {
-    // Given
     LocationReferenceDto ref = new LocationReferenceDto(UUID.randomUUID(), "Area 18 100%");
     PageRequest pageable = PageRequest.of(0, 25);
     when(locationRepository.searchReference("100\\%", pageable))
         .thenReturn(new PageImpl<>(List.of(ref)));
 
-    // When
     Page<LocationReferenceDto> result = locationService.searchReference("100%", pageable);
 
-    // Then
     assertEquals(List.of(ref), result.getContent());
     verify(locationRepository, times(1)).searchReference("100\\%", pageable);
   }
 
   @Test
   void searchReference_passesNullThroughAsTheNoFilterMarker() {
-    // Given
     PageRequest pageable = PageRequest.of(0, 25);
     when(locationRepository.searchReference(null, pageable)).thenReturn(new PageImpl<>(List.of()));
 
-    // When
     locationService.searchReference(null, pageable);
 
-    // Then
     verify(locationRepository, times(1)).searchReference(null, pageable);
   }
 

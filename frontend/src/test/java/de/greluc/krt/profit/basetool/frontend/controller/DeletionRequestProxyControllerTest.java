@@ -41,17 +41,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Mockito tests for {@link DeletionRequestProxyController} (REQ-SEC-061, ADR-0181).
- *
- * <p>The property worth a test rather than a comment: <b>the proxy accepts no user id and relays
- * none.</b> The backend derives the subject from the token, and that is precisely what makes these
- * three endpoints safe to expose to every authenticated member without a scope check of their own.
- * An id sneaking into the relayed URI would turn a self-service surface into one member erasing
- * another, so each test asserts the literal URI.
- *
- * <p>The flag coercion is the other one: a missing or malformed {@code eraseHistory} means "did not
- * ask for the extra erasure", because that erasure is irreversible and a parse failure must not
- * grant it.
+ * Mockito tests for {@link DeletionRequestProxyController} (REQ-SEC-061, ADR-0181): the proxy
+ * relays no user id, asserted on the literal URI, and a missing or malformed {@code eraseHistory}
+ * flag means {@code false}.
  */
 class DeletionRequestProxyControllerTest {
 
@@ -72,8 +64,6 @@ class DeletionRequestProxyControllerTest {
 
   @Test
   void request_aStringFlagIsNotATrueFlag() {
-    // A hand-written client sending "true" has not expressed the wish in the form the API takes,
-    // and the erasure it would trigger cannot be undone.
     BackendApiClient client = mock(BackendApiClient.class);
     DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
 
@@ -94,8 +84,6 @@ class DeletionRequestProxyControllerTest {
 
   @Test
   void request_relaysTheBackendStatusRatherThanFlatteningItTo500() {
-    // A second request while one is pending is a 409 the card turns into a specific message; a 500
-    // would show the generic failure toast instead.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.post(eq(URI), any(), eq(Object.class)))
         .thenThrow(new BackendServiceException("already pending", new RuntimeException(), 409));
@@ -171,10 +159,6 @@ class DeletionRequestProxyControllerTest {
 
   @Test
   void card_saysSoWhenTheBackendIsDownRatherThanClaimingNoRequest() {
-    // The card is swapped in after a write that already succeeded, so failing the fragment would
-    // leave the old state on screen. Rendering the no-request state is not the answer either: a
-    // DECLINED request carries the refusal reason Art. 12(4) obliges the controller to tell the
-    // member, and it used to disappear from the page with nothing said.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(
             eq(URI), ArgumentMatchers.<ParameterizedTypeReference<Map<String, Object>>>any()))
@@ -200,7 +184,6 @@ class DeletionRequestProxyControllerTest {
 
     controller.card(model);
 
-    // A member who has never asked is not an error, and the card must still offer the action.
     assertEquals(false, model.getAttribute("deletionRequestUnavailable"));
   }
 

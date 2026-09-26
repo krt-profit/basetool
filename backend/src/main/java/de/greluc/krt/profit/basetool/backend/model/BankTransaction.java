@@ -42,16 +42,13 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Append-only bank transaction header (epic #556, REQ-BANK-004, ADR-0010), persisted in the {@code
- * bank_transaction} table created by Flyway V153 together with its 1..n {@link BankPosting} legs.
+ * Append-only bank transaction header with its 1..n {@link BankPosting} legs (REQ-BANK-004,
+ * ADR-0010).
  *
- * <p>Insert-only event-log entity in the {@link ExternalSyncReport} style: it deliberately does NOT
- * extend {@link AbstractEntity} — no {@code @Version} (rows are never updated, so the
- * optimistic-locking trap class documented in CLAUDE.md cannot occur on bookings) and {@link
- * #createdAt} is the single authoritative timestamp, stamped by {@code BankLedgerService} so the
- * header and all its legs share the exact same instant. Corrections are {@link
- * BankTransactionType#REVERSAL} rows referencing the original via {@link #reversedTransaction}; the
- * V153 unique constraint caps reversals at one per original.
+ * <p>Not an {@link AbstractEntity}: rows are never updated, so there is no {@code @Version}. {@link
+ * #createdAt} is stamped by {@code BankLedgerService} and shared with all legs. Corrections are
+ * {@link BankTransactionType#REVERSAL} rows referencing the original via {@link
+ * #reversedTransaction}, at most one per original.
  */
 @Entity
 @Table(name = "bank_transaction")
@@ -99,77 +96,53 @@ public class BankTransaction {
   private String justification;
 
   /**
-   * Optional free-text note authored by the <em>booking bank employee</em> ("Notiz
-   * Bankmitarbeiter", REQ-BANK-054) — internal context for the movement, as opposed to {@link
-   * #note} / {@link #justification}, which come from the requester / booking party.
-   *
-   * <p>Captured for <strong>every</strong> transaction kind including a {@code DEPOSIT} (unlike
-   * {@link #justification}, which debit-only rules govern), on a direct booking and on the
-   * confirmation of a booking request alike, and always optional. Shown in the booking history, the
-   * account statement and the management report, but <strong>redacted</strong> out of the org-unit
-   * member-facing history and statement (REQ-BANK-038) — an employee note is internal.
+   * Optional internal note by the booking bank employee (REQ-BANK-054), captured for every
+   * transaction kind. Redacted from the member-facing history and statement (REQ-BANK-038).
    */
   @Nullable
   @Column(length = 500)
   private String staffNote;
 
   /**
-   * The member on the far side of a {@link BankTransactionType#DEPOSIT} (the Einzahler who handed
-   * the money in) or {@link BankTransactionType#WITHDRAWAL} (the Empf&auml;nger who received the
-   * payout), distinct from the {@code BankHolderPosting} holder (the bank custodian who physically
-   * received/paid). REQ-BANK-044. The database FK is {@code ON DELETE SET NULL}; {@link
-   * #counterpartyHandle} keeps the row attributable afterwards. {@code null} for transfers,
-   * holder→holder Umbuchungen, reversals, the wipe reset, and for bookings where no counterparty
-   * was recorded (the field is optional). Kept as a plain UUID — the booking surfaces render the
-   * {@link #counterpartyHandle} snapshot, not a live join.
+   * The member on the far side of a {@link BankTransactionType#DEPOSIT} or {@link
+   * BankTransactionType#WITHDRAWAL}, distinct from the custodian holder (REQ-BANK-044). Optional
+   * and {@code null} for every other type; loose reference ({@code ON DELETE SET NULL}) whose
+   * display comes from {@link #counterpartyHandle}.
    */
   @Nullable
   @Column(name = "counterparty_user_id")
   private UUID counterpartyUserId;
 
   /**
-   * Deletion-proof handle snapshot of {@link #counterpartyUserId} (the effective name at booking
-   * time), mirroring the {@code bank_audit_event.actor_handle} / {@code bank_holder.handle}
-   * snapshot pattern so the booking history and statements survive user deletion (REQ-BANK-044).
-   * {@code null} exactly when {@link #counterpartyUserId} is {@code null} (V197 CHECK).
+   * Deletion-proof handle snapshot of {@link #counterpartyUserId} at booking time (REQ-BANK-044).
+   * {@code null} exactly when {@link #counterpartyUserId} is {@code null}.
    */
   @Nullable
   @Column(name = "counterparty_handle", length = 255)
   private String counterpartyHandle;
 
   /**
-   * Optional org unit the counterparty belongs to, picked from their own memberships at booking
-   * time (membership is multi, so the booker chooses which one). REQ-BANK-044. The FK references
-   * {@code org_unit} ({@code ON DELETE SET NULL}); only ever set together with {@link
-   * #counterpartyUserId}. Kept as a plain UUID (no JPA relation) — consistent with how the rest of
-   * the bank treats org-unit references during the SQUADRON soak — with {@link
-   * #counterpartyOrgUnitName} carrying the display label.
+   * Optional org unit the counterparty belongs to, chosen from their memberships at booking time
+   * (REQ-BANK-044). Set only together with {@link #counterpartyUserId}; loose reference labelled by
+   * {@link #counterpartyOrgUnitName}.
    */
   @Nullable
   @Column(name = "counterparty_org_unit_id")
   private UUID counterpartyOrgUnitId;
 
   /**
-   * Deletion-proof name snapshot of {@link #counterpartyOrgUnitId} (REQ-BANK-044), so the history
-   * and statements label the counterparty's org unit without a live polymorphic org-unit load.
-   * {@code null} exactly when {@link #counterpartyOrgUnitId} is {@code null} (V197 CHECK).
+   * Deletion-proof name snapshot of {@link #counterpartyOrgUnitId} (REQ-BANK-044). {@code null}
+   * exactly when {@link #counterpartyOrgUnitId} is {@code null}.
    */
   @Nullable
   @Column(name = "counterparty_org_unit_name", length = 255)
   private String counterpartyOrgUnitName;
 
   /**
-   * In-game aUEC transfer fee added on top of the entered amount and borne by the debited source
-   * (ADR-0052 superseding ADR-0041, REQ-BANK-033). Set by {@code BankLedgerService} on a
-   * customer-facing transfer the bank makes on a member's behalf — a {@link
-   * BankTransactionType#WITHDRAWAL} and an account-to-account {@link BankTransactionType#TRANSFER}
-   * with a holder change; {@code 0} for {@link BankTransactionType#DEPOSIT} (the depositor bears
-   * their own fee), the internal {@link BankTransactionType#HOLDER_TRANSFER} Umbuchung (the staff
-   * bear that in-game fee personally), {@link BankTransactionType#WIPE_RESET}, {@link
-   * BankTransactionType#REVERSAL} and same-holder transfers. The source leg is debited the gross
-   * (entered amount + fee) and the destination leg credited the full entered amount, so a
-   * fee-bearing TRANSFER nets to {@code -transfer_fee} across its legs (REQ-BANK-020 integrity
-   * widened accordingly). Never negative (V183 CHECK).
+   * In-game aUEC transfer fee borne by the debited source on top of the entered amount (ADR-0052,
+   * REQ-BANK-033). Non-zero only on a {@link BankTransactionType#WITHDRAWAL} and on a {@link
+   * BankTransactionType#TRANSFER} with a holder change; the source leg is debited amount plus fee,
+   * the destination credited the amount. Never negative.
    */
   @Column(name = "transfer_fee", nullable = false, precision = 19, scale = 4, updatable = false)
   @Builder.Default

@@ -57,13 +57,11 @@ public enum SelectorKind {
   EVENT_RECIPIENT,
 
   /**
-   * Resolves to the <em>responsible holder(s)</em> (Kontoverantwortliche, REQ-BANK-034) of the bank
-   * account carried by the event ({@link
-   * de.greluc.krt.profit.basetool.backend.event.NotificationEvent#contextAccountId()}) — the
-   * Staffelleiter / SK-Leiter / Bereichsleiter / OL members / Profit-Bereichsleiter derived from
-   * the account's owning org unit. Reads no selector columns — the account comes from the event,
-   * mirroring {@link #ACCOUNT_GRANT}. The org-unit-aware resolution stays inside the {@code
-   * OrgUnitBankAccessService} seam so the bank stays org-unit-blind (REQ-BANK-008, REQ-BANK-026).
+   * Resolves to the responsible holder(s) (Kontoverantwortliche) of the bank account carried by the
+   * event ({@link
+   * de.greluc.krt.profit.basetool.backend.event.NotificationEvent#contextAccountId()}), derived
+   * from the account's owning org unit via {@code OrgUnitBankAccessService} (REQ-BANK-034). Reads
+   * no selector columns, like {@link #ACCOUNT_GRANT}.
    */
   ACCOUNT_RESPONSIBLE
 }

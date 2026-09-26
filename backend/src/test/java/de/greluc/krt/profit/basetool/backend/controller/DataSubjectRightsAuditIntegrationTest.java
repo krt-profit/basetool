@@ -52,36 +52,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Proves the five data-subject-rights endpoints really do write their audit row with a real {@link
- * de.greluc.krt.profit.basetool.backend.service.AuditService} wired in (REQ-SEC-058, REQ-SEC-060,
- * REQ-AUDIT-001).
+ * Proves the five data-subject-rights endpoints write their audit row with a real {@link
+ * de.greluc.krt.profit.basetool.backend.service.AuditService}, whose {@code MANDATORY} propagation
+ * mocked tests cannot exercise (REQ-SEC-058, REQ-SEC-060). The export requests also send the
+ * frontend's real {@code Accept} header.
  *
- * <p><b>Why this exists next to the MockMvc gate matrices.</b> {@code AuditService.record} is
- * {@code MANDATORY}-propagated: calling it with no transaction in progress is a programming error
- * and throws. Every other audited call site sits inside a business transaction and satisfies that
- * for free — but these five audit a <em>read</em>, and a read hands its transaction back before the
- * controller gets to the audit call. {@link DataExportControllerSecurityTest} and {@link
- * AdminPersonSearchControllerSecurityTest} cannot see the difference, because they declare
- * {@code @MockitoBean AuditService}: replacing the bean also removes the transactional proxy around
- * it, so the propagation is never exercised and those tests stay green against an endpoint that
- * would 500 in production.
- *
- * <p><b>The four export requests also carry the frontend's real {@code Accept} header</b>, and that
- * is a second defect this class is the only place to catch. The shared {@code webClient} bean sends
- * {@code application/cbor, application/json} under the default {@code APP_HTTP_CODEC=CBOR} ({@code
- * WebClientConfig#backendAcceptTypes}), and both download endpoints hand their bytes straight to
- * the member's browser. A {@code produces} condition on the PDF mappings answered 406 before the
- * handler ran, and the JSON export -- returning a POJO -- negotiated its way to CBOR and was served
- * as {@code datenauskunft.json}, a binary blob no JSON tool opens. Both are invisible to a test
- * that sends no {@code Accept} header, and invisible to {@code DataExportProxyControllerTest}
- * because that builds a bare {@code WebClient} without the bean's default headers. The person
- * search is deliberately left to negotiate: its response is decoded by the frontend, never handed
- * to a member as a file.
- *
- * <p><b>This class must never become {@code @Transactional}</b>, and neither must its test methods.
- * A test-managed transaction is exactly the ambient transaction whose absence is the defect, and it
- * would make the class pass against broken code. The seeding goes through an explicit {@link
- * TransactionTemplate} for the same reason.
+ * <p>The class and its methods must never be {@code @Transactional}; seeding uses an explicit
+ * {@link TransactionTemplate}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -115,8 +92,6 @@ class DataSubjectRightsAuditIntegrationTest {
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // Committed, because audit_event.actor_user_id carries an FK to app_user: an uncommitted actor
-    // would fail the insert for a reason unrelated to the property under test.
     actor = user("ZzzAuditActorZzz");
   }
 
@@ -131,7 +106,6 @@ class DataSubjectRightsAuditIntegrationTest {
         });
   }
 
-  // covers REQ-SEC-058 - the member's own JSON export is served and audited
   @Test
   void selfExportJson_isServedAndAudited() throws Exception {
     mockMvc
@@ -149,7 +123,6 @@ class DataSubjectRightsAuditIntegrationTest {
             });
   }
 
-  // covers REQ-SEC-058 - the member's own PDF export is served and audited
   @Test
   void selfExportPdf_isServedAndAudited() throws Exception {
     mockMvc
@@ -162,14 +135,10 @@ class DataSubjectRightsAuditIntegrationTest {
         .allSatisfy(
             event -> {
               assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=true");
-              // Not rows=-1. The renderer used to assemble the export itself and return only the
-              // bytes, so both PDF endpoints recorded a sentinel where the count belongs -- in the
-              // one payload that answers "how much was disclosed".
               assertThat(event.getDetails()).doesNotContain("rows=-1");
             });
   }
 
-  // covers REQ-SEC-058 - the admin JSON export is served and audited as somebody else's
   @Test
   void adminExportJson_isServedAndAudited() throws Exception {
     mockMvc
@@ -188,7 +157,6 @@ class DataSubjectRightsAuditIntegrationTest {
                 assertThat(event.getDetails()).contains("format=json").contains("bySelf=false"));
   }
 
-  // covers REQ-SEC-058 - the admin PDF export is served and audited
   @Test
   void adminExportPdf_isServedAndAudited() throws Exception {
     mockMvc
@@ -204,12 +172,10 @@ class DataSubjectRightsAuditIntegrationTest {
         .allSatisfy(
             event -> {
               assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=false");
-              // See selfExportPdf_isServedAndAudited: the admin path carried the same sentinel.
               assertThat(event.getDetails()).doesNotContain("rows=-1");
             });
   }
 
-  // covers REQ-SEC-060 - the person search is served and audited without recording the term
   @Test
   void personSearch_isServedAndAudited() throws Exception {
     mockMvc

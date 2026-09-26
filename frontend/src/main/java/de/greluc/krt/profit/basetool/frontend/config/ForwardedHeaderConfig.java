@@ -28,24 +28,11 @@ import org.springframework.core.Ordered;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
 /**
- * Explicitly registers Spring's {@link ForwardedHeaderFilter} one ordering slot <em>after</em>
- * {@code ClientIpContextFilter}, replacing the framework auto-registration (finding SEC-02).
+ * Registers Spring's {@link ForwardedHeaderFilter} at {@link Ordered#HIGHEST_PRECEDENCE} + 1, so
+ * {@code ClientIpContextFilter} reads the raw forwarded headers first.
  *
- * <p><b>Why this is needed:</b> the frontend relies on {@code ForwardedHeaderFilter} to rebuild the
- * external scheme/host from {@code X-Forwarded-Proto}/{@code -Host} so the OAuth2 redirect URI and
- * HSTS are correct — that is why {@code server.forward-headers-strategy} was {@code framework}. But
- * that filter consumes {@code X-Forwarded-For} and exposes only the <em>leftmost</em> (client-
- * controlled) entry, which {@code ClientIpContextFilter} must read <b>raw</b> to attribute the rate
- * limit safely (SEC-02). Spring Boot pins the auto-registered {@code ForwardedHeaderFilter} to
- * {@link Ordered#HIGHEST_PRECEDENCE} ({@code Integer.MIN_VALUE}), and no servlet filter can be
- * ordered before {@code Integer.MIN_VALUE}. So {@code application.yml} sets {@code
- * forward-headers-strategy: none} (suppressing the auto-registration) and this bean re-registers
- * the identical filter at {@code HIGHEST_PRECEDENCE + 1}. Net effect: {@code ClientIpContextFilter}
- * (still at {@code HIGHEST_PRECEDENCE}) runs first on the raw headers, then this filter runs and
- * rewrites scheme/host/remote-addr for OAuth2 and HSTS exactly as the framework strategy did.
- *
- * <p>The registration mirrors Spring Boot's own ({@code new ForwardedHeaderFilter()} over the
- * {@code REQUEST}/{@code ASYNC}/{@code ERROR} dispatcher types); only the order differs by one.
+ * <p>Requires {@code server.forward-headers-strategy: none}; the registration otherwise mirrors
+ * Spring Boot's own.
  */
 @Configuration
 public class ForwardedHeaderConfig {

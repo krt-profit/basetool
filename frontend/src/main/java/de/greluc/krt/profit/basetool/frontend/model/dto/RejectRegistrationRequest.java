@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Body of a reject-registration request relayed to the backend (epic #720, Track 1).
+ * Body of a reject-registration request relayed to the backend.
  *
  * @param reason optional free-text reason recorded in the approval audit
  * @param version the optimistic-lock version the admin last read; {@code null} bypasses the check

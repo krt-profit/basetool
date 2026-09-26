@@ -30,14 +30,11 @@
     window.krtEvents.on('change', 'inv-boerse-toggle', function (el) {
         const itemId = el.getAttribute('data-id');
         if (el.checked) {
-            // Newly released: open the remark dialog pre-filled with this Lager item.
             window.krtMaterialRelease.open(
                 'lager',
                 {
                     itemId,
                     material: el.getAttribute('data-material'),
-                    // 'ITEM' for a game-item row (a stock-backed item offer, REQ-MARKET-014) — the
-                    // modal then hides the quality fact; absent/null for a material row.
                     kind: el.getAttribute('data-kind'),
                     quality: el.getAttribute('data-quality'),
                     amount: el.getAttribute('data-amount'),
@@ -54,7 +51,6 @@
             );
             return;
         }
-        // Un-checked: confirm, then take the item's active offer off the board.
         window
             .showKrtConfirm(
                 i18n.deactivateTitle,
@@ -75,8 +71,6 @@
                     serialize: 'materialboerse',
                     onSuccess() {
                         setStatus(itemId, false);
-                        // REQ-FE-015 (ADR-0094): notify board viewers over the shared multiplexed
-                        // /ws/sync `materialboard` room (was the retired materialboerse-presence.js).
                         if (window.krtLiveSync) {
                             window.krtLiveSync.sendChanged('materialboard', ['board']);
                         }

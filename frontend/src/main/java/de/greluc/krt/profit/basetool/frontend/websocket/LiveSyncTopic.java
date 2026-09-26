@@ -24,14 +24,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A parsed, validated live-sync topic: its {@link LiveSyncTopicClass}, the optional resource id,
- * and the canonical wire string used as the room key (REQ-FE-015, ADR-0094).
+ * A parsed, validated live-sync topic: its {@link LiveSyncTopicClass}, optional resource id and
+ * canonical wire string used as the room key (REQ-FE-015, ADR-0094).
  *
- * <p>Only {@link #parse(String)} constructs instances, so a {@code LiveSyncTopic} is always a
- * well-formed topic of a known class with the scope its class demands (a resource UUID present iff
- * the class is {@link LiveSyncTopicClass#scoped()}). The {@link #canonical()} string is what the
- * relay uses to key rooms and what crosses Redis, so it is normalised (lower-cased UUID) to make
- * two spellings of the same topic collide in one room.
+ * <p>Instances come only from {@link #parse(String)}; {@link #canonical()} is normalised
+ * (lower-case UUID) so equivalent spellings share a room.
  *
  * @param topicClass the class this topic belongs to
  * @param resourceId the resource UUID for a scoped class, or {@code null} for a global class
@@ -44,16 +41,12 @@ public record LiveSyncTopic(
   private static final int MAX_RAW_LENGTH = 128;
 
   /**
-   * Parses a raw wire topic string into a {@link LiveSyncTopic}, or returns {@code null} if it
-   * names no known class, violates its class's scope (a UUID where none is allowed or vice versa),
-   * or the id segment is not a UUID.
-   *
-   * <p>Accepted shapes: the bare {@link LiveSyncTopicClass#prefix()} for a global class, or {@code
-   * prefix:uuid} for a scoped class. Matching is exact on the prefix — an unknown prefix yields
-   * {@code null} rather than a fallback class.
+   * Parses a raw wire topic ({@code prefix} for a global class, {@code prefix:uuid} for a scoped
+   * one) into a {@link LiveSyncTopic}.
    *
    * @param raw the raw topic string from a client frame (may be {@code null})
-   * @return the parsed topic, or {@code null} if {@code raw} is not a valid topic of a known class
+   * @return the parsed topic, or {@code null} for an unknown prefix, a scope mismatch or a non-UUID
+   *     id
    */
   @Nullable
   public static LiveSyncTopic parse(@Nullable String raw) {
@@ -86,13 +79,8 @@ public record LiveSyncTopic(
   }
 
   /**
-   * Resolves the topic class whose {@link LiveSyncTopicClass#prefix()} equals {@code prefix} and
-   * whose scope matches the request. When a prefix is shared between a global and a scoped class
-   * ({@code bank} → {@link LiveSyncTopicClass#BANK_STAFF} global vs {@link
-   * LiveSyncTopicClass#BANK_ACCOUNT} scoped), the caller's id segment decides which: the scoped
-   * class when an id segment is present, the global one otherwise. Returns {@code null} for an
-   * unknown prefix or when no class of the requested scope uses it (e.g. {@code orders:{id}} — a
-   * scoped request on a prefix that only has a global class).
+   * Resolves the topic class for a prefix and scope; for a prefix shared by a global and a scoped
+   * class (e.g. {@code bank}), the presence of an id segment decides.
    *
    * @param prefix the wire prefix (never {@code null})
    * @param hasIdSegment whether the raw topic carried a {@code :id} segment

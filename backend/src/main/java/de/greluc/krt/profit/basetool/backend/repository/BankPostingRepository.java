@@ -37,12 +37,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for the append-only {@link BankPosting} account-ledger legs (epic #556,
- * ADR-0010/0039). Strictly insert-and-read: no {@code @Modifying} method may ever appear here — the
- * ledger is never updated or deleted (REQ-BANK-004, pinned by {@code ArchitectureTest}). Since
- * ADR-0039 a posting carries only the account dimension; the holder dimension lives in {@link
- * BankHolderPostingRepository}. All account balances are computed here as grouped sums
- * (compute-on-read, REQ-BANK-020), backed by the V153 composite indexes.
+ * Spring Data repository for the append-only {@link BankPosting} account-ledger legs (ADR-0039).
+ * Insert-and-read only, with no {@code @Modifying} method (REQ-BANK-004); account balances are
+ * computed here as grouped sums (REQ-BANK-020).
  */
 @Repository
 public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> {
@@ -72,9 +69,8 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
   List<BankAccountBalance> accountBalances(@Param("accountIds") Collection<UUID> accountIds);
 
   /**
-   * All postings of the given accounts since a cutoff, reduced to the dashboard-relevant columns in
-   * ONE statement; the service derives 30-day deltas, in/out totals and the daily sparkline series
-   * in memory (REQ-BANK-016).
+   * Returns the dashboard-relevant columns of all postings of the given accounts since a cutoff in
+   * one statement (REQ-BANK-016).
    *
    * @param accountIds the visible accounts
    * @param cutoff window start (inclusive)
@@ -89,11 +85,8 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
       @Param("accountIds") Collection<UUID> accountIds, @Param("cutoff") Instant cutoff);
 
   /**
-   * One account's posting slices inside a closed period, reduced to the (createdAt, amount) columns
-   * the balance-over-time chart needs (REQ-BANK-049). The service adds the opening balance from
-   * {@link #accountBalanceBefore(UUID, Instant)} and derives the end-of-day series in memory
-   * ({@code BankBalanceSeriesCalculator}), mirroring the 30-day sparkline math. Both bounds are
-   * inclusive.
+   * Returns one account's (createdAt, amount) posting slices inside a closed period, for the
+   * balance-over-time chart (REQ-BANK-049).
    *
    * @param accountId the account
    * @param from inclusive period start
@@ -110,20 +103,11 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
       @Param("accountId") UUID accountId, @Param("from") Instant from, @Param("to") Instant to);
 
   /**
-   * One page of an account's booking history — the account posting joined with its header in a
-   * single statement (REQ-BANK-018); newest first by default (whitelisted sort on {@code
-   * createdAt}). Since ADR-0039 a {@code TRANSFER} always spans two different accounts, so an
-   * account has at most one leg per transaction — no intra-account pair collapse is needed. The
-   * holder annotation is resolved separately from the holder ledger (see {@code
-   * BankAccountService}).
+   * Returns one page of an account's booking history, each posting joined with its transaction
+   * header, newest first by default (REQ-BANK-018).
    *
-   * <p>Both period bounds are optional (REQ-BANK-051): a {@code null} {@code from} or {@code to}
-   * drops that side of the filter, so passing {@code (null, null)} pages the whole history exactly
-   * as before the period filter existed. The bounds are inclusive. Each bound is compared for
-   * nullness through {@code CAST(:bound AS timestamp)} rather than a bare {@code :bound IS NULL}:
-   * PostgreSQL cannot infer the type of an untyped bind parameter in an {@code IS NULL} position
-   * and fails the whole statement at plan time with "could not determine data type of parameter" —
-   * so the cast is load-bearing, not cosmetic (mirrors {@code AuditEventRepository#findFiltered}).
+   * <p>Both period bounds are optional and inclusive; {@code null} drops that side of the filter
+   * (REQ-BANK-051).
    *
    * @param accountId the account
    * @param from inclusive lower bound on the booking instant, or {@code null} for no lower bound
@@ -184,10 +168,7 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
       @Param("accountId") UUID accountId, @Param("before") Instant before);
 
   /**
-   * The account legs of the given transactions with their account labels, batched in one IN-query —
-   * counter-account resolution for transfer rows and the negated account-side mirror of a reversal
-   * (ADR-0010/0039). The holder side is mirrored via {@link
-   * BankHolderPostingRepository#findHolderLegsByTransactionIds}.
+   * Returns the account legs of the given transactions with their account labels in one IN-query.
    *
    * @param transactionIds the batch of transaction ids
    * @return every account leg of the given transactions

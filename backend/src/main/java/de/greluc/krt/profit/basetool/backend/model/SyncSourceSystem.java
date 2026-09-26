@@ -20,12 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * External catalogue that produced an {@link ExternalSyncReport} event.
- *
- * <p>Distinct from {@link MaterialExternalAliasSource} (which is scoped to the commodity-alias
- * domain): the sync report spans every aggregate (commodities, items, vehicles, blueprints), so it
- * carries its own source discriminator. The two enums share the {@code UEX} / {@code SCWIKI} member
- * names by coincidence of the underlying systems, not by shared semantics.
+ * External catalogue that produced an {@link ExternalSyncReport} event. Independent of {@link
+ * MaterialExternalAliasSource}, which covers only commodity aliases.
  */
 public enum SyncSourceSystem {
 

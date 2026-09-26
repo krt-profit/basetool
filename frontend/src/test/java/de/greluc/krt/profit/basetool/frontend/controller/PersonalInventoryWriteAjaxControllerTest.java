@@ -48,12 +48,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #578 header-gated personal-inventory write twins ({@link
- * PersonalInventoryPageController#addAjax}/{@code updateAjax}/{@code deleteAjax}). They assert that
- * an {@code X-Requested-With=XMLHttpRequest} JSON request forwards to the backend and answers
- * {@code 204}, a payload missing the typeahead-chosen location is rejected up front with {@code
- * 422} {@code problem+json} (code {@code VALIDATION}) without calling the backend, and a backend
- * optimistic-lock failure is relayed as {@code 409} {@code problem+json} carrying its {@code code}.
+ * MVC tests for the personal-inventory write twins ({@link
+ * PersonalInventoryPageController#addAjax}/{@code updateAjax}/{@code deleteAjax}): AJAX requests
+ * are forwarded and answer {@code 204}, a missing location yields {@code 422} {@code problem+json}
+ * without a backend call, and an optimistic-lock failure is relayed as {@code 409}.
  */
 @SpringBootTest
 class PersonalInventoryWriteAjaxControllerTest {

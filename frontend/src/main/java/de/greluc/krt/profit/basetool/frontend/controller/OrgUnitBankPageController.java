@@ -59,14 +59,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Renders the org-unit bank view (epic #666 + REQ-BANK-034..038): the balance cards of every
- * account the caller may view, the read-only account drill-in (history + Halter-redacted
- * statement), the responsible-holder/OL settings (balance target + configurable visibility), and
- * the officer/lead booking-request flow. This is the org-unit-facing surface — reachable by any KRT
- * member (the cartel account is visible to all, REQ-BANK-037, and a member may have been granted
- * access to other accounts), deliberately <em>not</em> {@code BANK_EMPLOYEE}; the backend seam
- * decides the actual data per account. Booking/settings writes are AJAX swaps via {@code
- * /api/proxy/org-units/bank/**} (no reload, REQ-FE-005).
+ * Renders the org-unit bank view (REQ-BANK-034..038) for any KRT member: balance cards of every
+ * viewable account, the read-only account drill-in, the holder/OL settings and the booking-request
+ * flow. The backend decides the data per account; writes go through {@code
+ * /api/proxy/org-units/bank/**}.
  */
 @Controller
 @UsesLayoutModel
@@ -111,19 +107,14 @@ public class OrgUnitBankPageController {
       BANK_BOOKING_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   /**
-   * Renders the overview page (or one of its fragments for an in-place swap). The Konten list is
-   * shown as a card grid (default) or a dense table, chosen per user; the choice rides on the
-   * {@code layout} query parameter and is persisted client-side by {@code bank.js} (mirroring the
-   * dashboard, REQ-BANK-016, but without the by-Bereich grouping). An {@code orgUnitBankAccounts}
-   * fragment request re-renders just the switchable account list for the view-toggle swap
-   * (REQ-FE-005); an {@code orgUnitBank} fragment request re-renders the tabs + both request
-   * regions after a booking write.
+   * Renders the org-unit bank overview as a card grid or, with {@code layout=table}, a dense table
+   * (REQ-BANK-016), or one of its fragments for an in-place swap (REQ-FE-005).
    *
    * @param layout {@code table} for the dense table, otherwise the default card grid
-   * @param fragment when {@code "orgUnitBankAccounts"} only the switchable account list is
-   *     re-rendered (view-toggle swap); when {@code "orgUnitBank"} the tabs + own-request region
-   * @param principal the authenticated OIDC user, whose display name seeds the pre-filled
-   *     Empf&auml;nger picker of a withdrawal request (REQ-BANK-055)
+   * @param fragment {@code "orgUnitBankAccounts"} for the account list, {@code "orgUnitBank"} for
+   *     the tabs and own-request region, otherwise the full page
+   * @param principal the authenticated OIDC user, whose display name seeds the Empf&auml;nger
+   *     picker of a withdrawal request (REQ-BANK-055)
    * @param model Spring MVC model
    * @return the template, or its {@code orgUnitBankAccounts} / {@code orgUnitBank} fragment view
    */
@@ -138,9 +129,6 @@ public class OrgUnitBankPageController {
     String effectiveLayout = "table".equals(layout) ? "table" : "card";
     model.addAttribute("layout", effectiveLayout);
 
-    // Pure account-list sub-fragment swap (view toggle, REQ-BANK-021): only the balances + their
-    // scaled sparklines are rendered, so the own/foreign request lists + transfer targets the full
-    // page loads are skipped. Mirrors the account-detail method's pure sub-fragment short-circuits.
     if ("orgUnitBankAccounts".equals(fragment)) {
       List<OrgUnitBankBalanceDto> accounts =
           BankAccountOrder.byName(fetchBalances(), OrgUnitBankBalanceDto::accountName);
@@ -149,13 +137,6 @@ public class OrgUnitBankPageController {
       return "org-unit-bank :: orgUnitBankAccounts";
     }
 
-    // Balances, own-requests, foreign-requests and the all-active-account list are independent
-    // reads; fetch them concurrently via ParallelPageLoader (which relays the bearer token +
-    // active-OrgUnit header to the worker threads) instead of serial round-trips. Each helper
-    // degrades to an empty list on failure, so allOf().join() never throws and the page renders
-    // exactly as the serial version. The all-active list (transfer-targets) is now always fetched:
-    // it is both the transfer destination picker (REQ-BANK-040) AND the deposit source picker
-    // (REQ-BANK-042 — a deposit may target any active account, not just a viewable one).
     CompletableFuture<List<OrgUnitBankBalanceDto>> balancesFuture =
         parallelPageLoader.loadAsync(this::fetchBalances);
     CompletableFuture<List<BankBookingRequestDto>> ownRequestsFuture =
@@ -173,40 +154,18 @@ public class OrgUnitBankPageController {
     model.addAttribute("balances", safeBalances);
     model.addAttribute("ownRequests", ownRequestsFuture.join());
     model.addAttribute("sparks", sparksByAccountId(safeBalances));
-    // canRequest = the caller may view a REQUEST-CAPABLE account, i.e. may raise a
-    // withdrawal/transfer request against it (REQ-BANK-039). Drives the withdrawal/transfer type
-    // options and which source-account options carry a debit affordance + approval limit.
     boolean anyCanRequest = safeBalances.stream().anyMatch(OrgUnitBankBalanceDto::canRequest);
     model.addAttribute("anyCanRequest", anyCanRequest);
-    // "Fremde Anträge" tab (REQ-BANK-041/-046): requests the caller may act on.
     List<BankBookingRequestDto> foreignRequests = foreignRequestsFuture.join();
     model.addAttribute("foreignRequests", foreignRequests);
-    // Show the tab when the caller manages a REQUEST-CAPABLE account (canManageSettings on an
-    // ORG_UNIT/AREA/CARTEL account == its responsible holder) OR when the band-routed list already
-    // carries a request for them — the latter covers the KRT-account middle-band approver (the
-    // Bankleitung, ADR-0109), who is not the account's responsible holder but sees its
-    // BANK_MANAGEMENT-band requests (REQ-BANK-047). SPECIAL is never request-capable, so an
-    // OL/management user who can only configure a Sonderkonto's visibility still does not see the
-    // tab
-    // unless a routed request exists.
     model.addAttribute(
         "hasResponsibleAccounts",
         safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest())
             || !foreignRequests.isEmpty());
-    // Deposit / transfer-destination source: every active account (REQ-BANK-040/-042), ordered A→Z
-    // by name like every other account picker (BankAccountOrder).
     List<BankAccountRefDto> transferTargets =
         BankAccountOrder.byName(transferTargetsFuture.join(), BankAccountRefDto::name);
     model.addAttribute("requestTransferTargets", transferTargets);
-    // The request CTA + modal are shown whenever a request is possible at all — since a deposit may
-    // target any active account, that is whenever at least one active account exists
-    // (REQ-BANK-042),
-    // even for a caller who oversees / may view none.
     model.addAttribute("canRequestAny", !transferTargets.isEmpty());
-    // Per-account debit affordance for the merged source picker: the ids of the caller's
-    // request-capable (withdrawal/transfer) accounts and their resolved approval limits. The
-    // template marks each active-account <option> with these so the JS can show all options for a
-    // deposit but only the debitable ones for a withdrawal/transfer, carrying the limit warning.
     Set<UUID> debitableAccountIds =
         safeBalances.stream()
             .filter(OrgUnitBankBalanceDto::canRequest)
@@ -220,25 +179,12 @@ public class OrgUnitBankPageController {
       }
     }
     model.addAttribute("requestLimits", requestLimits);
-    // REQ-BANK-041 (owner decision): the accounts the caller is the responsible holder of. They are
-    // bound by no ceiling there, so the modal must not warn — a missing limit alone would otherwise
-    // read as "approval required".
     Set<UUID> approvalExemptAccountIds =
         safeBalances.stream()
             .filter(b -> b.canRequest() && b.approvalExempt())
             .map(OrgUnitBankBalanceDto::accountId)
             .collect(Collectors.toSet());
     model.addAttribute("approvalExemptAccountIds", approvalExemptAccountIds);
-    // REQ-BANK-055: the Empfaenger picker of a withdrawal request is pre-filled with the requester,
-    // so the common case ("pay out to me") needs no interaction. The picker is a REMOTE combobox,
-    // which needs the LABEL alongside the id to seed itself -- an id alone renders a blank box.
-    //
-    // The id MUST be the JWT subject, NOT #authentication.name: this client is configured with
-    // `user-name-attribute: preferred_username`, so Authentication#getName() is the USERNAME.
-    // Seeding
-    // the option value with it submitted a username where the backend deserializes a UUID, which
-    // 400'd every withdrawal request (caught by BankOrgUnitRequestsE2eTest, invisible to the MVC
-    // render tests). `sub` is the same value as app_user.id, which is what the backend expects.
     model.addAttribute("requesterId", CurrentUser.userIdText(principal));
     model.addAttribute("requesterHandle", requesterHandle(principal));
     if ("orgUnitBank".equals(fragment)) {
@@ -248,13 +194,8 @@ public class OrgUnitBankPageController {
   }
 
   /**
-   * The caller's display label for the pre-filled Empf&auml;nger picker (REQ-BANK-055), read
-   * straight off the OIDC token so the page load costs no extra backend call.
-   *
-   * <p>Falls back {@code displayName} &rarr; {@code preferred_username} &rarr; the subject,
-   * matching how the backend's {@code User#getEffectiveName()} resolves the same name — the label
-   * is only cosmetic (the submitted value is the id), but a blank one would make the seeded
-   * combobox look empty and invite the requester to re-pick themselves.
+   * Returns the caller's label for the pre-filled Empf&auml;nger picker (REQ-BANK-055), read from
+   * the OIDC token: {@code displayName}, then {@code preferred_username}, then the subject.
    *
    * @param principal the authenticated OIDC user, or {@code null} outside a user context
    * @return a non-blank label, or {@code null} when nothing identifies the caller
@@ -273,7 +214,6 @@ public class OrgUnitBankPageController {
     if (preferred != null && !preferred.isBlank()) {
       return preferred;
     }
-    // Last resort: show the id itself rather than an empty cell.
     String userId = CurrentUser.userIdText(principal);
     return userId == null || userId.isBlank() ? null : userId;
   }
@@ -360,13 +300,9 @@ public class OrgUnitBankPageController {
   }
 
   /**
-   * Renders the read-only account drill-in (REQ-BANK-038) — the balance chart (REQ-BANK-049) +
-   * history (Halter redacted) with its period filter (REQ-BANK-051) + the Kontoauszug export —
-   * plus, for the responsible holder / OL, the settings region (balance target + configurable
-   * visibility). The {@code orgUnitBankBookings} fragment re-renders the paginated/filtered history
-   * in place, the {@code orgUnitBalanceChart} fragment re-renders the chart on a range change, and
-   * the {@code orgUnitBankSettings} fragment re-renders the facts + settings region after a
-   * target/visibility write.
+   * Renders the read-only account drill-in (REQ-BANK-038): balance chart, redacted booking history
+   * with period filter, statement export and, for the responsible holder or OL, the settings
+   * region.
    *
    * @param id the account id
    * @param page zero-based booking-history page index
@@ -392,7 +328,6 @@ public class OrgUnitBankPageController {
       @RequestParam(required = false) String chartRange,
       @RequestParam(required = false) String fragment,
       Model model) {
-    // Pure sub-fragment swaps skip the detail/settings fetch they do not render.
     if ("orgUnitBankBookings".equals(fragment)) {
       addBookingsModel(id, page, size, from, to, model);
       return "org-unit-bank-account-detail :: orgUnitBankBookings";
@@ -427,15 +362,11 @@ public class OrgUnitBankPageController {
               "/api/v1/org-units/bank/accounts/" + id + "/settings",
               OrgUnitBankAccountSettingsDto.class);
     }
-    // The individual-visibility and individual-limit pickers are now server-side search comboboxes
-    // (#1193, data-krt-combobox="remote-users"): the roster is fetched on demand via /users/search,
-    // so no full user list is preloaded into the model here.
     model.addAttribute("settings", settings);
 
     if ("orgUnitBankSettings".equals(fragment)) {
       return "org-unit-bank-account-detail :: orgUnitBankSettings";
     }
-    // Full page: also render the chart and the paged/filtered history.
     addBookingsModel(id, page, size, from, to, model);
     addChartModel(id, chartRange, detail, model);
     return "org-unit-bank-account-detail";

@@ -38,41 +38,22 @@ import org.jetbrains.annotations.UnmodifiableView;
 import org.springframework.stereotype.Service;
 
 /**
- * In-memory editor-presence store for live-sync topics that carry presence dots (REQ-FE-015,
- * ADR-0094) — today only the mission surface.
+ * In-memory editor-presence store for live-sync topics that carry presence dots (REQ-FE-015); it
+ * only describes who is editing and never blocks a write.
  *
- * <p>Tracks, per topic and per section key, which users are currently editing that section. Entries
- * decay after {@link #ENTRY_TTL} since the last heartbeat — a client that closes its tab or
- * navigates away without sending a {@code blur} message is therefore reaped within the TTL window
- * by the scheduled cleanup in {@code LiveSyncWebSocketHandler}.
- *
- * <p><b>Two partitions, one merged view</b> (ADR-0126, #1237). {@code byTopic} holds the editors
- * whose sockets live on <em>this</em> JVM; {@code remoteByTopic} holds the snapshots peer replicas
- * gossip over Redis, keyed by the publishing instance id. {@link #snapshot(String, Instant)} merges
- * both, so a viewer sees every editor of a topic regardless of which replica served them. The two
- * partitions never mix: only local entries decay on {@link #ENTRY_TTL} heartbeats, are published to
- * peers, or are touched by {@code focus}/{@code blur}; a remote partition is replaced wholesale by
- * its origin's next gossip and expires on {@link #REMOTE_PARTITION_TTL} if that origin goes away.
- * Losing Redis therefore degrades presence to exactly the pre-#1237 per-instance behaviour — the
- * local half keeps working untouched.
- *
- * <p>Awareness, not locking: this service only <em>describes</em> who is editing where. It never
- * blocks a write or rejects a save. The optimistic-lock counters remain the single source of truth
- * for conflict resolution; this is just a UX-layer hint so two users notice the overlap before they
- * collide on a 409.
+ * <p>Tracks per topic and section which users are editing; local entries decay after {@link
+ * #ENTRY_TTL} without a heartbeat. Local editors and the partitions peer replicas gossip over Redis
+ * are kept apart and merged by {@link #snapshot(String, Instant)} (ADR-0126); without Redis,
+ * presence is per instance.
  */
 @Service
 @Slf4j
 public class LiveSyncPresenceService {
 
   /**
-   * Time after the last heartbeat at which a presence entry is considered stale and removed.
-   * Heartbeats arrive every ~60s from the client (see {@code HEARTBEAT_MS} in {@code
-   * krt-live-sync.js}); 120s gives two missed beats of slack before the indicator disappears.
-   *
-   * <p>Tune this together with the client-side heartbeat: the 120s / 60s pairing keeps a
-   * two-missed-beats safety ratio. Lowering this in isolation would reap editors that are still
-   * actively heartbeating.
+   * Time after the last heartbeat at which a presence entry is removed: two missed beats of the
+   * client's roughly 60s heartbeat ({@code HEARTBEAT_MS} in {@code krt-live-sync.js}). Tune the two
+   * together.
    */
   public static final Duration ENTRY_TTL = Duration.ofSeconds(120);
 
@@ -86,15 +67,8 @@ public class LiveSyncPresenceService {
   static final int MAX_SECTIONS_PER_TOPIC = 64;
 
   /**
-   * Age past which a mirrored peer-replica partition is dropped (ADR-0126). Every instance
-   * re-gossips each of its tracked presence topics on the WebSocket handler's 10 s reaper tick, so
-   * this allows two missed gossips before a silent replica's dots disappear — the same
-   * two-missed-beats ratio {@link #ENTRY_TTL} keeps against the client heartbeat.
-   *
-   * <p>Deliberately far below {@link #ENTRY_TTL}: a remote partition's freshness rides the origin's
-   * 10 s gossip, not the editor's 60 s heartbeat, so a replica that dies mid-edit stops showing
-   * dots within 30 s instead of the two minutes its own local entries would have survived. Raising
-   * this without raising the gossip cadence only makes a dead replica's dots linger.
+   * Age past which a mirrored peer-replica partition is dropped (ADR-0126): two missed 10 s gossip
+   * ticks of the WebSocket handler's reaper.
    */
   public static final Duration REMOTE_PARTITION_TTL = Duration.ofSeconds(30);
 
@@ -126,20 +100,12 @@ public class LiveSyncPresenceService {
   private final Map<String, Map<String, RemotePartition>> remoteByTopic = new ConcurrentHashMap<>();
 
   /**
-   * Binds the {@code basetool_mission_presence_missions} gauge to the live presence map
-   * (REQ-OBS-011) — the count of topics currently tracked with at least one live editor in this
-   * instance. The gauge is unlabelled and its name is legacy-pinned (presence is mission-only at
-   * ship time, so the value is unchanged and the dashboard panel keeps meaning); topic id, section
-   * key and user id are all unbounded and PII-adjacent, so none is used as a tag. Per-instance
-   * edit-awareness (see the class note), not a global online-user roster; the closest online-user
-   * proxy is {@code basetool_active_sessions}.
+   * Binds the unlabelled gauges {@code basetool_mission_presence_missions} (topics with at least
+   * one live local editor) and {@code basetool_livesync_presence_remote_partitions} (mirrored
+   * {@code (topic, peer instance)} partitions) (REQ-OBS-011).
    *
-   * <p>Also binds {@code basetool_livesync_presence_remote_partitions} (REQ-OBS-011): the number of
-   * live {@code (topic, peer instance)} partitions mirrored from other replicas. It is the direct
-   * "is cross-instance presence actually arriving" signal — on a single-replica deployment it reads
-   * a flat zero, and on a multi-replica one a zero while editors are active means the presence
-   * gossip is not landing (ADR-0126). Unlabelled for the same reason as the gauge above: topic id
-   * and instance id are unbounded.
+   * <p>A zero remote-partition count on a multi-replica deployment while editors are active means
+   * the presence gossip is not arriving.
    *
    * @param meterRegistry the Micrometer registry the presence gauges are bound to
    */
@@ -156,16 +122,14 @@ public class LiveSyncPresenceService {
   }
 
   /**
-   * Record an editor's heartbeat (or initial focus) on a section of a topic. Replaces any previous
-   * entry for the same {@code (topic, sectionKey, userId)} triple so the heartbeat timestamp moves
-   * forward.
+   * Records an editor's heartbeat (or initial focus) on a section of a topic, replacing any
+   * previous entry for the same {@code (topic, sectionKey, userId)} triple.
    *
    * @param topic canonical topic this presence belongs to
    * @param sectionKey panel key (e.g. {@code "crew"}, {@code "overview"})
    * @param userId stable identifier of the editing user (JWT {@code sub} via OIDC)
    * @param displayName name to show in the UI (already redacted for guests by the caller)
-   * @return {@code true} if this is a new editor for that section (the caller may want to broadcast
-   *     a state update only then; in practice we broadcast on every change anyway)
+   * @return {@code true} if this is a new editor for that section
    */
   public boolean touch(
       @NotNull String topic,
@@ -176,11 +140,6 @@ public class LiveSyncPresenceService {
         byTopic.computeIfAbsent(topic, ignored -> new ConcurrentHashMap<>());
     Map<String, Entry> editors = sections.get(sectionKey);
     if (editors == null) {
-      // Refuse a first-seen section once the topic is already at the distinct-section cap, rather
-      // than growing the map. Guards against a crafted client looping focus frames with unique
-      // section keys to exhaust memory (the handler additionally rate-limits and length-caps the
-      // key). A concurrent pair of first-sightings may overshoot the cap by a small constant, which
-      // is harmless — the bound is a memory ceiling, not an exact count.
       if (sections.size() >= MAX_SECTIONS_PER_TOPIC) {
         return false;
       }
@@ -276,20 +235,12 @@ public class LiveSyncPresenceService {
   }
 
   /**
-   * Merged snapshot of the current presence state for one topic, keyed by section — this instance's
-   * own editors plus every non-expired partition peer replicas have gossiped for the topic
-   * (ADR-0126). This is what the WebSocket handler serialises into a {@code presence} frame, so a
-   * viewer sees the same dots no matter which replica served their page. Returns an immutable view;
-   * modification of the returned map throws.
+   * Merged snapshot of one topic's presence by section: this instance's editors plus every
+   * non-expired peer partition (ADR-0126), as serialised into a {@code presence} frame.
    *
-   * <p>A user present in both halves — two tabs load-balanced onto different replicas — is
-   * collapsed to a single editor per section, keeping the dot count a count of <em>people</em>
-   * rather than of sockets.
-   *
-   * <p>Remote entries carry the arrival instant of their partition as {@link
-   * Entry#lastHeartbeat()}, not the peer's own clock reading: a mirrored partition's liveness is
-   * decided by {@link #REMOTE_PARTITION_TTL} against local time here, so nothing in this class ever
-   * depends on two hosts' clocks agreeing.
+   * <p>A user present on several replicas counts once per section. Remote entries carry their
+   * partition's local arrival instant as {@link Entry#lastHeartbeat()}, so no two hosts' clocks are
+   * compared. The returned map is unmodifiable.
    *
    * @param topic canonical topic
    * @param now reference instant for filtering out entries that would expire on the next reap
@@ -308,15 +259,11 @@ public class LiveSyncPresenceService {
   }
 
   /**
-   * This instance's own half of {@link #snapshot(String, Instant)}, reduced to the wire shape
-   * gossiped to peer replicas — no heartbeat timestamps (a peer judges freshness by arrival, see
-   * {@link #REMOTE_PARTITION_TTL}) and no mirrored entries (that would echo a peer's state back at
-   * it and let two instances keep each other's stale dots alive forever).
+   * This instance's own half of {@link #snapshot(String, Instant)} in the wire shape gossiped to
+   * peers, without timestamps or mirrored entries.
    *
-   * <p>An empty result is meaningful, not a no-op: it is how an instance tells its peers "nobody is
-   * editing this topic here any more" after the last local editor blurred, closed their tab or
-   * decayed, so the corresponding remote partition is dropped immediately instead of lingering for
-   * a full {@link #REMOTE_PARTITION_TTL}.
+   * <p>An empty result tells peers that nobody edits the topic here any more, so they drop the
+   * partition at once.
    *
    * @param topic canonical topic
    * @param now reference instant for filtering out entries that would expire on the next reap
@@ -338,20 +285,15 @@ public class LiveSyncPresenceService {
   }
 
   /**
-   * Replaces the presence partition a peer replica holds for one topic with its freshly gossiped
-   * state, or drops it when the peer reports an empty snapshot (ADR-0126). Wholesale replacement —
-   * never a per-entry merge — is what makes the mirror self-healing: a lost gossip message costs at
-   * most one 10 s tick of staleness and the next message restores the truth, with no delete frames
-   * or ordering assumptions.
+   * Replaces a peer replica's presence partition for one topic wholesale with its gossiped state,
+   * or drops it when the snapshot is empty (ADR-0126).
    *
    * @param topic canonical topic the partition belongs to
    * @param originId stable id of the publishing instance
-   * @param sections that instance's editors per section — already length- and whitelist-sanitised
-   *     by the caller; an empty map removes the partition
+   * @param sections that instance's editors per section, already sanitised by the caller; an empty
+   *     map removes the partition
    * @param now arrival instant, used as the partition's freshness reference
-   * @return {@code true} if the merged view for {@code topic} actually changed, so the caller
-   *     should broadcast a fresh snapshot — {@code false} for the common case of a periodic gossip
-   *     that restates what this instance already holds, which must not spam the room
+   * @return {@code true} if the merged view for {@code topic} changed and should be broadcast
    */
   public boolean applyRemote(
       @NotNull String topic,
@@ -374,10 +316,6 @@ public class LiveSyncPresenceService {
         remoteByTopic.computeIfAbsent(topic, ignored -> new ConcurrentHashMap<>());
     RemotePartition previous = origins.get(originId);
     if (previous == null && origins.size() >= MAX_REMOTE_ORIGINS_PER_TOPIC) {
-      // Refuse a first-seen origin at the cap rather than growing the map or evicting an
-      // established peer. The frontend runs a handful of replicas, so reaching this means a
-      // spoofed or misconfigured publisher, and the established partitions are the trustworthy
-      // ones.
       log.debug(
           "Refusing mirrored presence partition for topic {}: origin cap {} reached",
           topic,
@@ -389,15 +327,11 @@ public class LiveSyncPresenceService {
   }
 
   /**
-   * Drops mirrored partitions that have not been re-gossiped within {@link #REMOTE_PARTITION_TTL} —
-   * the mechanism by which a replica that crashed, was scaled down or lost its Redis connection
-   * stops showing phantom dots on every other replica. Called from the WebSocket handler's
-   * scheduled tick alongside {@link #reapExpired(Instant)}.
+   * Drops mirrored partitions not re-gossiped within {@link #REMOTE_PARTITION_TTL}, so a vanished
+   * replica stops showing dots. Called from the WebSocket handler's scheduled tick.
    *
-   * @param now reference instant — pass {@link Instant#now()} in production; tests pass a frozen
-   *     value
-   * @return the canonical topics that lost at least one partition, so the caller can broadcast
-   *     their shrunken snapshots (empty if nothing expired)
+   * @param now reference instant; {@link Instant#now()} in production, a frozen value in tests
+   * @return the canonical topics that lost at least one partition (empty if nothing expired)
    */
   @NotNull
   public List<String> reapExpiredRemote(@NotNull Instant now) {
@@ -567,9 +501,7 @@ public class LiveSyncPresenceService {
 
   /**
    * One editor as it crosses the cross-replica presence channel (ADR-0126): identity and label
-   * only. Deliberately timestamp-free — a mirrored partition's freshness is judged by its arrival
-   * instant against {@link #REMOTE_PARTITION_TTL}, so no peer's clock is ever trusted, and the wire
-   * frame stays byte-identical in shape to what the browser already receives.
+   * only, with no timestamp.
    *
    * @param userId stable identifier of the editing user
    * @param displayName name to show in the UI (already redacted for guests by the publisher)
@@ -577,10 +509,8 @@ public class LiveSyncPresenceService {
   public record PresenceEditor(String userId, String displayName) {}
 
   /**
-   * One peer replica's complete presence state for one topic, plus the local instant it arrived.
-   * Replaced as a unit by that origin's next gossip and expired as a unit by {@link
-   * #reapExpiredRemote(Instant)} — never mutated entry by entry, which is what keeps the mirror
-   * convergent without delete frames or message ordering.
+   * One peer replica's complete presence state for one topic, plus the local instant it arrived;
+   * replaced and expired only as a unit.
    *
    * @param sections the origin's editors per section key (immutable, already bounded)
    * @param receivedAt local instant at which this partition was applied

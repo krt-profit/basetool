@@ -90,14 +90,12 @@ class RedisLiveSyncFanoutIntegrationTest {
     template.afterPropertiesSet();
     String topic = "mission:5f1d2c3b-0000-0000-0000-000000000042";
 
-    // Peer instance B: its handler records what it is asked to relay.
     CountDownLatch peerDelivered = new CountDownLatch(1);
     List<String> peerTopics = new CopyOnWriteArrayList<>();
     List<List<String>> peerSections = new CopyOnWriteArrayList<>();
     RedisLiveSyncFanout instanceB =
         newFanout(template, "instance-B", peerTopics, peerSections, peerDelivered);
 
-    // Origin instance A: its handler must NOT be called for its own publication.
     CountDownLatch ownDelivered = new CountDownLatch(1);
     RedisLiveSyncFanout instanceA =
         newFanout(
@@ -109,7 +107,6 @@ class RedisLiveSyncFanoutIntegrationTest {
 
     listenerContainer.addMessageListener(instanceB, new ChannelTopic(CHANNEL));
     listenerContainer.addMessageListener(instanceA, new ChannelTopic(CHANNEL));
-    // Give the subscriptions a moment to register before publishing.
     Thread.sleep(300);
 
     instanceA.publish(topic, List.of("crew", "mgmt"));
@@ -119,7 +116,6 @@ class RedisLiveSyncFanoutIntegrationTest {
         .isTrue();
     assertThat(peerTopics).containsExactly(topic);
     assertThat(peerSections).containsExactly(List.of("crew", "mgmt"));
-    // The origin's own handler must never be invoked for its own publication (own-origin skip).
     assertThat(ownDelivered.await(1, TimeUnit.SECONDS))
         .as("origin instance A skipped its own message")
         .isFalse();
@@ -152,7 +148,6 @@ class RedisLiveSyncFanoutIntegrationTest {
 
     listenerContainer.addMessageListener(instanceB, new ChannelTopic(PRESENCE_CHANNEL));
     listenerContainer.addMessageListener(instanceA, new ChannelTopic(PRESENCE_CHANNEL));
-    // Give the subscriptions a moment to register before publishing.
     Thread.sleep(300);
 
     instanceA.publishPresence(
@@ -167,7 +162,6 @@ class RedisLiveSyncFanoutIntegrationTest {
     assertThat(peerSnapshots)
         .containsExactly(
             Map.of("crew", List.of(new LiveSyncPresenceService.PresenceEditor("user-1", "Alice"))));
-    // The origin must skip its own gossip exactly as it skips its own changed frames.
     assertThat(ownMirrored.await(1, TimeUnit.SECONDS))
         .as("origin instance A skipped its own gossip")
         .isFalse();
@@ -197,8 +191,8 @@ class RedisLiveSyncFanoutIntegrationTest {
   }
 
   /**
-   * Builds a fan-out whose mocked handler records the presence snapshots it is asked to mirror —
-   * the presence-channel counterpart of {@link #newFanout}.
+   * Builds a fan-out whose mocked handler records the presence snapshots it mirrors, the presence
+   * counterpart of {@link #newFanout}.
    *
    * @param template the Redis template both instances publish through
    * @param instanceId the instance id this fan-out publishes under and skips on consume

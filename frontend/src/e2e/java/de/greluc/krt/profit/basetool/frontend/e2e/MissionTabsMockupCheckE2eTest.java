@@ -33,12 +33,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Ad-hoc visual verification harness for the mission tab layout against an ALREADY RUNNING local
- * test stack ({@code E2E_BASE_URL} + {@code MISSION_ID} env). Logs in as the synthetic test admin,
- * walks all four tabs, captures full-page screenshots under {@code build/e2e/}, dumps console
- * errors, probes the chip-select computed styles, and performs two board drag&drops (pool→unit, and
- * unit→empty-space which returns the participant to the pool). Not part of CI — it requires a
- * pre-seeded mission id, and without {@code MISSION_ID} the whole class is reported as skipped.
+ * Ad-hoc visual harness for the mission tabs against an already running local stack ({@code
+ * E2E_BASE_URL}, {@code MISSION_ID}): screenshots every tab, dumps console errors, probes the
+ * chip-select styles and performs two board drag-and-drops.
+ *
+ * <p>Not part of CI; skipped without {@code MISSION_ID}.
  */
 @Tag("e2e")
 class MissionTabsMockupCheckE2eTest {
@@ -47,11 +46,9 @@ class MissionTabsMockupCheckE2eTest {
   private static Browser browser;
 
   /**
-   * Skips the class unless {@code MISSION_ID} names the mission to walk, then boots the headless
-   * browser of the configured engine ({@code -Pe2e.browser}) through {@link
-   * E2eSupport#launchBrowser}. The assumption runs <em>before</em> any browser launch: a CI matrix
-   * cell installs only its own engine, so an unconditional launch of a hard-coded one fails the
-   * whole class with a {@code DriverException} instead of skipping it.
+   * Skips the class unless {@code MISSION_ID} names the mission to walk, then launches the
+   * configured browser engine through {@link E2eSupport#launchBrowser}. The skip check runs first,
+   * so a CI cell without that engine skips instead of failing.
    */
   @BeforeAll
   static void setUp() {
@@ -107,7 +104,6 @@ class MissionTabsMockupCheckE2eTest {
                 .setPath(Paths.get("build", "e2e", "tab-" + tab + ".png")));
       }
 
-      // Probe the chip-select rendering on the crew board.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       Locator chip = page.locator(".crew-role-select").first();
@@ -123,7 +119,6 @@ class MissionTabsMockupCheckE2eTest {
         System.out.println("[mockup-check] no chip-select found");
       }
 
-      // Finance pane probe: which mock sections rendered for an admin?
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
       page.waitForLoadState();
       Object finProbe =
@@ -135,7 +130,6 @@ class MissionTabsMockupCheckE2eTest {
                   + " pageWidth: document.querySelector('.page-wrapper').offsetWidth })");
       System.out.println("[mockup-check] fin probe: " + finProbe);
 
-      // One real drag&drop: first pool row onto the first unit zone.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       int poolBefore = page.locator("#board-pool .person-row").count();
@@ -155,9 +149,6 @@ class MissionTabsMockupCheckE2eTest {
                 .setPath(Paths.get("build", "e2e", "tab-crew-after-drag.png")));
       }
 
-      // Drag a unit row OUT onto the section header (not a drop-zone): releasing over
-      // no unit returns the participant to the "Ohne Einheit" pool, mirroring a pool
-      // drop. This is the long-board unassign gesture — no need to scroll to the pool.
       Locator unitRow = page.locator(".board-units .drop-zone .person-row").first();
       if (unitRow.count() > 0) {
         int poolBeforeRemove = page.locator("#board-pool .person-row").count();

@@ -35,22 +35,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end coverage for a <b>stock-backed</b> Materialbörse item offer (REQ-MARKET-014,
- * ADR-0108): releasing one of the caller's own game-item Lager rows from the "Material anbieten"
- * picker creates an ITEM offer that appears on the board.
+ * E2E flow for a stock-backed Materialbörse item offer (REQ-MARKET-014, ADR-0108): releasing an own
+ * game-item Lager row from the "Material anbieten" picker creates an ITEM offer shown on the board.
  *
- * <p>The board release picker now returns both material and game-item rows ({@code
- * findReleasableForUser} dropped its material-only guard); picking a game-item row and submitting a
- * whole-unit quantity posts the ordinary {@code /materialboerse/offers/ajax} payload, and the
- * backend detects the game-item row and creates a stock-backed item offer bound to it (its product
- * key/name derived from the row's game item). This drives the whole flow in a real browser and
- * asserts the item offer surfaces on the board with its "Item" kind tag.
- *
- * <p><b>Seeding.</b> A bookable game item is the output of an active blueprint (REQ-INV-029),
- * seeded via {@link BackendSeeder#seedOrderableItem}; the game-item stock row is seeded through the
- * real {@code POST /api/v1/inventory} with a {@code gameItemId} payload ({@link
- * BackendSeeder#createItemInventoryEntry}). The actor is {@code test-admin} (seeded IRIDIUM
- * membership → KRT_MEMBER, the role the board requires).
+ * <p>Seeds an orderable game item and a stock row for it; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class MaterialboardItemStockOfferE2eTest {
@@ -121,19 +109,8 @@ class MaterialboardItemStockOfferE2eTest {
         assertThat(pickerInput)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // The picker defaults to Material (REQ-MARKET-002); pick the Item kind so the stock-backed
-        // game-item rows are the ones the combobox lists.
         page.locator("#mb-modal [data-mb-kind-radio][value=\"ITEM\"]").check();
 
-        // Type the item name and gate on the debounced /releasable-items?q=… query it fires,
-        // so the picker list has settled before we touch it. The picker REPLACES the
-        // [data-mb-picker-list] innerHTML when that response renders; clicking an option
-        // mid-replacement detaches it, and the click retried to its 10s timeout on the
-        // timing-sensitive Firefox shard (chromium/webkit won the race). Waiting for the
-        // filtered response means the render has run and — via the JS pickerSeq guard that
-        // drops any late initial-query response — no further re-render follows, so the
-        // resolved option is stable when clicked. The modal-open query carries no q=, so the
-        // predicate matches only the typed search.
         page.waitForResponse(
             response ->
                 response.url().contains("/materialboerse/releasable-items")
@@ -146,8 +123,6 @@ class MaterialboardItemStockOfferE2eTest {
         assertThat(option).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         option.click();
 
-        // Picking a game-item row enables the amount field (whole units); offer 5 of the 20 in
-        // stock.
         Locator amount = page.locator("#mb-modal [data-mb-amount]");
         assertThat(amount).isEnabled(new LocatorAssertions.IsEnabledOptions().setTimeout(10_000));
         amount.fill("5");
@@ -156,7 +131,6 @@ class MaterialboardItemStockOfferE2eTest {
         assertThat(page.locator("#mb-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
-        // The board now carries the stock-backed item offer: the item name and its "Item" kind tag.
         assertThat(page.getByText(ITEM_NAME).first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator(".mb-kind-tag").first())

@@ -56,14 +56,17 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #589 in-place mission core-edit twin {@link
- * MissionWriteController#updateMissionAjax}: the success path returns the four fresh versions
- * (incl. the schedule version re-read after the PLANNED→ACTIVE auto-bump), an unedited microsecond
- * zoneless schedule time round-trips through the schedule PATCH instead of being nulled, a
- * {@code @Valid} failure returns a {@code 422} {@code {field: message}} map (messages resolved
- * exactly as {@code th:errors}) with no backend call, a backend {@code 409} is propagated as {@code
- * problem+json} preserving the {@code code}, and a header-less POST falls back to the classic
- * redirect handler.
+ * MVC tests for the in-place mission core-edit twin {@link
+ * MissionWriteController#updateMissionAjax}.
+ *
+ * <ul>
+ *   <li>Success returns the four fresh versions, including the schedule version after the
+ *       PLANNED→ACTIVE auto-bump.
+ *   <li>An unedited schedule time round-trips unchanged.
+ *   <li>A validation failure returns a {@code 422} field map without a backend call.
+ *   <li>A backend {@code 409} is relayed as {@code problem+json} with its {@code code}.
+ *   <li>A POST without the AJAX header falls back to the redirect handler.
+ * </ul>
  */
 @SpringBootTest
 class MissionCoreEditAjaxControllerTest {
@@ -87,10 +90,6 @@ class MissionCoreEditAjaxControllerTest {
 
   @Test
   void updateMissionAjax_validForm_runsThreePatchesAndReturnsFourFreshVersions() throws Exception {
-    // The re-read after the three patches is the authoritative source of the versions — the
-    // PLANNED→ACTIVE auto-transition during the core patch bumps the schedule version a second
-    // time,
-    // so the value the client gets back is 33 (the fresh read), not the 5 it submitted.
     MissionDto refreshed = mock(MissionDto.class);
     when(refreshed.version()).thenReturn(11L);
     when(refreshed.coreVersion()).thenReturn(22L);
@@ -126,13 +125,6 @@ class MissionCoreEditAjaxControllerTest {
 
   @Test
   void updateMissionAjax_microsecondZonelessPlannedStart_isPreservedNotNulled() throws Exception {
-    // Regression for the datetime round-trip data loss: formatInstant renders a schedule time that
-    // was displayed but never re-edited as a zoneless Europe/Berlin local datetime that can carry
-    // microseconds (e.g. 2026-06-21T11:59:58.222717). parseToInstant must round-trip it to the
-    // correct instant instead of throwing and nulling the field — otherwise every core-edit save
-    // silently clears plannedStartTime/meetingTime/plannedEndTime the user did not re-touch, which
-    // is exactly what broke MissionCoreEditInPlaceE2eTest (the next page load lost the required
-    // plannedStart, so the form could no longer submit).
     MissionDto refreshed = mock(MissionDto.class);
     when(refreshed.version()).thenReturn(1L);
     when(refreshed.coreVersion()).thenReturn(1L);
@@ -158,8 +150,6 @@ class MissionCoreEditAjaxControllerTest {
             eq("/api/v1/missions/" + MISSION_ID + "/schedule"),
             scheduleBody.capture(),
             eq(Void.class));
-    // 2026-06-21T11:59:58.222717 in Europe/Berlin (CEST, +02:00 in June) is 09:59:58.222717Z — and
-    // critically NOT null, which is what the broken parse produced.
     assertEquals(
         Instant.parse("2026-06-21T09:59:58.222717Z"),
         scheduleBody.getValue().get("plannedStartTime"),
@@ -168,10 +158,6 @@ class MissionCoreEditAjaxControllerTest {
 
   @Test
   void updateMissionAjax_onlyCoreDirty_skipsScheduleAndFlagsPatches() throws Exception {
-    // #1136: a name-only edit marks dirtyCore=true, dirtySchedule=false, dirtyFlags=false. Only the
-    // core section must be PATCHed, so a peer's concurrent scheduleVersion bump cannot 409 this
-    // save
-    // and the untouched schedule/flags values are not re-written.
     MissionDto refreshed = mock(MissionDto.class);
     when(refreshed.version()).thenReturn(1L);
     when(refreshed.coreVersion()).thenReturn(2L);
@@ -206,9 +192,6 @@ class MissionCoreEditAjaxControllerTest {
 
   @Test
   void updateMissionAjax_onlyScheduleDirty_skipsCoreAndFlagsPatches() throws Exception {
-    // #1136: a schedule-only edit patches only the schedule section (schedule still runs first for
-    // a
-    // both-touched save; here core/flags are skipped entirely).
     MissionDto refreshed = mock(MissionDto.class);
     when(refreshed.version()).thenReturn(1L);
     when(refreshed.coreVersion()).thenReturn(1L);
@@ -242,8 +225,6 @@ class MissionCoreEditAjaxControllerTest {
 
   @Test
   void updateMissionAjax_dirtyFlagsAbsent_stillPatchesEverySection() throws Exception {
-    // #1136: the no-JavaScript classic fallback submits no dirty flags -> they bind to null, which
-    // means "save this section", preserving the pre-#1136 full three-section fan-out.
     MissionDto refreshed = mock(MissionDto.class);
     when(refreshed.version()).thenReturn(1L);
     when(refreshed.coreVersion()).thenReturn(1L);
@@ -283,8 +264,6 @@ class MissionCoreEditAjaxControllerTest {
                 .param("name", "")
                 .param("status", ""))
         .andExpect(status().isUnprocessableContent())
-        // The map carries the RESOLVED localized message (not the raw {validation.*} key), matching
-        // exactly what th:errors renders for the request locale.
         .andExpect(jsonPath("$.name").exists())
         .andExpect(jsonPath("$.name", not(containsString("{"))))
         .andExpect(jsonPath("$.status").exists())
@@ -316,8 +295,6 @@ class MissionCoreEditAjaxControllerTest {
 
   @Test
   void updateMission_withoutHeader_fallsBackToClassicRedirect() throws Exception {
-    // No X-Requested-With → Spring routes to the classic form-post handler (the no-JS fallback),
-    // which redirects instead of returning JSON.
     mockMvc
         .perform(
             post("/missions/" + MISSION_ID)

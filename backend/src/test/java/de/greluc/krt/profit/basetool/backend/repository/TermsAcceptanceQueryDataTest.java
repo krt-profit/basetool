@@ -42,20 +42,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level pins for the Terms-of-Use consent queries (REQ-SEC-028, V229) against the real
- * Postgres test schema.
+ * Integration tests for the Terms-of-Use consent queries against real Postgres (REQ-SEC-028),
+ * notably the paginated admin overview whose count query Spring Data derives.
  *
- * <p>The admin overview query is the reason this class exists. It combines three things that each
- * work alone and can fail together: a constructor expression, a {@code LEFT JOIN … ON} whose right
- * side may be absent, and {@link org.springframework.data.domain.Pageable}. Spring Data derives the
- * count query for a paginated {@code @Query} by rewriting the select clause, and a constructor
- * expression over an outer join is exactly the shape where that rewrite can fail — at runtime, on
- * the first request, never at compile time. {@link #adminOverviewPaginatesWithACorrectTotal} calls
- * it with a page smaller than the result set specifically so the derived count is exercised rather
- * than incidentally equal to the page size.
- *
- * <p>{@link Transactional} so every method rolls back — the seeded rows never commit to the shared
- * Testcontainers database.
+ * <p>Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -92,16 +82,13 @@ class TermsAcceptanceQueryDataTest {
     persistAcceptance(acceptedUserId, VERSION_IN_FORCE, Instant.now().minus(1, ChronoUnit.HOURS));
     persistAcceptance(
         staleAcceptanceUserId, OLDER_VERSION, Instant.now().minus(9, ChronoUnit.DAYS));
-    // The departed user did accept — the row must still be hidden, because the exclusion is about
-    // being able to act on the person, not about whether they ever consented.
     persistAcceptance(departedUserId, VERSION_IN_FORCE, Instant.now().minus(2, ChronoUnit.DAYS));
     entityManager.flush();
   }
 
   /**
-   * The regression this class was written for: a page smaller than the result set must still report
-   * the true total, which is only possible if Spring Data's derived count query survives the
-   * constructor expression over the outer join.
+   * A page smaller than the result set still reports the true total, proving the derived count
+   * query works with the constructor expression over the outer join.
    */
   @Test
   void adminOverviewPaginatesWithACorrectTotal() {
@@ -205,12 +192,8 @@ class TermsAcceptanceQueryDataTest {
   }
 
   /**
-   * Pins the repository's actual sort contract: the joined column must be named by its <em>alias
-   * path</em>, because Spring Data resolves a plain {@link Sort} property against the query root
-   * ({@code User}), where {@code acceptedAt} does not exist. Translating the caller's property into
-   * this path is {@code TermsAcceptanceService}'s job, and {@code TermsAcceptanceServiceSortTest}
-   * pins that half — this test exists so the repository side of the contract is written down rather
-   * than rediscovered by whoever next passes a bare property and gets a 500.
+   * Sorting on the joined {@code acceptedAt} column works only through its alias path, since a
+   * plain {@link Sort} property resolves against the query root {@code User}.
    */
   @Test
   void sortingOnTheJoinedColumnRequiresTheAliasPath() {
@@ -219,11 +202,6 @@ class TermsAcceptanceQueryDataTest {
             VERSION_IN_FORCE, "ALL", PageRequest.of(0, 50, JpaSort.unsafe("ta.acceptedAt")));
 
     assertThat(page.getTotalElements()).isEqualTo(3);
-    // Postgres treats NULL as larger than any non-null value, so ASC means NULLS LAST: the one user
-    // who accepted the version in force leads, and everyone still owing consent trails. Worth
-    // pinning because it is the opposite of what the admin overview wants by default — the useful
-    // default sort is the pending users first — so a later NULLS FIRST or DESC switch has to be a
-    // visible decision rather than a silent reordering of the worklist.
     assertThat(page.getContent().getFirst().userId()).isEqualTo(acceptedUserId);
     assertThat(page.getContent().get(1).acceptedAt()).isNull();
   }

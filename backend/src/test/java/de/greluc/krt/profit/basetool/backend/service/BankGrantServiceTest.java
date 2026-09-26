@@ -77,12 +77,10 @@ class BankGrantServiceTest {
 
   @Test
   void createGrant_rejectsGranteeWithoutBankRole() {
-    // Given: a user with only org roles — org-unit membership does not qualify (REQ-BANK-008)
     User user = userWithRoleCodes("KRT_MEMBER", "OFFICER");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
 
-    // When
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -90,14 +88,12 @@ class BankGrantServiceTest {
                 bankGrantService.createGrant(
                     new CreateBankGrantRequest(userId, accountId, true, false, false)));
 
-    // Then
     assertEquals(BankConflictException.CODE_BANK_GRANTEE_MISSING_ROLE, ex.getCode());
     verify(grantRepository, never()).save(any());
   }
 
   @Test
   void createGrant_acceptsBankEmployeeAndAudits() {
-    // Given
     User user = userWithRoleCodes("BANK_EMPLOYEE");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
@@ -106,10 +102,8 @@ class BankGrantServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
 
-    // When
     bankGrantService.createGrant(new CreateBankGrantRequest(userId, accountId, true, false, true));
 
-    // Then
     verify(bankAuditService)
         .record(
             eq(BankAuditEventType.GRANT_CREATED),
@@ -121,13 +115,11 @@ class BankGrantServiceTest {
 
   @Test
   void createGrant_rejectsDuplicate() {
-    // Given
     User user = userWithRoleCodes("BANK_EMPLOYEE");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
     when(grantRepository.existsById(new BankAccountGrantId(userId, accountId))).thenReturn(true);
 
-    // When / Then
     assertThrows(
         DuplicateEntityException.class,
         () ->
@@ -137,18 +129,15 @@ class BankGrantServiceTest {
 
   @Test
   void updateGrant_auditsBeforeAndAfterFlags() {
-    // Given: deposit-only grant updated to withdraw-only
     BankAccountGrant grant = grantWithFlags(true, false, false, 2L);
     when(grantRepository.findById(new BankAccountGrantId(userId, accountId)))
         .thenReturn(Optional.of(grant));
     when(grantRepository.save(any(BankAccountGrant.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     bankGrantService.updateGrant(
         userId, accountId, new UpdateBankGrantRequest(false, true, false, 2L));
 
-    // Then
     verify(bankAuditService)
         .record(
             eq(BankAuditEventType.GRANT_UPDATED),
@@ -160,12 +149,10 @@ class BankGrantServiceTest {
 
   @Test
   void updateGrant_staleVersionFailsFastWith409() {
-    // Given
     BankAccountGrant grant = grantWithFlags(false, false, false, 7L);
     when(grantRepository.findById(new BankAccountGrantId(userId, accountId)))
         .thenReturn(Optional.of(grant));
 
-    // When / Then
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () ->
@@ -176,15 +163,12 @@ class BankGrantServiceTest {
 
   @Test
   void deleteGrant_auditsRevocationWithFinalFlags() {
-    // Given
     BankAccountGrant grant = grantWithFlags(true, true, false, 1L);
     when(grantRepository.findById(new BankAccountGrantId(userId, accountId)))
         .thenReturn(Optional.of(grant));
 
-    // When
     bankGrantService.deleteGrant(userId, accountId);
 
-    // Then
     verify(grantRepository).delete(grant);
     verify(bankAuditService)
         .record(

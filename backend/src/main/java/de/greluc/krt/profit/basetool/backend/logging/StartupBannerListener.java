@@ -32,21 +32,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
- * Logs a concise startup banner as soon as the application context is fully ready.
- *
- * <p>The banner surfaces the most important runtime facts a developer or on-call engineer needs
- * when triaging an incident:
- *
- * <ul>
- *   <li>active Spring profiles
- *   <li>Keycloak issuer URI (public, no secret)
- *   <li>Datasource URL with credentials <b>stripped</b>
- *   <li>effective logging configuration (correlation header, slow-request threshold, structured)
- * </ul>
- *
- * <p>Secrets like {@code spring.datasource.password}, admin client secrets and tokens are never
- * logged. JDBC URLs are sanitised via {@link #sanitiseJdbcUrl(String)} to remove any {@code
- * user=}/{@code password=} query parameters that some drivers accept.
+ * Logs a startup banner with the active profiles, the Keycloak issuer URI, the datasource URL with
+ * credentials stripped ({@link #sanitiseJdbcUrl(String)}) and the effective logging configuration.
+ * Secrets are never logged.
  */
 @Slf4j
 @Component
@@ -66,9 +54,8 @@ public class StartupBannerListener {
   private String applicationName;
 
   /**
-   * Emits the startup banner once the application context is fully initialized. Triggered by {@link
-   * ApplicationReadyEvent} so {@code @ConfigurationProperties}, datasource and security subsystems
-   * are all wired up and produce real values rather than placeholders.
+   * Emits the startup banner on {@link ApplicationReadyEvent}, once configuration, datasource and
+   * security are fully wired.
    */
   @EventListener(ApplicationReadyEvent.class)
   public void onReady() {

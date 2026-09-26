@@ -26,30 +26,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuration under {@code app.request-body-limit.*} for the {@code RequestBodySizeLimitFilter} —
- * a hard cap on the size of a non-multipart JSON request body on the heavy import endpoints, so an
- * oversized array is refused with 413 BEFORE Jackson binds it into heap (security review,
- * memory-DoS).
+ * Configuration under {@code app.request-body-limit.*} for the {@code RequestBodySizeLimitFilter},
+ * which refuses an oversized non-multipart JSON body on the listed paths with 413 before it is
+ * bound.
  *
- * <p>Scoped to the listed paths only (the refinery screenshot-import extract by default) — the
- * everyday JSON write endpoints carry tiny bodies and are not affected. Multipart uploads (hangar /
- * blueprint / P4K imports) are handled by the separate {@code spring.servlet.multipart} cap and are
- * skipped by the filter.
- *
- * <p>Like {@link RateLimitProperties}, this lives in the dependency-leaf {@code support} package
- * (not {@code config}) so the {@code filter} layer can read it without a {@code filter} &rarr;
- * {@code config} package cycle; it is picked up by {@code @ConfigurationPropertiesScan} regardless
- * of package. An immutable record (BE-MOD-04).
- *
- * @param enabled whether the request-body-size cap is active; disable only to diagnose a false
- *     rejection
- * @param maxBytes the inclusive maximum request-body size in bytes for the covered paths. Defaults
- *     to 2&nbsp;MiB, the same ceiling the frontend refinery proxy already enforces ({@code
- *     RefineryImportProxyController.MAX_EXTRACT_BYTES}); a real extract is a few KB, so anything
- *     near this is hostile or buggy. Must be at least 1&nbsp;KiB.
- * @param paths the request URIs (exact match) whose non-multipart body is size-capped. Defaults to
- *     the refinery screenshot-import extract endpoint — the one non-multipart JSON import flagged
- *     by the review; add further JSON write paths here if they ever accept large bodies.
+ * @param enabled whether the request-body-size cap is active
+ * @param maxBytes the inclusive maximum body size in bytes; default 2&nbsp;MiB, at least 1&nbsp;KiB
+ * @param paths the request URIs (exact match) whose non-multipart body is capped
  */
 @Validated
 @ConfigurationProperties(prefix = "app.request-body-limit")

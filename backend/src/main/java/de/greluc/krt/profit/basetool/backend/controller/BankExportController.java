@@ -36,9 +36,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Management-level bank export surface (epic #556 Phase 3): the rolling three-month report over all
- * accounts (REQ-BANK-015). Statement exports live on the account resource ({@code
- * BankAccountController}); this controller carries the account-spanning documents.
+ * Management-level bank export surface for account-spanning documents: the rolling three-month
+ * report over all accounts (REQ-BANK-015).
  */
 @RestController
 @RequestMapping("/api/v1/bank/export")

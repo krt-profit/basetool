@@ -22,23 +22,15 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * The Terms-of-Use wording in force, structured rather than pre-rendered (REQ-SEC-028).
+ * The Terms-of-Use wording in force as structured data rather than HTML (REQ-SEC-028).
  *
- * <p><strong>Structure, not HTML.</strong> The two clients that render this are a Thymeleaf page
- * and a Jetpack Compose screen; neither can share a markup blob, and shipping HTML to the app would
- * force it to parse and sanitise a document it is meant to display. Sections and paragraphs travel
- * as data so each client applies its own typography.
- *
- * <p>{@link #version} is the same digest {@code TermsStatusDto.currentVersion} reports and the
- * value an acceptance is recorded against. It travels with the text so a client can tell, from one
- * response, that what it is showing is what consent will be recorded for — the mismatch that would
- * otherwise be invisible is a member reading one wording and accepting another.
+ * <p>{@link #version} is the digest an acceptance is recorded against.
  *
  * @param version content digest of this wording; identical to the value the status endpoint reports
  * @param title the document's own heading
  * @param intro the lead paragraph, before the first numbered section
  * @param sections the numbered sections, in document order
- * @param lastUpdated the "Stand ..." line; part of the document, and inside the version digest
+ * @param lastUpdated the "Stand ..." line; part of the version digest
  */
 public record TermsDocumentDto(
     String version,

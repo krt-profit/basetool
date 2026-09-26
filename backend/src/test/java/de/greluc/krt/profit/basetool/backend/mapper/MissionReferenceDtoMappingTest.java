@@ -36,22 +36,18 @@ import org.junit.jupiter.api.Test;
  */
 class MissionReferenceDtoMappingTest {
 
-  // None of the mappers MissionMapper uses is reached by these mappings.
   private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null);
 
   @Test
   void shouldMapPlannedStartTimeToReferenceDto() {
-    // Given
     Mission mission = new Mission();
     mission.setId(UUID.randomUUID());
     mission.setName("Operation Orange Sun");
     Instant utc = Instant.parse("2026-05-12T09:30:00Z");
     mission.setPlannedStartTime(utc);
 
-    // When
     MissionReferenceDto dto = mapper.toReferenceDto(mission);
 
-    // Then
     assertNotNull(dto);
     assertEquals("Operation Orange Sun", dto.name());
     assertEquals(utc, dto.plannedStartTime(), "plannedStartTime must be preserved as UTC Instant");

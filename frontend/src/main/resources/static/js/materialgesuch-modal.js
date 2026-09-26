@@ -20,8 +20,6 @@
     }
 
     const SERIALIZE_KEY = 'materialgesuch';
-    // REQ-FE-015 (ADR-0094): the global live-sync room a request create/edit publishes to over the
-    // shared multiplexed /ws/sync socket, on the 'requests' section key (the offers use 'board').
     const MATERIALBOARD_TOPIC = 'materialboard';
     let state = {
         mode: null,
@@ -36,8 +34,6 @@
     };
     let lastFocused = null;
     const PICKER_SEARCH_DEBOUNCE_MS = 200;
-    // Both catalogue comboboxes start CLOSED and open only on an explicit gesture, so the floating
-    // list never covers the fields below it the moment the modal opens (see materialboerse-release.js).
     let materialSeq = 0;
     let materialTimer = null;
     let materialListOpen = false;
@@ -242,8 +238,6 @@
         }
     }
 
-    // -------- material catalogue picker --------
-
     function loadMaterialPicker(query) {
         const seq = ++materialSeq;
         const url =
@@ -309,7 +303,6 @@
             list.hidden = !materialListOpen;
             return;
         }
-        // Accumulated from literals and escapeHtml / escapeAttr calls only (FE-SEC-05).
         let html = '';
         materialItems.forEach(function (it) {
             const unit =
@@ -340,8 +333,6 @@
         applyQuantityUnit();
         closeMaterialList();
     }
-
-    // -------- item (blueprint-product) picker --------
 
     function loadItemPicker(query) {
         const seq = ++itemSeq;
@@ -408,7 +399,6 @@
             list.hidden = !itemListOpen;
             return;
         }
-        // Accumulated from literals and escapeHtml / escapeAttr calls only (FE-SEC-05).
         let html = '';
         productItems.forEach(function (it) {
             html +=
@@ -433,8 +423,6 @@
         setValue('[data-mg-item-picker-input]', li.getAttribute('data-name'));
         closeItemList();
     }
-
-    // -------- validation + submit --------
 
     /** Reads the optional min-quality field; returns undefined when blank, null on an invalid value. */
     function readMinQuality() {
@@ -558,8 +546,6 @@
             window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
         }
     }
-
-    // -------- events (scoped to the modal DOM) --------
 
     document.addEventListener('click', function (e) {
         if (!isModalOpen()) {

@@ -4228,8 +4228,8 @@ cadence — never older than a day — instead of how long the account has been 
 
 **Rows flagged before V241 are backfilled with the migration's own timestamp.** Nothing recorded when
 they disappeared, which is the defect being fixed, so there is no value to recover; the deploy time
-is the only honest stand-in and is documented as a lower bound in the migration and in the alert's
-comment.
+is the only honest stand-in and is documented as a lower bound in the migration and here: for a row
+flagged before V241 the alert's age understates the wait.
 
 **The alert is on age, not on count** (`UserDeletionUnfinished`, > 7 days, `for: 30m`). A count above
 zero held for seven days would also fire on a stream of accounts each cleared within a day, because

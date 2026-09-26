@@ -1,18 +1,5 @@
-# Dependabot covers the ecosystems that refreshVersions does NOT manage:
-# GitHub Actions workflow pins and the Docker base images referenced by
-# docker-compose. Java / Gradle dependencies are intentionally left to
-# `./gradlew refreshVersions -PrefreshVersions` (see .github/workflows/refresh-versions.yml)
-# so the two systems do not generate duplicate PRs.
 version: 2
 updates:
-  # One PR per week for ALL action bumps (audit item CI-13). One PR per action used to mean up to
-  # five PRs a Monday, each re-running the whole CI and each needing its own review and merge. A
-  # group is one review, one CI cycle, one merge. The Docker entries below stay
-  # separate on purpose (see their comment): there a wrong key would silently stop updates to a
-  # base image, and the lever for a faster OS-level patch is this file's interval, not a batch.
-  #
-  # `directories` rather than `directory: /`: the root entry reads .github/workflows only, so the
-  # SHA pins inside the local composite actions (.github/actions/*) were watched by nothing.
   - package-ecosystem: github-actions
     directories:
       - /
@@ -31,28 +18,6 @@ updates:
     commit-message:
       prefix: "chore(actions)"
 
-  # The three app images share ONE base image (eclipse-temurin:25-jre-alpine,
-  # digest-pinned), so this cadence is the dominant term in how long an OS-level
-  # CVE survives in production. Measured 2026-09-03: the pin has moved exactly
-  # once since the images went to Alpine, and the whole path is
-  #   Dependabot notices -> PR -> merge -> release build -> promotion.
-  # Only the build is fast (~4 min after ADR-0137), so weekly detection puts up to
-  # seven days in front of everything else. That measurement is why a "rebase the
-  # runtime layer without rebuilding" pipeline was considered and dropped: it would
-  # have optimised the four-minute term while the seven-day term dominated.
-  #
-  # Weekly is nevertheless retained, by the repository owner's decision
-  # (2026-09-03), with the seven-day detection window known and accepted. Written
-  # down so the number is not rediscovered as if it were a defect: the cadence is a
-  # choice, and the lever anyone reaching for a faster patch should pull first is
-  # this interval, not a rebase pipeline.
-  #
-  # ONE entry since 2026-09-23: the three per-module Dockerfiles became
-  # docker/app/Dockerfile (IMG-SIMP-14), so a base bump is one PR instead of three
-  # that had to be merged together. This is a plain `directory:` like the three
-  # entries it replaces, not a `directories:` + `groups:` construction, so it
-  # carries none of the silent-misconfiguration risk that argued against grouping
-  # the old three.
   - package-ecosystem: docker
     directory: /docker/app
     schedule:
@@ -65,10 +30,6 @@ updates:
     commit-message:
       prefix: "chore(docker)"
 
-  # The BuildKit image every release build boots, pinned by digest in a carrier Dockerfile that
-  # nothing builds (.github/actions/setup-buildx/Dockerfile, audit item CI-SEC-13). The composite
-  # action reads the reference from that file, so this entry is what keeps the pin moving with
-  # the `buildx-stable-1` channel instead of freezing it.
   - package-ecosystem: docker
     directory: /.github/actions/setup-buildx
     schedule:
@@ -81,14 +42,6 @@ updates:
     commit-message:
       prefix: "chore(docker)"
 
-  # Infra image pins (redis/postgres/keycloak/npm) in docker-compose.yml. Once a
-  # bump PR is merged and a release is cut + promoted, the new compose ships to
-  # prod automatically as part of the `basetool-config` artifact (no manual
-  # `cp docker-compose.yml` / `docker compose up -d`); deploy.sh recreates the
-  # affected container, except a postgres/Keycloak image change, which stays
-  # operator-gated. See docs/deployment.md and docs/adr/0049-*. The config
-  # bundle's Dockerfile is `FROM scratch` (no base image), so it needs no Docker
-  # ecosystem entry of its own.
   - package-ecosystem: docker-compose
     directory: /
     schedule:
@@ -101,15 +54,6 @@ updates:
     commit-message:
       prefix: "chore(compose)"
 
-  # The frontend's asset-lint toolchain (Stylelint / ESLint / HTMLHint / Prettier / TypeScript).
-  # This was the one ecosystem in the repo NOTHING watched: refreshVersions
-  # only knows Maven coordinates and the entries above only cover Actions and images, so
-  # `frontend/package.json` drifted silently until someone checked it by hand. These linters gate
-  # CI (REQ-FE-018), so an unnoticed major here breaks the build on a version nobody chose.
-  #
-  # `versioning-strategy: increase` bumps the declared range in package.json rather than only the
-  # lockfile — the ranges are carets, so a lockfile-only bump would leave the manifest reading as
-  # an older floor forever.
   - package-ecosystem: npm
     directory: /frontend
     schedule:

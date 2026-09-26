@@ -25,14 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * Unit tests for {@link IngestPathScope}, the single scope decision the client-identity, payload,
- * rate-limit and access-log filters share.
- *
- * <p>The point of the class — and of these tests — is that the decision is made on the
- * <em>decoded</em> path, the same one {@code RequestMappingHandlerMapping} routes on. The raw
- * {@code getRequestURI().startsWith("/v1/")} test it replaced said "not an ingest path" for an
- * encoded spelling the dispatcher happily decoded and delivered, which silently switched off all
- * four filters at once.
+ * Unit tests for {@link IngestPathScope}, the scope decision shared by the client-identity,
+ * payload, rate-limit and access-log filters, which is made on the decoded path that Spring MVC
+ * routes on.
  */
 class IngestPathScopeTest {
 
@@ -55,23 +50,18 @@ class IngestPathScopeTest {
 
   @Test
   void matchesAPercentEncodedIngestPath() {
-    // %76 = 'v'. Spring MVC decodes this back to /v1/... and dispatches it, so the protective
-    // filters must see it as in scope.
     assertThat(IngestPathScope.isIngestRequest(request("/%761/refinery-extract"))).isTrue();
     assertThat(IngestPathScope.isIngestRequest(request("/v%31/refinery-extract"))).isTrue();
   }
 
   @Test
   void doesNotMatchTheUnauthenticatedOperationalEndpoints() {
-    // Gating these would break the container healthcheck and the Prometheus scrape.
     assertThat(IngestPathScope.isIngestRequest(request("/actuator/health"))).isFalse();
     assertThat(IngestPathScope.isIngestRequest(request("/v3/api-docs"))).isFalse();
   }
 
   @Test
   void doesNotMatchAPathThatMerelyStartsWithTheScopeLiteral() {
-    // /v1x is a different first segment, not a sub-path of /v1 — the segment-wise match keeps them
-    // apart where a naive string prefix would not.
     assertThat(IngestPathScope.isIngestRequest(request("/v1x/refinery-extract"))).isFalse();
   }
 }

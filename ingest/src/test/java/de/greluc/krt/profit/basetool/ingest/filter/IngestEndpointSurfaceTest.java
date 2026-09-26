@@ -37,23 +37,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the gateway's routed surface to exactly its two ingest endpoints (REQ-INGEST-001,
- * ING-SEC-05).
- *
- * <p><b>Why a surface test and not a review rule.</b> Every protective filter of this module — the
- * client-identity gate, the payload cap, the per-IP rate limit and the access log — scopes itself
- * to {@code /v1/**} through {@link IngestPathScope}. A controller mapped anywhere else would
- * therefore be served with <em>none</em> of them: no allowlist, no size cap, no throttle, no log
- * line, and still reachable by any valid realm token because {@code anyRequest().authenticated()}
- * is the only thing that applies. Nothing prevented that except whoever wrote the next endpoint
- * knowing it.
- *
- * <p>So this asks the dispatcher — via the shared {@link EndpointEnumeration}, the same engine the
- * backend and frontend surface sweeps use — for every mapping it routes and requires the set to be
- * exactly the two documented ingest calls. The only other entries tolerated are springdoc's {@code
- * /v3/api-docs} tree and its {@code /v3/api-docs.yaml} sibling (non-prod only; {@code
- * springdoc.api-docs.enabled=false} in prod) and Boot's {@code /error} dispatch target, none of
- * which is an ingest endpoint.
+ * Pins the gateway's routed surface to exactly its two ingest endpoints (REQ-INGEST-001), since the
+ * protective filters scope themselves to {@code /v1/**} via {@link IngestPathScope}. Uses {@link
+ * EndpointEnumeration}; only springdoc's {@code /v3/api-docs} tree and Boot's {@code /error} are
+ * tolerated besides.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class IngestEndpointSurfaceTest {
@@ -116,8 +103,6 @@ class IngestEndpointSurfaceTest {
 
   @Test
   void theEnumerationIsNotVacuous() {
-    // A sweep that enumerates nothing passes every assertion it makes; read the raw patterns once
-    // more to prove the enumeration really reached the dispatcher's ingest mappings.
     assertThat(EndpointEnumeration.patterns(context, HttpMethod.POST))
         .contains("/v1/refinery-extract", "/v1/blueprint-preview");
   }

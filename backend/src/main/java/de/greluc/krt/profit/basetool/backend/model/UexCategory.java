@@ -31,16 +31,9 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Reference row for UEX Corp's {@code /categories} endpoint (V109 / R1, populated in R2).
- *
- * <p>The 98+ rows of the UEX category table drive {@code UexItemSyncService}'s walk through {@code
- * /items?id_category=<n>} and carry the {@link #getSection()} + {@link #getName()} pair used by the
- * kind-derivation table in SC_WIKI_SYNC_PLAN.md §6.3.1. Section "Armor" maps to {@link
- * GameItemKind#ARMOR}, "Vehicle Weapons" to {@link GameItemKind#VEHICLE_WEAPON}, and so on.
- *
- * <p>The PK is UEX's integer id (1..98+) rather than a synthetic UUID — the id is stable across
- * runs (UEX never re-numbers categories), survives JOIN queries from {@code game_item} cheaply, and
- * matches the on-the-wire identifier the sync uses.
+ * Reference row from UEX's {@code /categories} endpoint. Drives {@code UexItemSyncService}'s walk
+ * through {@code /items?id_category=<n>} and maps its {@link #getSection()} / {@link #getName()}
+ * pair to a {@link GameItemKind}. The primary key is UEX's stable integer id.
  */
 @Entity
 @Table(name = "uex_category")

@@ -29,22 +29,11 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 /**
- * Evicts the master-data Caffeine caches whose backing tables are bulk-rewritten by the periodic
- * UEX / SC Wiki sync sweeps.
+ * Evicts the master-data caches whose tables the UEX / SC Wiki / P4K sync jobs rewrite directly,
+ * bypassing the CRUD services' own {@code @CacheEvict} hooks (REQ-DATA-007).
  *
- * <p>The admin CRUD services (e.g. {@link MaterialService}, {@code ManufacturerService}) evict
- * their own cache on every user-facing write, but the {@code Uex*SyncService} / {@code
- * ScWiki*SyncService} background jobs write directly to the repositories and therefore bypass those
- * {@code @CacheEvict} hooks. Before this service the only reconciliation was the 12-hour
- * master-data TTL (REQ-DATA-007, CACHE-SYNC-EVICT-001), so a freshly-synced
- * material/manufacturer/ship-type/star-system/refining-method could stay invisible for up to the
- * TTL. Each scheduler now calls the matching {@code evict…} method once its sweep has finished (in
- * a {@code finally}, so committed steps are reconciled even after a mid-sweep step failure),
- * collapsing the stale window to "next read after the sync".
- *
- * <p>The per-sweep cache-name sets are the single source of truth for "which caches a sync can make
- * stale"; a new cache added over a synced table must be added to the matching set here (and is
- * pinned by {@code MasterDataCacheEvictionServiceTest}).
+ * <p>Each job calls the matching {@code evict…} method after its sweep, also after a partial
+ * failure. A new cache over a synced table must be added to the matching cache-name set here.
  */
 @Slf4j
 @Service
@@ -84,12 +73,8 @@ public class MasterDataCacheEvictionService {
           CacheConfig.BLUEPRINT_FAMILY_INDEX_CACHE);
 
   /**
-   * Caches a P4K catalog apply ({@code P4kImportJobRunner}, APPLY kind) can make stale: it
-   * reconciles the material catalogue, manufacturers, ship types and the blueprint master that
-   * backs the blueprint variant-family index. Unlike the UEX / SC Wiki sweeps this runs on the
-   * async import executor rather than a scheduler, so it carries its own evict hook
-   * (CACHE-SYNC-EVICT-001). The apply also writes {@code game_item} rows, but no backend cache is
-   * registered over that table.
+   * Caches a P4K catalog apply can make stale: materials, manufacturers, ship types and the
+   * blueprint master.
    */
   static final List<String> P4K_SYNCED_CACHES =
       List.of(

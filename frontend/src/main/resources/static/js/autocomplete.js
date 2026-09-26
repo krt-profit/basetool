@@ -9,12 +9,10 @@ function krtAutocomplete(inp, dataSource, options = {}) {
     let currentFocus;
     let debounceTimer;
 
-    // Create results container
     const a = document.createElement('DIV');
     a.setAttribute('id', inp.id + '-autocomplete-list');
     a.setAttribute('class', 'autocomplete-items');
 
-    // Ensure parent is positioned relatively
     const parent = inp.parentNode;
     if (window.getComputedStyle(parent).position === 'static') {
         parent.style.position = 'relative';
@@ -30,14 +28,12 @@ function krtAutocomplete(inp, dataSource, options = {}) {
         currentFocus = -1;
 
         if (Array.isArray(dataSource)) {
-            // Local data
             const results = dataSource.filter((item) => {
                 const itemStr = typeof item === 'string' ? item : item.label || item.value || '';
                 return itemStr.toUpperCase().includes(val.toUpperCase());
             });
             renderResults(results, val);
         } else if (typeof dataSource === 'function') {
-            // Remote data
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(async () => {
                 try {
@@ -54,17 +50,14 @@ function krtAutocomplete(inp, dataSource, options = {}) {
         let x = document.getElementById(inp.id + '-autocomplete-list');
         if (x) x = x.getElementsByTagName('div');
         if (e.keyCode === 40) {
-            // DOWN
             currentFocus++;
             addActive(x);
         } else if (e.keyCode === 38) {
-            // UP
             currentFocus--;
             addActive(x);
         } else if (e.keyCode === 13) {
-            // ENTER
             if (currentFocus > -1) {
-                if (x && x.length > 0) e.preventDefault(); // Only prevent default if we have items
+                if (x && x.length > 0) e.preventDefault();
                 if (x && x[currentFocus]) x[currentFocus].click();
             }
         }
@@ -79,8 +72,6 @@ function krtAutocomplete(inp, dataSource, options = {}) {
             const itemVal = typeof item === 'string' ? item : item.value || '';
 
             const b = document.createElement('DIV');
-            // Build the highlighted label using DOM nodes so itemStr is treated
-            // as text, not HTML. Only the surrounding <strong> wrapper is markup.
             const escapedVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const regex = new RegExp('(' + escapedVal + ')', 'gi');
             const parts = itemStr.split(regex);

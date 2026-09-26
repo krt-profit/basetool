@@ -40,30 +40,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Guards the <b>external contract set</b> (REQ-API-009, ADR-0136): the operations a shipped client
- * depends on, which may no longer change shape in place.
+ * Guards the external contract set (REQ-API-009, ADR-0136): operations a shipped client depends on,
+ * which may not change shape in place.
  *
- * <p>REQ-API-001's carve-out lets an endpoint consumed only by the in-repo frontend change its
- * response shape without an {@code /api/v2} bump, because frontend and backend deploy atomically. A
- * released Android build breaks that premise: it sits on devices for months, and a field the server
- * stops sending is a crash or a blank screen in a version nobody can redeploy. For the operations
- * listed here the carve-out therefore does not apply.
- *
- * <p><b>What this test can and cannot prove.</b> It reads the committed {@code openapi.json} — the
- * artifact REQ-API-007 already keeps in sync with the controllers — and fails when a contract
- * operation disappears, changes its verb, loses a recorded response field, gains a required request
- * field, changes a required enum's constants, or renames or retypes a query parameter the app
- * addresses it by. Those are the breaks that silently reach a device.
- *
- * <p>It still does <em>not</em> compare response field types, nullability, or a parameter's default
- * value — the last of which is a real gap, since a list whose {@code sort} default flips reorders a
- * shipped screen with every name and type intact. Catching that needs a schema diff against the
- * previous release, which ADR-0136 records as the next step rather than pretending this covers it.
- *
- * <p><b>Adding to the set is a deliberate act.</b> The list grows one app phase at a time, together
- * with the vhost allow-list that exposes those paths. Removing an entry is not a way to make this
- * test pass: it means retiring a contract, which is an {@code /api/v2} plus {@code @ApiDeprecation}
- * question and needs the sunset the shipped clients get to live through.
+ * <p>Reads the committed {@code openapi.json} and fails when a contract operation disappears,
+ * changes its verb, loses a recorded response field, gains a required request field, changes a
+ * frozen enum, or changes a recorded query parameter. Removing an entry means retiring a contract
+ * via {@code /api/v2}.
  */
 class ExternalContractTest {
 
@@ -79,27 +62,16 @@ class ExternalContractTest {
   private static final int MAX_NESTING = 2;
 
   /**
-   * One frozen operation: path, verb, the response fields a shipped client may rely on, the query
-   * parameters it addresses the operation by, and — for a write — the request fields the server may
-   * demand of it.
-   *
-   * <p><b>Why the query parameters sit here and not in a list of their own.</b> They were held in a
-   * side map keyed by {@code "method path"}, and the shape of that map was the defect: adding an
-   * operation to {@code CONTRACT} did not oblige anyone to say how the app addresses it. Five
-   * operations that take query parameters therefore reached the set with none recorded — a paged
-   * Finanzen tab, the paged Hangar org overview, the offer sheet's picker, an optimistic lock
-   * riding a {@code DELETE} as a query parameter, and one whose honest answer turned out to be
-   * "none at all". As a component the slot travels with the entry, and the coverage guard fails the
-   * build when it is left unanswered.
+   * One frozen operation: path, verb, response fields a shipped client relies on, query parameters
+   * it sends, and for a write the request fields the server may require.
    *
    * @param path the {@code /api/v1} path exactly as it appears in the document
-   * @param method the HTTP verb, lower case, as OpenAPI spells it
-   * @param responseFields response properties that must keep existing; additive change is fine
-   * @param requiredRequestFields the request body's {@code required} list, frozen exactly. Empty
-   *     for an operation with no request body, and for one whose body is entirely optional
-   * @param queryParams query parameters the app sends, as {@code name:type}, frozen as a subset so
-   *     the server may still add optional ones. Empty for an operation the app addresses by path
-   *     alone
+   * @param method the HTTP verb, lower case
+   * @param responseFields response properties that must keep existing; additions are fine
+   * @param requiredRequestFields the request body's {@code required} list, frozen exactly; empty
+   *     without a body or when nothing is required
+   * @param queryParams query parameters the app sends, as {@code name:type}, frozen as a subset;
+   *     empty for an operation addressed by path alone
    */
   private record ContractOperation(
       String path,
@@ -120,7 +92,7 @@ class ExternalContractTest {
     }
 
     /**
-     * A write whose request body has a {@code required} list to freeze.
+     * Creates a write operation whose request body has a {@code required} list to freeze.
      *
      * @param path the {@code /api/v1} path
      * @param method the HTTP verb, lower case
@@ -135,13 +107,8 @@ class ExternalContractTest {
     /**
      * Records the query parameters a shipped client addresses this operation by.
      *
-     * <p>Written as a builder step rather than a fifth argument so the seventy-odd entries the app
-     * reaches by path alone stay as they are, and the ones that take parameters name them where a
-     * reviewer reads the entry.
-     *
-     * @param frozen the parameters as {@code name:type}, using the schema type the document
-     *     declares; an array's element type is left out, since a client sends the same repeated
-     *     parameter either way
+     * @param frozen the parameters as {@code name:type} using the document's schema type; an
+     *     array's element type is omitted
      * @return a copy of this operation carrying the frozen parameters
      */
     ContractOperation addressedBy(Set<String> frozen) {
@@ -150,16 +117,11 @@ class ExternalContractTest {
   }
 
   /**
-   * The contract set: the app's phase 1 (auth, terms gate, pending-approval screen, settings) plus
-   * what each later phase adds as it is actually consumed — exactly the paths the API vhost
-   * allow-lists.
-   *
-   * <p>Recorded from the generated document rather than hand-written, so the baseline is what the
-   * server actually serves and not what someone believed it served.
+   * The contract set: every operation the Android app consumes, matching the paths the API vhost
+   * allow-lists, recorded from the generated document.
    */
   /**
-   * The nginx include that decides what the internet can reach through the API vhost — the source
-   * of truth since 2026-09-12 (ADR-0162), applied by the deploy reconcile.
+   * The nginx include that decides what the internet can reach through the API vhost (ADR-0162).
    */
   private static final String ALLOW_LIST = "docker/edge/include/api-allowlist.conf";
 
@@ -188,26 +150,13 @@ class ExternalContractTest {
           "true",
           "{roleCode}",
           "KOMMANDOLEITER",
-          // Phase X. The two settings keys are named EXACTLY in the allow-list -- the `/settings`
-          // prefix carries every system setting there is and the app reads two of them -- so the
-          // reachability guard has to be told which one to try.
           "{key}",
           "job_order.age_yellow_days");
 
   /**
-   * What an org-unit bank account's settings response promises, for <b>all seven</b> operations
-   * that answer with one.
-   *
-   * <p>Named once because they share a mapper. {@code settings}, {@code balance-target}, both
-   * {@code visibility} pairs and the four {@code approval-limit} leaves all funnel their answer
-   * through the app's single {@code mapped(...)} → {@code toModel()}, so a field the read needs is
-   * a field every write's response needs too. Six of the seven had a narrower set of their own
-   * until 2026-09-03 — {@code approvalLimits} and {@code canConfigureApprovalLimits} were on none
-   * of them, and the whole Freigabe-Limits section is drawn from the first.
-   *
-   * <p>The nested names are the ones {@code BankApprovalLimitsDto.toModel} reads. They are here for
-   * the same reason the top-level ones are: the guard walks nested properties, and a rename inside
-   * that object empties a control rather than failing anything.
+   * Response fields promised by all seven operations that answer with an org-unit bank account's
+   * settings, since the app maps them through one shared mapper. Includes the nested approval-limit
+   * names {@code BankApprovalLimitsDto.toModel} reads.
    */
   private static final Set<String> BANK_ACCOUNT_SETTINGS =
       Set.of(
@@ -224,7 +173,6 @@ class ExternalContractTest {
           "allMembersGranted",
           "approvalLimits",
           "canConfigureApprovalLimits",
-          // BankApprovalLimitsDto, read field by field by the section's own mapper.
           "configurable",
           "areaMembersSupported",
           "allMembersLimit",
@@ -236,17 +184,8 @@ class ExternalContractTest {
           "limitAmount");
 
   /**
-   * What a {@code JobOrderDto} answer promises, for every operation that returns one.
-   *
-   * <p>Named once because they share a mapper: the detail read, the edit and the priority change
-   * all fold their answer back through the app's single {@code JobOrderDto.toModel()}, so a field
-   * one of them needs is a field all of them need. It was written out three times before phase T
-   * added the third consumer, which is one copy past the point where they drift.
-   *
-   * <p>{@code effectiveName} is the only name an assignee row can show, and {@code version} is what
-   * a note edit echoes -- lose it and every note edit 409s. {@code user} and {@code assignees} are
-   * the containers they arrive in; without them the app cannot tell whose edge it is holding, which
-   * is what decides "assign me" from "unassign me".
+   * Response fields promised by every operation returning a {@code JobOrderDto}, since the app maps
+   * them through one shared mapper. {@code version} is required for assignee note edits.
    */
   private static final Set<String> JOB_ORDER_DETAIL =
       Set.of(
@@ -271,17 +210,9 @@ class ExternalContractTest {
           "responsibleOrgUnit");
 
   /**
-   * What an {@code InventoryItemDto} answer promises, for all three allocation verbs.
-   *
-   * <p>Named once because they share a mapper: {@code POST}, {@code PATCH} and {@code DELETE} on
-   * {@code …/allocation} all fold their answer through the app's single {@code toEntry()}, so a
-   * field one needs is a field all three need.
-   *
-   * <p>{@code jobOrderRest} and {@code missionRest} are what the sheet caps a new earmark against —
-   * how much of the row is still unspoken for — and losing either turns a bounded control into one
-   * that lets a member allocate stock twice. The nested allocation names are read field by field to
-   * label each existing earmark; a row whose target id is gone is dropped rather than drawn, so it
-   * disappears instead of showing blank.
+   * Response fields promised by the three allocation operations returning an {@code
+   * InventoryItemDto}, since the app maps them through one shared mapper. {@code jobOrderRest} and
+   * {@code missionRest} bound new earmarks.
    */
   private static final Set<String> INVENTORY_ROW =
       Set.of(
@@ -310,15 +241,8 @@ class ExternalContractTest {
           "missionRest");
 
   /**
-   * What a {@code MissionDto} answer promises, for every operation that returns one.
-   *
-   * <p>Named once because they share a mapper: the detail read and the five planning writes that
-   * still answer with the whole Einsatz all fold through the app's single {@code toModel()}.
-   *
-   * <p>Phase 3 widened this set: the app acts on the caller's OWN participant row, and {@code user}
-   * is the only thing that says which row that is. A name cannot decide it — the server sends
-   * {@code displayName} when a member set one and {@code username} otherwise — and {@code
-   * startTime} is what "checked in" means on the wire.
+   * Response fields promised by every operation returning a {@code MissionDto}, since the app maps
+   * them through one shared mapper. {@code user} identifies the caller's own participant row.
    */
   /**
    * What a step row promises, for all five writes that answer with the Ablauf.
@@ -370,12 +294,6 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/terms/acceptance", "post", Set.of("accepted", "currentVersion")),
           new ContractOperation("/api/v1/me/active-org-unit", "get", Set.of("orgUnitId")),
-          // The two bank flags are what the app's scope segment is drawn from, and they are here
-          // rather than derived client-side on purpose: the me-response reports role DISPLAY names
-          // ("Bank Employee"), the bank roles carry no permissions at all, and the hierarchy
-          // ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE lives in SecurityConfig. Losing either flag
-          // would lock the staff bank away from the people who run it, on a build nobody can
-          // redeploy.
           new ContractOperation(
               "/api/v1/me/capabilities",
               "get",
@@ -387,35 +305,14 @@ class ExternalContractTest {
                   "canManageBank")),
           new ContractOperation(
               "/api/v1/users/me/registration-status", "get", Set.of("approvalStatus")),
-          // ADR-0138: the app renders the wording from here instead of shipping a copy in the APK,
-          // so a field dropped from this response blanks a legal document on a build nobody can
-          // redeploy. `sections` is the field that matters most -- rename it and the terms screen
-          // shows a heading and nothing else.
           new ContractOperation(
               "/api/v1/terms/document",
               "get",
               Set.of("version", "title", "intro", "sections", "lastUpdated")),
-          // Phase 2, first entry: the app's org-unit switcher. It exists as a me-scoped endpoint
-          // rather than reusing GET /{id}/memberships precisely so that the public vhost never has
-          // to allow-list a path able to name another user. `isProfitEligible` is deliberately NOT
-          // frozen -- the app does not read it, and freezing a field nobody consumes buys the
-          // backend a constraint for nothing. Adding it later is one more deliberate edit, which
-          // is the process working rather than a gap.
           new ContractOperation(
               "/api/v1/users/me/memberships",
               "get",
               Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "kind")),
-          // Phase 2, the Einsatz list. `/search` rather than the plain `/missions`: the app's chip
-          // row filters by text, status and date range, and the plain list takes only paging -- so
-          // filtering would have to happen on a page the server had already truncated. Deliberately
-          // the ONLY missions path in the set: the detail screen is not built yet, and opening a
-          // family before a client consumes it is exactly what ADR-0135 tells the allow-list not to
-          // do.
-          //
-          // Both levels are frozen. The envelope's `totalElements` is what the list states as its
-          // count, and the row fields are what a member actually reads; `size`, `sort`,
-          // `calendarLink` and `version` are left out because the app does not consume them, and
-          // freezing a field nobody reads buys the backend a constraint for nothing.
           new ContractOperation(
                   "/api/v1/missions/search",
                   "get",
@@ -444,22 +341,7 @@ class ExternalContractTest {
                       "page:integer",
                       "size:integer",
                       "sort:string")),
-          // Phase 2, the Einsatz detail. Anonymous by design like the search above it, and
-          // redacted for an outsider by MissionPeerRedactor (ADR-0034): no description, no owner,
-          // no managers, and each participant loses their payout preference and comment. An
-          // internal or terminal Einsatz is refused outright with 403. What is frozen here is what
-          // the app reads for its seven tabs -- the counters and the four planning collections
-          // among them, since a tab whose collection vanished would render as an empty screen with
-          // no error anywhere.
           new ContractOperation("/api/v1/missions/{id}", "get", MISSION_DETAIL),
-          // Phase 3, the four things a member does to their own participation. `join` answers with
-          // the whole Einsatz because it creates the row; the three slim ones answer with the row
-          // alone, which is the point of them — the detail is large and a check-in changes one
-          // timestamp.
-          //
-          // The leave is the slim DELETE and not the legacy full one: both exist, the legacy pair
-          // is `@ApiDeprecation`-marked with a sunset, and freezing a deprecated path would be a
-          // promise the backend has already announced it will not keep.
           new ContractOperation(
               "/api/v1/missions/{id}/join",
               "post",
@@ -474,18 +356,11 @@ class ExternalContractTest {
               "/api/v1/missions/{id}/participants/{participantId}/check-out/slim",
               "post",
               Set.of("id", "user", "endTime")),
-          // PAYOUT / DONATE, and the request half is where the app's own copy of those two words
-          // lives. Required on the request, so the enum guard covers it.
           new ContractOperation(
               "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim",
               "put",
               Set.of("id", "payoutPreference"),
               Set.of("preference")),
-          // The Finanzen tab. Unlike the two above it this one is NOT anonymous:
-          // `isAuthenticated() and isMemberOrAbove() and canSeeMission(#missionId)`, so it answers
-          // 403 to an anonymous caller and to a guest alike -- not 401, because the chain is
-          // permitAll here and the refusal happens at the method seam (REQ-SEC-037, pinned by
-          // ApiVhostAnonymousSurfaceTest).
           new ContractOperation(
                   "/api/v1/missions/{missionId}/finance-entries",
                   "get",
@@ -498,52 +373,27 @@ class ExternalContractTest {
                       "type",
                       "amount",
                       "note"))
-              // Paged like every other list the app scrolls: the envelope above is frozen, so the
-              // two
-              // parameters that reach page two belong to the same contract. `sort` is left alone --
-              // the
-              // app takes the server's `createdAt,desc` default, as it does on the inbox and the
-              // ledger.
               .addressedBy(Set.of("page:integer", "size:integer")),
           new ContractOperation(
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
-          // Phase 3, booking money against an Einsatz. The write paths are
-          // `/api/v1/finance-entries`
-          // — NOT under `/missions` — so they are their own family on the vhost rather than an
-          // exception to the read-only guard on that one.
-          //
-          // `participant` and `version` join the read for the same reason the assignee edge did on
-          // an order: the app may only edit the caller's own entry, and both halves of that
-          // sentence need a field. The nested participant is stripped of PII by the controller on
-          // the create response, so what is frozen here is the id and nothing else about them.
           new ContractOperation(
               "/api/v1/finance-entries",
               "post",
               Set.of("id", "missionId", "participant", "type", "amount", "note", "version"),
               Set.of("amount", "missionId", "participantId", "type")),
-          // The update requires `version` where the create cannot have one, and that asymmetry is
-          // the optimistic lock: an entry is edited against the copy the client read.
           new ContractOperation(
               "/api/v1/finance-entries/{entryId}",
               "put",
               Set.of("id", "missionId", "participant", "type", "amount", "note", "version"),
               Set.of("amount", "type", "version")),
           new ContractOperation("/api/v1/finance-entries/{entryId}", "delete", Set.of()),
-          // The payout confirmation. Two roles in one gate: MISSION_MANAGER may mark a share paid
-          // out, and only an OFFICER or ADMIN may take that back — the app offers the first and
-          // lets the server refuse the second, because it cannot know which of the two the caller
-          // is from `/users/me` alone.
           new ContractOperation(
               "/api/v1/operations/{id}/payouts/paid-out",
               "put",
               Set.of("participantKey", "paidOut", "paidOutAt", "paidOutByName"),
               Set.of("participantKey")),
-          // Phase 2, the Lager tree. Two reads, one per level: the aggregate is the group
-          // row a member sees first, and the grouped read fills a group they opened. Neither is
-          // `/inventory/all`, which is the flat entry list -- a tree that fetched every leaf to
-          // draw its roots would pull the whole warehouse to show a dozen headings.
           new ContractOperation(
                   "/api/v1/inventory/aggregated",
                   "get",
@@ -573,10 +423,6 @@ class ExternalContractTest {
                       "personal",
                       "entryCount"))
               .addressedBy(Set.of("materialIds:array")),
-          // Phase 2, the Aufträge queue and one order in full. `redacted` is frozen because it is
-          // the field that tells the screen it is looking at a reduced order (REQ-ORDERS-023): a
-          // requester sees their own order without the parts that are not theirs, and a client
-          // that stopped seeing the flag would present the gaps as the whole truth.
           new ContractOperation(
                   "/api/v1/orders",
                   "get",
@@ -594,20 +440,7 @@ class ExternalContractTest {
                       "materials",
                       "redacted"))
               .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
-          // Phase 3 widened this one rather than adding a second entry: the assignee edge is what
-          // the app now writes to, and it is reached through this response. `note` and `version`
-          // are the edge's own -- the version is NOT the order's, and sending the order's would
-          // 409 every note edit -- and `effectiveName` is the only name a row can show. `user` and
-          // `assignees` are the containers they arrive in; without them the app cannot tell whose
-          // edge it is holding, which is what decides "assign me" from "unassign me".
           new ContractOperation("/api/v1/orders/{id}", "get", JOB_ORDER_DETAIL),
-          // Phase 3, the two writes any member may make on an order they can see: putting their
-          // own name on it and taking it off again. Self-assignment is open to everyone;
-          // assigning someone else needs LOGISTICIAN, which the app never attempts.
-          //
-          // The response is the whole order, and what the app reads back from it is the refreshed
-          // assignee list plus the version -- the list is redrawn from the answer rather than
-          // guessed at, because the server decides the order of it.
           new ContractOperation(
               "/api/v1/orders/{id}/assignees/{userId}",
               "post",
@@ -616,10 +449,6 @@ class ExternalContractTest {
               "/api/v1/orders/{id}/assignees/{userId}",
               "delete",
               Set.of("id", "assignees", "user", "effectiveName", "note", "version")),
-          // The assignee's own note -- when they work on it, which part they take. Locked on the
-          // EDGE's version, which is why nothing here is required: a client that has never seen a
-          // version may omit it and take the last write, and a client that has one sends it and
-          // gets a 409 instead of overwriting a colleague.
           new ContractOperation(
               "/api/v1/orders/{id}/assignees/{userId}/note",
               "put",
@@ -629,27 +458,12 @@ class ExternalContractTest {
                   "/api/v1/orders/{id}/assignees/{userId}/note",
                   "delete",
                   Set.of("id", "assignees", "user", "effectiveName", "note", "version"))
-              // The optimistic lock, and it travels as a QUERY parameter here where the PUT twin
-              // carries
-              // it in the body. A null version skips the check server-side, so a renamed parameter
-              // does
-              // not fail: every note deletion in the field silently stops being locked and takes
-              // the last
-              // write over a colleague's edit. Nothing about the screen would look wrong.
               .addressedBy(Set.of("version:integer")),
-          // The status change. LOGISTICIAN + per-order scope, so the app offers it only to a
-          // Logistician and names the refusal when the order is outside their slice.
-          //
-          // `status` and `version` are both REQUIRED on the request: dropping either from the
-          // required list would be a widening the app survives, but ADDING a third required field
-          // is what a shipped build cannot send -- which is what this half of the entry guards.
           new ContractOperation(
               "/api/v1/orders/{id}/status",
               "put",
               Set.of("id", "status", "version"),
               Set.of("status", "version")),
-          // Phase 2, the org bank a member may see. `/org-units/bank/**`, never
-          // `/bank/accounts/**`: the latter is the bank-employee surface and lists every account.
           new ContractOperation(
               "/api/v1/org-units/bank/balances",
               "get",
@@ -661,11 +475,6 @@ class ExternalContractTest {
                   "delta30d",
                   "sparkline",
                   "orgUnitName",
-                  // The request sheet is built out of these three. `canRequest` decides which
-                  // accounts a withdrawal or transfer may name at all; `approvalLimit` is the
-                  // threshold the sheet states live under the amount, per caller and per account;
-                  // `approvalExempt` is why it sometimes states nothing. Losing any of them turns
-                  // a form that explains itself into one that guesses.
                   "canRequest",
                   "approvalLimit",
                   "approvalExempt")),
@@ -674,27 +483,13 @@ class ExternalContractTest {
               "get",
               Set.of(
                   "detail", "account", "delta30d", "bookingCount", "name", "accountNo", "balance")),
-          // Phase 3, the only bank writes a member has: the settings of an account they are
-          // responsible for. Still not `/api/v1/bank/**` wholesale — that prefix carries the admin
-          // area — but the three bookings under it ARE frozen further down: the app has carried the
-          // bank-employee surface since REQ-APP-BANK-007 and its direct booking since -016, and
-          // this comment claimed the opposite until 2026-09-03.
-          //
-          // `canSetTarget` and `canConfigureVisibility` are the two fields that make this slice
-          // work at all: the server states what the caller may do, so the app offers exactly that
-          // and guesses at no role. Losing either would leave the app either hiding a control a
-          // holder is entitled to, or offering one that answers 403.
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/settings", "get", BANK_ACCOUNT_SETTINGS),
-          // The target is version-echoed and the target itself is optional: clearing it is sending
-          // no target at all, which is why only `version` is required.
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/balance-target",
               "put",
               BANK_ACCOUNT_SETTINGS,
               Set.of("version")),
-          // Visibility is addressed entirely by its path — a role bucket by code, the all-members
-          // switch by a boolean path segment — so neither carries a body to freeze.
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
               "post",
@@ -721,24 +516,11 @@ class ExternalContractTest {
                       "note",
                       "createdAt",
                       "holderHandle",
-                      // Under-frozen until 2026-09-03: this operation runs the SAME
-                      // BankBookingDto.toModel() as the staff ledger, and that mapper reads four
-                      // more names than were recorded here. A rename of any of them would have
-                      // emptied a column on a shipped build with this guard green — a guard can
-                      // only defend the names it was told about.
                       "transactionId",
                       "reversedTransactionId",
                       "transferFee",
                       "counterpartyHandle"))
               .addressedBy(Set.of("page:integer", "size:integer")),
-          // Phase 5, the member's booking requests (app REQ-APP-BANK-008). Still
-          // `/org-units/bank/**`: confirming and rejecting live on `/api/v1/bank/requests/**`,
-          // which is `BANK_EMPLOYEE` and stays off this list.
-          //
-          // `requiredApprover` is the field that keeps the app honest about the approval model.
-          // There is no count of approvals anywhere — one owner approval, granted by the class
-          // this field names (REQ-BANK-041/-047) — and the app's row chip renders that class.
-          // Dropping it would leave the client unable to say who a request is waiting on.
           new ContractOperation(
               "/api/v1/org-units/bank/requests",
               "get",
@@ -750,9 +532,6 @@ class ExternalContractTest {
                   "type",
                   "amount",
                   "note",
-                  // Both request lists run one mapper, and it falls back to `justification` when
-                  // `note` is blank. A request raised with a reason and no note would otherwise
-                  // render as an unexplained row. Under-frozen until 2026-09-03, on both.
                   "justification",
                   "status",
                   "requesterHandle",
@@ -774,9 +553,6 @@ class ExternalContractTest {
                   "type",
                   "amount",
                   "note",
-                  // Both request lists run one mapper, and it falls back to `justification` when
-                  // `note` is blank. A request raised with a reason and no note would otherwise
-                  // render as an unexplained row. Under-frozen until 2026-09-03, on both.
                   "justification",
                   "status",
                   "requesterHandle",
@@ -786,23 +562,13 @@ class ExternalContractTest {
                   "ownerApprovalGrantedByHandle",
                   "createdAt",
                   "version")),
-          // A transfer's destinations. The app shows the name and falls back to the number, so
-          // both are relied on.
           new ContractOperation(
               "/api/v1/org-units/bank/transfer-targets", "get", Set.of("id", "name", "accountNo")),
-          // Raising one. `targetAccountId` travels only for a TRANSFER; the server ignores it
-          // otherwise, and the app omits it rather than putting a value on the wire that
-          // describes nothing.
           new ContractOperation(
               "/api/v1/org-units/bank/requests",
               "post",
               Set.of("id", "status", "requiresOwnerApproval", "requiredApprover", "version"),
               Set.of("sourceAccountId", "type", "amount")),
-          // Correcting one's own. The account and the kind are absent on purpose: the server
-          // refuses a change to either, so a client that sent them would be asking for a 400.
-          // Only `amount` is required. The version travels too and the app sends it, but the
-          // server accepts the edit without one — recorded as it is rather than as it ought to be,
-          // because this set is what a shipped build is held to.
           new ContractOperation(
               "/api/v1/org-units/bank/requests/{id}",
               "put",
@@ -813,8 +579,6 @@ class ExternalContractTest {
               "post",
               Set.of("id", "status", "version"),
               Set.of("version")),
-          // The two approval verbs take NO body — no version to echo, and the app sends none.
-          // Frozen so that gaining one would be a contract change rather than a silent 400.
           new ContractOperation(
               "/api/v1/org-units/bank/requests/{id}/owner-approval",
               "post",
@@ -823,13 +587,6 @@ class ExternalContractTest {
               "/api/v1/org-units/bank/requests/{id}/owner-approval",
               "delete",
               Set.of("id", "ownerApprovalGranted", "version")),
-          // Phase 2, the member's own hangar. The row's `shipType` and `location` are nested
-          // objects whose `name` is what the card actually shows, which is why the guard now
-          // descends into a referenced schema and not only into an array's items.
-          //
-          // `owner` is deliberately NOT frozen. It is a full user record -- email, roles, rank --
-          // and on this endpoint it is always the caller's own, so the app has no reason to read
-          // it. Freezing it would oblige the backend to keep sending a payload nobody wants.
           new ContractOperation(
                   "/api/v1/hangar/my-ships",
                   "get",
@@ -845,12 +602,8 @@ class ExternalContractTest {
                       "location",
                       "fitted",
                       "manufacturer",
-                      // Added in phase 3: the app now edits these rows, and the edit echoes the
-                      // version it read. A read-only client had no use for it; a writing one cannot
-                      // save without it.
                       "version"))
               .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
-          // The org-unit half of the same screen: one row per ship type with its counts.
           new ContractOperation(
                   "/api/v1/hangar/squadron-overview",
                   "get",
@@ -862,20 +615,8 @@ class ExternalContractTest {
                       "shipType",
                       "count",
                       "fittedCount"))
-              // The org half of the Hangar screen, addressed exactly like `my-ships` beside it.
               .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
-          // Phase 2, the dashboard's announcement band. `content` is the whole point of the
-          // operation, and the endpoint answers 204 when there is nothing to announce -- a
-          // no-content answer the client must read as "no banner", never as a failure. That
-          // distinction lives in the client (`ApiReader.getOptional`), because a schema cannot
-          // express "and sometimes there is no body".
           new ContractOperation("/api/v1/announcement", "get", Set.of("content", "updatedAt")),
-          // Phase 2, the notification inbox. `params` is frozen as a field but its CONTENT is
-          // not a contract this guard can hold: the app renders each notification from
-          // `notifications.type.<TYPE>` with those named placeholders substituted, so a renamed
-          // placeholder changes a sentence the server never sees. The client's answer is to fall
-          // back to the generic wording when a placeholder cannot be filled -- a defence that
-          // belongs there, because no schema check can express it.
           new ContractOperation(
                   "/api/v1/notifications",
                   "get",
@@ -893,48 +634,15 @@ class ExternalContractTest {
                       "createdAt"))
               .addressedBy(Set.of("page:integer", "size:integer")),
           new ContractOperation("/api/v1/notifications/unread-count", "get", Set.of("count")),
-          // The push channel. Its response is a stream, not a schema, so the field assertion here
-          // is vacuous by nature -- what this entry is worth is the OTHER guard: the path and verb
-          // must keep existing. The event NAMES (`connected`, `notification`, `heartbeat`,
-          // `replaced`) are the real contract and are pinned in the app's spec, since nothing in
-          // this document describes them.
           new ContractOperation("/api/v1/notifications/stream", "get", Set.of()),
-          // Phase 5, the inbox's mutating half. The app shipped a read-only inbox because these
-          // four were "Phase 3" work that phase 3 never picked up; design chapter 07 specifies a
-          // fully interactive one, so the deferral was a defect rather than a decision.
-          //
-          // Only the DELETE of a single row is a 204. The other three answer with a body, and
-          // `unreadCount` on the two bulk results is the field worth freezing hardest: it is what
-          // lets the badge settle from the same response that changed it. Without it the app would
-          // have to follow every bulk action with a second call to `/unread-count`, and the badge
-          // would disagree with the list for as long as that took.
-          //
-          // `/read` and `/read-all` are literal segments sitting beside `{id}`, which is a UUID --
-          // they cannot collide, and the vhost allow-list relies on exactly that to admit the
-          // three by name without admitting the family or the `/notification-rules` admin surface
-          // next to it.
           new ContractOperation("/api/v1/notifications/{id}/read", "post", Set.of("id", "read")),
           new ContractOperation(
               "/api/v1/notifications/read-all", "post", Set.of("affected", "unreadCount")),
           new ContractOperation("/api/v1/notifications/{id}", "delete", Set.of()),
           new ContractOperation(
               "/api/v1/notifications/read", "delete", Set.of("affected", "unreadCount")),
-          // Phase 2, the caller's own record. The app needs two fields of it. Its own backend user
-          // id: an Operation's payout rows are keyed by that id -- not by the Keycloak `sub` the
-          // app holds, and not by a name -- so "Dein Anteil" cannot be found without it, and
-          // neither can "assign me to this order". And `isLogistician`, which decides whether the
-          // Auftrag detail offers the status control at all; without it the app would either hide
-          // a control a Logistician is entitled to or offer one that answers 403.
-          //
-          // Still not the roles or the permissions set: the app asks one yes/no question and this
-          // is the field that answers it. Freezing the rest would buy the backend a constraint on
-          // a payload nobody reads.
           new ContractOperation(
               "/api/v1/users/me", "get", Set.of("id", "isLogistician", "isMissionManager")),
-          // Phase 2, the Operationen segment of the same screen. The row is deliberately thin:
-          // OperationDto carries no mission or participant count, and the owner decided against
-          // adding them rather than spend aggregate queries on a list that has documented itself
-          // as cheap ("the bulk endpoints have no reason to spend the extra count query").
           new ContractOperation(
                   "/api/v1/operations/search",
                   "get",
@@ -948,24 +656,15 @@ class ExternalContractTest {
                       "page:integer",
                       "size:integer",
                       "sort:string")),
-          // The Operation detail. `payoutPreliminary` is frozen because it is authoritative HERE
-          // and nowhere else -- the app reads it to say that the payout figures may still
-          // rebalance, and a screen that silently stopped saying so would present a provisional
-          // number as final.
           new ContractOperation(
               "/api/v1/operations/{id}",
               "get",
               Set.of("id", "name", "description", "status", "payoutPreliminary")),
-          // The Finanz-Rollup. `truncated` is frozen for the same reason ADR-0104 exists: it is
-          // the field that tells the member the per-mission list is not all of it, and losing it
-          // turns a capped list into one that looks complete.
           new ContractOperation(
               "/api/v1/operations/{id}/finance-summary",
               "get",
               Set.of(
                   "operationId", "totalSum", "missions", "truncated", "missionId", "missionName")),
-          // The Auszahlungen tab. Read-only in this phase: the app renders each participant's
-          // share and whether it has been paid, and the manager toggle behind it is phase 3.
           new ContractOperation(
               "/api/v1/operations/{id}/payouts",
               "get",
@@ -979,9 +678,6 @@ class ExternalContractTest {
                   "donatedAmount",
                   "payoutAmount",
                   "paidOut")),
-          // Phase 3, "Mein Inventar" — the first WRITES in the contract set, and the reason the
-          // request-side guard above exists. A member's personal stock is theirs alone: the list
-          // is me-scoped by the service, so no id of anyone else appears in these paths.
           new ContractOperation(
                   "/api/v1/personal-inventory",
                   "get",
@@ -999,9 +695,6 @@ class ExternalContractTest {
                       "quantity",
                       "version"))
               .addressedBy(Set.of("q:string", "page:integer", "size:integer")),
-          // `locationName` is frozen although the create/update pair does not send it: it is
-          // resolved server-side from the UEX id, and it is the only human-readable form of the
-          // place the member picked. Without it a row can only show a number.
           new ContractOperation(
               "/api/v1/personal-inventory",
               "post",
@@ -1019,30 +712,17 @@ class ExternalContractTest {
                   "locationName",
                   "quantity",
                   "version")),
-          // `version` is required on the update and on nothing else. It is the optimistic lock:
-          // the client echoes what it read, and a concurrent edit answers 409 instead of
-          // overwriting. A future field added to this body must be optional, or every build in
-          // the field starts failing its saves.
           new ContractOperation(
               "/api/v1/personal-inventory/{id}",
               "put",
               Set.of("id", "name", "quantity", "locationUexId", "locationType", "version"),
               Set.of("name", "quantity", "locationUexId", "locationType", "version")),
-          // The delete answers 204 with no body, so there is nothing to freeze but the path and
-          // the verb — which is exactly what an old build needs to keep working.
           new ContractOperation("/api/v1/personal-inventory/{id}", "delete", Set.of()),
-          // The location picker behind the editor. Cities and space stations in one search, keyed
-          // by the UEX id the two write bodies send. `type` is frozen because it IS the
-          // `locationType` half of that pair — the row carries both halves of what gets saved.
           new ContractOperation(
                   "/api/v1/uex/locations/search",
                   "get",
                   Set.of("uexId", "type", "name", "starSystemName", "parentName"))
               .addressedBy(Set.of("q:string", "limit:integer")),
-          // Phase 3, the Blueprints half of the same screen. `removable` is frozen because it
-          // qualifies the row rather than describing it: an entry the server will not let go of
-          // must not be offered a delete action that answers 409 (same class as `redacted` and
-          // `truncated`).
           new ContractOperation(
                   "/api/v1/personal-blueprints",
                   "get",
@@ -1064,23 +744,12 @@ class ExternalContractTest {
               "post",
               Set.of("id", "productKey", "productName", "version"),
               Set.of("productKey")),
-          // Only `version` is required on the update: the note and the date are both optional, and
-          // an app that sends one without the other must keep working.
           new ContractOperation(
               "/api/v1/personal-blueprints/{id}",
               "put",
               Set.of("id", "productKey", "productName", "note", "acquiredAt", "version"),
               Set.of("version")),
           new ContractOperation("/api/v1/personal-blueprints/{id}", "delete", Set.of()),
-          // Phase 5, the recipe behind one owned blueprint. Design ch. 09 lays the tablet's
-          // Blueprints out as master-detail "with live ingredient quality", and the quality it
-          // means is `minQuality` on each ingredient -- the lowest grade that still satisfies the
-          // requirement. Without this operation the detail pane of that layout has nothing to show.
-          //
-          // Both quantity fields are frozen, and deliberately both: `quantityScu` and
-          // `quantityUnits` are the same amount in two scales, and the app has already been bitten
-          // once by reading a unit figure as SCU (the refinery's 100x stock bug). Freezing the pair
-          // means a client can render the one its column is labelled for instead of converting.
           new ContractOperation(
               "/api/v1/personal-blueprints/{id}/recipe",
               "get",
@@ -1095,10 +764,6 @@ class ExternalContractTest {
                   "quantityUnits",
                   "minQuality",
                   "quantityType")),
-          // The craftability chip. `limitingMaterialName` is what turns "N Materialien fehlen"
-          // into a sentence a member can act on, and `craftableWithRefinery` is the second answer
-          // the same question has once refining is allowed for — dropping either would leave the
-          // chip stating a bare boolean.
           new ContractOperation(
                   "/api/v1/personal-blueprints/craftability",
                   "get",
@@ -1116,22 +781,11 @@ class ExternalContractTest {
                       "missingScu",
                       "quantityType"))
               .addressedBy(Set.of("includeRefinery:boolean")),
-          // The product picker behind "Blueprint hinzufügen". `ownedByCurrentUser` is frozen
-          // because it is what keeps the picker from offering a duplicate the server would then
-          // refuse.
           new ContractOperation(
                   "/api/v1/blueprints/products/search",
                   "get",
                   Set.of("productKey", "name", "manufacturerName", "ownedByCurrentUser"))
               .addressedBy(Set.of("q:string", "limit:integer")),
-          // Phase 3, the Hangar's own ships. The write path is /hangar/ships, NOT
-          // /hangar/users/{id}/ships: the second one names a member and is the admin surface,
-          // which this contract set has no reason to carry.
-          //
-          // The request requires `insurance` and `shipTypeId` and nothing else. `version` is
-          // deliberately NOT required by the schema — a create has none — but the app sends it on
-          // every update, and freezing the required list as it stands is what stops the server
-          // from making a field mandatory that a shipped build does not send.
           new ContractOperation(
               "/api/v1/hangar/ships",
               "post",
@@ -1143,8 +797,6 @@ class ExternalContractTest {
               Set.of("id", "name", "shipType", "insurance", "location", "fitted", "version"),
               Set.of("insurance", "shipTypeId")),
           new ContractOperation("/api/v1/hangar/ships/{id}", "delete", Set.of()),
-          // The two pickers the editor needs. `manufacturer` is frozen on the ship type because it
-          // is what tells two similarly named hulls apart in a list of hundreds.
           new ContractOperation(
                   "/api/v1/ship-types",
                   "get",
@@ -1158,29 +810,6 @@ class ExternalContractTest {
                       "manufacturer"))
               .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
           new ContractOperation("/api/v1/locations/home-locations", "get", Set.of("id", "name")),
-          // ── Reachable since before this entry, and unfrozen until 2026-09-03 ──────────────
-          // REQ-API-009 says the allow-list "must be a subset of this set". It was not: an audit
-          // found 30 operations the vhost admits whose shape nothing froze, so the backend could
-          // rename a field on any of them and break a shipped app with no gate firing. These six
-          // are the reads whose consumed fields could be established from the app's own mapping;
-          // the rest — the bank-staff surface and the operations with request bodies — follow.
-          //
-          // Each field set is what the APP READS, not what the DTO carries. `LocationDto` also
-          // serialises description, hidden, homeLocation and version; the refinery picker maps
-          // `id to name` and nothing else, so freezing more would promise what nobody relies on.
-          // ── The bank-staff reads (2026-09-03) ────────────────────────────────────────────
-          // Nineteen bank-staff paths are admitted by the vhost and frozen by nothing, which is
-          // the largest half of the 30-operation gap. These four are the reads whose consumed
-          // fields could be established from the app's own mapping; the rest — the writes and the
-          // transaction lists — follow, established the same way rather than guessed.
-          //
-          // The stakes are higher here than anywhere else on this vhost. `bank` is deliberately
-          // NOT in the read-only family, so naming a path opens every verb the backend serves on
-          // it, and the backend's role gate is the only thing between a shipped client and moving
-          // money. A field rename on any of these breaks that client silently.
-          //
-          // `BankAccountDto` also serialises areaLeadApprovalCeiling, areaName, balanceTarget,
-          // createdAt and employeeApprovalCeiling; the app's mapping reads none of them.
           new ContractOperation(
                   "/api/v1/bank/accounts",
                   "get",
@@ -1195,12 +824,6 @@ class ExternalContractTest {
                       "orgUnit",
                       "version"))
               .addressedBy(Set.of("page:integer", "size:integer")),
-          // The management overview. Three top-level parts, and the guard descends one level into
-          // each: `totals` is null for a non-management caller and stays null rather than being
-          // folded into zeroes, which is why the three totals fields are frozen beside it.
-          //
-          // `BankDashboardAccountDto` also carries bereichDepartment, bereichId and bereichName —
-          // the web's grouping, which this client does not render.
           new ContractOperation(
               "/api/v1/bank/dashboard",
               "get",
@@ -1219,9 +842,6 @@ class ExternalContractTest {
                   "balance",
                   "delta30d",
                   "sparkline")),
-          // The holder list and one holder: the same DTO, so the same five fields. `userId` and
-          // `roleManaged` are on the wire and deliberately not frozen — the app maps neither, and
-          // freezing a field nobody reads is a promise that costs without buying anything.
           new ContractOperation(
               "/api/v1/bank/holders",
               "get",
@@ -1230,32 +850,13 @@ class ExternalContractTest {
               "/api/v1/bank/holders/{id}",
               "get",
               Set.of("id", "handle", "active", "totalHeld", "version")),
-          // ── The three pickers behind the two create forms (2026-09-03) ───────────────────
-          // The item order's catalogue and the grant editor's grantee search. Reads, all three,
-          // and each one is the only way its form can be filled: a picker that answers nothing is
-          // a form that cannot be submitted, which is the shape a member reads as "there are none"
-          // rather than as a fault.
           new ContractOperation(
                   "/api/v1/orders/item-catalog", "get", Set.of("content", "id", "name"))
               .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
-          // `outputName` with `scwikiKey` behind it and the id behind that: a blueprint whose
-          // product the catalogue has not named still has to render as something a member can
-          // pick. All three are frozen because the fallback chain IS the contract here — freezing
-          // only `outputName` would let the two behind it disappear unnoticed.
           new ContractOperation(
               "/api/v1/orders/item-catalog/{gameItemId}/blueprints",
               "get",
               Set.of("id", "outputName", "scwikiKey")),
-          // The grantee picker of the grant editor. Deliberately the bank twin of /users/search:
-          // the two run the same query over the same scope with the same peer-redacted
-          // projection and differ only in the role gate, which here is widened to BANK_EMPLOYEE.
-          // A bank manager holding no org role gets 403 on /users/search and would have no picker
-          // at all.
-          //
-          // The handle is a fallback chain — effectiveName, then displayName, then username — and
-          // all three are frozen for the same reason as the blueprint reference above.
-          // `totalElements` is frozen and the rest of the paging envelope is not: the picker shows
-          // the first page and says how many there are, and never asks for a second.
           new ContractOperation(
                   "/api/v1/users/search-bank",
                   "get",
@@ -1263,23 +864,10 @@ class ExternalContractTest {
                       "content", "totalElements", "id", "effectiveName", "displayName", "username"))
               .addressedBy(Set.of("query:string", "page:integer", "size:integer")),
           new ContractOperation("/api/v1/locations/refineries", "get", Set.of("id", "name")),
-          // The method picker of the refinery form. A PAGE, not a bare array — the sibling above
-          // answers an array and the two are easy to assume alike; parsed as a list this yields
-          // nothing and the form is silently unsendable. `content` is frozen for that reason; the
-          // paging envelope is not, because the picker reads the first page whole and never asks
-          // for a second.
           new ContractOperation(
               "/api/v1/refining-methods",
               "get",
               Set.of("content", "id", "name", "ratingYield", "ratingCost", "ratingSpeed")),
-          // The three org-unit option reads. One DTO, one field set, three callers: the switcher
-          // asks what may be PINNED, the order form asks what exists, and the Lager's Umbuchen
-          // picker asks for the DESTINATION member's units rather than the caller's — which is why
-          // /users/{id}/memberships cannot be served by the me-scoped one.
-          //
-          // `kind` is frozen as a field, not constant-by-constant: it is nullable on the wire, and
-          // a strict client coerces an unknown value to null, so a new OrgUnit kind costs the row
-          // its badge rather than its screen.
           new ContractOperation(
               "/api/v1/me/org-units",
               "get",
@@ -1288,20 +876,12 @@ class ExternalContractTest {
               "/api/v1/org-units/active-all-kinds",
               "get",
               Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "isProfitEligible", "kind")),
-          // `allKinds=true` is not decoration: without it the answer is the member's Staffeln
-          // alone, and the Umbuchen picker would silently omit every Bereich, Spezialkommando and
-          // the Organisationsleitung — a destination the member can see in the web but not here.
           new ContractOperation(
                   "/api/v1/users/{id}/memberships",
                   "get",
                   Set.of(
                       "orgUnitId", "orgUnitName", "orgUnitShorthand", "isProfitEligible", "kind"))
               .addressedBy(Set.of("allKinds:boolean")),
-          // One material's entries, flat and paged — the tablet detail pane. The same rows as
-          // /inventory/all/stack/entries above and therefore the same frozen set: the pane shows
-          // what the caller may already see in the tree, laid out differently.
-          // `sort` is offered and deliberately not sent: the pane takes the server's order, and
-          // freezing a parameter the app does not send would promise a shape nobody relies on.
           new ContractOperation(
                   "/api/v1/inventory/material/{materialId}",
                   "get",
@@ -1319,12 +899,6 @@ class ExternalContractTest {
                       "note",
                       "user"))
               .addressedBy(Set.of("page:integer", "size:integer")),
-          // Phase 3, the Lager's three bookings. Every one of them carries `version`, and the two
-          // that move stock carry `amount` — the pair that decides what actually happens to a
-          // member's material, which is why they are the required fields the contract freezes.
-          // The entry level of the Lager tree, added in phase 3: a member cannot book out what they
-          // cannot select, and the two levels phase 2 read stop at the stack. `version` is frozen
-          // here for the same reason as on my-ships — every booking echoes it.
           new ContractOperation(
                   "/api/v1/inventory/all/stack/entries",
                   "get",
@@ -1341,9 +915,6 @@ class ExternalContractTest {
                       "personal",
                       "note",
                       "user"))
-              // The stack drill-down: five of these together name ONE stack. Dropping any of them
-              // does
-              // not widen the answer, it asks a different question.
               .addressedBy(
                   Set.of(
                       "materialId:string",
@@ -1358,9 +929,6 @@ class ExternalContractTest {
               "post",
               Set.of("id", "material", "location", "amount", "quality", "personal"),
               Set.of("amount", "locationId")),
-          // The book-out's `type` is DISCARD / TRANSFER / SELL. The schema does not mark it
-          // required — a book-out without one defaults server-side — so the required-enum guard
-          // leaves it alone by design, and the wording is pinned in the app's spec instead.
           new ContractOperation(
               "/api/v1/inventory/{id}/book-out",
               "post",
@@ -1373,9 +941,6 @@ class ExternalContractTest {
               Set.of("amount", "version")),
           new ContractOperation(
               "/api/v1/inventory/{id}/note", "put", Set.of("id", "note"), Set.of("version")),
-          // The four pickers the booking form needs. `quantityType` is frozen on the material
-          // because it is the unit every amount on the screen is expressed in — SCU or units — and
-          // a number without its unit is not a quantity.
           new ContractOperation(
                   "/api/v1/materials/search",
                   "get",
@@ -1393,9 +958,6 @@ class ExternalContractTest {
                   "get",
                   Set.of("content", "page", "totalElements", "totalPages", "id", "name"))
               .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
-          // `effectiveName` and not `username`: it is what the web app renders and what the member
-          // recognises. The rest of the record — email, roles, permissions — is deliberately not
-          // frozen, because the picker must not read it.
           new ContractOperation(
                   "/api/v1/users/search",
                   "get",
@@ -1405,36 +967,10 @@ class ExternalContractTest {
               "/api/v1/materials/{id}/terminals",
               "get",
               Set.of("terminalId", "terminalName", "priceSell")),
-          // Phase 4, the live-sync bridge (ADR-0143). Like the notification stream above, the
-          // response is a stream rather than a schema, so the field assertion is vacuous and the
-          // path-and-verb guard is the whole point. The event NAMES (`subscribed`, `changed`,
-          // `heartbeat`) and the frame shape are the real contract; they are pinned in the app's
-          // REQ-APP-SYNC spec and in LiveSyncStreamServiceTest, since nothing in this document
-          // describes them.
-          //
-          // The TOPIC vocabulary is a contract too, and a nastier one: renaming a room or a section
-          // key breaks a shipped client silently -- it keeps streaming and simply never hears about
-          // that screen again. That half cannot live here, because the topics appear in no OpenAPI
-          // schema; it is held by LiveSyncTopicRegistryParityTest against the frontend's registry.
           new ContractOperation("/api/v1/live-sync/stream", "get", Set.of())
-              // The live-sync stream's whole subscription protocol is this one parameter
-              // (ADR-0143).
-              // Losing it would not degrade the stream, it would silently open every client on
-              // nothing.
               .addressedBy(Set.of("topics:string")),
-          // The publish half. Frozen for its request fields rather than its response: it answers
-          // 202 with no body, and what a shipped client must keep being able to SEND is the frame.
           new ContractOperation(
               "/api/v1/live-sync/changed", "post", Set.of(), Set.of("topic", "sections")),
-          // Phase 4, Beförderung. The member's own record, me-scoped by construction: neither path
-          // takes an id, which is why neither appears in the query-parameter freeze.
-          //
-          // `hasConfiguredRules` is frozen for a reason that is easy to lose: it is what tells "no
-          // rules exist for this step" apart from "you do not meet them". Drop it and a shipped app
-          // renders an empty requirement list, which reads as a verdict the organisation never
-          // made. `assignedLevel` is frozen as a FIELD but deliberately not as a required enum --
-          // the levels are configured per organisation, the app shows the server's own spelling,
-          // and freezing the constants would bind a vocabulary that is theirs to change.
           new ContractOperation(
               "/api/v1/promotion/evaluations/my",
               "get",
@@ -1454,24 +990,10 @@ class ExternalContractTest {
                   "requiredCount",
                   "achievedCount",
                   "satisfied")),
-          // Phase 4, the forced-update gate. This one is in the set for an inverted reason: every
-          // other entry is frozen so a shipped app keeps working, and this is frozen so a shipped
-          // app can be told to STOP working. If the server ever renamed `minimumVersionCode`, the
-          // build that most needs the answer -- the one already too old -- would read no floor and
-          // carry on against a contract that no longer exists. It is also the operation an app
-          // calls before it has a token, so it must keep answering when everything else refuses.
           new ContractOperation(
               "/api/v1/app/version-policy",
               "get",
               Set.of("minimumVersionCode", "latestVersionCode", "releasesUrl")),
-          // Phase 4, Raffinerie. `status` is frozen as a FIELD and its constants are frozen by the
-          // required-enum guard, because the app sends them back as query values -- a renamed
-          // constant turns the whole list request into a 400 while the screen keeps loading.
-          //
-          // `endsAt` is frozen on the LIST only, and that asymmetry is deliberate: the detail DTO
-          // does not carry it, and the app computes it from `startedAt` + `durationMinutes` so the
-          // two screens agree. Freezing it on the detail would record a field that has never been
-          // sent.
           new ContractOperation(
                   "/api/v1/refinery-orders/my-orders",
                   "get",
@@ -1490,15 +1012,7 @@ class ExternalContractTest {
                       "oreSales",
                       "profit",
                       "version"))
-              // `status` repeats, which the array type records: the two live filters are one
-              // request for
-              // OPEN + IN_PROGRESS, split on the device.
               .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
-          // The squadron-wide list, admitted at the edge on 2026-09-08 (API vhost runbook phase U).
-          // Same
-          // envelope and same row as `/my-orders` -- the app switches between them without a
-          // second mapping -- plus `owner`, which is the whole reason it reads this one: a card
-          // that does not name its owner is useless the moment foreign runs are on screen.
           new ContractOperation(
                   "/api/v1/refinery-orders/all",
                   "get",
@@ -1533,18 +1047,8 @@ class ExternalContractTest {
                   "oreSales",
                   "profit",
                   "version")),
-          // The booking. Its item list is what the whole slice turns on: the endpoint marks an
-          // order COMPLETED whatever that list contains, so a renamed field would mark orders
-          // stored while creating nothing -- silently, and unrecoverably for the member.
           new ContractOperation(
               "/api/v1/refinery-orders/{id}/store", "post", Set.of(), Set.of("items")),
-          // Phase 4, Materialbörse. `kind` is frozen with its constants because the app reads a
-          // DIFFERENT PAIR OF FIELDS depending on it: an item names itself in `itemName` /
-          // `itemQuantity`, a material in `material` / `amount`. A renamed constant renders every
-          // item row blank rather than failing.
-          //
-          // `quantityType` is frozen for the reason the unit exists: an item counted in pieces and
-          // labelled „SCU" is a quantity a member acts on in a handover the tool never sees.
           new ContractOperation(
                   "/api/v1/material-exchange/offers",
                   "get",
@@ -1599,10 +1103,6 @@ class ExternalContractTest {
                       "viewerInterested",
                       "version"))
               .addressedBy(Set.of("page:integer", "size:integer")),
-          // The pledge and its withdrawal answer with the updated row, which is what lets the app
-          // replace one entry instead of re-reading the page. Freezing the response is therefore
-          // not optional here: a body that stopped carrying `interestCount` would leave the count
-          // frozen on screen with no error anywhere.
           new ContractOperation(
               "/api/v1/material-exchange/offers/{id}/interest",
               "post",
@@ -1623,8 +1123,6 @@ class ExternalContractTest {
               "/api/v1/material-exchange/offers/{id}/deactivate", "post", Set.of("id", "status")),
           new ContractOperation(
               "/api/v1/material-requests/{id}/deactivate", "post", Set.of("id", "status")),
-          // The two creates. `inventoryItemId` is what makes an offer an offer of something the
-          // member actually holds; `materialId` the same for a request.
           new ContractOperation(
               "/api/v1/material-exchange/offers",
               "post",
@@ -1635,9 +1133,6 @@ class ExternalContractTest {
               "post",
               Set.of(),
               Set.of("materialId", "requestedAmount")),
-          // The offer sheet's stock suggestion. `alreadyReleased` is frozen because it is the only
-          // thing stopping a member from offering the same stack twice, and `quantityType` for the
-          // unit reason above.
           new ContractOperation(
                   "/api/v1/material-exchange/releasable-items",
                   "get",
@@ -1649,46 +1144,16 @@ class ExternalContractTest {
                       "amount",
                       "locationName",
                       "alreadyReleased"))
-              // The offer sheet's picker: `q` is its search box and `kind` its Material/Item radio
-              // (REQ-MARKET-002). `kind` carries the MATERIAL / ITEM vocabulary already frozen on
-              // the
-              // offers response -- but as a PARAMETER enum, which the required-enum guard does not
-              // walk,
-              // so the type is all this half can hold and the constants stay pinned by that
-              // response.
               .addressedBy(Set.of("q:string", "kind:string")),
-          // ── The bank-staff writes, and the lists they answer with (2026-09-03) ───────────
-          // The other half of the 30-operation gap the same audit opened. These are the paths
-          // whose shape could only be established from what the app SENDS as well as from what it
-          // reads, which is why they trail the four bank-staff reads above rather than sitting
-          // beside them. `bank` is deliberately not in the read-only family, so naming a path here
-          // opens every verb the backend serves on it — the request half is frozen too, because a
-          // newly required field is a 400 on every build already in the field.
-          //
-          // The account DTO's five unread fields are named above and hold here unchanged.
-
-          // The account detail behind artboard 6. `account` is frozen as a field with the four
-          // names the pane renders out of it, and `delta30d` and `bookingCount` beside it as the
-          // two roll-ups the header shows. `approvalLimits` and `capabilities` are on the wire and
-          // read by nothing: the app takes its capability answer from /me/capabilities, and the
-          // KRT ladder editor is not one of its four tabs.
           new ContractOperation(
               "/api/v1/bank/accounts/{id}",
               "get",
               Set.of("account", "id", "accountNo", "name", "balance", "delta30d", "bookingCount")),
-          // The rename. It answers the account DTO through the SAME mapping function as the list
-          // above, so the same eight fields — freezing fewer here would let this response drift
-          // into a row the list's own mapper can no longer read. Both request fields are required:
-          // the new name, and the lock echo without which the rename is last-writer-wins.
           new ContractOperation(
               "/api/v1/bank/accounts/{id}",
               "patch",
               Set.of("id", "accountNo", "name", "type", "status", "balance", "orgUnit", "version"),
               Set.of("name", "version")),
-          // Close and reopen: one request shape, one response shape, two operations. The body is
-          // the version echo and nothing else — the state being set is in the path, which is why
-          // `version` alone is the required set and why dropping it would make the two buttons
-          // silently clobber a concurrent edit instead of answering 409.
           new ContractOperation(
               "/api/v1/bank/accounts/{id}/close",
               "post",
@@ -1699,13 +1164,6 @@ class ExternalContractTest {
               "post",
               Set.of("id", "accountNo", "name", "type", "status", "balance", "orgUnit", "version"),
               Set.of("version")),
-          // The staff ledger. Same envelope and same row DTO as the member's
-          // /org-units/bank/accounts/{id}/transactions, mapped by the same function — so this set
-          // is what that mapper consumes, not what this screen happens to draw. `justification`,
-          // `staffNote`, `counterAccountNo`, `counterAccountName`, `counterHolderHandle`,
-          // `intraAccount` and `counterpartyOrgUnitName` are on the wire and it reads none of
-          // them. `size` and `sort` sit on the envelope unread: paging is decided from
-          // `page` + `totalPages`.
           new ContractOperation(
                   "/api/v1/bank/accounts/{id}/transactions",
                   "get",
@@ -1725,22 +1183,9 @@ class ExternalContractTest {
                       "transferFee",
                       "counterpartyHandle"))
               .addressedBy(Set.of("page:integer", "size:integer")),
-          // The account statement, a PDF: the 200 body is a byte string with no `$ref`, so the
-          // field guard resolves nothing and the two parameters ARE the contract here. Both are
-          // required server-side and both are sent. Frozen as the bare OpenAPI type, because the
-          // resolver builds its key from `schema.type` and never reads the format — a recorded
-          // `string(date-time)` would match nothing it ever emits.
           new ContractOperation("/api/v1/bank/accounts/{id}/statement", "get", Set.of())
               .addressedBy(Set.of("from:string", "to:string")),
-          // The three-month export, bytes and fieldless for the same reason, earning its entry
-          // through the path/verb and edge-reachability guards. It declares `X-User-Time-Zone` as
-          // a HEADER parameter, which the query-parameter guard filters out by `in` — and nothing
-          // in this file freezes a header, so making that one required would fire no gate at all.
           new ContractOperation("/api/v1/bank/export/three-month-report", "get", Set.of()),
-          // Artboard 7's grant list, addressed by ONE parameter although the endpoint offers two:
-          // a grant screen is per account, and `userId` is never sent. The answer is a bare array,
-          // so there is no envelope to freeze. `accountName`, `accountNo` and `granteeHasBankRole`
-          // are on the DTO and the app maps none of them.
           new ContractOperation(
                   "/api/v1/bank/grants",
                   "get",
@@ -1753,12 +1198,6 @@ class ExternalContractTest {
                       "canTransfer",
                       "version"))
               .addressedBy(Set.of("accountId:string")),
-          // The create. Its 201 runs through the list's own mapper, which is why the whole row is
-          // frozen although the caller discards the model and re-reads: two of these names are
-          // load-bearing before it gets that far — without `userId` or `accountId` the mapper
-          // returns null and the repository reports a write that SUCCEEDED as a server failure.
-          // Only those two are required on the wire; the three capability flags default
-          // server-side, so an old build stays correct whether it sends them or not.
           new ContractOperation(
               "/api/v1/bank/grants",
               "post",
@@ -1771,9 +1210,6 @@ class ExternalContractTest {
                   "canTransfer",
                   "version"),
               Set.of("userId", "accountId")),
-          // The capability toggles. All four request fields are required and all four are sent:
-          // the flags go as a complete set rather than as a delta, so a fourth capability added as
-          // required would leave a shipped build unable to change any of the three it knows.
           new ContractOperation(
               "/api/v1/bank/grants/{userId}/{accountId}",
               "patch",
@@ -1786,25 +1222,12 @@ class ExternalContractTest {
                   "canTransfer",
                   "version"),
               Set.of("canDeposit", "canWithdraw", "canTransfer", "version")),
-          // The revoke answers 204 with no body, so there is nothing to freeze but the path and
-          // the verb. Both ids are path segments, which is why no query parameter is recorded.
           new ContractOperation("/api/v1/bank/grants/{userId}/{accountId}", "delete", Set.of()),
-          // The holder-to-holder transfer, frozen for its request rather than its response: it
-          // answers the transaction DTO and the repository collapses it to Unit, so no field is
-          // read and an empty set is the fact rather than an omission. The three required fields
-          // are the two ends and the amount — the whole of what the write means; `note` is
-          // optional and stays out, so it can never become the field an old build fails to send.
           new ContractOperation(
               "/api/v1/bank/holders/transfer",
               "post",
               Set.of(),
               Set.of("sourceHolderId", "destinationHolderId", "amount")),
-          // The holder ledger. A different row DTO from the account ledger and a different read:
-          // this one names the COUNTER ACCOUNT — `counterAccountName` with `counterAccountNo`
-          // behind it — where the staff ledger names the counterparty handle. Both halves of that
-          // fallback are frozen, because the fallback IS the contract: losing the name alone
-          // leaves a number, losing both leaves a booking with no other side. `transferFee` is on
-          // this DTO as well and read by nothing here; `sort` is offered and not sent.
           new ContractOperation(
                   "/api/v1/bank/holders/{id}/transactions",
                   "get",
@@ -1824,16 +1247,6 @@ class ExternalContractTest {
                       "counterHolderHandle",
                       "reversedTransactionId"))
               .addressedBy(Set.of("page:integer", "size:integer")),
-          // The staff request queue. `status` is offered as a filter and no shipped call site
-          // sends one: the repository can emit it, but every screen takes the default, and
-          // freezing a parameter the app does not send would promise a shape nobody relies on.
-          //
-          // `justification` is frozen because it is what `note` falls back to when the member left
-          // the note empty — a row whose reason vanished reads as a request submitted without one.
-          // The member-side /org-units/bank/requests entry above runs the SAME mapper and omits
-          // it; that entry is under-frozen, this one is not. `BankBookingRequestDto` carries
-          // seventeen further fields the mapper never touches, among them staffNote, holderId,
-          // resultingTransactionId, deciderHandle, splitEnabled and the four counterparty names.
           new ContractOperation(
                   "/api/v1/bank/requests",
                   "get",
@@ -1861,15 +1274,6 @@ class ExternalContractTest {
                       "createdAt",
                       "version"))
               .addressedBy(Set.of("page:integer", "size:integer")),
-          // Confirm and reject, the two decisions. Both answer the request DTO and both send it
-          // through the queue's own mapper, so the frozen set is what that mapper consumes rather
-          // than the single field the caller keeps — the mapper is the thing that breaks, not the
-          // screen. `id` is the load-bearing one: without it the mapper returns null and a 200 is
-          // reported to the staff member as a server error, on a booking that already happened.
-          //
-          // `holderId` is required on the confirm because the money needs a holder to land on, and
-          // `reason` on the reject because a rejection without one is not a rejection. Neither
-          // takes a query parameter; `id` is a path segment on both.
           new ContractOperation(
               "/api/v1/bank/requests/{id}/confirm",
               "post",
@@ -1916,37 +1320,10 @@ class ExternalContractTest {
                   "createdAt",
                   "version"),
               Set.of("reason", "version")),
-          // The Storno. Unlike confirm and reject it does NOT go through that mapper — the success
-          // branch discards the parsed body — so the empty response set is a fact about the app,
-          // not an omission. The request half is what this entry really pins: the schema requires
-          // nothing today, the app sends only the optional `note`, and a `reason` made mandatory
-          // here would 400 every installed build in the middle of reversing a booking.
           new ContractOperation("/api/v1/bank/transactions/{id}/reversal", "post", Set.of()),
-          // The two creates that closed the audit. `items` is the whole of the item order: a list
-          // that arrived renamed makes an order the requester sees accepted and nobody can fulfil.
-          // `id` is all either response is read for — both forms navigate to what they just
-          // created, and a create that answers without one strands the member on the form.
           new ContractOperation("/api/v1/orders/items", "post", Set.of("id"), Set.of("items")),
-          // `RefineryOrderDto` is the request AND the response schema here, so the required set is
-          // asserted against the same object the response guard walks. `goods` and `location` are
-          // required and sent; the DTO's other fourteen properties are optional on the way in and
-          // unread on the way out.
           new ContractOperation(
               "/api/v1/refinery-orders", "post", Set.of("id"), Set.of("goods", "location")),
-          // ---- Phase N: the Materialsammelübersicht and one crew removal ----------------------
-          //
-          // The screen is one gate, so its four operations are frozen together. `canEdit` above is
-          // the gate: the app draws all three controls from it because it is
-          // `isLogisticianOrAbove() && canEditJobOrder(id)`, the same expression the two unlinks
-          // carry in their own `@PreAuthorize`. Renaming or dropping it does not disable the
-          // screen, it opens it -- an absent flag reads as "no" client-side, and every member would
-          // silently lose the three writes with nothing in a log to say why.
-          //
-          // The row's frozen set is the mapper's, not the DTO's: `inventoryEntryId` keys every
-          // write and a row without one is dropped, `version` is the row's own optimistic lock, and
-          // the remaining seven are what the card draws. `ownerName`/`location` are redacted to
-          // null for a caller who may not see them, which the app already handles -- absent is not
-          // the same as renamed.
           new ContractOperation(
               "/api/v1/orders/{jobOrderId}/material-collection",
               "get",
@@ -1962,56 +1339,19 @@ class ExternalContractTest {
                   "quantity",
                   "allocatedQuantity",
                   "delivered")),
-          // Both unlinks answer 204 and the app reads nothing back -- it re-reads the collection,
-          // because every write here moves a figure the server computes. Nothing to freeze but the
-          // path and the verb, which is the promise that matters: a rename is a 404 the member
-          // sees as "could not be saved".
           new ContractOperation(
               "/api/v1/orders/{jobOrderId}/inventory/{inventoryItemId}/unlink", "delete", Set.of()),
           new ContractOperation(
               "/api/v1/orders/{jobOrderId}/materials/{materialId}", "delete", Set.of()),
-          // The delivered flag. The response is discarded, so only the request is frozen -- and all
-          // three of its fields are required: `jobOrderId` says which order's link is being marked
-          // (a row can be earmarked to exactly one, but the endpoint is on /inventory and will not
-          // infer it), and `version` is the row's own lock, so dropping it would turn a concurrent
-          // edit from a 409 into a silent overwrite.
           new ContractOperation(
               "/api/v1/inventory/{id}/delivered",
               "patch",
               Set.of(),
               Set.of("delivered", "jobOrderId", "version")),
-          // The `/slim` crew removal, and deliberately not the deprecated full-DTO sibling beside
-          // it: that one is `@ApiDeprecation`-marked with a sunset, and freezing a path the backend
-          // has announced it will withdraw is a promise made to be broken. Answers 204, so the app
-          // re-reads the Einsatz -- the same shape as the participant leave frozen further up.
           new ContractOperation(
               "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "delete", Set.of()),
-          // ---- Phase O: the Verwaltung's direct booking ----------------------------------------
-          //
-          // Design ch. 12 artboard 9, REQ-APP-BANK-016, shipped with tests -- and answering 404 in
-          // production the whole time, because the vhost excluded the four paths on the ground that
-          // "no artboard draws them". Freezing them here is the other half of admitting them; the
-          // reachability guard below now holds both halves together.
-          //
-          // The gate on all four is `hasRole('BANK_EMPLOYEE')`, and on the three bookings a
-          // PER-ACCOUNT grant on top (`canDeposit` / `canWithdraw` / `canTransfer`, with
-          // management and admin unrestricted). Not Bank-Management: the app had gated its own
-          // entry on that and locked out exactly the caller the Grants tab exists to create.
-          //
-          // `holderId` is required on all three and is the one worth saying out loud: custody is
-          // kept per org unit, so a balance without a holder is money nobody is accountable for.
-          // A server that stopped requiring it would not break the app -- it would let the app
-          // write an unaccountable balance.
           new ContractOperation(
               "/api/v1/bank/deposits", "post", Set.of(), Set.of("accountId", "amount", "holderId")),
-          // The two with a ceiling, and the reason their RESPONSE is frozen where the deposit's is
-          // not. Over the KRT employee ceiling the server does not refuse: it files the attempt as
-          // a band-routed approval request and answers 202 with `pendingRequest` where a booking
-          // carries `transaction` (REQ-BANK-047, ADR-0109). Both are 2xx. The app branches on
-          // `pendingRequest` to tell the member the balance has NOT moved -- so renaming that field
-          // does not break a screen, it makes a shipped build report a filed withdrawal as a
-          // completed one. It did exactly that until 2026-09-03, when the app read no answer at
-          // all.
           new ContractOperation(
               "/api/v1/bank/withdrawals",
               "post",
@@ -2027,25 +1367,7 @@ class ExternalContractTest {
                   "destinationHolderId",
                   "sourceAccountId",
                   "sourceHolderId")),
-          // The fee rate the sheet quotes before anything is booked. `rate` is the only field, and
-          // an absent one is read as zero -- so a rename would not fail, it would quietly quote
-          // "no fee" on a transfer that charges one.
           new ContractOperation("/api/v1/bank/transfer-fee-rate", "get", Set.of("rate")),
-          // ---- Phase P: the Freigabe-Limits -----------------------------------------------------
-          //
-          // REQ-APP-BANK-017, design ch. 12 artboard 10, shipped 2026-08-30 -- and refused by the
-          // edge ever since, on a stem whose `/settings` GET is admitted. So the section drew its
-          // current values correctly and every write answered 404. `approval-limit` appeared
-          // NOWHERE in the API vhost runbook: not admitted, and not among the deliberate exclusions
-          // either.
-          //
-          // All four leaves answer the account's whole settings object, which is why their frozen
-          // response set is the same one `/settings` carries above -- the section redraws from the
-          // answer rather than re-reading, so a field lost here is a control that silently stops
-          // reflecting what was just saved.
-          //
-          // `limit` is the only required request field, and the DELETEs have none: clearing a
-          // ceiling is addressed entirely by its path.
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
               "put",
@@ -2082,18 +1404,6 @@ class ExternalContractTest {
               "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
               "delete",
               BANK_ACCOUNT_SETTINGS),
-          // ---- Phase Q: the member's own settings, and the Aushang's read marker --------------
-          //
-          // Reported from a device: both Einstellungen rows greyed out on every account since the
-          // first release. They are drawn `enabled` only once their value has arrived, and the GET
-          // that would deliver it was admitted by no rule -- so it answered 404 and the rows sat in
-          // exactly the state a never-set value produces. The quietest shape this class has: not a
-          // failure a member can report, just two settings that appear to have none.
-          //
-          // GET and PUT are frozen TOGETHER for both, and that is not tidiness. The two rows are
-          // columns of one User row sharing one optimistic-lock version, which the app echoes from
-          // whatever its read returned; a client that could write but not read would send `0` and
-          // be refused -- or succeed by accident against a row still at 0.
           new ContractOperation(
               "/api/v1/users/me/payout-preference",
               "get",
@@ -2112,62 +1422,23 @@ class ExternalContractTest {
               "put",
               Set.of("shareBlueprintsGlobally", "version"),
               Set.of("shareBlueprintsGlobally", "version")),
-          // The marker answers the whole UserDto and the app reads exactly one name out of it --
-          // the id it just wrote -- to confirm the band may stay down. Losing that field would put
-          // the „UNGELESEN" band back on every dashboard load with the write having succeeded.
           new ContractOperation(
               "/api/v1/users/me/read-announcement/{announcementId}",
               "put",
               Set.of("lastReadAnnouncementId")),
-          // ---- Phase R: the two edits that were 405, not 404 ---------------------------------
-          //
-          // Both paths were already admitted; only the read-only guard refused the verb. The
-          // carve-out that opens them is METHOD-SCOPED, because the backend serves DELETE on both
-          // and the app sends neither -- see phase R of docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md.
-          //
-          // The order edit answers the whole order and the app folds it back through the SAME
-          // mapper as the detail read, so its frozen set is that one. `materials` is the only
-          // required request field: an order without lines is not an order.
           new ContractOperation(
               "/api/v1/orders/{id}", "put", JOB_ORDER_DETAIL, Set.of("materials")),
-          // The Operation edit DISCARDS its answer -- `updateOperation` maps the result to
-          // `ApiResult.Success(Unit)` -- so there is no response field to freeze and recording one
-          // would promise a shape nothing reads. The request is what matters, and its `status` is
-          // a required enum: a shipped build sends the literal string.
           new ContractOperation(
               "/api/v1/operations/{id}", "put", Set.of(), Set.of("name", "status", "version")),
-          // ---- Phase S: the four pickers that answered „there are none" ----------------------
-          //
-          // Each of these is swallowed on failure by design -- a picker is one field on a form
-          // about something else -- so a refused read renders as an EMPTY list, and an empty
-          // picker reads as an answer. That is what made this class unreportable, and it is why
-          // the frozen sets below are derived from what each mapper reads rather than from the
-          // DTO: a name that disappears here empties a control rather than failing anything.
           new ContractOperation(
               "/api/v1/orders/lookup",
               "get",
               Set.of("id", "displayId", "handle", "requiredMaterialIds", "requiredGameItemIds")),
           new ContractOperation("/api/v1/missions/lookup", "get", Set.of("id", "name", "status")),
           new ContractOperation("/api/v1/operations/lookup", "get", Set.of("id", "name")),
-          // `active` is read as a FILTER (`it.active != false`), which is the easiest kind of
-          // field to lose: drop it and every retired Funktion returns to both pickers, with
-          // nothing failing. `content` is the envelope the app reads whole -- it walks no pages
-          // here, it asks for 200 and takes them.
           new ContractOperation(
                   "/api/v1/job-types", "get", Set.of("content", "id", "name", "active"))
               .addressedBy(Set.of("archetype:string", "page:integer", "size:integer")),
-          // ---- Phase T: the Auftrags-Familie, reads and the writes they arm -------------------
-          //
-          // The audit's own block of ten, minus `PUT /orders/<uuid>` which phase R opened. Four
-          // reads and five writes, admitted together because the pairs do not work apart: the
-          // Zusagen list carries its own upsert and withdrawal, and the Bestandszeilen read is
-          // what makes a Material-Uebergabe submittable at all -- without it no `inventoryItemId`
-          // can be picked, and an Uebergabe is what closes an Auftrag.
-          //
-          // `material-demand` nests THREE deep (overview -> group -> row -> per-order share) and
-          // this guard descends two, so the share's `jobOrderId`, `displayId` and `status` are out
-          // of its reach and are deliberately not recorded. Recording them would fail the guard
-          // rather than protect them; the two levels it does see carry the whole planning table.
           new ContractOperation(
               "/api/v1/orders/material-demand",
               "get",
@@ -2185,9 +1456,6 @@ class ExternalContractTest {
                   "claimedAmount",
                   "outstandingAmount",
                   "orders")),
-          // The Verfuegbarkeits-Chip on a sub-assembly. It reads five names and drops a group
-          // without a `gameItem.id`, so the id is load-bearing rather than decorative: lose it and
-          // the chip does not go blank, the row disappears.
           new ContractOperation(
               "/api/v1/orders/{jobOrderId}/item-stock",
               "get",
@@ -2198,9 +1466,6 @@ class ExternalContractTest {
                   "orderedAmount",
                   "manufacturedAmount",
                   "allocatedTotal")),
-          // The Zusagen tab, and its two writes. `openRemaining` is what the tab is FOR -- how much
-          // of a material nobody has pledged yet -- and `material.id` keys the upsert, so a bucket
-          // without one is dropped.
           new ContractOperation(
               "/api/v1/orders/{jobOrderId}/claims",
               "get",
@@ -2217,19 +1482,12 @@ class ExternalContractTest {
                   "claimingOrgUnit",
                   "shorthand",
                   "amount")),
-          // Both claim writes DISCARD their answer -- the tab is re-read instead, because the
-          // server decides the bucket order -- so there is no response field to freeze and
-          // recording one would promise a shape nothing reads. `qualityRequirement` is a required
-          // enum the app sends as a literal string; it is frozen below.
           new ContractOperation(
               "/api/v1/orders/{jobOrderId}/claims",
               "post",
               Set.of(),
               Set.of("amount", "claimingOrgUnitId", "materialId", "qualityRequirement")),
           new ContractOperation("/api/v1/orders/{jobOrderId}/claims/{claimId}", "delete", Set.of()),
-          // The Bestandszeilen the Uebergabe-Sheet picks from. `jobOrderAllocations` carries the
-          // slice already earmarked for THIS Auftrag, which is the number the sheet caps against;
-          // without it every row would offer its whole stack.
           new ContractOperation(
               "/api/v1/orders/{id}/materials/{matId}/inventory",
               "get",
@@ -2245,14 +1503,6 @@ class ExternalContractTest {
                   "jobOrderAllocations",
                   "jobOrderId",
                   "version")),
-          // The three Logistiker writes that answer with something the app does not read: the
-          // material handover, the item handover and the production booking. Each maps its result
-          // to success-or-failure and re-reads the Auftrag, so only the request is frozen.
-          //
-          // `items` and `entries` are the two list names, and they differ: the item handover's
-          // wire name is `entries` while the app's generated property is `propertyEntries`. The
-          // wire name is what is frozen, which is the whole point of reading the document rather
-          // than the client.
           new ContractOperation(
               "/api/v1/orders/{id}/handovers",
               "post",
@@ -2268,21 +1518,9 @@ class ExternalContractTest {
               "post",
               Set.of(),
               Set.of("amount", "bookIn", "consumption", "version")),
-          // The Gegenstands-Edit replaces the ordered lines whole, so `items` is its one required
-          // field: an edit that omits it is not an edit, it is an emptying.
           new ContractOperation("/api/v1/orders/{id}/items", "put", Set.of(), Set.of("items")),
-          // „Nach vorn/hinten" -- and it takes the position as a QUERY parameter with no body at
-          // all, which is why its required-request set is empty rather than forgotten. The answer
-          // is the whole Auftrag through the same mapper as the detail read, because every other
-          // row's priority has changed too.
           new ContractOperation("/api/v1/orders/{id}/priority", "put", JOB_ORDER_DETAIL)
               .addressedBy(Set.of("priority:integer")),
-          // ---- Phase U: the three Lager writes -----------------------------------------------
-          //
-          // Sammel-Ausbuchen discards its answer -- the list is re-read -- so only its request is
-          // frozen. Sammel-Umbuchen reads two counters and nothing else: the screen reports „so
-          // many moved, so many skipped", and a lost counter makes a bulk move that worked look
-          // like one that did nothing.
           new ContractOperation(
               "/api/v1/inventory/bulk-checkout", "post", Set.of(), Set.of("itemIds")),
           new ContractOperation(
@@ -2290,9 +1528,6 @@ class ExternalContractTest {
               "post",
               Set.of("rebooked", "skipped"),
               Set.of("itemIds", "mode")),
-          // The earmark, and the worst of the three: the save loop is sequential and
-          // version-chained, so the first refused row leaves `partial` at zero and NOTHING is ever
-          // written. All three verbs answer the whole row through one mapper.
           new ContractOperation(
               "/api/v1/inventory/{id}/allocation",
               "post",
@@ -2308,21 +1543,6 @@ class ExternalContractTest {
               "delete",
               INVENTORY_ROW,
               Set.of("field", "targetId")),
-          // ---- Phase V: the Einsatz planning set ---------------------------------------------
-          //
-          // The audit's largest block, and the one where most entries freeze NOTHING on the
-          // response. Every `/slim` write answers with the part it touched, and since
-          // basetool-android#140 the app discards that and re-reads the Einsatz -- so recording a
-          // response field would promise a shape nothing reads. What is left to guard is the
-          // request, and there the `version` fields are the whole game: each section carries its
-          // own counter, and a counter that disappears turns a concurrent edit into a silent
-          // overwrite instead of the 409 it exists to raise.
-          //
-          // The four that still answer with the whole Einsatz do so because their endpoints have
-          // no slim twin. A fifth, `POST …/participants`, was retired on 2026-09-22 (BE-SIMP-02):
-          // it had been deprecated (announced sunset 2026-10-20, shortened by owner decision to
-          // 2026-09-22), and the app moved off it on 2026-09-07. Its manager-only successor is
-          // `…/participants/by-id/slim` below.
           new ContractOperation(
               "/api/v1/missions/{id}/core", "patch", MISSION_DETAIL, Set.of("name", "version")),
           new ContractOperation(
@@ -2334,19 +1554,10 @@ class ExternalContractTest {
               Set.of("isInternal", "version")),
           new ContractOperation(
               "/api/v1/missions/{id}/party-lead", "put", MISSION_DETAIL, Set.of("version")),
-          // The manager-only add-by-id that replaced it (REQ-MISSION-020, ADR-0170 amended
-          // 2026-09-22). The answer is the participant list and the app re-reads the Einsatz, so
-          // no response field is frozen; the one required request field is the whole contract.
           new ContractOperation(
               "/api/v1/missions/{id}/participants/by-id/slim", "post", Set.of(), Set.of("userId")),
-          // The only read in the phase, and the only one that is not 401: `GET /missions/**` is
-          // permitAll, so it is dispatched and refused at the method seam with a 403. A ship
-          // without an id is dropped, and the type is what tells two Carracks apart.
           new ContractOperation(
               "/api/v1/missions/{id}/unit-ship-options", "get", Set.of("id", "name", "shipType")),
-          // Einheiten, crew, Frequenz and Verwalter. All answers discarded except the custom
-          // frequency's, which is spliced onto the Einsatz as last read -- it is the one endpoint
-          // in this group with no plain twin, so it never went through the re-read.
           new ContractOperation(
               "/api/v1/missions/{id}/units/slim", "post", Set.of(), Set.of("name")),
           new ContractOperation(
@@ -2370,10 +1581,6 @@ class ExternalContractTest {
               "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", "delete", Set.of()),
           new ContractOperation("/api/v1/missions/{id}/managers/{userId}/slim", "post", Set.of()),
           new ContractOperation("/api/v1/missions/{id}/managers/{userId}/slim", "delete", Set.of()),
-          // Ablauf and Ziele, which exist ONLY as /slim and whose answers ARE read: the section is
-          // spliced onto the Einsatz as last read rather than re-fetched, because the server
-          // decides the order. `stepsVersion` and `objectivesVersion` are the section counters --
-          // the two most load-bearing request fields in this phase.
           new ContractOperation(
               "/api/v1/missions/{id}/steps/slim",
               "post",
@@ -2384,9 +1591,6 @@ class ExternalContractTest {
               "put",
               STEP_ROW,
               Set.of("stepsVersion", "title")),
-          // The two deletes carry their section counter as a QUERY parameter rather than a
-          // body, which is the one place in this phase where the version is not in the payload --
-          // and losing it there would not fail the write, it would make it unconditional.
           new ContractOperation("/api/v1/missions/{id}/steps/{stepId}/slim", "delete", STEP_ROW)
               .addressedBy(Set.of("stepsVersion:integer")),
           new ContractOperation(
@@ -2417,14 +1621,6 @@ class ExternalContractTest {
               "put",
               OBJECTIVE_ROW,
               Set.of("objectiveIds", "objectivesVersion")),
-          // ---- Phase W: the Handel family -----------------------------------------------------
-          //
-          // The price screens and the Materialboerse. Three of the four price reads were ANONYMOUS
-          // when this phase was written -- `prices-overview` and `*/prices` answered 200 and
-          // `profit-calculation` answered 500, dispatched and crashing rather than refusing -- and
-          // they carry the same UEX trade data REQ-SEC-032 keeps off the public vhost through
-          // `matrix`. They were closed in SecurityConfig BEFORE the edge admitted them; admitting
-          // them as they stood would have published trade prices to the internet.
           new ContractOperation(
                   "/api/v1/materials/prices-overview",
                   "get",
@@ -2437,9 +1633,6 @@ class ExternalContractTest {
                       "maxPriceSell",
                       "isIllegal"))
               .addressedBy(Set.of("name:string", "page:integer", "size:integer", "sort:string")),
-          // `GET /materials/{id}` stays anonymous by decision (REQ-SEC-037): MaterialDto is
-          // catalogue only -- no price -- and `/materials/search` has published the same fields
-          // anonymously since phase 2.
           new ContractOperation(
               "/api/v1/materials/{id}",
               "get",
@@ -2449,9 +1642,6 @@ class ExternalContractTest {
                   "get",
                   Set.of("content", "id", "terminalName", "priceBuy", "priceSell"))
               .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
-          // The route arithmetic. `starSystemNames` is a REPEATED parameter, one per system, and an
-          // absent list means „every system" -- which is why it is recorded rather than left blank:
-          // a rename would narrow the answer instead of failing it.
           new ContractOperation(
                   "/api/v1/materials/profit-calculation",
                   "get",
@@ -2464,16 +1654,11 @@ class ExternalContractTest {
                       "maxProfitFullLoad",
                       "marginPercent"))
               .addressedBy(Set.of("shipId:string", "starSystemNames:array")),
-          // The app page-walks this for ONE field: the set of star-system names its filter offers.
           new ContractOperation(
                   "/api/v1/terminals", "get", Set.of("content", "starSystemName", "totalPages"))
               .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
-          // A list of ids in and a list of ids out. Nothing to freeze on the response but its
-          // shape, and the query parameter is the whole request.
           new ContractOperation("/api/v1/material-exchange/released-item-ids", "get", Set.of())
               .addressedBy(Set.of("ids:array")),
-          // The three Materialboerse writes the audit counted. Each answers with the row it wrote,
-          // and `version` is the optimistic lock the two edits echo.
           new ContractOperation(
               "/api/v1/material-exchange/item-offers",
               "post",
@@ -2491,15 +1676,6 @@ class ExternalContractTest {
               "put",
               Set.of(),
               Set.of("desiredAmount", "version")),
-          // ---- Phase X: the last seven ---------------------------------------------------------
-          //
-          // Blaupausen, the Fleetview import and the two thresholds that colour an Auftrag by age.
-          //
-          // The import PAIR is the shape to read: `/import/preview` is a multipart upload whose
-          // answer the member then edits, and `/import/apply` sends those edits back. The audit
-          // filed the apply as „latent -- and then work-destroying": unreachable without the
-          // preview, and the thing that discards a member's resolutions once it is reachable. They
-          // are frozen together for the same reason they are admitted together.
           new ContractOperation(
               "/api/v1/personal-blueprints/import/preview",
               "post",
@@ -2538,8 +1714,6 @@ class ExternalContractTest {
                   "get",
                   Set.of("ownerName", "orgUnitMember"))
               .addressedBy(Set.of("productKey:string")),
-          // The Fleetview import reads three counters and nothing else -- the screen reports what
-          // happened, and a lost counter makes a successful import read as one that did nothing.
           new ContractOperation(
               "/api/v1/hangar/import/fleetview",
               "post",
@@ -2547,59 +1721,31 @@ class ExternalContractTest {
               Set.of("file")),
           new ContractOperation(
               "/api/v1/hangar/ships/home-location", "post", Set.of(), Set.of("locationId")),
-          // Anonymous BY DESIGN (REQ-SEC-037): two integers from the same permitAll catalogue block
-          // as /locations and /job-types. `value` is the whole answer the app reads -- it parses it
-          // as a number and falls back to a built-in default when the read fails, which is exactly
-          // why the failure was silent for so long.
           new ContractOperation("/api/v1/settings/{key}", "get", Set.of("value")));
 
   /**
-   * Contract operations the app addresses by <strong>no</strong> query parameter, although the
-   * document declares one.
-   *
-   * <p>An exemption ledger, not a second freeze list. The coverage guard below refuses an operation
-   * that takes query parameters and records none, because that silence is indistinguishable from
-   * forgetting — which is exactly how five of them slipped in. Naming one here is the way to say
-   * "considered, and the app sends nothing", and it costs a line in a diff a reviewer sees.
-   *
-   * <p>{@code GET /api/v1/users/me/memberships} declares {@code allKinds}, and the app relies on
-   * its <em>default</em> rather than sending it: {@code false} is the Staffel/SK-only shape the
-   * org-unit switcher renders, and the {@code kind} field frozen on its response is that pair. The
-   * house rule — freeze only what the app sends — keeps it out, for the same reason {@code sort} is
-   * absent from the paged lists whose server-side default order the app takes as it comes.
+   * Contract operations the app deliberately addresses with no query parameter although the
+   * document declares one, exempting them from the query-parameter coverage guard.
    */
   private static final Set<String> ADDRESSED_BY_NO_QUERY_PARAMETER =
       Set.of(
           "get /api/v1/users/me/memberships",
-          // The refinery form's method picker asks for the path and reads `content` whole. The
-          // endpoint offers page/size/sort and the app sends none of them: there are a couple of
-          // dozen methods, they change on a game patch rather than on a member's action, and a
-          // picker that paged would be a picker somebody has to operate. Recorded rather than left
-          // blank, because a blank slot cannot be told apart from a forgotten one.
           "get /api/v1/refining-methods",
-          // Phase X. The two imports are addressed by path and their multipart part; the
-          // home-location write and the two blueprint writes take no parameter at all.
           "post /api/v1/personal-blueprints/import/preview",
           "post /api/v1/personal-blueprints/import/apply",
           "post /api/v1/personal-blueprints/batch",
           "post /api/v1/hangar/import/fleetview",
           "post /api/v1/hangar/ships/home-location",
-          // Phase W. The four writes are addressed by path alone; every read in the phase
-          // takes parameters and records them above.
           "post /api/v1/material-exchange/item-offers",
           "post /api/v1/material-requests/item",
           "put /api/v1/material-exchange/offers/{id}/remark",
           "put /api/v1/material-requests/{id}",
           "get /api/v1/materials/{id}",
-          // Phase U. All three are addressed by path alone.
           "post /api/v1/inventory/bulk-checkout",
           "post /api/v1/inventory/bulk-rebook",
           "post /api/v1/inventory/{id}/allocation",
           "patch /api/v1/inventory/{id}/allocation",
           "delete /api/v1/inventory/{id}/allocation",
-          // Phase T. Six of its nine take no parameter at all, and the four reads are
-          // addressed by path alone. Recorded rather than left blank, because a blank slot cannot
-          // be told apart from a forgotten one.
           "get /api/v1/orders/material-demand",
           "get /api/v1/orders/{jobOrderId}/item-stock",
           "get /api/v1/orders/{jobOrderId}/claims",
@@ -2610,27 +1756,11 @@ class ExternalContractTest {
           "post /api/v1/orders/{id}/item-handovers",
           "post /api/v1/orders/{id}/items/{itemId}/production",
           "put /api/v1/orders/{id}/items",
-          // Phase S. `/orders/lookup` offers `withNeeds`, which decides whether each row carries
-          // its required material and item ids. The app sends none of it and reads both id lists
-          // anyway -- the endpoint's default already includes them -- so the parameter is a
-          // narrowing the app has no use for. Recorded rather than left blank, because a blank
-          // slot cannot be told apart from a forgotten one.
           "get /api/v1/orders/lookup");
 
   @Test
   @DisplayName("the query parameters a shipped client asks with still exist, with their types")
   void theContractQueryParametersAreFrozen() throws IOException {
-    // A response field that disappears is caught by the field guard and a request field that
-    // becomes mandatory by the required-field one. A query parameter was caught by neither, and it
-    // is how the app says WHICH rows it wants: rename `materialId`, retype `quality` from integer
-    // to string, and the installed build asks a question the server no longer understands. Two of
-    // those happened inside one afternoon on the Lager slice -- a 400 TYPE_MISMATCH on a decimal
-    // quality, and an omitted `owningOrgUnitId` that the server reads as "the unpooled stack"
-    // rather than "any pool" -- and neither would have failed a build.
-    //
-    // Frozen as `name:type` so a retype is caught as loudly as a rename, and asserted as a subset
-    // so adding an optional parameter stays free. Paging counts: a shipped list that cannot ask
-    // for page two is as broken as one that cannot parse a row.
     JsonNode document = openapi();
 
     for (ContractOperation operation : CONTRACT) {
@@ -2651,12 +1781,6 @@ class ExternalContractTest {
   @Test
   @DisplayName("no operation joins the set with its query parameters left unrecorded")
   void everyOperationWithQueryParametersStatesThem() throws IOException {
-    // The guard that keeps the guard above honest, and the one this file was missing: freezing the
-    // parameters once closed nothing durably, because the next operation added could simply not
-    // mention them. Five already had: a paged Finanzen tab, the paged Hangar overview, the offer
-    // sheet's picker, the assignee note's DELETE -- whose `version` IS the optimistic lock -- and
-    // the org-unit switcher, whose answer turned out to be "none", which is why it is the one
-    // entry in the ledger above rather than a fifth freeze.
     JsonNode document = openapi();
 
     for (ContractOperation operation : CONTRACT) {
@@ -2676,12 +1800,11 @@ class ExternalContractTest {
   }
 
   /**
-   * The query parameters an operation declares, as {@code name:type}.
+   * Returns the query parameters an operation declares, as {@code name:type}.
    *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
-   * @return the declared query parameters; an array's element type is not part of the key, since a
-   *     client sends the same repeated parameter either way
+   * @return the declared query parameters; an array's element type is omitted
    */
   private static Set<String> queryParameters(JsonNode document, ContractOperation operation) {
     JsonNode node = document.get("paths").path(operation.path()).path(operation.method());
@@ -2704,44 +1827,16 @@ class ExternalContractTest {
   }
 
   /**
-   * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.
+   * Constants of required enum properties reachable from the contract, keyed {@code
+   * Schema.property}.
    *
-   * <p><strong>Only REQUIRED enum properties are here, and that is the whole point.</strong> The
-   * Android client parses with kotlinx.serialization and {@code coerceInputValues}, which turns an
-   * unrecognised constant into {@code null} — but only where the property is nullable. A required
-   * one has nowhere to go, so an unknown value fails the **entire response**, not the field.
-   *
-   * <p>Measured on the app before this guard existed: a single unknown {@code JobTypeDto.archetype}
-   * made the whole mission-detail response unparseable. The list endpoint has no nested enums and
-   * kept working, so the member would have seen a list whose every row failed to open — on an APK
-   * in the field that cannot be redeployed. The client cannot defend itself either:
-   * openapi-generator's {@code enumUnknownDefaultCase} is a no-op for kotlinx_serialization, and
-   * the app does not even read this field. It is required purely to parse.
-   *
-   * <p>So the defence has to be here, and it is a release-ordering one: adding a constant fails
-   * this build, which forces the app to ship a build that knows it <em>before</em> the server
-   * starts sending it.
-   *
-   * <p>Nullable enums are deliberately absent. They degrade to {@code null} — an objective loses
-   * its kind badge, not its screen — and freezing them would make this fire on harmless additions,
-   * which is how a guard gets widened until it means nothing.
-   *
-   * <p><strong>Requests count as well as responses.</strong> A shipped build sends {@code
-   * type=TRANSFER} and {@code status=IN_PROGRESS} as literal strings; renaming a constant
-   * server-side turns every one of those writes into a 400 that the member reads as "the app is
-   * broken". The failure is quieter than the response one — the screen still loads — and it is just
-   * as unfixable without a new APK, so the same release ordering applies: ship a build that sends
-   * the new constant first.
+   * <p>The Android client fails the whole response on an unknown constant in a required enum, and a
+   * renamed request constant causes a 400, so changing one requires shipping an app build first.
+   * Nullable enums are excluded because they degrade to {@code null}.
    */
   private static final Map<String, Set<String>> FROZEN_REQUIRED_ENUMS =
-      // `Map.ofEntries`, not `Map.of`: the latter caps at ten key/value pairs, and phase R's
-      // Operation edit is the eleventh. The overload resolves silently up to that point and
-      // then stops compiling — a good failure, but an opaque one if you have not met it.
       Map.ofEntries(
           Map.entry("JobTypeDto.archetype", Set.of("CREW", "MISSION")),
-          // Both halves of the personal-inventory editor send this one, and it was invisible until
-          // the guard started walking requests: a renamed constant would have turned every save on
-          // an installed build into a 400 while the screen kept loading.
           Map.entry(
               "PersonalInventoryItemCreateRequest.locationType", Set.of("CITY", "SPACE_STATION")),
           Map.entry(
@@ -2750,42 +1845,17 @@ class ExternalContractTest {
               "UpdateJobOrderStatusDto.status",
               Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED")),
           Map.entry("UpdatePayoutPreferenceRequest.preference", Set.of("PAYOUT", "DONATE")),
-          // The me-scoped twin of the line above, frozen with phase Q. Different schema, same two
-          // constants and the same failure: a shipped build sends the literal string, so a rename
-          // turns every save of the Einstellungen row into a 400 while the screen keeps loading.
           Map.entry("MyPayoutPreferenceRequest.preference", Set.of("PAYOUT", "DONATE")),
           Map.entry("MissionFinanceEntryCreateDto.type", Set.of("INCOME", "EXPENSE")),
           Map.entry("MissionFinanceEntryUpdateDto.type", Set.of("INCOME", "EXPENSE")),
-          // The three movements the app's request sheet sends as literals. Renaming one would
-          // turn every booking request an installed build raises into a 400 while the sheet still
-          // opens and still looks fine.
           Map.entry("CreateBankBookingRequest.type", Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER")),
-          // Reachable since POST /orders/items joined the set. A material line on an item order is
-          // raw or refined, and the app sends the constant as a literal: renaming one turns every
-          // item order an installed build raises into a 400 while the form still opens.
-          //
-          // Unlike the response enums above, a NEW constant here is harmless to an old build - it
-          // simply never sends it. The direction that hurts is removal, which this guard catches
-          // the same way.
           Map.entry("CreateJobOrderItemMaterialDto.quality", Set.of("GOOD", "NONE")),
-          // Phase V. The Ziel's kind decides which of the three lists it lands in, and the app
-          // sends the literal on every create and every edit.
           Map.entry("AddMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
           Map.entry(
               "UpdateMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
-          // Phase U. Two more literals a shipped build sends. `mode` is the sharper of them:
-          // the app only ever sends `LOCATION`, so renaming either of the other two constants
-          // would look harmless in the document and still be a rename of the one it uses if the
-          // list is reordered rather than extended.
           Map.entry("BulkRebookRequest.mode", Set.of("LOCATION", "PERSONALIZE", "DEPERSONALIZE")),
           Map.entry("InventoryAllocationWriteDto.field", Set.of("JOB_ORDER", "MISSION")),
-          // Phase T. The Zusage the app files carries its quality as a literal string, and a
-          // rename turns every pledge into a 400 while the tab keeps loading -- the bucket list is
-          // a separate read that would go on working.
           Map.entry("CreateClaimDto.qualityRequirement", Set.of("GOOD", "NONE")),
-          // Phase R. The Operation edit the app sends is the eleventh frozen request enum, which
-          // is what forced this map off `Map.of` — that factory caps at ten pairs and then simply
-          // stops resolving.
           Map.entry(
               "OperationUpdateDto.status", Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELED")));
 
@@ -2806,16 +1876,8 @@ class ExternalContractTest {
   }
 
   /**
-   * Collects every required enum property reachable from the contract set's schemas.
-   *
-   * <p>Walks the schema graph transitively, because a client parses the whole payload and not just
-   * the fields it reads: an enum four levels down inside a participant's job type is as fatal as
-   * one on the root object. Array properties are followed through their {@code items}, since the
-   * item's own {@code required} list is what decides whether an element can be parsed at all.
-   *
-   * <p>Request bodies are walked alongside responses. The direction of the break differs — a
-   * response enum fails the parse, a request enum fails the write with a 400 — but both are
-   * unfixable on an installed build.
+   * Collects every required enum property reachable from the contract's request and response
+   * schemas, walking the schema graph transitively including array items.
    *
    * @param document the parsed API document
    * @return {@code Schema.property} to its sorted constants; empty when nothing qualifies
@@ -2930,18 +1992,9 @@ class ExternalContractTest {
   }
 
   /**
-   * The one traversal both frozen records are built from.
-   *
-   * <p>The enum guard and the type record used to carry a near-verbatim copy each, which meant
-   * every fix to the walk had to be found twice and applied twice \u2014 and the {@code
-   * additionalProperties} gap proves the point: it was fixed in the type record and would have
-   * stayed open in the enum one, where a required enum used as a map's VALUE type is exactly as
-   * fatal to a strict parser.
-   *
-   * <p>Transitive and cycle-guarded by the caller's {@code visited} set, because a client parses
-   * the whole payload: a type four levels down inside a participant's job type breaks it as surely
-   * as one on the root object. Descends through an array's {@code items} and a map's {@code
-   * additionalProperties} as well as a plain {@code $ref}.
+   * Walks a schema and everything it references transitively, via {@code $ref}, array {@code items}
+   * and map {@code additionalProperties}, calling the visitor for each property. Shared by the enum
+   * guard and the type record.
    *
    * @param schemas the document's {@code components.schemas} node
    * @param name the schema to walk; {@code null} and already-visited names are no-ops
@@ -3002,30 +2055,17 @@ class ExternalContractTest {
   private static final String FROZEN_TYPES_RESOURCE = "/api/frozen-contract-types.txt";
 
   /**
-   * System property naming a previous release's {@code openapi.json} to diff against.
-   *
-   * <p>Set by CI, absent locally. See {@link #theContractTypesMatchThePreviousRelease()} for why
-   * both halves of §8.4 exist rather than one.
+   * System property naming a previous release's {@code openapi.json} to diff against; set by CI,
+   * absent locally.
    */
   private static final String BASELINE_PROPERTY = "contract.baseline";
 
   /**
-   * REQ-API-009's last open acceptance box: type and nullability changes are caught.
+   * Verifies that no field reachable from the contract changed its type, format or {@code required}
+   * status against the frozen record (REQ-API-009).
    *
-   * <p>ADR-0136 states the gap in its own words — {@code ExternalContractTest} <em>"does not
-   * compare types, nullability or enum values. A field that turns from string to object, or an enum
-   * that loses a constant, passes it and still breaks an old build."</em> The enum half was closed
-   * by {@link #theContractRequiredEnumsAreFrozen()}. This is the rest of it, and it closes the box.
-   *
-   * <p>The reachability is {@code walkSchema}'s, deliberately: from every contract operation's
-   * response and request schemas, transitively, cycle-guarded by a shared visited set. A client
-   * parses the whole payload, so a type four levels down inside a participant's job type breaks it
-   * exactly as one on the root object does.
-   *
-   * <p><b>Nullability here means {@code required}.</b> The document carries no {@code nullable}
-   * keyword and no {@code ["string","null"]} union — springdoc emits neither at OpenAPI 3.1 — so a
-   * schema's {@code required} list is the entire signal, and a property leaving it is a field that
-   * may now be absent on a build that assumed it never would be.
+   * <p>Nullability is expressed only by {@code required}, as the document carries no {@code
+   * nullable} keyword.
    *
    * @throws IOException if the committed document or the frozen record cannot be read
    */
@@ -3078,23 +2118,8 @@ class ExternalContractTest {
   }
 
   /**
-   * The same comparison, against the previous release rather than against a recorded intent.
-   *
-   * <p>Two halves, because they fail on different things. The frozen record above catches a change
-   * against what somebody wrote down and reviewed; it stays green if the record and the document
-   * are edited together in one PR, which is exactly what a careless "make the build pass" looks
-   * like. This one has no such hole: the baseline is a released artefact nobody in the pull request
-   * can edit. It is also the literal wording of ADR-0136 — <em>"a schema diff of the contract
-   * subset against the previous release tag"</em>.
-   *
-   * <p>Its weakness is the mirror image: it needs a baseline, so it <b>skips</b> when the file is
-   * absent. That is why it is not the only half. CI writes {@code
-   * build/contract-baseline/openapi.json} from the previous release tag and passes {@code
-   * -Dcontract.baseline}; a developer machine has neither and runs the frozen record instead.
-   *
-   * <p>Only properties present in <em>both</em> documents are compared. A field added since the
-   * release is not a break for a client that never knew it, and a removed one is already the
-   * subject of {@link #theContractResponsesKeepTheirFields()}.
+   * Verifies that no contract field changed shape since the previous release, comparing only
+   * properties present in both documents (ADR-0136). Skipped when no baseline is configured.
    *
    * @throws IOException if either document cannot be read
    */
@@ -3123,17 +2148,6 @@ class ExternalContractTest {
       }
     }
 
-    // A field the release HAD and the document no longer has. Looping over `now` alone could never
-    // see one, which made this half blind to exactly the change class it exists for: measured
-    // against real history with v1.6.0 as the baseline, `MissionParticipantDto.guestEditToken` was
-    // removed and went unreported while two type changes were caught.
-    //
-    // The Javadoc used to send the reader to theContractResponsesKeepTheirFields for removals. That
-    // test asserts hand-listed field sets, and a name nobody listed -- guestEditToken appears zero
-    // times in this file -- is not in them. So a removal was caught only by the frozen record,
-    // which
-    // this pull request CAN edit, and the "no such hole" claim above was false for the one thing
-    // this comparison is the second opinion on.
     Set<String> gone = new TreeSet<>(was.keySet());
     gone.removeAll(now.keySet());
 
@@ -3165,7 +2179,6 @@ class ExternalContractTest {
     Set<String> visited = new TreeSet<>();
     for (ContractOperation operation : CONTRACT) {
       if (document.path("paths").path(operation.path()).path(operation.method()).isMissingNode()) {
-        // A baseline predating an operation simply has nothing to say about it.
         continue;
       }
       for (String root : responseSchemaNames(document, operation)) {
@@ -3178,22 +2191,8 @@ class ExternalContractTest {
   }
 
   /**
-   * Freezes the body shapes that resolve to no named schema at all.
-   *
-   * <p>Two gaps closed together, because they are the same gap seen from the two ends of a request.
-   *
-   * <p><b>Multipart requests.</b> {@code requestSchemaName} reads only {@code application/json}, so
-   * {@code POST /api/v1/personal-blueprints/import/preview} — a contract operation whose body is
-   * {@code multipart/form-data} with {@code required: ["file"]} — resolved to {@code null} and
-   * every guard over it became a no-op. Renaming the part to {@code csv} would 400 every shipped
-   * Android build's blueprint import with the whole suite green.
-   *
-   * <p><b>Inline responses.</b> A 2xx schema that is an inline array of primitives, such as {@code
-   * GET /api/v1/material-exchange/released-item-ids} answering {@code array<string/uuid>}, names no
-   * schema either, so its element type could flip unnoticed.
-   *
-   * <p>Keyed by operation and media type rather than by schema name, because these shapes have no
-   * name to be keyed by — which is precisely why they were invisible.
+   * Freezes body shapes that resolve to no named schema: multipart request bodies and inline 2xx
+   * response schemas, keyed by operation and media type.
    *
    * @param document the parsed API document
    * @param operation the contract operation
@@ -3277,13 +2276,6 @@ class ExternalContractTest {
     }
     JsonNode additional = node.path("additionalProperties");
     if (additional.isObject()) {
-      // A map, and its VALUE type is the half that breaks a client. Frozen as `object` this was a
-      // guard with a hole big enough to drive the Freigabe-Limits response through:
-      // `BankApprovalLimitsDto.roleLimits` is `{"type":"object","additionalProperties":{"type":
-      // "number"}}` and is frozen for all seven bank-account settings operations. Change that value
-      // to a string or a $ref and the signature stayed `object` -- changed, gone and added all
-      // empty, build green, and a shipped build parsing Map<String, BigDecimal> fails the whole
-      // response.
       String value = schemaName(additional);
       return "map<" + (value != null ? "$" + value : signature(additional)) + ">";
     }
@@ -3363,10 +2355,6 @@ class ExternalContractTest {
   @Test
   @DisplayName("no contract request has gained a field an old build does not send")
   void theContractRequestsKeepTheirRequiredFields() throws IOException {
-    // The mirror image of the response guard, and the half that only matters from phase 3 on: a
-    // *new* required request field is a 400 for every build already in the field, which sends the
-    // payload it was written against. Removing one is safe (the old build keeps sending it), so
-    // this asserts equality in one direction only — nothing added.
     JsonNode document = openapi();
 
     for (ContractOperation operation : CONTRACT) {
@@ -3382,15 +2370,12 @@ class ExternalContractTest {
   }
 
   /**
-   * Reads the {@code required} list of an operation's request body schema.
-   *
-   * <p>Follows the {@code $ref} of the first media type declared, which is how springdoc emits a
-   * single-body operation. An operation with no request body answers an empty set, so a read entry
-   * needs no special case.
+   * Reads the {@code required} list of an operation's request body schema, following the first
+   * media type's {@code $ref}.
    *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
-   * @return the required property names, empty when there is no body or nothing is required
+   * @return the required property names; empty when there is no body or nothing is required
    */
   private static Set<String> requiredRequestFields(JsonNode document, ContractOperation operation) {
     JsonNode body =
@@ -3415,27 +2400,17 @@ class ExternalContractTest {
 
   @Test
   void theContractSetIsNotSilentlyEmptied() {
-    // A guard on the guard: deleting entries is the easy way to make the two tests above pass, and
-    // it is exactly the move REQ-API-009 forbids. The floor is the phase-1 set; it may only grow.
     assertThat(CONTRACT).hasSizeGreaterThanOrEqualTo(5);
   }
 
   /**
-   * Collects the property names of an operation's 2xx response body schema.
-   *
-   * <p>Follows the schema's {@code $ref}, or — for a list endpoint — the {@code $ref} of its {@code
-   * items}. Without the second case every array-returning operation resolves to nothing, and an
-   * entry recording no fields would then pass this guard while proving nothing.
-   *
-   * <p>It additionally descends into the item schema of <strong>every array property</strong>, so
-   * the recorded set spans the envelope and the rows it carries. That covers a paged response's
-   * {@code content} — stopping at the envelope would freeze {@code totalElements} and leave every
-   * field a member actually reads unguarded — and equally an embedded list such as an operation's
-   * {@code payouts}, whose rows are parsed one by one exactly like a page's are.
+   * Collects the property names of an operation's 2xx response schema, following its {@code $ref}
+   * or its array items' {@code $ref}, plus the properties of schemas referenced by array
+   * properties.
    *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
-   * @return the property names, or an empty set when the response carries no body schema
+   * @return the property names, or an empty set when the response has no body schema
    */
   private static Set<String> responseProperties(JsonNode document, ContractOperation operation) {
     JsonNode responses =
@@ -3451,10 +2426,6 @@ class ExternalContractTest {
       }
       for (Map.Entry<String, JsonNode> mediaType : content.properties()) {
         JsonNode schemaNode = mediaType.getValue().path("schema");
-        // A list endpoint's schema is `{"type": "array", "items": {"$ref": ...}}` — the fields a
-        // client reads are the ITEM's. Following only the top-level $ref made this helper return
-        // nothing for every array response, which for an operation with no recorded fields would
-        // have passed vacuously: the guard would have looked green while seeing nothing at all.
         JsonNode ref = schemaNode.get("$ref");
         if (ref == null) {
           ref = schemaNode.path("items").get("$ref");
@@ -3475,27 +2446,8 @@ class ExternalContractTest {
   }
 
   /**
-   * Collects the property names of the schemas a response's properties reference.
-   *
-   * <p>Descends **two levels** into the schemas a response references — an array's items and a
-   * plain nested object alike. Two, because a paged response spends the first on its own rows: the
-   * envelope references the row, and the row references the object whose field the screen shows. A
-   * {@code PageResponse} carries its rows under {@code content}, a roll-up carries its
-   * per-participant rows under a named list, and a ship carries its {@code shipType} as an object
-   * whose {@code name} is the whole point of the row. All three are invisible to a resolver that
-   * stops at the top-level object: an entry that froze only {@code payouts} would freeze the *list*
-   * and nothing in it, and a renamed {@code shareAmount} would reach a device with this guard
-   * green.
-   *
-   * <p>Two levels, not the whole graph. The deeper the walk, the more a recorded name could be
-   * satisfied by an unrelated schema somewhere far from the field it was recorded for, and the
-   * guard would read as stronger than it is.
-   *
-   * <p>The names land in one flat set together with the envelope's, which is the shape this guard
-   * has always had. That makes a recorded field satisfiable by a same-named field on another schema
-   * in the same response — accepted, because the alternative is a per-schema contract record and
-   * the failure it would add precision to (two schemas in one response sharing a field name where
-   * only one of them keeps it) is not the break this guard exists for.
+   * Collects the property names of schemas referenced by a response's properties, two levels deep,
+   * into one flat set.
    *
    * @param document the parsed API document
    * @param objectProperties the properties of the already-resolved response schema
@@ -3539,22 +2491,8 @@ class ExternalContractTest {
   }
 
   /**
-   * Every frozen operation is actually reachable from the internet.
-   *
-   * <p>Freezing an operation's shape and admitting its path are the same decision seen from two
-   * sides — the allow-list says so itself — and they are kept in two files that nothing compared
-   * until now. The asymmetry is not hypothetical: an audit on 2026-09-03 found <b>75 paths the
-   * Android app calls that no allow-list rule admits</b>, every one of them refused at the edge
-   * with a 404 the app renders as „Konnte nicht gespeichert werden.". None of those 75 was in this
-   * contract set, which is exactly why this test cannot see them.
-   *
-   * <p>What it <em>can</em> see is the other direction, and that is the half this repository owns:
-   * a promise made here that the edge does not let through. That was true for 0 of 90 operations
-   * when this test was written, and this pins it — the next `ContractOperation` added without its
-   * allow-list line fails the build instead of shipping a promise nobody can call.
-   *
-   * <p>The allow-list is parsed out of the nginx include rather than mirrored into a fixture on
-   * purpose: a copy is a third thing to keep in sync, and the include is the file the edge serves.
+   * Verifies that every frozen operation is admitted by the API vhost allow-list, parsed from the
+   * nginx include.
    *
    * @throws IOException if the allow-list cannot be read
    */
@@ -3585,11 +2523,8 @@ class ExternalContractTest {
   }
 
   /**
-   * The allow-list, as predicates over a concrete URI.
-   *
-   * <p>Two rule shapes appear in the allow-list and both are honoured: {@code $uri = "…"} is an
-   * exact comparison, {@code $uri ~ "…"} a regular expression. Anything else on a {@code
-   * krt_api_allowed 1} line is ignored rather than guessed at.
+   * Parses the allow-list into predicates over a concrete URI: {@code $uri = "…"} as an exact
+   * match, {@code $uri ~ "…"} as a regular expression; other lines are ignored.
    *
    * @return one predicate per parsed rule
    * @throws IOException if the allow-list cannot be read
@@ -3619,15 +2554,11 @@ class ExternalContractTest {
   }
 
   /**
-   * Turns a contract path into a concrete URI the allow-list can be asked about.
-   *
-   * <p>A placeholder stands for a real segment, and the rules match on its <em>shape</em> — a UUID
-   * character class, or a literal alternation such as {@code (true|false)}. Substituting a UUID for
-   * everything would silently fail against the latter, so the few non-UUID placeholders are named
-   * in {@link #PLACEHOLDERS} instead of guessed.
+   * Replaces each placeholder in a contract path with a representative value: a UUID by default, or
+   * the value named in {@link #PLACEHOLDERS}.
    *
    * @param path the contract path, possibly containing {@code {name}} segments
-   * @return the path with every placeholder replaced by a representative value
+   * @return the path with every placeholder replaced
    */
   private static String probePath(String path) {
     String probe = path;
@@ -3657,23 +2588,8 @@ class ExternalContractTest {
   }
 
   /**
-   * No frozen operation demands a header a shipped build does not send.
-   *
-   * <p>The request guard beside this one freezes required <em>body</em> fields, and the parameter
-   * guard freezes query parameters. A header was caught by neither, and it is the same break in a
-   * different envelope: a build already on a member's phone sends the headers it was written
-   * against, so a newly <b>required</b> one is a 400 on every call it makes — while the screen
-   * still opens and still looks fine.
-   *
-   * <p>Two frozen operations declare a header today ({@code X-User-Time-Zone}, on the bank
-   * statement and the three-month export) and both are optional, which is why this asserts a
-   * property rather than keeping a list: there is nothing to record while nothing is required, and
-   * the day something is, the build says so.
-   *
-   * <p>A header the app genuinely sends on <em>every</em> call could be made required safely —
-   * {@code Authorization}, the active org unit, the correlation id. None is declared as a parameter
-   * in the document, so none reaches this assertion; if one ever is, the right answer is a named
-   * exemption with the reason, not a wider rule.
+   * Verifies that no frozen operation declares a required header, which an installed app build may
+   * not send.
    *
    * @throws IOException if the document cannot be read
    */
@@ -3684,9 +2600,6 @@ class ExternalContractTest {
 
     List<String> demanded = new java.util.ArrayList<>();
     for (ContractOperation operation : CONTRACT) {
-      // By field name, not a JSON Pointer: a path is itself full of slashes, and building a
-      // pointer out of it escapes them into one token that resolves to nothing — which is a test
-      // that passes because it looked nowhere.
       JsonNode paths = document.get("paths");
       JsonNode path = paths == null ? null : paths.get(operation.path());
       JsonNode verb = path == null ? null : path.get(operation.method());

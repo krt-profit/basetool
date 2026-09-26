@@ -1,43 +1,15 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  Deposit/withdrawal counterparty block (Einzahler / Empfaenger, REQ-BANK-044, #994) for the unified
-  Kontobewegung modal. A "kein Tool-Account" toggle (data-role="bank-cp-external-toggle") swaps the
-  registered-user lookup for a free-text name input and, for the org unit, widens the picklist from
-  the chosen user's memberships to ALL active org units (membership check skipped server-side for an
-  external counterparty). Both the registered user and the free-text name submit under their own
-  field name; only one is enabled at a time, so the inactive one is omitted from the JSON body.
-  bank.js (toggleCounterpartyExternal) drives the swap and clones the shared [data-bank-all-orgunits]
-  option source into the org-unit select in external mode.
-
-  The whole block is one [data-movement-types] container so the movement-type gating
-  (syncMovementRows) shows/enables it only for its type; within an active block the external toggle
-  refines the user-vs-name + org-unit-source state.
-
-  Parameters:
-    - movementType : "DEPOSIT" or "WITHDRAWAL" — the movement type this block belongs to.
-    - prefix       : unique id/testid prefix (e.g. "bank-mv-cp-deposit").
-    - labelKey     : i18n key of the party label ("bank.field.counterparty.depositor" / ".recipient").
-    - hintKey      : i18n key of the party hint tooltip.
-*/-->
 <div th:fragment="counterpartyBlock(movementType, prefix, labelKey, hintKey)"
      data-counterparty-section th:attr="data-movement-types=${movementType}"
      th:hidden="${movementType != 'DEPOSIT'}">
 
-    <!--/* Registered counterparty (default): the tool-user lookup + membership-filtered unit. */-->
     <div class="bank-form-row" data-cp-registered-row>
         <label th:for="${prefix} + '-user'">
             <span th:text="#{__${labelKey}__}">Einzahler</span>
             <th:block th:replace="~{fragments/scu-hint :: fieldHint(${hintKey})}"></th:block>
         </label>
-        <!--/* Server-side searchable combobox (remote-bank-users, #1193 follow-up, REQ-FE-011): the
-             roster is no longer preloaded. Typing queries /users/search-bank on demand (the
-             bank-widened audience, so role-less bank staff can search); an add-only picker, so only
-             the placeholder is seeded (no edit-mode value). The enhancer carries data-counterparty-user
-             + data-orgunit-target onto its hidden input and re-dispatches a bubbling `change` on it, so
-             bank.js's change-delegated membership loader (fillCounterpartyOrgUnits) and the "kein
-             Tool-Account" external toggle keep driving the dependent Einheit picker unchanged. */-->
         <select th:id="${prefix} + '-user'" name="counterpartyUserId"
                 data-counterparty-user data-krt-combobox="remote-bank-users"
                 th:attr="data-orgunit-target=${prefix} + '-ou',data-testid=${prefix} + '-user'">
@@ -46,7 +18,6 @@
         <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
     </div>
 
-    <!--/* External free-text name (#994), hidden + disabled until the toggle is on. */-->
     <div class="bank-form-row" data-cp-external-row hidden>
         <label th:for="${prefix} + '-name'">
             <span th:text="#{bank.field.counterparty.externalName}">Name (extern)</span>
@@ -58,9 +29,6 @@
         <span class="bank-field-error" data-error-for="counterpartyExternalName"></span>
     </div>
 
-    <!--/* "not a tool user" toggle (#994): reveals the free-text name + widens the unit picklist. Sits
-         directly under the Einzahler/Empfaenger picker it swaps (it toggles the registered vs.
-         free-text alternative above), before the shared Einheit row below. */-->
     <div class="bank-form-row">
         <label class="bank-check-label">
             <input type="checkbox" disabled data-role="bank-cp-external-toggle"
@@ -70,8 +38,6 @@
         </label>
     </div>
 
-    <!--/* Unit: registered -> the user's memberships (bank.js), external -> all org units (bank.js
-         clones [data-bank-all-orgunits]). Disabled until a source is chosen either way. */-->
     <div class="bank-form-row">
         <label th:for="${prefix} + '-ou'">
             <span th:text="#{bank.field.counterparty.orgUnit}">Einheit</span>
@@ -85,27 +51,6 @@
     </div>
 </div>
 
-<!--/*
-  Requester-side Empfaenger block for the org-unit booking-request modal (REQ-BANK-055). A sibling
-  of counterpartyBlock rather than a parameterisation of it, because three things genuinely differ:
-
-    1. It is gated on the REQUEST type ([data-request-withdrawal-only], driven by
-       syncRequestTypeRows) instead of the movement type ([data-movement-types], syncMovementRows).
-    2. It has NO "kein Tool-Account" toggle. Recording a free-text external counterparty on the
-       ledger stays a Bank-Employee capability (REQ-BANK-044/#994) — a requester names a registered
-       tool user or nobody.
-    3. It is PRE-FILLED with the requester. The picker is a remote combobox, which seeds itself from
-       a `selected` option, so the caller is rendered as a real option here; the dependent unit
-       select is populated by the same bank.js change-delegated loader as the employee modal, which
-       activateRequestCounterparty pokes once when the block first becomes active.
-
-  Both selects stay disabled while the block is hidden so a DEPOSIT/TRANSFER request omits them from
-  the JSON body entirely (submitBankForm skips disabled controls).
-
-  Parameters:
-    - requesterId     : the caller's user id (#authentication.name), seeded as the selected option.
-    - requesterHandle : the caller's display label; a remote combobox needs it alongside the id.
-*/-->
 <div th:fragment="requestCounterpartyBlock(requesterId, requesterHandle)"
      data-request-withdrawal-only hidden>
     <div class="bank-form-row">
@@ -118,8 +63,6 @@
                 data-orgunit-target="org-unit-request-cp-ou"
                 data-testid="org-unit-request-cp-user">
             <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
-            <!--/* The seed. th:selected is load-bearing: the enhancer seeds itself from select.value,
-                 so without it the box renders empty and the requester has to pick themselves. */-->
             <option th:if="${requesterId != null and requesterHandle != null}"
                     th:value="${requesterId}" th:selected="true"
                     th:text="${requesterHandle}">greluc</option>

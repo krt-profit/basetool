@@ -39,38 +39,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Layout regression guard (REQ-UI-013): the date and time parts of a {@code .datetime-split-group}
- * must render INSIDE their {@code .form-row} column on the mission detail page — in the participant
- * edit modal and in the Verwaltung form alike.
+ * Layout guard (REQ-UI-013): the date and time parts of a {@code .datetime-split-group} must stay
+ * inside their {@code .form-row} column on the mission detail page, in the participant edit modal
+ * and the Verwaltung form.
  *
- * <p>Both parts are fixed-width and non-shrinkable (10.5rem + {@code --space-2} + 7rem = an 18rem
- * floor), while a multi-column {@code .form-row} hands out a generic 250px per-column floor. Where
- * the column ends up narrower than 18rem the parts simply spill out of it: the time part overran
- * its column by ~13px in the 600px {@code .krt-modal--wide} participant modal (leaving "Endzeit"
- * 3px from the modal border and collapsing the 16px column gap to 3px) and by ~14.7px per group in
- * the three-column Verwaltung time row. The fix declares the real floor so the row WRAPS instead of
- * overflowing.
- *
- * <p>Two things about this test are deliberate and easy to get wrong when editing it:
- *
- * <ul>
- *   <li><b>Every check runs at several desktop widths, not one.</b> Whether a group ends up below
- *       its 18rem floor depends on how many of them the flex row keeps on a line, which depends on
- *       the container width — so a single viewport proves very little. The modal, a fixed 600px
- *       frame, overflows at every desktop width; the Verwaltung form only does so in the band where
- *       its row is wide enough to keep two groups on one line but too narrow to give each 18rem,
- *       and it renders perfectly fine on either side of that band. Sweeping the four widths of the
- *       device-class ladder (REQ-UI-009) keeps the guard honest without hard-coding a band that a
- *       future layout change would silently move out from under it.
- *   <li><b>The assertion compares bounding rectangles, NOT {@code scrollWidth} vs {@code
- *       clientWidth}.</b> The overflow lands inside the container's right padding, which the
- *       scrollable overflow region does not account for: {@code scrollWidth - clientWidth} measured
- *       0 on the broken layout and would have passed straight through the bug.
- * </ul>
- *
- * <p>The mission and the acting user's registration as a participant (which is what makes the crew
- * board render an {@code .edit-participant-btn} at all) are seeded via {@link BackendSeeder}; a
- * mission is staffel-scoped, so the user is assigned to the IRIDIUM Squadron first.
+ * <p>Every check runs at several desktop widths, because the overflow depends on the container
+ * width, and compares bounding rectangles, because the overflow lands in the container's padding
+ * where {@code scrollWidth} does not see it.
  */
 @Tag("e2e")
 class MissionDatetimeSplitLayoutE2eTest {
@@ -83,8 +58,7 @@ class MissionDatetimeSplitLayoutE2eTest {
 
   /**
    * Desktop widths each surface is measured at, spanning the Desktop and Ultra-wide device classes
-   * of REQ-UI-009. Narrower classes are covered by the {@code <= 768px} stacking rules and are not
-   * multi-column layouts at all, so they cannot exhibit this defect.
+   * of REQ-UI-009.
    */
   private static final List<Integer> SWEPT_WIDTHS = List.of(1280, 1440, 1600, 1800);
 
@@ -132,10 +106,6 @@ class MissionDatetimeSplitLayoutE2eTest {
         return { measured: measured, violations: violations };
       }
       """
-          // Double.toString + replace, NOT String.formatted("%f"): the default locale decides
-          // the decimal separator, so a German JVM would splice "0,500000" into the script and
-          // evaluate() would die of a syntax error instead of reporting a layout verdict.
-          // Double.toString is locale-independent by contract.
           .replace("%s", Double.toString(OVERFLOW_TOLERANCE_PX));
 
   private static Playwright playwright;
@@ -171,10 +141,8 @@ class MissionDatetimeSplitLayoutE2eTest {
   }
 
   /**
-   * Opens a participant's edit modal from the crew board and asserts both of its time pickers
-   * ("Startzeit", "Endzeit") render inside their column. This is the surface the defect was
-   * reported on: the modal frame is a fixed 600px, so its two-column row gave each group ~275px
-   * against an 18rem floor.
+   * Opens a participant's edit modal from the crew board and asserts both time pickers
+   * ("Startzeit", "Endzeit") render inside their column.
    */
   @Test
   void participantEditModalKeepsTheTimePickersInsideTheirColumn() {
@@ -182,9 +150,6 @@ class MissionDatetimeSplitLayoutE2eTest {
         "crew",
         "mission-datetime-split-modal",
         page -> {
-          // The crew board renders one edit button per participant; the seeded self-registration
-          // guarantees exactly one. Opening it runs krtModalOpen(), which is what makes the two
-          // datetime groups measurable.
           Locator editBtn = page.locator(".edit-participant-btn").first();
           assertThat(editBtn).isVisible();
           editBtn.click();
@@ -206,8 +171,6 @@ class MissionDatetimeSplitLayoutE2eTest {
         "mission-datetime-split-verwaltung",
         page -> {
           assertThat(page.locator("#pane-verw")).isVisible();
-          // Planned row (meeting / planned start / planned end) plus the actual start/end row —
-          // the latter only renders on an existing mission, which this seeded one is.
           assertNoOverflowAcrossWidths("#pane-verw", page, 5);
         });
   }
@@ -237,9 +200,6 @@ class MissionDatetimeSplitLayoutE2eTest {
    * @param width the viewport width currently applied, named in the failure message
    */
   private static void assertNoOverflow(String scope, Page page, int expectedGroups, int width) {
-    // Wildcard types, not Map<String, Object>: Playwright hands back a raw Object and a
-    // parameterised cast would be unchecked, which the project bans papering over with
-    // @SuppressWarnings. Nothing here needs the element types.
     Map<?, ?> probe = (Map<?, ?>) page.evaluate(PROBE_JS, scope);
     List<?> violations = (List<?>) probe.get("violations");
     assertTrue(

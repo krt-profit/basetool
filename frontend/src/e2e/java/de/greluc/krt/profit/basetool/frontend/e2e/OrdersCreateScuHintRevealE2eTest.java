@@ -41,25 +41,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Reveal-over-class regression for the material-order editor's SCU hint after ADR-0093. The "?" SCU
- * hint that {@code orders-create.js} builds for each material row starts hidden and is revealed
- * only when an SCU-typed material is chosen. Before the fix it started hidden via an inline {@code
- * style="display:none"} and was revealed with {@code hint.style.display = ''}; the CSP migration
- * moved the hidden state to a class, at which point clearing the (empty) inline style could no
- * longer override the class rule, so the hint stayed hidden for SCU materials. The fix toggles the
- * runtime {@code krtm-hidden} class instead.
+ * Verifies that choosing an SCU-typed material in the {@code /orders/create} material editor
+ * reveals the row's SCU hint by toggling {@code krtm-hidden}, without a {@code style-src-attr} CSP
+ * violation (ADR-0093).
  *
- * <p>This test opens {@code /orders/create}, adds a material row, selects an SCU-typed material
- * (discovered via the {@code /catalog/material-search} proxy the picker's server-side-search
- * combobox also queries, REQ-FE-016), and asserts the row's SCU hint becomes visible — the
- * discriminator that turns red on the pre-fix frontend (which leaves the hint hidden) — while
- * asserting no {@code style-src-attr} CSP violation is logged. Materials with a quantity type are
- * core seed data, so an SCU-typed material is present on any provisioned stack; the reveal step is
- * guarded so a stack seeded without an SCU material still runs the console guard rather than
- * failing spuriously.
- *
- * <p>Read-only: it builds a row in the browser but never submits, so it mutates no server state.
- * The actor is {@code test-admin}, who may create orders.
+ * <p>Read-only: never submits. Without an SCU material only the console guard runs.
  */
 @Tag("e2e")
 class OrdersCreateScuHintRevealE2eTest {
@@ -92,12 +78,9 @@ class OrdersCreateScuHintRevealE2eTest {
   }
 
   /**
-   * Adds a material row on the create-order form and asserts that choosing an SCU material reveals
-   * the row's SCU hint (via the toggled visibility class) without any {@code style-src-attr} CSP
-   * violation — the reveal-over-class failure mode the ADR-0093 JS fix addresses. Piggybacks the
-   * REQ-FE-016 metadata-mirror contract onto the same pick: the selected option's {@code
-   * data-quantity-type} must appear on the combobox's hidden input, and a programmatic {@code
-   * setValue('')} must remove the previously mirrored key instead of leaving it stale.
+   * Adds a material row, chooses an SCU material and asserts the SCU hint is revealed without a CSP
+   * violation; also asserts that the combobox's hidden input mirrors the option's {@code
+   * data-quantity-type} and drops it on {@code setValue('')} (REQ-FE-016).
    */
   @Test
   void scuMaterialRevealsHintWithoutCspViolation() {
@@ -114,17 +97,9 @@ class OrdersCreateScuHintRevealE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
 
-        // Material mode is the default; add a fresh row (the SCU hint of which is built by
-        // scuHintMarkup and starts hidden via krtm-hidden).
         page.locator("[data-trigger=\"orders-add-material\"]").click();
         Locator row = page.locator("#materials-container .material-row").last();
 
-        // The row's material picker is a server-side-search combobox (REQ-FE-016): the page no
-        // longer preloads the catalog as <option>s, so an SCU-typed material is discovered by
-        // querying the same catalog proxy the picker's remote source uses (fetched in-page so the
-        // session cookie authenticates the call), then picked in the combobox by its id — the
-        // enhancer mirrors each fetched option's value into data-value, and the seeded e2e
-        // catalog is small enough that the empty-query first page contains every material.
         Object catalog =
             page.evaluate(
                 "() => fetch('/catalog/material-search?jobOrder=true&q=')"
@@ -147,10 +122,6 @@ class OrdersCreateScuHintRevealE2eTest {
           assertThat(row.locator(".scu-hint"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
 
-          // Metadata-mirror contract (REQ-FE-016): the pick above must have mirrored the option's
-          // data-quantity-type onto the hidden input, and clearing the picker via the programmatic
-          // setValue path must REMOVE the previously mirrored key — the stale-key half of the
-          // contract, which no user-driven flow exercises.
           Locator hiddenMaterial = row.locator("input[data-role=\"material-select\"]");
           assertEquals(
               "SCU",

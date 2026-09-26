@@ -96,7 +96,6 @@ class AdminSyncReportsPageControllerMvcTest {
     return new PageResponse<>(List.of(ev), 0, 50, 60L, 2, List.of());
   }
 
-  // covers REQ-FE-002 — the full page renders the swap-target wrapper and the tab bar.
   @Test
   @WithMockUser(roles = "ADMIN")
   void combined_fullPage_rendersSwapWrapperAndTabs() throws Exception {
@@ -111,9 +110,6 @@ class AdminSyncReportsPageControllerMvcTest {
         .andExpect(content().string(containsString("tab-bar")));
   }
 
-  // covers REQ-FE-002 — fragment=results on a source tab renders only the inner table + pager: the
-  // row and pager are present and the pager keeps the active tab's base path, but the wrapper, tab
-  // bar and purge form (all outside the fragment) are not.
   @Test
   @WithMockUser(roles = "ADMIN")
   void uex_fragmentResults_rendersOnlyInnerFragment_withTabBasePath() throws Exception {
@@ -126,17 +122,12 @@ class AdminSyncReportsPageControllerMvcTest {
         .andExpect(view().name("admin/sync-reports :: results"))
         .andExpect(content().string(containsString("FragmentEvent")))
         .andExpect(content().string(containsString("class=\"pager\"")))
-        // The pager keeps the UEX tab's base path (shared render relays basePath into the
-        // fragment).
         .andExpect(content().string(containsString("/admin/sync-reports/uex?page=1")))
         .andExpect(content().string(not(containsString("id=\"sync-results\""))))
         .andExpect(content().string(not(containsString("tab-bar"))))
         .andExpect(content().string(not(containsString("id=\"purge-form\""))));
   }
 
-  // covers #582 — the delete-old twin (X-Requested-With) purges and returns the deleted-row count
-  // as
-  // JSON so the page shows a count toast in place rather than reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteOldAjax_withHeader_returns200WithDeletedCount() throws Exception {
@@ -154,7 +145,6 @@ class AdminSyncReportsPageControllerMvcTest {
         .andExpect(content().string(containsString("deleted")));
   }
 
-  // covers #582 — days < 1 is rejected with 400 before any backend call.
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteOldAjax_withHeaderDaysZero_returns400() throws Exception {
@@ -167,8 +157,6 @@ class AdminSyncReportsPageControllerMvcTest {
         .andExpect(status().isBadRequest());
   }
 
-  // covers #582 — header routing: the same URL WITHOUT the header still hits the classic form
-  // handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteOld_withoutHeader_redirects() throws Exception {

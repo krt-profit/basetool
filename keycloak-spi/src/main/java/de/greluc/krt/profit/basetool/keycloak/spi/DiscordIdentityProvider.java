@@ -43,19 +43,12 @@ import org.keycloak.models.KeycloakSession;
 import org.keycloak.util.JsonSerialization;
 
 /**
- * Discord identity provider that brokers a Discord login into Keycloak.
+ * OAuth 2.0 identity provider that brokers a Discord login into Keycloak, mapping the {@code GET
+ * /users/@me} profile into a {@link BrokeredIdentityContext}.
  *
- * <p>Discord is a plain OAuth 2.0 provider — it issues no OIDC {@code id_token} — so this extends
- * {@link AbstractOAuth2IdentityProvider} (the same base Keycloak's own GitHub/Google social
- * providers use) rather than the OIDC provider. After the authorization-code exchange it reads the
- * Discord profile from {@code GET /users/@me} with the obtained access token and maps it into a
- * {@link BrokeredIdentityContext}. The raw profile JSON is stashed for {@link
- * DiscordUserAttributeMapper}, which lets an admin import the Discord user id into the {@code
- * discord_user_id} user attribute (the auto-link, epic #720 / REQ-DATA-006).
- *
- * <p>The default scopes include {@code guilds.members.read}; the first-login membership gate
- * ({@link DiscordGuildRoleGateAuthenticator}, T1.2) reuses the stored access token to verify guild
- * + role membership. This provider only federates the identity — it grants no access on its own.
+ * <p>The raw profile JSON is stored for {@link DiscordUserAttributeMapper}. The scopes include
+ * {@code guilds.members.read} for {@link DiscordGuildRoleGateAuthenticator}; the provider itself
+ * grants no access.
  */
 public class DiscordIdentityProvider
     extends AbstractOAuth2IdentityProvider<OAuth2IdentityProviderConfig>
@@ -74,22 +67,15 @@ public class DiscordIdentityProvider
   public static final String PROFILE_URL = API_BASE_URL + "/users/@me";
 
   /**
-   * Synthetic field injected into the brokered {@code /users/@me} profile JSON to carry the name
-   * the guild displays for the user — the per-guild {@code nick} if set, otherwise the account's
-   * global display name ({@code user.global_name}, see {@link
-   * DiscordGuildNicknameReader#readGuildDisplayName}). It lets a standard <em>Attribute
-   * Importer</em> mapper map that name to the {@code discord_guild_nickname} user attribute exactly
-   * the way {@code id} maps to {@code discord_user_id} — Discord's {@code /users/@me} payload
-   * itself has no per-guild name, which is only available via the guild-member call. Absent when
-   * neither a nickname nor a global name was captured. Epic #720 / REQ-DATA-018.
+   * Synthetic profile field carrying the guild display name from {@link
+   * DiscordGuildNicknameReader#readGuildDisplayName}, for import into the {@code
+   * discord_guild_nickname} attribute (REQ-DATA-018); absent when no name was captured.
    */
   public static final String GUILD_NICK_PROFILE_FIELD = "guild_nick";
 
   /**
-   * Name of the environment variable holding the das-kartell guild id used to fetch the server
-   * nickname. When unset or blank the nickname capture is skipped entirely (no extra Discord call),
-   * so the feature is fully optional and never affects the login or the fail-closed membership
-   * gate.
+   * Environment variable holding the guild id for the nickname capture; unset or blank skips the
+   * capture.
    */
   static final String GUILD_ID_ENV = "DISCORD_GUILD_ID";
 
@@ -102,11 +88,8 @@ public class DiscordIdentityProvider
 
   private static final Duration HTTP_TIMEOUT = DiscordHttp.TIMEOUT;
 
-  // The one Discord client of the provider JAR (KC-SIMP-01), shared with the first-login gate.
   private static final HttpClient HTTP_CLIENT = DiscordHttp.CLIENT;
 
-  // Best-effort (fail-open) reader for the per-guild server nickname; shares the profile-call
-  // client and timeout. Never breaks the login — see enrichWithGuildNickname.
   private static final DiscordGuildNicknameReader NICKNAME_READER =
       new DiscordGuildNicknameReader(HTTP_CLIENT, HTTP_TIMEOUT);
 
@@ -130,12 +113,8 @@ public class DiscordIdentityProvider
   }
 
   /**
-   * Appends {@code prompt=none} to Discord's authorization request so a returning member is not
-   * shown the OAuth consent screen on every login. Discord defaults to {@code prompt=consent},
-   * which re-prompts on each authorization; with {@code prompt=none} Discord skips the screen once
-   * the user has authorized the app for these scopes — the very first authorization still shows it.
-   * This only changes the consent UX: the full authorization-code exchange (and therefore the
-   * membership gate, which reuses the obtained access token) is unaffected.
+   * Appends {@code prompt=none} to the authorization request so Discord shows the consent screen
+   * only on the first authorization.
    *
    * @param request the brokered authentication request being built
    * @return the authorization-URL builder with {@code prompt=none} appended
@@ -158,7 +137,6 @@ public class DiscordIdentityProvider
       HttpResponse<String> response =
           HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() != 200) {
-        // Status code only — never the body, which carries the Discord identity.
         throw new IdentityBrokerException(
             "Discord profile request returned HTTP " + response.statusCode());
       }
@@ -174,13 +152,12 @@ public class DiscordIdentityProvider
   }
 
   /**
-   * Builds the brokered identity from the Discord {@code /users/@me} profile and stores the raw
-   * profile JSON so {@link DiscordUserAttributeMapper} can import fields (e.g. {@code id}) into
-   * user attributes. Never logs the profile, the id, the e-mail or any token.
+   * Builds the brokered identity from the Discord profile and stores the raw profile JSON for
+   * {@link DiscordUserAttributeMapper}; logs no profile data or token.
    *
-   * @param event the broker event builder (unused; the Discord flow has no extra events)
+   * @param event the broker event builder; unused
    * @param profile the parsed {@code /users/@me} response
-   * @return the brokered identity keyed by the Discord user id (snowflake)
+   * @return the brokered identity keyed by the Discord user id
    */
   @Override
   protected @NotNull BrokeredIdentityContext extractIdentityFromProfile(
@@ -202,21 +179,14 @@ public class DiscordIdentityProvider
   }
 
   /**
-   * Best-effort: fetches the name the guild displays for the user — the per-guild {@code nick} if
-   * set, otherwise the account's global display name ({@code user.global_name}) — and injects it
-   * into the profile JSON under {@link #GUILD_NICK_PROFILE_FIELD} so a standard <em>Attribute
-   * Importer</em> mapper can carry it onward to the {@code discord_guild_nickname} user attribute.
-   * The {@code global_name} fallback ({@link DiscordGuildNicknameReader#readGuildDisplayName}) is
-   * what keeps a member who never set an explicit server nickname from surfacing as a blank in the
-   * admin approval queue (the reported case of a member with no per-guild nick). Runs on every
-   * Discord login (so the value stays current with the mapper's FORCE sync mode), but is skipped —
-   * with no Discord call — when {@link #GUILD_ID_ENV} is unset or the profile is not a JSON object.
-   * It <strong>never throws</strong>: a missing or failed capture must never break or delay the
-   * login beyond the reader's bounded timeout (REQ-DATA-018), in deliberate contrast to the
-   * fail-closed membership gate.
+   * Injects the guild display name under {@link #GUILD_NICK_PROFILE_FIELD} into the profile, using
+   * {@link DiscordGuildNicknameReader#readGuildDisplayName} (REQ-DATA-018).
    *
-   * @param profile the parsed {@code /users/@me} profile, mutated in place when a name is found
-   * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
+   * <p>Skipped when {@link #GUILD_ID_ENV} is unset or the profile is not a JSON object; never
+   * throws.
+   *
+   * @param profile the parsed profile, mutated in place when a name is found
+   * @param accessToken the user's brokered Discord access token
    */
   private void enrichWithGuildNickname(@Nullable JsonNode profile, @NotNull String accessToken) {
     String guildId = configuredGuildId();

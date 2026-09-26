@@ -67,28 +67,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Pure-Mockito unit tests for {@link InventoryItemController}. The controller is otherwise a
- * delegating thin shell, but five behaviours need an explicit pin because regressing them is silent
- * at the type level:
+ * Pure-Mockito unit tests for {@link InventoryItemController}.
  *
  * <ul>
- *   <li>{@code /my-inventory*} derives the owner id from the JWT via {@link
- *       UserService#getUserIdFromJwt} — never a URL parameter. This is the personal-inventory
- *       data-isolation guarantee from CLAUDE.md.
- *   <li>{@code create}, {@code book-out}, {@code update-delivered} and {@code update-note} read
- *       {@code authHelperService.isLogisticianOrAbove()} at the HTTP boundary and pass the boolean
- *       down so the service stays free of {@code SecurityContextHolder} (ArchUnit rule). The
- *       role-driven branch is exercised for both {@code true} and {@code false}.
- *   <li>{@code POST /{id}/book-out} returns {@code 200 OK} when the service yields a DTO and {@code
- *       204 No Content} when the row was removed entirely (service returns {@code null}). The
- *       branch decision lives in the controller, not the service.
- *   <li>{@code POST /bulk-checkout} forwards only the calling user's id — never an {@code
- *       isLogistician} flag — because the service deliberately refuses to remove items owned by
- *       another user, regardless of role. The test confirms the boundary helper is NEVER consulted
- *       for bulk checkout.
- *   <li>{@code POST /bulk-rebook} (REQ-INV-036) carries the same owner-only contract: it forwards
- *       the calling user's id and never consults {@code isLogisticianOrAbove()}, so an admin cannot
- *       bulk-move another member's stock through it.
+ *   <li>{@code /my-inventory*} takes the owner id from the JWT via {@link
+ *       UserService#getUserIdFromJwt}, never from the URL.
+ *   <li>{@code create}, {@code book-out}, {@code update-delivered} and {@code update-note} pass the
+ *       boundary's {@code isLogisticianOrAbove()} result to the service.
+ *   <li>{@code POST /{id}/book-out} answers {@code 200} with a DTO and {@code 204} when the row was
+ *       removed.
+ *   <li>{@code POST /bulk-checkout} and {@code POST /bulk-rebook} (REQ-INV-036) forward only the
+ *       caller's id and never consult the role check.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -131,8 +120,6 @@ class InventoryItemControllerTest {
         null);
   }
 
-  // ── GET /aggregated ───────────────────────────────────────────────────
-
   @Test
   void getAggregatedInventory_wrapsPageIntoPageResponse() {
     AggregatedInventoryDto agg = new AggregatedInventoryDto(null, null, 750.0, 900.0, 25.0);
@@ -146,8 +133,6 @@ class InventoryItemControllerTest {
     assertThat(result.totalElements()).isEqualTo(1L);
     verify(inventoryItemService).getAggregatedInventory(any(Pageable.class));
   }
-
-  // ── GET /material/{materialId} ───────────────────────────────────────
 
   @Test
   void getInventoryByMaterial_forwardsMaterialIdAndPageableToService() {
@@ -164,8 +149,6 @@ class InventoryItemControllerTest {
     verify(inventoryItemService).getInventoryByMaterial(eq(materialId), any(Pageable.class));
   }
 
-  // ── GET /my-inventory (JWT-derived owner) ────────────────────────────
-
   @Test
   void getMyInventory_resolvesOwnerFromJwt_neverFromCallerParameters() {
     Jwt jwt = jwt("alice-sub");
@@ -178,9 +161,6 @@ class InventoryItemControllerTest {
     PageResponse<InventoryItemDto> result =
         controller.getMyInventory(jwt, InventoryCatalog.MATERIAL, 0, 20, null);
 
-    // The owner id MUST come from UserService.getUserIdFromJwt — the test pins that the captured
-    // owner argument matches the JWT-derived id, not the URL/page params. This is the same guard
-    // as in HangarController.getMyShips.
     ArgumentCaptor<UUID> ownerCaptor = ArgumentCaptor.forClass(UUID.class);
     verify(inventoryItemService).getUserInventory(ownerCaptor.capture(), any(Pageable.class));
     assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
@@ -271,8 +251,6 @@ class InventoryItemControllerTest {
         .getMyAggregatedInventory(ownerId, null, null, null, null, null, false, true);
   }
 
-  // ── GET /all (admin/logistician wide read) ───────────────────────────
-
   @Test
   void getAllInventory_forwardsFiltersAndPageableToService() {
     UUID materialId = UUID.randomUUID();
@@ -311,14 +289,9 @@ class InventoryItemControllerTest {
         controller.getAllGroupedInventory(
             null, null, null, null, null, null, InventoryCatalog.MATERIAL);
 
-    // The squadron-wide read MUST NOT touch the JWT helper — its access is gated by
-    // @PreAuthorize on the controller method (LOGISTICIAN or above) plus service-level checks,
-    // not by a runtime ownership decision.
     assertThat(result).containsExactly(group);
     verifyNoInteractions(userService, authHelperService);
   }
-
-  // ── GET /my-inventory/stack/entries (JWT-derived owner, clamped paging) ──
 
   @Test
   void getMyStackEntries_resolvesOwnerFromJwt_clampsPageSize_andWrapsPage() {
@@ -356,10 +329,7 @@ class InventoryItemControllerTest {
             500);
 
     assertThat(result.content()).containsExactly(dto);
-    // The owner id is derived from the JWT, never a request parameter (personal-inventory
-    // isolation).
     verify(userService).getUserIdFromJwt(jwt);
-    // A request for size=500 is clamped to the STACK_ENTRIES_MAX_SIZE bound (100).
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(inventoryItemService)
         .getMyStackEntries(
@@ -373,8 +343,6 @@ class InventoryItemControllerTest {
     assertThat(pageable.getValue().getPageSize()).isEqualTo(100);
     assertThat(pageable.getValue().getPageNumber()).isZero();
   }
-
-  // ── GET /all/stack/entries (per-owner stack key, default paging) ──
 
   @Test
   void getAllStackEntries_forwardsUserIdParam_appliesDefaultPaging_andWrapsPage() {
@@ -400,9 +368,7 @@ class InventoryItemControllerTest {
             null);
 
     assertThat(result.content()).containsExactly(dto);
-    // The squadron-wide drill-down is gated by @PreAuthorize + service scope, not a JWT-owner read.
     verifyNoInteractions(userService, authHelperService);
-    // Null page/size fall back to the first page of STACK_ENTRIES_DEFAULT_SIZE (20).
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(inventoryItemService)
         .getAllStackEntries(
@@ -411,9 +377,6 @@ class InventoryItemControllerTest {
     assertThat(pageable.getValue().getPageNumber()).isZero();
   }
 
-  // ── catalog=ITEM read family (V220, REQ-INV-029/030/031) ─────────────
-
-  // covers REQ-INV-030 (catalog=ITEM aggregated view dispatches to the item sibling)
   @Test
   void getAggregatedInventory_catalogItem_dispatchesToAggregationService() {
     AggregatedInventoryDto agg =
@@ -430,14 +393,11 @@ class InventoryItemControllerTest {
     PageResponse<AggregatedInventoryDto> result =
         controller.getAggregatedInventory(InventoryCatalog.ITEM, 0, 20, null);
 
-    // The ITEM catalog bypasses the historical material facade entirely — pre-item clients that
-    // never send the parameter keep hitting inventoryItemService (pinned by the MATERIAL test).
     assertThat(result.content()).containsExactly(agg);
     verify(inventoryAggregationService).getAggregatedItemInventory(any(Pageable.class));
     verifyNoInteractions(inventoryItemService);
   }
 
-  // covers REQ-INV-030 (catalog=ITEM flat my-inventory dispatches to the item sibling)
   @Test
   void getMyInventory_catalogItem_dispatchesToUserItemInventory() {
     Jwt jwt = jwt("alice-sub");
@@ -456,18 +416,15 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // covers REQ-INV-029/031 (catalog=ITEM grouped view rejects the material-only filters with 400)
   @Test
   void getMyGroupedInventory_catalogItem_rejectsMinQualityAndMissionIds() {
     Jwt jwt = jwt("alice-sub");
 
-    // minQuality is meaningless without a quality dimension → 400, never silently ignored.
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 controller.getMyGroupedInventory(
                     jwt, null, null, null, 700, null, null, false, false, InventoryCatalog.ITEM))
         .isInstanceOf(BadRequestException.class);
-    // missionIds could only ever match the empty set (item rows are never mission-allocated).
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 controller.getMyGroupedInventory(
@@ -485,13 +442,10 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-029/031 (catalog=ITEM grouped view rejects a material filter with 400)
   @Test
   void getMyGroupedInventory_catalogItem_rejectsMaterialIds() {
     Jwt jwt = jwt("alice-sub");
 
-    // Item rows carry no material — a silently dropped materialIds filter would return
-    // plausible-looking but unfiltered data, so the mismatch is a 400 contract error.
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 controller.getMyGroupedInventory(
@@ -510,13 +464,10 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-029/031 (catalog=MATERIAL grouped view rejects an item filter with 400)
   @Test
   void getMyGroupedInventory_catalogMaterial_rejectsGameItemIds() {
     Jwt jwt = jwt("alice-sub");
 
-    // The mirror guard: material rows carry no game item, so gameItemIds under the (default)
-    // MATERIAL catalog is rejected before any owner resolution or service dispatch.
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 controller.getMyGroupedInventory(
@@ -535,7 +486,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-030 (catalog=ITEM grouped view dispatches with the item filter surface)
   @Test
   void getMyGroupedInventory_catalogItem_dispatchesWithItemFilters() {
     Jwt jwt = jwt("alice-sub");
@@ -572,10 +522,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // ── GET /my-inventory/entry-ids (select-all, REQ-INV-034) ─────────────
-
-  // covers REQ-INV-034 (material select-all resolves the owner from the JWT and forwards the same
-  // material filter surface as the grouped view, returning the flat id set).
   @Test
   void getMyEntryIds_material_resolvesOwnerFromJwt_andForwardsFilters() {
     Jwt jwt = jwt("alice-sub");
@@ -626,8 +572,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryAggregationService);
   }
 
-  // covers REQ-INV-034 (item select-all dispatches to the item id query with the item filter
-  // surface and the personal toggle, never the material facade).
   @Test
   void getMyEntryIds_catalogItem_dispatchesWithItemFilters() {
     Jwt jwt = jwt("alice-sub");
@@ -657,8 +601,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // covers REQ-INV-034 + REQ-INV-029/031 (item select-all rejects the material-only filters with
-  // 400, exactly like the grouped item view — never a silently-ignored filter).
   @Test
   void getMyEntryIds_catalogItem_rejectsMaterialOnlyFilters() {
     Jwt jwt = jwt("alice-sub");
@@ -686,7 +628,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-034 + REQ-INV-029/031 (material select-all rejects a game-item filter with 400).
   @Test
   void getMyEntryIds_catalogMaterial_rejectsGameItemIds() {
     Jwt jwt = jwt("alice-sub");
@@ -709,7 +650,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-029/031 (catalog=ITEM flat /all rejects the material-only filters with 400)
   @Test
   void getAllInventory_catalogItem_rejectsMinQualityAndMissionIds() {
     org.assertj.core.api.Assertions.assertThatThrownBy(
@@ -734,7 +674,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-029/031 (catalog=ITEM flat /all rejects a material filter with 400)
   @Test
   void getAllInventory_catalogItem_rejectsMaterialIds() {
     org.assertj.core.api.Assertions.assertThatThrownBy(
@@ -755,7 +694,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-029/031 (catalog=MATERIAL flat /all rejects an item filter with 400)
   @Test
   void getAllInventory_catalogMaterial_rejectsGameItemIds() {
     org.assertj.core.api.Assertions.assertThatThrownBy(
@@ -776,7 +714,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-030 (catalog=ITEM flat /all dispatches to the item sibling)
   @Test
   void getAllInventory_catalogItem_dispatchesToAllItemInventory() {
     UUID gameItemId = UUID.randomUUID();
@@ -794,7 +731,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // covers REQ-INV-029/031 (catalog=ITEM grouped /all rejects the material-only filters with 400)
   @Test
   void getAllGroupedInventory_catalogItem_rejectsMinQualityAndMissionIds() {
     org.assertj.core.api.Assertions.assertThatThrownBy(
@@ -816,7 +752,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-029/031 (catalog=ITEM grouped /all rejects a material filter with 400)
   @Test
   void getAllGroupedInventory_catalogItem_rejectsMaterialIds() {
     org.assertj.core.api.Assertions.assertThatThrownBy(
@@ -834,7 +769,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-029/031 (catalog=MATERIAL grouped /all rejects an item filter with 400)
   @Test
   void getAllGroupedInventory_catalogMaterial_rejectsGameItemIds() {
     org.assertj.core.api.Assertions.assertThatThrownBy(
@@ -852,7 +786,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-030 (catalog=ITEM grouped /all dispatches to the item sibling)
   @Test
   void getAllGroupedInventory_catalogItem_dispatchesWithItemFilters() {
     UUID gameItemId = UUID.randomUUID();
@@ -875,19 +808,16 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // covers REQ-INV-005/029 (catalog=ITEM stack drill-down: gameItemId required, quality rejected)
   @Test
   void getMyStackEntries_catalogItem_requiresGameItemId_andRejectsQuality() {
     Jwt jwt = jwt("owner-sub");
     UUID locationId = UUID.randomUUID();
 
-    // The stack address of an item drill-down is the gameItemId — absent → 400.
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 controller.getMyStackEntries(
                     jwt, null, null, locationId, null, false, null, InventoryCatalog.ITEM, 0, 20))
         .isInstanceOf(BadRequestException.class);
-    // Item stacks carry no quality key — a quality param is a contract error → 400.
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 controller.getMyStackEntries(
@@ -905,7 +835,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // covers REQ-INV-005/029 (catalog=ITEM my-stack drill-down dispatches to the item sibling)
   @Test
   void getMyStackEntries_catalogItem_dispatchesToItemStackEntries() {
     Jwt jwt = jwt("owner-sub");
@@ -932,7 +861,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // covers REQ-INV-005/029 (catalog=ITEM global stack drill-down dispatches to the item sibling)
   @Test
   void getAllStackEntries_catalogItem_dispatchesToItemStackEntries() {
     UUID gameItemId = UUID.randomUUID();
@@ -949,7 +877,6 @@ class InventoryItemControllerTest {
             null, gameItemId, userId, locationId, null, null, InventoryCatalog.ITEM, null, null);
 
     assertThat(result.content()).containsExactly(dto);
-    // Quality on the global item drill-down is rejected exactly like the my-variant.
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 controller.getAllStackEntries(
@@ -966,9 +893,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // ── GET /game-item/{gameItemId} (item drilldown) ─────────────────────
-
-  // covers REQ-INV-030 (per-game-item drilldown wired to the aggregation service)
   @Test
   void getInventoryByGameItem_forwardsGameItemIdAndPageableToService() {
     UUID gameItemId = UUID.randomUUID();
@@ -985,10 +909,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // ── GET /item-catalog (bookable game items picker) ───────────────────
-
-  // covers REQ-INV-029 (item-catalog picker returns the paged reference shape with a stable
-  // id tiebreaker)
   @Test
   void getItemCatalog_wrapsCatalogServicePageIntoPageResponse() {
     InventoryGameItemReferenceDto ref =
@@ -1003,10 +923,6 @@ class InventoryItemControllerTest {
 
     assertThat(result.content()).containsExactly(ref);
     assertThat(result.totalElements()).isEqualTo(1L);
-    // The sort whitelist includes `id`, so PaginationUtil appends it as a tiebreaker even when the
-    // caller sorts by name only — equal-named UEX variants keep a deterministic page order (the
-    // name,asc;id,asc default-sort contract). A whitelist regression to {name} drops the appended
-    // key and this captor catches it.
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(inventoryItemCatalogService).findBookableItems(eq("drive"), pageable.capture());
     org.springframework.data.domain.Sort sort = pageable.getValue().getSort();
@@ -1015,15 +931,13 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
-  // ── POST /inventory (create) ─────────────────────────────────────────
-
   @Test
   void createInventoryItem_delegatesWithoutAnyRoleBoolean() {
     Jwt jwt = jwt("alice-sub");
     UUID callerId = UUID.randomUUID();
     InventoryItemCreateDto createDto =
         new InventoryItemCreateDto(
-            UUID.randomUUID(), // an explicit, foreign receiver ...
+            UUID.randomUUID(),
             UUID.randomUUID(),
             null,
             UUID.randomUUID(),
@@ -1042,17 +956,10 @@ class InventoryItemControllerTest {
 
     InventoryItemDto result = controller.createInventoryItem(jwt, createDto);
 
-    // ... and the controller decides NOTHING about it. The receiver is an authorization input that
-    // can only be answered against the target id, so the gate lives in the service
-    // (canManageUserInventory). This test pins that no role boolean is computed here any more: the
-    // predecessor passed isLogisticianOrAbove() down, which is org-unit-less and let a logistician
-    // of any Staffel write into any other Staffel's member ledger (REQ-SEC-005).
     assertThat(result).isSameAs(persisted);
     verify(inventoryItemService).createInventoryItem(createDto, callerId);
     verify(authHelperService, never()).isLogisticianOrAbove();
   }
-
-  // ── POST /inventory/{id}/book-out (200 / 204 split) ──────────────────
 
   @Test
   void bookOutInventoryItem_returns200_whenServiceYieldsDto() {
@@ -1089,15 +996,9 @@ class InventoryItemControllerTest {
     ResponseEntity<InventoryItemDto> response =
         controller.bookOutInventoryItem(jwt, itemId, bookOutDto);
 
-    // The 200/204 split lives in the CONTROLLER, not in the service: service returning null is
-    // the signal "row was removed entirely (post-decrement quantity < epsilon)". A regression
-    // that returns 200 with an empty body would break the frontend's "removed-from-list"
-    // animation contract, which keys off the status code, not the body.
     assertThat(response.getStatusCode().value()).isEqualTo(204);
     assertThat(response.getBody()).isNull();
   }
-
-  // ── POST /inventory/{id}/personal-rebook (Umbuchung) ─────────────────
 
   @Test
   void rebookPersonal_logisticianBranch_passesTrueToService_andReturnsServiceDto() {
@@ -1114,8 +1015,6 @@ class InventoryItemControllerTest {
 
     InventoryItemDto result = controller.rebookPersonal(jwt, itemId, rebookDto);
 
-    // The role flag from the HTTP boundary reaches the service as the isAdmin arg, the owner id is
-    // the JWT-derived id, and the controller returns the service DTO directly (no 200/204 split).
     assertThat(result).isSameAs(persisted);
     verify(inventoryItemService).rebookPersonal(itemId, rebookDto, ownerId, true);
   }
@@ -1135,16 +1034,12 @@ class InventoryItemControllerTest {
 
     InventoryItemDto result = controller.rebookPersonal(jwt, itemId, rebookDto);
 
-    // Non-logistician path — the boolean flows through unchanged; the captured service arguments
-    // pin that the owner id is the JWT-derived id and the isAdmin flag is false.
     assertThat(result).isSameAs(persisted);
     ArgumentCaptor<UUID> ownerCaptor = ArgumentCaptor.forClass(UUID.class);
     verify(inventoryItemService)
         .rebookPersonal(eq(itemId), eq(rebookDto), ownerCaptor.capture(), eq(false));
     assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
   }
-
-  // ── PUT /inventory/{id}/note ─────────────────────────────────────────
 
   @Test
   void updateInventoryItemNote_logisticianBranch_passesTrueToService() {
@@ -1176,13 +1071,9 @@ class InventoryItemControllerTest {
 
     InventoryItemDto result = controller.updateInventoryItemNote(jwt, itemId, request);
 
-    // Non-logistician path — the service rejects with 403 if itemId belongs to another user.
-    // The test pins the boolean flow, NOT the service's downstream decision.
     assertThat(result).isSameAs(persisted);
     verify(inventoryItemService).updateNote(itemId, request, ownerId, false);
   }
-
-  // ── POST /inventory/bulk-checkout ────────────────────────────────────
 
   @Test
   void bulkCheckout_forwardsOwnerOnly_neverConsultsIsLogistician() {
@@ -1194,16 +1085,9 @@ class InventoryItemControllerTest {
 
     controller.bulkCheckout(jwt, request);
 
-    // Bulk checkout is deliberately NOT role-overridable: even an admin must use the
-    // single-item endpoints to delete someone else's stock. The test pins that
-    // isLogisticianOrAbove() is NEVER consulted for this flow — silent regression in the
-    // future (e.g. "let's just accept the same isLogistician flag everywhere") would change
-    // the data-isolation contract.
     verify(inventoryItemService).bulkCheckout(request, ownerId);
     verify(authHelperService, never()).isLogisticianOrAbove();
   }
-
-  // ── POST /inventory/bulk-rebook ──────────────────────────────────────
 
   @Test
   void bulkRebook_forwardsOwnerOnly_neverConsultsIsLogistician() {
@@ -1223,15 +1107,10 @@ class InventoryItemControllerTest {
 
     BulkRebookResultDto result = controller.bulkRebook(jwt, request);
 
-    // Same data-isolation contract as bulk checkout: the bulk rebooking is owner-scoped from the
-    // JWT and deliberately NOT role-overridable — an admin must use the single-row endpoints to
-    // move someone else's stock. Pin that isLogisticianOrAbove() is never consulted here.
     assertThat(result).isSameAs(expected);
     verify(inventoryItemService).bulkRebook(request, ownerId);
     verify(authHelperService, never()).isLogisticianOrAbove();
   }
-
-  // ── PATCH /inventory/{id}/delivered ──────────────────────────────────
 
   @Test
   void updateDelivered_logisticianBranch_passesTrueToService() {
@@ -1269,22 +1148,14 @@ class InventoryItemControllerTest {
     verify(inventoryItemService).updateDelivered(itemId, request, ownerId, false);
   }
 
-  // ── DELETE /inventory/all (ADMIN-only nuke) ──────────────────────────
-
   @Test
   void deleteAllGlobalInventory_returns204_andDelegatesToService() {
     ResponseEntity<Void> response = controller.deleteAllGlobalInventory();
 
-    // Admin-only "globales Lager leeren" — the @PreAuthorize gate is the entire access story
-    // for this endpoint. The controller test confirms (1) the delegation and (2) the 204
-    // status code — the ADMIN gate itself is covered by Spring Security and not duplicated
-    // here in a pure-Mockito unit test.
     assertThat(response.getStatusCode().value()).isEqualTo(204);
     assertThat(response.getBody()).isNull();
     verify(inventoryItemService).deleteAllGlobalInventory();
   }
-
-  // ── POST/PATCH/DELETE /inventory/{id}/allocation (Variante C splits) ──
 
   @Test
   void addAllocation_delegatesIdAndDto_withoutJwtOrRoleHelper() {
@@ -1297,9 +1168,6 @@ class InventoryItemControllerTest {
 
     InventoryItemDto result = controller.addAllocation(itemId, dto);
 
-    // The allocation endpoints are gated purely by @PreAuthorize(@ownerScopeService
-    // .canEditInventoryItem) plus the service's personal-entry guard — no JWT-owner read and no
-    // isLogistician boundary flag, so neither helper is consulted.
     assertThat(result).isSameAs(persisted);
     verify(inventoryItemService).addAllocation(itemId, dto);
     verifyNoInteractions(userService, authHelperService);
@@ -1337,9 +1205,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(userService, authHelperService);
   }
 
-  // ── Location filter (REQ-INV-040) ─────────────────────────────────────
-
-  // covers REQ-INV-040 (the grouped "Mein Lager" read relays locationIds to the material facade)
   @Test
   void getMyGroupedInventory_catalogMaterial_forwardsLocationIds() {
     Jwt jwt = jwt("alice-sub");
@@ -1377,8 +1242,6 @@ class InventoryItemControllerTest {
             eq(false));
   }
 
-  // covers REQ-INV-040 (the location filter is catalog-agnostic: an ITEM read takes it too and is
-  // NOT rejected the way minQuality / missionIds / materialIds are)
   @Test
   void getMyGroupedInventory_catalogItem_forwardsLocationIdsInsteadOfRejectingThem() {
     Jwt jwt = jwt("alice-sub");
@@ -1410,8 +1273,6 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
-  // covers REQ-INV-040 + REQ-INV-034 ("Alle markieren" resolves the same location-filtered set the
-  // table shows, on both catalogs)
   @Test
   void getMyEntryIds_forwardsLocationIdsOnBothCatalogs() {
     Jwt jwt = jwt("alice-sub");
@@ -1454,7 +1315,6 @@ class InventoryItemControllerTest {
         .containsExactly(entry);
   }
 
-  // covers REQ-INV-040 (the shared "Globales Lager" carries the same filter, material and items)
   @Test
   void getAllGroupedInventory_forwardsLocationIdsOnBothCatalogs() {
     UUID locationId = UUID.randomUUID();
@@ -1474,8 +1334,6 @@ class InventoryItemControllerTest {
                 null, null, List.of(locationId), null, null, null, InventoryCatalog.ITEM))
         .containsExactly(group);
 
-    // The squadron-wide read must not touch the JWT helper (its access is role-gated, not
-    // owner-scoped) — the location filter changes nothing about that.
     verifyNoInteractions(userService);
   }
 }

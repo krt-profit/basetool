@@ -56,11 +56,7 @@ import org.springframework.web.cors.CorsConfiguration;
  */
 class SecurityConfigTest {
 
-  /**
-   * The gateway's real audience (ADR-0018 amendment 1). This constant used to be the backend's
-   * {@code basetool-backend}, which made the suite assert — and document — exactly the wrong
-   * configuration.
-   */
+  /** The gateway's own token audience (ADR-0018). */
   private static final List<String> EXPECTED = List.of("basetool-ingest");
 
   private static Jwt jwtWithAudience(List<String> audience) {
@@ -75,21 +71,16 @@ class SecurityConfigTest {
 
   @Test
   void shouldAcceptTokenWhoseAudienceContainsAnExpectedValue() {
-    // Given
     OAuth2TokenValidator<Jwt> validator = SecurityConfig.audienceValidator(EXPECTED);
     Jwt jwt = jwtWithAudience(List.of("basetool-backend", "basetool-ingest"));
 
-    // When
     OAuth2TokenValidatorResult result = validator.validate(jwt);
 
-    // Then
     assertThat(result.hasErrors()).isFalse();
   }
 
   @Test
   void shouldRejectAFrontendSessionTokenThatCarriesOnlyTheBackendAudience() {
-    // The reason the gateway's audience is not the backend's: every frontend session token carries
-    // basetool-backend, and only the extractor's extractor-ingest-only scope adds basetool-ingest.
     OAuth2TokenValidator<Jwt> validator = SecurityConfig.audienceValidator(EXPECTED);
     Jwt frontendSession = jwtWithAudience(List.of("basetool-backend"));
 
@@ -105,20 +96,16 @@ class SecurityConfigTest {
 
   @Test
   void shouldRejectTokenWithoutAnyExpectedAudience() {
-    // Given
     OAuth2TokenValidator<Jwt> validator = SecurityConfig.audienceValidator(EXPECTED);
     Jwt jwt = jwtWithAudience(List.of("basetool-frontend"));
 
-    // When
     OAuth2TokenValidatorResult result = validator.validate(jwt);
 
-    // Then
     assertThat(result.hasErrors()).isTrue();
   }
 
   @Test
   void shouldRejectTokenWithoutAnyAudienceClaim() {
-    // Given: `aud` absent entirely — the disjoint check must treat that as a reject, not a pass.
     OAuth2TokenValidator<Jwt> validator = SecurityConfig.audienceValidator(EXPECTED);
     Jwt jwt =
         Jwt.withTokenValue("token")
@@ -128,15 +115,11 @@ class SecurityConfigTest {
             .expiresAt(Instant.now().plusSeconds(300))
             .build();
 
-    // When / Then
     assertThat(validator.validate(jwt).hasErrors()).isTrue();
   }
 
   @Test
   void shouldBuildAnIssuerLocationDecoderWhenNoInternalJwksUriIsConfigured() throws Exception {
-    // The blank-jwkSetUri branch must reproduce the auto-configuration exactly: discover the
-    // issuer's OIDC configuration and derive the accepted algorithm set from the live JWKS, rather
-    // than using a hand-configured key URL.
     ECKey key = new ECKeyGenerator(Curve.P_256).keyID("k1").generate();
     try (MockWebServer keycloak = new MockWebServer()) {
       keycloak.start();
@@ -146,8 +129,6 @@ class SecurityConfigTest {
       NimbusJwtDecoder decoder =
           SecurityConfig.buildDecoder(issuer, "", new DefaultSslBundleRegistry());
 
-      // The discovered issuer is enforced, so a token minted for it decodes and one minted for a
-      // different issuer does not.
       assertThat(decoder.decode(signedToken(key, List.of("basetool-backend"), issuer)).getSubject())
           .isEqualTo("caller-sub");
     }
@@ -155,8 +136,6 @@ class SecurityConfigTest {
 
   @Test
   void shouldAttachNoAudienceValidatorWhenOnlyBlankAudiencesAreConfigured() throws Exception {
-    // Given: the property binds blank entries — configuration noise, not a real audience. Attaching
-    // a validator for them would reject every token, since a blank `aud` matches nothing.
     ECKey key = new ECKeyGenerator(Curve.P_256).keyID("k1").generate();
     try (MockWebServer keycloak = new MockWebServer()) {
       keycloak.enqueue(
@@ -167,7 +146,6 @@ class SecurityConfigTest {
 
       SecurityConfig config = new SecurityConfig();
 
-      // When
       JwtDecoder decoder =
           config.resourceServerJwtDecoder(
               "https://keycloak.example/realms/iri",
@@ -175,7 +153,6 @@ class SecurityConfigTest {
               List.of("  ", ""),
               new DefaultSslBundleRegistry());
 
-      // Then: a token whose audience matches nothing still decodes — no audience rule is active.
       assertThat(decoder.decode(signedToken(key, List.of("some-other-client"))).getSubject())
           .isEqualTo("caller-sub");
     }
@@ -183,8 +160,6 @@ class SecurityConfigTest {
 
   @Test
   void shouldRejectAnAudienceMismatchOnceAudiencesAreConfigured() throws Exception {
-    // Given a decoder built with a real expected audience and a live JWKS the token is signed
-    // against, so the audience rule is the only thing that can fail.
     ECKey key = new ECKeyGenerator(Curve.P_256).keyID("k1").generate();
     try (MockWebServer keycloak = new MockWebServer()) {
       keycloak.enqueue(
@@ -201,7 +176,6 @@ class SecurityConfigTest {
               EXPECTED,
               new DefaultSslBundleRegistry());
 
-      // When / Then
       assertThatThrownBy(() -> decoder.decode(signedToken(key, List.of("some-other-client"))))
           .isInstanceOf(JwtValidationException.class);
     }
@@ -209,8 +183,6 @@ class SecurityConfigTest {
 
   @Test
   void corsSourceAllowsNoOriginAndNoCredentials() {
-    // The gateway is called by a native desktop app; a browser origin must never be allowed, and
-    // credentials must never be echoed (REQ-INGEST-002).
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/v1/refinery-extract");
     request.addHeader(HttpHeaders.ORIGIN, "https://evil.example");
 

@@ -26,15 +26,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Binds the caller's {@code X-User-Time-Zone} request header, parsed to a {@link java.time.ZoneId},
- * to a controller method parameter — replacing the duplicated {@code parse}/{@code parseZone}
- * header try/catch helpers scattered across the PDF-export controllers.
+ * Binds the caller's {@code X-User-Time-Zone} header, parsed to a {@link java.time.ZoneId}, to a
+ * controller method parameter.
  *
- * <p>Resolved by {@link UserZoneArgumentResolver}: an absent, blank or invalid IANA zone yields
- * {@code null} (the report services then render in UTC) rather than failing the request — the
- * "silently fall back to UTC" contract the hand-rolled parsers shared. Sites keep the header
- * documented in the OpenAPI output via an explicit {@code @Parameter(in = HEADER)} so the generated
- * document is unchanged.
+ * <p>Resolved by {@link UserZoneArgumentResolver}; an absent, blank or invalid zone yields {@code
+ * null}, and callers then render in UTC.
  */
 @Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)

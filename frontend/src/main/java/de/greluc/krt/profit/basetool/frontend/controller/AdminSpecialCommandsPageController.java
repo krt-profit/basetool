@@ -59,28 +59,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the admin Spezialkommando-management page ({@code
- * /admin/special-commands}). Mirrors the Squadron section of {@link AdminMissionDataPageController}
- * field-for-field: list + create + update + soft-delete + re-activate, with the same
- * BindingResult-inline-rerender / 409-distinct-toast / generic-error- redirect pattern.
+ * Controller for the admin Spezialkommando page ({@code /admin/special-commands}): list, create,
+ * update, soft-delete and re-activate, plus the admin-only SK-lead toggle. Spezialkommandos carry
+ * no promotion toggle.
  *
- * <p>SK-specific differences from Squadron:
- *
- * <ul>
- *   <li>No promotion-feature toggle — Spezialkommandos never carry the promotion subsystem. The
- *       backend's V94 CHECK constraint plus the {@code SpecialCommand} setter override forbid the
- *       flag from ever being {@code true} on an SK row.
- *   <li>SK lives on a dedicated page rather than being one of three columns on {@code
- *       /admin/mission-data}. SK administration is a denser surface (each row links to the SK's
- *       member page) so the dedicated page avoids cluttering the existing reference-data view.
- * </ul>
- *
- * <p>The per-SK member page is not here. It is {@code /organisation/special-commands/{id}} on
- * {@link SpecialCommandMembersPageController}, outside the admin area, because the SK's own lead
- * manages its members too and the admin area stays admin-only (REQ-ORG-005). This controller keeps
- * the SK lifecycle (list / create / update / soft-delete / re-activate), a redirect from the old
- * {@code /admin/special-commands/{id}} URL, and the admin-only SK-lead toggle whose form the member
- * page renders for admins.
+ * <p>The SK member page is {@link SpecialCommandMembersPageController} (REQ-ORG-005).
  */
 @Controller
 @UsesLayoutModel
@@ -104,16 +87,12 @@ public class AdminSpecialCommandsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the SK overview list. Re-seeds an empty form when the model does not already carry one
-   * (which would be the case after a validation re-render). {@code includeInactive=true} surfaces
-   * soft-deleted SKs so the admin can reactivate them.
+   * Renders the SK list, seeding an empty form unless a validation re-render already supplied one.
    *
-   * @param includeInactive show soft-deleted SKs.
-   * @param fragment when {@code "results"} only the SK-list fragment is rendered (AJAX
-   *     include-inactive filter swap, REQ-FE-002); otherwise the full page is returned.
+   * @param includeInactive whether to include soft-deleted SKs.
+   * @param fragment {@code "results"} to render only the SK list (REQ-FE-002).
    * @param model Thymeleaf model populated with the SK list, the form and the toggle.
-   * @return the {@code admin/special-commands} view name, or its {@code results} fragment for an
-   *     AJAX swap.
+   * @return the {@code admin/special-commands} view name, or its {@code results} fragment.
    */
   @NotNull
   @GetMapping
@@ -145,13 +124,10 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Fetches the <em>complete</em> SK catalog from the backend — every page, not one capped chunk
-   * (REQ-ADMIN-001, ADR-0102) — and transforms the raw payload into a sorted list of {@link
-   * SpecialCommandDto} records. Mirrors {@link AdminMissionDataPageController}'s {@code
-   * fetchSquadrons} parsing path. The returned wrapper carries the truncation flag for the
-   * page-level warning banner (REQ-ADMIN-002).
+   * Fetches every page of the SK catalog from the backend (REQ-ADMIN-001) as {@link
+   * SpecialCommandDto} records.
    *
-   * @param includeInactive forward to the backend's {@code includeInactive} query param.
+   * @param includeInactive forwarded as the backend's {@code includeInactive} parameter.
    * @return SKs sorted case-insensitively by name plus the truncation flag; never {@code null}.
    */
   @NotNull
@@ -184,15 +160,14 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Creates a new Spezialkommando. Validation failure re-renders the list inline with the create
-   * modal re-opened; a 409 from the backend's duplicate-name check surfaces as the dedicated toast;
-   * all other failures redirect with an error query param.
+   * Creates a Spezialkommando. Validation failures re-render the list with the create modal open; a
+   * duplicate-name 409 shows its own toast; other failures redirect with an error parameter.
    *
    * @param form SK form payload.
    * @param bindingResult validation errors carrier.
-   * @param model Thymeleaf model used for inline re-rendering on validation failure.
-   * @param redirectAttributes flash-attribute carrier for the success / error toast.
-   * @return inline list page on validation failure, otherwise redirect to {@code
+   * @param model Thymeleaf model used for the inline re-render.
+   * @param redirectAttributes flash-attribute carrier for the toast.
+   * @return the inline list page on validation failure, otherwise a redirect to {@code
    *     /admin/special-commands}.
    */
   @NotNull
@@ -229,15 +204,14 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Updates an existing Spezialkommando. Distinguishes optimistic-locking conflict ({@code
-   * concurrency-conflict} problem type) from a duplicate-name 409 so the user gets the right toast.
+   * Updates a Spezialkommando, telling an optimistic-lock conflict apart from a duplicate-name 409.
    *
    * @param id SK id.
-   * @param form SK form (carries the version).
+   * @param form SK form, carrying the version.
    * @param bindingResult validation errors carrier.
-   * @param model Thymeleaf model used for inline re-rendering.
+   * @param model Thymeleaf model used for the inline re-render.
    * @param redirectAttributes flash-attribute carrier.
-   * @return inline list page on failure, otherwise redirect.
+   * @return the inline list page on failure, otherwise a redirect.
    */
   @NotNull
   @PostMapping("/{id}/update")
@@ -278,9 +252,7 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Soft-deletes a Spezialkommando (flips {@code active = false}). A 409 from the backend (would
-   * indicate a future referential-integrity guard once aggregates can be owned by SKs) surfaces as
-   * the dedicated "in use" toast.
+   * Soft-deletes a Spezialkommando; a backend 409 shows the "in use" toast.
    *
    * @param id SK id.
    * @param redirectAttributes flash-attribute carrier.
@@ -331,11 +303,7 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Keeps the former SK detail URL working: the member page moved to {@code
-   * /organisation/special-commands/{id}} ({@link SpecialCommandMembersPageController}) so a
-   * non-admin SK lead can reach it, and an old bookmark or link lands there. Query parameters (e.g.
-   * {@code fragment}) are not carried over — the only caller that sent one was the page's own
-   * roster re-swap, which now targets the new URL directly.
+   * Redirects the former SK detail URL to the member page, dropping query parameters.
    *
    * @param id Spezialkommando id.
    * @return redirect to {@code /organisation/special-commands/{id}}.
@@ -347,19 +315,16 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Toggles the Spezialkommando-Lead flag on a member's membership row (no-JS fallback of the
-   * lead-toggle form on the SK member page). ADMIN-only at the controller level — the SK member
-   * page renders this form for admins only, because a Lead can never promote themselves or another
-   * member; the backend gates the endpoint to admin or the Bereichsleiter of the SK's parent
-   * Bereich, who toggles it from the Leitung page.
+   * Toggles the Spezialkommando-Lead flag on a membership (no-JS fallback). ADMIN only here; a lead
+   * can never promote anyone.
    *
    * @param id Spezialkommando id.
    * @param userId user whose membership to update.
    * @param isLead new Lead state.
    * @param version current optimistic-lock version held by the form.
    * @param redirectAttributes flash-attribute carrier.
-   * @return redirect to the SK member page {@code /organisation/special-commands/{id}}, with an
-   *     {@code error} query parameter on a failure other than 409.
+   * @return redirect to the SK member page, with an {@code error} parameter on a failure other than
+   *     409.
    */
   @NotNull
   @PostMapping("/{id}/members/{userId}/lead")
@@ -389,13 +354,6 @@ public class AdminSpecialCommandsPageController {
     }
     return "redirect:" + MEMBER_PAGE_BASE + id;
   }
-
-  // In-place (AJAX) twins (#582). Routed ahead of their classic POST->redirect siblings by the
-  // X-Requested-With header (no-JS forms keep their redirect fallback). They return 200 on success
-  // — the list page re-swaps the SK-list fragment and the SK member page re-swaps its member-roster
-  // fragment after a lead toggle, which re-render the correct derived state (active badges, lead
-  // state) and fresh @Version data so the next action does not 409. Conflicts are relayed as
-  // application/problem+json (duplicate/in-use toast, or OPTIMISTIC_LOCK reload-confirm).
 
   /**
    * In-place twin of {@link #createSpecialCommand}.
@@ -537,13 +495,8 @@ public class AdminSpecialCommandsPageController {
 
   /**
    * Evicts the {@link CacheDomain#SQUADRON} and {@link CacheDomain#ORG_UNIT} caches after an SK
-   * <b>lifecycle</b> change (create / update / soft-delete / re-activate / profit-eligible flip).
-   * The SK name, shorthand, active flag and {@code isProfitEligible} feed the cached org-units
-   * owner-pickers ({@code GET /api/v1/org-units/active…}) and the admin switcher's SK catalogue
-   * that {@code OrgUnitContextAdvice} reads, so every catalogue-changing mutation must drop both
-   * caches or those surfaces stay stale up to their 2-hour backstop TTL. This is the eviction that
-   * REQ-DATA-007 gates SK-catalogue cacheability on. Member-roster mutations (add / remove / flags
-   * / lead) do not touch the catalogue fields, so they deliberately do not evict.
+   * lifecycle change, so cached org-unit pickers and catalogues pick it up (REQ-DATA-007). Member
+   * roster changes do not need it.
    */
   private void evictOrgUnitCatalogueCache() {
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);

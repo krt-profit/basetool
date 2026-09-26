@@ -24,20 +24,16 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Response payload for one holder-registry row (epic #556, REQ-BANK-003, ADR-0039), enriched with
- * the holder's global custody total the management "Halter" tab shows (W1 mockup).
+ * Response payload for one holder-registry row (REQ-BANK-003), with the holder's global custody
+ * total.
  *
  * @param id the holder row's id
- * @param userId the linked basetool user, or {@code null} after user deletion (handle snapshot
- *     remains)
- * @param handle the holder's display label — the linked user's live effective name (display name
- *     preferred, username fallback), falling back to the deletion-proof handle snapshot once the
- *     user is deleted (REQ-BANK-003)
+ * @param userId the linked basetool user, or {@code null} after user deletion
+ * @param handle the linked user's live effective name, or the handle snapshot once the user is
+ *     deleted
  * @param active whether the holder accepts new incoming postings
- * @param totalHeld signed global sum the holder physically holds across the whole bank (may be
- *     negative, REQ-BANK-006)
- * @param roleManaged whether the holder was auto-created from a bank role (REQ-BANK-029); manual
- *     custodians are {@code false}
+ * @param totalHeld signed global sum the holder holds across the bank (may be negative)
+ * @param roleManaged whether the holder was auto-created from a bank role (REQ-BANK-029)
  * @param version optimistic-locking version the client must echo on mutations
  */
 public record BankHolderDto(

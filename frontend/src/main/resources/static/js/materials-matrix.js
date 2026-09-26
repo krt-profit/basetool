@@ -1,26 +1,3 @@
-/*
- * Materials trade-matrix grid — client-side renderer with vertical virtual scrolling.
- *
- * The server (`GET /materials/overview`) ships only an empty skeleton plus a JSON config element;
- * this module fetches the matrix from `GET /materials/overview/data` and draws it. The matrix is a
- * dense materials x terminals grid that, rendered eagerly, builds tens of thousands of DOM cells
- * and freezes the browser. Instead we keep the fetched data in memory and materialize ONLY the
- * rows currently inside the scroll viewport (plus a small buffer) into <tbody>, padding the scroll
- * height with two spacer rows. Scrolling re-renders the window; the DOM node count stays roughly
- * constant no matter how large the universe grows.
- *
- * Filtering (material / system / loading-dock / auto-load) is SERVER-SIDE (ADR-0105, REQ-UI-014):
- * on every filter change the grid re-fetches `/materials/overview/data` with the selection as query
- * parameters and re-renders. This replaced an in-memory filter over a single clamped fetch, which
- * silently dropped material×terminal cells once the universe exceeded the backend page-size clamp.
- * A stale-response guard (fetchToken) discards out-of-order responses from rapid filter changes.
- * The filter selection is persisted per browser in localStorage (REQ-UI-016) and restored before
- * the initial fetch, so a reload or a later visit reopens the page with the last-used filters.
- * The category-grouping toggle and the collapse/expand of a category are pure presentation and stay
- * client-side (no re-fetch). Columns are NOT virtualized (terminals are bounded by the game
- * universe and rendered in full per visible row); the unbounded dimension is the material rows,
- * which is what we virtualize.
- */
 (function () {
     'use strict';
 
@@ -35,10 +12,6 @@
         return;
     }
 
-    // Visibility is class-based (ADR-0093): the server skeleton hides #tableContainer / #matrixError
-    // with this generated `display:none` class. Under CSP `style-src-attr 'none'` you cannot reveal
-    // them by writing an inline `style="display:.."` (blocked), and clearing `element.style.display`
-    // is a no-op against the class. Toggle the class instead — a CSSOM class change is CSP-clean.
     const HIDDEN_CLASS = 'krtm-display-none-5790';
 
     const DATA_URL = config.getAttribute('data-data-url');
@@ -58,45 +31,33 @@
         volatileTime: config.getAttribute('data-label-volatile-time') || '',
     };
 
-    // Group thousands with '.' to preserve the server's previous `formatInteger(.., 'POINT')` look,
-    // independent of UI locale; prices are whole-number aUEC.
     const NUM = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
 
-    const BUFFER = 8; // extra rows rendered above and below the viewport
-    const collapsed = {}; // kind -> true when its rows are hidden
+    const BUFFER = 8;
+    const collapsed = {};
     const GROUP_PREF_KEY = 'materials_matrix_group_by_category';
     const FILTER_PREF_KEY = 'materials_matrix_filters';
-    let grouped = true; // false -> one flat, alphabetically sorted row list with no category headers
+    let grouped = true;
 
-    let rowHeight = 0; // measured from the first rendered row (uniform via CSS)
+    let rowHeight = 0;
     let calibrated = false;
-    let grid = null; // fetched (already server-filtered) data: { terminals: [...], groups: [...] }
-    let cols = []; // current terminal columns (the fetched grid's terminals)
-    let flat = []; // flattened display items: { type: 'kind'|'row', ... }
+    let grid = null;
+    let cols = [];
+    let flat = [];
     let renderedStart = -1;
     let renderedEnd = -1;
-    let colsSig = ''; // signature of current columns, to know when headers must rebuild
+    let colsSig = '';
     let scrollPending = false;
     let filterTimer = null;
-    let fetchToken = 0; // monotonic; a response whose token is stale (superseded) is discarded
-    let bound = false; // filter listeners are attached exactly once
-
-    /* --------------------------------------------------------------------- data load */
+    let fetchToken = 0;
+    let bound = false;
 
     function init() {
-        // Bind first so the grouping preference is restored before the initial render and the
-        // filters are live immediately; restore the saved filter selection into the widgets
-        // (REQ-UI-016) before the initial fetch so the first request already carries it; then
-        // load the grid for that selection.
         bindFilters();
         restoreFilters();
         fetchGrid();
     }
 
-    // Fetches the grid for the current filter selection and re-renders. Filtering is server-side:
-    // buildFilterQuery() turns the checkbox state into query parameters the backend applies, so the
-    // response already contains only the matching slice. Out-of-order responses from rapid filter
-    // changes are discarded via a monotonic token so the grid never shows a stale selection.
     function fetchGrid() {
         const token = ++fetchToken;
         fetch(DATA_URL + buildFilterQuery(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -108,7 +69,7 @@
             })
             .then(function (data) {
                 if (token !== fetchToken) {
-                    return; // a newer fetch has superseded this one
+                    return;
                 }
                 grid = {
                     terminals: (data && data.terminals) || [],
@@ -130,10 +91,6 @@
                 if (loading) {
                     loading.classList.add(HIDDEN_CLASS);
                 }
-                // Keep the error state exclusive: hide the grid so a failed filter re-fetch never
-                // leaves the previous selection's rows visible under the error banner (they would
-                // contradict the filter widgets, which already updated synchronously). Drop the
-                // stale data too so a later scroll can't resurface it before a successful re-fetch.
                 wrapper.classList.add(HIDDEN_CLASS);
                 grid = null;
                 if (errorBox) {
@@ -142,12 +99,6 @@
             });
     }
 
-    /* ----------------------------------------------------------------------- filters */
-
-    // Turns the checkbox state into the backend query string. A dimension with zero or all options
-    // checked is treated as "no filter" (omitted), matching the backend's null-means-all semantics
-    // and keeping the unfiltered request URL identical to the cached default. The parameter names
-    // mirror MaterialsPageController#getMatrixData (materials / systems / loadingDock / autoLoad).
     function buildFilterQuery() {
         const parts = [];
         const materials = selectedValues('matCheck');
@@ -171,9 +122,6 @@
         return parts.length ? '?' + parts.join('&') : '';
     }
 
-    // Returns the checked values of a filter dimension, or null when zero or all are checked (i.e.
-    // the dimension applies no filter). Only the per-option checkboxes of `className` are counted,
-    // never the select-all box.
     function selectedValues(className) {
         const checks = document.getElementsByClassName(className);
         const total = checks.length;
@@ -184,7 +132,7 @@
             }
         }
         if (picked.length === 0 || picked.length === total) {
-            return null; // no filter
+            return null;
         }
         return picked;
     }
@@ -194,32 +142,21 @@
         return !!(el && el.checked);
     }
 
-    // Per-browser persistence of the filter selection (REQ-UI-016), mirroring the orders-queue
-    // filter idiom (REQ-ORDERS-027): one JSON object under a single key, `null` for a multi-select
-    // dimension meaning "no filter" (all options), absence of the key meaning "no saved
-    // preference" (server-rendered defaults). Storing `null` — not the full option list — for an
-    // unfiltered dimension keeps options added to the catalogue later included automatically.
-    // Guarded so privacy modes that deny storage degrade to the defaults instead of breaking.
     function readFilterPref() {
         try {
             const raw = localStorage.getItem(FILTER_PREF_KEY);
             return raw === null ? null : JSON.parse(raw);
         } catch (_e) {
-            return null; // corrupt value / storage unavailable: fall back to the defaults
+            return null;
         }
     }
 
     function writeFilterPref(value) {
         try {
             localStorage.setItem(FILTER_PREF_KEY, JSON.stringify(value));
-        } catch (_e) {
-            /* storage unavailable */
-        }
+        } catch (_e) {}
     }
 
-    // Snapshots the current widget state into localStorage. Called on every filter change (via
-    // scheduleRefetch), immediately — persistence is not debounced with the fetch, so even a
-    // change the user navigates away from before the debounce fires is kept.
     function persistFilters() {
         writeFilterPref({
             materials: selectedValues('matCheck'),
@@ -229,10 +166,6 @@
         });
     }
 
-    // Applies the saved selection to the filter widgets before the initial fetch. Saved values
-    // whose option no longer exists are dropped silently; a saved subset none of whose values
-    // still exist falls back to the "all" default (an all-unchecked widget would confusingly
-    // show a "0 selected" header while the query builder treats it as "no filter" anyway).
     function restoreFilters() {
         const saved = readFilterPref();
         if (!saved || typeof saved !== 'object') {
@@ -246,7 +179,7 @@
 
     function applySavedSelection(className, allId, headerId, saved) {
         if (!Array.isArray(saved) || saved.length === 0) {
-            return; // null / absent = no filter — keep the server-rendered "all checked" default
+            return;
         }
         const checks = document.getElementsByClassName(className);
         let anyChecked = false;
@@ -280,8 +213,6 @@
         }
     }
 
-    // Per-browser persistence of the category-grouping preference (guarded so privacy modes that
-    // throw on storage access degrade to the default grouped view instead of breaking the page).
     function readGroupPref() {
         try {
             return localStorage.getItem(GROUP_PREF_KEY);
@@ -293,15 +224,9 @@
     function writeGroupPref(value) {
         try {
             localStorage.setItem(GROUP_PREF_KEY, value);
-        } catch (_e) {
-            /* storage unavailable */
-        }
+        } catch (_e) {}
     }
 
-    // Renders the currently fetched grid. The server has already applied the four filter dimensions,
-    // so this is pure presentation: the columns are the fetched terminals and the rows are the
-    // fetched groups, arranged per the client-only grouping/collapse state. Called after every fetch
-    // and whenever a client-only view control (grouping toggle, category collapse) changes.
     function render() {
         if (!grid) {
             return;
@@ -309,7 +234,6 @@
         cols = grid.terminals;
         renderHead();
         buildFlat(grid.groups);
-        // Force a full body re-render for the new data set.
         renderedStart = -1;
         renderedEnd = -1;
         wrapper.scrollTop = 0;
@@ -319,8 +243,6 @@
     function buildFlat(groups) {
         flat = [];
         if (!grouped) {
-            // Flat mode: merge every category's rows into one list, sort alphabetically by
-            // material name, and emit only material rows (no category header rows).
             const rows = [];
             groups.forEach(function (g) {
                 for (let i = 0; i < g.rows.length; i++) {
@@ -347,8 +269,6 @@
         });
     }
 
-    /* ------------------------------------------------------------------- header build */
-
     function renderHead() {
         const sig =
             String(cols.length) +
@@ -359,12 +279,10 @@
                 })
                 .join('');
         if (sig === colsSig) {
-            return; // columns unchanged — keep existing header/colgroup
+            return;
         }
         colsSig = sig;
 
-        // Accumulated from literals and escapeHtml / escapeAttr calls only, so the innerHTML sinks
-        // provably see escaped values (FE-SEC-05).
         let cgHtml = '<col class="mtx-col-first" />';
         let sysHtml = '<th></th>';
         let termHtml = '<th>' + escapeHtml(I18N.material) + '</th>';
@@ -403,7 +321,6 @@
             '</tr>';
     }
 
-    // Contiguous-run counts of the star-system header over the (filtered) column order.
     function systemGroups(columns) {
         const out = [];
         let current = null;
@@ -427,8 +344,6 @@
         return out;
     }
 
-    /* --------------------------------------------------------------- body / virtualize */
-
     function renderBody() {
         if (!flat.length) {
             body.innerHTML =
@@ -442,17 +357,9 @@
             return;
         }
 
-        // The body markup accumulator: every write — here and in the nested append* helpers — is a
-        // literal or an escapeHtml / escapeAttr call, so the one innerHTML sink it feeds provably
-        // sees escaped values only (FE-SEC-05). The helpers are nested so it stays a local here.
         let bodyHtml = '';
 
         function appendSpacer(heightPx) {
-            // Spacer height is genuinely dynamic (row count x measured row height). Emit it as a
-            // `data-krtm-height` hint, NOT an inline `style="height:.."` attribute — the latter is
-            // injected via innerHTML and blocked by CSP `style-src-attr 'none'`.
-            // applySpacerHeights() then writes it to `style.height` through the CSSOM, which
-            // `style-src-attr` does not govern.
             bodyHtml +=
                 '<tr class="row-spacer"><td colspan="' +
                 escapeAttr(cols.length + 1) +
@@ -538,8 +445,6 @@
             }
         }
 
-        // Before calibration we render an initial window with an estimated row height, measure a
-        // real row, then re-render once with the true height so spacer math is exact.
         const rh = rowHeight || 44;
         const viewport = wrapper.clientHeight || 600;
         const firstVisible = Math.floor(wrapper.scrollTop / rh);
@@ -566,9 +471,6 @@
         }
     }
 
-    // Applies the `data-krtm-height` hints to `style.height` via the CSSOM, mirroring the
-    // `data-krtm-width` pattern of inline-style-apply.js (ADR-0093). Must run after every
-    // body.innerHTML rewrite so freshly materialized spacer rows get their height.
     function applySpacerHeights() {
         const spacers = body.querySelectorAll('td[data-krtm-height]');
         for (let i = 0; i < spacers.length; i++) {
@@ -577,8 +479,6 @@
         }
     }
 
-    // Measure the true height of a rendered material row (all rows are forced to a uniform height
-    // in CSS) and re-render once if it differs from the estimate.
     function calibrate() {
         const sample = body.querySelector('tr.row-material') || body.querySelector('tr.row-kind');
         if (!sample) {
@@ -593,8 +493,6 @@
             renderBody();
         }
     }
-
-    /* --------------------------------------------------------------------- scrolling */
 
     function onScroll() {
         if (scrollPending) {
@@ -620,12 +518,6 @@
         }
     }
 
-    /* ----------------------------------------------------------------- filter wiring */
-
-    // Debounces a server re-fetch so dragging through many checkboxes issues one request, not one
-    // per click. Each fired fetch carries a fresh token, so an earlier in-flight response that
-    // arrives late is discarded rather than clobbering the newer selection. The selection is
-    // persisted (REQ-UI-016) on every call, outside the debounce.
     function scheduleRefetch() {
         persistFilters();
         if (filterTimer) {
@@ -669,10 +561,9 @@
 
     function bindFilters() {
         if (bound) {
-            return; // listeners attach exactly once, even if init runs again
+            return;
         }
         bound = true;
-        // Dropdown open / close.
         Array.prototype.forEach.call(
             document.getElementsByClassName('mtx-multi-header'),
             function (h) {
@@ -692,7 +583,6 @@
             }
         });
 
-        // Select-all toggles.
         Array.prototype.forEach.call(
             document.getElementsByClassName('mtx-select-all'),
             function (box) {
@@ -708,7 +598,6 @@
             },
         );
 
-        // Individual option toggles.
         Array.prototype.forEach.call(document.getElementsByClassName('mtx-check'), function (chk) {
             chk.addEventListener('change', function () {
                 const checkClass = chk.getAttribute('data-check-class');
@@ -729,7 +618,6 @@
             });
         });
 
-        // Boolean filters.
         Array.prototype.forEach.call(
             document.getElementsByClassName('mtx-bool-filter'),
             function (b) {
@@ -737,9 +625,6 @@
             },
         );
 
-        // Category-grouping toggle: switch between category-grouped header rows and a single
-        // flat, alphabetically sorted row list. Restore the saved preference into `grouped`
-        // before the initial render, then re-apply (and persist) on every change.
         const groupBox = document.getElementById('filterGroupByCategory');
         if (groupBox) {
             const pref = readGroupPref();
@@ -750,12 +635,10 @@
             groupBox.addEventListener('change', function () {
                 grouped = groupBox.checked;
                 writeGroupPref(grouped ? '1' : '0');
-                // Pure presentation over the already-fetched grid — no server round-trip.
                 render();
             });
         }
 
-        // Category collapse / expand (delegated to the virtual <tbody>).
         body.addEventListener('click', function (ev) {
             const kindRow = ev.target.closest('tr.row-kind');
             if (!kindRow) {
@@ -763,7 +646,6 @@
             }
             const kind = kindRow.getAttribute('data-kind');
             collapsed[kind] = !collapsed[kind];
-            // Rebuild the flat list with the new collapse state — client-only, no re-fetch.
             render();
         });
 

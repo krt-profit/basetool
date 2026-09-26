@@ -57,7 +57,6 @@ class BackendCallLoggingInterceptorTest {
           try {
             interceptor.intercept(REQUEST, new byte[0], upstream);
           } catch (IOException | RuntimeException propagated) {
-            // The interceptor never swallows a failure; the log line is what is under test.
           }
         });
   }
@@ -81,8 +80,6 @@ class BackendCallLoggingInterceptorTest {
 
   @Test
   void marksASlowRelayAtInfoRatherThanEscalatingToWarn() {
-    // Issue #1204: a slow-but-successful call is still a success; latency is alerted on through the
-    // http.client.requests p95 histogram, not by crying wolf in the log.
     List<ILoggingEvent> events =
         exchange(
             new BackendCallLoggingInterceptor(TestLoggingProperties.withThresholds(2000L, 0L)),
@@ -106,7 +103,6 @@ class BackendCallLoggingInterceptorTest {
 
   @Test
   void keepsATransportFailureAtDebugAndNeverLogsItsMessage() {
-    // The message can carry the full target URL; the handler's WARN is the operator-facing line.
     List<ILoggingEvent> events =
         exchange(
             new BackendCallLoggingInterceptor(TestLoggingProperties.defaults()),

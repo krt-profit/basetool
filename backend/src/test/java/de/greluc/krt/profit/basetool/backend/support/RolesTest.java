@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit test for {@link Roles} (S3, #909): pins the byte-identical role-code values (Keycloak realm
- * roles / {@code Role.code}) and the {@code ROLE_}-prefixing helper's exact output.
+ * Unit test for {@link Roles}: pins the role-code values (Keycloak realm roles / {@code Role.code})
+ * and the {@code ROLE_}-prefixing helper's output.
  */
 class RolesTest {
 

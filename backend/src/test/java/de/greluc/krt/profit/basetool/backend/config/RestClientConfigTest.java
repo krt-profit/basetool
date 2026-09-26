@@ -33,9 +33,8 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 /**
- * Pins the wire behaviour of the backend's outbound client after the move from WebClient to {@code
- * RestClient} on the JDK client (ADR-0204): the read timeout is enforced, the client speaks plain
- * HTTP/1.1 as the replaced Reactor Netty client did, and each builder is independent.
+ * Pins the wire behaviour of the backend's {@code RestClient} on the JDK client (ADR-0204): the
+ * read timeout is enforced, it speaks plain HTTP/1.1, and each builder is independent.
  */
 class RestClientConfigTest {
 

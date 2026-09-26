@@ -22,21 +22,11 @@ package de.greluc.krt.profit.basetool.backend.support;
 import java.util.UUID;
 
 /**
- * Caller-aware access seam the {@code MissionMapper} uses to fill the viewer-dependent fields of a
- * mission DTO ({@code description} redaction for guests, {@code canEdit}, {@code
- * canManageManagers}) without the {@code mapper} package depending on the {@code service} layer.
+ * Caller-aware seam the {@code MissionMapper} uses to fill the viewer-dependent fields of a mission
+ * DTO ({@code description} redaction, {@code canEdit}, {@code canManageManagers}).
  *
- * <p>This is a deliberate <b>dependency inversion</b> (ADR-0047, cycle cleanup): the {@code
- * service} layer already depends on the {@code mapper} layer (services map entities to DTOs through
- * the mappers), so a {@code mapper} &rarr; {@code service} edge — which the previous {@code
- * MissionMapper} had via {@code AuthHelperService} + {@code MissionSecurityService} — closed a
- * {@code mapper} &harr; {@code service} package cycle. By depending on this leaf interface instead,
- * implemented in the {@code service} layer ({@code MissionViewerAccessService}), the mapper stays
- * free of the service layer and the cycle is gone. It supersedes the older "mappers route auth
- * lookups through {@code AuthHelperService}" guidance (which is still honoured transitively — the
- * implementation is the only thing that touches {@code AuthHelperService}); mappers must reach
- * neither {@code SecurityContextHolder} (ArchUnit {@code
- * mapperLayerShouldNotReachIntoSecurityContext}) nor, now, the {@code service} layer directly.
+ * <p>Implemented in the {@code service} layer, so the {@code mapper} package depends on neither the
+ * service layer nor the security context (ADR-0047).
  */
 public interface MissionViewerAccess {
 
@@ -48,15 +38,10 @@ public interface MissionViewerAccess {
   boolean isAuthenticated();
 
   /**
-   * Reports whether the current caller is a squadron member or above (REQ-SEC-009).
+   * Reports whether the current caller is a squadron member or above (REQ-SEC-009); gates the
+   * mission {@code description} redaction (REQ-SEC-041).
    *
-   * <p>Backs the mission {@code description} redaction (REQ-SEC-041). {@link #isAuthenticated()} is
-   * deliberately <em>not</em> the gate for it: authentication and membership are different
-   * questions, and a caller can hold the first without the second — a PENDING registration does,
-   * and until ADR-0159 a role-less {@code GUEST} token did too. Gating on membership here makes the
-   * list/search rows agree with the detail instead of leaking what the detail's redactor removes.
-   *
-   * @return {@code true} iff the caller holds a member or elevated role.
+   * @return {@code true} iff the caller holds a member or elevated role
    */
   boolean isMemberOrAbove();
 

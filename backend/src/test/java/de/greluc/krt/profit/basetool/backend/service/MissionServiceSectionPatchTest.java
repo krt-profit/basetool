@@ -62,15 +62,13 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit-Tests fuer die Section-Patch-Methoden in {@link MissionService}.
- *
- * <p>Verifiziert, dass:
+ * Unit tests for the section-patch methods of {@link MissionService}.
  *
  * <ul>
- *   <li>ein erfolgreicher Section-Patch nur die Felder der jeweiligen Sektion aktualisiert,
- *   <li>bei abweichender {@code expectedVersion} eine {@link
- *       ObjectOptimisticLockingFailureException} (HTTP 409) geworfen wird,
- *   <li>die Zeitplan-Validierung (meeting &le; plannedStart &le; plannedEnd) weiterhin greift.
+ *   <li>A patch updates only the fields of its section.
+ *   <li>A mismatching {@code expectedVersion} throws {@link
+ *       ObjectOptimisticLockingFailureException}.
+ *   <li>The schedule validation (meeting &le; plannedStart &le; plannedEnd) still applies.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -88,19 +86,10 @@ class MissionServiceSectionPatchTest {
 
   @Mock private AuditService auditService;
 
-  // The party-lead / manager methods were extracted to MissionParticipantService (L1 step 2, #920);
-  // MissionService now delegates to it. Mockito builds a real instance from the same mocks, which
-  // setUp() wires into missionService via reflection (Mockito does not inject one @InjectMocks
-  // target into another), so this class keeps exercising those delegated paths alongside the
-  // core/schedule/flags section patches.
   @InjectMocks private MissionParticipantService missionParticipantService;
 
-  // removeMissionUnit was extracted to MissionStructureService (L1 step 2, #920); same wiring
-  // rationale as the participant service above.
   @InjectMocks private MissionStructureService missionStructureService;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
-  // co-built sub-services
   private MissionService missionService;
 
   private UUID missionId;
@@ -108,26 +97,20 @@ class MissionServiceSectionPatchTest {
 
   @BeforeEach
   void setUp() {
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     missionService =
         new MissionService(
             missionRepository,
             missionParticipantRepository,
             userRepository,
-            null, // frequencyTypeRepository
-            null, // missionFrequencyRepository
+            null,
+            null,
             missionOwnershipRepository,
-            null, // operationRepository
-            null, // userService
+            null,
+            null,
             ownerScopeService,
-            null, // authHelperService
+            null,
             auditService,
-            null, // missionTimelineService
+            null,
             missionParticipantService,
             missionStructureService);
     missionId = UUID.randomUUID();
@@ -144,10 +127,6 @@ class MissionServiceSectionPatchTest {
     existing.setPlannedStartTime(Instant.parse("2030-01-01T10:00:00Z"));
     existing.setPlannedEndTime(Instant.parse("2030-01-01T12:00:00Z"));
 
-    // Since #1112/#1114 the section guard is DB-enforced: enforceSectionVersion runs the matching
-    // missionRepository.bump*VersionIfMatches conditional UPDATE. Default the bumps to "1 row
-    // affected" (the version matched) so happy-path tests pass; each conflict test below overrides
-    // the specific stale echo to return 0 so enforceSectionVersion raises the 409.
     lenient()
         .when(missionRepository.bumpCoreVersionIfMatches(eq(missionId), anyLong()))
         .thenReturn(1);
@@ -167,11 +146,9 @@ class MissionServiceSectionPatchTest {
 
   @Test
   void updateCoreSection_shouldUpdateOnlyCoreFields_whenCoreVersionMatches() {
-    // Given
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When
     Mission result =
         missionService.updateCoreSection(
             missionId,
@@ -183,16 +160,13 @@ class MissionServiceSectionPatchTest {
             null,
             4L);
 
-    // Then
     assertEquals("New name", result.getName());
     assertEquals("New desc", result.getDescription());
     assertEquals("https://example.org/cal", result.getCalendarLink());
     assertEquals("PLANNED", result.getStatus());
-    // Section-Counter: coreVersion ist gebumpt, schedule/flags unveraendert
     assertEquals(5L, result.getCoreVersion());
     assertEquals(5L, result.getScheduleVersion());
     assertEquals(6L, result.getFlagsVersion());
-    // Schedule-/Flags-Felder bleiben unveraendert
     assertEquals(Instant.parse("2030-01-01T10:00:00Z"), result.getPlannedStartTime());
     assertFalse(result.getIsInternal());
   }
@@ -201,8 +175,6 @@ class MissionServiceSectionPatchTest {
   void updateCoreSection_shouldThrow409_whenCoreVersionMismatch() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 
-    // Stale coreVersion (mission has 4, caller sends 3) must fail — even though the global
-    // Mission.version (7) and the other section counters (schedule=5, flags=6) are untouched.
     when(missionRepository.bumpCoreVersionIfMatches(missionId, 3L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -211,29 +183,24 @@ class MissionServiceSectionPatchTest {
 
   @Test
   void updateCoreSection_shouldAlsoBumpScheduleAndStampActualStart_whenStatusTransitionsToActive() {
-    // Given: existing.status == PLANNED, actualStartTime == null
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Instant before = Instant.now();
 
-    // When: caller switches status to ACTIVE via the core patch
     Mission result =
         missionService.updateCoreSection(
             missionId, "Old name", "Old desc", null, "ACTIVE", null, null, 4L);
 
     Instant after = Instant.now();
 
-    // Then: actualStartTime is auto-stamped AND scheduleVersion is bumped, because the
-    // activation crosses the core/schedule boundary and concurrent schedule editors must
-    // see the change as a 409 instead of silently overwriting the stamp.
     assertNotNull(result.getActualStartTime());
     assertTrue(!result.getActualStartTime().isBefore(before));
     assertTrue(!result.getActualStartTime().isAfter(after));
     assertEquals("ACTIVE", result.getStatus());
     assertEquals(5L, result.getCoreVersion());
     assertEquals(6L, result.getScheduleVersion());
-    assertEquals(6L, result.getFlagsVersion()); // flags unaffected
+    assertEquals(6L, result.getFlagsVersion());
   }
 
   @Test
@@ -252,9 +219,7 @@ class MissionServiceSectionPatchTest {
     assertEquals(meeting, result.getMeetingTime());
     assertEquals(plannedStart, result.getPlannedStartTime());
     assertEquals(plannedEnd, result.getPlannedEndTime());
-    // Core-Felder bleiben unveraendert
     assertEquals("Old name", result.getName());
-    // Section-Counter: scheduleVersion ist gebumpt, core/flags unveraendert
     assertEquals(4L, result.getCoreVersion());
     assertEquals(6L, result.getScheduleVersion());
     assertEquals(6L, result.getFlagsVersion());
@@ -270,8 +235,6 @@ class MissionServiceSectionPatchTest {
 
     missionService.updateScheduleSection(missionId, null, null, null, actualStart, actualEnd, 5L);
 
-    // #1146: the O(roster) per-participant entity loop is replaced by ONE atomic set-based clamp so
-    // the schedule close cannot 409 against concurrent check-outs and vice versa.
     verify(missionParticipantRepository).clampCheckedInEndTimes(missionId, actualEnd);
   }
 
@@ -307,9 +270,7 @@ class MissionServiceSectionPatchTest {
     Mission result = missionService.updateFlagsSection(missionId, true, 6L);
 
     assertTrue(result.getIsInternal());
-    // Core unveraendert
     assertEquals("Old name", result.getName());
-    // Section-Counter: flagsVersion ist gebumpt, core/schedule unveraendert
     assertEquals(4L, result.getCoreVersion());
     assertEquals(5L, result.getScheduleVersion());
     assertEquals(7L, result.getFlagsVersion());
@@ -327,43 +288,26 @@ class MissionServiceSectionPatchTest {
 
   @Test
   void sectionPatches_acrossDisjointSections_doNotInvalidateEachOther() {
-    // Given: core and flags patches arrive with their respective section counters; both
-    // hit the mission in sequence — this is the canonical Stufe-1 promise: concurrent users
-    // editing disjoint sections of the same mission do not produce 409 conflicts.
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When (1): a core-section caller saves
     Mission afterCore =
         missionService.updateCoreSection(
             missionId, "New name", null, null, "PLANNED", null, null, 4L);
 
-    // Then (1): coreVersion advances to 5, flagsVersion is still 6
     assertEquals(5L, afterCore.getCoreVersion());
     assertEquals(6L, afterCore.getFlagsVersion());
 
-    // When (2): a flags-section caller — that had loaded the mission BEFORE the core save —
-    // submits with the still-valid flagsVersion=6. The previously-issued core save must NOT
-    // have invalidated this flags submit.
     Mission afterFlags = missionService.updateFlagsSection(missionId, true, 6L);
 
-    // Then (2): both edits coexist; flagsVersion now 7, coreVersion stays at 5.
     assertEquals(5L, afterFlags.getCoreVersion());
     assertEquals(7L, afterFlags.getFlagsVersion());
     assertEquals("New name", afterFlags.getName());
     assertTrue(afterFlags.getIsInternal());
   }
 
-  // -----------------------------------------------------------------------------------------
-  // Option A / multi-user concurrency: sub-section writes MUST NOT call
-  // missionRepository.save(mission)
-  // and MUST NOT bump the parent Mission.version. These tests lock in that guarantee for the
-  // most impactful sub-section paths.
-  // -----------------------------------------------------------------------------------------
-
   @Test
   void removeMissionUnit_shouldNotCallMissionRepositorySave() {
-    // Given an existing mission with a unit
     de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
         new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
     UUID unitId = UUID.randomUUID();
@@ -371,10 +315,8 @@ class MissionServiceSectionPatchTest {
     existing.getAssignedUnits().add(unit);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 
-    // When
     Mission result = missionService.removeMissionUnit(missionId, unitId);
 
-    // Then: parent is returned but was never persisted via save(mission)
     assertSame(existing, result);
     verify(missionRepository, never()).save(any(Mission.class));
   }
@@ -393,14 +335,8 @@ class MissionServiceSectionPatchTest {
     verify(missionRepository, never()).save(any(Mission.class));
   }
 
-  // -----------------------------------------------------------------------------------------
-  // MissionOwnership (Option A, variant a): owner changes are protected by a dedicated
-  // optimistic-lock version on the MissionOwnership companion row; Mission.version is NOT bumped.
-  // -----------------------------------------------------------------------------------------
-
   @Test
   void updateMissionOwner_shouldSucceed_whenOwnershipVersionMatches() {
-    // Given
     UUID newOwnerId = UUID.randomUUID();
     User newOwner = new User();
     newOwner.setId(newOwnerId);
@@ -416,17 +352,12 @@ class MissionServiceSectionPatchTest {
     when(missionOwnershipRepository.saveAndFlush(any(MissionOwnership.class)))
         .thenAnswer(inv -> flushOwnership(inv.getArgument(0)));
 
-    // When
     Mission result = missionService.updateMissionOwner(missionId, newOwnerId, 3L);
 
-    // Then
     assertSame(existing, result);
     assertNotNull(result.getOwner());
     assertEquals(newOwnerId, result.getOwner().getId());
-    // The response carries the counter the change produced, not the one the mission was read with
-    // -- otherwise the client echoes 3 on its next change and 409s itself.
     assertEquals(4L, result.getOwnershipVersion());
-    // Crucial: Mission.version was NOT bumped via save(mission)
     verify(missionRepository, never()).save(any(Mission.class));
   }
 
@@ -444,10 +375,6 @@ class MissionServiceSectionPatchTest {
 
   @Test
   void updateMissionOwner_firstChange_materialisesTheRowWithTheOldOwnerAndEndsAtVersionOne() {
-    // A mission whose owner was never changed has no companion row and reads as version 0. The row
-    // is created with the owner being REPLACED and then moved, so the first change ends at 1: a row
-    // created straight at the new owner would stay at 0, and a second client still holding the 0
-    // it read before this change would overwrite it unchallenged.
     User oldOwner = new User();
     oldOwner.setId(UUID.randomUUID());
     existing.setOwner(oldOwner);
@@ -476,7 +403,6 @@ class MissionServiceSectionPatchTest {
 
   @Test
   void updateMissionOwner_shouldThrow409_whenNoRowYetButTheEchoIsNotZero() {
-    // No row reads as version 0, so an echo of anything else is stale by definition.
     UUID newOwnerId = UUID.randomUUID();
     User newOwner = new User();
     newOwner.setId(newOwnerId);
@@ -509,16 +435,9 @@ class MissionServiceSectionPatchTest {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.updateMissionOwner(missionId, newOwnerId, 2L));
-    // A stale echo changes nothing: neither the row nor the mission's owner.
     verify(missionOwnershipRepository, never()).saveAndFlush(any(MissionOwnership.class));
     assertNull(existing.getOwner());
   }
-
-  // -----------------------------------------------------------------------------------------
-  // Owning org unit reassignment (REQ-ORG-018): section-scoped owningOrgUnitVersion. The target is
-  // resolved/authorised by OwnerScopeService.resolveReassignTargetOrgUnit; updateOwningOrgUnit only
-  // validates+bumps owningOrgUnitVersion (never Mission.version) and audits the change.
-  // -----------------------------------------------------------------------------------------
 
   @Test
   void updateOwningOrgUnit_shouldReassignAndBumpOnlyItsCounter_whenVersionMatches() {
@@ -576,7 +495,6 @@ class MissionServiceSectionPatchTest {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.updateOwningOrgUnit(missionId, UUID.randomUUID(), 2L));
-    // The stale version is rejected before the target is resolved or anything is persisted.
     verify(missionRepository, never()).save(any(Mission.class));
   }
 
@@ -603,19 +521,11 @@ class MissionServiceSectionPatchTest {
         () -> missionService.updateOwningOrgUnit(missionId, UUID.randomUUID(), 0L));
   }
 
-  // -----------------------------------------------------------------------------------------
-  // Party lead (Partyleiter): section-scoped attribute. setPartyLead persists exactly what the
-  // controller hands it (the free-text -> user resolution happens controller-side, mirroring the
-  // participant-add endpoints), validates/bumps only partyLeadVersion, and links XOR guest-handle
-  // are mutually exclusive.
-  // -----------------------------------------------------------------------------------------
-
   @Test
   void setPartyLead_shouldLinkRegisteredUser_whenUserIdProvided() {
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
-    // A pre-existing guest handle must be cleared when a registered user is linked.
     existing.setPartyLeadGuestName("Old Guest Lead");
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
@@ -632,7 +542,6 @@ class MissionServiceSectionPatchTest {
   void setPartyLead_shouldStoreGuestName_whenOnlyGuestNameProvided() {
     User previous = new User();
     previous.setId(UUID.randomUUID());
-    // A pre-existing linked user must be cleared when a free-text handle is stored.
     existing.setPartyLeadUser(previous);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -640,7 +549,6 @@ class MissionServiceSectionPatchTest {
     Mission result = missionService.setPartyLead(missionId, null, "  Ghost Pilot  ", 0L);
 
     assertNull(result.getPartyLeadUser());
-    // The handle is trimmed before persisting.
     assertEquals("Ghost Pilot", result.getPartyLeadGuestName());
     assertEquals(1L, result.getPartyLeadVersion());
   }
@@ -669,8 +577,6 @@ class MissionServiceSectionPatchTest {
 
     Mission result = missionService.setPartyLead(missionId, userId, null, 0L);
 
-    // Only the party-lead counter advances; the other section counters and the global version
-    // stay put so concurrent edits on other sections are not invalidated.
     assertEquals(1L, result.getPartyLeadVersion());
     assertEquals(4L, result.getCoreVersion());
     assertEquals(5L, result.getScheduleVersion());
@@ -682,8 +588,6 @@ class MissionServiceSectionPatchTest {
   void setPartyLead_shouldThrow409_whenPartyLeadVersionMismatch() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 
-    // Mission partyLeadVersion is 0 (fresh Mission); a stale expected version must fail with 409
-    // even though every other counter is untouched.
     when(missionRepository.bumpPartyLeadVersionIfMatches(missionId, 5L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,

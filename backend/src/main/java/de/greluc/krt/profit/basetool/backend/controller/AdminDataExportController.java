@@ -35,20 +35,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The admin variant of the Art. 15 / Art. 20 data export (REQ-SEC-058).
+ * The admin variant of the Art. 15 / Art. 20 data export (REQ-SEC-058), for members who cannot
+ * export their own data.
  *
- * <p><b>Why it exists at all</b>, given that every member can export their own: an access request
- * does not always come from somebody who can log in. A member who has been locked out, or an
- * account already disabled in Keycloak, still has the right — and serving it by hand across ~25
- * tables is precisely the manual, error-prone work this feature was built to remove.
- *
- * <p>It shares the <b>same projections and the same anonymisation</b> as the self-service path. An
- * admin export is not a fuller one: a third party's data is no more disclosable to an admin acting
- * on somebody's Art. 15 request than it is to the member.
- *
- * <p>Audited with {@code bySelf = false}, which is the distinction that matters when reviewing the
- * trail: a member reading their own record is unremarkable, an admin reading somebody else's is the
- * thing an audit exists to make answerable.
+ * <p>Uses the same projections and anonymisation as the self-service export, and is audited with
+ * {@code bySelf = false}.
  */
 @RestController
 @RequestMapping("/api/v1/admin/users/{userId}/export")
@@ -75,8 +66,6 @@ public class AdminDataExportController {
   public ResponseEntity<DataExportService.DataExport> exportJson(@PathVariable UUID userId) {
     DataExportService.DataExport export = dataExportService.export(userId);
     dataExportService.recordExport(userId, "json", export.totalRows(), false);
-    // Pinned, not negotiated -- see DataExportController#exportJson. An admin serving an access
-    // request has to be able to hand the member a file they can actually open.
     return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(export);
   }
 
@@ -86,8 +75,6 @@ public class AdminDataExportController {
    * @param userId the member the export is about
    * @return the PDF
    */
-  // No `produces` -- it is a mapping condition, and the frontend's Accept header does not include
-  // application/pdf, so it would answer 406. See DataExportController#exportPdf.
   @GetMapping("/pdf")
   @PreAuthorize("hasRole('ADMIN')")
   @Operation(summary = "Export another member's data as a PDF")

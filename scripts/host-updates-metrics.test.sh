@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Self-test for scripts/host-updates-metrics.sh -- the textfile collector behind
-# HostSecurityUpdatesFailing, HostSecurityUpdatesStale and HostRebootRequired.
-#
-# No host, no dnf, no systemd: `needs-restarting` is a stub whose exit code the
-# test chooses, and $SERVICE_RESULT is set the way systemd sets it for an
-# ExecStopPost=. What is asserted is the part that decides whether an alert can
-# fire at all: the run is recorded only by the run, a boot refresh carries the
-# last run over instead of erasing it, and a reading the tool could not make is
-# LEFT OUT rather than written as a reassuring 0.
-#
-#   bash scripts/host-updates-metrics.test.sh
-# =============================================================================
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,23 +15,20 @@ trap 'rm -rf "${WORK}"' EXIT
 OUT="${WORK}/textfile/host-updates.prom"
 mkdir -p "${WORK}/textfile" "${WORK}/bin"
 
-# The stub exits with whatever NR_RC says: 0 no reboot, 1 reboot required, anything else "cannot tell".
 cat > "${WORK}/bin/needs-restarting" <<'STUB'
 #!/usr/bin/env bash
 exit "${NR_RC:-0}"
 STUB
 chmod +x "${WORK}/bin/needs-restarting"
 
-# run <env assignments...> -- runs the collector with the stub and the output file.
 run() {
   env IRI_HOST_UPDATES_METRICS_FILE="${OUT}" IRI_NEEDS_RESTARTING="${WORK}/bin/needs-restarting" \
     "$@" bash "${SUT}"
 }
 
-# value <series> -- prints the sample value of one series from the output, or nothing.
 value() { awk -v n="$1" '$1 == n { print $2 }' "${OUT}" 2>/dev/null; }
 
-expect_value() { # label series want
+expect_value() {
   local got; got="$(value "$2")"
   if [[ "${got}" == "$3" ]]; then ok "$1"; else bad "$1 -- wanted '$3', got '${got}'"; fi
 }

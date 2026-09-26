@@ -35,24 +35,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * JSON proxies for the catalog pickers' live search (REQ-FE-016): material and location comboboxes
- * fetch their options on demand through these endpoints instead of preloading the full catalog into
- * the page. Every entry stays reachable by typing regardless of catalog size — the deliberate
- * alternative to a preloaded (or silently capped) option list, mirroring the orderable item search
- * in {@link JobOrderPageController#itemSearch(String)}. Both relays fetch one row more than their
- * combobox renders ({@link PickerSearch}) so an overflow is detectable and announced, and degrade
- * to an empty list on backend failure so the picker shows "no matches" instead of an error page.
- * {@code /catalog/**} was {@code permitAll} because the anonymous order form carried a material
- * picker. That form went with ADR-0149 and the URL rule with ADR-0159; the relays are members-only
- * now, like the pickers that call them.
+ * Members-only JSON proxies for the material and location pickers' live search (REQ-FE-016).
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
- * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather than
- * by anything next to the code. A method-level gate still wins where one is present.
- *
- * <p>A {@code RestController} without {@code UsesLayoutModel} since FE-PERF-01: both handlers
- * answer JSON, so the layout advices have nothing to contribute and must not run ahead of them.
+ * <p>Each relay fetches one row more than the combobox renders ({@link PickerSearch}) so overflow
+ * can be announced, and returns an empty list on backend failure (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/catalog")
@@ -73,18 +59,14 @@ public class CatalogSearchController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Live search over the visible material catalog for the searchable material pickers. {@code
-   * jobOrder=true} narrows to the job-order subset (the orders material lines), {@code raw=true} to
-   * refinery inputs (RAW or manually raw-flagged) — mutually independent flags matching the
-   * backend's picker search. Returns full {@link MaterialDto}s because the pickers mirror option
-   * metadata (quantity type, refined material) off the results.
+   * Live search over the visible material catalog. {@code jobOrder=true} and {@code raw=true}
+   * independently narrow to job-order materials and refinery inputs.
    *
    * @param q the case-insensitive material-name fragment ({@code null}/blank = first page)
    * @param jobOrder when true, only job-order materials
    * @param raw when true, only refinery input materials
    * @return up to {@link PickerSearch#PAGE_SIZE} matching visible materials, name ascending; empty
-   *     on failure. The combobox renders {@link PickerSearch#RENDER_CAP} of them and turns the
-   *     extra row into the "keep typing" hint rather than showing it.
+   *     on failure
    */
   @GetMapping("/material-search")
   public List<MaterialDto> materialSearch(
@@ -110,14 +92,8 @@ public class CatalogSearchController {
   }
 
   /**
-   * Live search over the non-hidden location catalog for the searchable location pickers.
-   *
-   * <p>Fetches {@link PickerSearch#LOCATION_PAGE_SIZE} rows, not the generic {@link
-   * PickerSearch#PAGE_SIZE}: the location catalogue is small and bounded by the game universe, and
-   * a booking user expects to scroll it rather than guess a search term. At the shipped {@code
-   * size=25} against a render cap of 50 this relay was a silent cap — 28 of the 53 visible
-   * locations (MIC-L5, Patch City, New Babbage, Orison, …) never appeared in the Lager Einbuchen
-   * picker, with nothing on screen indicating the list was cut.
+   * Live search over the non-hidden location catalog, fetching {@link
+   * PickerSearch#LOCATION_PAGE_SIZE} rows so the small catalog is fully browsable.
    *
    * @param q the case-insensitive location-name fragment ({@code null}/blank = first page)
    * @return up to {@link PickerSearch#LOCATION_PAGE_SIZE} matching non-hidden location references,

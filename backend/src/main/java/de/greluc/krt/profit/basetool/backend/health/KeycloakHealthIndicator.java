@@ -35,30 +35,12 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Spring Boot {@link HealthIndicator} that probes the configured Keycloak realm's OIDC discovery
- * endpoint ({@code {issuer}/.well-known/openid-configuration}) and surfaces unreachability as a
- * {@code DOWN} contribution to {@code /actuator/health}.
+ * {@link HealthIndicator} that probes the Keycloak realm's OIDC discovery endpoint and reports
+ * {@code DOWN} when it is unreachable.
  *
- * <p>The base {@code /actuator/health} aggregation otherwise only reflects database / disk / SSL
- * state — a Keycloak outage would leave the backend {@code UP} even though every authenticated
- * request would fail JWT validation. Routing this indicator into the {@code readiness} health group
- * (see {@code management.endpoint.health.group.readiness.include} in {@code application.yml}) makes
- * Docker Compose's {@code depends_on: condition: service_healthy} gate the frontend on a real
- * end-to-end auth-server check rather than just "Tomcat is bound and Postgres answers
- * SELECT&nbsp;1".
- *
- * <p>Bean is registered under the default name {@code keycloakHealthIndicator}; Spring Boot strips
- * the {@code HealthIndicator} suffix, so the indicator key in health-group includes is {@code
- * keycloak}. The property {@code management.health.keycloak.enabled=false} disables the bean
- * entirely (used by the {@code test} profile to keep {@code @SpringBootTest} runs from waiting on a
- * dummy issuer URI).
- *
- * <p>HTTP probe details: a synchronous {@link RestClient} over Java's {@link HttpClient} with a
- * 2&nbsp;s connect timeout and 3&nbsp;s read timeout — kept well inside the Docker {@code
- * HEALTHCHECK}'s 5&nbsp;s overall budget so a slow Keycloak surfaces as {@code DOWN} before {@code
- * curl} itself gives up. The OIDC discovery endpoint is the same metadata document Spring's
- * resource server fetches at startup, so a successful probe guarantees the realm exists and
- * responds with valid metadata.
+ * <p>Part of the {@code readiness} health group under the key {@code keycloak}; disabled by {@code
+ * management.health.keycloak.enabled=false}. The probe uses a 2&nbsp;s connect and 3&nbsp;s read
+ * timeout.
  */
 @Component
 @ConditionalOnEnabledHealthIndicator("keycloak")
@@ -75,17 +57,10 @@ public class KeycloakHealthIndicator implements HealthIndicator {
   private final RestClient client;
 
   /**
-   * Production constructor used by Spring; resolves the issuer URI from {@code
-   * spring.security.oauth2.resourceserver.jwt.issuer-uri} and builds a {@link RestClient} with the
-   * indicator-specific timeouts. {@link Autowired} is required because the class declares a second
-   * (package-private, test-only) constructor; without it Spring 4+'s constructor-selection logic
-   * falls back to a non-existent default constructor and fails at startup with {@code
-   * NoSuchMethodException: <init>()}.
+   * Production constructor; builds the probe client with the indicator's default timeouts.
    *
-   * @param issuerUri the Keycloak realm issuer URI (e.g. {@code
-   *     https://keycloak.example/realms/iri}) resolved from {@code
-   *     spring.security.oauth2.resourceserver.jwt.issuer-uri}; the discovery document path is
-   *     appended verbatim
+   * @param issuerUri the Keycloak realm issuer URI from {@code
+   *     spring.security.oauth2.resourceserver.jwt.issuer-uri}; the discovery path is appended
    */
   @Autowired
   public KeycloakHealthIndicator(
@@ -94,14 +69,11 @@ public class KeycloakHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * Visible-for-testing constructor that lets unit tests inject shorter timeouts when driving the
-   * indicator against an in-process {@code MockWebServer}.
+   * Test constructor accepting custom timeouts.
    *
    * @param issuerUri the Keycloak realm issuer URI; the OIDC discovery path is appended verbatim
-   * @param connectTimeout maximum time the underlying {@link HttpClient} waits to establish the TCP
-   *     connection before the probe is treated as {@code DOWN}
-   * @param readTimeout maximum time the {@link RestClient} waits for response bytes before the
-   *     probe is treated as {@code DOWN}
+   * @param connectTimeout maximum wait to establish the TCP connection
+   * @param readTimeout maximum wait for response bytes
    */
   KeycloakHealthIndicator(String issuerUri, Duration connectTimeout, Duration readTimeout) {
     this.discoveryUrl = issuerUri + DISCOVERY_PATH;
@@ -112,17 +84,11 @@ public class KeycloakHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * Issues a {@code GET} against the OIDC discovery endpoint and maps the outcome to a {@link
-   * Health} contribution. A 2xx response yields {@code UP}; any HTTP error response yields {@code
-   * DOWN} with the upstream status code; any I/O failure (DNS, connection refused, timeout, TLS
-   * handshake) yields {@code DOWN} with the exception class name. Details land in the {@link
-   * Health} object for logging but are not exposed externally because {@code
-   * management.endpoint.health.show-details=never} keeps the response body to {@code
-   * {"status":"UP"|"DOWN"}} only.
+   * Fetches the OIDC discovery document and maps the outcome to a {@link Health}: {@code UP} on
+   * 2xx, {@code DOWN} with the status code or exception class otherwise.
    *
-   * @return {@link Health#up()} when the discovery endpoint replied with a 2xx status; {@link
-   *     Health#down()} otherwise (HTTP error or transport failure), with diagnostic details
-   *     attached for log correlation
+   * @return {@link Health#up()} on a 2xx reply; {@link Health#down()} with diagnostic details
+   *     otherwise
    */
   @Override
   public @NotNull Health health() {

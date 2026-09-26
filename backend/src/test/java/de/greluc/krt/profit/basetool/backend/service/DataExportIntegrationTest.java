@@ -45,19 +45,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Integration coverage for the Art. 15 / Art. 20 data export against the real Postgres test
- * container (REQ-SEC-058).
+ * Integration tests for the data export against real Postgres (REQ-SEC-058).
  *
- * <p>The property this class exists for is the one the handover plan called the hardest thing to
- * get subtly wrong, and asked to be treated as a test rather than a review comment: <b>no other
- * member's handle appears in an export.</b> It is asserted here across the whole document, not per
- * section, because a leak introduced by a future section would otherwise only be caught by somebody
- * re-reading that section's SQL.
- *
- * <p>It also runs all ~29 statements against the real schema. A registry of hand-written SQL is
- * exactly the kind of thing that compiles and type-checks while naming a column that was renamed
- * two migrations ago, and the first person to find out must not be somebody answering a legal
- * request.
+ * <p>Asserts across the whole document that no other member's handle appears, and runs every export
+ * statement against the real schema.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -70,12 +61,8 @@ class DataExportIntegrationTest {
   private static final String OTHER_HANDLE = "ZzzOtherMemberHandleZzz";
 
   /**
-   * A person who has <em>no account</em> — a job order's external contact, which is the common case
-   * for {@code job_order.handle}.
-   *
-   * <p>The distinction is the point of {@link #anAuditSubjectLabelNeverReachesTheExport()}: {@link
-   * HandleScrubber} is built from the roster, so it can never match this name. Only the projection
-   * can keep it out, which is why the column is dropped rather than scrubbed.
+   * An external contact without an account, which {@link HandleScrubber} cannot match, so only the
+   * projection can keep it out of the export.
    */
   private static final String EXTERNAL_CONTACT = "ZzzExternalContactZzz";
 
@@ -101,8 +88,6 @@ class DataExportIntegrationTest {
     transactionTemplate.executeWithoutResult(
         status -> {
           personalInventoryItemRepository.deleteAllById(seededItems);
-          // Audit rows outlive the account by design (REQ-AUDIT-006), so nothing cascades them
-          // away -- this class has to remove its own or they accumulate in the shared container.
           auditEventRepository.deleteAllById(seededAuditEvents);
           userRepository.deleteAllById(seededUsers);
           seededItems.clear();
@@ -144,8 +129,6 @@ class DataExportIntegrationTest {
           item.setName("Probe");
           item.setQuantity(1);
           item.setNote(note);
-          // The three location columns are NOT NULL; the values are irrelevant to this test but
-          // the insert is not valid without them.
           item.setLocationUexId(1);
           item.setLocationType(PersonalInventoryLocationType.values()[0]);
           item.setLocationNameSnapshot("Testort");
@@ -154,12 +137,11 @@ class DataExportIntegrationTest {
   }
 
   /**
-   * Creates a committed audit row carrying a subject label, in the shape the job-order trails
-   * write: {@code #<displayId> '<handle>'}.
+   * Creates a committed audit row with a job-order style subject label.
    *
    * @param actor the acting member, or {@code null} when the member is only the target
    * @param target the member the action was performed on, or {@code null}
-   * @param subjectLabel the label to snapshot, which is what this test is about
+   * @param subjectLabel the subject label to snapshot
    */
   private void auditEvent(UUID actor, UUID target, String subjectLabel) {
     transactionTemplate.executeWithoutResult(
@@ -170,8 +152,6 @@ class DataExportIntegrationTest {
                   .domain(AuditEventType.JOB_ORDER_CREATED.domain())
                   .eventType(AuditEventType.JOB_ORDER_CREATED)
                   .actorUserId(actor)
-                  // NOT NULL, and deliberately the subject's own handle in the actor case: the
-                  // export omits the column, so a leak here would be a different bug.
                   .actorHandle("ZzzActorZzz")
                   .subjectLabel(subjectLabel)
                   .targetUserId(target)
@@ -212,7 +192,6 @@ class DataExportIntegrationTest {
         .toList();
   }
 
-  // covers REQ-SEC-058 — every registered statement runs against the real schema
   @Test
   void everySectionRunsAndIsReported() {
     UUID subject = user("ZzzSubjectZzz");
@@ -222,13 +201,11 @@ class DataExportIntegrationTest {
     assertThat(export.sections()).hasSameSizeAs(DataExportSections.SECTIONS);
     assertThat(export.subjectId()).isEqualTo(subject);
     assertThat(export.subjectHandle()).isEqualTo("ZzzSubjectZzz");
-    // The account section is the one that must always have exactly one row.
     assertThat(export.sections().stream().filter(s -> s.key().equals("account")).findFirst())
         .get()
         .satisfies(s -> assertThat(s.rows()).hasSize(1));
   }
 
-  // covers REQ-SEC-058 — the section order and legal-basis marking survive into the document
   @Test
   void everySectionCarriesItsLegalBasis() {
     UUID subject = user("ZzzBasisZzz");
@@ -245,7 +222,6 @@ class DataExportIntegrationTest {
             DataExportSections.SECTIONS.stream().map(DataExportSections.Section::key).toList());
   }
 
-  // covers REQ-SEC-058 — THE test the handover plan asked for: no other member's handle anywhere
   @Test
   void noOtherMembersHandleAppearsInTheExport() {
     UUID subject = user("ZzzSubjectTwoZzz");
@@ -263,7 +239,6 @@ class DataExportIntegrationTest {
     assertThat(export.thirdPartyHandlesRemoved()).isTrue();
   }
 
-  // covers REQ-SEC-058 — the scrub replaces rather than drops, so the member keeps their own entry
   @Test
   void theMembersOwnFreeTextSurvivesWithTheOtherNameReplaced() {
     UUID subject = user("ZzzSubjectThreeZzz");
@@ -279,14 +254,8 @@ class DataExportIntegrationTest {
     assertThat(note).contains(HandleScrubber.REPLACEMENT);
   }
 
-  // covers REQ-SEC-058 — the subject's OWN handle must not be scrubbed out of their own entries
   @Test
   void theSubjectsOwnHandleIsNotScrubbed() {
-    // A third party whose handle is a PREFIX of the subject's own name, which is the fixture that
-    // matters: this test used to seed no other user at all, so it pinned only the case where the
-    // dictionary is empty. With "ZzzSelf" in it and the subject's own name left out of the
-    // matcher, longest-match had no competitor and "ZzzSelfNamedZzz" came back as
-    // "#OTHER_MEMBER#NamedZzz" -- the subject's own name shredded, in their own export.
     UUID subject = user("ZzzSelfNamedZzz");
     user("ZzzSelf");
     personalItem(subject, "Notiz von ZzzSelfNamedZzz");
@@ -302,15 +271,11 @@ class DataExportIntegrationTest {
         .isFalse();
   }
 
-  // covers REQ-SEC-058 — an audit subject label is a person often enough that it is not exported
   @Test
   void anAuditSubjectLabelNeverReachesTheExport() {
     UUID subject = user("ZzzSubjectFourZzz");
     user(OTHER_HANDLE);
-    // The member acted on a job order whose contact is an outsider with no account.
     auditEvent(subject, null, "#4711 '" + EXTERNAL_CONTACT + "'");
-    // Somebody acted on the member, and the label snapshotted a registered member's handle -- the
-    // shape DeletionRequestService writes.
     auditEvent(null, subject, OTHER_HANDLE);
 
     DataExportService.DataExport export = dataExportService.export(subject);
@@ -323,8 +288,6 @@ class DataExportIntegrationTest {
                 + "member are both invisible to it. The column must stay unselected.")
         .noneMatch(v -> v.contains(EXTERNAL_CONTACT) || v.contains(OTHER_HANDLE));
 
-    // ... and the rows themselves still come through, so the fix is a narrower projection rather
-    // than a section that quietly stopped answering.
     assertThat(sectionRows(export, "auditActionsByMember")).hasSize(1);
     assertThat(sectionRows(export, "auditActionsOnMember")).hasSize(1);
     assertThat(sectionRows(export, "auditActionsByMember").get(0))
@@ -332,7 +295,6 @@ class DataExportIntegrationTest {
         .doesNotContainKey("subject_label");
   }
 
-  // covers REQ-SEC-058 — structural guard: no future section may select the label back in
   @Test
   void noSectionSelectsTheAuditSubjectLabel() {
     assertThat(DataExportSections.SECTIONS)
@@ -343,7 +305,6 @@ class DataExportIntegrationTest {
         .noneMatch(section -> section.sql().contains("subject_label"));
   }
 
-  // covers REQ-SEC-058 — the PDF renders for a real subject without a label blowing up
   @Test
   void thePdfRenders() {
     UUID subject = user("ZzzPdfZzz");
@@ -351,10 +312,8 @@ class DataExportIntegrationTest {
     DataExportService.DataExport export = dataExportService.export(subject);
     byte[] pdf = dataExportReportService.renderPdf(export);
 
-    // The count the audit payload records is the count of what was rendered, not -1.
     assertThat(export.totalRows()).isNotNegative();
     assertThat(pdf).isNotEmpty();
-    // %PDF- magic: proves a document came out rather than an empty buffer.
     assertThat(new String(pdf, 0, 5, java.nio.charset.StandardCharsets.ISO_8859_1))
         .isEqualTo("%PDF-");
   }

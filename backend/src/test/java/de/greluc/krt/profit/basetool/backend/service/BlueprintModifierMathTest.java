@@ -84,15 +84,12 @@ class BlueprintModifierMathTest {
     segment.setModifierAtEnd(1.4);
     modifier.addSegment(segment);
 
-    // Stepped form: the start multiplier is held across the whole segment.
     assertEquals(1.2, BlueprintModifierMath.computeModifierValue(modifier, 0), 1e-9);
     assertEquals(1.2, BlueprintModifierMath.computeModifierValue(modifier, 999), 1e-9);
   }
 
   @Test
   void computeModifierValue_returnsNullForUnderspecifiedLinearSegment() {
-    // A linear segment missing an endpoint cannot be interpolated, so it yields null rather than a
-    // half-defined value (and the lerp call is never reached with a null operand).
     BlueprintRequirementModifier modifier = new BlueprintRequirementModifier();
     modifier.setBetterWhen("higher");
     modifier.setValueRangeType("linear");
@@ -101,7 +98,6 @@ class BlueprintModifierMathTest {
     segment.setQualityMin(0.0);
     segment.setQualityMax(1000.0);
     segment.setModifierAtStart(0.9);
-    // modifierAtEnd intentionally left unset.
     modifier.addSegment(segment);
 
     assertNull(BlueprintModifierMath.computeModifierValue(modifier, 500));
@@ -111,18 +107,17 @@ class BlueprintModifierMathTest {
   void isDegrading_higherStatWorsensBelowNeutral() {
     BlueprintRequirementModifier modifier = linear("higher", 0.95, 1.05);
 
-    assertTrue(BlueprintModifierMath.isDegrading(modifier, 0)); // ×0.95 < 1.0
-    assertFalse(BlueprintModifierMath.isDegrading(modifier, 500)); // ×1.0 neutral
-    assertFalse(BlueprintModifierMath.isDegrading(modifier, 1000)); // ×1.05 > 1.0
+    assertTrue(BlueprintModifierMath.isDegrading(modifier, 0));
+    assertFalse(BlueprintModifierMath.isDegrading(modifier, 500));
+    assertFalse(BlueprintModifierMath.isDegrading(modifier, 1000));
   }
 
   @Test
   void isDegrading_lowerStatWorsensAboveNeutral() {
-    // A "lower is better" stat: a multiplier above 1.0 raises the stat, which is worse.
     BlueprintRequirementModifier modifier = linear("lower", 1.05, 0.95);
 
-    assertTrue(BlueprintModifierMath.isDegrading(modifier, 0)); // ×1.05 > 1.0 (worse)
-    assertFalse(BlueprintModifierMath.isDegrading(modifier, 1000)); // ×0.95 < 1.0 (better)
+    assertTrue(BlueprintModifierMath.isDegrading(modifier, 0));
+    assertFalse(BlueprintModifierMath.isDegrading(modifier, 1000));
   }
 
   @Test
@@ -134,7 +129,6 @@ class BlueprintModifierMathTest {
 
   @Test
   void noDegradationFloor_isTheNeutralCrossoverForAHigherStat() {
-    // ×0.95 → ×1.05 crosses 1.0 at quality 500, so stock below 500 would worsen the stat.
     BlueprintRequirementModifier modifier = linear("higher", 0.95, 1.05);
 
     assertEquals(500, BlueprintModifierMath.noDegradationFloor(List.of(modifier)));
@@ -142,17 +136,14 @@ class BlueprintModifierMathTest {
 
   @Test
   void noDegradationFloor_takesTheStrictestModifier() {
-    BlueprintRequirementModifier mild = linear("higher", 0.99, 1.01); // crosses at 500
-    BlueprintRequirementModifier strict = linear("higher", 0.6, 1.4); // crosses at ~286
+    BlueprintRequirementModifier mild = linear("higher", 0.99, 1.01);
+    BlueprintRequirementModifier strict = linear("higher", 0.6, 1.4);
 
-    // Both must be non-degrading at the floor → the higher crossover (500) wins.
     assertEquals(500, BlueprintModifierMath.noDegradationFloor(List.of(mild, strict)));
   }
 
   @Test
   void noDegradationFloor_ignoresAModifierThatWorsensAcrossTheWholeBand() {
-    // Always below neutral → no quality avoids the penalty → imposes no floor (treated as
-    // inherent).
     BlueprintRequirementModifier alwaysBad = linear("higher", 0.7, 0.9);
 
     assertEquals(0, BlueprintModifierMath.noDegradationFloor(List.of(alwaysBad)));

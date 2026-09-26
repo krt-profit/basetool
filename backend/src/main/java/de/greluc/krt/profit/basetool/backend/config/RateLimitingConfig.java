@@ -42,17 +42,13 @@ import org.springframework.core.Ordered;
 public class RateLimitingConfig {
 
   /**
-   * Returns the {@link RateLimitingFilter} bean injected into the servlet container registration
-   * below.
+   * Creates the {@link RateLimitingFilter}.
    *
-   * @param properties typed configuration with bucket capacity, refill rate, path patterns and
-   *     trusted proxies
-   * @param problemProperties RFC&nbsp;7807 base URI used in the 429 problem-detail response body
-   * @param messageSource resolves the localized 429 {@code title}/{@code detail} for the response
-   *     body
-   * @param meterRegistry the Micrometer registry the filter's per-bucket 429 rejection counter uses
-   * @return the {@link RateLimitingFilter} bean injected into the servlet container registration
-   *     below
+   * @param properties bucket capacity, refill rate, path patterns and trusted proxies
+   * @param problemProperties the RFC&nbsp;7807 base URI for the 429 body
+   * @param messageSource resolves the localized 429 title and detail
+   * @param meterRegistry the registry for the per-bucket rejection counter
+   * @return the rate-limiting filter
    */
   @NotNull
   @Bean
@@ -65,12 +61,10 @@ public class RateLimitingConfig {
   }
 
   /**
-   * Registers the {@link RateLimitingFilter} for the entire URI space ({@code /*}) very early in
-   * the filter chain (highest precedence + 10) so a rejected request never reaches downstream
-   * components.
+   * Registers the {@link RateLimitingFilter} for {@code /*} at highest precedence + 10.
    *
    * @param filter the rate-limiting filter created by {@link #rateLimitingFilter}
-   * @return Servlet registration with the order and URL patterns set
+   * @return the servlet registration with order and URL patterns set
    */
   @NotNull
   @Bean
@@ -83,12 +77,12 @@ public class RateLimitingConfig {
   }
 
   /**
-   * The request-body-size cap for the heavy JSON import endpoints (security review, memory-DoS).
+   * Creates the request-body-size cap for the heavy JSON import endpoints.
    *
    * @param properties the {@code app.request-body-limit.*} configuration
-   * @param problemProperties supplies the RFC-7807 {@code type} base URI for the 413 body
-   * @param meterRegistry counts each rejection on {@code basetool_request_body_rejected_total}
-   * @return the filter (registered by {@link #requestBodySizeLimitFilterRegistration})
+   * @param problemProperties the RFC&nbsp;7807 base URI for the 413 body
+   * @param meterRegistry counts rejections on {@code basetool_request_body_rejected_total}
+   * @return the filter, registered by {@link #requestBodySizeLimitFilterRegistration}
    */
   @NotNull
   @Bean
@@ -100,9 +94,8 @@ public class RateLimitingConfig {
   }
 
   /**
-   * Registers {@link #requestBodySizeLimitFilter} just after the rate limiter (highest precedence +
-   * 15) so an oversized body is refused before Spring Security and MVC binding, but a flood still
-   * trips the per-IP rate limit first.
+   * Registers {@link #requestBodySizeLimitFilter} at highest precedence + 15, after the rate
+   * limiter and before Spring Security.
    *
    * @param filter the body-size filter
    * @return the servlet registration

@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code NotificationRuleWriteRequest}. Enum-typed fields are sent
- * as {@link String}; field names match the backend record (mirror-DTO rule). {@code version} is
- * {@code null} on create and carries the expected optimistic-lock version on update.
+ * Frontend mirror of the backend {@code NotificationRuleWriteRequest}; enum fields are sent as
+ * {@link String}.
  *
  * @param eventType the trigger to match
  * @param notificationType the type produced per recipient

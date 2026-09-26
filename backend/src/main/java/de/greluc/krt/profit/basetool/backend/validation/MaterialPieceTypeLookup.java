@@ -22,22 +22,9 @@ package de.greluc.krt.profit.basetool.backend.validation;
 import java.util.UUID;
 
 /**
- * Lookup seam the {@link ValidQuantityAmountValidator} uses to learn whether a material is measured
- * in whole PIECEs, without the {@code validation} package depending on {@code model} / {@code
- * repository}.
- *
- * <p>This is a deliberate <b>dependency inversion</b> (REQ-ARCH cycle cleanup): the constraint
- * annotations in {@code model.dto} reference the validator's package, so if the validator itself
- * reached down into {@code repository.MaterialRepository} / {@code model.QuantityType} the slices
- * would form a {@code model} &harr; {@code validation} (and {@code model} &rarr; {@code validation}
- * &rarr; {@code repository} &rarr; {@code model}) package cycle. By depending only on this
- * interface — implemented in the {@code service} layer ({@code MaterialPieceTypeLookupService}) —
- * {@code validation} stays a pure leaf.
- *
- * <p>The method returns a plain {@code boolean} on purpose (not the {@code model.QuantityType}
- * enum) so the interface carries no {@code model} type: an unknown / missing material maps to
- * {@code false}, which the validator treats exactly like a non-PIECE material — validation passes
- * and the surrounding {@code @NotNull} / foreign-key checks report the missing material instead.
+ * Lookup that tells {@link ValidQuantityAmountValidator} whether a material is measured in whole
+ * PIECEs, keeping the {@code validation} package free of {@code model} and {@code repository}
+ * dependencies. Implemented in the service layer.
  */
 public interface MaterialPieceTypeLookup {
 

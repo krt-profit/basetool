@@ -41,18 +41,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Relays the member's own Art. 17 erasure request to the backend (REQ-SEC-061).
- *
- * <p>AJAX-only, because both actions are offered from the profile page's "Access &amp; Security"
- * card and both update it in place (REQ-FE-001): there is no page to redirect to that would say
- * anything the card does not already show. There is deliberately no non-AJAX twin — unlike the
- * profile's description and payout forms, this is not a form whose value a script-disabled browser
- * still needs to be able to save; it is a request behind a confirmation dialog, and a dialog needs
- * script anyway.
- *
- * <p>No user id is relayed and none is accepted. The backend derives the subject from the token, so
- * this proxy cannot be talked into acting for somebody else — the property that makes the surface
- * safe for every member rather than needing a scope check of its own.
+ * AJAX-only relay of the member's own Art. 17 erasure request (REQ-SEC-061). No user id is
+ * accepted; the backend derives the subject from the token.
  */
 @Controller
 @UsesLayoutModel
@@ -67,13 +57,8 @@ public class DeletionRequestProxyController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Re-renders the profile page's deletion card as a standalone fragment.
-   *
-   * <p>This is the other half of the live update: the two write endpoints below return the API's
-   * answer, and the page then asks for this fragment and swaps it in place (REQ-FE-001). Rendering
-   * the card server-side rather than rebuilding it in JavaScript keeps the three states — no
-   * request, pending, declined-with-reason — decided in exactly one place, so the swapped card can
-   * never disagree with the freshly loaded page.
+   * Re-renders the profile page's deletion card as a fragment for the in-place swap after a write
+   * (REQ-FE-001).
    *
    * @param model the view model the fragment reads {@code deletionRequest} and {@code
    *     deletionRequestUnavailable} from
@@ -93,9 +78,6 @@ public class DeletionRequestProxyController {
       unavailable = true;
     }
     model.addAttribute("deletionRequest", deletionRequest);
-    // Reported rather than swallowed: the swap happens after a write that already succeeded, and
-    // rendering the no-request state here would tell the member the opposite of what just
-    // happened. See the same flag in ProfileController.
     model.addAttribute("deletionRequestUnavailable", unavailable);
     return "fragments/profile-deletion-card :: card";
   }
@@ -103,9 +85,8 @@ public class DeletionRequestProxyController {
   /**
    * Raises the caller's erasure request.
    *
-   * @param request the client payload; only {@code eraseHistory} is read, and it is coerced rather
-   *     than validated, because a missing or malformed flag means "did not ask for the extra
-   *     erasure" and that is the safe reading
+   * @param request the client payload; only {@code eraseHistory} is read, a missing or malformed
+   *     value counting as {@code false}
    * @return {@code 200} with the created request, or the relayed backend status
    */
   @ResponseBody

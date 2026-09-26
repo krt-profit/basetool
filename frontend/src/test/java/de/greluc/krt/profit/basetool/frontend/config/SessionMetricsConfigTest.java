@@ -37,11 +37,9 @@ import org.springframework.session.events.SessionDeletedEvent;
 import org.springframework.session.events.SessionExpiredEvent;
 
 /**
- * Tests {@link SessionMetricsConfig}'s gauge wiring (#1158): the {@code basetool_active_sessions}
- * gauge must sample a <em>finite</em> value (the whole point of the fix — the old registry-sampling
- * implementation reported {@code NaN}), seed correctly from the Redis session namespace, and track
- * create / delete / expire events. Redis is mocked (no live store needed); the config's own
- * {@code @Profile("!test")} gating is bypassed by driving the bean directly.
+ * Unit tests for {@link SessionMetricsConfig}'s {@code basetool_active_sessions} gauge: it samples
+ * a finite value, seeds from the Redis session namespace, and tracks create, delete and expire
+ * events.
  */
 class SessionMetricsConfigTest {
 
@@ -78,7 +76,6 @@ class SessionMetricsConfigTest {
 
     config.seedFromRedis();
 
-    // aaaa + bbbb counted; the per-session `expires:` marker key is skipped -> a finite 2, not NaN.
     assertThat(gauge()).isEqualTo(2.0);
   }
 

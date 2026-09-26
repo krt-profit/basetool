@@ -72,7 +72,6 @@ class UserJoinDateTest {
 
   @Test
   void shouldSetJoinDate_WhenAdminUpdatesAttributes() throws Exception {
-    // Given
     String joinDate = "2024-03-15";
     String updateJson =
         "{\"rank\": 5, \"version\": "
@@ -81,21 +80,18 @@ class UserJoinDateTest {
             + joinDate
             + "\"}";
 
-    // When
     mockMvc
         .perform(
             put("/api/v1/users/" + testUser.getId() + "/attributes")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
-        // Then
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.joinDate").value(joinDate));
   }
 
   @Test
   void shouldForbidJoinDateUpdate_WhenOfficerRole() throws Exception {
-    // Given
     String joinDate = "2023-06-01";
     String updateJson =
         "{\"rank\": 3, \"version\": "
@@ -104,20 +100,17 @@ class UserJoinDateTest {
             + joinDate
             + "\"}";
 
-    // When
     mockMvc
         .perform(
             put("/api/v1/users/" + testUser.getId() + "/attributes")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
-        // Then
         .andExpect(status().isForbidden());
   }
 
   @Test
   void shouldClearJoinDate_WhenNullIsSent() throws Exception {
-    // Given – set a date first
     testUser.setJoinDate(LocalDate.of(2022, 1, 1));
     userRepository.save(testUser);
     userRepository.flush();
@@ -125,14 +118,12 @@ class UserJoinDateTest {
     String updateJson =
         "{\"rank\": 1, \"version\": " + testUser.getVersion() + ", \"joinDate\": null}";
 
-    // When
     mockMvc
         .perform(
             put("/api/v1/users/" + testUser.getId() + "/attributes")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
-        // Then
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.joinDate").doesNotExist());
 
@@ -142,11 +133,9 @@ class UserJoinDateTest {
 
   @Test
   void shouldForbidJoinDateUpdate_WhenMemberRole() throws Exception {
-    // Given
     String updateJson =
         "{\"rank\": 1, \"version\": " + testUser.getVersion() + ", \"joinDate\": \"2024-01-01\"}";
 
-    // When / Then
     mockMvc
         .perform(
             put("/api/v1/users/" + testUser.getId() + "/attributes")
@@ -158,20 +147,17 @@ class UserJoinDateTest {
 
   @Test
   void shouldReturnJoinDate_InResponseDto_WhenSet() throws Exception {
-    // Given
     testUser.setJoinDate(LocalDate.of(2021, 5, 20));
     userRepository.save(testUser);
 
     String updateJson = "{\"rank\": 1, \"version\": " + testUser.getVersion() + "}";
 
-    // When
     mockMvc
         .perform(
             put("/api/v1/users/" + testUser.getId() + "/attributes")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
-        // Then – joinDate is reset to null because request sends null
         .andExpect(status().isOk());
   }
 }

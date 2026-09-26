@@ -53,11 +53,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Unit tests for {@link RefineryImportProxyController} (#435): the JSON relay to the Phase 1
- * backend endpoint, the draft-to-form mapping (incl. the hours/minutes split and the row-issue
- * grouping by draft index), and every error branch (not-JSON upload, backend problem detail,
- * unexpected failure). The backend seam is a mocked {@link BackendApiClient} — the typed client is
- * the frontend's single backend seam, so no raw HTTP server is needed here.
+ * Unit tests for {@link RefineryImportProxyController}: the JSON relay to the backend, the
+ * draft-to-form mapping (hours/minutes split, row issues grouped by draft index) and every error
+ * branch, against a mocked {@link BackendApiClient}.
  */
 class RefineryImportProxyControllerTest {
 
@@ -79,7 +77,6 @@ class RefineryImportProxyControllerTest {
 
   @Test
   void importExtract_happyPath_flashesPrefilledFormAndIssues() {
-    // Given — a draft with a matched row, an unmatched row with suggestions and order-level flags
     MaterialDto raw = material(MATERIAL_ID, "Stileron (Raw)");
     MaterialDto refined = material(REFINED_ID, "Stileron");
     RefineryGoodDto matched = new RefineryGoodDto(null, raw, 957, refined, 448, 618, null);
@@ -133,17 +130,14 @@ class RefineryImportProxyControllerTest {
             eq("/api/v1/refinery-orders/import-extract"), any(), eq(RefineryImportDraftDto.class)))
         .thenReturn(draft);
 
-    // When
     String view = controller.importExtract(jsonUpload("{\"schemaVersion\":1}"), redirectAttributes);
 
-    // Then — redirect with the pre-filled form
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     Map<String, Object> flash = flash();
     RefineryOrderForm form = (RefineryOrderForm) flash.get("refineryOrderForm");
     assertThat(form).isNotNull();
     assertThat(form.getLocationId()).isEqualTo(LOCATION_ID);
     assertThat(form.getRefiningMethodId()).isEqualTo(METHOD_ID);
-    // The capture-derived start time arrives as the UTC ISO instant the splitter renders locally.
     assertThat(form.getStartedAt()).isEqualTo("2026-06-01T19:39:01Z");
     assertThat(form.getDurationHours()).isEqualTo(20);
     assertThat(form.getDurationMinutes()).isEqualTo(58);
@@ -155,7 +149,6 @@ class RefineryImportProxyControllerTest {
     assertThat(form.getGoods().get(0).getQuality()).isEqualTo(618);
     assertThat(form.getGoods().get(1).getInputMaterialId()).isNull();
 
-    // Then — issues split into row-anchored and banner findings
     @SuppressWarnings("unchecked")
     Map<String, List<ImportIssueDto>> rowIssues =
         (Map<String, List<ImportIssueDto>>) flash.get("importRowIssues");
@@ -173,15 +166,12 @@ class RefineryImportProxyControllerTest {
 
   @Test
   void importExtract_nonJsonUpload_flashesInvalidFileWithoutBackendCall() {
-    // Given
     MultipartFile file =
         new MockMultipartFile(
             "file", "screenshot.png", "image/png", "not json".getBytes(StandardCharsets.UTF_8));
 
-    // When
     String view = controller.importExtract(file, redirectAttributes);
 
-    // Then — rejected locally, the backend is never bothered
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.invalidFile");
     verifyNoInteractions(backendApiClient);
@@ -189,10 +179,8 @@ class RefineryImportProxyControllerTest {
 
   @Test
   void importExtract_jsonArrayUpload_flashesInvalidFile() {
-    // Given — parseable JSON but not an object envelope
     String view = controller.importExtract(jsonUpload("[1,2,3]"), redirectAttributes);
 
-    // Then
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.invalidFile");
     verifyNoInteractions(backendApiClient);
@@ -200,29 +188,23 @@ class RefineryImportProxyControllerTest {
 
   @Test
   void importExtract_emptyUpload_flashesInvalidFile() {
-    // Given
     MultipartFile file =
         new MockMultipartFile("file", "empty.json", "application/json", new byte[0]);
 
-    // When
     String view = controller.importExtract(file, redirectAttributes);
 
-    // Then
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.invalidFile");
   }
 
   @Test
   void importExtract_oversizedUpload_flashesInvalidFileWithoutBackendCall() {
-    // Given — a file above the 2 MB sanity cap (the wrong file, e.g. a screenshot)
     byte[] oversized = new byte[(int) RefineryImportProxyController.MAX_EXTRACT_BYTES + 1];
     MultipartFile file =
         new MockMultipartFile("file", "screenshot.png", "application/json", oversized);
 
-    // When
     String view = controller.importExtract(file, redirectAttributes);
 
-    // Then — rejected locally, the backend is never called (covers REQ-REFINERY-016)
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.invalidFile");
     verifyNoInteractions(backendApiClient);
@@ -230,18 +212,14 @@ class RefineryImportProxyControllerTest {
 
   @Test
   void handleOversizedUpload_flashesInvalidFile() {
-    // Given / When — Spring rejected the multipart before the handler ran (above the 64 MB cap)
     String view = controller.handleOversizedUpload(redirectAttributes);
 
-    // Then — same friendly inline error as the controller's own sanity cap
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.invalidFile");
   }
 
   @Test
   void rowIssues_indexBeyondIntRange_treatedAsUnanchoredInsteadOfThrowing() {
-    // Given — a crafted/corrupt field path whose digits overflow Integer (regex \d+ accepts any
-    // length); Integer.valueOf would throw NumberFormatException without the guard
     ImportIssueDto overflow =
         new ImportIssueDto(
             "goods[99999999999999999999].inputMaterial",
@@ -251,29 +229,24 @@ class RefineryImportProxyControllerTest {
             null,
             null);
 
-    // When
     Map<String, List<ImportIssueDto>> byRow =
         RefineryImportProxyController.rowIssues(List.of(overflow));
     List<ImportIssueDto> general = RefineryImportProxyController.generalIssues(List.of(overflow));
 
-    // Then — the finding falls through to the banner list instead of aborting the import
     assertThat(byRow).isEmpty();
     assertThat(general).containsExactly(overflow);
   }
 
   @Test
   void importExtract_backendProblemWithoutDetail_flashesGenericError() {
-    // Given — a backend reject whose problem body carries no detail text
     when(backendApiClient.post(
             eq("/api/v1/refinery-orders/import-extract"), any(), eq(RefineryImportDraftDto.class)))
         .thenThrow(
             new BackendServiceException(
                 "400 from backend", null, 400, "BAD_REQUEST", null, Collections.emptyList(), null));
 
-    // When
     String view = controller.importExtract(jsonUpload("{\"schemaVersion\":2}"), redirectAttributes);
 
-    // Then — falls back to the generic frontend i18n key instead of flashing blank text
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.failed");
     assertThat(flash()).doesNotContainKey("importErrorText");
@@ -281,15 +254,12 @@ class RefineryImportProxyControllerTest {
 
   @Test
   void importExtract_nullDraft_flashesGenericError() {
-    // Given — the relay succeeded but returned no usable draft
     when(backendApiClient.post(
             eq("/api/v1/refinery-orders/import-extract"), any(), eq(RefineryImportDraftDto.class)))
         .thenReturn(null);
 
-    // When
     String view = controller.importExtract(jsonUpload("{\"schemaVersion\":1}"), redirectAttributes);
 
-    // Then
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.failed");
     assertThat(flash()).doesNotContainKey("refineryOrderForm");
@@ -297,7 +267,6 @@ class RefineryImportProxyControllerTest {
 
   @Test
   void importExtract_backendProblem_surfacesLocalizedDetailVerbatim() {
-    // Given — envelope-level reject (e.g. unsupported schemaVersion) with localized detail
     when(backendApiClient.post(
             eq("/api/v1/refinery-orders/import-extract"), any(), eq(RefineryImportDraftDto.class)))
         .thenThrow(
@@ -310,10 +279,8 @@ class RefineryImportProxyControllerTest {
                 Collections.emptyList(),
                 "Die Extract-Datei verwendet eine nicht unterstützte Schema-Version."));
 
-    // When
     String view = controller.importExtract(jsonUpload("{\"schemaVersion\":2}"), redirectAttributes);
 
-    // Then — the backend's already-localized problem detail is shown verbatim
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash())
         .containsEntry(
@@ -324,22 +291,18 @@ class RefineryImportProxyControllerTest {
 
   @Test
   void importExtract_unexpectedFailure_flashesGenericError() {
-    // Given
     when(backendApiClient.post(
             eq("/api/v1/refinery-orders/import-extract"), any(), eq(RefineryImportDraftDto.class)))
         .thenThrow(new IllegalStateException("boom"));
 
-    // When
     String view = controller.importExtract(jsonUpload("{\"schemaVersion\":1}"), redirectAttributes);
 
-    // Then
     assertThat(view).isEqualTo("redirect:/refinery-orders/create");
     assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.failed");
   }
 
   @Test
   void toForm_keepsSeededEmptyRowForEmptyGoodsDraft() {
-    // Given — a draft whose rows were all skipped (e.g. fully un-quoted order)
     RefineryOrderDto order =
         new RefineryOrderDto(
             null,
@@ -359,13 +322,10 @@ class RefineryImportProxyControllerTest {
             null,
             null);
 
-    // When
     RefineryOrderForm form = RefineryImportProxyController.toForm(order);
 
-    // Then — the template's row-clone JS needs at least the one seeded empty row
     assertThat(form.getGoods()).hasSize(1);
     assertThat(form.getGoods().getFirst().getInputMaterialId()).isNull();
-    // No capture metadata in the draft → the create flow keeps its "now" default at save time.
     assertThat(form.getStartedAt()).isNull();
   }
 

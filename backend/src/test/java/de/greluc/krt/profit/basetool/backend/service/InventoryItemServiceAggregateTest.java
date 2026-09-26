@@ -62,28 +62,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Coverage for {@link InventoryItemService#getAllAggregatedInventory} and the private assembly
- * helpers ({@code buildGroupedFromStacks} / {@code buildMaterialGroup} / {@code mapAggregateRefs}).
- * Since the append-only Lager moved its grouping and aggregate math into SQL (ADR-0003,
- * REQ-INV-002), the database now returns one {@link InventoryStackAggregate} per stock identity
- * with {@code SUM(amount)}, the amount-weighted quality sum, {@code MAX(quality)} and the entry
- * count already computed. This unit test therefore verifies the two remaining service
- * responsibilities over a mocked repository:
+ * Unit tests for {@link InventoryItemService#getAllAggregatedInventory} over a mocked repository
+ * returning SQL-computed {@link InventoryStackAggregate}s (ADR-0003, REQ-INV-002):
  *
  * <ul>
- *   <li>filter routing: each of {@code materialIds} / {@code minQuality} / {@code jobOrderIds} /
- *       {@code missionIds} flips the corresponding {@code hasX} flag and is or isn't forwarded to
- *       {@link InventoryItemRepository#findGlobalStacks};
- *   <li>assembly: the per-stack aggregates are grouped into materials, each stack's mean quality is
- *       derived as {@code weightedQualitySum / totalAmount} (rounded HALF_UP to two decimals), the
- *       stacks are ordered quality-desc / location-asc / amount-desc, and the materials are ordered
- *       alphabetically — with the material-wide totals accumulated from the raw SQL sums.
+ *   <li>filter routing: each filter sets its {@code hasX} flag and is forwarded to {@link
+ *       InventoryItemRepository#findGlobalStacks} as appropriate;
+ *   <li>assembly: stacks group into materials, mean quality is {@code weightedQualitySum /
+ *       totalAmount} rounded HALF_UP to two decimals, stacks sort quality desc / location asc /
+ *       amount desc, and materials sort alphabetically.
  * </ul>
- *
- * <p>The correctness of the SQL grouping itself (that two rows differing only in owning squadron or
- * the personal flag form separate stacks, that the {@code GROUP BY} executes on Postgres) is a
- * data-layer concern covered by {@code InventoryItemStackQueryTest} and the seeded integration
- * tests, not by this mocked unit.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceAggregateTest {
@@ -101,10 +89,6 @@ class InventoryItemServiceAggregateTest {
   @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private InventoryAggregationService service;
-
-  // ---------------------------------------------------------------------
-  // filter routing
-  // ---------------------------------------------------------------------
 
   @Nested
   class FilterRoutingTests {
@@ -201,17 +185,12 @@ class InventoryItemServiceAggregateTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // assembly — material grouping, weighted average, ordering
-  // ---------------------------------------------------------------------
-
   @Nested
   class AssemblyTests {
 
     @Test
     void singleStack_singleMaterial_isProjectedWithItsAggregates() {
       Material mat = material("Quantanium");
-      // total 100 @ quality 500 -> weighted sum 50000 -> mean 500
       stubGlobalStacks(agg(mat, location("ARC-L1"), 500, 100.0, 50_000.0, 500, 1));
       stubRefMapper();
 
@@ -235,8 +214,6 @@ class InventoryItemServiceAggregateTest {
     @Test
     void weightedAverageQuality_isAccumulatedFromRawSqlSums() {
       Material mat = material("Quantanium");
-      // (amount 100, q 400 -> wsum 40000) and (amount 300, q 500 -> wsum 150000)
-      // material mean = (40000 + 150000) / (100 + 300) = 475
       stubGlobalStacks(
           agg(mat, location("ARC-L1"), 400, 100.0, 40_000.0, 400, 1),
           agg(mat, location("ARC-L2"), 500, 300.0, 150_000.0, 500, 1));
@@ -251,7 +228,6 @@ class InventoryItemServiceAggregateTest {
     @Test
     void perStackMeanQuality_roundedHalfUpToTwoDecimals() {
       Material mat = material("Quantanium");
-      // wsum 451 over total 3 -> 150.333... -> 150.33
       stubGlobalStacks(agg(mat, location("ARC-L1"), 200, 3.0, 451.0, 200, 3));
       stubRefMapper();
 
@@ -286,7 +262,6 @@ class InventoryItemServiceAggregateTest {
       List<InventoryStackDto> stacks =
           service.getAllAggregatedInventory(null, null).get(0).stacks();
 
-      // q500 first (locA amt20, locA amt10, locB amt10), then q300 last
       assertEquals("A", stacks.get(0).location().name());
       assertEquals(20.0, stacks.get(0).totalAmount(), "locA q500 highest amount first");
       assertEquals("A", stacks.get(1).location().name());
@@ -311,10 +286,6 @@ class InventoryItemServiceAggregateTest {
           result.stream().map(g -> g.material().name()).toList());
     }
   }
-
-  // ---------------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------------
 
   /** Stubs the scoped stack query to return no stacks (for the filter-routing verifications). */
   private void stubFindGlobalStacks() {

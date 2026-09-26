@@ -1,10 +1,3 @@
-/*
- * KRT "DAS KARTELL" Corporate Design styling for the Personal Inventory feature.
- * Color tokens: --color-primary (#E77E23), --color-bg-dark-gray (#141414).
- * Typography: Lato only - headlines use weight (700) + ALL CAPS + tracking.
- * Touch targets >= 44px; responsive across 4 device classes.
- */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
@@ -31,10 +24,6 @@
     }
 
     .krt-personal-inventory {
-        /* The wrapping .hud-box owns the surface treatment (hairline + corner brackets +
-       translucent fill). This rule only carries the page's content padding; a solid fill
-       and a full orange border here would override the quieter .hud-box look and make the
-       page read louder than the rest of the modernised app (DS hygiene, REQ-UI-002). */
         padding: 1.25rem;
     }
 
@@ -82,13 +71,11 @@
         background-color: var(--color-surface-input);
         border: 1px solid var(--color-gray-3);
         color: var(--color-gray-1);
-        /* Reserve right space for the SVG arrow injected by styles.css */
         padding: 0.4rem 2rem 0.4rem 0.6rem;
         min-width: 240px;
     }
 
     .krt-pi-userform label {
-        /* Form labels stay neutral; orange is reserved for action + identity (REQ-UI-002). */
         color: var(--color-gray-1);
         font-family: Lato, sans-serif;
         font-weight: var(--fw-bold);
@@ -109,7 +96,6 @@
         background-color: var(--color-surface-input);
         border: 1px solid var(--color-gray-3);
         color: var(--color-gray-1);
-        /* No padding of its own: the base text-input rule has always set it (FE-MOD-02). */
         min-width: 220px;
     }
 
@@ -136,7 +122,6 @@
         min-height: 44px;
     }
 
-    /* HUD-style location marker (triangle for SPACE_STATION, ring for CITY). */
     .krt-pi-location-marker {
         display: inline-block;
         width: 12px;
@@ -160,7 +145,6 @@
         background: transparent;
     }
 
-    /* Forms inside list section AND modals (Personal Inventory). */
     .krt-personal-inventory .form-group,
     #krt-pi-modal .form-group,
     #krt-pi-delete-modal .form-group {
@@ -182,7 +166,6 @@
         display: block;
     }
 
-    /* Select elements need extra right padding for the SVG arrow from styles.css */
     .krt-personal-inventory .form-group select,
     #krt-pi-modal .form-group select {
         width: 100%;
@@ -200,7 +183,6 @@
     .krt-personal-inventory .form-group label,
     #krt-pi-modal .form-group label {
         display: block;
-        /* Neutral label; the input value is the brightest element, not the label (REQ-UI-002). */
         color: var(--color-gray-1);
         font-family: Lato, sans-serif;
         font-weight: var(--fw-bold);
@@ -242,7 +224,6 @@
         color: var(--color-danger-text);
     }
 
-    /* Typeahead dropdown. */
     .krt-pi-typeahead {
         position: relative;
     }
@@ -296,7 +277,6 @@
         font-style: italic;
     }
 
-    /* REQ-FE-016: truncation hint appended when a result fills the requested cap. */
     .krt-pi-typeahead-more {
         padding: 0.75rem 1rem;
         color: var(--color-gray-2-text);
@@ -316,9 +296,6 @@
         border: 0;
     }
 
-    /* Responsive: 4 device classes. */
-
-    /* Smartphone <= 768px */
     @media (width <= 768px) {
         .krt-pi-actionbar {
             flex-direction: column;
@@ -353,7 +330,6 @@
         }
     }
 
-    /* Tablet 768-1024px */
     @media (width >= 769px) and (width <= 1024px) {
         .krt-pi-table th,
         .krt-pi-table td {
@@ -361,9 +337,6 @@
         }
     }
 
-    /* Desktop 1024-1600px (default body styling) */
-
-    /* Ultra Wide Desktop >= 1600px */
     @media (width >= 1600px) {
         .krt-personal-inventory {
             padding: 1.5rem 2rem;
@@ -376,24 +349,16 @@
         }
     }
 
-    /* ------------------------------------------------------------------ *
- * Blueprints sub-page (#327, Phase 5): multi-select staging chips.   *
- * Reuses the krt-pi-* table / modal / typeahead base. The in-page    *
- * Items | Blueprints tabs use the shared .tab-nav DS component.      *
- * ------------------------------------------------------------------ */
-
     .krt-bp-section-title {
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        /* Neutral section heading; orange is reserved for action + identity (REQ-UI-002). */
         color: var(--color-gray-1);
         font-size: 1rem;
         margin: 0 0 1rem;
     }
 
-    /* Search result staging states. */
     .krt-bp-result-owned {
         opacity: 0.55;
         cursor: not-allowed;
@@ -410,14 +375,12 @@
         color: var(--color-primary);
     }
 
-    /* Selection staging area + chips. */
     .krt-bp-staging {
         margin-top: 1.25rem;
     }
 
     .krt-bp-staging-label {
         display: block;
-        /* Neutral label; orange is reserved for action + identity (REQ-UI-002). */
         color: var(--color-gray-1);
         font-family: Lato, sans-serif;
         font-weight: var(--fw-bold);
@@ -470,8 +433,6 @@
         outline: none;
     }
 
-    /* Staging selections render as the canonical DS .chip (chip--primary). The inline remove
-   affordance is sized down to fit the compact squared chip and inherits the chip's hue. */
     .krt-bp-chip-list .chip .krt-bp-chip-remove {
         min-width: 1.25rem;
         min-height: 1.25rem;
@@ -505,7 +466,6 @@
 
     #krt-bp-edit-modal .form-group label {
         display: block;
-        /* Neutral label; orange is reserved for action + identity (REQ-UI-002). */
         color: var(--color-gray-1);
         font-family: Lato, sans-serif;
         font-weight: var(--fw-bold);
@@ -525,10 +485,6 @@
             position: static;
         }
     }
-
-    /* ------------------------------------------------------------------ *
- * SCMDB import (#327, Phase 6): trigger, preview modal, resolve rows. *
- * ------------------------------------------------------------------ */
 
     .krt-bp-addbar-head {
         display: flex;
@@ -688,12 +644,6 @@
         }
     }
 
-    /* ------------------------------------------------------------------ *
- * Expandable recipe detail: ingredients ("Zutaten") + per-quality    *
- * stat sliders ("Stat-Beitrag nach Zutat-Qualitaet"), mirroring the  *
- * admin /admin/blueprints view but lazy-loaded per owned row.        *
- * ------------------------------------------------------------------ */
-
     .krt-bp-recipe-toggle-col {
         width: 3rem;
     }
@@ -710,7 +660,6 @@
         justify-content: center;
         background: transparent;
         border: 1px solid var(--color-gray-3);
-        /* Corners are sharp everywhere except pills + circular controls (REQ-UI-007). */
         border-radius: var(--radius-none);
         color: var(--color-primary);
         cursor: pointer;
@@ -765,7 +714,6 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-size: var(--fs-xs);
-        /* Neutral column header; orange is reserved for action + identity (REQ-UI-002). */
         color: var(--color-gray-1);
     }
 
@@ -895,7 +843,6 @@
         font-style: italic;
     }
 
-    /* Smartphone: collapse the two-column recipe table to stacked, labelled blocks. */
     @media (width <= 768px) {
         .krt-bp-recipe-table,
         .krt-bp-recipe-table tbody,
@@ -938,17 +885,8 @@
         }
     }
 
-    /* ==========================================================================
-   Blueprints master-detail (V3) — page-specific layout on top of the DS
-   .master-detail / .quality-* / .empty-state patterns.
-   ========================================================================== */
-
-    /* Compact add bar in the greeting head (typeahead + CTA + JSON import). */
     .krt-bp-head {
         display: flex;
-        /* Title left, add-bar (search + add + import) right. Without an explicit row direction the
-       shared .krt-personal-inventory-header (flex-direction: column) would stack the add-bar
-       below the title; "wrap" keeps the stacked fallback on narrow screens. */
         flex-flow: row wrap;
         justify-content: space-between;
         align-items: flex-start;
@@ -970,20 +908,15 @@
 
     .krt-bp-addbar .krt-bp-search input {
         min-height: 44px;
-        /* Leave room for the leading magnifier glyph (DS search-input affordance). */
         padding-left: 38px;
     }
 
-    /* Leading magnifier inside the typeahead, matching the DS search-input specimen:
-   absolutely positioned over the input's left inset, non-interactive, neutral grey. */
     .krt-bp-search-icon {
         position: absolute;
         left: 12px;
         top: 50%;
         transform: translateY(-50%);
         display: inline-flex;
-        /* Decorative (aria-hidden icon beside a labelled field): canonical Grau 2 per REQ-UI-006,
-           exempted by name in AccessibleTextTintTest. */
         color: var(--color-gray-2);
         pointer-events: none;
     }
@@ -993,8 +926,6 @@
         height: 16px;
     }
 
-    /* Staging chips collapse to a compact strip under the bar; hidden when empty
-   (the CTA stays disabled until something is staged). */
     .krt-bp-staging-bar {
         margin-top: 0.5rem;
         display: flex;
@@ -1003,9 +934,6 @@
         flex-wrap: wrap;
     }
 
-    /* "Auswahl" heading sits inline before the staged chips (consistent with the admin
-   blueprint twins). The compact bar omits the empty-text, so the heading stays hidden
-   until at least one chip is staged to keep the empty bar quiet. */
     .krt-bp-staging-bar .krt-bp-staging-label {
         margin-bottom: 0;
     }
@@ -1022,7 +950,6 @@
         display: none;
     }
 
-    /* Master list: scrollable, filter box pinned on top. */
     .krt-bp-master-filter {
         padding: 8px;
         border-bottom: var(--border-hairline);
@@ -1054,31 +981,12 @@
         font-family: var(--font-body);
     }
 
-    /*
- * REQ-UI-009's dense exemption for the blueprint list rows, written down in CSS for the first
- * time.
- *
- * The exemption itself is not new: the requirement has granted it since 2026-09-13 ("`.master-row`
- * IS exempt, at 32px" — the rows measured 33px, and they are a scan-and-tap list where density is
- * the point). What was missing is any DECLARATION of it. `.master-row` sized itself from its
- * content and named `--touch-target-dense` nowhere, so the exemption existed only in prose:
- * TouchClassLayoutE2eTest builds its dense set by reading `--touch-target-dense` consumers out of
- * the CSSOM, and a class that consumes the token nowhere is in no such set, whatever the spec says
- * about it.
- *
- * It became load-bearing with ADR-0176. `.master-row` is a `<button>`, so the inverted floor in
- * styles.css now offers it 44px by default, and an exemption that is only written in a document
- * cannot decline the offer. This rule is the decline — and, being a `--touch-target-dense`
- * consumer, it is simultaneously what finally puts the class in the guard's dense set.
- */
     @media (width <= 1024px) {
         .master-row {
             min-height: var(--touch-target-dense);
         }
     }
 
-    /* Right-aligned status cluster on a master row: the note pencil + the craft badge sit
-   together at the row's trailing edge so the "can I build this?" signal is scannable. */
     .krt-bp-row-aside {
         display: inline-flex;
         align-items: center;
@@ -1098,7 +1006,6 @@
         height: 14px;
     }
 
-    /* Detail pane: head row, quality blocks, note box, mobile back button. */
     .krt-bp-detail-head {
         display: flex;
         justify-content: space-between;
@@ -1142,13 +1049,11 @@
         margin-bottom: 0.75rem;
     }
 
-    /* Wide variant for the import preview inside the KRT modal frame. */
     .krt-modal.krt-bp-import-frame {
         max-width: 1100px;
         width: 95%;
     }
 
-    /* Mobile (≤900px): list → detail navigation. */
     @media (width <= 900px) {
         .krt-bp-md .detail-pane {
             display: none;
@@ -1172,26 +1077,16 @@
         }
     }
 
-    /* ==========================================================================
-   Craftability (#781): refinery toggle, master-row craft badge, and the
-   detail-pane craftability section (counter + per-material breakdown).
-   Status-green / warning-yellow / research-blue accents; orange stays the CTA.
-   ========================================================================== */
-
     .krt-bp-craft-toolbar {
         display: flex;
         align-items: center;
         gap: 0.75rem;
         flex-wrap: wrap;
-        /* First row inside the collection box: a hairline separates it from the master-detail. */
         margin: 0 0 0.75rem;
         padding-bottom: 0.75rem;
         border-bottom: var(--border-hairline);
     }
 
-    /* Hidden while the collection is empty (the empty-state shows instead). recipe.js mirrors this
-   from the rendered master rows after an in-place swap, since the toolbar lives outside the
-   swapped #krt-bp-list fragment and is therefore not re-rendered by the swap itself. */
     .krt-bp-craft-toolbar.is-empty {
         display: none;
     }
@@ -1217,8 +1112,6 @@
         font-size: 0.72rem;
     }
 
-    /* Master-row badge: lives in the trailing .krt-bp-row-aside cluster (which owns the
-   margin-left:auto), so the note pencil and the badge stay grouped at the row's edge. */
     .krt-bp-craft-badge {
         flex: none;
         font-size: 0.62rem;
@@ -1252,7 +1145,6 @@
         background: rgb(108 147 239 / 10%);
     }
 
-    /* Detail-pane craftability section. */
     .krt-bp-craft-summary {
         display: flex;
         align-items: center;

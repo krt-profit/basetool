@@ -38,23 +38,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Storing ("einlagern") a refinery order's refined output into the Lager (UC-19) — the completion
- * half of the refinery lifecycle. The store dialog on the order-detail page turns each output good
- * into an append-only {@code InventoryItem} (REQ-INV-001) and flips the order to {@code COMPLETED};
- * the resulting row is stamped onto the assignee's owning org unit (REQ-ORG-004).
+ * Storing ("einlagern") a refinery order's output into the Lager (UC-19): the store dialog turns
+ * each output good into an {@code InventoryItem} (REQ-INV-001), completes the order and stamps the
+ * row onto the assignee's org unit (REQ-ORG-004).
  *
- * <p><b>Drive via UI, verify via API.</b> The headline flow opens the pre-filled store modal in the
- * real browser and submits it; the side effects (order status, the new Lager row, the propagated
- * note) are then asserted through the scoped backend endpoints via {@link BackendSeeder}, the
- * established race-free way to check persistence. The status-guard and note edges run purely
- * through the API.
- *
- * <p>Each test uses its own freshly-seeded input material so its order's output maps 1:1 to a
- * single Lager material — the grouped-inventory probe ({@code
- * /api/v1/inventory/all/grouped?materialIds=…}) then reads back exactly that order's contribution.
- * The seeded manual RAW material has no refined counterpart, so the backend sets the output
- * material equal to the input, and that is the material the store flow inserts. {@code test-admin}
- * (ADMIN, IRIDIUM member) owns every order and drives the flow.
+ * <p>Driven via the UI and verified via the API through {@link BackendSeeder}; each test uses its
+ * own fresh input material so the grouped-inventory probe reads exactly that order's output.
  */
 @Tag("e2e")
 class RefineryOrderStoreE2eTest {
@@ -120,16 +109,9 @@ class RefineryOrderStoreE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/" + orderId);
         page.waitForLoadState();
-        // The Einlagern button is rendered only for an editable OPEN/IN_PROGRESS order; clicking it
-        // reveals the store modal, which the detail controller pre-fills from the order's goods
-        // (amount, quality, the order's location, the current user) — so a bare submit is valid.
         page.locator("[data-trigger='rod-open-store']").click();
         assertThat(page.locator("#storeModal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        // Drop the fixed footer so the modal's submit is clickable, then wait for the store POST's
-        // own response. E2eSupport#clickSubmitClearingFooter is deliberately NOT used here: it
-        // waits for a settled post-submit *navigation* document, and since #1238 a successful store
-        // performs none — it re-renders in place — so that helper would hang out its full timeout.
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
@@ -138,10 +120,6 @@ class RefineryOrderStoreE2eTest {
                 response.url().contains("/refinery-orders/" + orderId + "/store")
                     && "POST".equals(response.request().method()),
             () -> page.locator("#storeForm button[type='submit']").click());
-        // A successful store STAYS on the detail page (REQ-FE-001): the modal closes and the
-        // `order` section is re-rendered from the now-COMPLETED order, which drops the Einlagern
-        // button its status gate no longer satisfies. That button disappearing is the success
-        // signal — a validation/backend failure keeps the modal open with the button intact.
         assertThat(page.locator("#storeModal"))
             .not()
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
@@ -201,10 +179,6 @@ class RefineryOrderStoreE2eTest {
     String items = seeder.getBody(USERNAME, PASSWORD, "/api/v1/inventory/material/" + materialId);
     assertTrue(items.contains(note), "the stored Lager row carries the note from the store dialog");
   }
-
-  // --------------------------------------------------------------------------------------------
-  // Helpers
-  // --------------------------------------------------------------------------------------------
 
   /**
    * Reports whether the calling admin sees any shared stock of {@code materialId} in the global

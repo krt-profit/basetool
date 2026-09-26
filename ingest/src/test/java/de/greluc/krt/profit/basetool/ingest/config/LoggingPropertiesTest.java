@@ -100,8 +100,6 @@ class LoggingPropertiesTest {
 
   @Test
   void keepsTheMdcKeysInSyncWithTheLogbackPattern() {
-    // logback-spring.xml renders %X{correlationId} and %X{userId:-anonymous}; a renamed key here
-    // would leave both fields permanently blank in every log line without any error.
     runner.run(
         context -> {
           LoggingProperties properties = context.getBean(LoggingProperties.class);

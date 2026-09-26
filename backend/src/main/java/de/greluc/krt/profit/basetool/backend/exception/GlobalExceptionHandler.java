@@ -75,41 +75,19 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import tools.jackson.databind.DatabindException;
 
 /**
- * Central RFC7807 exception handler.
+ * Central RFC 7807 exception handler.
  *
- * <p>Every error response carries the standard Problem Details fields (type, title, status, detail,
- * instance) plus two additional, stable extension fields:
+ * <p>Every problem carries the standard fields plus two stable extensions:
  *
  * <ul>
- *   <li>{@code code} - a stable, machine readable error code used by the frontend to select the
- *       appropriate localized message (e.g. {@code OPTIMISTIC_LOCK}). The code must never change
- *       once published, even if the user-facing {@code detail} text is reworded.
- *   <li>{@code correlationId} - a per-request UUID used to correlate the user-visible error with a
- *       server log entry without leaking stack traces or internal implementation details to the
- *       client.
+ *   <li>{@code code} - a stable, machine-readable error code the frontend localizes (e.g. {@code
+ *       OPTIMISTIC_LOCK}); never changed once published.
+ *   <li>{@code correlationId} - a per-request id tying the error to the server log.
  * </ul>
  *
- * <p>Expected, user-driven errors (4xx) are logged at {@code WARN}/{@code DEBUG} without a stack
- * trace; unexpected internal errors (5xx) are logged at {@code ERROR} with the full stack trace and
- * the correlation id to aid post-mortem debugging.
- *
- * <p><strong>The {@code @Order} is load-bearing — do not remove it.</strong> {@code
- * application.yml} sets {@code spring.mvc.problemdetails.enabled: true}, which makes Spring Boot
- * register its own {@code ProblemDetailsExceptionHandler} advice at {@code @Order(0)} (guarded only
- * by {@code @ConditionalOnMissingBean(ResponseEntityExceptionHandler.class)}, and this class
- * deliberately does not extend that base class). An unordered {@code @ControllerAdvice} sits at
- * {@code LOWEST_PRECEDENCE} and therefore LOSES to it for every exception type Spring's advice also
- * declares — {@link MethodArgumentNotValidException}, {@link
- * org.springframework.http.converter.HttpMessageNotReadableException}, {@link
- * org.springframework.web.method.annotation.MethodArgumentTypeMismatchException}, {@link
- * HttpRequestMethodNotSupportedException}, {@link NoResourceFoundException} and {@link
- * ErrorResponseException}. Those responses then ship Spring's bare {@link ProblemDetail}: no {@code
- * code}, no {@code correlationId}, no {@code fieldErrors}, and an untranslated English {@code
- * detail} ({@code "Invalid request content."}). The frontend needs {@code fieldErrors} to place an
- * inline message at the offending field, so it degraded every 400 to a generic "some fields are
- * invalid" toast, and {@link #handleValidationExceptions}'s diagnostic WARN log never ran — a bank
- * employee hit exactly that on a booking-request confirmation and neither they nor the production
- * log could tell which field was rejected.
+ * <p>4xx outcomes are logged at WARN/DEBUG without a stack trace, 5xx at ERROR with one. The
+ * {@code @Order(HIGHEST_PRECEDENCE)} is required so this advice wins over Spring Boot's own
+ * problem-details advice for the exception types both declare.
  */
 @ControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -148,25 +126,18 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Increments {@code basetool_http_error_total} for a handled error, tagged by its stable RFC-7807
-   * code (REQ-OBS-011). The code is a bounded {@code CODE_*} constant, never a path or message, so
-   * the label stays low-cardinality and PII-free. Only the security/concurrency codes operators
-   * alert on are instrumented — a 409 optimistic-lock storm (contention / locking regression), 401
-   * spikes (token breakage) and 403 spikes (authorization misconfig).
+   * Increments {@code basetool_http_error_total} tagged with the stable error code (REQ-OBS-011).
+   * Only the security and concurrency codes operators alert on (409, 401, 403) are counted.
    *
-   * @param code the stable {@code CODE_*} error code to tag the increment with
+   * @param code the bounded {@code CODE_*} constant to tag the increment with
    */
   private void countHttpError(String code) {
     meterRegistry.counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, code).increment();
   }
 
   /**
-   * Resolve a localized message via Spring's {@link MessageSource} using the locale from {@link
-   * LocaleContextHolder} (populated from the {@code Accept-Language} header by Spring's default
-   * {@code AcceptHeaderLocaleResolver}). If the key is missing in the bundle, the key itself is
-   * returned as the default — which makes missing translations obvious in QA without crashing
-   * production. Keys live in {@code backend/src/main/resources/messages*.properties} under the
-   * {@code problem.*.title} / {@code problem.*.detail} convention.
+   * Resolves a localized message from the {@link MessageSource} for the locale in {@link
+   * LocaleContextHolder}, falling back to the key itself when it is missing.
    */
   private String tr(String key, Object... args) {
     Locale locale = LocaleContextHolder.getLocale();
@@ -181,32 +152,15 @@ public class GlobalExceptionHandler {
   private static final String MESSAGE_NOT_FOUND_SENTINEL = "\u0000\u0000__missing__\u0000\u0000";
 
   /**
-   * Resolve the {@code detail} text for handlers that fall back to a thrown exception's message
-   * (e.g. {@code BadRequestException}, {@code NotFoundException}, {@code
-   * DuplicateEntityException}). The behaviour is layered so that legacy throw sites with hardcoded
-   * English strings keep working unchanged while new throw sites may pass an i18n key and receive a
-   * locale-aware translation for free.
-   *
-   * <p>Resolution order:
+   * Resolves the {@code detail} text for handlers that use the thrown exception's message.
    *
    * <ol>
-   *   <li>{@code message} is {@code null} or blank → return the localized {@code fallbackKey} (the
-   *       same generic detail this handler has always produced when no specific message was
-   *       provided).
-   *   <li>{@code message} matches a key in {@link MessageSource} → return the localized
-   *       translation. This is the §3.9 migration seam: throw {@code new
-   *       BadRequestException("error.refinery_order.location_required")} and the {@code
-   *       Accept-Language}-aware translation flows through to the RFC 7807 {@code detail}.
-   *   <li>Otherwise → return {@code message} verbatim. Keeps the dozens of existing throw sites
-   *       with literal English strings byte-identical on the wire until they are migrated
-   *       key-by-key.
+   *   <li>{@code message} {@code null} or blank: the localized {@code fallbackKey}.
+   *   <li>{@code message} is a key in the {@link MessageSource}: its localized translation.
+   *   <li>Otherwise: {@code message} verbatim.
    * </ol>
    *
-   * <p>The sentinel-based missing-key check is necessary because {@link
-   * MessageSource#getMessage(String, Object[], String, Locale)} returns the default unchanged when
-   * the key is missing — we need a value that can never appear as a legitimate translation so we
-   * can tell "key not in bundle" apart from "key resolved to a string that happens to equal the
-   * input".
+   * <p>A sentinel default distinguishes a missing key from a translation equal to the input.
    */
   private String resolveDetail(@Nullable String message, @NotNull String fallbackKey) {
     if (message == null || message.isBlank()) {
@@ -232,18 +186,11 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Runs {@code logStatement} with {@code cid} in the {@code correlationId} MDC key, then hands the
-   * key back exactly as it was: removed when it was absent, the previous value put back otherwise.
+   * Runs {@code logStatement} with {@code cid} in the {@code correlationId} MDC key, then restores
+   * the key exactly as it was: removed when absent, the previous value otherwise (REQ-OBS-002).
    *
-   * <p>The key belongs to whoever set it — on a real request that is {@code CorrelationIdFilter},
-   * which keeps it for the whole chain. Removing it unconditionally here (as both ERROR branches
-   * did until 2026-09-25) emptied it for every line written later on the same thread, above all
-   * {@code RequestLoggingFilter}'s access-log line for the resulting 5xx, which then could not be
-   * joined to this ERROR line or to the id in the problem body (REQ-OBS-001, REQ-OBS-002).
-   *
-   * @param cid the id the ERROR line and the problem body share; when {@link #correlationId()}
-   *     returned the request's own id this put is a no-op, otherwise it is the minted one
-   * @param logStatement the single log call to run while {@code cid} is in the MDC
+   * @param cid the id shared by the ERROR line and the problem body
+   * @param logStatement the log call to run while {@code cid} is in the MDC
    */
   private static void underCorrelationId(@NotNull String cid, @NotNull Runnable logStatement) {
     String previous = MDC.get(MDC_CORRELATION_ID);
@@ -270,15 +217,13 @@ public class GlobalExceptionHandler {
       Pattern.compile("constraint\\s+\"?([A-Za-z0-9_]+)\"?");
 
   /**
-   * Structured 4xx log line at {@code WARN}, shared by all client-error handlers. See {@link
-   * #logProblem(HttpServletRequest, ProblemDetail, String, Map, boolean)} for the format and the
-   * level rationale.
+   * Writes the structured 4xx log line at WARN; delegates to {@link #logProblem(HttpServletRequest,
+   * ProblemDetail, String, Map, boolean)}.
    *
-   * @param req the servlet request, for method/URI enrichment; never {@code null}.
-   * @param pd the problem detail carrying status, {@code code} and {@code correlationId}; never
-   *     {@code null}.
-   * @param shortMessage the human-readable log prefix; never {@code null}.
-   * @param extra optional structured context appended verbatim (no PII); may be {@code null}/empty.
+   * @param req the servlet request, for method and URI
+   * @param pd the problem carrying status, {@code code} and {@code correlationId}
+   * @param shortMessage the log prefix
+   * @param extra optional structured context without PII; may be {@code null} or empty
    */
   private void logProblem(
       @NotNull HttpServletRequest req,
@@ -289,24 +234,15 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Structured 4xx log line shared by all client-error handlers. Contains HTTP method, URI, status,
-   * stable {@code code} and the per-request {@code correlationId} so that a user-reported problem
-   * can be located in the log without a reproduction. The optional {@code extra} map is appended
-   * verbatim and MUST NOT contain rejected user values (PII protection, see AGENTS.md).
+   * Writes the structured 4xx log line with method, URI, status, {@code code} and {@code
+   * correlationId}. The {@code extra} map is appended verbatim and must not contain rejected user
+   * values.
    *
-   * <p>Logged at {@code WARN} except when {@code debug} is set: a {@code 401 UNAUTHENTICATED} is
-   * the expected, non-actionable default for any unauthenticated caller — internal-TLS health
-   * probes hitting {@code /}, bots/scanners, and pre-login navigation all produce it — so it logs
-   * at {@code DEBUG} to keep the log free of that steady probe noise (REQ-OBS-001). The {@code
-   * basetool_http_error_total{code}} counter preserves the signal regardless of level, and every
-   * other 4xx (including {@code 403 ACCESS_DENIED}) stays at {@code WARN}.
-   *
-   * @param req the servlet request, for method/URI enrichment; never {@code null}.
-   * @param pd the problem detail carrying status, {@code code} and {@code correlationId}; never
-   *     {@code null}.
-   * @param shortMessage the human-readable log prefix; never {@code null}.
-   * @param extra optional structured context appended verbatim (no PII); may be {@code null}/empty.
-   * @param debug {@code true} to log at {@code DEBUG} instead of {@code WARN}.
+   * @param req the servlet request, for method and URI
+   * @param pd the problem carrying status, {@code code} and {@code correlationId}
+   * @param shortMessage the log prefix
+   * @param extra optional structured context without PII; may be {@code null} or empty
+   * @param debug {@code true} to log at DEBUG instead of WARN (used for 401)
    */
   private void logProblem(
       @NotNull HttpServletRequest req,
@@ -353,21 +289,12 @@ public class GlobalExceptionHandler {
         correlationId());
   }
 
-  // --- 409 Optimistic Locking -----------------------------------------------------------
-
   /**
-   * Maps every flavor of optimistic-locking failure (Spring's wrapper, the JPA spec exception, and
-   * Hibernate's stale-state exception) to a single 409 with the stable code {@code
-   * OPTIMISTIC_LOCK}. The frontend uses this code to trigger a re-fetch + re-edit prompt rather
-   * than surfacing the raw error.
+   * Maps every optimistic-locking failure flavor to 409 with code {@code OPTIMISTIC_LOCK}; the WARN
+   * line carries the entity, id and version pair from {@link #optimisticLockContext(Exception)}.
    *
-   * <p>The WARN line additionally carries the conflicting entity, its identifier and the compared
-   * version pair (see {@link #optimisticLockContext(Exception)}), which is what separates genuine
-   * contention from the REQ-FE-003 failure mode where a fragment never re-echoes the bumped {@code
-   * version} and the same client 409s forever with nobody else editing.
-   *
-   * @param ex thrown optimistic-locking exception
-   * @param request servlet request, used for the {@code instance} URI and access-log enrichment
+   * @param ex the optimistic-locking exception
+   * @param request servlet request for the {@code instance} URI and log enrichment
    * @return RFC 7807 problem-detail response
    */
   @ExceptionHandler({
@@ -391,23 +318,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Builds the structured {@code extra} context for the 409 WARN line: always the exception's
-   * simple name, plus — when the throwable is Spring's {@link
-   * ObjectOptimisticLockingFailureException} — the entity class name, the entity identifier and the
-   * exception message. For the conflicts the {@code support.OptimisticLock} helpers raise, that
-   * message is the {@code expected=<client> persisted=<persisted>} version pair; for a conflict
-   * Hibernate raised during flush it is Hibernate's own stale-state text. Either way it is the only
-   * field that distinguishes a real concurrent edit from a stale client echo.
+   * Builds the insertion-ordered log context for the 409 WARN line: the exception's simple name
+   * and, for {@link ObjectOptimisticLockingFailureException}, the entity class, identifier and
+   * message (the version pair). Contains no user-supplied text (REQ-OBS-004).
    *
-   * <p>Deliberately no Mission-style composite section key: every mission section has its own URI,
-   * so the affected entity, id and section are already derivable from the method + {@code
-   * requestURI} the same line logs. REQ-OBS-004 holds — the identifier is a UUID (or {@code null},
-   * or a bounded {@code SystemSetting} key) at every call site and the message is numbers only, so
-   * no user-supplied text reaches the log. A {@link LinkedHashMap} keeps the field order stable
-   * across log lines (and tolerates a {@code null} identifier, which {@code Map.of} would reject).
-   *
-   * @param ex the optimistic-locking throwable being mapped to the 409
-   * @return the mutable, insertion-ordered context map appended verbatim to the WARN line
+   * @param ex the optimistic-locking throwable
+   * @return the mutable context map; may hold a {@code null} identifier
    */
   @NotNull
   private static Map<String, Object> optimisticLockContext(Exception ex) {
@@ -420,8 +336,6 @@ public class GlobalExceptionHandler {
     }
     return context;
   }
-
-  // --- 409 Pessimistic Locking ----------------------------------------------------------
 
   /**
    * Maps pessimistic-lock acquisition failures (timeout / deadlock-victim) to 409 with code {@code
@@ -452,12 +366,9 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
-  // --- 401 Authentication ---------------------------------------------------------------
-
   /**
-   * Maps a missing/invalid bearer token to 401 with code {@code UNAUTHENTICATED}. The exception
-   * type is intentionally never echoed in the response body so a malformed-JWT case is
-   * indistinguishable on the wire from a missing-token case (information disclosure prevention).
+   * Maps a missing or invalid bearer token to 401 with code {@code UNAUTHENTICATED}; the response
+   * never reveals which of the two it was.
    *
    * @param ex Spring Security {@link AuthenticationException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -475,9 +386,6 @@ public class GlobalExceptionHandler {
             request,
             "unauthenticated",
             CODE_UNAUTHENTICATED);
-    // DEBUG, not WARN: a 401 is the expected default for any unauthenticated caller (internal-TLS
-    // health probes on `/`, bots, pre-login navigation), so WARN-logging it floods the log with
-    // steady probe noise. The counter above preserves the signal; 403 stays at WARN (REQ-OBS-001).
     logProblem(
         request,
         pd,
@@ -487,24 +395,18 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
-  // --- 403 Authorization ----------------------------------------------------------------
-
   /**
-   * Covers both the legacy {@link AccessDeniedException} and the newer Spring Security 6+ {@link
-   * AuthorizationDeniedException} raised by method security. The detail is kept deliberately
-   * generic: the required role is not echoed back to avoid information disclosure to clients who
-   * are already not authorized for this resource.
+   * Maps {@link AccessDeniedException} and {@link AuthorizationDeniedException} to 403 with code
+   * {@code ACCESS_DENIED} and a generic detail that does not name the required role.
    *
-   * @param ex thrown access-denied exception (legacy or Spring Security 6+ method-security flavor)
+   * @param ex the access-denied exception
    * @param request servlet request for instance URI + access-log enrichment
-   * @return RFC 7807 problem-detail response with 403 / code {@code ACCESS_DENIED}
+   * @return RFC 7807 problem-detail response
    */
   @ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})
   public ResponseEntity<ProblemDetail> handleAccessDenied(
       Exception ex, HttpServletRequest request) {
     countHttpError(CODE_ACCESS_DENIED);
-    // Do NOT echo ex.getMessage() to clients (may contain SpEL or required-role hints) -
-    // keep the user-facing detail generic and put the diagnostic info into the WARN log only.
     final ProblemDetail pd =
         problem(
             HttpStatus.FORBIDDEN,
@@ -525,17 +427,12 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
-  // --- 400 Validation (@Valid on @RequestBody) ------------------------------------------
-
   /**
-   * Maps a failed {@code @Valid @RequestBody} into a 400 with code {@code VALIDATION_FAILED}.
+   * Maps a failed {@code @Valid @RequestBody} to 400 with code {@code VALIDATION_FAILED}, exposing
+   * the field errors as an {@code errors} map and a {@code fieldErrors} list. Rejected values are
+   * never logged.
    *
-   * <p>Builds two views of the per-field errors: a legacy map ({@code errors}: field → message) for
-   * older frontend code and a structured list ({@code fieldErrors}: array of {@code {field,
-   * message}}) for newer consumers. Logs the field+message pairs but never the rejected value, so
-   * PII (handles, emails, recipient names) does not leak into log files.
-   *
-   * @param ex Spring's bind-result wrapper with the per-field constraint violations
+   * @param ex Spring's bind-result wrapper with the field violations
    * @param request servlet request for instance URI + access-log enrichment
    * @return RFC 7807 problem-detail response
    */
@@ -556,8 +453,6 @@ public class GlobalExceptionHandler {
               entry.put("field", field);
               entry.put("message", message);
               errors.add(entry);
-              // Log only field name + violated constraint message; never the rejected value to
-              // avoid leaking PII (handles, emails, recipient names) into the log files.
               logSummary.add(field + "=" + message + " (code=" + fieldError.getCode() + ")");
             });
     ex.getBindingResult()
@@ -574,12 +469,8 @@ public class GlobalExceptionHandler {
             request,
             "constraint-violation",
             CODE_VALIDATION_FAILED);
-    // Keep the legacy map-shaped "errors" for backwards compatibility AND expose a
-    // structured list under "fieldErrors" for new consumers.
     pd.setProperty("errors", errorsByField);
     pd.setProperty("fieldErrors", errors);
-    // WARN-level structured log so a 400 VALIDATION_FAILED can be analysed in production
-    // without having to ask the user to reproduce the request (see CHANGELOG / log.txt L1467).
     log.warn(
         "Validation failed for {} {} [correlationId={}]: {}",
         request.getMethod(),
@@ -589,16 +480,10 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
-  // --- 400 Validation (@Validated on path/query params, jakarta constraints) ------------
-
   /**
-   * Maps a failed {@code @Validated} on path/query parameters or service-level Jakarta constraints
-   * into a 400 with code {@code CONSTRAINT_VIOLATION}.
-   *
-   * <p>Distinct from {@link #handleValidationExceptions} (different exception type, different
-   * source of constraints), but exposes the same {@code fieldErrors} list so the frontend can treat
-   * both uniformly. The {@code field} value comes from the constraint's property path, which on
-   * method parameters looks like {@code methodName.argName}.
+   * Maps a Jakarta constraint violation on parameters or service methods to 400 with code {@code
+   * CONSTRAINT_VIOLATION}, with the same {@code fieldErrors} list as {@link
+   * #handleValidationExceptions}; {@code field} is the property path (e.g. {@code method.arg}).
    *
    * @param ex thrown {@link ConstraintViolationException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -617,7 +502,6 @@ public class GlobalExceptionHandler {
               entry.put("field", field);
               entry.put("message", v.getMessage());
               errors.add(entry);
-              // Log field + message only; the invalid value may contain user input/PII.
               logSummary.add(field + "=" + v.getMessage());
             });
     ProblemDetail pd =
@@ -638,25 +522,13 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
-  // --- AppException dispatch (S4, #910) --------------------------------------------------
-
   /**
-   * Single dispatch handler for every sealed {@link AppException} subtype except {@link
-   * NotFoundException} (whose handler stays separate — see {@link #handleNotFound}): {@link
-   * BadRequestException}, {@link BankConflictException}, {@link BusinessConflictException}, {@link
-   * DuplicateEntityException}, {@link EntityInUseException}, {@link ExternalServiceException} and
-   * {@link ReportGenerationException}. Replaces the seven near-identical handlers these types used
-   * to each carry — the status/code/i18n-keys/type-suffix/log-label now live on the exception
-   * itself (via {@link AppExceptionKind} for the six fixed types, computed per-instance for {@link
-   * BankConflictException}), so this method only needs to read the accessors.
+   * Dispatches every {@link AppException} subtype except {@link NotFoundException}, reading status,
+   * code, i18n keys and log label from the exception itself.
    *
-   * <p>{@link AppException#disclosurePolicy()} forks the one genuinely different behaviour, applied
-   * after the common {@link #problem} construction: {@link ErrorDisclosurePolicy#SUPPRESSED} (only
-   * {@code ExternalServiceException} / {@code ReportGenerationException}) never consults {@code
-   * ex.getMessage()} for the client-visible detail — it may carry upstream response bodies or
-   * library-internal paths (CWE-209) — and logs the full exception at ERROR with the correlation id
-   * instead of the standard WARN, skipping {@link AppException#extraProperties()} (no suppressed
-   * subtype carries any).
+   * <p>For {@link ErrorDisclosurePolicy#SUPPRESSED} the detail is always the generic localized text
+   * and the exception is logged at ERROR with the correlation id; otherwise the message is resolved
+   * and the problem logged at WARN.
    *
    * @param ex the thrown {@link AppException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -677,12 +549,9 @@ public class GlobalExceptionHandler {
           () ->
               log.error(
                   "{} at {} [correlationId={}]", ex.logLabel(), request.getRequestURI(), cid, ex));
-      // Overwrite the freshly generated correlation id with the one we used for the log
-      // line so the client-visible id matches the server log entry exactly.
       pd.setProperty("correlationId", cid);
     } else {
       ex.extraProperties().forEach(pd::setProperty);
-      // logExtra() is null for most kinds, so this cannot be a copy-constructor.
       Map<String, Object> extra = new LinkedHashMap<>();
       if (ex.logExtra() != null) {
         extra.putAll(ex.logExtra());
@@ -697,26 +566,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * The source line that refused the request, for the log line that otherwise says only that
-   * something was refused.
+   * Returns the application source location that raised a refusal, for the log line. The location
+   * is logged instead of the message, which may contain a rejected user value (REQ-OBS-004).
    *
-   * <p>Written after a production {@code 400} could not be diagnosed. {@code Bad request for POST
-   * /api/v1/missions/{id}/participants/slim [status=400, code=BAD_REQUEST, correlationId=…]} is the
-   * whole line: the caller received the reason in the problem detail, and the operator received
-   * none of it. There are 242 {@code BadRequestException} call sites, so "which rule was it" is not
-   * a question the URI answers.
-   *
-   * <p><strong>The line number and not the message, deliberately.</strong> The messages are
-   * developer-authored, but a minority interpolate the value that was rejected ({@code "Unknown
-   * material type: " + dto.type()}), and logging a rejected user value is exactly what the PII rule
-   * forbids (REQ-OBS-004) — it would persist for the retention window and there is no per-call-site
-   * audit that could make a blanket copy safe. A file and line carry no runtime data at all, cannot
-   * be made to, and answer the same question: the reader opens that line and reads the message in
-   * the source.
-   *
-   * @param ex the refusal.
-   * @return {@code File.java:123} for the innermost frame belonging to this application, or {@code
-   *     null} when the stack has none (a proxy-only stack, or one stripped by the JVM).
+   * @param ex the refusal
+   * @return {@code File.java:123} of the innermost application frame, or {@code null} when the
+   *     stack has none
    */
   @Nullable
   private static String originOf(@NotNull Throwable ex) {
@@ -728,13 +583,9 @@ public class GlobalExceptionHandler {
     return null;
   }
 
-  // --- 400 Illegal arguments / malformed bodies -----------------------------------------
-
   /**
-   * Maps {@link IllegalArgumentException} (typically: unknown sort field, malformed UUID-not-from-
-   * the-binder, library guard) to 400 with code {@code ILLEGAL_ARGUMENT}. The exception message is
-   * never echoed in the response body because it can contain SQL fragments, internal paths or raw
-   * inputs that triggered a parser — the message lives in the server log only.
+   * Maps {@link IllegalArgumentException} to 400 with code {@code ILLEGAL_ARGUMENT}; the message is
+   * logged but never echoed to the client.
    *
    * @param ex thrown {@link IllegalArgumentException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -743,9 +594,6 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ProblemDetail> handleIllegalArgument(
       IllegalArgumentException ex, HttpServletRequest request) {
-    // ex.getMessage() can contain implementation details (SQL fragments, internal
-    // paths, raw inputs that triggered a parser, ...). Return a generic detail to
-    // the client and keep the real message only in the server log.
     ProblemDetail pd =
         problem(
             HttpStatus.BAD_REQUEST,
@@ -763,21 +611,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a raw {@link IllegalStateException} to a generic 500, exactly as the {@link
-   * #handleAllExceptions catch-all} does — its message is logged with the stack trace and never
-   * echoed (REQ-API-004, APPSEC-06).
-   *
-   * <p>This handler used to answer every {@code IllegalStateException} with a 400 and echo its
-   * message as the problem detail, on the assumption that only the application's own guards threw
-   * it. They were not the only ones: the JDK, Spring, Hibernate and every library throw it too, for
-   * conditions that are server defects and with messages that can carry data values, internal names
-   * or query fragments. So a defect reached the client as "your request was wrong", with an
-   * internal message attached, and escaped every 5xx alert. The application's genuine client-side
-   * guards now throw {@link BadRequestException} with an i18n key instead, so a raw {@code
-   * IllegalStateException} means what its name says: the server is in a state it should not be in.
-   *
-   * <p>Kept as an explicit handler rather than left to the catch-all so that the decision is
-   * visible here, and re-adding a 400 mapping has to argue with this comment.
+   * Maps a raw {@link IllegalStateException} to a generic 500 like the {@link #handleAllExceptions
+   * catch-all}: it signals a server defect, so its message is logged with the stack trace and never
+   * echoed (REQ-API-004).
    *
    * @param ex thrown {@link IllegalStateException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -790,9 +626,8 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Catch-all for {@link ResponseStatusException} thrown by callers (or framework code) that prefer
-   * Spring's lightweight status-only exception. Maps the carried status to a matching RFC&nbsp;7807
-   * problem; the {@code code} is derived from the status via {@link #codeForStatus(HttpStatus)}.
+   * Maps a {@link ResponseStatusException} to a problem with its carried status and a code from
+   * {@link #codeForStatus(HttpStatus)}.
    *
    * @param ex thrown {@link ResponseStatusException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -806,14 +641,6 @@ public class GlobalExceptionHandler {
             ? hs
             : HttpStatus.valueOf(ex.getStatusCode().value());
     String code = codeForStatus(status);
-    // M-7: never echo {@code ex.getMessage()} verbatim. Spring's {@link
-    // ResponseStatusException#getMessage()} synthesises "&lt;status&gt; &lt;phrase&gt;
-    // \"&lt;reason&gt;\";
-    // nested exception is …" — the "; nested exception is" suffix carries the underlying
-    // exception's class name and message, which on WebClient-relay paths (see {@code
-    // HangarImportProxyController.forwardImport}) wraps the upstream Spring/Hibernate error
-    // verbatim. Echoing that leaks SQL constraint names / class FQDNs / internal paths (CWE-209).
-    // Use the caller-friendly {@code reason} only, or the bare status reason phrase as fallback.
     String safeDetail = ex.getReason() != null ? ex.getReason() : status.getReasonPhrase();
     ProblemDetail pd =
         problem(status, safeDetail, safeDetail, request, Integer.toString(status.value()), code);
@@ -823,14 +650,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Handles Spring 6's {@link ErrorResponseException} (used by some MVC infrastructure code that
-   * carries its own {@code ProblemDetail} body). Preserves the existing body when present, only
-   * filling in {@code instance}, {@code code} and {@code correlationId} if they are missing, so we
-   * never overwrite richer information Spring already attached.
+   * Handles Spring's {@link ErrorResponseException}, keeping its carried body and only filling in a
+   * missing {@code instance}, {@code code} and {@code correlationId}.
    *
    * @param ex thrown {@link ErrorResponseException}
    * @param request servlet request for instance URI + access-log enrichment
-   * @return RFC 7807 problem-detail response (possibly augmented from the carried body)
+   * @return RFC 7807 problem-detail response, possibly augmented from the carried body
    */
   @ExceptionHandler(ErrorResponseException.class)
   public ResponseEntity<ProblemDetail> handleErrorResponseException(
@@ -867,23 +692,16 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a malformed request body (Jackson parse errors, missing closing brace, wrong type for a
-   * field) to 400 with code {@code BAD_REQUEST}.
+   * Maps an unreadable request body to 400 with code {@code BAD_REQUEST}, logging the JSON path of
+   * the offending node but no user values.
    *
-   * <p>Extracts the JSON path of the offending node from the Jackson cause when available — that
-   * path is the single most useful triage signal for a "400 BAD_REQUEST" report and does NOT
-   * contain user values, only field names. The raw user values stay out of the log because Jackson
-   * masks them in the cause message.
-   *
-   * @param ex Spring's wrapper around the Jackson parse failure
+   * @param ex Spring's wrapper around the parse failure
    * @param request servlet request for instance URI + access-log enrichment
    * @return RFC 7807 problem-detail response
    */
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ProblemDetail> handleHttpMessageNotReadable(
       @NotNull HttpMessageNotReadableException ex, HttpServletRequest request) {
-    // Most-specific cause carries the actual JSON parse error (path, line, column) which is the
-    // information needed to triage "400 BAD_REQUEST" reports without a reproduction.
     Throwable rootCause = ex.getMostSpecificCause();
     ProblemDetail pd =
         problem(
@@ -897,10 +715,6 @@ public class GlobalExceptionHandler {
     extra.put("contentType", String.valueOf(request.getContentType()));
     if (rootCause != null) {
       extra.put("rootCause", rootCause.getClass().getSimpleName());
-      // REQ-OBS-004: an InvalidFormatException/MismatchedInputException message embeds the rejected
-      // value verbatim ("... from String \"<value>\": ...") and PiiMasker does not scrub it. Mask
-      // any double-quoted segment (the offending user value) while keeping the structural triage
-      // text (type, reason, path/line/column) a 400 report needs.
       extra.put("causeMessage", maskQuotedValues(rootCause.getMessage()));
       if (rootCause instanceof DatabindException jme && jme.getPath() != null) {
         StringBuilder path = new StringBuilder();
@@ -926,15 +740,11 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Masks every double-quoted segment in a Jackson parse-cause message. Jackson embeds the rejected
-   * user value in double quotes ({@code ... from String "<value>": ...}) while type names use
-   * backticks and field names surface separately as {@code jsonPath}, so replacing quoted runs with
-   * {@code "***"} strips the only PII-bearing part (REQ-OBS-004) yet keeps the structural "cannot
-   * deserialize type / not a valid X" text that makes a 400 triage-able.
+   * Replaces every double-quoted segment of a Jackson parse message with {@code "***"}, removing
+   * the rejected user value while keeping the structural text (REQ-OBS-004).
    *
-   * @param message the raw {@link Throwable#getMessage()} of the parse cause; may be {@code null}
-   * @return the message with quoted values masked, or {@code null} when {@code message} is {@code
-   *     null}
+   * @param message the parse cause's message; may be {@code null}
+   * @return the masked message, or {@code null} when {@code message} is {@code null}
    */
   @Contract("null -> null")
   @Nullable
@@ -946,11 +756,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a Spring {@link DataIntegrityViolationException} (FK violation, NOT NULL violation,
-   * unique-constraint violation that wasn't pre-checked in the service) to 409 with code {@code
-   * DATA_INTEGRITY_VIOLATION}. Tries to extract the offending constraint name from the cause
-   * message using {@link #CONSTRAINT_NAME_PATTERN}; only the first line of the cause message goes
-   * into the log because subsequent lines may contain row data.
+   * Maps a {@link DataIntegrityViolationException} to 409 with code {@code
+   * DATA_INTEGRITY_VIOLATION}, logging the constraint name matched by {@link
+   * #CONSTRAINT_NAME_PATTERN} and only the first line of the cause message.
    *
    * @param ex thrown {@link DataIntegrityViolationException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -977,8 +785,6 @@ public class GlobalExceptionHandler {
         if (m.find()) {
           extra.put("constraint", m.group(1));
         }
-        // First line of the cause message - usually the SQL state + constraint summary,
-        // safe to log; subsequent lines may contain row data and are dropped.
         int nl = msg.indexOf('\n');
         extra.put("causeMessage", nl > 0 ? msg.substring(0, nl) : msg);
       }
@@ -988,10 +794,8 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a path/query-parameter binding failure (e.g. {@code "abc"} where a UUID is expected) to
-   * 400 with code {@code TYPE_MISMATCH}. The rejected raw value is never logged because path/query
-   * parameters can carry PII like usernames or emails; only the parameter name and the target type
-   * are logged.
+   * Maps a path or query parameter conversion failure to 400 with code {@code TYPE_MISMATCH},
+   * logging only the parameter name and target type, never the raw value.
    *
    * @param ex Spring's binder wrapper for the conversion failure
    * @param request servlet request for instance URI + access-log enrichment
@@ -1008,7 +812,6 @@ public class GlobalExceptionHandler {
             request,
             "type-mismatch",
             CODE_TYPE_MISMATCH);
-    // Do NOT log ex.getValue() - request parameter values may carry PII (handles, mails, IDs).
     Map<String, Object> extra = new HashMap<>();
     extra.put("parameter", ex.getName());
     extra.put(
@@ -1018,21 +821,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Answers a request body in a media type no converter will read.
+   * Maps a request body in an unreadable media type (e.g. {@code application/cbor}, which is
+   * response-only) to 415 (REQ-API-011).
    *
-   * <p>Reachable since the API gained a second encoding (REQ-API-011, ADR-0161 §8.5). CBOR
-   * negotiates on the <b>response</b> side only, so the CBOR converter is deliberately write-only
-   * ({@code CborFidelityConfig}) and a {@code Content-Type: application/cbor} body is refused. Left
-   * unhandled that refusal arrived here as an "Unexpected error" and became a <b>500</b>, which
-   * tells a caller its own request was fine and the server broke — the opposite of the truth, and
-   * unactionable.
-   *
-   * <p>The {@code Accept} header is untouched by this: a caller may still ask for a CBOR
-   * <em>response</em> while sending JSON, which is exactly what the frontend does.
-   *
-   * @param ex the refusal, carrying the offending content type and the supported ones.
-   * @param request the request, for the {@code instance} URI and the correlation id.
-   * @return a {@code 415} RFC 7807 problem naming the type that was refused.
+   * @param ex the refusal, carrying the offending and the supported content types
+   * @param request the request, for the {@code instance} URI and the correlation id
+   * @return a {@code 415} RFC 7807 problem naming the refused type
    */
   @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
   public ResponseEntity<ProblemDetail> handleMediaTypeNotSupported(
@@ -1054,9 +848,8 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a 405 from Spring MVC to a localized RFC&nbsp;7807 response with code {@code
-   * METHOD_NOT_ALLOWED} (e.g. {@code POST} to an endpoint that only declares {@code GET}). Logs the
-   * supported methods so reverse-proxy misrouting is easy to spot.
+   * Maps an unsupported HTTP method to 405 with code {@code METHOD_NOT_ALLOWED}, logging the
+   * supported methods.
    *
    * @param ex Spring's method-not-supported exception
    * @param request servlet request for instance URI + access-log enrichment
@@ -1085,16 +878,10 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
-  // --- 404 Not Found --------------------------------------------------------------------
-
   /**
-   * Handles both the application-specific {@link NotFoundException} as well as common JPA / JDK
-   * flavors of "not found" ({@link EntityNotFoundException}, {@link NoSuchElementException}) and
-   * Spring's {@link NoResourceFoundException} (static resources / unknown paths) so that none of
-   * them accidentally bubble up into the generic 500 handler. The status/code/title/detail literals
-   * are read from {@link AppExceptionKind#NOT_FOUND} — the same constant {@link NotFoundException}
-   * itself delegates to — rather than a second, independently-hardcoded copy, so the two can never
-   * drift apart.
+   * Maps {@link NotFoundException}, {@link EntityNotFoundException}, {@link NoSuchElementException}
+   * and {@link NoResourceFoundException} to 404, using the literals of {@link
+   * AppExceptionKind#NOT_FOUND}.
    */
   @ExceptionHandler({
     NotFoundException.class,
@@ -1104,9 +891,6 @@ public class GlobalExceptionHandler {
   })
   public ResponseEntity<ProblemDetail> handleNotFound(
       @NotNull Exception ex, @NotNull HttpServletRequest request) {
-    // 404 is an expected, user-driven outcome (e.g. stale links, external crawlers hitting
-    // deleted mission IDs). Log at DEBUG only and do NOT include the stacktrace to keep
-    // the error log focused on real problems.
     log.debug("Not found at {}: {}", request.getRequestURI(), ex.getMessage());
     ProblemDetail pd =
         problem(
@@ -1119,88 +903,28 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
-  // --- upstream HTTP failures ------------------------------------------------------------
-
   /**
-   * Any failure of an outbound {@code RestClient} / {@code RestTemplate} call, mapped to the same
-   * {@code 502 EXTERNAL_SERVICE_ERROR} an explicit {@link ExternalServiceException} produces.
+   * Maps any failed outbound {@code RestClient} call, including an upstream 4xx, to 502 with code
+   * {@code EXTERNAL_SERVICE_ERROR} by delegating to {@link #handleAppException}, so the upstream
+   * body is logged but never relayed (CWE-209).
    *
-   * <p><strong>Written after one reached a user.</strong> Deleting the ingest gateway's stray
-   * member row called Keycloak's admin API; the backend's admin client is granted user management
-   * but not client inspection, so the call came back {@code 403}. Nothing handled {@link
-   * RestClientException}, so a misconfigured <em>upstream permission</em> surfaced to an admin as
-   * {@code 500 INTERNAL_ERROR} with "an unexpected error occurred" — a message that describes the
-   * one thing it was not. It named neither the dependency nor the cause, and it is
-   * indistinguishable from a genuine bug in this application, which is the wrong place to start
-   * looking.
-   *
-   * <p>{@code 502} rather than {@code 500} because that is what happened: a dependency this
-   * application calls answered badly, or did not answer. That is also true when the upstream status
-   * is a {@code 4xx} — a {@code 401}/{@code 403} from Keycloak means <em>this</em> service
-   * presented unusable credentials or lacks a role, which is a configuration fault on our side of
-   * the boundary, never the caller's, so it must not be relayed as a client error.
-   *
-   * <p>Delegates to {@link #handleAppException} rather than building its own body, so the shape,
-   * the {@code code} and the disclosure policy cannot drift from the explicit path. That policy is
-   * the point here: {@link ErrorDisclosurePolicy#SUPPRESSED} logs the full exception at ERROR with
-   * the correlation id and sends the client only a localized generic detail, so an upstream
-   * response body — which for an identity provider may carry realm names, client ids or token
-   * material — cannot be relayed outward (CWE-209).
-   *
-   * <p>This is a safety net, not a licence. An adapter that knows what its call meant should still
-   * translate the failure itself, with a message worth reading in the log; catching it here only
-   * guarantees that forgetting to do so costs a truthful status rather than a mystery.
-   *
-   * @param ex the failed outbound call — connection, timeout, or any 4xx/5xx from the upstream
+   * @param ex the failed outbound call
    * @param request servlet request for instance URI + access-log enrichment
    * @return RFC 7807 problem-detail response with status 502
    */
   @ExceptionHandler(RestClientException.class)
   public ResponseEntity<ProblemDetail> handleRestClientException(
       @NotNull RestClientException ex, HttpServletRequest request) {
-    // The message reaches the server log only; SUPPRESSED replaces it for the client. Deliberately
-    // the exception's TYPE and not getMessage(), which for HttpClientErrorException embeds the
-    // upstream response body — that belongs in the logged stack trace, not in a summary line.
     return handleAppException(
         new ExternalServiceException("Outbound call failed: " + ex.getClass().getSimpleName(), ex),
         request);
   }
 
-  // --- disconnected SSE clients ----------------------------------------------------------
-
   /**
-   * A client that went away while the server was still writing its stream. Not an error, and
-   * deliberately answered with <em>nothing at all</em>.
+   * Swallows a client disconnect during a streamed (SSE) response: logs at DEBUG and writes
+   * nothing, since the connection is gone.
    *
-   * <p>Written after it filled the production log. Both SSE endpoints — {@code
-   * /api/v1/live-sync/stream} and {@code /api/v1/notifications/stream} — hand the servlet container
-   * a response that stays open for minutes, and every ordinary way a client leaves closes it
-   * mid-write: a navigation, a closed tab, a phone whose screen went off, a proxy reaping an idle
-   * connection. Tomcat reports the broken pipe, Spring wraps it as {@link
-   * AsyncRequestNotUsableException}, and before this handler existed it fell through to {@link
-   * #handleAllExceptions} and cost <em>two</em> log lines per disconnect:
-   *
-   * <ul>
-   *   <li>an {@code ERROR "Unexpected error at /api/v1/live-sync/stream"} with a full stack trace —
-   *       the wrong severity for the most routine thing an SSE endpoint experiences, and it feeds
-   *       {@code logback_events_total{level="error"}} and every error-rate alert built on it;
-   *   <li>a {@code WARN} from Spring itself, because the {@link ProblemDetail} that handler returns
-   *       cannot be written to a response whose content type is already {@code text/event-stream}
-   *       ({@code HttpMessageNotWritableException: No converter for [class ProblemDetail] with
-   *       preset Content-Type}). Even on a live connection that body would be unparseable to an
-   *       {@code EventSource}.
-   * </ul>
-   *
-   * <p>In one 16-hour production window those two lines were 30 of the 50 WARN/ERROR entries the
-   * backend produced.
-   *
-   * <p><strong>The {@code void} return type is the fix, not an oversight.</strong> It tells Spring
-   * the exception is handled and leaves the response untouched — there is no socket left to write
-   * to, and any attempt to write one is what produced the second line. {@code DEBUG} rather than
-   * {@code INFO}: a disconnect carries no information a reader would act on, and an SSE deployment
-   * produces one per client per navigation.
-   *
-   * @param ex the disconnect, kept only for the debug line's cause
+   * @param ex the disconnect, used only as the debug line's cause
    * @param request servlet request, for the URI in the debug line
    */
   @ExceptionHandler(AsyncRequestNotUsableException.class)
@@ -1209,14 +933,9 @@ public class GlobalExceptionHandler {
     log.debug("Client disconnected from {}: {}", request.getRequestURI(), ex.getMessage());
   }
 
-  // --- 500 fallback ---------------------------------------------------------------------
-
   /**
-   * Last-resort fallback for any {@link Exception} not matched by a more specific handler above.
-   * Returns a 500 with code {@code INTERNAL_ERROR} and a localized generic detail. The full
-   * stacktrace is logged at ERROR with the per-request correlation id so the client-visible id and
-   * the server log line can be tied together without leaking implementation details to the
-   * response.
+   * Maps any otherwise unhandled {@link Exception} to 500 with code {@code INTERNAL_ERROR} and a
+   * generic localized detail, logging the stack trace at ERROR with the correlation id.
    *
    * @param ex any unhandled exception
    * @param request servlet request for instance URI + access-log enrichment
@@ -1225,26 +944,11 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ProblemDetail> handleAllExceptions(
       Exception ex, HttpServletRequest request) {
-    // A security refusal raised inside a @PreAuthorize SpEL expression does not arrive as itself:
-    // SpEL wraps whatever a bean method threw, so RequestScopeResolver's "no identity" refusal
-    // (REQ-SEC-052) would land here and be answered 500 with a stack trace in the log and a 5xx on
-    // the alerting - for a request whose only problem is that it carried no login. Unwrap before
-    // giving up, so the shape of the answer follows the cause rather than the wrapper.
-    //
-    // NARROWED to the one exception this was written for. Matching any AuthenticationException in
-    // the chain turned a real outage into a silent 401: a Keycloak Admin-API or JWKS call failing
-    // inside a service and rethrown wrapped carries an AuthenticationServiceException or an
-    // OAuth2AuthenticationException, and answering that 401-with-a-DEBUG-line means
-    // LogbackErrorSpike
-    // and the http-error alerting never fire while the incident reads as a 401 spike. The cause
-    // this
-    // handler exists for has exactly one shape; anything else genuinely is a 500.
     AuthenticationCredentialsNotFoundException wrapped = wrappedMissingCredentials(ex);
     if (wrapped != null) {
       return handleAuthentication(wrapped, request);
     }
     String cid = correlationId();
-    // Make sure the correlation id is the same for both the log line and the response.
     underCorrelationId(
         cid,
         () ->
@@ -1262,18 +966,11 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Digs a {@link AuthenticationCredentialsNotFoundException} out of a wrapper chain.
-   *
-   * <p><b>This type and no other.</b> It is what {@code RequestScopeResolver} raises when a scoped
-   * read is reached with no identity, and SpEL wraps it when the call comes from a
-   * {@code @PreAuthorize} expression. Widening the match to {@link AuthenticationException} would
-   * also catch {@code AuthenticationServiceException} and {@code OAuth2AuthenticationException} —
-   * the shapes an unreachable Keycloak produces — and answer a genuine outage with a {@code 401}
-   * and a DEBUG line, which is precisely the signal an outage must not be able to suppress.
+   * Finds an {@link AuthenticationCredentialsNotFoundException} in the cause chain. Only this type
+   * matches, so an identity-provider outage is never downgraded to a 401.
    *
    * @param ex the exception that reached the catch-all
-   * @return the first matching exception in its cause chain, or {@code null} when there is none.
-   *     The walk is depth-bounded so a self-referencing cause cannot spin.
+   * @return the first matching cause, or {@code null}; the walk is depth-bounded
    */
   @Nullable
   private static AuthenticationCredentialsNotFoundException wrappedMissingCredentials(

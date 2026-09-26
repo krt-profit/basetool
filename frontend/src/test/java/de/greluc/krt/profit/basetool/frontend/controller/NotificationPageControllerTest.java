@@ -48,20 +48,14 @@ import org.springframework.ui.Model;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Unit tests for the {@code /notifications} inbox page's load-more / no-silent-cap behaviour
- * (REQ-NOTIF-019). The page renders the newest 50 notifications from the paginated backend listing
- * and exposes the total count plus a more-pages flag so the template can show a truthful "latest N
- * of M" hint and a load-more control; {@code /page-items} relays the following pages. These tests
- * pin the paging facts the view and the relay depend on, driving the controller directly with a
- * mocked {@link BackendApiClient}.
+ * Unit tests for the {@code /notifications} inbox paging (REQ-NOTIF-019): the newest 50 are
+ * rendered with the total count and a more-pages flag, and {@code /page-items} relays later pages.
  */
 class NotificationPageControllerTest {
 
   /** Builds a controller whose only wired collaborator that matters here is the backend client. */
   private static NotificationPageController controllerWith(BackendApiClient backendApiClient) {
     MessageSource messageSource = mock(MessageSource.class);
-    // render() dereferences the resolved template when params are present; return a fixed string so
-    // localization never NPEs. The paging assertions below don't depend on the text.
     when(messageSource.getMessage(anyString(), any(), anyString(), any(Locale.class)))
         .thenReturn("Notification text");
     return new NotificationPageController(
@@ -93,8 +87,6 @@ class NotificationPageControllerTest {
     return new PageResponse<>(content, pageIndex, size, totalElements, totalPages, List.of());
   }
 
-  // covers REQ-NOTIF-019 — the page exposes the backend total and a more-pages flag from page 0, so
-  // the template can render the "latest N of M" hint + load-more instead of a silent cap.
   @Test
   void page_exposesTotalAndHasMore_fromFirstBackendPage() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -110,7 +102,6 @@ class NotificationPageControllerTest {
     assertEquals(Boolean.TRUE, model.getAttribute("notifHasMore"));
     assertEquals(50, ((List<?>) model.getAttribute("notifications")).size());
 
-    // The first page (index 0, size 50) is the one requested.
     ArgumentCaptor<Object> pageArg = ArgumentCaptor.captor();
     ArgumentCaptor<Object> sizeArg = ArgumentCaptor.captor();
     verify(backendApiClient).get(anyString(), anyTypeRef(), pageArg.capture(), sizeArg.capture());
@@ -118,8 +109,6 @@ class NotificationPageControllerTest {
     assertEquals(50, sizeArg.getValue());
   }
 
-  // covers REQ-NOTIF-019 — an inbox that fits one page reports no more pages, so the template hides
-  // the hint + load-more entirely.
   @Test
   void page_singlePage_reportsNoMore() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -134,8 +123,6 @@ class NotificationPageControllerTest {
     assertEquals(Boolean.FALSE, model.getAttribute("notifHasMore"));
   }
 
-  // covers REQ-NOTIF-019 — a backend hiccup keeps the page's fail-soft-to-empty contract: empty
-  // list, zero total, no more-pages flag, and an error attribute (never a 500).
   @Test
   void page_backendReturnsNull_failsSoftToEmpty() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -151,8 +138,6 @@ class NotificationPageControllerTest {
     assertEquals(Boolean.FALSE, model.getAttribute("notifHasMore"));
   }
 
-  // covers REQ-NOTIF-019 — /page-items returns the requested follow-up page as localized view DTOs
-  // with the total and a more-pages flag so the client can append and keep the hint truthful.
   @Test
   void pageItems_returnsLocalizedSlice_withHasMoreFlag() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -174,7 +159,6 @@ class NotificationPageControllerTest {
     assertEquals(1, pageArg.getValue());
   }
 
-  // covers REQ-NOTIF-019 — the last page reports no more pages, so the client drops the load-more.
   @Test
   void pageItems_lastPage_reportsNoMore() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -188,8 +172,6 @@ class NotificationPageControllerTest {
     assertEquals(123L, slice.totalElements());
   }
 
-  // covers REQ-NOTIF-019 — a hostile negative page index clamps to 0 rather than reaching the
-  // backend with a negative page.
   @Test
   void pageItems_negativePage_clampsToZero() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);

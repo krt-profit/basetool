@@ -35,13 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Cross-Staffel handover flow (UC-09): Staffel A creates a job order, Staffel B supplies it with
- * B-owned inventory, and an Officer of A then records a handover of that foreign item through A's
- * order — optionally naming Staffel B as the recipient. Proves the job-order workspace lets one
- * Staffel act on inventory another Staffel contributed, end to end through the handover UI.
- *
- * <p>Builds on the same seeding as {@link CrossStaffelJobOrderE2eTest}, but drives the full
- * handover modal (item + amount + time + recipient) and verifies the handover row appears.
+ * Cross-Staffel handover flow (UC-09): an officer of Staffel A records, through A's job order, a
+ * handover of inventory that Staffel B contributed, and the handover row appears.
  */
 @Tag("e2e")
 class CrossStaffelHandoverE2eTest {
@@ -138,19 +133,12 @@ class CrossStaffelHandoverE2eTest {
         page.locator("#handover-modal .date-part").fill(LocalDate.now().toString());
         page.locator("#handover-modal .time-part").fill("12:00");
         page.locator("#recipientHandle").fill("E2E CrossStaffel Recipient");
-        // recipientSquadron is an optional name dropdown; name Staffel B as the recipient when it
-        // is
-        // offered (the cross-Staffel recipient case), otherwise leave it blank.
         Locator bRecipientOption =
             page.locator("#recipientSquadron option[value='" + STAFFEL_B_NAME + "']");
         if (bRecipientOption.count() > 0) {
           page.locator("#recipientSquadron").selectOption(STAFFEL_B_NAME);
         }
 
-        // Submit in place (#575): the material handover swaps sections via AJAX and closes the
-        // modal — no Post/Redirect/Get navigation to await. Mark the window to prove no full reload
-        // happened, submit, then web-first-wait for the handover row carrying the recipient to
-        // appear in the re-rendered history (which also proves persistence), and assert the marker.
         page.evaluate("window.__krtNoReload = true;");
         page.getByTestId("order-handover-submit").click();
         assertThat(

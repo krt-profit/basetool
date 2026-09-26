@@ -49,13 +49,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the registration-approval admin surface, focused on the rejected-list
- * read and the reopen action added for REQ-SEC-034. Both are admin-only: an elevated non-admin role
- * must not be able to see who was rejected, nor push a rejected account back into the approval
- * queue.
- *
- * <p>Also pins the deliberate refusal of {@code ?status=ACTIVE}: the queue endpoint serves the two
- * decision-relevant states only and must not degrade into an unbounded member dump.
+ * MockMvc gate matrix for the registration-approval admin surface: the rejected list and the reopen
+ * action are admin-only (REQ-SEC-034), and {@code ?status=ACTIVE} is refused.
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -41,11 +41,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Spring-Boot integration tests for the {@code @Cacheable} / {@code @CacheEvict} annotations on
- * {@link FrequencyTypeService}. Cover every mutator path because each of them must clear the cache;
- * a refactor that drops one {@code @CacheEvict} would otherwise leave stale list pages around
- * silently. The {@code (Boolean active, Pageable pageable)} two-arg read is verified to use a
- * {@link SimpleKey} composite so that filter combinations do not collide.
+ * Integration tests for the caching annotations on {@link FrequencyTypeService}: every mutator
+ * evicts the cache, and the two-argument {@code (Boolean active, Pageable pageable)} read uses a
+ * {@link SimpleKey} so filter combinations do not collide.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -197,7 +195,6 @@ class FrequencyTypeServiceCachingTest {
     frequencyTypeService.getFrequencyType(uhf.getId());
     frequencyTypeService.getFrequencyType(vhf.getId());
 
-    // sanity — three distinct entries
     assertNotNull(cache().get(new SimpleKey(null, pageable)));
     assertNotNull(cache().get(new SimpleKey(Boolean.TRUE, pageable)));
     assertNotNull(cache().get(uhf.getId()));

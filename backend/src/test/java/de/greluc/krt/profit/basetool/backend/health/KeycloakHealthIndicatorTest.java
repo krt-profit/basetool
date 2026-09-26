@@ -38,36 +38,15 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
 /**
- * Unit tests for the {@link KeycloakHealthIndicator}. The indicator is driven against an in-process
- * {@link MockWebServer} so the OIDC discovery response — including failure modes such as 4xx/5xx
- * upstream codes and connection-refused — can be staged deterministically without a real Keycloak
- * running.
- *
- * <p>Three behaviour classes are covered:
- *
- * <ol>
- *   <li>Happy path — a 2xx response from {@code /.well-known/openid-configuration} yields {@link
- *       Status#UP}.
- *   <li>Upstream error — a 4xx/5xx response yields {@link Status#DOWN} with the upstream status
- *       code attached as a detail for log correlation.
- *   <li>Transport failure — the upstream port is closed (server shut down before the probe), so the
- *       {@code JdkClientHttpRequestFactory} surfaces an I/O failure that maps to {@link
- *       Status#DOWN} with the exception class as a detail.
- * </ol>
- *
- * <p>Each test pins the request path to {@code /.well-known/openid-configuration} so a future
- * refactor that accidentally pointed the indicator at the wrong sub-resource (e.g. the JWKS or the
- * token endpoint) would fail loud.
+ * Unit tests for {@link KeycloakHealthIndicator} against a {@link MockWebServer}: a 2xx discovery
+ * response is {@link Status#UP}; an upstream 4xx/5xx or a transport failure is {@link Status#DOWN}
+ * with a detail.
  */
 class KeycloakHealthIndicatorTest {
 
   /**
-   * Test timeouts. These stay fast without being flaky: the transport-failure test hits a closed
-   * port, where connection-refused is surfaced immediately (not by an elapsed timeout), so a larger
-   * bound does not slow it; the happy-path and upstream-error tests make a real localhost
-   * round-trip whose first {@code JdkClientHttpRequestFactory} call can cold-start past a tight
-   * 500&nbsp;ms bound on a loaded CI runner and spuriously report {@link Status#DOWN}. 2&nbsp;s
-   * gives ample margin while staying well under the production indicator's 2&nbsp;s / 3&nbsp;s.
+   * Connect timeout for the tests, generous enough to absorb a cold first HTTP call on a loaded
+   * runner.
    */
   private static final Duration TEST_CONNECT_TIMEOUT = Duration.ofSeconds(2);
 
@@ -80,9 +59,6 @@ class KeycloakHealthIndicatorTest {
   void setUp() throws Exception {
     server = new MockWebServer();
     server.start();
-    // The issuer URI looks like the real production one — a path under the host, the realm name —
-    // so the appended `/.well-known/openid-configuration` lands at exactly the path Keycloak
-    // serves in prod.
     issuerUri = server.url("/realms/iri").toString();
   }
 
@@ -91,12 +67,8 @@ class KeycloakHealthIndicatorTest {
     server.shutdown();
   }
 
-  // ─── Happy path ─────────────────────────────────────────────────────────
-
   @Test
   void health_returns_up_when_discovery_endpoint_responds_200() throws Exception {
-    // Given — a minimal OIDC discovery document; the indicator does not parse the body, only the
-    // status code, but the realistic payload documents the contract.
     server.enqueue(
         new MockResponse()
             .setResponseCode(200)
@@ -114,33 +86,25 @@ class KeycloakHealthIndicatorTest {
     KeycloakHealthIndicator indicator =
         new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
-    // When
     Health health = indicator.health();
 
-    // Then
     assertEquals(Status.UP, health.getStatus());
     assertEquals("openid-configuration", health.getDetails().get("endpoint"));
 
-    // And — the indicator must hit the canonical discovery path, not some other Keycloak endpoint.
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req, "indicator did not issue an HTTP request");
     assertEquals("GET", req.getMethod());
     assertEquals("/realms/iri/.well-known/openid-configuration", req.getPath());
   }
 
-  // ─── Upstream HTTP errors (4xx / 5xx) ───────────────────────────────────
-
   @Test
   void health_returns_down_when_discovery_endpoint_responds_503() throws Exception {
-    // Given — Keycloak is reachable but its cluster is degraded (e.g. DB connectivity).
     server.enqueue(new MockResponse().setResponseCode(503).setBody("upstream exploded"));
     KeycloakHealthIndicator indicator =
         new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
-    // When
     Health health = indicator.health();
 
-    // Then
     assertEquals(Status.DOWN, health.getStatus());
     assertEquals(503, health.getDetails().get("status"));
     assertEquals("openid-configuration", health.getDetails().get("endpoint"));
@@ -152,37 +116,25 @@ class KeycloakHealthIndicatorTest {
 
   @Test
   void health_returns_down_when_discovery_endpoint_responds_404() {
-    // Given — the configured realm does not exist on the Keycloak server. Keycloak itself is
-    // healthy, but the JWT validator can never succeed, so the backend must surface DOWN.
     server.enqueue(new MockResponse().setResponseCode(404));
     KeycloakHealthIndicator indicator =
         new KeycloakHealthIndicator(issuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
-    // When
     Health health = indicator.health();
 
-    // Then
     assertEquals(Status.DOWN, health.getStatus());
     assertEquals(404, health.getDetails().get("status"));
   }
 
-  // ─── Transport failure (TCP refused) ────────────────────────────────────
-
   @Test
   void health_returns_down_when_server_is_unreachable() throws Exception {
-    // Given — capture the URL the server WAS listening on, then shut the server down so the
-    // kernel responds with TCP RST to the indicator's connect attempt. The probe must surface
-    // DOWN with the exception class name so an operator reading the structured logs can tell
-    // "Keycloak unreachable" apart from "Keycloak responded 5xx".
     String deadIssuerUri = server.url("/realms/iri").toString();
     server.shutdown();
     KeycloakHealthIndicator indicator =
         new KeycloakHealthIndicator(deadIssuerUri, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
 
-    // When
     Health health = indicator.health();
 
-    // Then
     assertEquals(Status.DOWN, health.getStatus());
     assertEquals("openid-configuration", health.getDetails().get("endpoint"));
     Object error = health.getDetails().get("error");
@@ -190,16 +142,8 @@ class KeycloakHealthIndicatorTest {
     assertNotEquals("", error.toString(), "the recorded error class name must not be empty");
   }
 
-  // ─── Spring constructor-selection guard ─────────────────────────────────
-
   @Test
   void productionConstructor_isAnnotatedAutowired_soSpringCanInstantiate() {
-    // Regression guard: the indicator declares TWO constructors -- the production @Value one and a
-    // package-private test-only one with explicit Duration parameters. Spring 4+ refuses to
-    // auto-select between multiple constructors and falls back to a no-arg default; without that,
-    // it aborts startup with `NoSuchMethodException: <init>()`. The fix is exactly the @Autowired
-    // marker on the production constructor; the test below asserts that marker survives any
-    // future refactor.
     long autowiredCtors =
         Arrays.stream(KeycloakHealthIndicator.class.getDeclaredConstructors())
             .filter(ctor -> ctor.isAnnotationPresent(Autowired.class))

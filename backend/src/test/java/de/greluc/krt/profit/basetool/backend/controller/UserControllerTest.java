@@ -53,16 +53,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Pure-method unit tests for {@link UserController}. Coverage was 39% before this file. The key
- * behaviours under test:
+ * Unit tests for {@link UserController}.
  *
  * <ul>
- *   <li>{@code /me} endpoints derive the caller id from the JWT — never from the URL — so callers
- *       cannot impersonate someone else.
- *   <li>Each admin endpoint forwards the path id and request DTO fields verbatim to the service;
- *       the controller does not silently drop / transform values.
- *   <li>The {@code lookup} endpoint returns reference DTOs directly from the service — no mapper
- *       involvement, so the email/sensitive fields cannot accidentally leak.
+ *   <li>{@code /me} endpoints take the caller id from the JWT, never from the URL.
+ *   <li>Admin endpoints forward path id and DTO fields verbatim.
+ *   <li>The {@code lookup} endpoint returns the service's reference DTOs unmapped.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -83,22 +79,9 @@ class UserControllerTest {
 
   @BeforeEach
   void setUp() {
-    // Audit finding H-4: UserController now redacts peer PII for non-Officer callers via
-    // {@code authHelperService.isLogisticianOrAbove()}. The existing delegation/contract tests
-    // below were written before that gate and assume "controller hands the DTO through as-is".
-    // Default the gate to {@code true} (officer view) here so those tests keep asserting the
-    // delegation invariants; the dedicated H-4 tests override the stub with {@code false}.
     org.mockito.Mockito.lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    // Audit finding H-3 (2026-05-20): {@link UserController#getUserById} additionally checks the
-    // squadron-scope of the target user — a non-admin caller asking for a foreign-squadron user
-    // (or a squadron-less account: admins, guests) is always given the peer-redacted shape, even
-    // when their role would otherwise unlock full PII. Default {@code isAdmin} to {@code true}
-    // for the delegation tests so they keep asserting the "controller hands the DTO through
-    // as-is" invariant; the H-3 cross-squadron tests below flip it to {@code false}.
     org.mockito.Mockito.lenient().when(authHelperService.isAdmin()).thenReturn(true);
   }
-
-  // ── GET / (list) ────────────────────────────────────────────────────────
 
   @Test
   void getAllUsers_wrapsServicePageIntoPageResponse() {
@@ -112,8 +95,6 @@ class UserControllerTest {
     assertEquals(1, resp.totalElements());
     assertSame(dto, resp.content().getFirst());
   }
-
-  // ── POST /sync (admin-triggered manual Keycloak user sync) ────────────────
 
   @Test
   void syncUsersNow_runsTheReconciliationThroughTaskMetricsAndReturnsTheCount() {
@@ -130,17 +111,11 @@ class UserControllerTest {
     when(taskMetrics.recordCountingRethrow(eq(ScheduledJob.USER_SYNC), any()))
         .thenThrow(new IllegalStateException("keycloak down"));
 
-    // The manual endpoint must surface a failure (→ RFC 7807), unlike the swallowing scheduled
-    // path.
     assertThrows(IllegalStateException.class, () -> controller.syncUsersNow());
   }
 
-  // ── GET /lookup ─────────────────────────────────────────────────────────
-
   @Test
   void lookupUsers_returnsReferenceListDirectlyFromService() {
-    // The reference DTO intentionally hides email / rank / description so
-    // a regression that routed through userMapper would leak fields.
     List<UserReferenceDto> refs =
         List.of(
             new UserReferenceDto(UUID.randomUUID(), "alice", "Alice", "Alice", 5),
@@ -152,8 +127,6 @@ class UserControllerTest {
     assertSame(refs, result);
     verifyNoInteractions(userMapper);
   }
-
-  // ── GET /search ─────────────────────────────────────────────────────────
 
   @Test
   void searchUsers_forwardsQueryToService() {
@@ -167,9 +140,6 @@ class UserControllerTest {
 
   @Test
   void searchUsers_nullQuery_matchesAllViaEmptyFilter() {
-    // The remoteSource picker fires an empty ?query= on a browse-mode open, which the emptyAsNull
-    // string binder collapses to null; the controller must normalise it to the match-all empty
-    // filter rather than reject it as a missing required param (#1193).
     when(userService.searchByUsername(eq(""), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of()));
 
@@ -191,8 +161,6 @@ class UserControllerTest {
     assertEquals(1, resp.content().size());
   }
 
-  // ── GET /{id} ───────────────────────────────────────────────────────────
-
   @Test
   void getUserById_delegatesAndMaps() {
     UUID id = UUID.randomUUID();
@@ -205,8 +173,6 @@ class UserControllerTest {
 
     assertSame(dto, result);
   }
-
-  // ── Audit finding H-4: peer redaction for non-Officer callers ───────────
 
   @Test
   void getUserById_nonOfficerCaller_redactsPii() {
@@ -244,13 +210,8 @@ class UserControllerTest {
     assertNull(redacted.email());
   }
 
-  // ── Audit finding H-3 (2026-05-20): cross-squadron isolation on getUserById ────────────
-
   @Test
   void getUserById_officerFromForeignSquadron_redactsPii() {
-    // Officer of squadron A asking for a user that lives in squadron B. Without H-3 the
-    // role-based gate {@code isLogisticianOrAbove()} would unlock full PII; with H-3 the
-    // squadron-scope check overrides that for non-admin callers.
     when(authHelperService.isAdmin()).thenReturn(false);
     UUID userId = UUID.randomUUID();
     UUID foreignSquadronId = UUID.randomUUID();
@@ -258,8 +219,6 @@ class UserControllerTest {
 
     User entity = new User();
     entity.setId(userId);
-    // REQ-ORG-017: the home Staffel(n) come from the membership service (the PII gate ORs across
-    // all of the target's Staffeln).
     when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
         .thenReturn(java.util.List.of(foreignSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
@@ -268,8 +227,6 @@ class UserControllerTest {
 
     UserDto result = controller.getUserById(userId);
 
-    // Slim peer view: callsign + displayName remain, PII fields are wiped — same shape as the
-    // existing peer-redaction path.
     assertEquals("bob.callsign", result.username());
     assertNull(result.email(), "cross-squadron non-admin must not see email");
     assertNull(result.joinDate(), "cross-squadron non-admin must not see joinDate");
@@ -277,13 +234,10 @@ class UserControllerTest {
 
   @Test
   void getUserById_unassignedUser_redactsPiiForNonAdmin() {
-    // Squadron-less users (admins, freshly-imported guests) are always treated as
-    // cross-squadron for non-admin callers — full PII on those rows stays admin-only.
     when(authHelperService.isAdmin()).thenReturn(false);
     UUID userId = UUID.randomUUID();
     User entity = new User();
     entity.setId(userId);
-    // REQ-ORG-017: "no Staffel" surfaces as an empty list from the membership lookup.
     when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
         .thenReturn(java.util.List.of());
     UserDto fullDto = fullPiiUserDto(userId);
@@ -297,8 +251,6 @@ class UserControllerTest {
 
   @Test
   void getUserById_sameSquadronOfficer_keepsPii() {
-    // Officer of squadron A asking for a user in squadron A: H-3 must NOT block — they need the
-    // PII for moderation / payouts inside their own squadron.
     when(authHelperService.isAdmin()).thenReturn(false);
     UUID userId = UUID.randomUUID();
     UUID sharedSquadronId = UUID.randomUUID();
@@ -306,7 +258,6 @@ class UserControllerTest {
 
     User entity = new User();
     entity.setId(userId);
-    // REQ-ORG-017: same-squadron lookup goes through the membership service (ORs across Staffeln).
     when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
         .thenReturn(java.util.List.of(sharedSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
@@ -340,15 +291,9 @@ class UserControllerTest {
         false);
   }
 
-  // ── GET /me ─────────────────────────────────────────────────────────────
-
   @Test
   void getCurrentUser_resolvesIdFromJwt_neverFromURL() {
-    // SECURITY: the /me endpoint must derive its target id from the JWT,
-    // never from a request parameter. A regression here lets any caller
-    // request another user's profile.
     User entity = new User();
-    // The self endpoint re-adds the caller's OWN email on top of the (email-free) mapper output.
     entity.setEmail("me@example.invalid");
     UserDto dto = mockDto(CALLER_ID);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
@@ -359,13 +304,10 @@ class UserControllerTest {
 
     assertNotNull(result);
     assertEquals(CALLER_ID, result.id());
-    // A user always sees their own email in their own profile (re-added by withSelfEmail).
     assertEquals("me@example.invalid", result.email());
     verify(userService).getUserIdFromJwt(jwt);
     verify(userService).findById(CALLER_ID);
   }
-
-  // ── PUT /me/description ─────────────────────────────────────────────────
 
   @Test
   void updateMyDescription_resolvesIdFromJwt_andForwardsAllFields() {
@@ -390,8 +332,6 @@ class UserControllerTest {
     assertEquals("me@example.invalid", result.email());
     verify(userService).updateUserDescription(CALLER_ID, "Pilot extraordinaire", "Ace", 2L);
   }
-
-  // ── GET/PUT /me/payout-preference ────────────────────────────────────────
 
   @Test
   void getMyPayoutPreference_resolvesIdFromJwt_andReturnsPreferenceAndVersion() {
@@ -442,8 +382,6 @@ class UserControllerTest {
     verify(userService).updateUserDefaultPayoutPreference(CALLER_ID, PayoutPreference.DONATE, 2L);
   }
 
-  // ── GET/PUT /me/blueprint-sharing (REQ-INV-018) ─────────────────────────
-
   @Test
   void getMyBlueprintSharing_resolvesIdFromJwt_andReturnsFlagAndVersion() {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
@@ -478,8 +416,6 @@ class UserControllerTest {
     verify(userService).updateUserShareBlueprintsGlobally(CALLER_ID, true, 2L);
   }
 
-  // ── PUT /me/read-announcement/{id} ──────────────────────────────────────
-
   @Test
   void updateReadAnnouncement_resolvesIdFromJwt_andForwardsAnnouncementId() {
     UUID announcementId = UUID.randomUUID();
@@ -497,8 +433,6 @@ class UserControllerTest {
     assertEquals("me@example.invalid", result.email());
     verify(userService).updateReadAnnouncement(CALLER_ID, announcementId);
   }
-
-  // ── PUT /{id}/attributes ────────────────────────────────────────────────
 
   @Test
   void updateUserAttributes_forwardsAllFieldsToService() {
@@ -540,8 +474,6 @@ class UserControllerTest {
     verify(userService).updateUserAttributes(id, 3, null, null, 1L, null);
   }
 
-  // ── DELETE /{id} ────────────────────────────────────────────────────────
-
   @Test
   void deleteUser_delegatesIdToService() {
     UUID id = UUID.randomUUID();
@@ -551,8 +483,6 @@ class UserControllerTest {
     verify(userDeletionService).deleteUser(id);
     verifyNoMoreInteractions(userService, userDeletionService, userMapper);
   }
-
-  // ── GET /{id}/memberships ───────────────────────────────────────────────
 
   @Test
   void getUserMemberships_delegatesToService() {
@@ -571,7 +501,6 @@ class UserControllerTest {
 
   @Test
   void getUserMemberships_allKinds_delegatesToDirectMembershipOptions() {
-    // REQ-BANK-044: the bank counterparty picker asks for all four kinds via allKinds=true.
     UUID userId = UUID.randomUUID();
     OrgUnitMembershipOptionDto bereich =
         new OrgUnitMembershipOptionDto(
@@ -603,13 +532,10 @@ class UserControllerTest {
 
     java.util.Set<UUID> result = controller.getMyOrgUnitIds(jwt);
 
-    // The caller id is taken from the JWT (never an URL path), and the id set is handed through.
     assertSame(ids, result);
     verify(userService).getUserIdFromJwt(jwt);
     verify(orgUnitMembershipQueryService).findDirectMembershipOrgUnitIds(CALLER_ID);
   }
-
-  // ── helpers ─────────────────────────────────────────────────────────────
 
   private static UserDto mockDto(UUID id) {
     return new UserDto(

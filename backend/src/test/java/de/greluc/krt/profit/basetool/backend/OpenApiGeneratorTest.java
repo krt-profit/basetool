@@ -65,10 +65,6 @@ class OpenApiGeneratorTest {
 
   @Test
   void generateOpenApiDocs() throws Exception {
-    // REQ-SEC-052: the document is admin-gated now — it enumerates every path, parameter and DTO
-    // field the API has, which is the most efficient description of the attack surface the project
-    // can produce, and it was readable without a token on every profile that serves it. Being a 404
-    // in prod is a deployment property, not an access rule.
     MvcResult result =
         mockMvc
             .perform(
@@ -81,7 +77,6 @@ class OpenApiGeneratorTest {
     Object jsonObject = objectMapper.readValue(json, Object.class);
 
     Path path = Paths.get("src/main/resources/api/openapi.json");
-    // Ensure the directory exists
     if (path.getParent() != null) {
       Files.createDirectories(path.getParent());
     }
@@ -91,27 +86,11 @@ class OpenApiGeneratorTest {
   }
 
   /**
-   * Serializes {@code document} into {@code target} via a temporary sibling file that is then moved
-   * into place, so the committed spec is never observable half-written.
-   *
-   * <p>This matters because {@code org.gradle.parallel=true} lets {@code :backend:test} and {@code
-   * :frontend:test} run at the same time, and four frontend contract tests ({@code
-   * DtoOpenApiContractTest}, {@code FrontendDtoContractTest}, …) read this very file with {@code
-   * Files.readString}. Writing in place truncated the 1.8&nbsp;MB document and streamed it back
-   * over several hundred milliseconds; a reader that hit that window parsed a cut-off document and
-   * failed with {@code UnexpectedEndOfInputException} — a flake that only surfaced when the two
-   * test tasks happened to overlap on the wrong side (release/v1.5.23, while the identical tree
-   * passed on {@code main} minutes earlier). Moving a fully-written file into place means a
-   * concurrent reader always sees one complete version, old or new; since the generated document
-   * must equal the committed one anyway, either is a valid read.
-   *
-   * <p>The temporary file is created <em>in the target's own directory</em> so the move stays
-   * within one filesystem and can be atomic. A filesystem that cannot do atomic moves falls back to
-   * a plain replace, which still writes the bytes elsewhere first and so keeps the truncation
-   * window far smaller than an in-place write.
+   * Writes {@code document} to a temporary file in the target's directory and moves it into place,
+   * so concurrent readers of the committed spec never see a partial file.
    *
    * @param target the committed spec path to replace
-   * @param document the parsed OpenAPI document to serialize
+   * @param document the OpenAPI document to serialize
    * @throws IOException if the document cannot be written or moved into place
    */
   private void writeAtomically(Path target, Object document) throws IOException {
@@ -127,7 +106,6 @@ class OpenApiGeneratorTest {
         Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
       }
     } finally {
-      // A successful move already consumed the temporary file; this only cleans up after a failure.
       Files.deleteIfExists(temporary);
     }
   }

@@ -68,71 +68,14 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Generic native-WebSocket relay for the tool-wide live-sync feature (REQ-FE-015, ADR-0094).
+ * Native-WebSocket relay for tool-wide live sync (REQ-FE-015, ADR-0094): fans a client's {@code
+ * changed} section keys out to the other sockets of a {@link LiveSyncTopic} room.
  *
- * <p>Generalises the former per-mission presence relay into a topic-room relay: a socket is bound
- * to a {@link LiveSyncTopic} (its {@link LiveSyncTopicClass} fixes the section whitelist and
- * whether it carries editor-presence dots), and the handler fans a client's {@code
- * {"type":"changed", "sections":[…]}} signal out to every <em>other</em> socket in the same room.
- * Only opaque section keys cross the socket — never entity data: each peer re-pulls the affected
- * fragment through its own authenticated, authorization-checked GET, so redaction and access gates
- * re-apply per viewer.
- *
- * <p><b>Topic binding.</b> Every socket is a multiplexed {@code /ws/sync} socket ({@link
- * #ATTR_MULTIPLEXED}): it binds no topic at connect and manages a set of rooms via {@code
- * subscribe} frames — each authorized asynchronously (off the container thread, on the {@code
- * authExecutor}) by {@link LiveSyncSubscriptionAuthorizer} — while {@code changed} and presence
- * frames carry their own {@code topic}. (The one-release per-resource legacy aliases {@code
- * /ws/missions/{id}/presence} and {@code /ws/materialboerse/board}, and the single-topic connect
- * binding they used, were removed in #1236/#1182.) Publishing a {@code changed} frame needs
- * <b>no</b> subscription (the cross-topic case: a requester notifies a staff queue it may not
- * read), only an authenticated socket, a known topic class and the per-session rate limit; a
- * subscribe is what an <em>inbound</em> relay requires. The frame's {@code sections} array is
- * sanitised against the topic class's whitelist before it is relayed.
- *
- * <p><b>Cross-replica fan-out.</b> An accepted {@code changed} frame is relayed to this instance's
- * local room first, then handed to {@link LiveSyncFanout#publish(String, List)} so peer replicas
- * relay it to their local rooms; {@link #deliverFromFanout(String, List)} is the consume-side entry
- * a Redis subscriber calls. Because local relay happens first, a fan-out outage degrades to
- * single-instance behaviour, never worse (ADR-0094).
- *
- * <p><b>Cross-replica presence</b> (ADR-0126, #1237). Editor-presence dots follow the same
- * local-first shape on a second channel, but carry <em>state</em> rather than a signal: every local
- * presence change broadcasts locally and then gossips this instance's complete snapshot for the
- * topic via {@link LiveSyncFanout#publishPresence(String, Map)}, the reaper re-gossips each tracked
- * topic every tick, and {@link #deliverPresenceFromFanout(String, String, Map)} replaces the
- * publishing replica's partition in the presence store and re-broadcasts the merged dots. Full
- * snapshots rather than deltas make the mirror converge after a dropped message with no ordering or
- * acknowledgement assumptions; consume never re-publishes, so replicas cannot echo each other.
- *
- * <p><b>Abuse bounds</b> (F2 / #1243). Publishing needs no subscription, so two levers are capped
- * independently: a <b>per-user socket cap</b> ({@link #MAX_SOCKETS_PER_USER}) bounds how many
- * multiplexed sockets one user may hold (a refused socket is closed with {@link
- * #SOCKET_CAP_EXCEEDED}), and a <b>per-topic token bucket</b> ({@link #TOPIC_CHANGED_BURST} burst /
- * {@code TOPIC_CHANGED_REFILL_PER_SEC}/s, on top of the per-session bucket) bounds a room's
- * aggregate relay + fan-out rate regardless of how many sockets publish to it. Both sit far above
- * any legitimate use, so they only clamp a crafted flood; both degrade to a bounded re-fetch rate,
- * never data loss.
- *
- * <p><b>Per-session frame buckets.</b> All three inbound frame types carry the same per-session
- * token bucket ({@link #allowFrame}): {@code changed} ({@link #CHANGED_BURST}), presence ({@link
- * #PRESENCE_BURST}) and {@code subscribe} ({@link #SUBSCRIBE_BURST}). The subscribe bucket is what
- * bounds the rate at which a socket can submit authorization probes to the {@code authExecutor} —
- * the per-session topic cap does not, because a denied subscribe releases its reserved slot, so a
- * subscribe → deny → subscribe cycle never reaches the cap.
- *
- * <p><b>Concurrency &amp; backpressure</b> (preserved verbatim from the mission relay,
- * #1149/#1150): the per-topic session map is a {@link ConcurrentHashMap} whose sets are mutated
- * atomically under the entry's bin lock ({@code compute}/{@code computeIfPresent}), so a concurrent
- * open/close cannot strand a viewer in an orphaned set. Every socket is wrapped once in a {@link
- * ConcurrentWebSocketSessionDecorator} (send-time and buffer-size bounded, TERMINATE on overflow)
- * so a slow/dead consumer is dropped rather than blocking the serial broadcast loop; broadcasts
- * iterate a defensive {@code List.copyOf}.
- *
- * <p><b>Keepalive.</b> Every open socket is pinged on a fixed {@link #KEEPALIVE_INTERVAL} sweep.
- * Without it a room that nobody is writing to carries no bytes at all, and the edge proxy closes an
- * idle upgraded connection at its 90 s {@code proxy_read_timeout} — which turned every open tab
- * into a reconnect-and-refetch loop on a 90-second cadence.
+ * <p>Only opaque, whitelisted section keys cross the socket; each peer re-fetches its own data.
+ * Rooms are joined by authorized {@code subscribe} frames; publishing needs no subscription.
+ * Changes and editor presence are relayed locally first, then across replicas via {@link
+ * LiveSyncFanout} (ADR-0126). Per-session and per-topic token buckets, a per-user socket cap,
+ * backpressure decorators and a keepalive ping bound abuse and idle timeouts.
  */
 @Slf4j
 public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
@@ -141,29 +84,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   public static final Duration REAPER_INTERVAL = Duration.ofSeconds(10);
 
   /**
-   * How often every open socket is sent a WebSocket ping frame so the edge proxy does not tear the
-   * connection down as idle.
-   *
-   * <p>A live-sync room is usually silent for minutes at a time — a {@code changed} frame only
-   * flies when a peer actually writes, presence gossip only reaches presence-enabled rooms, and the
-   * client sends nothing on its own. The edge's {@code proxy_read_timeout} is 90 s ({@code
-   * docker/edge/nginx.conf}) and nginx applies it to an upgraded connection as well, so a silent
-   * socket was torn down almost exactly 90 s after it opened, every time, for every tab. The client
-   * dutifully reconnected, re-subscribed every topic — re-running one backend authorization probe
-   * per room — and fired its post-reconnect resync, which re-fetches every section the page
-   * renders. What looks like a live socket was a full page-wide refetch loop on a 90-second
-   * cadence, and it was found from the outside: a bank-account viewer whose {@code bank:{id}}
-   * subscribe legitimately fails its primary probe produced 114 backend {@code 403 WARN} lines in
-   * three hours from a single open tab.
-   *
-   * <p>Pinging from the <em>server</em> is what fixes it, and the direction is not interchangeable:
-   * {@code proxy_read_timeout} times out reading from the upstream, so only a frame travelling
-   * server → client resets it. This is the remedy nginx's own WebSocket guide names. At 30 s three
-   * pings fit inside the 90 s window, so a delayed or lost tick is not a lost socket, and the cost
-   * is one empty frame per socket per half minute. A browser answers a ping with a pong at the
-   * protocol level, so no client code participates; {@code handlePongMessage} is inherited as a
-   * no-op. {@code LiveSyncKeepaliveEdgeTimeoutParityTest} pins the two numbers together, requiring
-   * the sweep to fire at least twice inside whatever the edge's timeout currently is.
+   * Interval at which every open socket is pinged so the edge proxy's 90&nbsp;s idle timeout does
+   * not close it.
    */
   public static final Duration KEEPALIVE_INTERVAL = Duration.ofSeconds(30);
 
@@ -182,14 +104,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static final double CHANGED_REFILL_PER_SEC = 20.0;
 
   /**
-   * Hard cap on the accepted length of a client-supplied presence {@code sectionKey}. Legitimate
-   * keys are short panel identifiers; anything longer is a crafted client trying to bloat the
-   * per-topic presence map's memory footprint and is dropped (#1245 presence-WS hardening).
-   *
-   * <p>Doubles as the truncation bound when a rejected {@code changed}-frame section key is put
-   * through {@link LogSafe} for the whitelist-filter DEBUG line: the same "a section key is a short
-   * panel identifier" assumption applies, so a longer value is hostile and there is nothing to gain
-   * from logging the rest of it.
+   * Maximum accepted length of a client-supplied presence {@code sectionKey}, also the truncation
+   * bound for logged section keys.
    */
   private static final int MAX_SECTION_KEY_LENGTH = 64;
 
@@ -201,13 +117,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static final int MAX_LOGGED_TOPIC_LENGTH = 64;
 
   /**
-   * Token-bucket capacity for inbound presence control frames ({@code focus} / {@code heartbeat} /
-   * {@code blur}) per session. Legitimate presence traffic is sparse — a {@code focus} on entering
-   * a panel plus a heartbeat once a minute — so this burst sits far above any human cadence and
-   * only bounds a crafted client emitting presence frames in a loop (which each insert a per-topic
-   * presence entry and force a full-map snapshot rebuild + broadcast: O(N²) amplification). The
-   * {@code changed} path had a bucket; the presence path did not until #1245. Package-private for
-   * the test.
+   * Per-session token-bucket capacity for inbound presence frames ({@code focus} / {@code
+   * heartbeat} / {@code blur}).
    */
   static final int PRESENCE_BURST = 20;
 
@@ -215,66 +126,33 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static final double PRESENCE_REFILL_PER_SEC = 10.0;
 
   /**
-   * Token-bucket capacity for inbound {@code subscribe} frames per session — the third frame type
-   * to get the same per-session bucket the {@code changed} and presence paths already had.
-   *
-   * <p>The per-session topic cap ({@link #MAX_TOPICS_PER_SESSION}) bounds how many rooms a socket
-   * <em>holds</em>, but not how many subscribe frames it <em>sends</em>: {@link #completeSubscribe}
-   * releases the reserved slot on a deny, so a subscribe → deny → subscribe cycle never reaches the
-   * cap and was previously unbounded — and every non-idempotent subscribe submits an authorization
-   * probe to {@link #authExecutor}. This bucket bounds that submission rate, and with it the rate
-   * at which the saturation branch of {@link #handleSubscribe} can author a log line.
-   *
-   * <p>Sized at 1.5× the topic cap so a page that legitimately subscribes to the maximum number of
-   * rooms the instant its socket opens never trips it; a reconnect re-subscribes on a
-   * <em>fresh</em> socket with a fresh, full bucket, so the reconnect storm is unaffected either.
-   * Package-private for the test.
+   * Per-session token-bucket capacity for inbound {@code subscribe} frames, bounding the rate of
+   * authorization probes; 1.5 times {@link #MAX_TOPICS_PER_SESSION}.
    */
   static final int SUBSCRIBE_BURST = 24;
 
-  /**
-   * Token-bucket refill rate for inbound {@code subscribe} frames, in tokens per second.
-   * Deliberately an order of magnitude below the {@code changed} / presence refills: a socket
-   * subscribes to each of its rooms once and then has essentially no legitimate need for further
-   * subscribe frames, so the sustained allowance only has to cover the occasional re-subscribe, not
-   * a cadence.
-   */
+  /** Refill rate for inbound {@code subscribe} frames, in tokens per second. */
   private static final double SUBSCRIBE_REFILL_PER_SEC = 1.0;
 
   /**
-   * Per-<em>topic</em> token-bucket capacity for accepted {@code changed} frames (F2 / #1243). The
-   * per-session bucket ({@link #CHANGED_BURST}) bounds one socket; this second bucket, keyed by the
-   * canonical topic, bounds a room's <em>aggregate</em> relay + fan-out rate across <b>all</b>
-   * publishers, so no set of sockets can amplify one (chiefly global) room's fragment-refetch
-   * fan-out. Sized far above any realistic mutation cadence for a room — even a busy queue or bank
-   * sees a handful of writes/s, well under this — so a legitimate 200-user room never trips it; it
-   * only clamps a crafted flood. Package-private for the test.
+   * Per-topic token-bucket capacity for accepted {@code changed} frames, bounding a room's
+   * aggregate relay and fan-out rate across all publishers.
    */
   static final int TOPIC_CHANGED_BURST = 200;
 
-  /** Per-topic refill rate for accepted {@code changed} frames, in tokens per second (F2/#1243). */
+  /** Per-topic refill rate for accepted {@code changed} frames, in tokens per second. */
   private static final double TOPIC_CHANGED_REFILL_PER_SEC = 100.0;
 
-  /**
-   * Idle age past which the reaper drops a per-topic {@code changed} bucket (F2/#1243). A bucket
-   * untouched this long has fully refilled (30/s ≫ 60 in 60 s), so dropping it and recreating a
-   * fresh full bucket on the next publish is behaviourally identical — this just bounds the
-   * per-topic map to the set of recently-active rooms instead of accreting one entry per distinct
-   * mission/operation/order ever edited. Package-private for the test.
-   */
+  /** Idle age after which the reaper drops a per-topic {@code changed} bucket. */
   static final long TOPIC_BUCKET_IDLE_REAP_NANOS = TimeUnit.SECONDS.toNanos(60);
 
   /**
-   * Max time (ms) a single send may block before the {@link ConcurrentWebSocketSessionDecorator}
-   * TERMINATEs a wedged peer instead of parking the broadcasting thread (#1149).
+   * Maximum time in milliseconds a single send may block before the {@link
+   * ConcurrentWebSocketSessionDecorator} terminates the peer.
    */
   private static final int SEND_TIME_LIMIT_MS = 5_000;
 
-  /**
-   * Max bytes buffered for a slow peer before the decorator TERMINATEs it (#1149). Frames are tiny
-   * (a snapshot / a handful of section keys), so half a MB tolerates a long burst before a
-   * genuinely dead consumer is dropped.
-   */
+  /** Maximum bytes buffered for a slow peer before the decorator terminates it. */
   private static final int SEND_BUFFER_SIZE_LIMIT = 512 * 1024;
 
   /**
@@ -299,10 +177,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   public static final String ATTR_ACTIVE_ORG_UNIT = "livesync.activeOrgUnit";
 
   /**
-   * Session-attribute key ({@code Set<String>}) holding the caller's authorities captured at
-   * handshake, used to authorize a subscribe to a locally role-gated global room (the {@code bank}
-   * staff and {@code orgunit-bank} rooms) without a backend call. Public so the interceptor can
-   * populate it.
+   * Session-attribute key ({@code Set<String>}) for the caller's authorities captured at handshake,
+   * used for locally role-gated subscribes.
    */
   public static final String ATTR_AUTHORITIES = "livesync.authorities";
 
@@ -321,20 +197,14 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static final int MAX_TOPICS_PER_SESSION = 16;
 
   /**
-   * Hard cap on concurrent multiplexed {@code /ws/sync} sockets one user (Keycloak {@code sub}) may
-   * hold (F2 / #1243). One tab opens exactly one such socket (the lazy singleton in {@code
-   * krt-live-sync.js}), so this sits far above any legitimate multi-tab use — with headroom for the
-   * brief overlap while a reconnecting tab's old socket is still closing — yet bounds the {@code K}
-   * in the {@code K sockets × publish-rate × room-viewers} amplification lever. A refused socket is
-   * closed with {@link #SOCKET_CAP_EXCEEDED}. Package-private for the test.
+   * Maximum concurrent {@code /ws/sync} sockets per user; a refused socket is closed with {@link
+   * #SOCKET_CAP_EXCEEDED}.
    */
   static final int MAX_SOCKETS_PER_USER = 20;
 
   /**
-   * Application-defined WebSocket close status ({@code 4029}) for a socket refused by the per-user
-   * cap ({@link #MAX_SOCKETS_PER_USER}). The client ({@code krt-live-sync.js}) recognises this code
-   * and backs its reconnect off to the maximum interval rather than hammering, recovering quietly
-   * once another tab closes and frees a slot.
+   * Close status {@code 4029} for a socket refused by {@link #MAX_SOCKETS_PER_USER}; the client
+   * backs off its reconnect to the maximum interval.
    */
   static final CloseStatus SOCKET_CAP_EXCEEDED = new CloseStatus(4029, "socket cap exceeded");
 
@@ -347,35 +217,22 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   public static final String ATTR_TERMS_GATE = "livesync.termsGate";
 
   /**
-   * Application-defined WebSocket close status ({@code 4003}) for a socket refused because its user
-   * has not accepted the Terms of Use in force (REQ-SEC-028). Mirrors HTTP {@code 403} the way
-   * {@link #SOCKET_CAP_EXCEEDED} mirrors {@code 429} — and specifically the {@code 403} plus {@code
-   * X-Terms-Acceptance-Required} the gate answers an XHR with, since this is the same refusal in
-   * the one idiom a WebSocket can act on.
+   * Close status code {@code 4003} for a socket whose user has not accepted the Terms of Use
+   * (REQ-SEC-028).
    *
-   * <p>The close <em>reason</em> carries the consent-page URL, which is the whole point: without it
-   * the client learns only that the socket died, and a dead socket is something it must retry.
-   * {@code krt-live-sync.js} treats this code as terminal — it stops reconnecting for good and
-   * navigates to the named page — because no amount of reconnecting can produce consent.
+   * <p>The close reason carries the consent-page URL; the client stops reconnecting and navigates
+   * there.
    */
   static final int TERMS_CONSENT_REQUIRED_CODE = 4003;
 
-  /**
-   * Hard cap on the close reason, in UTF-8 bytes. A close frame's payload is 125 bytes and the code
-   * takes two of them, so a longer reason makes the container reject the close outright — which
-   * would leave the socket open and hand the client back the reconnect loop this refusal exists to
-   * end. Only a pathological context path could approach it; the guard is here so that case
-   * degrades to "closed without a URL" rather than "not closed at all".
-   */
+  /** Maximum close-reason length in UTF-8 bytes, the most a close frame can carry. */
   private static final int MAX_CLOSE_REASON_BYTES = 123;
 
   private static final String ATTR_USER_ID = "livesync.userId";
 
   /**
-   * Session-attribute key ({@link Boolean}) marking a socket that incremented its user's
-   * live-socket count, so the close path decrements exactly once. A socket refused by the per-user
-   * cap never sets it (it decrements inline), so its later {@code afterConnectionClosed} does not
-   * double-decrement.
+   * Session-attribute key ({@link Boolean}) marking a socket that incremented its user's socket
+   * count, so the close path decrements exactly once.
    */
   private static final String ATTR_USER_COUNTED = "livesync.userCounted";
 
@@ -391,10 +248,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static final String ATTR_SUBSCRIBE_RATE = "livesync.subscribeRate";
 
   /**
-   * Session-attribute key holding the {@link ConcurrentWebSocketSessionDecorator} wrapping the raw
-   * socket (#1149). The decorator — not the raw session — is what lives in {@link #sessionsByTopic}
-   * and what every broadcast writes to; the close / relay paths resolve it back from the raw
-   * session Spring hands them via {@link #decorated(WebSocketSession)}.
+   * Session-attribute key for the {@link ConcurrentWebSocketSessionDecorator} wrapping the raw
+   * socket; the decorator is what {@link #sessionsByTopic} holds, resolved via {@link
+   * #decorated(WebSocketSession)}.
    */
   private static final String ATTR_DECORATED = "livesync.decorated";
 
@@ -407,11 +263,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private final Executor authExecutor;
 
   /**
-   * Monotonic nanosecond clock backing every token-bucket refill and the idle-bucket reaper.
-   * Production wires {@link System#nanoTime()}; the throttle tests inject a frozen/steppable
-   * supplier so a burst's refill is deterministic (real wall-clock elapsed during the emit loop
-   * otherwise refills a few tokens and makes an exact per-topic-burst assertion flaky under CI
-   * load).
+   * Monotonic nanosecond clock for token-bucket refills and the idle-bucket reaper; {@link
+   * System#nanoTime()} in production.
    */
   private final LongSupplier nanoClock;
 
@@ -423,49 +276,32 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   private final Map<String, Set<WebSocketSession>> sessionsByTopic = new ConcurrentHashMap<>();
 
-  /**
-   * Every open socket's decorator, regardless of which rooms it has joined — the set the keepalive
-   * sweep pings.
-   *
-   * <p>Deliberately not derived from {@link #sessionsByTopic}: that map holds only
-   * <em>subscribed</em> sockets, and a tab that merely publishes ({@code /orders/create} announcing
-   * to a queue room it may not read) or that has not finished its first subscribe holds a socket in
-   * no room at all. Those are exactly the sockets whose silence is total, so pinging only the rooms
-   * would have left the quietest connections to time out.
-   */
+  /** Every open socket's decorator, subscribed or not; the set the keepalive sweep pings. */
   private final Set<WebSocketSession> liveSessions = ConcurrentHashMap.newKeySet();
 
   /**
-   * Live multiplexed-socket count per user (Keycloak {@code sub}), backing the per-user socket cap
-   * (F2 / #1243). Incremented atomically at connect, decremented at close; an entry is removed when
-   * it reaches zero, so the map is bounded by the number of currently connected users.
+   * Live socket count per user (Keycloak {@code sub}) for the per-user socket cap; an entry is
+   * removed at zero.
    */
   private final Map<String, Integer> socketsByUser = new ConcurrentHashMap<>();
 
   /**
-   * Per-topic {@code changed}-frame token buckets, backing the per-topic publish throttle (F2 /
-   * #1243). Keyed by canonical topic; each bucket serialises its own token math under its instance
-   * monitor. Buckets are reaped by {@link #reapIdleTopicBuckets(long)} so the map stays bounded to
-   * recently-active rooms.
+   * Per-topic {@code changed}-frame token buckets keyed by canonical topic; idle buckets are
+   * removed by {@link #reapIdleTopicBuckets(long)}.
    */
   private final Map<String, TopicRateState> changedRateByTopic = new ConcurrentHashMap<>();
 
   /**
-   * Builds the handler. Binds the {@code basetool_presence_ws_sessions} gauge (live sockets summed
-   * across all rooms) and, per topic class, one {@code
-   * basetool_livesync_subscriptions{topic_class}} gauge (sockets in that class) plus one {@code
-   * basetool_livesync_peer_rooms{topic_class}} gauge (rooms of that class holding two or more
-   * sockets) plus the {@code basetool_livesync_socket_lifetime_seconds} timer; the presence reaper
-   * and the keepalive sweep start ticking immediately.
+   * Creates the handler, binds its live-sync gauges and socket-lifetime timer, and starts the
+   * presence reaper and keepalive sweep.
    *
    * @param presenceService in-memory editor-presence store
    * @param fanout cross-replica fan-out seam (no-op when single-instance)
-   * @param objectMapper Jackson mapper for the minimal {@code {type, sections}} wire format
-   * @param meterRegistry the Micrometer registry the gauges and relay counters bind to
-   * @param authorizer authorizes a multiplexed {@code /ws/sync} subscribe to a resource topic
-   * @param authExecutor executor that runs subscribe-authorization probes off the WebSocket
-   *     container thread; a {@link RejectedExecutionException} (saturation) fails the subscribe
-   *     open
+   * @param objectMapper Jackson mapper for the {@code {type, sections}} wire format
+   * @param meterRegistry the registry the gauges and relay counters bind to
+   * @param authorizer authorizes a {@code /ws/sync} subscribe to a topic
+   * @param authExecutor runs subscribe-authorization probes off the container thread; a {@link
+   *     RejectedExecutionException} fails the subscribe open
    */
   public LiveSyncWebSocketHandler(
       @NotNull LiveSyncPresenceService presenceService,
@@ -485,20 +321,15 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Test seam of {@link #LiveSyncWebSocketHandler(LiveSyncPresenceService, LiveSyncFanout,
-   * ObjectMapper, MeterRegistry, LiveSyncSubscriptionAuthorizer, Executor)} that additionally
-   * injects the monotonic {@code nanoClock} backing the token-bucket refills and idle-bucket
-   * reaper, so a throttle test can freeze time and assert an exact per-topic-burst bound rather
-   * than tolerating wall-clock refill. Behaviour is otherwise identical.
+   * Test constructor that additionally injects the monotonic clock.
    *
    * @param presenceService in-memory editor-presence store
    * @param fanout cross-replica fan-out seam (no-op when single-instance)
-   * @param objectMapper Jackson mapper for the minimal {@code {type, sections}} wire format
-   * @param meterRegistry the Micrometer registry the gauges and relay counters bind to
-   * @param authorizer authorizes a multiplexed {@code /ws/sync} subscribe to a resource topic
-   * @param authExecutor executor that runs subscribe-authorization probes off the WebSocket
-   *     container thread; a {@link RejectedExecutionException} (saturation) fails the subscribe
-   *     open
+   * @param objectMapper Jackson mapper for the {@code {type, sections}} wire format
+   * @param meterRegistry the registry the gauges and relay counters bind to
+   * @param authorizer authorizes a {@code /ws/sync} subscribe to a topic
+   * @param authExecutor runs subscribe-authorization probes off the container thread; a {@link
+   *     RejectedExecutionException} fails the subscribe open
    * @param nanoClock monotonic nanosecond source ({@link System#nanoTime()} in production)
    */
   LiveSyncWebSocketHandler(
@@ -548,9 +379,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         REAPER_INTERVAL.toSeconds(),
         REAPER_INTERVAL.toSeconds(),
         TimeUnit.SECONDS);
-    // Shares the reaper's thread rather than taking one of its own: both sweeps are short, neither
-    // blocks (the decorator buffers instead of waiting on a slow peer), and one daemon thread per
-    // handler is enough.
     this.reaper.scheduleAtFixedRate(
         this::tickKeepalive,
         KEEPALIVE_INTERVAL.toSeconds(),
@@ -585,14 +413,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Counts the rooms of a given topic class that currently hold two or more sockets (backs the
-   * per-class {@code basetool_livesync_peer_rooms} gauge, #1238).
-   *
-   * <p>Deliberately distinct from {@link #subscriptionCount(LiveSyncTopicClass)}: that sums sockets
-   * across the class, which cannot tell two peers sharing one room (peer-sync live, a {@code
-   * changed} relay is possible) from two separate single-viewer rooms (peer-sync inert, {@link
-   * #relayLocal} skips the origin so nothing can ever be relayed). Only this count makes a {@code
-   * changed}-frame flatline interpretable.
+   * Counts the rooms of a topic class holding two or more sockets, for the {@code
+   * basetool_livesync_peer_rooms} gauge.
    *
    * @param topicClass the class to count
    * @return the number of rooms of that class with at least two live sockets
@@ -609,12 +431,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Registers a freshly connected multiplexed {@code /ws/sync} socket. It joins no room at connect
-   * — its rooms are built by later {@code subscribe} frames — so this only resolves the principal,
-   * enforces the per-user socket cap (F2 / #1243), wraps the socket in its backpressure decorator
-   * and seeds an empty subscription set. A socket whose user has not accepted the Terms of Use
-   * ({@link #ATTR_TERMS_GATE}, REQ-SEC-028), one with no resolvable principal, or one that would
-   * put the user over {@link #MAX_SOCKETS_PER_USER}, is refused.
+   * Registers a new {@code /ws/sync} socket: resolves the principal, enforces {@link
+   * #MAX_SOCKETS_PER_USER}, wraps it in its backpressure decorator and seeds an empty subscription
+   * set.
+   *
+   * <p>Refuses a socket without accepted Terms of Use ({@link #ATTR_TERMS_GATE}, REQ-SEC-028),
+   * without a resolvable principal, or over the per-user cap.
    *
    * @param session the freshly opened session
    */
@@ -622,11 +444,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   public void afterConnectionEstablished(@NotNull WebSocketSession session) throws Exception {
     String consentUrl = (String) session.getAttributes().get(ATTR_TERMS_GATE);
     if (consentUrl != null) {
-      // The consent gate let this handshake complete for exactly this moment (REQ-SEC-028): a
-      // refused upgrade is a bare 1006 the client must read as "connection dropped" and retry, so
-      // the refusal is delivered here, where a close CODE and a reason exist. Checked before the
-      // principal resolution and the per-user cap so a gated socket neither takes a slot nor logs
-      // as a cap refusal.
       log.debug("Live-sync /ws/sync socket refused (Terms of Use not accepted)");
       socketRejectedCounter(MetricNames.SOCKET_REJECTED_TERMS_GATE).increment();
       session.close(termsConsentRequired(consentUrl));
@@ -640,10 +457,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     if (!tryAcquireUserSocket(userId)) {
-      // Per-user socket cap: bound the number of concurrent /ws/sync sockets one user holds so the
-      // K in the changed-publish amplification lever (K sockets × rate × room viewers) is bounded.
-      // The count was undone in tryAcquireUserSocket, and ATTR_USER_COUNTED is left unset so
-      // the ensuing afterConnectionClosed does not decrement again.
       log.debug("Live-sync /ws/sync socket refused (per-user cap {})", MAX_SOCKETS_PER_USER);
       socketRejectedCounter(MetricNames.SOCKET_REJECTED_USER_CAP).increment();
       session.close(SOCKET_CAP_EXCEEDED);
@@ -660,15 +473,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Builds the {@link #TERMS_CONSENT_REQUIRED_CODE} close status for a socket refused by the
-   * consent gate, carrying the consent-page URL as the close reason.
+   * Builds the {@link #TERMS_CONSENT_REQUIRED_CODE} close status with the consent-page URL as
+   * reason, omitting the URL when it exceeds {@link #MAX_CLOSE_REASON_BYTES}.
    *
-   * <p>The URL is dropped when it would not fit a close frame (see {@link #MAX_CLOSE_REASON_BYTES})
-   * rather than truncated: half a path is not a destination, and a client that receives the code
-   * without a reason still stops reconnecting — it just leaves the user to navigate. Losing the
-   * loop matters more than losing the redirect.
-   *
-   * @param consentUrl the context-relative consent-page URL the gate named
+   * @param consentUrl the context-relative consent-page URL
    * @return the close status to refuse the socket with
    */
   @NotNull
@@ -678,13 +486,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Wraps a raw socket in a {@link ConcurrentWebSocketSessionDecorator} (#1149): a slow/dead peer
-   * is bounded by the decorator's send-time / buffer-size limits (TERMINATE on overflow) instead of
-   * blocking the serial fan-out. The decorator is what is registered into rooms and broadcast to;
-   * it shares the raw session's attribute map.
+   * Wraps a raw socket in a {@link ConcurrentWebSocketSessionDecorator} bounded by send time and
+   * buffer size; the decorator shares the raw session's attributes.
    *
    * @param session the raw session
-   * @return the backpressure-bounding decorator around it
+   * @return the decorator around it
    */
   @NotNull
   private static WebSocketSession wrap(@NotNull WebSocketSession session) {
@@ -696,9 +502,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Adds a socket's decorator to a topic's room under the entry's bin lock (#1150), so a concurrent
-   * close cannot unmap the set this add is about to land in (which would strand the viewer in an
-   * orphaned set).
+   * Adds a socket's decorator to a topic's room atomically, so a concurrent close cannot orphan it.
    *
    * @param decorated the decorator to register (never the raw session)
    * @param topic the room to join
@@ -714,10 +518,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Dispatches one client message on a multiplexed {@code /ws/sync} socket, resolving the topic per
-   * frame: {@code subscribe} joins an authorized room, {@code changed} publishes to a topic (no
-   * subscription required), and presence frames touch a subscribed presence room. Unknown types are
-   * silently ignored to keep the wire format forward-compatible.
+   * Dispatches one client frame: {@code subscribe}, {@code changed} or a presence frame; unknown
+   * types are ignored.
    *
    * @param session the session that produced the message
    * @param message the text payload
@@ -744,36 +546,26 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       case "subscribe" -> handleSubscribe(session, node);
       case "changed" -> handleMultiplexedChanged(session, node);
       case "focus", "blur", "heartbeat" -> handleMultiplexedPresence(session, node, type, userId);
-      default -> {
-        // Unknown type: ignore to keep the wire format forward-compatible.
-      }
+      default -> {}
     }
   }
 
   /**
-   * Cleans up a closed multiplexed socket — leaves every room it subscribed to and, for a
-   * presence-enabled room where the user has no other live session, drops their presence and
-   * broadcasts the resulting snapshot.
+   * Cleans up a closed socket: leaves every room and, in presence-enabled rooms where the user has
+   * no other live session, drops their presence and broadcasts the new snapshot.
    *
    * @param session the closing session
-   * @param status close reason (unused; logged for diagnostics)
+   * @param status close reason (logged for diagnostics)
    */
   @Override
   public void afterConnectionClosed(
       @NotNull WebSocketSession session, @NotNull CloseStatus status) {
     recordSocketLifetime(session);
     String userId = (String) session.getAttributes().get(ATTR_USER_ID);
-    // Release the per-user socket slot exactly once (F2 / #1243) — only for a socket that actually
-    // acquired one (a cap-refused socket already released it inline and left ATTR_USER_COUNTED
-    // unset). Done before the subscription-set check so it runs even for a socket closed between
-    // establish and its first subscribe.
     if (userId != null && Boolean.TRUE.equals(session.getAttributes().get(ATTR_USER_COUNTED))) {
       releaseUserSocket(userId);
     }
     WebSocketSession decorated = decorated(session);
-    // Before the subscription-set check, like the socket-slot release above: a socket that closed
-    // before its first subscribe has no subscription set, and would otherwise stay in the keepalive
-    // sweep for the life of the process.
     liveSessions.remove(decorated);
     Set<String> subs = subscriptions(session);
     if (subs == null) {
@@ -807,11 +599,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Handles a {@code subscribe} frame: validates the topic, applies the per-session subscribe rate
-   * limit, enforces the per-session topic cap and idempotency, then authorizes the subscribe
-   * asynchronously on {@link #authExecutor} (so the container thread never blocks on a backend
-   * probe). A rejected submission (executor saturated) fails the subscribe open. The room is joined
-   * only once {@link #completeSubscribe} confirms an allow.
+   * Handles a {@code subscribe} frame: validates the topic, applies the rate limit, topic cap and
+   * idempotency, then authorizes asynchronously on {@link #authExecutor}; a saturated executor
+   * fails the subscribe open.
    *
    * @param session the subscribing session
    * @param node the parsed {@code subscribe} frame
@@ -823,10 +613,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       log.debug(
           "Live-sync subscribe to unknown topic '{}' refused",
           LogSafe.text(rawTopic, MAX_LOGGED_TOPIC_LENGTH));
-      // #1239: an unknown/unparseable subscribe topic is the signature of a client/server
-      // topic-vocabulary skew — count it so the drift is visible. No topic_class tag: the topic did
-      // not parse, so it belongs to no class (a dedicated unlabelled meter, not a topic_class
-      // sentinel — REQ-OBS-011).
       meterRegistry.counter(MetricNames.LIVESYNC_INVALID_TOPIC).increment();
       sendControlFrame(session, "denied", rawTopic);
       return;
@@ -835,12 +621,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (subs == null) {
       return;
     }
-    // Rate-limit the subscribe path per session with the same bucket primitive the changed and
-    // presence paths use — the topic cap alone does not bound it, because completeSubscribe
-    // releases the reserved slot on a deny (see SUBSCRIBE_BURST). Dropped silently, never answered
-    // with a `denied` control frame: the client treats a deny as terminal for the topic, so
-    // answering a throttled frame that way would turn a transient burst into a permanently dead
-    // room. The client's next reconnect re-subscribes against a fresh bucket.
     if (!allowSubscribeFrame(session)) {
       droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
       log.debug(
@@ -848,8 +628,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     if (subs.contains(topic.canonical())) {
-      // Idempotent (re)subscribe — e.g. after a reconnect: the socket already holds this room, so
-      // just re-ack so the client can drive its post-reconnect resync.
       sendControlFrame(session, "subscribed", topic.canonical());
       return;
     }
@@ -858,9 +636,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       sendControlFrame(session, "denied", topic.canonical());
       return;
     }
-    // Reserve the slot synchronously so the cap and idempotency hold even while the async probe
-    // runs;
-    // a DENY (or a close during the probe) removes it again in completeSubscribe.
     subs.add(topic.canonical());
     String token = (String) session.getAttributes().get(ATTR_ACCESS_TOKEN);
     UUID pin = session.getAttributes().get(ATTR_ACTIVE_ORG_UNIT) instanceof UUID u ? u : null;
@@ -868,27 +643,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     try {
       authExecutor.execute(() -> authorizeAndRegister(session, topic, token, pin, authorities));
     } catch (RejectedExecutionException e) {
-      // Auth executor saturated: indeterminate verdict. Fail in the class's direction — open for a
-      // non-presence class (opaque keys only; each fragment re-pull re-authorizes), closed for a
-      // presence class so the editor-identity snapshot is never leaked on an unverified subscribe
-      // (F1).
       LiveSyncSubscriptionAuthorizer.Decision verdict =
           LiveSyncSubscriptionAuthorizer.failOpen(topic);
       droppedCounter(topic, MetricNames.DROPPED_AUTHORIZE_SATURATED).increment();
-      // WARN, not DEBUG. The earlier justification here — "a client cannot provoke it" — was wrong:
-      // reaching this branch needs a saturated executor AND an inbound subscribe frame, and the
-      // subscribe path used to be the one frame type with no rate limit (the topic cap does not
-      // bound it, because a denied subscribe releases its reserved slot). A crafted client could
-      // therefore cycle subscribe → deny → subscribe, push the queue to rejection and author these
-      // lines at will. It is bucketed now, exactly like the changed and presence paths
-      // (SUBSCRIBE_BURST / SUBSCRIBE_REFILL_PER_SEC), and the per-user socket cap
-      // (MAX_SOCKETS_PER_USER) bounds how many buckets one user can hold — so the sustained line
-      // rate a single caller can drive is a small constant per second, and only while the executor
-      // is already saturated. That is a genuine infrastructure symptom, not a flood vector, and it
-      // matters: saturation silently degrades authorization for every subscribe landing on this
-      // instance, and on a presence class it fails closed, costing that tab live updates for the
-      // topic until it reconnects. The deny counter deliberately carries no `saturated` reason
-      // value — the authorize_saturated relay-drop series above is that signal.
       log.warn(
           "Live-sync subscribe authorization for topic {} was not scheduled (auth executor"
               + " saturated); resolved as {}",
@@ -899,20 +656,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Runs the subscribe-authorization probe (on {@link #authExecutor}) and applies its verdict. A
-   * probe that throws unexpectedly is an indeterminate verdict, resolved in the class's fail
-   * direction ({@link LiveSyncSubscriptionAuthorizer#failOpen(LiveSyncTopic)}) — open for a
-   * non-presence class, closed for a presence one (F1) — consistent with the authorizer's own
-   * transient-error handling.
-   *
-   * <p>This is where a completed probe's indeterminate <em>fail-closed</em> verdict is reported at
-   * WARN (the executor-saturation branch of {@link #handleSubscribe} reports its own, and no other
-   * path logs one): the refusal costs that tab every peer update for the topic until it reconnects,
-   * and the client retries such a deny exactly <em>once</em> on its next reconnect — so a backend
-   * blip outlasting that one retry still leaves the tab on the manual-refresh pill. That outcome is
-   * backend-triggered and bounded to one line per tab per topic, so it is not a log-flood vector —
-   * unlike an explicit permission deny, which is a routine, user-triggerable verdict and stays at
-   * DEBUG in the authorizer.
+   * Runs the subscribe-authorization probe and applies its verdict; an unexpected exception
+   * resolves via {@link LiveSyncSubscriptionAuthorizer#failOpen(LiveSyncTopic)}, and a fail-closed
+   * indeterminate verdict is logged at WARN.
    *
    * @param session the subscribing session
    * @param topic the topic being authorized
@@ -930,9 +676,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     try {
       decision = authorizer.authorize(topic, token, pin, authorities);
       if (decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE) {
-        // The authorizer logged the underlying transient (status code / exception) at DEBUG as
-        // probe detail; this is the single line stating that it became a user-visible, terminal
-        // refusal — the level the outcome warrants (REQ-OBS-001).
         log.warn(
             "Live-sync subscribe to topic {} failed closed on an indeterminate authorization"
                 + " outcome; this tab gets no live updates for it until it reconnects",
@@ -956,20 +699,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Finalises a subscribe: on either deny flavour it drops the reserved slot and refuses — with the
-   * flavour's bounded {@code reason} on the {@code denied} frame, so the client can retry a
-   * fail-closed indeterminate refusal once and treat an authorization refusal as terminal; on ALLOW
-   * it joins the room (skipping a socket that closed while the probe ran), acks {@code subscribed}
-   * and sends the initial presence snapshot for a presence-enabled class.
-   *
-   * <p>Dropping the reserved slot is why the per-session topic cap cannot bound the subscribe rate,
-   * and therefore why {@link #handleSubscribe} rate-limits the frame itself.
-   *
-   * <p>Deliberately emits no log line of its own — every refusal is already reported by whoever
-   * produced the verdict (the authorizer at DEBUG for an explicit deny, {@link
-   * #authorizeAndRegister} at WARN for a fail-closed indeterminate one, {@link #handleSubscribe} at
-   * WARN for executor saturation), so routing the logging through here as well would double-log the
-   * same failure (REQ-OBS-001).
+   * Finalises a subscribe: on a deny releases the reserved slot and sends {@code denied} with its
+   * reason; on an allow joins the room, acks {@code subscribed} and sends the initial presence
+   * snapshot where applicable. Logs nothing itself.
    *
    * @param session the subscribing session
    * @param topic the authorized topic
@@ -984,9 +716,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       if (subs != null) {
         subs.remove(topic.canonical());
       }
-      // The refusal flavour rides the wire frame, not just the metric: an indeterminate (fail-
-      // closed) deny is an availability symptom the client retries once on its next reconnect,
-      // while an authz deny stays terminal. Same bounded vocabulary as the deny metric's tag.
       String reason = denyReason(decision);
       sendControlFrame(session, "denied", topic.canonical(), reason);
       subscribeCounter(topic, MetricNames.OUTCOME_DENIED, reason).increment();
@@ -994,7 +723,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     }
     WebSocketSession decorated = decorated(session);
     if (!decorated.isOpen() || subs == null || !subs.contains(topic.canonical())) {
-      // Socket closed (or the subscribe was cleaned up) while the probe ran: nothing to join.
       if (subs != null) {
         subs.remove(topic.canonical());
       }
@@ -1002,8 +730,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     }
     joinRoom(decorated, topic);
     if (!decorated.isOpen()) {
-      // Lost the race with a concurrent close between the check and the join: undo so no closed
-      // decorator lingers in the room.
       leaveRoom(decorated, topic);
       return;
     }
@@ -1015,11 +741,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Maps a refusal to its bounded {@code reason} value, so a permission verdict and a fail-closed
-   * availability symptom stop sharing one indistinguishable {@code outcome=denied} series — and, on
-   * the wire, one indistinguishable {@code denied} control frame. The same value is used for both:
-   * a closed two-element vocabulary that is safe as a metric tag (REQ-OBS-006) and stable enough
-   * for the client to branch on.
+   * Maps a refusal to its bounded {@code reason} value, used as metric tag and wire field
+   * (REQ-OBS-006).
    *
    * @param decision the refusing verdict
    * @return {@link MetricNames#SUBSCRIBE_DENY_INDETERMINATE} for a fail-closed indeterminate
@@ -1033,10 +756,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Handles a {@code changed} frame on a multiplexed socket. Publishing needs no subscription —
-   * only an authenticated socket, a known topic class, the per-session rate limit and the class's
-   * section whitelist — so this resolves the frame's own topic, sanitises, relays locally
-   * (excluding the origin) and hands the signal to the cross-replica fan-out.
+   * Handles a {@code changed} frame: resolves its topic, sanitises the sections, relays locally
+   * (excluding the origin) and hands it to the cross-replica fan-out; no subscription is required.
    *
    * @param session the publishing session
    * @param node the parsed {@code changed} frame
@@ -1045,13 +766,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     String rawTopic = textValue(node, "topic");
     LiveSyncTopic topic = LiveSyncTopic.parse(rawTopic);
     if (topic == null) {
-      // The publish-side face of the client/server topic-vocabulary skew the subscribe path counts:
-      // the acting client believes in a topic this server does not know, so its peers never hear of
-      // the change (REQ-FE-010) and the drop is otherwise completely silent. Not counted — the
-      // relay-drop meter requires a `topic_class` an unparseable topic has none of, and the
-      // unlabelled invalid-topic meter is defined for the subscribe path, so widening it here would
-      // change what its dashboards and alerts mean. DEBUG because the frame is client-supplied and
-      // therefore an attacker-triggerable flood at INFO/WARN.
       log.debug(
           "Discarding live-sync changed frame for unknown topic '{}'",
           LogSafe.text(rawTopic, MAX_LOGGED_TOPIC_LENGTH));
@@ -1070,10 +784,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Handles a presence frame ({@code focus}/{@code blur}/{@code heartbeat}) on a multiplexed
-   * socket. Presence is only tracked for a presence-enabled class and only for a room the socket is
-   * actually subscribed to; a {@code focus}/{@code heartbeat} touches the editor entry and a {@code
-   * blur} clears it, and any state change fans a fresh snapshot to the room.
+   * Handles a presence frame for a subscribed, presence-enabled room: {@code focus}/{@code
+   * heartbeat} touch the editor entry, {@code blur} clears it, and any change broadcasts a
+   * snapshot.
    *
    * @param session the session
    * @param node the parsed presence frame
@@ -1099,7 +812,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         || sectionKey.length() > MAX_SECTION_KEY_LENGTH) {
       return;
     }
-    // Rate-limit the presence path per session (#1245) — see allowPresenceFrame for the rationale.
     if (!allowPresenceFrame(session)) {
       droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
       return;
@@ -1137,16 +849,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Sends a tiny control frame ({@code {"type":…,"topic":…}}) — a {@code subscribed} ack or a
-   * {@code denied} refusal — to a multiplexed socket, carrying no {@code reason}. Used for the two
-   * refusals decided before an authorization verdict exists (an unparseable topic, the per-session
-   * topic cap): both are terminal for the client by nature, and an absent {@code reason} is exactly
-   * what its terminal default keys off.
+   * Sends a {@code subscribed} or {@code denied} control frame without a {@code reason}, which the
+   * client treats as terminal.
    *
-   * @param session the target session (its decorator is resolved and written to)
+   * @param session the target session (its decorator is written to)
    * @param type the control-frame type ({@code subscribed} / {@code denied})
-   * @param topicString the topic the control frame refers to (echoed as-is; may be an unparseable
-   *     value for a denied unknown-topic subscribe)
+   * @param topicString the topic echoed as-is; may be unparseable for a denied subscribe
    */
   private void sendControlFrame(
       @NotNull WebSocketSession session, @NotNull String type, String topicString) {
@@ -1154,24 +862,13 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Sends a tiny control frame to a multiplexed socket, tolerating a closed/broken peer. Control
-   * frames are low-volume, so no relay-drop metric is recorded here.
+   * Sends a control frame, tolerating a closed peer; a {@code denied} frame carries its bounded
+   * reason from {@link #denyReason(LiveSyncSubscriptionAuthorizer.Decision)} when known.
    *
-   * <p>A {@code denied} frame carries the refusal's {@code reason} when one is known, so the client
-   * can tell an <em>authorization</em> verdict ({@link MetricNames#SUBSCRIBE_DENY_AUTHZ} — the
-   * caller may genuinely not read this room, so the refusal is terminal) from a <em>fail-closed
-   * indeterminate</em> one ({@link MetricNames#SUBSCRIBE_DENY_INDETERMINATE} — an availability
-   * symptom of a backend blip, which {@code krt-live-sync.js} retries exactly once on its next
-   * reconnect). Before the tag rode along, both flavours were the same opaque {@code denied} frame,
-   * so a 30-second blip stripped live sync from that tab permanently. The value comes from {@link
-   * #denyReason(LiveSyncSubscriptionAuthorizer.Decision)}, i.e. the same closed, bounded vocabulary
-   * the deny metric's {@code reason} tag uses — never free text.
-   *
-   * @param session the target session (its decorator is resolved and written to)
+   * @param session the target session (its decorator is written to)
    * @param type the control-frame type ({@code subscribed} / {@code denied})
-   * @param topicString the topic the control frame refers to (echoed as-is; may be an unparseable
-   *     value for a denied unknown-topic subscribe)
-   * @param reason the bounded refusal reason to carry, or {@code null} to omit the field
+   * @param topicString the topic echoed as-is; may be unparseable for a denied subscribe
+   * @param reason the bounded refusal reason, or {@code null} to omit the field
    */
   private void sendControlFrame(
       @NotNull WebSocketSession session,
@@ -1214,21 +911,15 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   @Nullable
   @SuppressWarnings("unchecked")
   private static Set<String> subscriptions(@NotNull WebSocketSession session) {
-    // Object -> generic cast is unavoidable reading the WebSocket attribute map
-    // (Map<String,Object>);
-    // ATTR_SUBSCRIPTIONS is only ever written as a ConcurrentHashMap keySet of topic strings.
     Object value = session.getAttributes().get(ATTR_SUBSCRIPTIONS);
     return value instanceof Set ? (Set<String>) value : null;
   }
 
   /**
-   * Resolves the authorities captured at handshake ({@link #ATTR_AUTHORITIES}) as a {@code
-   * Set<String>}, or {@code null} when none were captured — then a locally role-gated subscribe
-   * fails open. Rebuilt (rather than cast) so no unchecked cast is needed reading the untyped
-   * attribute map.
+   * Resolves the authorities captured at handshake ({@link #ATTR_AUTHORITIES}).
    *
    * @param session the session
-   * @return the captured authority names, or {@code null}
+   * @return the captured authority names, or {@code null} when none were captured
    */
   @Nullable
   private static Set<String> capturedAuthorities(@NotNull WebSocketSession session) {
@@ -1243,14 +934,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Counter {@code basetool_livesync_subscribe_total{topic_class, outcome, reason}} for a subscribe
-   * verdict. Micrometer requires a uniform tag-key set per meter name, so the {@code allowed} row
-   * carries {@link MetricNames#REASON_NONE} rather than omitting the tag.
+   * Returns the {@code basetool_livesync_subscribe_total{topic_class, outcome, reason}} counter for
+   * a subscribe verdict.
    *
    * @param topic the subscribed topic (its class tags the metric)
    * @param outcome {@link MetricNames#OUTCOME_ALLOWED} or {@link MetricNames#OUTCOME_DENIED}
-   * @param reason the bounded deny reason ({@link MetricNames#SUBSCRIBE_DENY_AUTHZ} / {@link
-   *     MetricNames#SUBSCRIBE_DENY_INDETERMINATE}), or {@link MetricNames#REASON_NONE} on an allow
+   * @param reason the bounded deny reason, or {@link MetricNames#REASON_NONE} on an allow
    * @return the counter to increment
    */
   private Counter subscribeCounter(
@@ -1266,18 +955,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Relays a {@code changed} signal that arrived from a peer replica via the fan-out (ADR-0094) to
-   * this instance's local room. No origin session is excluded — the originator lives on another
-   * replica — and nothing is re-published (that would loop).
-   *
-   * <p>The section keys are re-validated against the topic class's whitelist here too. The
-   * publishing replica already sanitised them before it put the frame on Redis, so this is
-   * defense-in-depth — it keeps the relay robust to a malformed or older-version peer, or a
-   * tampered Redis payload, matching the whitelist-on-ingest posture of the two client/server
-   * publish paths ({@link #handleMultiplexedChanged}, {@link #publishFromServer}).
+   * Relays a {@code changed} signal from a peer replica to this instance's room without
+   * re-publishing it; the sections are re-checked against the class whitelist.
    *
    * @param canonicalTopic the canonical topic string
-   * @param sections the section keys from the peer replica (re-filtered to the class whitelist)
+   * @param sections the section keys from the peer replica
    */
   public void deliverFromFanout(@NotNull String canonicalTopic, @NotNull List<String> sections) {
     LiveSyncTopic topic = LiveSyncTopic.parse(canonicalTopic);
@@ -1293,15 +975,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Publishes a <em>server-originated</em> {@code changed} signal (REQ-FE-015, ADR-0094): relays it
-   * to this instance's local room (no origin to exclude — there is no acting socket) and hands it
-   * to the cross-replica fan-out. This is the seam a controller uses when the mutating actor has no
-   * socket to publish from — chiefly an <b>anonymous guest order create</b>, which must still poke
-   * the staff {@code orders} queue every logged-in viewer is subscribed to. The sections are
-   * validated against the topic class's whitelist just like a client frame.
+   * Publishes a server-originated {@code changed} signal (REQ-FE-015) to the local room and the
+   * fan-out, e.g. for an anonymous guest order create; sections are whitelist-filtered.
    *
    * @param canonicalTopic the canonical topic string (unknown topics are ignored)
-   * @param sections the section keys to relay (filtered to the class whitelist)
+   * @param sections the section keys to relay
    */
   public void publishFromServer(@NotNull String canonicalTopic, @NotNull List<String> sections) {
     LiveSyncTopic topic = LiveSyncTopic.parse(canonicalTopic);
@@ -1318,13 +996,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Keeps only the section keys that belong to a class's whitelist, de-duplicated and capped — the
-   * {@link List}-input counterpart of {@link #sanitiseSections(JsonNode, LiveSyncTopicClass)} for a
-   * server-originated publish or a peer-replica delivery.
+   * Keeps only whitelisted section keys, de-duplicated and capped; the {@link List} counterpart of
+   * {@link #sanitiseSections(JsonNode, LiveSyncTopicClass)}.
    *
    * @param sections the raw section keys
    * @param topicClass the class whose whitelist applies
-   * @return the accepted keys plus the rejection evidence {@link #reportFilteredSections} needs
+   * @return the accepted keys plus the rejection evidence
    */
   @NotNull
   private static FilteredSections retainAllowed(
@@ -1355,27 +1032,13 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Reports the section keys one {@code changed} frame lost to the topic class's whitelist — the
-   * REQ-FE-010 defect class made observable.
+   * Counts, once per frame, the section keys a {@code changed} frame lost to the whitelist and logs
+   * one DEBUG line with the first rejected key via {@link LogSafe} (REQ-FE-010).
    *
-   * <p>An acting client (or a server publish, or a peer replica) broadcasting a key this relay's
-   * accept-list does not know leaves every peer's matching panel stale, with no error either side:
-   * {@code relay_frames_total{type="changed"}} keeps climbing while nothing records the key was
-   * filtered. This counts exactly that, once per frame (not once per key, which would make one
-   * crafted frame worth {@link #MAX_CHANGED_SECTIONS} increments), and logs one DEBUG line carrying
-   * the count plus the first rejected key as a representative sample.
-   *
-   * <p>DEBUG is mandatory here and the level is a contract: on the client path the frame — and the
-   * key inside it — is entirely client-supplied, so INFO or WARN would be an attacker-triggerable
-   * log flood. The key is rendered through {@link LogSafe} (control characters stripped, truncated
-   * at {@link #MAX_SECTION_KEY_LENGTH}) because it is free text on its way to a logger, and it is
-   * never used as a metric tag value — that would be unbounded, client-controlled cardinality
-   * (REQ-OBS-006).
-   *
-   * @param topic the topic the frame targeted (its class tags the drop counter)
-   * @param filtered the filter outcome; a zero rejection count reports nothing at all
-   * @param source which publish path produced the frame, for the log line only (a fixed literal —
-   *     {@code client} / {@code server} / {@code fan-out})
+   * @param topic the targeted topic (its class tags the drop counter)
+   * @param filtered the filter outcome; zero rejections report nothing
+   * @param source the publish path for the log line: {@code client}, {@code server} or {@code
+   *     fan-out}
    */
   private void reportFilteredSections(
       @NotNull LiveSyncTopic topic, @NotNull FilteredSections filtered, @NotNull String source) {
@@ -1394,40 +1057,19 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Outcome of filtering one {@code changed} frame's section keys against a topic class's
-   * whitelist: what survived, plus the evidence {@link #reportFilteredSections} needs to make the
-   * silent drop visible.
-   *
-   * <p>Only keys the whitelist refused count as rejected. A duplicate is collapsed rather than
-   * rejected (the client's vocabulary is fine, it just said the same thing twice) and a non-string
-   * array entry is malformed input rather than vocabulary skew, so neither inflates the count.
+   * Outcome of filtering one frame's section keys against a class whitelist; duplicates and
+   * non-string entries do not count as rejected.
    *
    * @param accepted the accepted, de-duplicated, {@link #MAX_CHANGED_SECTIONS}-capped keys
-   * @param rejected how many keys the class whitelist refused
-   * @param firstRejectedKey the first refused key, kept as the single representative for the
-   *     one-line-per-frame DEBUG report, or {@code null} when nothing was refused
+   * @param rejected how many keys the whitelist refused
+   * @param firstRejectedKey the first refused key, or {@code null} when none was refused
    */
   private record FilteredSections(List<String> accepted, int rejected, String firstRejectedKey) {}
 
   /**
-   * Reaper tick — three jobs, all on a single daemon thread; any thrown exception is logged and
-   * swallowed so a transient failure does not kill the reaper.
-   *
-   * <ol>
-   *   <li>drop expired local presence entries and broadcast (plus gossip) the shrunken snapshot to
-   *       rooms that lost at least one entry;
-   *   <li>drop peer partitions whose replica has gone quiet past {@link
-   *       LiveSyncPresenceService#REMOTE_PARTITION_TTL} and broadcast those rooms locally — a
-   *       <em>local</em> consequence of remote state, so it is deliberately not re-gossiped;
-   *   <li>re-gossip this instance's presence snapshot for every still-tracked topic (ADR-0126).
-   * </ol>
-   *
-   * <p>The periodic re-gossip is what makes the cross-replica mirror self-healing rather than
-   * delta-ordered: a dropped message, a Redis blip or a replica that started after the fact all
-   * converge within one tick, with no delete frames, no acknowledgements and no assumption that
-   * messages arrive in order. It costs one small message per <em>actively edited</em> topic per
-   * tick — {@link LiveSyncPresenceService#trackedTopics()} is empty whenever nobody has a mission
-   * panel focused, which is the overwhelmingly common case.
+   * Reaper tick: drops expired local presence and broadcasts it, drops remote partitions older than
+   * {@link LiveSyncPresenceService#REMOTE_PARTITION_TTL}, and re-gossips every tracked topic's
+   * presence (ADR-0126). Exceptions are logged and swallowed.
    */
   void tickReaper() {
     try {
@@ -1454,16 +1096,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Pings every open socket so the edge proxy sees traffic on an otherwise silent connection and
-   * does not close it as idle (see {@link #KEEPALIVE_INTERVAL} for why this is server-originated
-   * and why 30 s).
-   *
-   * <p>A failure is per socket, never per sweep: a peer that has gone away throws on the write, and
-   * the one socket is dropped from the registry while the rest of the sweep continues. Dropping it
-   * here is belt-and-braces — the container still delivers {@code afterConnectionClosed}, which
-   * removes it as well — but a socket that can no longer be written to must not be pinged again in
-   * 30 seconds either way. A closed session is skipped without a write attempt, so the ordinary
-   * close race costs nothing.
+   * Pings every open socket; a socket whose write fails is dropped, and closed sockets are skipped.
    */
   void tickKeepalive() {
     for (WebSocketSession session : List.copyOf(liveSessions)) {
@@ -1498,9 +1131,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     for (String canonical : uniqueTopics) {
       LiveSyncTopic topic = LiveSyncTopic.parse(canonical);
       if (topic != null) {
-        // Gossips even when the topic just lost its last local editor and is therefore no longer
-        // tracked: that empty snapshot is exactly what drops this instance's partition on the peers
-        // immediately, instead of leaving decayed dots up for a full REMOTE_PARTITION_TTL.
         broadcastLocalPresenceChange(topic);
       }
     }
@@ -1508,11 +1138,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Drops peer partitions that have not been re-gossiped within {@link
-   * LiveSyncPresenceService#REMOTE_PARTITION_TTL} — a replica that crashed, was scaled away or lost
-   * Redis — and broadcasts the shrunken snapshot to this instance's rooms. Nothing is published:
-   * the expiry is a purely local conclusion about a silent peer, and every other replica reaches it
-   * independently on its own tick.
+   * Drops peer presence partitions not re-gossiped within {@link
+   * LiveSyncPresenceService#REMOTE_PARTITION_TTL} and broadcasts the result locally without
+   * publishing.
    */
   private void broadcastRemotelyExpiredPresence() {
     for (String canonical : presenceService.reapExpiredRemote(Instant.now())) {
@@ -1540,15 +1168,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Sanitises an inbound {@code sections} array against a topic class's whitelist: non-string
-   * entries and keys outside {@link LiveSyncTopicClass#allowedSections()} are dropped, duplicates
-   * are collapsed, and the count is capped at {@link #MAX_CHANGED_SECTIONS}. This is what stops a
-   * client injecting an arbitrary fetch target or amplifying one frame into an unbounded fan-out.
-   *
-   * <p>Rejected keys are not swallowed: the returned {@link FilteredSections} carries the count and
-   * a sample so {@link #reportFilteredSections} can count and log the drop, which is what turns a
-   * client/relay vocabulary skew from an invisible stale panel into an observable signal
-   * (REQ-FE-010).
+   * Sanitises an inbound {@code sections} array: drops non-strings and keys outside {@link
+   * LiveSyncTopicClass#allowedSections()}, collapses duplicates and caps at {@link
+   * #MAX_CHANGED_SECTIONS}.
    *
    * @param sectionsNode the raw {@code sections} node (may be {@code null} or not an array)
    * @param topicClass the class whose whitelist applies
@@ -1587,9 +1209,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Fans a sanitised {@code changed} frame out to every socket in the topic's room except {@code
-   * origin} (which already applied its own change; {@code null} when the frame came from a peer
-   * replica via the fan-out, where no local origin exists).
+   * Sends a sanitised {@code changed} frame to every socket in the topic's room except {@code
+   * origin}.
    *
    * @param topic the topic whose room receives the frame
    * @param sections the sanitised section keys
@@ -1628,17 +1249,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Applies a peer replica's gossiped editor-presence snapshot (ADR-0126) — the presence-channel
-   * counterpart of {@link #deliverFromFanout(String, List)} — and re-broadcasts the merged dots to
-   * this instance's room when the merged view actually changed. Nothing is re-published, which is
-   * what keeps two replicas from echoing each other's state forever.
-   *
-   * <p>The payload is re-validated here, not trusted: the topic must parse to a
-   * <em>presence-enabled</em> class (so a peer can never open a presence surface on a class that
-   * has none), and section keys are held to the same shape bound as an inbound client frame. The
-   * publishing replica already applied both, so this is defense-in-depth against a malformed or
-   * older-version peer or a tampered Redis payload — the same posture {@link
-   * #deliverFromFanout(String, List)} takes on the changed channel.
+   * Applies a peer replica's presence snapshot (ADR-0126) and re-broadcasts locally when the merged
+   * view changed, without re-publishing; only presence-enabled topics and well-formed keys are
+   * accepted.
    *
    * @param canonicalTopic the canonical topic string (unknown or non-presence topics are ignored)
    * @param originId the publishing replica's instance id, which keys its partition
@@ -1671,15 +1284,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Broadcasts the merged presence snapshot for a topic to this instance's room <em>and</em>
-   * gossips this instance's own half to peer replicas (ADR-0126). Called from every path that
-   * mutates local presence — {@code focus}/{@code blur}, a socket close, a heartbeat-TTL reap — so
-   * a dot appears and disappears on every replica at the same time rather than within the next
-   * gossip tick.
-   *
-   * <p>The peer-driven path ({@link #deliverPresenceFromFanout(String, String, Map)}) deliberately
-   * calls {@link #broadcastSnapshot(LiveSyncTopic)} instead: re-publishing on consume would make
-   * two replicas echo each other indefinitely.
+   * Broadcasts a topic's merged presence snapshot locally and gossips this instance's part to peer
+   * replicas (ADR-0126); called on every local presence change.
    *
    * @param topic the topic whose presence changed locally
    */
@@ -1711,9 +1317,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Per-session token-bucket rate limit on inbound {@code changed} frames. Consumes and returns
-   * {@code true} when a token is available, or returns {@code false} (dropping the frame) once the
-   * session exceeds {@link #CHANGED_BURST} frames refilled at {@link #CHANGED_REFILL_PER_SEC}/s.
+   * Per-session rate limit on inbound {@code changed} frames ({@link #CHANGED_BURST} refilled at
+   * {@link #CHANGED_REFILL_PER_SEC}/s).
    *
    * @param session the session that sent the frame
    * @return {@code true} to relay the frame, {@code false} to drop it as throttled
@@ -1723,12 +1328,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Per-session token-bucket rate limit on inbound presence control frames ({@code focus} / {@code
-   * heartbeat} / {@code blur}), mirroring {@link #allowChangedFrame} (#1245). Bounds the per-topic
-   * presence-map growth rate and the snapshot-broadcast amplification a crafted client could drive
-   * by looping {@code focus} frames with unique section keys; {@link
-   * LiveSyncPresenceService#MAX_SECTIONS_PER_TOPIC} bounds the absolute map size, this bounds the
-   * rate.
+   * Per-session rate limit on inbound presence frames ({@code focus} / {@code heartbeat} / {@code
+   * blur}).
    *
    * @param session the session that sent the frame
    * @return {@code true} to process the frame, {@code false} to drop it as throttled
@@ -1738,12 +1339,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Per-session token-bucket rate limit on inbound {@code subscribe} frames, the third user of
-   * {@link #allowFrame} alongside {@link #allowChangedFrame} and {@link #allowPresenceFrame}.
-   * Bounds the rate at which one socket can submit authorization probes to {@link #authExecutor} —
-   * the per-session topic cap cannot, because {@link #completeSubscribe} releases the reserved slot
-   * on a deny, so a subscribe → deny → subscribe cycle stays below the cap forever (see {@link
-   * #SUBSCRIBE_BURST}).
+   * Per-session rate limit on inbound {@code subscribe} frames, bounding authorization probes to
+   * {@link #authExecutor}.
    *
    * @param session the session that sent the frame
    * @return {@code true} to process the subscribe, {@code false} to drop it as throttled
@@ -1753,17 +1350,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Shared token-bucket primitive backing {@link #allowChangedFrame}, {@link #allowPresenceFrame}
-   * and {@link #allowSubscribeFrame} — every inbound frame type goes through this one
-   * implementation, so a new frame type gets the same bounded behaviour rather than a fourth
-   * hand-rolled variant. Consumes and returns {@code true} when a token is available, or {@code
-   * false} once the session exceeds {@code burst} frames refilled at {@code refillPerSec}/s. Frames
-   * from one session are delivered serially by the container, so the unsynchronised bucket state
-   * held in the session attributes under {@code attrKey} needs no locking.
+   * Shared per-session token bucket, stored unsynchronised in the session attributes since one
+   * session's frames arrive serially.
    *
    * @param session the session that sent the frame
    * @param attrKey the session-attribute key holding this bucket's state
-   * @param burst the bucket capacity (maximum tokens)
+   * @param burst the bucket capacity
    * @param refillPerSec the token refill rate per second
    * @return {@code true} to process the frame, {@code false} to drop it as throttled
    */
@@ -1788,15 +1380,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Relays a sanitised {@code changed} frame through the per-<em>topic</em> throttle (F2 / #1243):
-   * consumes a token from the topic's bucket and, on success, relays to the local room (excluding
-   * {@code origin}) and hands the frame to the cross-replica fan-out; on exhaustion counts a {@link
-   * MetricNames#DROPPED_TOPIC_THROTTLED} drop and relays nothing. This is the second, room-scoped
-   * gate after the per-session bucket: it bounds a room's aggregate relay + fan-out rate across all
-   * publishers, so no set of sockets can amplify one room's fragment-refetch fan-out. Server-side
-   * publishes ({@link #publishFromServer}) and peer-replica deliveries ({@link #deliverFromFanout})
-   * deliberately bypass this gate — the former is trusted and request-rate-limited upstream, the
-   * latter was already accepted (and throttled) on its originating replica.
+   * Relays a sanitised {@code changed} frame through the per-topic throttle: on success to the
+   * local room (excluding {@code origin}) and the fan-out, otherwise counts a {@link
+   * MetricNames#DROPPED_TOPIC_THROTTLED} drop.
    *
    * @param topic the topic being published to
    * @param sections the sanitised, non-empty section keys
@@ -1815,15 +1401,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Per-topic token-bucket rate limit on accepted {@code changed} frames (F2 / #1243). Unlike the
-   * per-session bucket in {@link #allowChangedFrame} (touched only by that session's delivery
-   * thread), one topic bucket is hit concurrently by every session publishing to the room, so its
-   * token math runs under the bucket instance's monitor; {@code computeIfAbsent} atomically
-   * gets-or-creates the shared instance. A bucket the reaper drops while idle simply gets recreated
-   * full on the next publish — the correct idle state — so the reap never mis-throttles.
+   * Per-topic rate limit on accepted {@code changed} frames; the shared bucket is updated under its
+   * own monitor.
    *
    * @param topic the topic the frame targets
-   * @return {@code true} to relay the frame, {@code false} to drop it as per-topic throttled
+   * @return {@code true} to relay the frame, {@code false} to drop it as throttled
    */
   private boolean allowTopicChanged(@NotNull LiveSyncTopic topic) {
     long now = nanoClock.getAsLong();
@@ -1845,13 +1427,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Drops per-topic {@code changed} buckets untouched for at least {@link
-   * #TOPIC_BUCKET_IDLE_REAP_NANOS}, keeping {@link #changedRateByTopic} bounded to recently-active
-   * rooms rather than accreting one entry per distinct topic ever published to. An idle bucket has
-   * fully refilled, so removing it (and recreating it full on the next publish) is behaviourally
-   * identical; an actively-used bucket's monitor serialises against the token math, so its
-   * just-updated {@code lastRefillNanos} keeps it. Package-private and clock-parameterised so the
-   * test can force reaping deterministically.
+   * Drops per-topic {@code changed} buckets idle for at least {@link
+   * #TOPIC_BUCKET_IDLE_REAP_NANOS}.
    *
    * @param nowNanos the current {@link System#nanoTime()} reading
    */
@@ -1878,11 +1455,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Atomically claims a per-user socket slot (F2 / #1243): increments the user's live-socket count
-   * and, if that would exceed {@link #MAX_SOCKETS_PER_USER}, undoes the increment and refuses.
+   * Atomically claims a per-user socket slot, refusing when the user would exceed {@link
+   * #MAX_SOCKETS_PER_USER}.
    *
    * @param userId the connecting user's stable id (Keycloak {@code sub})
-   * @return {@code true} if a slot was claimed, {@code false} if the user is already at the cap
+   * @return {@code true} if a slot was claimed, {@code false} if the user is at the cap
    */
   private boolean tryAcquireUserSocket(@NotNull String userId) {
     int count = socketsByUser.merge(userId, 1, Integer::sum);
@@ -1894,8 +1471,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Releases a per-user socket slot (F2 / #1243), removing the entry when the user's last socket
-   * closes so the map stays bounded to currently-connected users.
+   * Releases a per-user socket slot, removing the entry when the user's last socket closes.
    *
    * @param userId the closing socket owner's stable id
    */
@@ -1905,11 +1481,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Counter {@code basetool_livesync_socket_rejected_total{reason}} for a {@code /ws/sync} socket
-   * refused at connect. Carries no {@code topic_class} — no topic at socket-establish time.
+   * Returns the {@code basetool_livesync_socket_rejected_total{reason}} counter for a socket
+   * refused at connect.
    *
-   * @param reason the refusal reason (a bounded literal, e.g. {@link
-   *     MetricNames#SOCKET_REJECTED_USER_CAP})
+   * @param reason the bounded refusal reason (e.g. {@link MetricNames#SOCKET_REJECTED_USER_CAP})
    * @return the counter to increment
    */
   private Counter socketRejectedCounter(@NotNull String reason) {
@@ -1947,9 +1522,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Writes one frame to a session, tolerating a closed or broken peer. A send that throws is
-   * counted as a {@code send_failed} relay drop (tagged with the topic class) and reported as not
-   * sent so the caller does not also count it as a delivered frame.
+   * Writes one frame to a session; a failed send is counted as a {@code send_failed} relay drop.
    *
    * @param session the target session
    * @param message the frame to write
@@ -1964,11 +1537,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (!session.isOpen()) {
       return false;
     }
-    // `session` is a ConcurrentWebSocketSessionDecorator (#1149): it serialises concurrent sends
-    // and
-    // bounds a slow consumer via its send-time / buffer-size limits, so NO external synchronized is
-    // used here — that would re-introduce the blocking serial fan-out this fixes. A buffer/time
-    // overflow surfaces as SessionLimitExceededException and TERMINATEs that one socket.
     try {
       session.sendMessage(message);
       return true;
@@ -1998,10 +1566,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Resolves the {@link ConcurrentWebSocketSessionDecorator} registered for a socket (#1149).
-   * Spring hands the handler the raw session on message / close callbacks, but the room holds the
-   * decorator — this returns the decorator stored in the shared attribute map, falling back to the
-   * given session if none was recorded.
+   * Resolves the {@link ConcurrentWebSocketSessionDecorator} registered for a raw session.
    *
    * @param session the raw (or already-decorated) session
    * @return the registered decorator, or {@code session} when none is stored
@@ -2031,9 +1596,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (principal instanceof AbstractAuthenticationToken token) {
       Object p = token.getPrincipal();
       if (p instanceof OidcUser oidc) {
-        // Privacy / data minimisation: the presence label is derived from the public callsign
-        // (preferred_username) only. given_name / family_name / the composite name claim are not
-        // read here — those claims are removed from the Keycloak tokens.
         String preferred = oidc.getPreferredUsername();
         if (preferred != null && !preferred.isBlank()) {
           return preferred;
@@ -2071,11 +1633,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Mutable per-topic token-bucket state for the per-topic {@code changed}-frame throttle (F2 /
-   * #1243). Distinct from {@link ChangedRateState} because one instance is shared across every
-   * session publishing to the room and is therefore mutated under its own monitor (see {@link
-   * #allowTopicChanged} / {@link #reapIdleTopicBuckets}) — a separate type keeps guarded-access
-   * discipline uniform and self-documenting.
+   * Per-topic token-bucket state for the {@code changed}-frame throttle, shared across publishers
+   * and mutated under its own monitor.
    */
   private static final class TopicRateState {
     private double tokens;

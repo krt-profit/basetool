@@ -89,9 +89,6 @@ class InventoryItemServiceTest {
   @Mock private JobOrderItemService jobOrderItemService;
 
   @Mock private AuditService auditService;
-  // Constructed in wireDelegates() rather than by @InjectMocks: two of its collaborators are
-  // REAL sub-services built from the same mocks, and Mockito injects neither one @InjectMocks
-  // target into another nor an object it did not create.
   private InventoryItemService inventoryItemService;
 
   private InventoryAggregationService realAggregationService;
@@ -99,11 +96,6 @@ class InventoryItemServiceTest {
 
   @BeforeEach
   void wireDelegates() {
-    // The facade delegates every read/aggregation to InventoryAggregationService and every checkout
-    // write to InventoryCheckoutService (the L2 split, #921). Mockito does not inject one
-    // @InjectMocks target into another, so build the real sub-services from the same mocks and set
-    // them on the facade. createInventoryItem / updateNote stay on the facade
-    // and use the mocks directly.
     realAggregationService =
         new InventoryAggregationService(
             inventoryItemRepository,
@@ -125,10 +117,6 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             ownerScopeService,
             auditService);
-    // Arg order matches the facade's @RequiredArgsConstructor field order. The two sub-services
-    // used
-    // to be patched into an @InjectMocks facade with ReflectionTestUtils.setField; its fields are
-    // `private final`, the mutation JEP 500 (JDK 26) warns about and a later release will refuse.
     inventoryItemService =
         new InventoryItemService(
             inventoryItemRepository,
@@ -148,16 +136,11 @@ class InventoryItemServiceTest {
 
   @Test
   void getMissionInventory_mapsEveryItemLinkedToTheMission() {
-    // #1138: the mission economy moved off the embedded MissionDto.inventoryEntries field onto a
-    // dedicated read that lists every item linked to the mission and maps each to its display DTO.
     UUID missionId = UUID.randomUUID();
     InventoryItem a = new InventoryItem();
     InventoryItem b = new InventoryItem();
     InventoryItemDto da = mock(InventoryItemDto.class);
     InventoryItemDto db = mock(InventoryItemDto.class);
-    // The mission panel is org-unit scoped now (REQ-ORG-003): InventoryItem is strict-staffel and
-    // the mission link was an undocumented third widener, so a member of any Staffel could read a
-    // foreign Staffel's mission stock by enumerating public missions.
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findByMissionIdScoped(missionId, true, null, java.util.Set.of()))
@@ -175,7 +158,6 @@ class InventoryItemServiceTest {
 
   @Test
   void getAggregatedInventory_shouldReturnPage() {
-    // material, weighted-avg quality, MAX quality, total amount (REQ-INV-027 max-quality column).
     Object[] obj = new Object[] {new Material(), 10.0, 900, 5L};
     Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
     when(ownerScopeService.currentScopePredicate())
@@ -199,8 +181,6 @@ class InventoryItemServiceTest {
   void getInventoryByMaterial_shouldReturnPage() {
     UUID materialId = UUID.randomUUID();
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
-    // Post-fix #5: getInventoryByMaterial routes through the scoped repository variant so
-    // a Lager-direct drilldown stays strictly squadron-isolated.
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findByMaterialAndPersonalFalseScoped(
@@ -260,7 +240,6 @@ class InventoryItemServiceTest {
 
   @Test
   void getAllInventory_shouldPassJobOrderAndMissionFilters() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     UUID missionId = UUID.randomUUID();
     List<UUID> jobOrderIds = List.of(jobOrderId);
@@ -285,12 +264,10 @@ class InventoryItemServiceTest {
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
 
-    // When
     Page<InventoryItemDto> result =
         inventoryItemService.getAllInventory(
             null, null, null, jobOrderIds, missionIds, Pageable.unpaged());
 
-    // Then
     assertNotNull(result);
     assertEquals(1, result.getTotalElements());
     verify(inventoryItemRepository)
@@ -312,7 +289,6 @@ class InventoryItemServiceTest {
 
   @Test
   void getMyAggregatedInventory_shouldPassJobOrderAndMissionFilters() {
-    // Given
     UUID userId = UUID.randomUUID();
     UUID jobOrderId = UUID.randomUUID();
     UUID missionId = UUID.randomUUID();
@@ -337,11 +313,9 @@ class InventoryItemServiceTest {
             eq(false)))
         .thenReturn(List.of());
 
-    // When
     List<GroupedInventoryDto> result =
         inventoryItemService.getMyAggregatedInventory(userId, jobOrderIds, missionIds);
 
-    // Then
     assertNotNull(result);
     verify(inventoryItemRepository)
         .findUserStacks(
@@ -401,7 +375,6 @@ class InventoryItemServiceTest {
 
   @Test
   void getMyAggregatedInventory_shouldPassMaterialAndMinQualityFilters() {
-    // Given
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     List<UUID> materialIds = List.of(materialId);
@@ -425,11 +398,9 @@ class InventoryItemServiceTest {
             eq(false)))
         .thenReturn(List.of());
 
-    // When
     List<GroupedInventoryDto> result =
         inventoryItemService.getMyAggregatedInventory(userId, materialIds, minQuality, null, null);
 
-    // Then
     assertNotNull(result);
     verify(inventoryItemRepository)
         .findUserStacks(
@@ -449,7 +420,6 @@ class InventoryItemServiceTest {
 
   @Test
   void getMyAggregatedInventory_personalOnly_forwardsFlagToRepository() {
-    // Given
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
@@ -470,12 +440,10 @@ class InventoryItemServiceTest {
             eq(false)))
         .thenReturn(List.of());
 
-    // When
     List<GroupedInventoryDto> result =
         inventoryItemService.getMyAggregatedInventory(
             userId, null, null, null, null, null, true, false);
 
-    // Then
     assertNotNull(result);
     verify(inventoryItemRepository)
         .findUserStacks(
@@ -495,7 +463,6 @@ class InventoryItemServiceTest {
 
   @Test
   void getMyAggregatedInventory_nonPersonalOnly_forwardsFlagToRepository() {
-    // Given
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
@@ -516,12 +483,10 @@ class InventoryItemServiceTest {
             eq(true)))
         .thenReturn(List.of());
 
-    // When
     List<GroupedInventoryDto> result =
         inventoryItemService.getMyAggregatedInventory(
             userId, null, null, null, null, null, false, true);
 
-    // Then
     assertNotNull(result);
     verify(inventoryItemRepository)
         .findUserStacks(
@@ -606,8 +571,6 @@ class InventoryItemServiceTest {
 
   @Test
   void createInventoryItem_withSplitAtCheckIn_writesEachAllocation() {
-    // Variante C (REQ-INV-027, R4): split at check-in — the entry earmarks parts of its amount to
-    // several job orders and a mission with their own amounts.
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -675,7 +638,6 @@ class InventoryItemServiceTest {
 
   @Test
   void createInventoryItem_withSplitExceedingAmount_throwsOverAllocation() {
-    // R5: Σ per dimension must stay within the entry amount; 8 + 5 > 10 => 422.
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -810,9 +772,6 @@ class InventoryItemServiceTest {
 
   @Test
   void createInventoryItem_shouldRejectWhenMaterialNotRequiredByJobOrder() {
-    // REQ-ORDERS-018: a material may only be linked to an order that requires it; otherwise the
-    // link
-    // binds stock to the order while staying invisible in its (requirement-driven) material view.
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -847,7 +806,6 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
-    // The order requires a DIFFERENT material than the one being linked.
     when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
 
     assertThrows(
@@ -857,7 +815,6 @@ class InventoryItemServiceTest {
 
   @Test
   void createInventoryItem_shouldAllowWhenMaterialRequiredByJobOrder() {
-    // REQ-ORDERS-018: linking is permitted when the order actually requires the material.
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -902,14 +859,11 @@ class InventoryItemServiceTest {
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
-    // Variante C (REQ-INV-027): a single-assignment create writes one job-order slice for the
-    // entry's full amount, so the earmark lives on the allocation, not a vestigial entry scalar.
     assertSame(jobOrder, captor.getValue().getJobOrderAllocations().get(0).getJobOrder());
   }
 
   @Test
   void createInventoryItem_shouldRoundAmountToThreeDecimals() {
-    // Given
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -947,10 +901,8 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
-    // When
     inventoryItemService.createInventoryItem(dto, userId);
 
-    // Then
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -983,13 +935,8 @@ class InventoryItemServiceTest {
   }
 
   /**
-   * REQ-SEC-005 regression: the receiver is authorised against the TARGET, never against a role.
-   *
-   * <p>Before this gate the decision was a flat {@code isLogisticianOrAbove()} boolean handed in
-   * from the controller, so a logistician of any Staffel could fabricate stock in a member of any
-   * other Staffel's ledger. The scope predicate must be consulted with the requested id, and it
-   * must be consulted BEFORE the user lookup so a refused caller cannot tell "no such user" from
-   * "access denied" and use the endpoint as an existence oracle.
+   * Creating stock for a target outside the caller's scope is refused (REQ-SEC-005), and the scope
+   * check runs before the user lookup so the endpoint does not reveal whether the user exists.
    */
   @Test
   void createInventoryItem_shouldThrowAccessDenied_whenTargetIsOutsideTheCallersScope() {
@@ -1040,9 +987,6 @@ class InventoryItemServiceTest {
             null,
             null,
             null);
-    // Scope is fine - a logistician of the target's own Staffel. The personal pool is still closed,
-    // because the write-time merge (REQ-INV-026) keys on `personal` and would fold the target's own
-    // private rows into the response.
     when(ownerScopeService.canManageUserInventory(foreignUserId)).thenReturn(true);
 
     assertThrows(
@@ -1091,17 +1035,14 @@ class InventoryItemServiceTest {
         target, captor.getValue().getUser(), "the row must be booked for the requested receiver");
   }
 
-  // --- game-item stock rows (V220, REQ-INV-029/031) --------------------------
-
   /**
-   * Builds a game-item create payload for the fixed owner/location pair with the given job-order /
-   * mission references (quality {@code null}, amount 5.0, non-personal — the well-formed item
-   * shape).
+   * Builds a well-formed game-item create payload for the fixed owner/location pair (quality {@code
+   * null}, amount 5.0, non-personal).
    *
    * @param userId the target owner
    * @param gameItemId the game-item reference
    * @param locationId the storage location
-   * @param missionId the legacy single mission reference, or {@code null}
+   * @param missionId the single mission reference, or {@code null}
    * @param jobOrderAllocations the job-order split list, or {@code null}
    * @param missionAllocations the mission split list, or {@code null}
    * @return the assembled payload
@@ -1152,10 +1093,8 @@ class InventoryItemServiceTest {
     return gameItem;
   }
 
-  // covers REQ-INV-029 (item create resolves the gameItem and stamps it, material stays null)
   @Test
   void createInventoryItem_gameItemRow_resolvesGameItemAndLeavesMaterialNull() {
-    // Given a gameItem-only payload
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1164,11 +1103,8 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
-    // When
     inventoryItemService.createInventoryItem(dto, userId);
 
-    // Then — the saved row is a catalog-consistent item row: gameItem set, material and quality
-    // null (the XOR the DB CHECK chk_inventory_item_catalog_xor enforces), whole-unit amount.
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -1179,10 +1115,8 @@ class InventoryItemServiceTest {
     verify(materialRepository, never()).findById(any());
   }
 
-  // covers REQ-INV-029 (unknown gameItem id -> 404)
   @Test
   void createInventoryItem_unknownGameItem_throwsNotFound() {
-    // Given a payload naming a game item that does not exist
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     InventoryItemCreateDto dto =
@@ -1192,17 +1126,13 @@ class InventoryItemServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(gameItemRepository.findById(gameItemId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(
         NotFoundException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // covers REQ-INV-031 (service belt: item rows carry no mission dimension — single missionId)
   @Test
   void createInventoryItem_gameItemWithMissionId_throwsBadRequest() {
-    // Given a game-item payload carrying the legacy single mission reference (as a crafted payload
-    // that bypassed the DTO's @AssertTrue guard would)
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1210,16 +1140,13 @@ class InventoryItemServiceTest {
         itemCreateDto(userId, gameItemId, locationId, UUID.randomUUID(), null, null);
     stubItemCreateResolution(userId, gameItemId, locationId);
 
-    // When / Then
     assertThrows(
         BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // covers REQ-INV-031 (service belt: item rows carry no mission dimension — split list)
   @Test
   void createInventoryItem_gameItemWithMissionAllocations_throwsBadRequest() {
-    // Given a game-item payload with a Variante-C mission split
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1233,16 +1160,13 @@ class InventoryItemServiceTest {
             java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0)));
     stubItemCreateResolution(userId, gameItemId, locationId);
 
-    // When / Then
     assertThrows(
         BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // covers REQ-INV-031 (check-in slice loop gates item rows on the order's requested game items)
   @Test
   void createInventoryItem_gameItemSlice_orderNotRequestingItem_throwsBadRequest() {
-    // Given an ITEM order that requests a DIFFERENT game item than the one being booked in
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1261,17 +1185,13 @@ class InventoryItemServiceTest {
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderItemService.requiredGameItemIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
 
-    // When / Then
     assertThrows(
         BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // covers REQ-INV-031 (a MATERIAL order requests no game items -> item earmark rejected)
   @Test
   void createInventoryItem_gameItemSlice_materialOrder_throwsBadRequest() {
-    // Given a MATERIAL order: requiredGameItemIds is the empty set by contract, so no item stock
-    // may ever be earmarked to it
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1290,16 +1210,13 @@ class InventoryItemServiceTest {
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(materialOrder));
     when(jobOrderItemService.requiredGameItemIds(materialOrder)).thenReturn(Set.of());
 
-    // When / Then
     assertThrows(
         BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // covers REQ-INV-031 (qualifying ITEM order -> slice written through the gameItem gate)
   @Test
   void createInventoryItem_gameItemSlice_qualifyingItemOrder_writesSlice() {
-    // Given an ITEM order that requests exactly the booked game item
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1320,11 +1237,8 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
-    // When
     inventoryItemService.createInventoryItem(dto, userId);
 
-    // Then — the slice is written via the gameItem gate; the material gate is never consulted
-    // (an item row has no material to check).
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -1333,10 +1247,8 @@ class InventoryItemServiceTest {
     verify(jobOrderItemService, never()).requiredMaterialIds(any(JobOrder.class));
   }
 
-  // covers REQ-INV-029 (item allocation slices are whole units)
   @Test
   void createInventoryItem_gameItemFractionalSliceAmount_throwsBadRequest() {
-    // Given an item payload whose job-order slice is fractional
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1350,20 +1262,13 @@ class InventoryItemServiceTest {
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
 
-    // When / Then — the whole-unit rule fires before the order lookup, mirroring PIECE materials
     assertThrows(
         BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // --- service-level catalog belts behind the DTO guards (V220, REQ-INV-029) --
-
-  // covers REQ-INV-029 (service belt: both catalog references -> 400, not an opaque V220 CHECK 500)
   @Test
   void createInventoryItem_bothCatalogReferences_throwsBadRequest() {
-    // Given a crafted payload carrying BOTH materialId and gameItemId (as a client that bypassed
-    // the DTO's @AssertTrue XOR guard would send); entity resolution runs BEFORE the belts, so
-    // every referenced id must resolve
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
@@ -1397,7 +1302,6 @@ class InventoryItemServiceTest {
     when(gameItemRepository.findById(gameItemId)).thenReturn(Optional.of(gameItem));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
 
-    // When / Then
     BadRequestException ex =
         assertThrows(
             BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
@@ -1405,11 +1309,8 @@ class InventoryItemServiceTest {
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // covers REQ-INV-029 (service belt: neither catalog reference -> 400)
   @Test
   void createInventoryItem_neitherCatalogReference_throwsBadRequest() {
-    // Given a crafted payload carrying neither materialId nor gameItemId — only the user and the
-    // location resolve (the null catalog ids skip both catalog lookups)
     UUID userId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
     InventoryItemCreateDto dto =
@@ -1423,7 +1324,6 @@ class InventoryItemServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
 
-    // When / Then — neither catalog repository is consulted, the belt 400s
     BadRequestException ex =
         assertThrows(
             BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
@@ -1433,10 +1333,8 @@ class InventoryItemServiceTest {
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // covers REQ-INV-029 (service belt: a material row must carry a quality)
   @Test
   void createInventoryItem_materialWithoutQuality_throwsBadRequest() {
-    // Given a material payload whose quality is missing (the V220 quality-by-kind CHECK shape)
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1466,7 +1364,6 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
 
-    // When / Then
     BadRequestException ex =
         assertThrows(
             BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
@@ -1474,10 +1371,8 @@ class InventoryItemServiceTest {
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
-  // covers REQ-INV-029 (service belt: a game-item row carries no quality)
   @Test
   void createInventoryItem_gameItemWithQuality_throwsBadRequest() {
-    // Given a game-item payload that illegally carries a quality
     UUID userId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1498,7 +1393,6 @@ class InventoryItemServiceTest {
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
 
-    // When / Then
     BadRequestException ex =
         assertThrows(
             BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
@@ -1572,15 +1466,11 @@ class InventoryItemServiceTest {
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
     when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
-    // Realistic save: return the persisted entity (the transfer's new target row) so the post-write
-    // stock-merge check receives a non-null row (it no-ops here — the row carries no material).
     when(inventoryItemRepository.save(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
 
     inventoryItemService.bookOutInventoryItem(itemId, dto, adminId, true);
 
-    // Partial TRANSFER -> new target row save()d once, reduced source row saveAndFlush()ed once
-    // (change #7: the source is flushed so its @Version stays current within the transaction).
     verify(inventoryItemRepository).save(any(InventoryItem.class));
     verify(inventoryItemRepository).saveAndFlush(existingItem);
     assertEquals(5.0, existingItem.getAmount());
@@ -1599,7 +1489,7 @@ class InventoryItemServiceTest {
     existingItem.setId(itemId);
     existingItem.setVersion(1L);
     User user = new User();
-    user.setId(UUID.randomUUID()); // different user
+    user.setId(UUID.randomUUID());
     existingItem.setUser(user);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
@@ -1694,9 +1584,6 @@ class InventoryItemServiceTest {
     existingItem.setAmount(10.0);
     existingItem.setUser(user);
     existingItem.setMaterial(material);
-    // Variante C (REQ-INV-027): the mission earmark lives on a mission allocation, not a scalar.
-    // Size it at 5.0 (the post-book-out remainder) so the R5 fit check still passes after the SELL
-    // consumes 5.0 — the test's intent is the mission finance entry, not over-allocation.
     InventoryAllocations.addMission(existingItem, mission, 5.0);
 
     MissionParticipant participant = new MissionParticipant();
@@ -1833,11 +1720,8 @@ class InventoryItemServiceTest {
     verify(inventoryItemRepository).saveAndFlush(item);
   }
 
-  // ---- getMaterialCollection ----
-
   @Test
   void getMaterialCollection_shouldReturnMappedEntries() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
@@ -1866,10 +1750,6 @@ class InventoryItemServiceTest {
     item.setMaterial(material);
     item.setQuality(100);
     item.setAmount(5.0);
-    // The order's own slice is delivered and earmarks only PART of the entry (3 of the 5 SCU): the
-    // collection must read the slice (Variante C, REQ-INV-027) — delivered and the order-relevant
-    // quantity live on the job-order allocation, not on the entry. quantity stays the entry total
-    // (5), allocatedQuantity is the slice's 3.
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
     slice.setJobOrder(jobOrder);
@@ -1880,11 +1760,9 @@ class InventoryItemServiceTest {
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId)).thenReturn(List.of(item));
 
-    // When
     List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto> result =
         inventoryItemService.getMaterialCollection(jobOrderId);
 
-    // Then
     assertEquals(1, result.size());
     de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto dto = result.get(0);
     assertEquals(itemId, dto.inventoryEntryId());
@@ -1902,16 +1780,12 @@ class InventoryItemServiceTest {
 
   @Test
   void getMaterialCollection_shouldThrowWhenJobOrderNotFound() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(
         NotFoundException.class, () -> inventoryItemService.getMaterialCollection(jobOrderId));
   }
-
-  // ---- getItemStockForJobOrder (REQ-ORDERS-028) ----
 
   /**
    * Builds a game-item inventory row with one earmark slice per (order, amount, delivered) triple,
@@ -1944,10 +1818,6 @@ class InventoryItemServiceTest {
 
   @Test
   void getItemStockForJobOrder_groupsPerGameItemAndReadsTheOrderSlice() {
-    // covers REQ-ORDERS-028
-    // Given: an ITEM order with two lines (5 ordered / 2 manufactured of the rifle across two
-    // lines; 1 / 0 of the scope) and three earmarked rows — two rifle rows (one shared with a
-    // sibling order, delivered only for THIS order) and one scope row.
     UUID jobOrderId = UUID.randomUUID();
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(jobOrderId);
@@ -1988,8 +1858,6 @@ class InventoryItemServiceTest {
     lorville.setId(UUID.randomUUID());
     lorville.setName("Lorville");
 
-    // The repository returns the rows pre-sorted by owner/location/name — the scope row FIRST, so
-    // the group sort must reorder the groups by game-item name (Optic Scope before Rifle).
     InventoryItem scopeRow =
         itemStockRow(scope, alice, lorville, 1.0, 3L, new Object[][] {{jobOrder, 1.0, false}});
     InventoryItem rifleRowShared =
@@ -2013,18 +1881,15 @@ class InventoryItemServiceTest {
               return new InventoryGameItemReferenceDto(gi.getId(), gi.getName(), null, null);
             });
 
-    // When
     List<JobOrderItemStockGroupDto> result =
         inventoryItemService.getItemStockForJobOrder(jobOrderId);
 
-    // Then: two groups, sorted by game-item name.
     assertEquals(2, result.size());
     JobOrderItemStockGroupDto scopeGroup = result.get(0);
     JobOrderItemStockGroupDto rifleGroup = result.get(1);
     assertEquals("Optic Scope", scopeGroup.gameItem().name(), "groups are name-sorted");
     assertEquals("Rifle", rifleGroup.gameItem().name());
 
-    // Then: the rifle group sums the order's line context across both lines and the slice totals.
     assertEquals(5, rifleGroup.orderedAmount(), "ordered = 3 + 2 across the two rifle lines");
     assertEquals(2, rifleGroup.manufacturedAmount());
     assertEquals(
@@ -2033,8 +1898,6 @@ class InventoryItemServiceTest {
         "Σ of THIS order's slices (1 + 2), not the 2.0" + " earmarked to the sibling order");
     assertEquals(2, rifleGroup.entries().size());
 
-    // Then: the shared row reads THIS order's slice — amount 1, delivered true — never the foreign
-    // slice, and quantity stays the entry's total physical stock (whole units).
     JobOrderItemStockEntryDto shared = rifleGroup.entries().get(0);
     assertEquals(rifleRowShared.getId(), shared.inventoryEntryId());
     assertEquals(7L, shared.version());
@@ -2046,11 +1909,9 @@ class InventoryItemServiceTest {
     assertEquals(1L, shared.allocatedQuantity(), "allocatedQuantity is this order's slice");
     assertTrue(shared.delivered(), "delivered reads this order's slice, not the sibling's");
 
-    // Then: a null persisted version is echoed as 0 (the delivered toggle's echo baseline).
     assertEquals(0L, rifleGroup.entries().get(1).version());
     assertFalse(rifleGroup.entries().get(1).delivered());
 
-    // Then: the scope group carries its own line context.
     assertEquals(1, scopeGroup.orderedAmount());
     assertEquals(0, scopeGroup.manufacturedAmount());
     assertEquals(1L, scopeGroup.allocatedTotal());
@@ -2058,10 +1919,6 @@ class InventoryItemServiceTest {
 
   @Test
   void getItemStockForJobOrder_orphanedEarmark_hasZeroLineContext() {
-    // covers REQ-ORDERS-028
-    // Given: an earmarked row whose game item the order no longer requests (no matching line) —
-    // the group still renders, with 0/0 ordered/manufactured context (REQ-ORDERS-019 flags the
-    // orphan separately).
     UUID jobOrderId = UUID.randomUUID();
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(jobOrderId);
@@ -2089,11 +1946,9 @@ class InventoryItemServiceTest {
               return new InventoryGameItemReferenceDto(gi.getId(), gi.getName(), null, null);
             });
 
-    // When
     List<JobOrderItemStockGroupDto> result =
         inventoryItemService.getItemStockForJobOrder(jobOrderId);
 
-    // Then
     assertEquals(1, result.size());
     assertEquals(0, result.get(0).orderedAmount());
     assertEquals(0, result.get(0).manufacturedAmount());
@@ -2103,21 +1958,15 @@ class InventoryItemServiceTest {
 
   @Test
   void getItemStockForJobOrder_shouldThrowWhenJobOrderNotFound() {
-    // covers REQ-ORDERS-028
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(
         NotFoundException.class, () -> inventoryItemService.getItemStockForJobOrder(jobOrderId));
   }
 
-  // ---- updateDelivered ----
-
   @Test
   void updateDelivered_shouldUpdateDeliveredFlag() {
-    // Given
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
@@ -2133,7 +1982,6 @@ class InventoryItemServiceTest {
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
-    // Variante A (REQ-INV-027): delivered lives on the job-order slice, not the entry.
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
     slice.setJobOrder(order);
@@ -2151,10 +1999,8 @@ class InventoryItemServiceTest {
     when(inventoryItemMapper.toDto(any(InventoryItem.class)))
         .thenReturn(minimalInventoryDto(itemId));
 
-    // When
     inventoryItemService.updateDelivered(itemId, request, ownerId, false);
 
-    // Then
     assertTrue(slice.getDelivered(), "the order's slice is delivered");
     verify(inventoryItemRepository).saveAndFlush(item);
   }
@@ -2198,7 +2044,6 @@ class InventoryItemServiceTest {
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
-    // Variante A (REQ-INV-027): delivered lives on the job-order slice, not the entry.
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
     slice.setJobOrder(order);
@@ -2220,15 +2065,11 @@ class InventoryItemServiceTest {
 
     verify(inventoryItemRepository).saveAndFlush(item);
     verify(inventoryItemRepository, never()).save(item);
-    // OPTIMISTIC_FORCE_INCREMENT bumps the entry @Version (1) at commit, so the client must echo 2
-    // on its next write to the same row — else a second consecutive delivered toggle 409s
-    // (the MaterialCollectionDeliveredInPlaceE2eTest regression, REQ-INV-027).
     assertEquals(2L, result.version(), "response carries the post-commit force-increment version");
   }
 
   @Test
   void updateDelivered_shouldThrowOnVersionConflict() {
-    // Given
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
@@ -2246,7 +2087,6 @@ class InventoryItemServiceTest {
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
-    // When / Then
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> inventoryItemService.updateDelivered(itemId, request, ownerId, false));
@@ -2255,7 +2095,6 @@ class InventoryItemServiceTest {
 
   @Test
   void updateDelivered_shouldThrowAccessDeniedForNonOwnerNonLogistician() {
-    // Given
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
@@ -2274,7 +2113,6 @@ class InventoryItemServiceTest {
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
-    // When / Then
     assertThrows(
         AccessDeniedException.class,
         () -> inventoryItemService.updateDelivered(itemId, request, otherUserId, false));
@@ -2282,39 +2120,32 @@ class InventoryItemServiceTest {
 
   @Test
   void deleteAllGlobalInventory_shouldDelegateToRepositoryAndReturnDeletedCount() {
-    // Given: admin in "all squadrons" mode (no active scope) — adminAllScope=true wipes across.
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
         .thenReturn(42);
 
-    // When
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
-    // Then
     assertEquals(42, removed);
     verify(inventoryItemRepository).deleteAllNonPersonal(true, null, java.util.Set.of());
   }
 
   @Test
   void deleteAllGlobalInventory_onEmptyGlobalInventory_shouldReturnZero() {
-    // Given
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
         .thenReturn(0);
 
-    // When
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
-    // Then
     assertEquals(0, removed);
     verify(inventoryItemRepository).deleteAllNonPersonal(true, null, java.util.Set.of());
   }
 
   @Test
   void deleteAllGlobalInventory_inFocusedMode_shouldScopeToActiveSquadron() {
-    // Given: focused admin / member in squadron A — only their own stock gets wiped.
     UUID scope = UUID.randomUUID();
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, scope, java.util.Set.of()));
@@ -2326,12 +2157,6 @@ class InventoryItemServiceTest {
     assertEquals(7, removed);
     verify(inventoryItemRepository).deleteAllNonPersonal(false, scope, java.util.Set.of());
   }
-
-  // --- R5.d picker output (owningOrgUnitId) ---------------------------------
-  // The membership-validation + Squadron-resolution logic itself is centralised on
-  // OwnerScopeService.resolveSquadronForPickerOutput and pinned by OwnerScopeServiceTest. These two
-  // tests just verify that InventoryItemService.createInventoryItem delegates to the helper and
-  // honours / propagates its outcome.
 
   @Test
   void createInventoryItem_delegatesPickerResolutionToOwnerScopeService() {
@@ -2412,9 +2237,6 @@ class InventoryItemServiceTest {
 
   @Test
   void createInventoryItem_alwaysInsertsSeparateRow() {
-    // Append-only Lager: create always inserts its own brand-new row and is never folded into any
-    // existing stack — not even one matching every stock-identity dimension. The saved row carries
-    // exactly the DTO amount and the resolved owning org unit.
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -2456,7 +2278,6 @@ class InventoryItemServiceTest {
 
     inventoryItemService.createInventoryItem(dto, userId);
 
-    // A brand-new row is saved, stamped with the resolved org unit and carrying the DTO amount.
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());

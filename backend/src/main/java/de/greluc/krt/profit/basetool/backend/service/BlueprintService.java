@@ -33,14 +33,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service for the admin blueprint page. Returns a paged, filtered view of the synced crafting
- * blueprints with their requirement-group stat graph. Blueprints are global SC Wiki reference data
- * (not org-unit-scoped), so this service deliberately does not wire {@code OwnerScopeService} —
- * visibility is the admin-only gate on the controller.
+ * Read service for the admin blueprint page: a paged, filtered view of the synced crafting
+ * blueprints with their requirement-group stat graph.
  *
- * <p>Mapping to DTOs happens inside this {@code readOnly} transaction so the lazy owned collections
- * (groups, modifiers, ingredients, summary, dismantle returns) initialize while the session is
- * open; their {@code @BatchSize} keeps the per-page load off the N+1 path.
+ * <p>Blueprints are global reference data, not org-unit-scoped; DTO mapping happens inside the
+ * read-only transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -51,10 +48,9 @@ public class BlueprintService {
   private final BlueprintMapper blueprintMapper;
 
   /**
-   * Returns one page of active (non-soft-deleted) blueprints, optionally filtered by a
-   * case-insensitive substring of the output-item name or Wiki key, mapped to DTOs.
+   * Returns one page of active blueprints, optionally filtered by output-item name or Wiki key.
    *
-   * @param search output-name / key substring; blank or {@code null} returns all active blueprints
+   * @param search case-insensitive substring; blank or {@code null} returns all
    * @param pageable page request with a whitelisted sort
    * @return a page of blueprint DTOs
    */

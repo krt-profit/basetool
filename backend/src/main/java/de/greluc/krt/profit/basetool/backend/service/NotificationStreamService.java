@@ -41,16 +41,11 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * In-memory registry of live Server-Sent-Event subscribers, keyed by recipient {@code sub}
- * (REQ-NOTIF-010).
+ * In-memory registry of this instance's Server-Sent-Event subscribers, keyed by recipient {@code
+ * sub} (REQ-NOTIF-010).
  *
- * <p>This registry delivers to <em>this</em> instance's emitters only; cross-replica fan-out is
- * layered on top by {@link NotificationFanout} (local-first, then Redis pub/sub — ADR-0094,
- * discharging the ADR-0016 follow-up), not by this class. Push is strictly best-effort: a failed
- * send simply drops that emitter, and the frontend's polling (REQ-NOTIF-006) remains the guaranteed
- * fallback. A periodic named {@code heartbeat} event keeps idle connections alive across proxies
- * and doubles as a browser-visible liveness signal so the client can detect a half-open stream (TCP
- * up, stream dead) and fall back to the fast poll (REQ-NOTIF-010, REQ-SEC-012).
+ * <p>Push is best-effort: a failed send drops the emitter. A periodic named {@code heartbeat} event
+ * keeps idle connections alive and lets clients detect a half-open stream.
  */
 @Service
 @Slf4j
@@ -66,33 +61,22 @@ public class NotificationStreamService {
   private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
   /**
-   * Max concurrent SSE streams retained per recipient {@code sub} (#1156). Every browser tab /
-   * device opens its own stream; beyond this many the OLDEST is retired with a terminal {@code
-   * replaced} event the client treats as do-not-reconnect, so one user's many tabs cannot multiply
-   * against the org-wide relay pool (which was sized on one stream per viewer). Kept small — a
-   * handful of tabs / devices is normal; more is almost always stale tabs. Package-private for the
-   * test.
+   * Maximum concurrent SSE streams per recipient {@code sub}; beyond it the oldest is retired with
+   * a terminal {@code replaced} event.
    */
   static final int MAX_EMITTERS_PER_SUB = 5;
 
   /**
-   * A {@link Queue} (FIFO) per recipient rather than a bare set, so {@link #MAX_EMITTERS_PER_SUB}
-   * eviction can retire the OLDEST stream (poll head) while adds append to the tail. {@link
-   * ConcurrentLinkedQueue} keeps {@link #publish}/{@link #heartbeat} iteration weakly-consistent
-   * and lock-free while {@link #subscribe}/{@link #remove} mutate the queue atomically under the
-   * map entry's bin lock via {@code compute} (#1157).
+   * FIFO emitter queue per recipient, so eviction retires the oldest stream; mutated atomically via
+   * {@code compute}.
    */
   private final Map<UUID, Queue<SseEmitter>> emittersBySub = new ConcurrentHashMap<>();
 
   private final MeterRegistry meterRegistry;
 
   /**
-   * Binds the {@code basetool_sse_connections} gauge to the live emitter registry (REQ-OBS-011) —
-   * the total number of open SSE subscriptions across all recipients on this instance, computed on
-   * scrape. Unlabelled: recipient {@code sub} is PII / unbounded. Zero here while the frontend
-   * still reports {@code basetool_active_sessions} means the push channel is dead ({@code
-   * SsePushChannelDead}), e.g. reverse-proxy buffering drift, and clients silently fell back to the
-   * unread-count poll.
+   * Binds the unlabelled {@code basetool_sse_connections} gauge to the number of open SSE
+   * subscriptions on this instance (REQ-OBS-011).
    *
    * @param meterRegistry the Micrometer registry the SSE gauge and send-failure counter bind to
    */
@@ -116,12 +100,6 @@ public class NotificationStreamService {
   @NotNull
   public SseEmitter subscribe(@NotNull UUID recipientUserId) {
     SseEmitter emitter = newEmitter();
-    // #1157: register under the map entry's bin lock so an old stream completing concurrently
-    // cannot
-    // evict the entry after this thread read the queue but before its add lands (which would orphan
-    // a
-    // live emitter — silently dead for up to EMITTER_TIMEOUT_MS). #1156: cap the streams per user;
-    // when full, evict the OLDEST (queue head) — retired outside the lambda below.
     List<SseEmitter> evicted = new ArrayList<>();
     emittersBySub.compute(
         recipientUserId,
@@ -137,16 +115,7 @@ public class NotificationStreamService {
           q.add(emitter);
           return q;
         });
-    // Retire evicted emitters OUTSIDE the compute lambda: complete() fires onCompletion ->
-    // remove(),
-    // which re-enters compute() on the same key — illegal from within a ConcurrentHashMap
-    // remapping.
-    // They were already polled out, so that remove() is a harmless no-op.
     for (SseEmitter old : evicted) {
-      // The eviction is otherwise invisible: basetool_sse_connections stays flat PRECISELY because
-      // the cap holds, so a user whose tabs keep knocking each other off the push channel produced
-      // no signal at all. Count every retirement (untagged — the recipient sub must never become a
-      // label) and leave the sub in a DEBUG line for the "one of my tabs stopped updating" report.
       meterRegistry.counter(MetricNames.SSE_EMITTERS_EVICTED).increment();
       log.debug(
           "Evicting oldest SSE emitter for recipient {}: per-recipient cap {} reached",
@@ -157,14 +126,6 @@ public class NotificationStreamService {
     emitter.onCompletion(() -> remove(recipientUserId, emitter));
     emitter.onTimeout(
         () -> {
-          // Complete the emitter on timeout so Spring MVC records a NORMAL async completion rather
-          // than raising AsyncRequestTimeoutException — which Micrometer books as a phantom 503 on
-          // http.server.requests even though the client received a clean 30-minute stream and
-          // simply
-          // reconnects. Without the explicit complete() the request finalizes as a server error and
-          // inflates the frontend's 5xx rate (REQ-NOTIF-010). Removal also runs via the
-          // onCompletion
-          // callback complete() triggers; the extra remove() here is idempotent.
           remove(recipientUserId, emitter);
           emitter.complete();
         });
@@ -179,14 +140,8 @@ public class NotificationStreamService {
   }
 
   /**
-   * Pushes a "notification" event to every live subscriber of the given recipients so their client
-   * refreshes its unread state. Dead emitters are dropped.
-   *
-   * <p>The event's <strong>name</strong> is the frozen part of this contract, and it does not
-   * change. Its data used to be the literal string {@code "new"}; it now carries the signal, so a
-   * client that needs to know <em>what</em> arrived does not have to fetch to find out. The web
-   * app's handler takes no argument and is unaffected; the Android app files the shade entry by
-   * kind and deep-links the tap by entity (REQ-APP-UI-007).
+   * Pushes a {@code notification} event carrying the serialized signal to every live subscriber of
+   * the given recipients; dead emitters are dropped.
    *
    * @param recipientUserIds the recipients whose connections to notify
    * @param signal what those recipients are being told
@@ -211,15 +166,8 @@ public class NotificationStreamService {
   }
 
   /**
-   * Renders a signal as the event's data.
-   *
-   * <p>A refresh-only signal keeps the historic {@code "new"} so nothing about the old payload has
-   * to be re-learned for the case it already covered, and so a client that only ever looked for a
-   * non-empty body keeps working.
-   *
-   * <p>A failure to serialise falls back to {@code "new"} rather than dropping the push: a client
-   * that cannot read what arrived still refetches, which is the behaviour before this method
-   * existed.
+   * Renders a signal as the event's data; a refresh-only signal and a serialization failure both
+   * render as {@code "new"}.
    *
    * @param signal what to render
    * @return the event data
@@ -244,14 +192,8 @@ public class NotificationStreamService {
   }
 
   /**
-   * Sends a named {@code heartbeat} event to all live emitters so idle SSE connections survive
-   * proxy idle timeouts and the browser gets a periodic liveness signal.
-   *
-   * <p>It is a named event (carrying a token payload), not an SSE comment, on purpose: browsers'
-   * {@code EventSource} swallow comments at the protocol level, so a comment cannot reset a
-   * client-side liveness watchdog. A named event lets the client notice a half-open stream (no
-   * traffic for several beats) and fall back to the fast unread-count poll (REQ-NOTIF-010,
-   * REQ-SEC-012). Dead emitters are dropped on send failure.
+   * Sends a named {@code heartbeat} event to all live emitters, keeping idle connections open and
+   * giving clients a liveness signal (REQ-NOTIF-010); dead emitters are dropped.
    */
   @Scheduled(fixedRateString = "${app.notifications.sse.heartbeat-interval:PT20S}")
   public void heartbeat() {
@@ -281,20 +223,11 @@ public class NotificationStreamService {
   }
 
   /**
-   * Bumps {@code basetool_sse_send_failures_total} for a push that failed on the named SSE event
-   * and leaves the throwable in a DEBUG line, just before the dead emitter is dropped. The {@code
-   * event} tag is a fixed literal ({@code connected} / {@code notification} / {@code heartbeat})
-   * and the {@code cause} tag is the bounded three-value shape from {@link
-   * SseSendFailureCause#tagOf}; neither ever carries recipient data.
-   *
-   * <p>DEBUG and not higher on purpose: a broken pipe here is the normal outcome of closing a
-   * browser tab, so every level above DEBUG is a client-triggerable log flood (REQ-OBS-001). The
-   * recipient {@code sub} is the one identifier that may be logged (REQ-OBS-004) and is what makes
-   * a "my notifications stopped" report answerable.
+   * Bumps {@code basetool_sse_send_failures_total} for a failed push and logs the cause at DEBUG.
    *
    * @param event the SSE event name whose send failed
    * @param recipientUserId the {@code sub} of the recipient whose emitter died
-   * @param cause the exception the emitter write threw — logged, not swallowed
+   * @param cause the exception the emitter write threw
    */
   private void recordSendFailure(
       @NotNull String event, @NotNull UUID recipientUserId, @NotNull Throwable cause) {
@@ -314,10 +247,8 @@ public class NotificationStreamService {
   }
 
   /**
-   * Retires an emitter evicted by the per-user cap (#1156): sends a terminal named {@code replaced}
-   * event the client treats as do-not-reconnect, then completes it. Both steps swallow failures —
-   * the emitter is being dropped regardless and may already be dead. Called only from {@link
-   * #subscribe}, after the evicted emitter was already removed from the queue.
+   * Retires an emitter evicted by the per-user cap: sends a terminal {@code replaced} event, then
+   * completes it, swallowing failures.
    *
    * @param emitter the evicted (oldest) emitter to retire
    */
@@ -335,9 +266,6 @@ public class NotificationStreamService {
   }
 
   private void remove(@NotNull UUID recipientUserId, @NotNull SseEmitter emitter) {
-    // #1157: remove-and-maybe-evict atomically under the entry's bin lock, so the empty-check
-    // cannot
-    // race a concurrent subscribe() into an orphaned queue.
     emittersBySub.compute(
         recipientUserId,
         (key, queue) -> {

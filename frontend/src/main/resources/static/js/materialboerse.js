@@ -23,16 +23,11 @@
 
     const SERIALIZE_KEY = 'materialboerse';
     const REQUEST_SERIALIZE_KEY = 'materialgesuch';
-    // REQ-FE-015 (ADR-0094): the global live-sync room the board publishes to / subscribes from,
-    // multiplexed over the shared /ws/sync socket. Offers broadcast the `board` section key,
-    // requests the `requests` key; the receiver refreshes only the visible board.
     const MATERIALBOARD_TOPIC = 'materialboard';
     let selectedId = readSelectedId();
     let selectedRequestId = readSelectedRequestId();
     let searchTimer = null;
     let requestSearchTimer = null;
-
-    // -------- helpers --------------------------------------------------------
 
     function fmt(template, value) {
         return String(template || '').replace('{0}', value);
@@ -67,13 +62,6 @@
         return tab ? tab.getAttribute('data-mb-mode') || 'offers' : 'offers';
     }
 
-    // -------- per-browser filter persistence (REQ-UI-017) --------------------
-
-    // One JSON object under a single key: the active (mode, tab) pair plus each board's
-    // minQuality / minAmount / sort. The search inputs ([data-mb-search] / [data-mg-search]) are
-    // deliberately NOT persisted. Absent key = no saved preference = the server-rendered
-    // defaults. Guarded so privacy modes that deny storage degrade to the defaults instead of
-    // breaking the board.
     const FILTER_PREF_KEY = 'materialboerse_filters';
     const SORT_KEYS = ['qual', 'menge', 'mat', 'neu'];
 
@@ -86,20 +74,16 @@
             const raw = localStorage.getItem(FILTER_PREF_KEY);
             return raw === null ? null : JSON.parse(raw);
         } catch (_e) {
-            return null; // corrupt value / storage unavailable: fall back to the defaults
+            return null;
         }
     }
 
     function writeFilterPref(value) {
         try {
             localStorage.setItem(FILTER_PREF_KEY, JSON.stringify(value));
-        } catch (_e) {
-            /* storage unavailable */
-        }
+        } catch (_e) {}
     }
 
-    // Copies one board's saved filter values onto its defaults, dropping anything stale or
-    // malformed (an unknown sort key falls back to the default).
     function mergeBoardFilters(target, saved) {
         if (!saved || typeof saved !== 'object') {
             return;
@@ -139,10 +123,6 @@
     const rawFilterPref = readFilterPref();
     const filterState = normalizeFilterPref(rawFilterPref);
 
-    // Snapshots the current widget state into localStorage, immediately on every tab / filter /
-    // sort / reset interaction (not debounced with the re-fetch). Only the visible board's
-    // toolbar exists in the DOM, so its values are merged into the kept state keyed by which
-    // widgets are present — the hidden board's stored values survive untouched.
     function persistFilters() {
         if (activeTabEl()) {
             filterState.mode = activeMode();
@@ -161,10 +141,6 @@
         writeFilterPref(filterState);
     }
 
-    // Reads a filter input's value, falling back to the persisted state (REQ-UI-017) when the
-    // widget is not in the DOM — only the visible board's toolbar is rendered, so a cross-mode
-    // board swap would otherwise silently drop the target board's persisted filters. The swap
-    // URL then carries them and the server echoes them into the swapped-in toolbar.
     function filterVal(selector, savedValue) {
         const el = document.querySelector(selector);
         if (el) {
@@ -172,8 +148,6 @@
         }
         return savedValue == null ? '' : String(savedValue);
     }
-
-    // -------- offer swaps ----------------------------------------------------
 
     function params() {
         const p = new URLSearchParams();
@@ -230,8 +204,6 @@
             history: false,
         });
     }
-
-    // -------- request (Gesuche) swaps ---------------------------------------
 
     function requestParams() {
         const p = new URLSearchParams();
@@ -290,8 +262,6 @@
         });
     }
 
-    // -------- relative time --------------------------------------------------
-
     function applyAgo(root) {
         (root || document).querySelectorAll('[data-mb-ago]').forEach(function (el) {
             const ts = el.getAttribute('data-ts');
@@ -318,8 +288,6 @@
             el.textContent = text;
         });
     }
-
-    // -------- tabs / CTA / selection -----------------------------------------
 
     function setActiveTabEl(el) {
         document.querySelectorAll('.tab[data-mb-tab]').forEach(function (btn) {
@@ -395,8 +363,6 @@
         });
     }
 
-    // -------- offer writes ---------------------------------------------------
-
     function toggleInterest(button) {
         const id = button.getAttribute('data-offer-id');
         const interested = button.getAttribute('data-interested') === 'true';
@@ -446,8 +412,6 @@
         }
         return swapBoard();
     }
-
-    // -------- request (Gesuche) writes --------------------------------------
 
     function toggleFulfillment(button) {
         const id = button.getAttribute('data-request-id');
@@ -499,8 +463,6 @@
         return swapRequestBoard();
     }
 
-    // Broadcast literal section keys (not a variable) so the LiveSyncSectionMapParityTest literal
-    // scan can prove every broadcast key is whitelisted.
     function notifyPeersBoard() {
         if (window.krtLiveSync) {
             window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
@@ -512,8 +474,6 @@
             window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
         }
     }
-
-    // -------- action dispatch ------------------------------------------------
 
     function handleAction(el) {
         if (el.hasAttribute('data-mb-interest')) {
@@ -572,8 +532,6 @@
         }
     }
 
-    // -------- delegated events -----------------------------------------------
-
     document.addEventListener('click', function (e) {
         let el;
         if ((el = e.target.closest('[data-mb-tab]'))) {
@@ -581,7 +539,7 @@
             const fromMode = activeMode();
             setActiveTabEl(el);
             toggleCtaGroups(toMode);
-            persistFilters(); // REQ-UI-017: keep the (mode, tab) selection across visits
+            persistFilters();
             if (toMode !== fromMode) {
                 if (toMode === 'requests') {
                     selectedRequestId = null;
@@ -604,7 +562,7 @@
             setInputVal('[data-mb-minquality]', '');
             setInputVal('[data-mb-minamount]', '');
             setActiveTabEl(tabEl('offers', 'alle'));
-            persistFilters(); // REQ-UI-017: a reset persists the cleared state
+            persistFilters();
             selectedId = null;
             swapList();
             return;
@@ -614,7 +572,7 @@
             setInputVal('[data-mg-minquality]', '');
             setInputVal('[data-mg-minamount]', '');
             setActiveTabEl(tabEl('requests', 'alle'));
-            persistFilters(); // REQ-UI-017: a reset persists the cleared state
+            persistFilters();
             selectedRequestId = null;
             swapRequestList();
             return;
@@ -669,12 +627,12 @@
 
     document.addEventListener('input', function (e) {
         if (e.target.matches('[data-mb-search], [data-mb-minquality], [data-mb-minamount]')) {
-            persistFilters(); // REQ-UI-017: persist immediately, not with the debounced fetch
+            persistFilters();
             debouncedList();
         } else if (
             e.target.matches('[data-mg-search], [data-mg-minquality], [data-mg-minamount]')
         ) {
-            persistFilters(); // REQ-UI-017: persist immediately, not with the debounced fetch
+            persistFilters();
             debouncedRequestList();
         }
     });
@@ -689,11 +647,6 @@
         }
     });
 
-    // REQ-MARKET-010 / REQ-FE-015: a peer released / deactivated / registered interest / posted a
-    // request — re-pull only the currently-visible board's list. Debounced; skipped while either
-    // modal is open so an in-progress dialog is not disrupted. The receiver branches on the changed
-    // section keys (offers on `board`, requests on `requests`), so an offer change never re-pulls
-    // the request list and vice-versa.
     let peerTimer = null;
     function onPeerChanged(sections) {
         const secs = Array.isArray(sections) ? sections : [];
@@ -723,7 +676,6 @@
         selectedRequestId = readSelectedRequestId();
     });
 
-    // Writes a saved value into a rendered toolbar widget; reports whether it actually changed.
     function setIfDifferent(selector, value) {
         const el = document.querySelector(selector);
         if (!el || el.value.trim() === value) {
@@ -733,7 +685,6 @@
         return true;
     }
 
-    // Writes one board's saved values into its rendered toolbar; reports whether anything changed.
     function applySavedBoardFilters(prefix, saved) {
         let changed = setIfDifferent('[data-' + prefix + '-minquality]', saved.minQuality);
         changed = setIfDifferent('[data-' + prefix + '-minamount]', saved.minAmount) || changed;
@@ -741,27 +692,19 @@
         return changed;
     }
 
-    // Applies the persisted (mode, tab) + filter selection at init (REQ-UI-017). A URL carrying
-    // explicit board query params (deep link — the swaps themselves run history:false) is
-    // authoritative: the rendered state is adopted and re-persisted; only a bare URL restores
-    // from storage. When the restored state differs from the server-rendered defaults, the
-    // existing tab-activation / swap path is driven exactly once.
     function restoreFilters() {
         if (/[?&](mode|tab|q|minQuality|minAmount|sort|selected)=/.test(window.location.search)) {
             persistFilters();
             return;
         }
         if (rawFilterPref === null) {
-            return; // no saved preference: keep the server-rendered defaults
+            return;
         }
         const target = tabEl(filterState.mode, filterState.tab);
         if (!target) {
             return;
         }
         if (filterState.mode !== activeMode()) {
-            // Cross-mode restore: activate the saved tab and swap the whole board once. The swap
-            // URL picks the saved filters up through the filterVal fallback and the server echoes
-            // them into the swapped-in toolbar.
             setActiveTabEl(target);
             toggleCtaGroups(filterState.mode);
             if (filterState.mode === 'requests') {
@@ -773,8 +716,6 @@
             }
             return;
         }
-        // Same mode: write the saved values into the rendered toolbar, then re-render the list
-        // once — only if anything differs from what the server rendered.
         let differs =
             filterState.mode === 'requests'
                 ? applySavedBoardFilters('mg', filterState.requests)

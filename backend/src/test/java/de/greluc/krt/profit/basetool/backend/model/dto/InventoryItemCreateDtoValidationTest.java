@@ -36,16 +36,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bean Validation contract tests for the three catalog guards on {@link InventoryItemCreateDto}
- * (V220, REQ-INV-029/031): the material/gameItem XOR, the quality-by-kind pairing, and the
- * no-mission-for-game-item rule. Each guard mirrors a DB CHECK or service invariant so a violating
- * payload surfaces as a 400 validation error instead of a 500 integrity failure — a silently
- * dropped {@code @AssertTrue} would regress exactly that, with nothing failing at the type level.
+ * Bean Validation tests for the catalog guards of {@link InventoryItemCreateDto} (REQ-INV-029/031):
+ * material/game-item XOR, quality by kind, and no mission for a game item.
  *
- * <p>The class-level {@code @ValidQuantityAmount} needs its Spring-managed validator, so the
- * factory is configured with a {@link ConstraintValidatorFactory} that hands the {@link
- * ValidQuantityAmountValidator} a stub {@code MaterialPieceTypeLookup} (every material SCU) and
- * falls back to default construction for the built-in validators.
+ * <p>The validator factory supplies {@link ValidQuantityAmountValidator} with a stub lookup that
+ * treats every material as SCU.
  */
 class InventoryItemCreateDtoValidationTest {
 
@@ -73,9 +68,7 @@ class InventoryItemCreateDtoValidationTest {
                   }
 
                   @Override
-                  public void releaseInstance(ConstraintValidator<?, ?> instance) {
-                    // Stateless test validators — nothing to release.
-                  }
+                  public void releaseInstance(ConstraintValidator<?, ?> instance) {}
                 })
             .buildValidatorFactory();
     validator = factory.getValidator();
@@ -89,13 +82,13 @@ class InventoryItemCreateDtoValidationTest {
   }
 
   /**
-   * Builds a create payload with the given catalog references, quality and mission fields; every
-   * other field is a fixed valid value (location set, amount 5.0, non-personal, no allocations).
+   * Builds a create payload with the given catalog, quality and mission fields and fixed valid
+   * values elsewhere.
    *
    * @param materialId the material reference, or {@code null}
    * @param gameItemId the game-item reference, or {@code null}
    * @param quality the quality grade, or {@code null}
-   * @param missionId the legacy single mission reference, or {@code null}
+   * @param missionId the single mission reference, or {@code null}
    * @param missionAllocations the mission split list, or {@code null}
    * @return the assembled payload
    */
@@ -135,14 +128,10 @@ class InventoryItemCreateDtoValidationTest {
         "expected a violation on " + property + " but got: " + violations);
   }
 
-  // covers REQ-INV-029 (catalog XOR — mirrors chk_inventory_item_catalog_xor)
   @Test
   void neitherCatalogReference_violatesXorGuard() {
-    // Given a payload with neither materialId nor gameItemId
     InventoryItemCreateDto payload = dto(null, null, null, null, null);
 
-    // When / Then — the XOR guard reports; the quality guard deliberately stays silent while the
-    // XOR already fails (so the caller sees one root cause, not two).
     assertViolationOn(payload, "catalogReferenceValid");
     assertTrue(
         validator.validate(payload).stream()
@@ -150,50 +139,36 @@ class InventoryItemCreateDtoValidationTest {
         "the quality-by-kind guard must be skipped while the XOR guard fails");
   }
 
-  // covers REQ-INV-029 (catalog XOR)
   @Test
   void bothCatalogReferences_violateXorGuard() {
-    // Given a payload naming a material AND a game item
     InventoryItemCreateDto payload = dto(UUID.randomUUID(), UUID.randomUUID(), 750, null, null);
 
-    // When / Then
     assertViolationOn(payload, "catalogReferenceValid");
   }
 
-  // covers REQ-INV-029 (quality-by-kind — material row requires a quality)
   @Test
   void materialRowWithoutQuality_violatesQualityGuard() {
-    // Given a material payload with no quality
     InventoryItemCreateDto payload = dto(UUID.randomUUID(), null, null, null, null);
 
-    // When / Then
     assertViolationOn(payload, "qualityConsistentWithCatalog");
   }
 
-  // covers REQ-INV-029 (quality-by-kind — game-item row forbids a quality)
   @Test
   void gameItemRowWithQuality_violatesQualityGuard() {
-    // Given a game-item payload carrying a quality
     InventoryItemCreateDto payload = dto(null, UUID.randomUUID(), 750, null, null);
 
-    // When / Then
     assertViolationOn(payload, "qualityConsistentWithCatalog");
   }
 
-  // covers REQ-INV-031 (game-item rows carry no mission dimension)
   @Test
   void gameItemRowWithMissionId_violatesMissionGuard() {
-    // Given a game-item payload with the legacy single mission reference
     InventoryItemCreateDto payload = dto(null, UUID.randomUUID(), null, UUID.randomUUID(), null);
 
-    // When / Then
     assertViolationOn(payload, "missionFreeForGameItem");
   }
 
-  // covers REQ-INV-031 (game-item rows carry no mission dimension — split list variant)
   @Test
   void gameItemRowWithMissionAllocations_violatesMissionGuard() {
-    // Given a game-item payload with a Variante-C mission split
     InventoryItemCreateDto payload =
         dto(
             null,
@@ -202,29 +177,22 @@ class InventoryItemCreateDtoValidationTest {
             null,
             List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0)));
 
-    // When / Then
     assertViolationOn(payload, "missionFreeForGameItem");
   }
 
-  // covers REQ-INV-029 (well-formed payloads of both catalog kinds pass)
   @Test
   void wellFormedMaterialAndGameItemPayloads_haveNoViolations() {
-    // Given a material payload with quality and a game-item payload without one
     InventoryItemCreateDto materialPayload = dto(UUID.randomUUID(), null, 750, null, null);
     InventoryItemCreateDto itemPayload = dto(null, UUID.randomUUID(), null, null, null);
 
-    // When / Then
     assertTrue(validator.validate(materialPayload).isEmpty(), "material payload must be valid");
     assertTrue(validator.validate(itemPayload).isEmpty(), "game-item payload must be valid");
   }
 
-  // covers REQ-INV-031 (a material payload keeps its mission dimension)
   @Test
   void materialRowWithMission_isNotRejectedByTheItemGuard() {
-    // Given a material payload with a mission reference — the pre-item contract
     InventoryItemCreateDto payload = dto(UUID.randomUUID(), null, 750, UUID.randomUUID(), null);
 
-    // When / Then
     assertTrue(
         validator.validate(payload).isEmpty(),
         "the mission guard only applies to game-item payloads");

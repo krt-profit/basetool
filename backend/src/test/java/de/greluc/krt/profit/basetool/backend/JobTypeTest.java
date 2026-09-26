@@ -135,13 +135,11 @@ class JobTypeTest {
 
   @Test
   void testCreateJobType_WithParent() throws Exception {
-    // Create parent
     JobType parent = new JobType();
     parent.setName("Engineer");
     parent.setArchetype(JobTypeArchetype.CREW);
     parent = jobTypeRepository.save(parent);
 
-    // Create child DTO referencing parent by ID
     JobTypeDto child =
         new JobTypeDto(
             null,
@@ -226,7 +224,6 @@ class JobTypeTest {
 
   @Test
   void testDeleteJobType_SoftDelete_Success() throws Exception {
-    // Given
     JobType parent = new JobType();
     parent.setName("Parent Job");
     parent.setArchetype(JobTypeArchetype.CREW);
@@ -238,7 +235,6 @@ class JobTypeTest {
     child.setParent(parent);
     jobTypeRepository.save(child);
 
-    // When / Then
     mockMvc
         .perform(
             delete("/api/v1/job-types/" + parent.getId())
@@ -253,18 +249,15 @@ class JobTypeTest {
                             new SimpleGrantedAuthority("REFINERY_MANAGE"))))
         .andExpect(status().isOk());
 
-    // Check if soft deleted
     JobType softDeletedParent = jobTypeRepository.findById(parent.getId()).orElseThrow();
     assertFalse(softDeletedParent.isActive());
 
-    // Child still has reference
     JobType updatedChild = jobTypeRepository.findById(child.getId()).orElseThrow();
     assertNotNull(updatedChild.getParent());
   }
 
   @Test
   void testDeleteJobType_SoftDelete_WithParticipant_Success() throws Exception {
-    // Given
     JobType jobType = new JobType();
     jobType.setName("Turret Gunner");
     jobType.setArchetype(JobTypeArchetype.CREW);
@@ -282,7 +275,6 @@ class JobTypeTest {
     participant.setDesiredMissionJobType(jobType);
     participant = missionParticipantRepository.save(participant);
 
-    // When / Then
     mockMvc
         .perform(
             delete("/api/v1/job-types/" + jobType.getId())
@@ -307,15 +299,12 @@ class JobTypeTest {
 
   @Test
   void testActivateJobType_Success() throws Exception {
-    // Given
     JobType jobType = new JobType();
     jobType.setName("Inactive Job");
     jobType.setArchetype(JobTypeArchetype.CREW);
     jobType.setActive(false);
     jobType = jobTypeRepository.save(jobType);
 
-    // When / Then
-    // Officer cannot activate
     mockMvc
         .perform(
             post("/api/v1/job-types/" + jobType.getId() + "/activate")
@@ -330,7 +319,6 @@ class JobTypeTest {
                             new SimpleGrantedAuthority("REFINERY_MANAGE"))))
         .andExpect(status().isForbidden());
 
-    // Admin can activate
     mockMvc
         .perform(
             post("/api/v1/job-types/" + jobType.getId() + "/activate")

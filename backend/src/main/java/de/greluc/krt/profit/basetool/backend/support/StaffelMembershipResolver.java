@@ -40,45 +40,13 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 /**
- * Single owner of the "name-sorted primary Staffel" definition introduced with REQ-ORG-017 (a
- * member may belong to up to two Staffeln). Given a user's {@code SQUADRON}-kind {@link
- * OrgUnitMembership} rows it resolves each to its {@link Squadron} and orders the result
- * case-insensitively by squadron name, so the <em>first</em> element is the deterministic
- * <b>primary</b> Staffel. Three call sites previously re-implemented this independently and had to
- * be kept byte-for-byte in agreement:
+ * Resolves a user's {@code SQUADRON}-kind {@link OrgUnitMembership} rows to their {@link
+ * Squadron}s, sorted case-insensitively by name so the first element is the primary Staffel
+ * (REQ-ORG-017).
  *
- * <ul>
- *   <li>{@code OrgUnitMembershipService.findStaffelMembershipOrgUnitIds} (and its single-value
- *       {@code findStaffelMembershipOrgUnitId} / order-aligned {@code findExecutingStaffelForOrder}
- *       derivatives) — the authorization-gate accessors;
- *   <li>{@code UserMapper.resolveSquadrons} / {@code resolveSquadron} — the {@code
- *       UserDto.squadrons} / {@code UserDto.squadron} projections;
- *   <li>{@code OwnerScopeService} — the name-sorted primary fallback of its pin-aware
- *       current-Staffel resolution.
- * </ul>
- *
- * <p>Centralising the rule here means the primary definition lives in exactly one place; the call
- * sites keep only their own concerns (the {@code UserMapper} request-scoped membership memo, the
- * {@code OwnerScopeService} active-pin override and request cache).
- *
- * <p><b>Package placement.</b> This collaborator lives in the dependency-leaf {@code support}
- * package — depending only on {@code model} + {@code repository} — precisely so the {@code mapper}
- * and {@code service} layers can both reuse it without a {@code mapper} → {@code service} back-edge
- * (the {@code service} layer already depends on {@code mapper}, so that edge would close a package
- * cycle). The leaf placement is gate-enforced by {@code ArchitectureTest} ({@code
- * supportPackageMustStayADependencyLeaf} and {@code backendPackagesShouldBeFreeOfDependencyCycles},
- * ADR-0047).
- *
- * <p>A row whose squadron no longer resolves (a dangling membership) is skipped — dropped by the
- * polymorphic {@code OrgUnitRepository#findAllById} batch (plus its {@code instanceof Squadron}
- * filter) on the multi-row path and by a {@link SquadronRepository#existsById(Object)} check on the
- * single-row fast path — so the resolver never throws on a bad-data edge case and treats a dangling
- * row identically whether the user holds one Staffel or two. The multi-row path loads base-typed on
- * purpose: a Squadron-typed query would narrow an org-unit id the surrounding transaction already
- * tracks as a base-typed proxy (HHH000179, breaks ==). It carries no {@code @Transactional} of its
- * own on purpose: it is a pure read helper that participates in whichever transaction (if any) the
- * caller already holds, matching how the three call sites read the squadron table inline before the
- * extraction.
+ * <p>The single definition of the primary Staffel, shared by the membership service, {@code
+ * UserMapper} and {@code OwnerScopeService}; lives in the dependency-leaf {@code support} package
+ * (ADR-0047). Dangling memberships are skipped, and it joins the caller's transaction, if any.
  */
 @Service
 @RequiredArgsConstructor
@@ -92,11 +60,8 @@ public class StaffelMembershipResolver {
   private final OrgUnitRepository orgUnitRepository;
 
   /**
-   * Resolves the given {@code SQUADRON}-kind membership rows to their owning {@link Squadron}
-   * entities, sorted case-insensitively by squadron name so the first element is the deterministic
-   * primary Staffel. Used where the caller needs the full squadron entities (e.g. to build the
-   * {@code UserDto.squadrons} reference DTOs that carry name + shorthand). Dangling rows whose
-   * squadron no longer exists are dropped by the batch load.
+   * Resolves the given {@code SQUADRON}-kind membership rows to their squadrons, name-sorted with
+   * the primary Staffel first; dangling rows are dropped.
    *
    * @param squadronRows the user's {@code SQUADRON}-kind membership rows; never {@code null},
    *     possibly empty.
@@ -112,13 +77,8 @@ public class StaffelMembershipResolver {
   }
 
   /**
-   * Batch variant of {@link #resolveNameSortedStaffeln(List)} for many users at once: every Staffel
-   * referenced by any of the given membership rows is loaded in <em>one</em> polymorphic {@code
-   * findAllById}, then each user's rows are resolved against that map and name-sorted with the same
-   * primary-first order. Backs the {@code UserMapper} batch primer, which seeds its request memo
-   * for a whole page or aggregate before the per-user projection runs, so mapping {@code n} users
-   * costs two queries instead of up to {@code 3n} (REQ-DATA-003). A row whose squadron no longer
-   * resolves is dropped, exactly as the single-user variant drops it.
+   * Batch variant of {@link #resolveNameSortedStaffeln(List)} that loads all referenced Staffeln in
+   * one query (REQ-DATA-003).
    *
    * @param squadronRowsByUser each user's {@code SQUADRON}-kind membership rows, keyed by user id;
    *     never {@code null}. A user mapped to an empty list resolves to an empty list.
@@ -150,13 +110,8 @@ public class StaffelMembershipResolver {
   }
 
   /**
-   * Loads the given org-unit ids polymorphically and keeps only the ones that are a {@link
-   * Squadron}, keyed by id. Polymorphic batch load + unproxy instead of a Squadron-typed query:
-   * this resolver runs for every embedded {@code UserDto}, frequently inside a transaction that
-   * already tracks one of the Staffel ids as a base-typed {@link OrgUnit} proxy (e.g. a mission's
-   * {@code owningOrgUnit}) — a subclass-typed query would force Hibernate to narrow that proxy
-   * (HHH000179, breaks {@code ==}). The {@code instanceof} filter replaces the SQL discriminator
-   * filter 1:1 and still drops dangling ids (absent from the batch result).
+   * Loads the given org-unit ids polymorphically and keeps the {@link Squadron}s, keyed by id. A
+   * base-typed load avoids narrowing an {@link OrgUnit} proxy the session already holds.
    *
    * @param staffelIds the org-unit ids to load; never {@code null}.
    * @return the resolvable squadrons keyed by id; never {@code null}, possibly empty.
@@ -173,14 +128,9 @@ public class StaffelMembershipResolver {
   }
 
   /**
-   * Resolves the given {@code SQUADRON}-kind membership rows to their owning Staffel ids,
-   * name-sorted (primary first) exactly as {@link #resolveNameSortedStaffeln(List)}. Used where the
-   * caller only needs the ids (authorization gates, the single-valued primary accessors). The
-   * common single-Staffel case skips the name sort and the full squadron <em>entity</em> load — one
-   * row is already its own primary and needs no name to sort — doing only a cheap {@code
-   * existsById} check so a dangling row (a membership whose squadron no longer resolves) is dropped
-   * exactly as the multi-row batch load drops it; the dangling-row treatment is therefore identical
-   * regardless of how many Staffeln the user holds.
+   * Resolves the given {@code SQUADRON}-kind membership rows to their Staffel ids in the same order
+   * as {@link #resolveNameSortedStaffeln(List)}. A single row is only checked for existence, not
+   * loaded.
    *
    * @param squadronRows the user's {@code SQUADRON}-kind membership rows; never {@code null},
    *     possibly empty.
@@ -193,9 +143,6 @@ public class StaffelMembershipResolver {
       return List.of();
     }
     if (squadronRows.size() == 1) {
-      // The common single-Staffel case needs no name sort and no entity hydration — but still
-      // confirms the squadron resolves (cheap existsById) so a dangling row is dropped consistently
-      // with the multi-row branch, rather than returned unchecked.
       UUID staffelId = squadronRows.getFirst().getId().getOrgUnitId();
       return squadronRepository.existsById(staffelId) ? List.of(staffelId) : List.of();
     }

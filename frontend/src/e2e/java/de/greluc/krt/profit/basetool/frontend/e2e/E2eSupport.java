@@ -46,26 +46,10 @@ import java.util.Map;
  */
 final class E2eSupport {
 
-  /**
-   * Total attempts for the Keycloak login flow before giving up. The OIDC round-trip is the suite's
-   * documented high-risk flakiness class (issuer timing under CI load — see {@code
-   * docs/e2e-test/README.md}): when the runner is simultaneously building the stack, driving a
-   * browser and running the JVM, Keycloak occasionally stalls past the post-credential redirect's
-   * 30 s wait, surfacing as a {@link TimeoutError} on an otherwise-correct login. Retrying the
-   * whole flow on a freshly re-navigated page absorbs that transient stall; a genuinely broken
-   * login still fails every attempt and propagates, so the retry hardens against timing without
-   * masking real breakage. Three keeps the worst case bounded well inside the job's 45-minute
-   * budget.
-   */
+  /** Number of attempts for the Keycloak login flow before a timeout propagates. */
   private static final int LOGIN_MAX_ATTEMPTS = 3;
 
-  /**
-   * Total attempts for {@link #navigate} before a navigation abort is allowed to propagate. Mirrors
-   * {@link #LOGIN_MAX_ATTEMPTS}: attempts {@code 1..N-1} retry a transient abort, the {@code N}-th
-   * runs uncaught so a persistent failure still surfaces with its real error. Three bounds the rare
-   * WebKit-abort retry loop; since the retry fires only on the abort path it never extends a
-   * healthy run.
-   */
+  /** Number of attempts for {@link #navigate}; the last attempt runs uncaught. */
   private static final int NAVIGATE_MAX_ATTEMPTS = 3;
 
   /**
@@ -76,28 +60,12 @@ final class E2eSupport {
    */
   private static final int NAVIGATE_RETRY_BACKOFF_MILLIS = 500;
 
-  /**
-   * Per-attempt navigation timeout, in milliseconds, applied to each {@code page.navigate(...)} in
-   * {@link #navigate}. Set above Playwright's 30 s default so a slow-but-progressing document load
-   * on a contended CI runner is not cut off prematurely; when an attempt does exceed it, {@link
-   * #navigate} treats the {@link TimeoutError} as transient and retries on a fresh GET rather than
-   * failing outright. The {@link #NAVIGATE_MAX_ATTEMPTS} bound keeps the worst case finite.
-   */
+  /** Per-attempt navigation timeout of {@link #navigate}, in milliseconds. */
   private static final double NAVIGATE_TIMEOUT_MILLIS = 45_000;
 
   /**
-   * Lowercase substrings that mark a {@code page.navigate(...)} failure as a transient connection
-   * reset of the navigation request rather than a genuine page failure (see {@link
-   * #isTransientNavigationAbort}): WebKit's HTTP/2 {@code INTERNAL_ERROR} and its {@code
-   * frameAbortedNavigation} wrapper, Firefox's {@code NS_BINDING_ABORTED} and {@code
-   * NS_ERROR_ABORT} (Gecko aborts a main-frame navigation under CI load with either code — the
-   * latter surfaced as the dominant Firefox-only flake), Chromium's {@code net::ERR_ABORTED} and
-   * {@code net::ERR_HTTP2_PROTOCOL_ERROR} (the latter is Chromium's surfacing of an HTTP/2 stream
-   * reset mid-navigation under CI load — the same root cause as WebKit's {@code INTERNAL_ERROR},
-   * with the frontend's Tomcat logging the peer-side symptom as {@code
-   * AsyncRequestNotUsableException} while having already served the document {@code 200}), and
-   * Playwright's own "Navigation interrupted by another one". Deliberately narrow so only a genuine
-   * abort is retried and every real error propagates unmasked.
+   * Lowercase message fragments that mark a {@code page.navigate(...)} failure as a transient
+   * connection abort in Chromium, Firefox, WebKit or Playwright itself.
    */
   private static final List<String> NAVIGATION_ABORT_SIGNATURES =
       List.of(
@@ -112,26 +80,11 @@ final class E2eSupport {
   private E2eSupport() {}
 
   /**
-   * Launches a headless browser of the engine named by the {@code e2e.browser} system property —
-   * {@code chromium} (default), {@code firefox}, or {@code webkit}. This is the single seam the
-   * test classes use, so the whole suite runs against any one engine per JVM (a CI matrix fans the
-   * three out in parallel).
+   * Launches a headless browser of the engine named by the {@code e2e.browser} system property
+   * ({@code chromium}, {@code firefox} or {@code webkit}).
    *
-   * <p>For the ephemeral local stack the Keycloak issuer host {@code host.docker.internal} must
-   * resolve to the loopback (the stack publishes Keycloak on 127.0.0.1). Each engine needs a
-   * different mechanism, all gated on {@code managesStack}:
-   *
-   * <ul>
-   *   <li><b>Chromium</b> — the {@code --host-resolver-rules} launch arg (override via {@code
-   *       -De2e.hostResolverRules}).
-   *   <li><b>Firefox</b> — the {@code network.dns.localDomains} preference.
-   *   <li><b>WebKit</b> — no launch-level override exists; it relies on the OS hosts file mapping
-   *       {@code host.docker.internal} to 127.0.0.1 (CI adds the entry — see {@code
-   *       docs/e2e-test/README.md}; on a workstation it must be added manually).
-   * </ul>
-   *
-   * <p>Against an external deployment ({@code !managesStack}) no remap is applied for any engine —
-   * the real hostname resolves normally.
+   * <p>When {@code managesStack} is set, {@code host.docker.internal} is mapped to the loopback;
+   * WebKit relies on the OS hosts file for that.
    *
    * @param playwright the Playwright entry point
    * @param managesStack whether an ephemeral local stack is in play (enables the issuer-host remap)
@@ -169,50 +122,8 @@ final class E2eSupport {
   }
 
   /**
-   * Launches headless Firefox pinned to a fresh HTTP/1.1 connection per request and, for the
-   * ephemeral stack, with {@code host.docker.internal} resolved to the loopback.
-   *
-   * <p><b>The uniform fix now lives at the server: the E2E stack disables HTTP/2 on the
-   * frontend</b> ({@code SERVER_HTTP2_ENABLED=false} in {@code docker-compose.e2e.yml}), so every
-   * engine speaks HTTP/1.1 and the stream-reset class below cannot arise for any of them. The two
-   * Firefox prefs here are retained on top of that as a Firefox-specific guard (the HTTP/1.1
-   * connection-reuse race called out below) plus defence-in-depth, and because they are what
-   * originally root-caused the flake; the narrative is kept for that history.
-   *
-   * <p>Two transport preferences together were the original root-cause fix for the suite's dominant
-   * Firefox-only flake — the bank wipe/deposit {@code waitForResponse} hangs that survived raising
-   * the timeout to 60 s. The frontend then served <b>HTTP/2</b> (WebKit reports its aborts as
-   * {@code HTTP/2 Error: INTERNAL_ERROR}), and under CI load Gecko's h2 stack <b>reset the POST
-   * stream mid-flight</b>: the captured deposit reset truncated the request body (the frontend
-   * logged {@code POST /api/proxy/bank/deposits -> 400 "I/O error while reading input message"})
-   * and the wipe reset dropped the response after the server had already committed {@code 200}.
-   * Either way the browser's {@code fetch()} rejects with a <em>network error</em> rather than
-   * delivering an HTTP response — the in-place handler shows its generic failure toast, and
-   * Playwright's {@code waitForResponse} never matches and hangs to its timeout. Chromium tolerated
-   * the reset and Firefox did not (and, unlike an idempotent GET, never auto-retries a
-   * non-idempotent POST), so this was first fixed per-browser; WebKit was later observed to hit the
-   * <em>same</em> reset (Tomcat "Client reset the stream before the request was fully read") but
-   * has no Playwright-level h2 toggle, which is why the fix moved to the server above.
-   *
-   * <ul>
-   *   <li><b>{@code network.http.http2.enabled = false}</b> drops Firefox to HTTP/1.1, eliminating
-   *       the h2 stream-reset entirely. {@code network.http.keep-alive} is an HTTP/1.1-only knob,
-   *       so it could never touch the h2 streams that were actually failing — hence the timeout
-   *       bump and a bare keep-alive toggle did not help.
-   *   <li><b>{@code network.http.keep-alive = false}</b> then forces a fresh connection per request
-   *       on that HTTP/1.1 transport, so the analogous HTTP/1.1 connection-reuse race (Gecko
-   *       reusing a persistent connection the instant the server closes it → {@code NS_ERROR_ABORT}
-   *       / {@code NS_BINDING_ABORTED}) cannot occur either.
-   * </ul>
-   *
-   * <p>Together they give every request — XHR and navigation alike — a clean, dedicated HTTP/1.1
-   * connection, complementing {@link #navigate}'s abort retry rather than relying on it. The cost
-   * is a few extra localhost TLS handshakes, negligible for the suite, and this hardens transport
-   * only: it changes neither the app nor any assertion, so a genuine failure still fails. The
-   * notification SSE is unaffected — its response streams open over its own HTTP/1.1 connection.
-   *
-   * <p>For the ephemeral stack {@code network.dns.localDomains} additionally maps the Keycloak
-   * issuer host to the loopback (Firefox has no {@code --host-resolver-rules} equivalent).
+   * Launches headless Firefox with HTTP/2 and keep-alive disabled, and for the ephemeral stack maps
+   * {@code host.docker.internal} to the loopback.
    *
    * @param playwright the Playwright entry point
    * @param managesStack whether the ephemeral stack is in play (enables the local-domain remap)
@@ -231,15 +142,8 @@ final class E2eSupport {
   }
 
   /**
-   * Launches headless WebKit. WebKit has neither a {@code --host-resolver-rules} arg nor a DNS
-   * preference, so for the ephemeral stack it relies on the OS hosts file mapping {@code
-   * host.docker.internal} to 127.0.0.1; this fails fast with an actionable message when that
-   * mapping is absent rather than surfacing an opaque "Could not connect to server" mid-flow.
-   *
-   * <p>WebKit likewise has no Playwright-level HTTP/2 toggle, so it does not carry the h2 opt-out
-   * the {@link #launchFirefox} prefs give Gecko; it instead depends on the E2E stack serving
-   * HTTP/1.1 ({@code SERVER_HTTP2_ENABLED=false}, see {@code docker-compose.e2e.yml}) to avoid the
-   * POST stream-reset flake documented on {@link #launchFirefox}.
+   * Launches headless WebKit; for the ephemeral stack it first verifies that the OS hosts file maps
+   * {@code host.docker.internal} to the loopback.
    *
    * @param playwright the Playwright entry point
    * @param managesStack whether the ephemeral stack is in play (requires the hosts-file mapping)
@@ -253,10 +157,7 @@ final class E2eSupport {
   }
 
   /**
-   * Verifies that {@code host.docker.internal} resolves to the loopback — the precondition for
-   * WebKit to reach the ephemeral stack's Keycloak. The OS resolver (and therefore WebKit) sees
-   * whatever this check sees, so an actionable error here pre-empts an opaque connection failure
-   * mid-flow.
+   * Verifies that {@code host.docker.internal} resolves to the loopback.
    *
    * @throws IllegalStateException if the host does not resolve, or resolves to a non-loopback
    *     address
@@ -284,17 +185,8 @@ final class E2eSupport {
   }
 
   /**
-   * Drives the Keycloak default-theme login form and waits for the redirect back to the frontend
-   * origin, retrying the whole flow up to {@link #LOGIN_MAX_ATTEMPTS} times when an attempt times
-   * out. A timed-out {@code waitForURL} means Keycloak never issued the redirect back and so set no
-   * authenticated session, which makes the retry safe and effective: re-navigating to the
-   * authorization endpoint on the same page reliably shows the form again (and aborts any
-   * navigation the stalled attempt left in flight), so a fresh attempt clears the transient
-   * issuer-timing stall. Because login is read-only this never re-runs a destructive mutation —
-   * unlike a whole-test retry — and every login in the suite gets the same resilience: the {@link
-   * #authenticatedStorageState} callers funnel through here, as do the multi-user tests that drive
-   * {@code login} directly. The final attempt's {@link TimeoutError} propagates unchanged, so a
-   * genuinely broken login is not masked.
+   * Logs in through the Keycloak form and waits for the redirect back, retrying the whole flow up
+   * to {@link #LOGIN_MAX_ATTEMPTS} times on timeout.
    *
    * @param page the page to drive
    * @param baseUrl the frontend origin
@@ -303,10 +195,6 @@ final class E2eSupport {
    * @throws TimeoutError if the login does not complete within {@link #LOGIN_MAX_ATTEMPTS} attempts
    */
   static void login(Page page, String baseUrl, String username, String password) {
-    // Attempts 1..N-1 retry on a timeout; the final attempt runs uncaught so a persistent
-    // failure propagates rather than being swallowed. Structuring it this way keeps the loop
-    // condition the genuine bound (instead of an in-body throw that the linter — rightly —
-    // flags as making the condition always true).
     for (int attempt = 1; attempt < LOGIN_MAX_ATTEMPTS; attempt++) {
       try {
         attemptLogin(page, baseUrl, username, password);
@@ -322,11 +210,8 @@ final class E2eSupport {
   }
 
   /**
-   * Performs a single Keycloak login attempt: navigates to the authorization endpoint (which aborts
-   * any navigation a previous attempt left in flight and re-renders the default-theme form), fills
-   * and submits the credentials, then waits up to 30 s for the redirect back to the frontend
-   * origin. Extracted from {@link #login} so the retry loop there can re-run the complete flow on a
-   * clean navigation rather than from a half-redirected page.
+   * Performs one login attempt: opens the authorization endpoint, submits the credentials and waits
+   * up to 30 s for the redirect back.
    *
    * @param page the page to drive
    * @param baseUrl the frontend origin
@@ -347,19 +232,8 @@ final class E2eSupport {
   }
 
   /**
-   * Passes the Terms-of-Use consent gate when it stands between the login and the tool
-   * (REQ-SEC-028).
-   *
-   * <p>The E2E stack runs the {@code dev} profile, not {@code test}, so unlike the unit suites the
-   * gate is genuinely armed here — a freshly seeded user has consented to nothing, and every test
-   * would otherwise land on the consent page instead of its own surface. Clicking through it here
-   * rather than pre-seeding an acceptance row is deliberate: it means the whole E2E suite exercises
-   * the real gate on every login, so a broken consent path fails loudly instead of being silently
-   * bypassed by fixture data.
-   *
-   * <p>Tolerant by design. It only acts when the gate actually appeared, so it stays a no-op once
-   * the user has consented (the acceptance is recorded per user and survives the session), and it
-   * does not fail when the page is already elsewhere.
+   * Accepts the Terms-of-Use consent page if it appears after login (REQ-SEC-028); otherwise a
+   * no-op.
    *
    * @param page the page that just completed the OIDC redirect
    * @param baseUrl the frontend origin
@@ -377,10 +251,7 @@ final class E2eSupport {
   }
 
   /**
-   * Logs in through Keycloak and returns the path to a saved Playwright storageState, so subsequent
-   * contexts in the same test class can start already authenticated instead of re-running the OIDC
-   * flow. Each call performs a fresh login (its own frontend session) — the result is deliberately
-   * NOT memoised across test classes, so flows stay isolated and never share a mutated session.
+   * Logs in freshly and saves the session as a Playwright storageState file.
    *
    * @param browser the test class's browser
    * @param baseUrl the frontend origin
@@ -404,20 +275,8 @@ final class E2eSupport {
   }
 
   /**
-   * Clicks a submit control that can be covered by the {@code position: fixed} global footer
-   * ({@code .krt-footer}, introduced with the das-kartell design system). A long form's bottom
-   * submit button sits behind the footer, so a coordinate click is intercepted and times out. The
-   * alternatives each failed on at least one engine — {@code dispatchEvent} is untrusted, {@code
-   * press("Enter")} does not activate these submits on WebKit, and {@code requestSubmit()} aborted
-   * the app's submit. So this drops the footer out of the way (it is irrelevant to the submit flow,
-   * and the page-side {@code evaluate} runs fine under the strict CSP — unlike string-predicate
-   * {@code eval}), then performs a normal, trusted click that submits with full validation,
-   * consistently across Chromium, Firefox and WebKit.
-   *
-   * <p>The click is wrapped in {@link #awaitFormPost} so the method only returns once the
-   * post-submit navigation (including the redirect it triggers) has settled — see that method for
-   * why a bare click would otherwise let a follow-up {@code navigate(...)} abort the in-flight
-   * submit on WebKit.
+   * Clicks a submit control that the fixed {@code .krt-footer} may cover, by hiding the footer
+   * first, and waits for the resulting form post via {@link #awaitFormPost}.
    *
    * @param submit the submit control (a {@code <button type="submit">}) to click
    */
@@ -430,18 +289,10 @@ final class E2eSupport {
   }
 
   /**
-   * Picks an option from a KRT searchable combobox (krt-searchable-select.js) by the option's
-   * value. The enhancer replaces the original {@code <select>} with a filtering text input plus a
-   * {@code role=listbox}, so selecting is no longer {@code selectOption(...)}: this focuses the
-   * textbox to open the popup, then clicks the {@code role=option} carrying the wanted value in its
-   * {@code data-value} (the enhancer mirrors each option's value there). The option lookup is
-   * scoped to this combobox's own wrapper (the textbox's parent): closing a combobox merely hides
-   * its rendered options, so a page-global lookup could match the stale, hidden option list of a
-   * combobox opened earlier and time out waiting for it to become clickable. Used wherever a {@code
-   * <select>} was converted into a searchable picker (REQ-FE-011).
+   * Selects the option with the given value in a searchable combobox (REQ-FE-011), looking up the
+   * option only within this combobox's wrapper.
    *
-   * @param comboInput the visible combobox textbox the enhancer rendered (e.g. located by its
-   *     {@code data-testid})
+   * @param comboInput the visible combobox textbox the enhancer rendered
    * @param value the option value to select
    */
   static void selectComboboxByValue(Locator comboInput, String value) {
@@ -454,17 +305,12 @@ final class E2eSupport {
   }
 
   /**
-   * Like {@link #selectComboboxByValue(Locator, String)}, but first types {@code searchText} into
-   * the combobox textbox — the real-user flow for a server-side-search picker (REQ-FE-016), whose
-   * open-with-empty-query popup renders only the first response page (25 rows, name ascending). A
-   * seeded entry sorting beyond that window never renders on the empty query, so picking it MUST
-   * narrow the search first; the option click then auto-waits for the debounced fetch to render the
-   * match.
+   * Like {@link #selectComboboxByValue(Locator, String)}, but first types {@code searchText} to
+   * narrow a server-side search picker (REQ-FE-016).
    *
    * @param comboInput the visible combobox textbox the enhancer rendered
    * @param value the option value to pick (matched via {@code data-value})
-   * @param searchText the query to type first, narrowing the server-side result to the wanted entry
-   *     (typically the entry's seeded name)
+   * @param searchText the query to type first
    */
   static void selectComboboxByValue(Locator comboInput, String value, String searchText) {
     comboInput.click();
@@ -477,13 +323,7 @@ final class E2eSupport {
   }
 
   /**
-   * Picks the first real option of a KRT searchable combobox — the equivalent of a native {@code
-   * selectOption(new SelectOption().setIndex(1))}. Opens the popup by focusing the textbox, then
-   * clicks the first {@code role=option} with a NON-empty {@code data-value} in this combobox's own
-   * wrapper — the {@code :not([data-value=''])} filter skips the optional picker's selectable
-   * "clear" row (empty value, REQ-FE-011), so this still lands on the first genuine entry. Scoped
-   * like {@link #selectComboboxByValue} so another combobox's stale, hidden option list on the same
-   * page cannot shadow the match.
+   * Selects the first option with a non-empty value in a searchable combobox.
    *
    * @param comboInput the visible combobox textbox the enhancer rendered
    */
@@ -497,11 +337,7 @@ final class E2eSupport {
   }
 
   /**
-   * Clears a KRT searchable combobox back to "no selection" by picking its "clear" row — the empty
-   * placeholder option an OPTIONAL picker (a non-required {@code <select>} with a descriptive empty
-   * option) re-exposes at the top of its unfiltered list (REQ-FE-011). Opens the popup by focusing
-   * the textbox, then clicks the {@code role=option} carrying an empty {@code data-value} in this
-   * combobox's own wrapper (scoped like {@link #selectComboboxByValue}).
+   * Clears an optional searchable combobox by picking its empty-value option (REQ-FE-011).
    *
    * @param comboInput the visible combobox textbox the enhancer rendered
    */
@@ -511,30 +347,8 @@ final class E2eSupport {
   }
 
   /**
-   * Runs a submit action that triggers a full-page form POST and blocks until the resulting
-   * navigation — <em>including the redirect the POST triggers</em> — has fully settled, so the
-   * submit and the page it lands on cannot be dropped by whatever the test does next.
-   *
-   * <p>Playwright's {@code locator.click()} returns once the click is dispatched — it does NOT wait
-   * for any navigation the click starts. The original pattern ({@code click()} then {@code
-   * waitForLoadState()}) was racy: when the POST had not yet committed, {@code waitForLoadState()}
-   * saw the still-current form document (already in the {@code load} state) and resolved
-   * immediately, so the test's next {@code navigate(...)} aborted the in-flight POST and the
-   * mutation was silently lost — the flaky, engine-specific "row not visible" failures.
-   *
-   * <p>Waiting only for the POST's own {@code 3xx} response (an earlier, incomplete fix) is also
-   * insufficient: the browser then follows that redirect with a GET for the post-submit document,
-   * and a {@code navigate(...)} fired while that GET is still in flight aborts it. WebKit surfaces
-   * the aborted navigation as {@code HTTP/2 Error: INTERNAL_ERROR} ({@code frameAbortedNavigation})
-   * — the failure this method now guards against.
-   *
-   * <p>So this waits for the <strong>settled</strong> post-submit document response: the redirect
-   * target's GET (the normal Post/Redirect/Get path), or — defensively — a non-{@code 3xx} POST
-   * document for a submit that renders its own page without redirecting (which keeps the wait from
-   * hanging for a redirect that never comes). Either way the backend mutation has provably landed
-   * and no navigation is in flight, so any subsequent {@code navigate(...)} is safe. The {@code
-   * isNavigationRequest} and {@code document} guards restrict the match to the top-level
-   * navigation, excluding XHR/WebSocket/beacon and subresource requests.
+   * Runs a submit action that triggers a full-page form POST and waits until the resulting document
+   * (the redirect target, or a non-redirect POST response) has loaded.
    *
    * @param page the page whose main-frame post-submit navigation to await
    * @param submitAction the action (typically a submit-button click) that starts the form POST
@@ -546,16 +360,9 @@ final class E2eSupport {
           if (!request.isNavigationRequest() || !"document".equals(request.resourceType())) {
             return false;
           }
-          // Post/Redirect/Get happy path: the app answers the POST with a 3xx and the browser
-          // follows it with a GET for the post-submit document. Waiting for that GET's response —
-          // not the POST's 3xx — means the redirect has fully committed, so the caller's next
-          // navigate(...) has no in-flight redirect GET to abort.
           if ("GET".equals(request.method())) {
             return true;
           }
-          // Defensive: a submit that renders its own document (no redirect) settles on the POST
-          // response itself, so accept any non-3xx POST document too rather than hang waiting for
-          // a redirect that will never arrive.
           int status = response.status();
           return "POST".equals(request.method()) && (status < 300 || status >= 400);
         },
@@ -564,44 +371,17 @@ final class E2eSupport {
   }
 
   /**
-   * Navigates to {@code url}, retrying up to {@link #NAVIGATE_MAX_ATTEMPTS} times when the
-   * navigation request is aborted by a transient, engine-level connection reset rather than the
-   * target page genuinely failing.
-   *
-   * <p>This hardens the post-submit list re-load that several flows perform immediately after
-   * {@link #awaitFormPost} / {@link #clickSubmitClearingFooter}, and every other content navigation
-   * the suite drives. {@code awaitFormPost} already blocks until the submit's Post/Redirect/Get has
-   * fully settled — so the mutation is safe and no submit navigation is in flight — but the very
-   * next {@code navigate(...)} still issues a fresh GET on a connection the browser has, under CI
-   * load, been seen to tear down mid-flight. The engines surface that aborted main-frame navigation
-   * differently: WebKit as {@code HTTP/2 Error: INTERNAL_ERROR} ({@code frameAbortedNavigation}),
-   * Firefox as {@code NS_ERROR_ABORT} / {@code NS_BINDING_ABORTED}, Chromium as {@code
-   * net::ERR_ABORTED} or — when the HTTP/2 stream is reset mid-navigation — {@code
-   * net::ERR_HTTP2_PROTOCOL_ERROR}, all thrown as a {@link PlaywrightException} (concretely a
-   * {@code DriverException}). The reset is transient — a brief settle plus a fresh GET succeeds —
-   * so {@link #isTransientNavigationAbort} gates the abort retry to exactly those signatures and
-   * lets every other navigation failure (a real 4xx/5xx document, a wrong URL) propagate
-   * immediately and unmasked.
-   *
-   * <p>It is also timeout-tolerant: each attempt is bounded by {@link #NAVIGATE_TIMEOUT_MILLIS}
-   * (above Playwright's 30 s default), and a {@link TimeoutError} from a slow-but-progressing load
-   * on a contended runner is retried on a fresh GET rather than failing the test outright. The
-   * final attempt runs uncaught, so a persistent abort or timeout still fails the test with the
-   * genuine Playwright error.
+   * Navigates to {@code url}, retrying up to {@link #NAVIGATE_MAX_ATTEMPTS} times on a transient
+   * abort ({@link #isTransientNavigationAbort}) or a timeout.
    *
    * @param page the page to navigate
    * @param url the absolute URL to load
-   * @return the main-frame {@link Response} of the successful navigation (never {@code null} for a
-   *     document load), so callers can assert on its HTTP status — e.g. that a reopened page
-   *     renders {@code 200} rather than {@code 500}
+   * @return the main-frame {@link Response} of the successful navigation
    * @throws PlaywrightException if every attempt is aborted or times out, or on the first
    *     non-transient navigation failure
    */
   static Response navigate(Page page, String url) {
     Page.NavigateOptions options = new Page.NavigateOptions().setTimeout(NAVIGATE_TIMEOUT_MILLIS);
-    // Attempts 1..N-1 retry a transient abort or timeout; the final attempt (below the loop) runs
-    // uncaught, so a persistent failure propagates with its real error — mirrors
-    // login()/attemptLogin.
     for (int attempt = 1; attempt < NAVIGATE_MAX_ATTEMPTS; attempt++) {
       try {
         return page.navigate(url, options);
@@ -620,13 +400,6 @@ final class E2eSupport {
             url,
             String.valueOf(abort.getMessage()).lines().findFirst().orElse("navigation aborted"));
       }
-      // Let the reset stream tear down and the page fall back to its prior, already-loaded document
-      // before re-issuing the GET. The settle runs between attempts, outside the catch, so it can
-      // never mask the abort/timeout it follows. The load-state wait is best-effort and explicitly
-      // bounded: the next attempt issues a fresh GET that establishes its own load state, so a
-      // settle that itself outruns the timeout on a contended runner must not become the test's
-      // failure — swallow that TimeoutError and retry. Only the final attempt (below the loop)
-      // propagates a genuine navigation failure.
       page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
       try {
         page.waitForLoadState(
@@ -642,15 +415,7 @@ final class E2eSupport {
   }
 
   /**
-   * Reports whether a {@link PlaywrightException} from {@code page.navigate(...)} is a transient,
-   * retryable abort of the navigation request itself — as opposed to a genuine failure of the
-   * target page. It matches only the engine-specific abort signatures in {@link
-   * #NAVIGATION_ABORT_SIGNATURES} (WebKit's {@code INTERNAL_ERROR} / {@code
-   * frameAbortedNavigation}, Firefox's {@code NS_BINDING_ABORTED} / {@code NS_ERROR_ABORT},
-   * Chromium's {@code ERR_ABORTED} / {@code ERR_HTTP2_PROTOCOL_ERROR}, and Playwright's "Navigation
-   * interrupted by another one"). A timeout, a 4xx/5xx, a DNS error or any other navigation failure
-   * carries none of these, so it is reported non-transient and {@link #navigate} lets it propagate
-   * unmasked.
+   * Reports whether a navigation failure carries one of the {@link #NAVIGATION_ABORT_SIGNATURES}.
    *
    * @param error the exception thrown by {@code page.navigate(...)}
    * @return {@code true} if the message carries a known transient-abort signature; {@code false}
@@ -689,15 +454,8 @@ final class E2eSupport {
   }
 
   /**
-   * Expands the page's filter panel if it is collapsed, and waits until its controls are reachable.
-   *
-   * <p>Every list page's filters ship collapsed (REQ-FE-021), so any test that touches a filter
-   * widget must open the panel first or Playwright will wait out its timeout against a {@code
-   * hidden} subtree. That is not a test artefact: a member has to make the same click, which is
-   * what the collapsed default costs and what this helper makes visible at the call site.
-   *
-   * <p>Idempotent, and a no-op on a page that has no collapsible panel — the pages whose filter is
-   * a single search input keep theirs permanently visible, deliberately.
+   * Expands the page's collapsed filter panel (REQ-FE-021) and waits until its controls are
+   * reachable; a no-op when the page has no collapsible panel.
    *
    * @param page the page under test
    */

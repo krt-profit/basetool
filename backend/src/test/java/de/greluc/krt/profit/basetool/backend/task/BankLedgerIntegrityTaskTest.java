@@ -55,13 +55,11 @@ class BankLedgerIntegrityTaskTest {
     task =
         new BankLedgerIntegrityTask(
             bankLedgerIntegrityService, new TaskMetrics(registry), registry);
-    // @PostConstruct is not invoked for a plain unit-constructed bean.
     task.registerViolationGauges();
   }
 
   @Test
   void runIntegrityCheck_publishesPerCategoryViolationGaugesFromTheReport() {
-    // Given a report with two negative-balance accounts and one unbalanced transfer.
     IntegrityReport report =
         new IntegrityReport(
             List.of(UUID.randomUUID(), UUID.randomUUID()),
@@ -72,14 +70,11 @@ class BankLedgerIntegrityTaskTest {
             List.of());
     when(bankLedgerIntegrityService.verify()).thenReturn(report);
 
-    // When
     task.runIntegrityCheck();
 
-    // Then the gauges mirror the per-category counts.
     assertThat(gauge(MetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)).isEqualTo(2.0d);
     assertThat(gauge(MetricNames.CATEGORY_UNBALANCED_TRANSFER)).isEqualTo(1.0d);
     assertThat(gauge(MetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT)).isEqualTo(0.0d);
-    // A run that found violations is still a successful job run, not a failure.
     assertThat(
             registry
                 .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)

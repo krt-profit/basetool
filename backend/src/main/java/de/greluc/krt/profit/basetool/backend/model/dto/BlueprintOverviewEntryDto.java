@@ -20,11 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * One row of the org-unit blueprint availability overview (#364): a distinct blueprint <em>variant
- * family</em> (a base item with its cosmetic variants collapsed onto one row; magazines stay
- * atomic) plus how many in-scope org-unit members own any member of it. Carries no owner identity —
- * the owner list is fetched separately via the drill-down endpoint, and only by callers cleared for
- * the overview.
+ * One row of the org-unit blueprint availability overview: a blueprint variant family and how many
+ * in-scope members own any of it. Carries no owner identity.
  *
  * @param productKey the variant family key (the aggregation and drill-down key)
  * @param productName the family's display label (the case-preserving base name)

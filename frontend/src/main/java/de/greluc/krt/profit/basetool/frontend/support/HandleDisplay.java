@@ -27,24 +27,11 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
- * Renders a handle snapshot for a human, mapping the Art. 17 erasure sentinel onto a localized
- * label (REQ-SEC-062).
+ * Renders a handle snapshot for display, mapping the erasure sentinel {@code #ANONYMISED#} to the
+ * localized {@code general.anonymisedHandle} label (REQ-SEC-062).
  *
- * <p>Registered as the Thymeleaf-visible bean {@code handles}, so a template writes {@code
- * ${@handles.display(row.actorHandle)}} — the same shape {@code @markdown.render(...)} already
- * uses. One seam rather than a ternary at each of the ~30 places a handle is printed: a site that
- * forgot the ternary would print the raw token, and the sites are spread over the audit viewer,
- * four bank screens and the job-order handover receipts.
- *
- * <p><b>Why the stored value is a token and not a word.</b> It is written once and read in two
- * languages, and the project's i18n rule admits no hardcoded user-visible string. So the column
- * carries {@code #ANONYMISED#} and this class resolves {@code general.anonymisedHandle} from the
- * message bundles.
- *
- * <p><b>This class is a mirror of {@code HandleAnonymisation} in the backend module</b>, which
- * holds the same constant. The duplication has the same cause as {@code CLIENT_IDS} mirroring
- * {@code ClientAttribution}: this module holds no backend beans. The two are a <b>mirror pair</b> —
- * changing the token means changing both.
+ * <p>Exposed to templates as the {@code handles} bean. The sentinel must match the backend's {@code
+ * HandleAnonymisation}.
  */
 @Component("handles")
 @RequiredArgsConstructor
@@ -77,10 +64,7 @@ public class HandleDisplay {
   }
 
   /**
-   * Whether a handle snapshot has been erased on request.
-   *
-   * <p>Exposed for the few templates that need to style the placeholder differently rather than
-   * merely print it.
+   * Checks whether a handle snapshot is the erasure sentinel.
    *
    * @param handle the stored handle snapshot, possibly {@code null}
    * @return {@code true} when the value is the erasure sentinel

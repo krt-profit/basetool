@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Frontend mirror of the caller's evaluated booking capabilities on one bank account
- * (REQ-BANK-009). Drives which K1 action buttons render — the backend re-checks every booking
- * regardless.
+ * Frontend mirror of the caller's booking capabilities on one bank account (REQ-BANK-009); decides
+ * which K1 action buttons render.
  *
  * @param canDeposit whether the caller may book deposits onto the account
  * @param canWithdraw whether the caller may book withdrawals from the account

@@ -36,10 +36,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
  * Mockito tests for the "delete reports older than X days" action on {@link
- * AdminSyncReportsPageController}. Pins the three behaviours that carry risk: (1) a blank source
- * purges the combined view and redirects to the combined tab, (2) a source tab is relayed to the
- * backend and the user lands back on that tab, and (3) invalid input / backend failure
- * short-circuit to an error flash without (respectively, regardless of) a backend call.
+ * AdminSyncReportsPageController}: a blank source purges the combined view, a source tab is relayed
+ * and returned to, and invalid input or a backend failure yields an error flash.
  */
 class AdminSyncReportsPageControllerTest {
 
@@ -93,10 +91,6 @@ class AdminSyncReportsPageControllerTest {
 
   @Test
   void deleteOld_canonicalisesTheSourceTabBeforeRelayingIt() {
-    // The redirect always upper-cased and trimmed the tab while the relayed backend query took the
-    // raw string, so "  scwiki  " landed on the SC Wiki tab but sent an unrecognised source — which
-    // the backend reads as "no filter" and purges BOTH catalogues. One canonical value now feeds
-    // both.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(3));
@@ -113,8 +107,6 @@ class AdminSyncReportsPageControllerTest {
 
   @Test
   void deleteOld_unknownSourceNeverReachesTheRelayedUri() {
-    // A crafted tab must not be able to append a second query parameter to the purge request. It is
-    // not in the allowlist, so it collapses to the combined purge and the URI carries no `source`.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(0));

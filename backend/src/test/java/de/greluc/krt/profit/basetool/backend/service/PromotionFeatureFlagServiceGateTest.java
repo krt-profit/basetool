@@ -65,16 +65,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Verifies the per-squadron promotion-feature gate end-to-end through {@link OwnerScopeService} +
- * the adjacent {@link PromotionTopicService} (the rest of the promotion services follow the same
- * pattern, so one representative is enough — every gated call site uses the same {@code
- * OwnerScopeService} primitive).
- *
- * <p>What's pinned here: an admin without an active pin keeps the menu open (so they can re-enable
- * a locked-out squadron); an admin pinned to a squadron honours that squadron's flag so the pinned
- * view matches what a member would see; Officers / members of a flag-off squadron get empty reads
- * and {@link AccessDeniedException} on writes; and the squadron-toggle service method flips only
- * the flag without touching any other column.
+ * Verifies the per-squadron promotion-feature gate through {@link OwnerScopeService} and {@link
+ * PromotionTopicService}: an unpinned admin keeps access, a pinned admin honours the squadron's
+ * flag, members of a disabled squadron get empty reads and {@link AccessDeniedException} on writes,
+ * and the toggle changes only the flag.
  */
 @ExtendWith(MockitoExtension.class)
 class PromotionFeatureFlagServiceGateTest {
@@ -95,15 +89,6 @@ class PromotionFeatureFlagServiceGateTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private StaffelMembershipResolver staffelMembershipResolver;
 
-  // R2.c: the real flag-resolution logic moved from OwnerScopeService to OwnerScopeService;
-  // we inject the latter directly with its repository mocks. The downstream PromotionTopicService
-  // tests further down still receive the OwnerScopeService shim as a plain Mockito mock — the
-  // shim's bean shape is unchanged from the caller's perspective.
-  //
-  // Constructed in stubMembershipLookup() rather than by @InjectMocks, because the facade needs a
-  // REAL RequestScopeResolver and that used to be patched into a `private final` field with
-  // ReflectionTestUtils.setField — the mutation JEP 500 (JDK 26) warns about and a later release
-  // will refuse.
   private OwnerScopeService ownerScopeService;
 
   private static Squadron squadron(UUID id, boolean enabled) {
@@ -118,25 +103,14 @@ class PromotionFeatureFlagServiceGateTest {
   @BeforeEach
   void stubMembershipLookup() {
     lenient().when(authHelper.isAdmin()).thenReturn(false);
-    // readPersistentSquadronFromUser delegates the name-sorted-primary fallback to
-    // StaffelMembershipResolver; back the mock with a real instance so the single-Staffel
-    // resolution
-    // these tests rely on runs through the real resolver.
     StaffelMembershipResolver realResolver =
         new StaffelMembershipResolver(squadronRepository, orgUnitRepository);
     lenient()
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
-    // The resolver's single-Staffel fast path now does a cheap existsById to drop a dangling row
-    // (finding #4). Every Staffel in these scenarios exists, so resolve it to present.
     lenient().when(squadronRepository.existsById(any())).thenReturn(true);
 
-    // #922 L3 split: the promotion-flag methods on the OwnerScopeService facade delegate to
-    // RequestScopeResolver. Wire a real resolver (fed the same mocks) into the facade so the
-    // direct-facade gate tests exercise the real flag resolution. currentSquadron() resolves the
-    // pinned/home Staffel through the polymorphic orgUnitRepository (HHH000179 fix); the cascade
-    // dep is never reached on the promotion path, so a plain mock satisfies the constructor.
     RequestScopeResolver requestScopeResolver =
         new RequestScopeResolver(
             authHelper,
@@ -145,9 +119,6 @@ class PromotionFeatureFlagServiceGateTest {
             mock(OrgUnitCascadeService.class),
             staffelMembershipResolver,
             request);
-    // Arg order matches OwnerScopeService's @RequiredArgsConstructor field order. The gate and
-    // stamping collaborators are never reached on the promotion path, so plain mocks satisfy the
-    // constructor — which is what @InjectMocks did with nulls before, only visibly.
     ownerScopeService =
         new OwnerScopeService(
             requestScopeResolver,
@@ -159,8 +130,6 @@ class PromotionFeatureFlagServiceGateTest {
   @DisplayName("Admin without an active pin passes the gate (re-enable a locked-out squadron)")
   void adminWithoutPinPassesGate() {
     when(authHelper.isAdmin()).thenReturn(true);
-    // No active pin → request.getHeader returns null → currentSquadronId().isEmpty() → defaults
-    // to true so the toggle UI stays reachable.
     assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
     ownerScopeService.assertPromotionFeatureEnabled();
   }
@@ -200,7 +169,6 @@ class PromotionFeatureFlagServiceGateTest {
     UUID userId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
     when(authHelper.currentUserId()).thenReturn(Optional.of(userId));
-    // Post-R9 D3 (V101): home Staffel via org_unit_membership.
     when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelMembership(userId, squadronId)));
     when(orgUnitRepository.findById(squadronId))

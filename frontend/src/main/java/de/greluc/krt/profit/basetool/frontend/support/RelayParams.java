@@ -27,19 +27,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Validates the request parameters the frontend relays verbatim into a backend URI (REQ-SEC-051).
+ * Validates request parameters the frontend relays into backend URIs (REQ-SEC-051).
  *
- * <p>The frontend is a proxy: a page or proxy controller binds a value, drops it into a {@code
- * UriComponentsBuilder} or a URI template and hands the result to {@code WebClient}. A relayed
- * value that carries URI syntax — {@code &}, {@code #}, {@code ?}, {@code /} — can reshape the
- * backend request even when it cannot redirect it to a different host, so every relayed value is
- * either bound to a type that cannot express URI syntax ({@link UUID}, {@link java.time.Instant})
- * or passed through one of the checks here before it reaches a builder.
- *
- * <p>The checks are deliberately narrowing rather than escaping. Escaping keeps a hostile value
- * alive one hop further; narrowing rejects it at the frontend, which is also where the clearer
- * error belongs — every parameter these methods guard has a known shape that the backend's own
- * controller signature already declares.
+ * <p>Every relayed value is either bound to a type that cannot carry URI syntax ({@link UUID},
+ * {@link java.time.Instant}) or narrowed by one of these checks; invalid values are rejected, not
+ * escaped.
  */
 public final class RelayParams {
 
@@ -56,12 +48,7 @@ public final class RelayParams {
   private RelayParams() {}
 
   /**
-   * Parses a relayed identifier into a {@link UUID}, collapsing anything unparseable to {@code
-   * null}.
-   *
-   * <p>Used where the page degrades gracefully on a bad identifier (an empty result rather than an
-   * error page). A {@code UUID} cannot carry URI syntax, so the parsed value is safe to concatenate
-   * into a path segment; the raw string never is.
+   * Parses a relayed identifier into a {@link UUID}, mapping anything unparseable to {@code null}.
    *
    * @param raw the raw parameter value, may be {@code null} or blank
    * @return the parsed identifier, or {@code null} when {@code raw} is absent, blank or not a UUID
@@ -79,15 +66,11 @@ public final class RelayParams {
   }
 
   /**
-   * Returns {@code raw} when it is a member of {@code allowed}, otherwise {@code null}.
-   *
-   * <p>The allowlist is the one the surrounding controller already renders into the form — the
-   * event-type options, the client-id options, the sort keys — so a value the UI can produce always
-   * passes and a hand-crafted one never reaches the relayed URI. An unknown value degrades to "no
-   * filter" rather than an error, matching how the same controllers already treat an unknown tab.
+   * Returns {@code raw} when it is a member of {@code allowed}, otherwise {@code null} ("no
+   * filter").
    *
    * @param raw the raw parameter value, may be {@code null} or blank
-   * @param allowed the permitted values; membership is exact and case-sensitive
+   * @param allowed the permitted values; exact, case-sensitive match
    * @return {@code raw} when allowed, otherwise {@code null}
    */
   @Contract(value = "null, _ -> null", pure = true)
@@ -100,12 +83,8 @@ public final class RelayParams {
   }
 
   /**
-   * Returns {@code raw} when it is a well-formed Spring sort specification, otherwise {@code null}.
-   *
-   * <p>Accepts {@code property} and {@code property,asc} / {@code property,desc} (either case) over
-   * the identifier characters a property path can contain. The backend whitelists the property
-   * itself (REQ-API-005), so this only has to guarantee that what is relayed cannot open a second
-   * query parameter or a fragment.
+   * Returns {@code raw} when it is a well-formed Spring sort specification ({@code property} or
+   * {@code property,asc|desc}), otherwise {@code null}; the backend whitelists the property itself.
    *
    * @param raw the raw parameter value, may be {@code null} or blank
    * @return {@code raw} when it is a well-formed sort specification, otherwise {@code null}

@@ -58,7 +58,6 @@ class CurrentRegistrationAuthorizedClientRepositoryTest {
 
   @Test
   void aSessionStoredWhileThePublicClientRanRefreshesAsTheConfidentialOne() {
-    // Stored before the rollout: the public registration, no secret.
     sessionStore.saveAuthorizedClient(
         authorizedClient(registration(ClientAuthenticationMethod.NONE, null)),
         principal,
@@ -89,8 +88,6 @@ class CurrentRegistrationAuthorizedClientRepositoryTest {
     OAuth2AuthorizedClient stored =
         sessionStore.loadAuthorizedClient("keycloak", principal, request);
     assertThat(stored.getClientRegistration().getClientSecret()).isEmpty();
-    // And not in what Redis would hold either: the session attribute, serialized as production
-    // serializes it.
     Object attribute =
         request
             .getSession()
@@ -102,7 +99,6 @@ class CurrentRegistrationAuthorizedClientRepositoryTest {
                 RedisSessionConfig.buildSessionJsonMapper(getClass().getClassLoader()))
             .serialize(attribute);
     assertThat(new String(json, StandardCharsets.UTF_8)).doesNotContain(SECRET);
-    // While the application still sees it on every read.
     assertThat(
             repository
                 .loadAuthorizedClient("keycloak", principal, request)

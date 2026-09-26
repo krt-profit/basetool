@@ -58,9 +58,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin-only bank surface (epic #556, REQ-BANK-012/-013): the wipe reset and the audit-log viewer.
- * Double-gated — the {@code /api/v1/bank/admin/**} URL matcher requires {@code ADMIN} before these
- * method gates even run; bank management explicitly does NOT see the audit log (REQ-BANK-010).
+ * Admin-only bank surface (REQ-BANK-012/-013): the wipe reset and the audit-log viewer. Bank
+ * management does not see the audit log (REQ-BANK-010).
  */
 @RestController
 @RequestMapping("/api/v1/bank/admin")

@@ -33,25 +33,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Build-time enforcement of the audit L-1 / REQ-SEC-024 {@code aud} contract for the E2E stack,
- * whose two halves sit on opposite sides of a Docker boundary and are related by nothing at compile
- * time.
+ * Verifies that the E2E backend's enforced {@code aud} value (REQ-SEC-024), set by {@code
+ * E2eStackExtension}, matches the audience mapper on the {@code basetool-frontend} client in {@code
+ * realm-export.e2e.json}.
  *
- * <p>{@code E2eStackExtension} sets {@code IRI_BACKEND_EXPECTED_AUDIENCES}, which makes the E2E
- * backend build the custom {@code resourceServerJwtDecoder} and REJECT every token whose {@code
- * aud} does not carry that value. The claim itself is stamped by the {@code aud-basetool-backend}
- * protocol mapper on the {@code basetool-frontend} client in {@code realm-export.e2e.json} — the
- * client that mints every E2E token, browser-flow and {@code BackendSeeder} ROPC alike. Drop the
- * mapper, rename the client, or change either string, and the suite does not fail with a hint: it
- * fails with a 401 on literally every test, including the ones that only read a public page.
- *
- * <p>Enforcement is switched ON for E2E on purpose (the deployed prod {@code .env} leaves the knob
- * empty until an operator flips it), so this is the one place the enforced path is exercised
- * against a real Keycloak-minted token before it reaches production.
- *
- * <p>Both files live in the {@code e2e} source set, which is not on this test's classpath, so they
- * are read off disk — the same technique as {@code PickerSearchLimitsParityTest} and {@code
- * ComboboxKindsParityTest}, which read the shipped JS and the head fragment.
+ * <p>Both files are read from disk, as they are not on this test's classpath.
  */
 class E2eAudienceEnforcementParityTest {
 
@@ -95,12 +81,8 @@ class E2eAudienceEnforcementParityTest {
   }
 
   /**
-   * Keeps the audience off the ID token, mirroring the prod realm's mapper config.
-   *
-   * <p>The frontend is an OAuth2 client and validates its own ID token: a second {@code aud} value
-   * there pushes Spring Security's {@code OidcIdTokenValidator} onto its multi-audience branch,
-   * which additionally requires {@code azp}. Prod stamps the access token only, so E2E must too —
-   * otherwise E2E would be rehearsing a token shape production never issues.
+   * Verifies that the audience mapper stamps the access token only, not the ID token, as in the
+   * prod realm.
    *
    * @throws IOException if either source file cannot be read from disk
    */
@@ -123,7 +105,6 @@ class E2eAudienceEnforcementParityTest {
     String source = Files.readString(resolve(STACK_EXTENSION), StandardCharsets.UTF_8);
     Matcher matcher = EXPECTED_AUDIENCE_CONSTANT.matcher(source);
     if (!matcher.find()) {
-      // Never pass silently: a renamed constant would otherwise turn this whole test into a no-op.
       return fail(
           "EXPECTED_AUDIENCE constant not found in %s — this parity test cannot verify anything;"
                   .formatted(STACK_EXTENSION)

@@ -44,12 +44,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pure-Mockito unit tests for {@link P4kImportJobRunner}: {@link P4kImportJobService} and {@link
- * P4kImportService} are mocked and the runner is driven synchronously (the {@code @Async} dispatch
- * is a Spring concern, irrelevant to the orchestration logic). A real Jackson 3 {@link JsonMapper}
- * serializes the result. Verifies the run order (running → work → succeeded), that APPLY reclaims
- * its payload while PREVIEW keeps it, that a failure is recorded rather than thrown, and that
- * housekeeping never masks the outcome.
+ * Unit tests for {@link P4kImportJobRunner} with mocked {@link P4kImportJobService} and {@link
+ * P4kImportService} and a real {@link JsonMapper}: run order, payload reclaim for APPLY but not
+ * PREVIEW, failures recorded rather than thrown, and housekeeping never masking the outcome.
  */
 @ExtendWith(MockitoExtension.class)
 class P4kImportJobRunnerTest {
@@ -86,11 +83,9 @@ class P4kImportJobRunnerTest {
     order.verify(importService).previewImport(bytes);
     order.verify(jobService).markSucceeded(eq(id), anyString());
     verify(importService, never()).applyImport(any(), anyBoolean());
-    verify(jobService, never())
-        .deletePayload(any()); // a preview keeps its payload for a later apply
+    verify(jobService, never()).deletePayload(any());
     verify(jobService, never()).markFailed(any(), anyString());
     verify(jobService).pruneOldJobs();
-    // A preview changes no master data, so it must never evict the caches.
     verify(cacheEvictionService, never()).evictP4kSyncedMasterData();
   }
 
@@ -106,9 +101,8 @@ class P4kImportJobRunnerTest {
     verify(importService).applyImport(bytes, true);
     verify(importService, never()).previewImport(any());
     verify(jobService).markSucceeded(eq(id), anyString());
-    verify(jobService).deletePayload(id); // an apply is terminal -> reclaim the bytes
+    verify(jobService).deletePayload(id);
     verify(jobService).pruneOldJobs();
-    // A committed apply rewrote master data -> evict the P4K-synced caches.
     verify(cacheEvictionService).evictP4kSyncedMasterData();
   }
 
@@ -123,8 +117,7 @@ class P4kImportJobRunnerTest {
     runner.run(id, P4kImportJobKind.APPLY, false);
 
     verify(jobService).markFailed(id, "empty catalog");
-    verify(jobService).deletePayload(id); // the payload is still reclaimed on a failed apply
-    // The apply rolled back, so nothing changed -> the caches must NOT be evicted.
+    verify(jobService).deletePayload(id);
     verify(cacheEvictionService, never()).evictP4kSyncedMasterData();
   }
 

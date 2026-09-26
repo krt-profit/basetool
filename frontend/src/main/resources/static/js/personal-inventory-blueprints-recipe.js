@@ -1,27 +1,4 @@
 // @ts-check
-/*
- * Personal Inventory — Blueprints sub-page: master-detail view (V3).
- *
- * The owned collection renders as a master list (left) with a permanent detail
- * pane (right). Selecting a row — by click, ↑/↓ keys on the listbox, or the
- * `?bp={id}` deeplink — fills the pane head from the row's data attributes and
- * lazily fetches the product's SC Wiki recipe from
- * /personal-inventory/blueprints/{id}/recipe (cached per id). Each requirement
- * group renders as a quality block: source slot, ingredient line(s), ONE quality
- * slider spanning the group's effective band, and the group's affected stats as
- * chips whose multiplier recomputes live — using exactly the interpolation logic
- * of the previous expandable-row view (linear band, or segment-by-segment for
- * stepped curves; see computeModifierValue, kept verbatim).
- *
- * The list filter input doubles up: typing filters the rendered rows instantly
- * client-side, Enter submits the existing ?q= server filter. On ≤900px the
- * layout collapses to list → detail navigation (back button in the pane).
- *
- * Wiring: CSP-nonce-safe (no inline handlers); strings from
- * window.krtBlueprintsRecipeI18n; URLs (ID_PLACEHOLDER template) from
- * window.krtBlueprintsEndpoints. DOM is built with createElement + textContent
- * only (no innerHTML), so no value is ever an HTML sink.
- */
 (function () {
     'use strict';
 
@@ -54,12 +31,8 @@
     /** @type {HTMLElement | null} */
     let activeRow = null;
 
-    // id -> recipe JSON, so re-selecting a row never refetches.
     const recipeCache = new Map();
 
-    // Craftability (#781): blueprintId -> craftability JSON. Fetched once for the whole owned set
-    // (with includeRefinery=true, so both inventory-only and refinery-included figures are present)
-    // and re-fetched only after the collection is re-rendered (batch add / import / remove).
     const craftabilityById = new Map();
     /** @type {HTMLElement | null} */
     let detailCraftEl = null;
@@ -69,14 +42,10 @@
     /** @type {any} */
     let activeCraftability = null;
 
-    // "Show only craftable" view filter: a client-side filter over the same craftability data,
-    // combined (AND) with the master search filter. Honours the refinery toggle, so a blueprint
-    // craftable only via refinery is shown iff the refinery toggle is on.
     /** @type {HTMLInputElement | null} */
     let craftableToggle = null;
     let craftableOnly = false;
 
-    // Marker on a craft badge/count when the blueprint is craftable ONLY thanks to refinery yield.
     const REFINERY_GLYPH = '⟢';
 
     function i18n() {
@@ -86,8 +55,6 @@
     function endpoints() {
         return window.krtBlueprintsEndpoints || {};
     }
-
-    /* ------------------------------------------------------------ DOM helpers */
 
     /**
      * Creates a detached element with an optional class and text content.
@@ -125,13 +92,11 @@
         return window.safeSameOriginUrl ? window.safeSameOriginUrl(raw, raw) : raw;
     }
 
-    // Thymeleaf renders a null Instant attribute as the literal string "null".
     function attr(row, name) {
         const v = row.getAttribute(name);
         return v == null || v === 'null' ? '' : v;
     }
 
-    // Same UTC → local conversion the .utc-time elements get globally (sidebar.html).
     function formatAcquired(iso) {
         if (!iso) {
             return '';
@@ -153,8 +118,6 @@
             timeZone: 'Europe/Berlin',
         }).format(date);
     }
-
-    /* ------------------------------------------------------- selection state */
 
     /**
      * The master-list rows, or an empty list before the collection is wired.
@@ -193,18 +156,13 @@
             row.focus();
         }
 
-        // Deeplink: keep the existing ?q= server-filter param intact.
         try {
             const url = new URL(window.location.href);
             url.searchParams.set('bp', attr(row, 'data-id'));
             history.replaceState(null, '', url);
-        } catch (_e) {
-            /* URL API unavailable — deeplink update is best-effort */
-        }
+        } catch (_e) {}
 
         renderDetailHead(row);
-        // Set the active craftability BEFORE rendering the recipe so a cached recipe's quality
-        // sliders default to the effective quality this row's stock would deliver.
         activeCraftability = craftabilityById.get(attr(row, 'data-id')) || null;
         loadRecipe(attr(row, 'data-id'));
         renderCraftDetail(attr(row, 'data-id'));
@@ -235,8 +193,6 @@
               formatted
             : '';
 
-        // The pane's edit/remove buttons reuse the existing bp-open-edit/bp-open-delete
-        // delegation — only their data attributes change per selection.
         [editBtn, deleteBtn].forEach(function (btn) {
             if (!btn) {
                 return;
@@ -249,11 +205,6 @@
             editBtn.setAttribute('data-version', version);
             editBtn.setAttribute('data-acquired-at', acquired);
         }
-        // Default blueprints (REQ-INV-016) are non-removable: hide the delete control so the user
-        // is never offered an action that would be refused. data-removable is "false" for defaults.
-        // The `hidden` attribute alone does NOT hide a `.btn` — its class display outranks the UA
-        // `[hidden]` rule (see the documented trap on `.master-row[hidden]` in styles.css) — so the
-        // inline `display` (which beats any class) is what actually hides/shows it.
         if (deleteBtn) {
             const removable = attr(row, 'data-removable') !== 'false';
             deleteBtn.hidden = !removable;
@@ -267,8 +218,6 @@
             noteSection.hidden = true;
         }
     }
-
-    /* --------------------------------------------------------- recipe loading */
 
     function loadRecipe(id) {
         if (!recipeEl || !id) {
@@ -299,7 +248,6 @@
                     return;
                 }
                 recipeCache.set(id, recipe);
-                // Only render if this id is still the active selection.
                 if (activeRow && attr(activeRow, 'data-id') === id) {
                     renderRecipe(recipe);
                 }
@@ -322,8 +270,6 @@
             ),
         );
     }
-
-    /* -------------------------------------------------------------- rendering */
 
     function renderRecipe(recipe) {
         if (!recipeEl) {
@@ -359,8 +305,6 @@
                 pane.appendChild(renderQualityBlock(g, idx));
             });
         } else {
-            // Legacy fallback for a blueprint synced without requirement groups: the flat
-            // ingredient list with no stat band (a dash).
             const block = el('div', 'quality-block');
             flat.forEach(function (ing) {
                 block.appendChild(renderIngredientLine(ing));
@@ -410,8 +354,6 @@
             return block;
         }
 
-        // One slider per ingredient block spanning the union of its stats' bands; every
-        // affected-stat chip recomputes its own multiplier from the shared quality value.
         const chips = [];
         mods.forEach(function (m) {
             const chip = el('span', 'chip');
@@ -440,9 +382,6 @@
                 }),
             );
 
-            // Default the slider to the effective quality the user's own stock would deliver for
-            // this slot (best-first SCU-weighted, honouring the refinery toggle); fall back to the
-            // band maximum when no qualifying stock / craftability data exists (#781).
             let defaultQ = qmax;
             const craftGroup =
                 activeCraftability &&
@@ -479,7 +418,6 @@
             qrow.appendChild(qval);
             block.appendChild(qrow);
 
-            // Hint after the chips, mirroring the mock: "(höher ist besser · 1000 → ×1.15)".
             const hintParts = [];
             const firstBw = betterWhenText(mods[0] && mods[0].betterWhen);
             if (firstBw) {
@@ -508,7 +446,6 @@
             range.addEventListener('input', compute);
             compute();
         } else {
-            // No usable quality band to slide over: show each stat's max-quality multiplier.
             chips.forEach(function (c) {
                 const v = c.modifier.modifierAtMaxQuality;
                 c.out.textContent = v == null ? '–' : '×' + Number(v).toFixed(2);
@@ -526,8 +463,6 @@
         line.appendChild(strong);
         const metaParts = [];
         if (ing.quantityScu != null) {
-            // A RESOURCE line can resolve to a PIECE material (quantityScu then holds a whole piece
-            // count): render it as an integer + "Stück" rather than a 2-decimal "SCU" amount.
             if (ing.quantityType === 'PIECE') {
                 metaParts.push(Math.round(Number(ing.quantityScu)) + ' ' + unitLabel('PIECE'));
             } else {
@@ -568,8 +503,6 @@
         return null;
     }
 
-    /* ----------------------------------------------------------- computation */
-
     function clamp01(t) {
         return t < 0 ? 0 : t > 1 ? 1 : t;
     }
@@ -578,10 +511,6 @@
         return a + (b - a) * t;
     }
 
-    // Mirror of the admin blueprint slider math. A segmented modifier follows its ordered
-    // segments — interpolated within a 'linear' segment, held constant for a stepped form
-    // (e.g. 'linear_integer_additive'); a non-segmented modifier interpolates linearly
-    // between its endpoint multipliers across the effective band.
     function computeModifierValue(m, q) {
         const segs = m.segments || [];
         if (segs.length > 0) {
@@ -615,9 +544,6 @@
         return null;
     }
 
-    /* --------------------------------------------------------- craftability */
-
-    // Formats an SCU figure with two decimals (matching the inventory amount scale, trimmed).
     function fmtScu(value) {
         if (value == null) {
             return '0';
@@ -626,16 +552,12 @@
         return (Math.round(n * 100) / 100).toString();
     }
 
-    // The unit label for a material's quantityType ('PIECE' -> Stück, anything else -> SCU). Mirrors
-    // the unit-aware rendering every other inventory surface uses (inventory-index.html et al.).
     function unitLabel(quantityType) {
         return quantityType === 'PIECE'
             ? window.krtI18nText(i18n().unitPiece, 'krtBlueprintsRecipeI18n.unitPiece')
             : i18n().unitScu || 'SCU';
     }
 
-    // Formats a quantity in its material's own unit: whole pieces for PIECE, the trimmed 2-decimal
-    // SCU scale otherwise. So a PIECE material reads "2", an SCU material "0.36".
     function fmtAmount(value, quantityType) {
         if (quantityType === 'PIECE') {
             return value == null ? '0' : String(Math.round(Number(value)));
@@ -643,8 +565,6 @@
         return fmtScu(value);
     }
 
-    // Fetches craftability for the whole owned set once (both figure sets), then paints the
-    // master-row badges and, if a row is already selected, its detail breakdown + recipe sliders.
     function loadCraftability() {
         const url = endpoints().craftability;
         if (!url) {
@@ -668,31 +588,22 @@
                     });
                 }
                 decorateRows();
-                // The craftability data has just arrived; if "show only craftable" is active it was
-                // hiding every row until now, so re-run the combined view filter.
                 applyClientFilter();
                 if (activeRow) {
                     const id = attr(activeRow, 'data-id');
                     activeCraftability = craftabilityById.get(id) || null;
                     renderCraftDetail(id);
-                    // Re-render the cached recipe so the sliders adopt the effective-quality default.
                     if (recipeCache.has(id)) {
                         renderRecipe(recipeCache.get(id));
                     }
                 }
             })
-            .catch(function () {
-                /* craftability is purely additive — on failure the page renders without badges */
-            });
+            .catch(function () {});
     }
 
-    // Paints / refreshes the per-row craft-status badge from the current toggle state.
     function decorateRows() {
         rows().forEach(function (r) {
             const id = attr(r, 'data-id');
-            // The badge lives in the row's trailing .krt-bp-row-aside cluster (next to the note
-            // pencil), so the status signals stay grouped at the row's edge. The template always
-            // renders the aside; find-or-create it defensively for any JS-built row.
             let aside = r.querySelector('.krt-bp-row-aside');
             if (!aside) {
                 aside = el('span', 'krt-bp-row-aside');
@@ -739,7 +650,6 @@
         });
     }
 
-    // Fills the detail-pane craftability section for the given blueprint id.
     function renderCraftDetail(id) {
         if (!detailCraftEl) {
             return;
@@ -875,13 +785,6 @@
         }
     }
 
-    /* ------------------------------------------- toggle persistence (REQ-UI-017) */
-
-    // Per-browser persistence of the two craftability toggles: one JSON object
-    // {refinery: bool, craftable: bool} under a single localStorage key. Absence of the key
-    // keeps the server-rendered (unchecked) defaults; the live search input (#krt-bp-q) is
-    // deliberately NOT persisted. All storage access is guarded so privacy modes that deny it
-    // degrade to the defaults instead of breaking the page.
     const TOGGLE_PREF_KEY = 'personal_blueprints_toggles';
     let togglesRestored = false;
 
@@ -891,28 +794,19 @@
             const parsed = raw === null ? null : JSON.parse(raw);
             return parsed && typeof parsed === 'object' ? parsed : null;
         } catch (_e) {
-            return null; // corrupt value / storage unavailable: fall back to the defaults
+            return null;
         }
     }
 
-    // Snapshots the current toggle states into localStorage. Called immediately on every toggle
-    // change (after the change handler mirrored the checkbox into its state variable).
     function writeTogglePref() {
         try {
             localStorage.setItem(
                 TOGGLE_PREF_KEY,
                 JSON.stringify({ refinery: refineryOn, craftable: craftableOnly }),
             );
-        } catch (_e) {
-            /* storage unavailable */
-        }
+        } catch (_e) {}
     }
 
-    // Applies the saved toggle states to the checkboxes. Runs once, from init() AFTER the
-    // toggle elements are grabbed but BEFORE their checked states are mirrored into
-    // refineryOn/craftableOnly — so the first recompute/filter pass (loadCraftability's
-    // callback) already honours the restored state. Re-inits after a krt:swapped keep the live
-    // checkbox state (the toggles survive the swap and storage already mirrors them).
     function restoreToggles() {
         if (togglesRestored) {
             return;
@@ -930,13 +824,10 @@
         }
     }
 
-    // Refinery toggle: recompute badges + active detail + recipe sliders client-side (both figure
-    // sets are already cached, so no refetch is needed).
     function onRefineryToggle() {
         refineryOn = !!(refineryToggle && refineryToggle.checked);
         writeTogglePref();
         decorateRows();
-        // The craftable set widens/narrows with the refinery toggle, so re-run the view filter too.
         applyClientFilter();
         if (activeRow) {
             const id = attr(activeRow, 'data-id');
@@ -947,18 +838,12 @@
         }
     }
 
-    // "Show only craftable" toggle: no badge/detail recompute needed — just re-run the view filter.
     function onCraftableToggle() {
         craftableOnly = !!(craftableToggle && craftableToggle.checked);
         writeTogglePref();
         applyClientFilter();
     }
 
-    /* ----------------------------------------------------- filter + keyboard */
-
-    // Mirrors decorateRows' craftable determination: a blueprint counts as craftable iff its recipe
-    // resolved, it has evaluable RESOURCE ingredients, and the current-toggle craftable count is > 0.
-    // Rows with no craftability data yet (fetch in flight) are treated as not craftable.
     function isRowCraftable(id) {
         const data = craftabilityById.get(id);
         if (!data || !data.recipeResolved || !data.hasResourceIngredients) {
@@ -968,9 +853,6 @@
         return count > 0;
     }
 
-    // Combined view filter: a row is visible iff it matches the master search text AND — when the
-    // "show only craftable" toggle is on — it is currently craftable. Re-run whenever the search
-    // text, either toggle, or the craftability data changes.
     function applyClientFilter() {
         if (!rowsEl) {
             return;
@@ -1005,20 +887,14 @@
         select(vis[idx], { focus: true, showDetail: false });
     }
 
-    /* ------------------------------------------------------------------ init */
-
     function init() {
         mdEl = document.getElementById('krt-bp-md');
-        // The craftability toolbar lives inside the collection box but OUTSIDE the swapped
-        // #krt-bp-list fragment, so its checkbox state survives a re-render. The swap does not
-        // re-render it either, so mirror its visibility here from the (possibly just-swapped)
-        // collection's empty state.
         const craftToolbar = document.getElementById('krt-bp-craft-toolbar');
         if (craftToolbar) {
             craftToolbar.classList.toggle('is-empty', !mdEl);
         }
         if (!mdEl) {
-            return; // empty collection — nothing to wire
+            return;
         }
         rowsEl = document.getElementById('krt-bp-master-rows');
         filterInput = /** @type {HTMLInputElement | null} */ (document.getElementById('krt-bp-q'));
@@ -1034,11 +910,6 @@
         backBtn = document.getElementById('krt-bp-detail-back');
         detailCraftEl = document.getElementById('krt-bp-detail-craft');
 
-        // The refinery toggle lives outside the swapped collection card, so it survives a re-render
-        // and is wired exactly once (init re-runs on krt:swapped). The "show only craftable"
-        // toggle likewise. Both are grabbed first so the one-time persisted-state restore
-        // (REQ-UI-017) can set their checked states BEFORE they are mirrored into
-        // refineryOn/craftableOnly below and before the first recompute (loadCraftability).
         refineryToggle = /** @type {HTMLInputElement | null} */ (
             document.getElementById('krt-bp-refinery-toggle')
         );
@@ -1072,10 +943,6 @@
         }
         if (filterInput) {
             filterInput.addEventListener('input', applyClientFilter);
-            // #573 (REQ-FE-002): every blueprint is already rendered and filtered client-side on
-            // each keystroke, so the master filter must never trigger a full-page reload. Intercept
-            // Enter and the wrapping <form>'s submit to re-filter in place instead of submitting the
-            // ?q= server form (which reloaded the whole master-detail page and dropped the selection).
             filterInput.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -1102,8 +969,6 @@
             });
         }
 
-        // Initial selection: ?bp= deeplink wins; otherwise the first row. On desktop the
-        // detail pane is permanent, so auto-select; on mobile only a deeplink opens it.
         /** @type {Element | null | undefined} */
         let initial = null;
         let fromDeeplink = false;
@@ -1115,9 +980,7 @@
                 });
                 fromDeeplink = initial != null;
             }
-        } catch (_e) {
-            /* URLSearchParams unavailable */
-        }
+        } catch (_e) {}
         if (!initial) {
             initial = rows()[0] || null;
         }
@@ -1129,8 +992,6 @@
             }
         }
 
-        // Fetch craftability for the whole owned set (re-fetched on every re-init after a swap, so
-        // the badges + breakdown reflect an add / import / remove).
         loadCraftability();
     }
 
@@ -1140,9 +1001,6 @@
         init();
     }
 
-    // Re-init after the collection card is re-rendered in place (#578 batch add / import / remove):
-    // the master rows + filter input are fresh DOM, so the direct bindings above must be re-applied.
-    // recipeCache persists across the swap; activeRow is reset because the previous node is detached.
     document.addEventListener('krt:swapped', function (e) {
         const c = e.detail && e.detail.container;
         if (c && (c.id === 'krt-bp-list' || c.querySelector('#krt-bp-md'))) {

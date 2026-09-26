@@ -25,24 +25,20 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Boundary view of one asynchronous P4K catalog-import run, returned by the admin import endpoints
- * and polled by the page. While {@link #status} is {@code PENDING} / {@code RUNNING} the {@link
- * #result} is {@code null}; on {@code SUCCEEDED} it carries the per-type {@link
- * P4kImportResultDto}; on {@code FAILED} the {@link #errorMessage} explains why.
+ * One asynchronous P4K catalog-import run, as polled by the admin page.
  *
  * @param id the job id
- * @param kind whether the run previews (dry) or applies the catalog
+ * @param kind whether the run previews or applies the catalog
  * @param status the lifecycle status
- * @param seedNew for an APPLY run, whether brand-new unmatched rows are seeded
- * @param sourceFilename original upload filename for display, or {@code null}
+ * @param seedNew for an APPLY run, whether new unmatched rows are seeded
+ * @param sourceFilename original upload filename, or {@code null}
  * @param fileSizeBytes size of the uploaded catalog in bytes, or {@code null}
  * @param previewJobId for an APPLY run, the preview it was launched from, else {@code null}
- * @param result the per-type reconciliation result once {@code SUCCEEDED}, else {@code null}
+ * @param result the per-type result once {@code SUCCEEDED}, else {@code null}
  * @param errorMessage the failure reason once {@code FAILED}, else {@code null}
  * @param createdAt when the run was enqueued
- * @param startedAt when the worker began (set on {@code RUNNING}), or {@code null}
- * @param finishedAt when the worker finished (set on {@code SUCCEEDED} / {@code FAILED}), or {@code
- *     null}
+ * @param startedAt when the worker began, or {@code null}
+ * @param finishedAt when the worker finished, or {@code null}
  */
 public record P4kImportJobDto(
     UUID id,

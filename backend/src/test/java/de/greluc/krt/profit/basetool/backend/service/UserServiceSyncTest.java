@@ -46,9 +46,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Unit tests for the identity-seam and self-service halves of {@link UserService} left in place
- * after the Keycloak reconciliation moved to {@link UserReconciliationService} (audit Thema&nbsp;7,
- * #1252):
+ * Unit tests for the identity and self-service parts of {@link UserService}:
  *
  * <ul>
  *   <li>{@link UserService#getUserIdFromJwt} — JWT sub/UUID validation (fail-closed).
@@ -69,10 +67,6 @@ class UserServiceSyncTest {
 
   private static final UUID USER_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
-  // ---------------------------------------------------------------
-  // getUserIdFromJwt
-  // ---------------------------------------------------------------
-
   @Nested
   class GetUserIdFromJwtTests {
 
@@ -84,8 +78,6 @@ class UserServiceSyncTest {
 
     @Test
     void throwsAuthenticationServiceException_whenSubjectIsNull() {
-      // Jwt.Builder requires a non-null subject; build with empty subject is impossible.
-      // Mock to return null directly.
       Jwt jwt = org.mockito.Mockito.mock(Jwt.class);
       when(jwt.getSubject()).thenReturn(null);
 
@@ -102,10 +94,6 @@ class UserServiceSyncTest {
       assertTrue(ex.getMessage().contains("must be a UUID"));
     }
   }
-
-  // ---------------------------------------------------------------
-  // updateUserDescription
-  // ---------------------------------------------------------------
 
   @Nested
   class UpdateUserDescriptionTests {
@@ -173,10 +161,6 @@ class UserServiceSyncTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // updateUserDefaultPayoutPreference
-  // ---------------------------------------------------------------
-
   @Nested
   class UpdateUserDefaultPayoutPreferenceTests {
 
@@ -227,10 +211,6 @@ class UserServiceSyncTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // findById
-  // ---------------------------------------------------------------
-
   @Nested
   class FindByIdTests {
 
@@ -249,10 +229,6 @@ class UserServiceSyncTest {
       assertThrows(NotFoundException.class, () -> userService.findById(USER_ID));
     }
   }
-
-  // ---------------------------------------------------------------
-  // getCurrentUser — every short-circuit branch
-  // ---------------------------------------------------------------
 
   @Nested
   class GetCurrentUserTests {
@@ -297,10 +273,6 @@ class UserServiceSyncTest {
       assertEquals(USER_ID, result.get().getId());
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private static Jwt newJwt(String subject, Map<String, Object> additionalClaims) {
     Map<String, Object> claims = new java.util.HashMap<>();

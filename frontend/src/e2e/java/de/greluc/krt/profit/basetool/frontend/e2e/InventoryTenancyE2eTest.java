@@ -38,43 +38,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Multi-org-unit tenancy matrix for the squadron Lager (REQ-ORG-002/003/004/008): who may SEE,
- * CREATE and EDIT inventory across every membership profile — a squadron-only member, an SK-only
- * member, a member of both a squadron and an SK, an admin, and a user with no membership at all.
- * The unauthenticated visitor is not covered here: since ADR-0159 there is no guest surface, and
- * who may reach the page at all is swept by {@code AnonymousSurfaceE2eTest} (REQ-SEC-052). The
- * direct Lager-View is <em>strict-staffel</em>: an item is scoped to its {@code owning_org_unit_id}
- * pool and never escapes it (REQ-ORG-003).
+ * Multi-org-unit tenancy matrix for the Lager (REQ-ORG-002/003/004/008): who may see, create and
+ * edit inventory as a squadron member, SK member, member of both, admin, and memberless user.
  *
- * <p><b>Fixtures.</b> Five real Keycloak users carry distinct membership profiles, assigned via the
- * REST seeder: {@code test-admin} (ADMIN, IRIDIUM = Staffel A), {@code test-member} (Staffel A
- * only), {@code test-both} (Staffel B + SK X), {@code test-sk} (SK X only), {@code test-none} (no
- * membership). One non-personal item is seeded per owner on its own material so a material maps 1:1
- * to an owner — Staffel A, Staffel B, SK X, and an ownerless ({@code owningOrgUnit = null}) item
- * recorded by the membershipless user. Items are created <em>as</em> the user homed in the target
- * unit so the create-time resolver stamps the intended owner.
- *
- * <p><b>Drive via UI, verify via API.</b> Mirroring {@code CrossStaffelJobOrderE2eTest}, the
- * visibility/stamping/edit matrix is asserted by calling the scoped backend endpoints as each user
- * through {@link BackendSeeder} — the established, race-free way to assert tenancy boundaries —
- * with the boundary additionally driven through the real {@code /inventory/all} UI for a
- * representative viewer. The admin pin is exercised by sending the {@code X-Active-Org-Unit-Id}
- * header the frontend relays, which the backend honours as the active scope.
- *
- * <p><b>The visibility grid this asserts</b> — for a non-personal item owned by org unit O, in the
- * global Lager-View ({@code /inventory/all}):
- *
- * <ul>
- *   <li>Admin without a pin → sees every unit's stock (incl. ownerless rows).
- *   <li>Admin pinned to O → scoped to O exactly like a member.
- *   <li>Member of O → sees O's stock; a member of another unit does not.
- *   <li>Member of (squadron + SK) → sees the union of both.
- *   <li>Membershipless user → sees no shared stock.
- *   <li>Ownerless stock → only the admin-without-pin and the owning user (in their personal view).
- * </ul>
- *
- * The personal view ({@code /inventory/my}) is purely owner-scoped: a user always sees their own
- * rows regardless of which unit owns them, and never another user's.
+ * <p>Asserted through the scoped backend endpoints per user, plus the {@code /inventory/all} UI for
+ * one viewer. Shared stock is strictly scoped to its owning unit; an unpinned admin sees all, a
+ * pinned admin only the pin. {@code /inventory/my} shows only the user's own rows.
  */
 @Tag("e2e")
 class InventoryTenancyE2eTest {
@@ -102,28 +71,20 @@ class InventoryTenancyE2eTest {
   private static Browser browser;
   private static BackendSeeder seeder;
 
-  // Seeded org units.
   private static String squadronBId;
   private static String skXId;
 
-  // Per-owner materials (one item each, so a material maps 1:1 to an owner in the grouped view).
-  private static String matAId; // owned by Staffel A (IRIDIUM)
-  private static String matBId; // owned by Staffel B
-  private static String matSkId; // owned by SK X
-  private static String matOwnerlessId; // ownerless (owningOrgUnit == null)
-  private static String matStampId; // used only by the create-stamping probes
-  private static String matEditId; // used only by the edit-gate probe
+  private static String matAId;
+  private static String matBId;
+  private static String matSkId;
+  private static String matOwnerlessId;
+  private static String matStampId;
+  private static String matEditId;
 
-  // The B-owned item the edit-gate test targets (kept separate so its mutation isolates).
   private static String editItemId;
 
-  // REQ-ORG-011 owner-escape fixture: an item owned by test-member but stamped to an SK the member
-  // no longer belongs to (they joined the SK, recorded the item, then left — Staffel A stays, so
-  // the
-  // reconciler keeps the stamp). Kept on its own material so no other probe touches it.
   private static String ownerMoveItemId;
 
-  // Shared storage location for all seeded rows and the create-stamping probes.
   private static String locId;
 
   /**
@@ -140,36 +101,27 @@ class InventoryTenancyE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // --- Memberships -------------------------------------------------------------------------
-    seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD); // admin in Staffel A
+    seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
     seeder.assignStaffelMembership(
         ADMIN_USER,
         ADMIN_PASSWORD,
         seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD),
         IRIDIUM_ID,
         false,
-        false); // test-member: Staffel A only
+        false);
 
     squadronBId =
         seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Staffel B", "ETSB");
     skXId = seeder.createSpecialCommand(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy SK X", "ETSX");
 
-    // test-both gets a dedicated profile (Staffel B + SK X). A dedicated user — not the shared
-    // test-officer — so the extra SK membership never leaks into sibling suites that rely on
-    // test-officer being single-membership (e.g. mission auto-stamping in
-    // PublicMissionCrossStaffel).
     String bothId = seeder.getUserId(BOTH_USER, BOTH_PASSWORD);
     seeder.assignStaffelMembership(ADMIN_USER, ADMIN_PASSWORD, bothId, squadronBId, false, false);
     seeder.addSpecialCommandMember(ADMIN_USER, ADMIN_PASSWORD, skXId, bothId);
 
     seeder.addSpecialCommandMember(
-        ADMIN_USER,
-        ADMIN_PASSWORD,
-        skXId,
-        seeder.getUserId(SK_USER, SK_PASSWORD)); // test-sk: SK X only
-    seeder.getUserId(NONE_USER, NONE_PASSWORD); // materialise test-none; leave it membershipless
+        ADMIN_USER, ADMIN_PASSWORD, skXId, seeder.getUserId(SK_USER, SK_PASSWORD));
+    seeder.getUserId(NONE_USER, NONE_PASSWORD);
 
-    // --- Reference data + one item per owner -------------------------------------------------
     locId = seeder.createLocation(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Loc");
     matAId = seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Mat A");
     matBId = seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Mat B");
@@ -179,7 +131,6 @@ class InventoryTenancyE2eTest {
     matStampId = seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Mat Stamp");
     matEditId = seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Mat Edit");
 
-    // Created AS the user homed in the target unit so the resolver stamps that owner.
     seeder.createInventoryItem(MEMBER_USER, MEMBER_PASSWORD, matAId, locId, SEED_QUALITY, 100);
     seeder.createInventoryItemOwnedBy(
         BOTH_USER, BOTH_PASSWORD, matBId, locId, SEED_QUALITY, 100, squadronBId);
@@ -189,11 +140,6 @@ class InventoryTenancyE2eTest {
         seeder.createInventoryItemOwnedBy(
             BOTH_USER, BOTH_PASSWORD, matEditId, locId, SEED_QUALITY, 100, squadronBId);
 
-    // --- REQ-ORG-011 owner-escape fixture ----------------------------------------------------
-    // test-member (Staffel A) briefly joins a fresh SK Y, records an item stamped to SK Y, then
-    // leaves SK Y. Because Staffel A remains, the reconciler keeps the SK stamp (REQ-INV-004), so
-    // test-member ends up owning an SK-Y-stamped item without being an SK Y member — the "owner
-    // switched / left the owning org unit while the entry stays booked to it" case.
     String skYId =
         seeder.createSpecialCommand(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy SK Y", "ETSY");
     String matMoveId =
@@ -332,24 +278,19 @@ class InventoryTenancyE2eTest {
    */
   @Test
   void createStampingFollowsTheMembershipMatrix() {
-    // Single membership → auto-stamp, no pick needed.
     assertCreated(
         attemptCreate(MEMBER_USER, MEMBER_PASSWORD, null), "A-only member auto-stamps Staffel A");
     assertCreated(attemptCreate(SK_USER, SK_PASSWORD, null), "SK-only member auto-stamps SK X");
-    // Membershipless → ownerless item is allowed.
     assertCreated(
         attemptCreate(NONE_USER, NONE_PASSWORD, null),
         "membershipless user creates ownerless stock");
-    // Multi-membership without a pick → forced choice → 400.
     assertEquals(
         400,
         attemptCreate(BOTH_USER, BOTH_PASSWORD, null),
         "multi-membership user without a pick must be rejected");
-    // Valid pick of an own membership → stamped.
     assertCreated(
         attemptCreate(BOTH_USER, BOTH_PASSWORD, squadronBId),
         "multi-membership user picking an own unit succeeds");
-    // Foreign picks → 400.
     assertEquals(
         400,
         attemptCreate(MEMBER_USER, MEMBER_PASSWORD, skXId),
@@ -370,7 +311,6 @@ class InventoryTenancyE2eTest {
    */
   @Test
   void editGateRespectsOrgUnitScope() {
-    // editItemId is owned by Staffel B (version 0, freshly seeded). Out-of-scope viewers: 403.
     assertEquals(
         403,
         seeder.attemptBookOutStatus(MEMBER_USER, MEMBER_PASSWORD, editItemId, 1, 0),
@@ -379,7 +319,6 @@ class InventoryTenancyE2eTest {
         403,
         seeder.attemptBookOutStatus(NONE_USER, NONE_PASSWORD, editItemId, 1, 0),
         "a membershipless user must not book out a B-owned item");
-    // The owning unit's member (and item owner) passes the org-scope gate.
     assertNotEquals(
         403,
         seeder.attemptBookOutStatus(BOTH_USER, BOTH_PASSWORD, editItemId, 1, 0),
@@ -394,7 +333,6 @@ class InventoryTenancyE2eTest {
    */
   @Test
   void ownerRetainsEditAfterLeavingOwningOrgUnit() {
-    // Non-owners outside the item's owning SK are still blocked — the escape is per-owner.
     assertEquals(
         403,
         seeder.attemptBookOutStatus(BOTH_USER, BOTH_PASSWORD, ownerMoveItemId, 1, 0),
@@ -403,7 +341,6 @@ class InventoryTenancyE2eTest {
         403,
         seeder.attemptBookOutStatus(NONE_USER, NONE_PASSWORD, ownerMoveItemId, 1, 0),
         "a membershipless non-owner must not book out the item");
-    // The owner — no longer a member of the item's owning SK — still passes the edit gate.
     assertNotEquals(
         403,
         seeder.attemptBookOutStatus(MEMBER_USER, MEMBER_PASSWORD, ownerMoveItemId, 1, 0),
@@ -435,19 +372,9 @@ class InventoryTenancyE2eTest {
     }
   }
 
-  // The anonymous-visitor case that stood here — /inventory/all lands on the landing page and never
-  // renders the Lager table — moved to AnonymousSurfaceE2eTest, which sweeps that same shape across
-  // every page rather than one. This class is about what a MEMBER sees; who may reach the page at
-  // all is REQ-SEC-052's question, and answering it in one place is what stops the two drifting.
-
-  // --------------------------------------------------------------------------------------------
-  // Helpers
-  // --------------------------------------------------------------------------------------------
-
   /**
-   * Reports whether the given user sees any shared stock of {@code materialId} in the global Lager
-   * -View ({@code /inventory/all/grouped}) — i.e. the grouped result for that material is
-   * non-empty.
+   * Reports whether the given user sees any shared stock of {@code materialId} in the global
+   * Lager-View ({@code /inventory/all/grouped}).
    *
    * @param username the viewer's Keycloak username
    * @param password the viewer's Keycloak password

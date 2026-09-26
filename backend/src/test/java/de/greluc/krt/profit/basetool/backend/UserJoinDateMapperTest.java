@@ -40,10 +40,6 @@ class UserJoinDateMapperTest {
 
   @BeforeEach
   void setUp() {
-    // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
-    // membership repository plus the StaffelMembershipResolver collaborator since this test does
-    // not
-    // load a Spring context.
     userMapper = new UserMapperImpl();
     ReflectionTestUtils.setField(
         userMapper, "membershipRepository", Mockito.mock(OrgUnitMembershipRepository.class));
@@ -58,7 +54,6 @@ class UserJoinDateMapperTest {
 
   @Test
   void shouldMapJoinDate_WhenSet() {
-    // Given
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("mapper_test");
@@ -66,26 +61,21 @@ class UserJoinDateMapperTest {
     LocalDate joinDate = LocalDate.of(2023, 7, 4);
     user.setJoinDate(joinDate);
 
-    // When
     UserDto dto = userMapper.toDto(user);
 
-    // Then
     assertThat(dto.joinDate()).isEqualTo(joinDate);
   }
 
   @Test
   void shouldMapJoinDate_AsNull_WhenNotSet() {
-    // Given
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("mapper_test_null");
     user.setRank(1);
     user.setJoinDate(null);
 
-    // When
     UserDto dto = userMapper.toDto(user);
 
-    // Then
     assertThat(dto.joinDate()).isNull();
   }
 }

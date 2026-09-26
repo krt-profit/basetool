@@ -36,28 +36,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: a mission unit's explicit responsible person can be REMOVED again through the
- * unit-edit modal — via BOTH supported paths — resetting the field to "none".
- *
- * <p>Regression coverage for the reported bug where, once a responsible person was pinned on a
- * unit, the searchable combobox offered no way back to empty: it swallowed the optional {@code
- * <select>}'s empty option into the placeholder (so "— automatisch: Schiffseigner —" was never a
- * pickable row) and, on blur, snapped a cleared textbox back to the just-removed name. The fix
- * (REQ-FE-011, ADR-0053) exposes two independent paths back to none, one per test method:
+ * Verifies that a mission unit's responsible person can be removed again through the unit-edit
+ * modal, via both paths (REQ-FE-011, ADR-0053):
  *
  * <ul>
- *   <li>the discoverable dropdown <b>"clear" row</b> ({@link
- *       #clearsUnitResponsibleViaTheClearRow});
- *   <li><b>delete-to-clear</b> — emptying the textbox, whose visual regression was that blur
- *       restored the removed name ({@link #clearsUnitResponsibleByEmptyingTheTextbox}).
+ *   <li>the dropdown's "clear" row ({@link #clearsUnitResponsibleViaTheClearRow});
+ *   <li>emptying the textbox ({@link #clearsUnitResponsibleByEmptyingTheTextbox}).
  * </ul>
  *
- * <p>The mission, the acting user as a registered participant (a unit's responsible person is
- * chosen from the registered participants), and one unit per path — each pinned to that participant
- * — are seeded via {@link BackendSeeder}; the tests then drive only the clear-and-save flow through
- * the UI, reusing one authenticated session via {@link E2eSupport#authenticatedStorageState}. A
- * mission is staffel-scoped, so the user is assigned to the IRIDIUM Squadron first. The two tests
- * target DISTINCT units (located by {@code data-name}) so they stay independent of ordering.
+ * <p>Each test targets its own seeded unit, so they are order-independent.
  */
 @Tag("e2e")
 class MissionUnitResponsibleClearE2eTest {
@@ -122,7 +109,6 @@ class MissionUnitResponsibleClearE2eTest {
         CLEAR_ROW_UNIT,
         "mission-unit-responsible-clear-row",
         (page, combo) -> {
-          // Discoverable path: pick the combobox "clear" row.
           E2eSupport.clearCombobox(combo);
           assertThat(combo).hasValue("");
         });
@@ -130,9 +116,8 @@ class MissionUnitResponsibleClearE2eTest {
 
   /**
    * Clears the responsible person of the {@link #DELETE_UNIT} by emptying the combobox textbox and
-   * moving focus away — the path a user takes when they miss the dropdown row. Asserts that blur
-   * does NOT snap the box back to the removed name (the reported visual regression), then saves and
-   * asserts the unit no longer has a responsible person.
+   * moving focus away, asserts that blur does not restore the removed name, then saves and asserts
+   * the unit has no responsible person.
    */
   @Test
   void clearsUnitResponsibleByEmptyingTheTextbox() {
@@ -140,10 +125,6 @@ class MissionUnitResponsibleClearE2eTest {
         DELETE_UNIT,
         "mission-unit-responsible-clear-delete",
         (page, combo) -> {
-          // Delete-to-clear: empty the textbox, then Tab away so the combobox blurs. Its blur
-          // handler
-          // runs on a 150 ms debounce and, before the fix, restored the just-removed name — so wait
-          // past that window before asserting the box stays empty.
           combo.fill("");
           combo.press("Tab");
           page.waitForTimeout(400);
@@ -172,34 +153,18 @@ class MissionUnitResponsibleClearE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Open the seeded mission on the crew tab (?tab=crew deeplink — the unit boxes and their
-        // edit
-        // buttons live in the "Teilnehmer & Einheiten" pane).
         E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
         page.waitForLoadState();
 
-        // The unit's edit button (located by data-name) carries the seeded responsible id; open it.
         Locator editBtn = page.locator(".edit-unit-btn[data-name='" + unitName + "']");
         assertThat(editBtn).hasAttribute("data-responsible", responsibleUserId);
         editBtn.click();
 
-        // The modal's responsible picker is a searchable combobox; opening the modal pre-selects
-        // the
-        // seeded participant, so the textbox shows their (non-empty) name.
         Locator responsibleCombo = page.locator("#edit-unit-modal .krt-combobox__input");
         assertThat(responsibleCombo).hasValue(Pattern.compile(".+"));
 
-        // Path-specific clear step (dropdown row vs delete-to-clear).
         clearAction.run(page, responsibleCombo);
 
-        // Save in place (the unit edit swaps the crew pane via AJAX — no Post/Redirect/Get). Mark
-        // the window to prove no full reload happened, then web-first-wait for the re-rendered edit
-        // button to no longer carry a responsible id — which also proves the clear was persisted,
-        // since the crew pane re-renders from the backend's fresh state. Thymeleaf omits an
-        // empty-valued th:data-* attribute entirely (as it does for this button's data-ship /
-        // data-frequency when empty) and the click handler reads it back with `|| ''`, so a cleared
-        // unit carries NO responsible id: the attribute is absent (or, were it ever rendered,
-        // empty). Assert it holds no non-empty value rather than a literal "".
         page.evaluate("window.__krtNoReload = true;");
         page.locator("#edit-unit-form button[type='submit']").click();
         assertThat(page.locator(".edit-unit-btn[data-name='" + unitName + "']"))

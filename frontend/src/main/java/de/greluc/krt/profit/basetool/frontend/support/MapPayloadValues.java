@@ -24,12 +24,9 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Coercion helpers for the loosely-typed {@code Object} values pulled out of a JSON AJAX payload
- * {@code Map} in the admin page controllers. The method names spell out the fallback each one
- * applies for an absent / unparseable value, because the defaults deliberately differ — a missing
- * id or string is {@code null}, a missing flag is {@code false}, a missing number is {@code 0L} —
- * and a caller must not have to guess which. Extracted from the byte-identical private copies the
- * admin controllers each carried.
+ * Coerces loosely typed values from JSON AJAX payload maps in the admin controllers. Each method
+ * name states its fallback for an absent or unparseable value: {@code null}, {@code false} or
+ * {@code 0L}.
  */
 public final class MapPayloadValues {
 

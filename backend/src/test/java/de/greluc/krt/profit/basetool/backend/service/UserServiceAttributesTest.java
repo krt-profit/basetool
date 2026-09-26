@@ -81,10 +81,6 @@ class UserServiceAttributesTest {
 
   private static final UUID USER_ID = UUID.randomUUID();
 
-  // ---------------------------------------------------------------
-  // updateUserAttributes — everything beyond the rank validation
-  // ---------------------------------------------------------------
-
   @Nested
   class UpdateUserAttributesTests {
 
@@ -175,10 +171,6 @@ class UserServiceAttributesTest {
 
     @Test
     void joinDateExplicitlyNull_clearsExistingJoinDate() {
-      // The inline comment in production code says: "joinDate can be explicitly
-      // set to null (clear the date)" — verify that setter is always called
-      // even when the parameter is null, unlike description/displayName which
-      // skip the setter on null.
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setJoinDate(LocalDate.of(2024, 1, 15));
@@ -192,7 +184,6 @@ class UserServiceAttributesTest {
 
     @Test
     void rankForNeitherOfficerNorSquadronUser_isSetWithoutValidation() {
-      // Bank employees/admins/etc. — no rank-range validation; whatever is passed sticks.
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRoles(new HashSet<>(Set.of(roleNamed("Bank Employee"))));
@@ -206,7 +197,6 @@ class UserServiceAttributesTest {
 
     @Test
     void rankNull_skipsRankSetterEntirely() {
-      // Edge: leaving rank == null in the request -> existing rank preserved.
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRank(10);
@@ -221,7 +211,6 @@ class UserServiceAttributesTest {
 
     @Test
     void officerRankBoundaries_areInclusive() {
-      // rank=1 (low boundary) and rank=12 (high boundary) must both pass.
       assertOfficerRankPasses(1);
       assertOfficerRankPasses(12);
     }
@@ -234,7 +223,6 @@ class UserServiceAttributesTest {
 
     @Test
     void officerRank_zero_isRejected() {
-      // Just below the 1-12 range.
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRoles(new HashSet<>(Set.of(roleNamed("OFFICER"))));
@@ -247,7 +235,6 @@ class UserServiceAttributesTest {
 
     @Test
     void squadronRank_21_isRejected() {
-      // Just above the 13-20 range.
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
@@ -283,10 +270,6 @@ class UserServiceAttributesTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // updateReadAnnouncement
-  // ---------------------------------------------------------------
-
   @Nested
   class UpdateReadAnnouncementTests {
 
@@ -311,10 +294,6 @@ class UserServiceAttributesTest {
       assertEquals(announcementId, user.getLastReadAnnouncementId());
     }
   }
-
-  // ---------------------------------------------------------------
-  // isUsernameOrDisplayNameTaken / findMatchesByExactName
-  // ---------------------------------------------------------------
 
   @Nested
   class NameLookupTests {
@@ -357,10 +336,6 @@ class UserServiceAttributesTest {
       assertFalse(userService.isUsernameOrDisplayNameTaken("ghost"));
     }
   }
-
-  // ---------------------------------------------------------------
-  // searchByUsername / findAll / findAllReference
-  // ---------------------------------------------------------------
 
   @Nested
   class SearchAndListDelegateTests {
@@ -413,10 +388,6 @@ class UserServiceAttributesTest {
       assertEquals(List.of(dto), userService.findAllReference());
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private static User newUser(UUID id) {
     User u = new User();

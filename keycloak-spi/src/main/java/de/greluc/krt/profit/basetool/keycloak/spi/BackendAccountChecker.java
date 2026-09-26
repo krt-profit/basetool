@@ -35,21 +35,13 @@ import org.jetbrains.annotations.Nullable;
 import org.keycloak.util.JsonSerialization;
 
 /**
- * Pure HTTP client for the Basetool "does an account already exist for this Discord identity?"
- * precheck (REQ-SEC-022). Calls {@code POST {url}} (the internal {@code
- * /internal/discord/account-existence} endpoint) over HTTPS, presenting the shared secret in the
- * {@code X-KRT-SPI-Secret} header and the candidate names/e-mail as JSON, and maps the {@code
- * {"exists": <bool>}} body to a {@link Result}.
+ * HTTP client for the backend precheck of whether an account already exists for a Discord identity
+ * (REQ-SEC-022), calling the internal account-existence endpoint with the shared secret in the
+ * {@code X-KRT-SPI-Secret} header.
  *
- * <p><strong>Fails open.</strong> Unlike {@link DiscordMembershipChecker} (the fail-closed security
- * gate), this is a duplicate-account guard, not a security boundary: only a confident {@link
- * Result#EXISTS} (HTTP 200 with {@code exists=true}) denies the login. Every ambiguity — a non-200
- * status (incl. the {@code 503} the backend returns when the feature is unconfigured, or a {@code
- * 401} on a bad secret), a TLS handshake failure against the backend's certificate, a timeout, a
- * network error, or a malformed/absent {@code exists} field — yields {@link Result#UNKNOWN}, which
- * the caller treats as "allow" so a transient hiccup never blocks a legitimate new member.
- *
- * <p>This class never logs the secret, the candidate names/e-mail, or the response body.
+ * <p>Fails open: only an HTTP 200 with {@code exists=true} yields {@link Result#EXISTS}; every
+ * error or ambiguous answer yields {@link Result#UNKNOWN}, which the caller treats as allow. It
+ * never logs the secret, the candidate names or e-mail, or the response body.
  */
 @JBossLog
 @RequiredArgsConstructor
@@ -108,9 +100,6 @@ public class BackendAccountChecker {
           httpClient.send(
               buildRequest(url, sharedSecret, body), HttpResponse.BodyHandlers.ofString());
     } catch (IOException e) {
-      // TLS handshake failure / timeout / connection reset / DNS failure — fail open. Logged
-      // because failing OPEN means the duplicate-account check silently did not happen: the login
-      // proceeds and nothing else records that the probe never ran.
       log.warnf(
           e,
           "Account-existence probe could not reach the backend (%s); skipping the check.",
@@ -123,8 +112,6 @@ public class BackendAccountChecker {
     }
 
     if (response.statusCode() != 200) {
-      // 503 (feature off) / 401 (bad secret) / 5xx / anything else — fail open. The status is the
-      // diagnosis and a 401 in particular is a misconfiguration that would otherwise never surface.
       log.warnf(
           "Account-existence probe answered HTTP %d; skipping the check.", response.statusCode());
       return Result.UNKNOWN;

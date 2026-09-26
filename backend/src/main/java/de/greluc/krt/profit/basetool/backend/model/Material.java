@@ -166,8 +166,8 @@ public class Material extends AbstractEntity<UUID> {
   private String scwikiSlug;
 
   /**
-   * Timestamp of the most recent successful SC Wiki sync touch on this row. {@code null} until the
-   * R3 Wiki commodity sync writes the row for the first time.
+   * Timestamp of the most recent successful SC Wiki sync touch on this row; {@code null} until the
+   * Wiki commodity sync first writes it.
    */
   @Column(name = "scwiki_synced_at")
   private Instant scwikiSyncedAt;
@@ -193,9 +193,8 @@ public class Material extends AbstractEntity<UUID> {
   private Double resistance;
 
   /**
-   * Catalog-visibility flag. {@code true} for every pre-R3 row (UEX catalogue is visible by
-   * default); the R3 Wiki commodity sync inserts Wiki-only rows with {@code false} so they stay out
-   * of trading flows until an admin reviews them (see SC_WIKI_SYNC_PLAN.md §4.3 and §6.1).
+   * Catalog-visibility flag. The Wiki commodity sync inserts Wiki-only rows as {@code false} so
+   * they stay out of trading flows until an admin reviews them.
    */
   @Column(name = "is_visible", nullable = false)
   private Boolean isVisible = true;
@@ -219,8 +218,6 @@ public class Material extends AbstractEntity<UUID> {
   @JoinColumn(name = "category_id")
   @ToString.Exclude
   private MaterialCategory category;
-
-  // ───── KRT P4K Reader source lane (catalog import) ─────
 
   /**
    * DataForge {@code __ref} commodity GUID observed by the KRT P4K Reader import. Kept alongside

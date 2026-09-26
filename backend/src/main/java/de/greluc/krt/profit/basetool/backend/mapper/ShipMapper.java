@@ -36,19 +36,10 @@ import org.mapstruct.Mapping;
     uses = {UserMapper.class, SquadronMapper.class})
 public interface ShipMapper {
   /**
-   * Maps a {@link Ship} entity to its outbound DTO.
+   * Maps a {@link Ship} to its DTO, publishing the owning org unit as {@code owningSquadron}.
    *
-   * <p>After R9 Step 2 of the multi-org-unit (Spezialkommando) rollout — the one whose column drop
-   * is {@code V103__drop_legacy_owning_squadron_columns.sql}, not the SC Wiki sync's separate R9
-   * cited on {@code shipTypeToDto} below — the ship entity exposes {@code owningOrgUnit} (typed
-   * {@code OrgUnit}); the DTO still publishes {@code owningSquadron} as {@code
-   * SquadronReferenceDto} for API stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
-   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned ships now
-   * surface their SK badge instead of a blank cell.
-   *
-   * @param ship the ship entity to project; {@code null} returns {@code null}.
-   * @return the populated ship DTO.
+   * @param ship the entity to project; {@code null} returns {@code null}
+   * @return the ship DTO
    */
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   ShipDto toDto(Ship ship);
@@ -60,15 +51,8 @@ public interface ShipMapper {
   ManufacturerDto manufacturerToDto(Manufacturer manufacturer);
 
   /**
-   * Lightweight nested mapping for the ship's {@link ShipType}. Intentionally narrower than the
-   * full UEX-sourced ShipType view to avoid leaking irrelevant fields through the {@link Ship}
-   * boundary.
-   *
-   * <p>SC Wiki sync R9 Step 2 (the catalogue-sync rollout, not the multi-org-unit R9 named above):
-   * the {@code description} wire field is sourced from the rich {@code descriptionDe} / {@code
-   * descriptionEn} columns (German preferred, English fallback), not the legacy synthesised {@code
-   * ship_type.description} column — which stopped being written then and was dropped, together with
-   * its entity field, by V125 on 2026-06-01 (SC Wiki sync R9 Step 4).
+   * Maps the ship's {@link ShipType} to a narrow nested DTO, with {@code description} taken from
+   * {@code descriptionDe}, falling back to {@code descriptionEn}.
    */
   @Mapping(
       target = "description",

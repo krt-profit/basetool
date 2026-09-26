@@ -34,13 +34,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service plus admin-override mutators for the city catalogue. The records themselves are
- * owned by {@link UexUniverseSyncService}; this service only exposes the read API and the
- * admin-only {@code hasLoadingDock} pin used by the UEX-overrides admin page. Read methods are
- * cached against {@link CacheConfig#CITIES_CACHE}; the override mutators evict the whole cache, and
- * the periodic {@link UexUniverseSyncService} sweep evicts it on completion (via {@code
- * MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so background-sync writes are visible on
- * the next read; the 12-hour master-data TTL is only the backstop.
+ * Read service and admin {@code hasLoadingDock} override for the city catalogue, whose records
+ * {@link UexUniverseSyncService} owns.
+ *
+ * <p>Reads are cached in {@link CacheConfig#CITIES_CACHE}; the override mutators and each UEX sweep
+ * evict it.
  */
 @Service
 @RequiredArgsConstructor
@@ -74,8 +72,8 @@ public class CityService {
   }
 
   /**
-   * Pins {@code hasLoadingDock} to the supplied value and marks the row as admin-overridden so the
-   * next UEX sweep leaves the value column untouched.
+   * Pins {@code hasLoadingDock} to the given value and marks the row admin-overridden, so the UEX
+   * sweep leaves it untouched.
    *
    * @param id city primary key
    * @param value desired {@code hasLoadingDock} value
@@ -91,8 +89,8 @@ public class CityService {
   }
 
   /**
-   * Releases the admin pin on {@code hasLoadingDock}. The value column stays at its last value
-   * until the next UEX sweep overwrites it from the upstream feed.
+   * Releases the admin pin on {@code hasLoadingDock}; the value stays until the next UEX sweep
+   * overwrites it.
    *
    * @param id city primary key
    * @return the persisted city

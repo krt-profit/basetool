@@ -67,41 +67,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * R4 SC Wiki blueprint sync (SC_WIKI_SYNC_PLAN.md §8.2). Pulls {@code /api/blueprints} and upserts
- * the recipe graph into {@code blueprint} + {@code blueprint_ingredient} + {@code
- * blueprint_dismantle_return}, plus the {@code blueprint_requirement_group} / {@code
- * blueprint_requirement_modifier} / {@code blueprint_summary_property} graph that carries the
- * per-slot crafting stat contributions.
+ * Syncs SC Wiki blueprints into {@code blueprint} and its ingredient, dismantle-return,
+ * requirement-group, modifier and summary-property tables.
  *
- * <p><b>Why a per-blueprint detail fetch.</b> The list endpoint returns only the flat {@code
- * ingredients[]} (name / kind / quantity). The {@code requirement_groups[]} block — the named build
- * slots and their stat {@code modifiers[]} (e.g. {@code weapon_damage} ×0.95..×1.05) — and the
- * {@code summary_properties[]} roll-up are returned <em>only</em> by the detail endpoint {@code GET
- * /api/blueprints/{uuid}} (verified against the live API + OpenAPI). So this sync walks the list to
- * enumerate the ~1559 blueprint UUIDs, then fetches each blueprint's detail (paced via {@link
- * ScWikiClient#paceForRateLimit()}) to capture the stats — the same per-UUID closure pattern as
- * {@link ScWikiItemSyncService}. Each blueprint is upserted in its own {@code REQUIRES_NEW}
- * transaction (via a self proxy) so the per-recipe lock window stays in the millisecond range and a
- * deadlock rolls back only that recipe instead of aborting the whole run.
+ * <p>Lists all blueprints, fetches each detail (paced via {@link ScWikiClient#paceForRateLimit()})
+ * and upserts each in its own {@code REQUIRES_NEW} transaction. Unresolved ingredients keep their
+ * Wiki snapshot and are re-resolved on later runs. When the detail is unavailable, the flat
+ * ingredient list is used and existing group data is kept.
  *
- * <p>Ingredient resolution: a {@code RESOURCE} line resolves to a {@code material} via {@code
- * scwiki_uuid} → alias table → exact name; an {@code ITEM} line resolves to a {@code game_item} via
- * {@code external_uuid}. The raw Wiki UUID + name snapshot are persisted on every line regardless,
- * so an unresolved line (FK {@code null}, {@link SyncEventType#UNRESOLVED_INGREDIENT} logged)
- * re-resolves on a later run once an alias is added or the item lands in {@code game_item} —
- * without re-fetching the Wiki.
- *
- * <p>When the detail carries {@code requirement_groups}, the owned ingredient / group / summary
- * collections are rebuilt in place (cleared, then re-added) and each ingredient is linked to its
- * slot; orphan removal deletes the previous generation on flush. When the detail is unavailable
- * (transient 404 / error), the sync falls back to the list's flat {@code ingredients[]} via the
- * legacy reuse-by-index path and <b>leaves any previously captured group / summary data
- * untouched</b> so a transient miss never wipes good stat data. No {@code @Modifying} bulk update
- * runs inside the per-blueprint loop, so the CLAUDE.md detach-clear trap does not apply.
- *
- * <p>Gated behind {@code krt.scwiki.blueprint-sync-enabled} (default {@code false}); ships dark
- * until an operator opts in per the runbook §4. Empty Wiki responses short-circuit before the
- * orphan sweep (§8.7).
+ * <p>Gated by {@code krt.scwiki.blueprint-sync-enabled} (default {@code false}); an empty Wiki
+ * response skips the orphan sweep.
  */
 @Slf4j
 @Service
@@ -117,39 +92,25 @@ public class ScWikiBlueprintSyncService {
   private final SyncReportService syncReportService;
 
   /**
-   * Curated corrections for CIG-mislabeled blueprint {@code output_name}s (#327), applied — guarded
-   * and self-healing — immediately before each {@code output_name} is persisted. See {@link
+   * Curated corrections applied to each {@code output_name} before it is persisted; see {@link
    * BlueprintOutputNameOverrides}.
    */
   private final BlueprintOutputNameOverrides outputNameOverrides;
 
   /**
-   * Self-reference, resolved lazily so the per-blueprint DB writes can be invoked through the
-   * Spring proxy. Calling a {@code @Transactional(REQUIRES_NEW)} method via {@code this} is
-   * self-invocation and silently skips the new transaction (the CLAUDE.md self-invocation trap);
-   * routing through this provider's proxy makes every per-blueprint write its own short transaction
-   * so a deadlock on one recipe rolls back only that recipe.
+   * Lazily resolved self proxy, so each per-blueprint write runs in its own {@code REQUIRES_NEW}
+   * transaction.
    */
   private final ObjectProvider<ScWikiBlueprintSyncService> self;
 
   /**
-   * Runs the full blueprint sync. No-op (with an INFO line) when the feature flag is off. An empty
-   * Wiki list response short-circuits before the orphan sweep so a transient outage never wipes the
-   * recipe graph. Each blueprint's detail (carrying {@code requirement_groups}) is fetched per UUID
-   * outside any transaction, then persisted in its own {@code REQUIRES_NEW} transaction via {@link
+   * Runs the full blueprint sync; a no-op when the feature flag is off, and an empty list response
+   * skips the orphan sweep. Each detail is fetched outside a transaction and persisted via {@link
    * #upsertBlueprintWithinTransaction(UUID, ScWikiBlueprintDto, UUID, Instant)}.
    *
-   * <p>Returns the number of blueprints upserted this run, which {@link ScWikiScheduler}
-   * accumulates into {@code basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled
-   * and <em>genuine</em> empty-response short-circuits return {@code 0} so a Wiki outage surfaces
-   * as a zero-item run ({@code SyncZeroItems}, #1041 item 2). A {@code 304 Not Modified} on the
-   * blueprint list is <b>not</b> such an outage — the catalogue is merely unchanged — so this
-   * reports {@link BlueprintRepository#countLiveScwikiBlueprints() the live blueprint count}
-   * instead of {@code 0}, keeping a fully-cached healthy run from false-firing {@code
-   * SyncZeroItems} (#1182).
-   *
-   * @return the number of blueprint rows upserted this run, or the live blueprint count on a {@code
-   *     304 Not Modified} (unchanged) list
+   * @return the number of blueprints upserted, {@code 0} when disabled or empty, or the live
+   *     blueprint count ({@link BlueprintRepository#countLiveScwikiBlueprints()}) on {@code 304 Not
+   *     Modified}
    */
   public int syncBlueprints() {
     if (!Boolean.TRUE.equals(properties.blueprintSyncEnabled())) {
@@ -166,10 +127,6 @@ public class ScWikiBlueprintSyncService {
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiBlueprintDto>>() {},
             "blueprints");
     if (listResult.notModified()) {
-      // Blueprint list unchanged since the last sync (ETag 304): the per-UUID detail fetches are
-      // never reached (they only run for the enumerated list), so nothing is upserted — but this is
-      // a healthy run. Report the live blueprint count so an all-304 run is not read as a zero-item
-      // outage (#1182). A genuine empty-200 falls through to isEmpty() and reports 0.
       long live = blueprintRepository.countLiveScwikiBlueprints();
       log.info(
           "SC Wiki blueprint list unchanged since last sync (304) — reporting {} live blueprint"
@@ -189,10 +146,6 @@ public class ScWikiBlueprintSyncService {
     int processed = 0;
     int unresolvedLines = 0;
     int detailMisses = 0;
-    // #327 curated output-name override bookkeeping. overrideKeysSeen maps each override-bearing
-    // scwiki_key the feed carried this run to the upstream output_name observed for it;
-    // overrideKeysFired holds the keys whose guard actually matched. A key seen but not fired means
-    // CIG changed the wrong name and the override is obsolete (reported after the loop).
     Map<String, String> overrideKeysSeen = new LinkedHashMap<>();
     Set<String> overrideKeysFired = new HashSet<>();
 
@@ -202,10 +155,6 @@ public class ScWikiBlueprintSyncService {
       }
       try {
         seen.add(listDto.uuid());
-        // requirement_groups (the stat modifiers) and summary_properties are detail-only, so fetch
-        // each blueprint's detail. Pace + fetch OUTSIDE any transaction so no blueprint row lock is
-        // held across the HTTP round-trip; the DB write runs in its own REQUIRES_NEW transaction
-        // (via the self proxy) so a deadlock rolls back only this recipe and the loop continues.
         scWikiClient.paceForRateLimit();
         ScWikiBlueprintDto detail =
             scWikiClient.fetchOne(
@@ -216,8 +165,6 @@ public class ScWikiBlueprintSyncService {
           detailMisses++;
         }
         ScWikiBlueprintDto dto = detail != null ? detail : listDto;
-        // Override bookkeeping (the correction itself is applied inside the upsert): record the key
-        // as seen and, if the guard matches, as fired, so an obsolete override can be reported.
         if (outputNameOverrides.isRegistered(dto.key())) {
           overrideKeysSeen.put(dto.key(), dto.outputName());
           if (outputNameOverrides.fires(dto.key(), dto.outputName())) {
@@ -233,10 +180,6 @@ public class ScWikiBlueprintSyncService {
     }
 
     if (!seen.isEmpty() && !listResult.complete()) {
-      // The list page walk could not vouch for the census (a page failed, the pagination metadata
-      // went missing on a full page, or meta.total disagreed with the merged rows). The uuids we
-      // did see are real, but every blueprint on the pages that were never fetched is absent from
-      // `seen` for that reason alone and would be tombstoned for it. Defer to the next full run.
       log.warn(
           "Skipping the blueprint scwiki_deleted sweep: the Wiki blueprint page walk did not"
               + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
@@ -266,24 +209,15 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Persists one blueprint's recipe graph in its own {@code REQUIRES_NEW} transaction so a deadlock
-   * or lock-timeout on this recipe rolls back only this recipe — not the whole sync — and the
-   * caller's loop continues. Invoked through the {@link #self} proxy so Spring opens the new
-   * transaction (a direct {@code this} call would be self-invocation and run in the caller's — here
-   * absent — transaction). The Wiki detail fetch happens in the caller, outside this transaction,
-   * so the per-recipe lock window is milliseconds.
-   *
-   * <p>Matches the blueprint by {@code scwiki_uuid} (creating it when absent), copies the scalar
-   * columns, resolves the output item, then rebuilds the owned graph: the requirement-group graph
-   * from the detail when present, otherwise the flat ingredient list (the fallback leaves
-   * previously captured group / summary data untouched). Orphan removal deletes the previous
-   * generation on commit.
+   * Persists one blueprint's recipe graph in its own {@code REQUIRES_NEW} transaction; call it via
+   * {@link #self}. Rebuilds the requirement-group graph from the detail when present, otherwise the
+   * flat ingredient list, keeping existing group data.
    *
    * @param scwikiUuid the Wiki blueprint UUID (the upsert key)
-   * @param dto the inbound blueprint payload (detail when available, else the list row)
+   * @param dto the blueprint payload (detail when available, else the list row)
    * @param runId the current run id for unresolved-ingredient events
    * @param now the shared {@code scwiki_synced_at} timestamp
-   * @return the number of ingredient lines that could not be resolved to a material / game item
+   * @return the number of unresolved ingredient lines
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public int upsertBlueprintWithinTransaction(
@@ -291,8 +225,6 @@ public class ScWikiBlueprintSyncService {
     Blueprint bp = blueprintRepository.findByScwikiUuid(scwikiUuid).orElseGet(Blueprint::new);
     bp.setScwikiUuid(scwikiUuid);
     bp.setScwikiKey(dto.key());
-    // #327: correct known CIG-mislabeled output names before persisting. Guarded + self-healing —
-    // the upstream value passes through untouched unless it matches a registered wrong name.
     bp.setOutputName(outputNameOverrides.correct(dto.key(), dto.outputName()));
     bp.setCategoryUuid(dto.categoryUuid());
     bp.setCraftTimeSeconds(dto.craftTimeSeconds());
@@ -307,8 +239,6 @@ public class ScWikiBlueprintSyncService {
     if (dto.requirementGroups() != null && !dto.requirementGroups().isEmpty()) {
       unresolved = applyRequirementGraph(bp, dto, runId);
     } else {
-      // Fallback: no detail (transient miss) — use the flat list ingredients and leave any
-      // previously captured group / summary data untouched so a miss never wipes good stats.
       unresolved = applyIngredients(bp, dto, runId);
     }
     applyDismantleReturns(bp, dto, runId);
@@ -319,10 +249,8 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Runs the blueprint orphan sweep in its own {@code REQUIRES_NEW} transaction (the preceding loop
-   * is non-transactional, and the {@code @Modifying} bulk soft-delete needs an active transaction).
-   * Invoked through the {@link #self} proxy. Soft-deletes every blueprint whose {@code scwiki_uuid}
-   * was not seen in the Wiki feed this run.
+   * Soft-deletes, in its own {@code REQUIRES_NEW} transaction, every blueprint whose {@code
+   * scwiki_uuid} was not seen this run; call it via {@link #self}.
    *
    * @param seenScwikiUuids the blueprint UUIDs processed this run
    * @param now the soft-delete timestamp
@@ -334,17 +262,14 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Emits a {@link SyncEventType#BLUEPRINT_NAME_OVERRIDE_OBSOLETE} event for every curated
-   * output-name override whose {@code scwiki_key} the feed carried this run but whose guard did not
-   * fire — i.e. CIG changed the wrong name, so the override is obsolete and should be removed from
-   * {@link BlueprintOutputNameOverrides}. Runs in its own {@code REQUIRES_NEW} transaction (invoked
-   * through the {@link #self} proxy) because the enclosing loop is non-transactional and {@link
-   * SyncReportService}'s write methods are designed to run inside the caller's transaction.
+   * Emits {@link SyncEventType#BLUEPRINT_NAME_OVERRIDE_OBSOLETE} for every override whose key was
+   * seen this run but whose guard did not fire, in its own {@code REQUIRES_NEW} transaction; call
+   * it via {@link #self}.
    *
-   * @param runId the current run id stamped on each emitted event
-   * @param seenOverrideKeyToIncomingName each override-bearing {@code scwiki_key} seen this run,
-   *     mapped to the upstream {@code output_name} observed for it (for the report detail)
-   * @param firedOverrideKeys the override keys whose guard actually matched (not obsolete)
+   * @param runId the current run id
+   * @param seenOverrideKeyToIncomingName each override key seen this run, mapped to its upstream
+   *     name
+   * @param firedOverrideKeys the override keys whose guard matched
    * @return the number of obsolete-override events emitted
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -398,17 +323,14 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Rebuilds the blueprint's requirement-group graph (slots + stat modifiers), its ingredient lines
-   * (from the group children, each linked to its slot) and its summary-property roll-up from the
-   * detail payload. The three owned collections are cleared first; orphan removal deletes the
-   * previous generation on flush. Each ingredient child resolves to a material (RESOURCE) or game
-   * item (ITEM); an unresolved line keeps its Wiki snapshot, logs {@link
-   * SyncEventType#UNRESOLVED_INGREDIENT}, and is counted in the return value.
+   * Rebuilds the blueprint's requirement groups, ingredient lines (linked to their slot) and
+   * summary properties from the detail, clearing the owned collections first. Unresolved lines log
+   * {@link SyncEventType#UNRESOLVED_INGREDIENT}.
    *
    * @param bp the managed blueprint
-   * @param dto the inbound blueprint detail DTO (requirement groups guaranteed non-empty by caller)
+   * @param dto the blueprint detail; requirement groups non-empty
    * @param runId current run id for unresolved-ingredient events
-   * @return number of ingredient lines that could not be resolved to a material / game item
+   * @return number of unresolved ingredient lines
    */
   private int applyRequirementGraph(@NotNull Blueprint bp, ScWikiBlueprintDto dto, UUID runId) {
     bp.clearIngredients();
@@ -534,15 +456,13 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Reconciles a blueprint's ingredient lines against the inbound flat list (fallback path when no
-   * detail / requirement groups are available): reuses existing lines by index, appends new ones,
-   * and drops trailing lines the upstream recipe no longer has (orphan removal deletes them on
-   * flush). Returns the count of lines left unresolved this pass.
+   * Reconciles the ingredient lines against the flat inbound list: reuses lines by index, appends
+   * new ones and drops trailing ones.
    *
    * @param bp the managed blueprint
    * @param dto the inbound blueprint DTO
    * @param runId current run id for unresolved-ingredient events
-   * @return number of ingredient lines that could not be resolved to a material / game item
+   * @return number of unresolved ingredient lines
    */
   private int applyIngredients(Blueprint bp, @NotNull ScWikiBlueprintDto dto, UUID runId) {
     List<ScWikiBlueprintIngredientDto> incoming =
@@ -635,11 +555,10 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Resolves a RESOURCE ingredient / dismantle-return reference to a local material: {@code
-   * scwiki_uuid} → alias table → exact name. Returns {@code null} when none match (the caller
-   * persists the raw Wiki snapshot and logs the miss).
+   * Resolves a RESOURCE reference to a material via {@code scwiki_uuid}, then alias, then exact
+   * name.
    *
-   * @param ref the inbound flat ingredient / return line
+   * @param ref the inbound flat ingredient or return line
    * @return the resolved material, or {@code null}
    */
   private Material resolveMaterialForResource(@NotNull ScWikiBlueprintIngredientDto ref) {
@@ -647,9 +566,8 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Resolves a RESOURCE requirement-group child to a local material, using the child's {@code uuid}
-   * (the resource-type UUID) and display name through the same {@code scwiki_uuid} → alias → exact
-   * name chain as {@link #resolveMaterialForResource}.
+   * Resolves a RESOURCE requirement-group child to a material like {@link
+   * #resolveMaterialForResource}.
    *
    * @param child the inbound requirement-group child line
    * @return the resolved material, or {@code null}

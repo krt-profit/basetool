@@ -25,20 +25,20 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Response payload for one bank audit-trail row (epic #556, REQ-BANK-012) — admin-only surface (A2
- * mockup). The actor renders from the deletion-proof handle snapshot, never from a live user join.
+ * Response payload for one bank audit-trail row (REQ-BANK-012), admin-only. The actor is rendered
+ * from the handle snapshot, never from a live user join.
  *
  * @param id the audit row's id
  * @param occurredAt the mutation instant (UTC)
  * @param actorHandle the acting user's handle snapshot
  * @param eventType what happened
  * @param accountId the affected account, when the event concerns one
- * @param accountNo the affected account's display number, resolved batch-wise for the viewer
+ * @param accountNo the affected account's display number
  * @param transactionId the created ledger transaction for booking events
  * @param targetUserId the affected user for grant/holder events
  * @param details compact human-readable details payload
- * @param clientId which client the mutation came through (REQ-AUDIT-005) — a bounded label, {@code
- *     null} on rows written before the column existed, where it means "not recorded"
+ * @param clientId the client the mutation came through (REQ-AUDIT-005), or {@code null} when not
+ *     recorded
  */
 public record BankAuditEventDto(
     UUID id,

@@ -45,16 +45,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * Covers the profile-gated TLS trust of the gateway's two outbound clients (audit finding M-13)
- * after the move from WebClient to {@code RestClient} on the JDK client (ADR-0204), against a real
- * HTTPS server.
- *
- * <p>The certificates are throwaways minted in memory for {@code backend} — deliberately NOT for
- * {@code localhost}, the name the tests dial — so every case separates the two checks the old
- * Reactor Netty client made independently: whether the chain is trusted, and whether the hostname
- * is verified. The backend relay must accept a pinned-but-misnamed certificate (the service-alias
- * cert has no matching SAN) and still refuse an unpinned one; the Keycloak client must refuse the
- * misnamed one even though its chain is pinned, because it verifies the hostname.
+ * Integration tests for the profile-gated TLS trust of the gateway's two outbound {@code
+ * RestClient}s (ADR-0204) against a real HTTPS server with a certificate issued for {@code
+ * backend}: the backend relay accepts a pinned but misnamed certificate and refuses an unpinned
+ * one, while the Keycloak client also verifies the hostname.
  */
 class RestClientConfigTest {
 
@@ -134,9 +128,6 @@ class RestClientConfigTest {
 
   @Test
   void withHostnameVerificationTheRelayRefusesAPinnedButMisnamedCertificate() throws Exception {
-    // REQ-SEC-070 / ING-SEC-04: once one internal CA signs every service the pinned anchor
-    // vouches for all of them, so the name has to be checked. Same pinned chain as the default
-    // case above, verification on: refused.
     try (MockWebServer backend = httpsServer(BACKEND_CERT)) {
       RestClient client =
           config(
@@ -153,7 +144,6 @@ class RestClientConfigTest {
 
   @Test
   void withHostnameVerificationTheRelayAcceptsAPinnedCorrectlyNamedCertificate() throws Exception {
-    // ...and the matching name is accepted, so the refusal above was the name and nothing else.
     try (MockWebServer backend = httpsServer(LOCALHOST_CERT)) {
       RestClient client =
           config(
@@ -197,8 +187,6 @@ class RestClientConfigTest {
 
   @Test
   void withoutABundleTheRelayFallsBackToTheJvmTrustStore() throws Exception {
-    // A publicly-trusted / corporate-CA backend cert needs no pin. A self-signed one is therefore
-    // refused here — the fallback is the JVM's anchors, not "trust anything".
     try (MockWebServer backend = httpsServer(LOCALHOST_CERT)) {
       RestClient client =
           config(httpsUrl(backend), new String[] {"prod"}, new DefaultSslBundleRegistry())
@@ -226,7 +214,6 @@ class RestClientConfigTest {
 
   @Test
   void theKeycloakClientVerifiesTheHostnameEvenForAPinnedCertificate() throws Exception {
-    // Pinned chain, wrong name: refused, because the token endpoint keeps hostname verification.
     try (MockWebServer keycloak = httpsServer(BACKEND_CERT)) {
       RestClient client =
           config(
@@ -239,8 +226,6 @@ class RestClientConfigTest {
       assertThatThrownBy(() -> client.get().uri(httpsUrl(keycloak)).retrieve().body(String.class))
           .isInstanceOf(ResourceAccessException.class);
     }
-    // Pinned chain, matching name: accepted — so the refusal above was the hostname and nothing
-    // else.
     try (MockWebServer keycloak = httpsServer(LOCALHOST_CERT)) {
       RestClient client =
           config(
@@ -327,7 +312,6 @@ class RestClientConfigTest {
       RecordedRequest recorded = backend.takeRequest(5, TimeUnit.SECONDS);
       assertThat(recorded).isNotNull();
       assertThat(recorded.getPath()).isEqualTo("/api/v1/ping");
-      // Pinned to HTTP/1.1, as the replaced Reactor Netty client spoke: no h2c upgrade offer.
       assertThat(recorded.getRequestLine()).endsWith("HTTP/1.1");
       assertThat(recorded.getHeader("Upgrade")).isNull();
     }

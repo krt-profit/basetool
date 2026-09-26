@@ -34,8 +34,6 @@
 
     <div class="hud-box mt-2">
 
-        <!--/* Primary action and the filter toggle share one bar; the filters collapse below it
-             (REQ-FE-021). The create action stays OUTSIDE the panel on purpose. */-->
         <div class="actions-bar">
             <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)"
                     type="button" class="btn btn--cta" th:text="#{operation.create}"
@@ -126,7 +124,6 @@
         </div>
     </div>
 
-    <!--/* Create Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='create-operation-modal', titleKey='operation.create', variant='krt-modal--wide', body=~{::create-operation-modal-body})}">
         <th:block th:ref="create-operation-modal-body">
             <form id="create-operation-form" th:action="@{/operations/create}" method="post">
@@ -148,7 +145,6 @@
                         <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
                     </select>
                 </div>
-                <!--/* R5.d.e owner-picker: hidden when the caller has ≤1 OrgUnit membership. */-->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
                 </div>
                 <div class="krt-modal-foot">
@@ -159,7 +155,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Delete Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-operation-modal', titleKey='general.confirm', variant='krt-modal--danger', body=~{::delete-operation-modal-body})}">
         <th:block th:ref="delete-operation-modal-body">
             <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
@@ -175,7 +170,6 @@
     </th:block>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    /*<![CDATA[*/
     const OPS_MSG = {
         createSuccess: /*[[#{operation.create.success}]]*/ 'Operation angelegt.',
         createError: /*[[#{operation.create.error}]]*/ 'Fehler beim Anlegen.',
@@ -187,7 +181,6 @@
         conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
         conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
-    /*]]>*/
 </script>
 <script th:src="@{/js/operations-index.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/operations.js}" defer th:attr="nonce=${cspNonce}"></script>

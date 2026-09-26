@@ -44,24 +44,17 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for Inventory Item. Since V220 the table is catalog-discriminated
- * (REQ-INV-029, ADR-0101): a row stocks either a material ({@code material_id} + {@code quality}
- * set) or a game item ({@code game_item_id} set, no quality). The read family therefore comes in
- * per-catalog variants — the historical material queries carry an explicit {@code i.material IS NOT
- * NULL} guard so item rows never leak into pre-item contracts, and the item variants key on {@code
- * gameItem} without the quality dimension. Queries keyed on a non-null id via {@code i.material.id
- * = :materialId} (an id-only FK-column dereference, no join) exclude item rows inherently, because
- * an equality never matches the item rows' {@code NULL} FK.
+ * Spring Data repository for {@link InventoryItem}.
+ *
+ * <p>A row stocks either a material ({@code material_id} and {@code quality} set) or a game item
+ * ({@code game_item_id} set, no quality), so queries come in per-catalog variants (REQ-INV-029).
  */
 @Repository
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {
 
   /**
-   * Pages the material stock rows owned by {@code user} — the flat "my inventory" list for {@code
-   * catalog=MATERIAL}. The explicit {@code i.material IS NOT NULL} keeps game-item rows (V220,
-   * REQ-INV-029) out of the pre-item flat contract; it also makes the caller-whitelisted {@code
-   * material.name} sort safe, whose implicit inner join would otherwise decide row visibility per
-   * chosen sort. Item rows are served by {@link #findItemRowsByUser(User, Pageable)}.
+   * Pages the material stock rows owned by {@code user}; item rows are served by {@link
+   * #findItemRowsByUser(User, Pageable)}.
    *
    * @param user the owning user; never {@code null}.
    * @return the user's material rows with the display associations eagerly graphed.
@@ -71,10 +64,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<InventoryItem> findMaterialRowsByUser(@Param("user") User user, Pageable pageable);
 
   /**
-   * Game-item sibling of {@link #findMaterialRowsByUser(User, Pageable)} — the flat "my inventory"
-   * list for {@code catalog=ITEM} (REQ-INV-029). Only rows stocking a game item are returned;
-   * {@code gameItem.manufacturer} is graphed alongside because the item reference DTO renders the
-   * manufacturer name.
+   * Pages the game-item stock rows owned by {@code user} (REQ-INV-029).
    *
    * @param user the owning user; never {@code null}.
    * @return the user's game-item rows with the display associations eagerly graphed.
@@ -85,17 +75,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<InventoryItem> findItemRowsByUser(@Param("user") User user, Pageable pageable);
 
   /**
-   * Loads an entry for a per-allocation write (add / change / remove a job-order or mission slice,
-   * Variante C REQ-INV-027) under {@link LockModeType#OPTIMISTIC_FORCE_INCREMENT}. An allocation
-   * lives on the inverse ({@code mappedBy}) side of the entry's {@code @OneToMany}, so cascading a
-   * child insert/delete/amount-change through the collection dirties only the child rows and would
-   * NOT bump the entry's own {@code @Version} on its own. Forcing the increment here makes the
-   * entry's version the single concurrency token for both its splits — two concurrent allocation
-   * writers (or an allocation write racing a scalar edit) serialise and the loser gets a clean 409
-   * — and makes the response DTO carry the post-increment version the client must echo next. The
-   * {@code material} is graphed because the write validates the amount against the material's
-   * PIECE/SCU precision; the two allocation collections stay lazy (both are bags, so graphing them
-   * together would raise {@code MultipleBagFetchException}) and load within the same transaction.
+   * Loads an entry for an allocation write under {@link LockModeType#OPTIMISTIC_FORCE_INCREMENT},
+   * so the entry's version guards its allocations too (REQ-INV-027).
    *
    * @param id the inventory entry id.
    * @return the entry under a forced version increment, or empty when unknown.
@@ -106,12 +87,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Optional<InventoryItem> findByIdForAllocationWrite(@Param("id") UUID id);
 
   /**
-   * Lists every inventory item (shared and personal) linked to {@code missionId} — the
-   * mission-detail Wirtschaft "Lagereinträge" table (#1138). Replaces the former eagerly embedded
-   * {@code MissionDto.inventoryEntries} field with a dedicated read; the display associations the
-   * table renders (material / location / user / job order) are graphed to avoid an N+1.
-   * Deliberately unscoped among members (the shared mission-stockpile view), matching the removed
-   * field's behaviour exactly.
+   * Lists every inventory row, shared and personal, linked to {@code missionId}, without org-unit
+   * scoping.
    *
    * @param missionId the mission whose linked inventory to load; never {@code null}.
    * @return the mission's inventory rows; never {@code null}, possibly empty.
@@ -125,17 +102,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<InventoryItem> findByMissionId(@Param("missionId") UUID missionId);
 
   /**
-   * Org-unit-scoped variant of {@link #findByMissionId(UUID)}, and the one the mission-detail
-   * "Lagereinträge" panel uses.
-   *
-   * <p>{@link InventoryItem} is <strong>strict-staffel</strong> with no cross-staffel escape
-   * (REQ-ORG-003, {@code docs/specs/org-unit-tenancy.md}); the two documented wideners are the
-   * owner escape and the job-order link. The mission link was a third, undocumented one: the
-   * unscoped query returned every row any Staffel had earmarked for the mission, and because a
-   * mission is visible cross-staffel whenever {@code is_internal = false}, any member could read a
-   * foreign Staffel's mission stock - owner callsign, location, material, quantity, quality and the
-   * linked job-order ids - simply by enumerating public missions. That is exactly the leak the
-   * refinery twin closed as BAC-004.
+   * Lists the inventory rows linked to {@code missionId} within the caller's org-unit scope; used
+   * by the mission-detail "Lagereinträge" panel (REQ-ORG-003).
    *
    * @param missionId the mission whose linked inventory to load; never {@code null}.
    * @param isAdminAllScope {@code true} for an unpinned admin (no org-unit filter).
@@ -155,12 +123,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
-   * Loads every non-personal (shared) inventory row owned by the given user as managed entities.
-   * Used by {@link de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitReconciler} to
-   * re-stamp and dedupe a user's shared stock when they gain their first or lose their last
-   * org-unit membership. Private inventory ({@code personal = true}) is intentionally excluded: it
-   * is owner-only regardless of org unit. The associations are loaded eagerly so the reconciler can
-   * read their ids (the eighth-dimension natural key) without an N+1 per row.
+   * Loads every non-personal inventory row owned by the given user, for {@link
+   * de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitReconciler}.
    *
    * @param userId the owner whose shared inventory to load; never {@code null}.
    * @return the user's non-personal inventory rows; never {@code null}, possibly empty.
@@ -170,15 +134,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<InventoryItem> findByUserIdAndPersonalFalse(@Param("userId") UUID userId);
 
   /**
-   * Pools the caller's entire "My Inventory" stock into one SCU total per (material, quality) pair,
-   * across all storage locations, for the blueprint craftability calculation (#781). Scoped
-   * strictly to the owning user ({@code i.user.id = :userId}) — both personal and shared rows the
-   * user owns count, matching the default {@code /inventory/my} view — and never to an org unit,
-   * because craftability answers "what can <em>I</em> craft from <em>my</em> stock". The quality is
-   * kept in the grouping key (not collapsed) so the calculator can consume the best-quality slices
-   * first. Material rows only: the explicit {@code i.material IS NOT NULL} keeps game-item rows
-   * (V220, REQ-INV-029) from surfacing as a null-material slice — craftability consumes materials,
-   * never finished items.
+   * Sums the user's own material stock, personal and shared, into one SCU total per (material,
+   * quality) across all locations, for the craftability calculation.
    *
    * @param userId the owning user; never {@code null}
    * @return one slice per (material, quality) the user owns, with the summed SCU; never {@code
@@ -195,11 +152,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<InventoryItem> findByMaterialAndPersonalFalse(Material material, Pageable pageable);
 
   /**
-   * Squadron-scoped variant of {@link #findByMaterialAndPersonalFalse(Material, Pageable)}. Used by
-   * the per-material drilldown so the Lager-direct path stays strictly staffel-isolated
-   * (MULTI_SQUADRON_PLAN.md section 1: Inventory direct view = strict eigene Staffel). {@code
-   * owningSquadronId} {@code null} = admin "all squadrons" mode (no filter applied); a non-null id
-   * restricts to that squadron.
+   * Pages the non-personal stock rows of one material within the caller's org-unit scope, for the
+   * per-material drilldown.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
@@ -213,12 +167,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Game-item sibling of {@link #findByMaterialAndPersonalFalseScoped} — the per-game-item
-   * drilldown behind {@code GET /api/v1/inventory/game-item/{gameItemId}} (REQ-INV-029). Lists
-   * every non-personal stock row of one game item under the same strict-staffel scope triple as the
-   * material drilldown; the entity equality on {@code :gameItem} never matches material rows'
-   * {@code NULL} FK. {@code gameItem.manufacturer} is graphed because the item reference DTO
-   * renders the manufacturer name.
+   * Pages the non-personal stock rows of one game item within the caller's org-unit scope, for the
+   * per-game-item drilldown (REQ-INV-029).
    *
    * @param gameItem the game item to drill into; never {@code null}.
    * @param isAdminAllScope admin all-scopes mode (scope triple, REQ-ORG-003).
@@ -243,22 +193,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<InventoryItem> findByPersonalFalse(Pageable pageable);
 
   /**
-   * Optional multi-filter search across non-personal inventory items. Each filter is gated by a
-   * boolean / nullable flag so callers can omit dimensions without building a dynamic query: {@code
-   * hasMaterials}, {@code hasLocations}, {@code hasJobOrders} and {@code hasMissions} turn the
-   * corresponding {@code IN :ids} clause on or off; a {@code null minQuality} skips the quality
-   * floor.
+   * Pages non-personal material rows within the caller's org-unit scope, with optional material,
+   * location, job-order, mission and minimum-quality filters, each switched by its flag.
    *
-   * <p>Multi-tenant: this method is the <em>Lager-View</em> entry point (MULTI_SQUADRON_PLAN.md
-   * section 4.4). {@code owningSquadronId} restricts to the caller's squadron stock; {@code null}
-   * means admin "all squadrons" mode. Items owned by another squadron NEVER surface here, even if
-   * they are linked to a job order - the Job-Order-Kontext is a separate, intentionally ungated
-   * lookup path served by {@link #findByJobOrderIdOrdered(UUID)}.
-   *
-   * <p>Material rows only ({@code catalog=MATERIAL}): the explicit {@code i.material IS NOT NULL}
-   * keeps game-item rows (V220, REQ-INV-029) out of the pre-item flat contract and keeps the
-   * default {@code material.name} sort's implicit inner join from deciding row visibility. The item
-   * variant is {@link #findGlobalItemsByFilters}.
+   * <p>The item variant is {@link #findGlobalItemsByFilters}.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
@@ -286,11 +224,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Per-user variant of {@link #findGlobalByFilters} - same optional filter contract, but scoped to
-   * the items owned by {@code :user}. Used by the "my inventory" view to enforce isolation at the
-   * data layer rather than relying on the controller alone. Material rows only — the explicit
-   * {@code i.material IS NOT NULL} keeps game-item rows (V220, REQ-INV-029) out; the item variant
-   * is {@link #findUserItemsByFilters}.
+   * Pages the material rows owned by {@code :user} with the same optional filters as {@link
+   * #findGlobalByFilters}; the item variant is {@link #findUserItemsByFilters}.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
@@ -318,12 +253,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Game-item sibling of {@link #findGlobalByFilters} — the flat squadron-wide list for {@code
-   * catalog=ITEM} (REQ-INV-029). Same scope-triple + gated-filter contract, reduced to the item
-   * filter surface: {@code gameItemIds}, {@code locationIds} and {@code jobOrderIds}. There is
-   * deliberately no quality floor (items carry no quality) and no mission filter (item rows are
-   * never mission-allocated, REQ-INV-031). {@code gameItem.manufacturer} is graphed because the
-   * item reference DTO renders the manufacturer name.
+   * Pages non-personal game-item rows within the caller's org-unit scope, with optional game-item,
+   * location and job-order filters (REQ-INV-029).
    *
    * @param hasGameItems gates the {@code gameItemIds} clause.
    * @param gameItemIds the game items to narrow to; ignored when {@code hasGameItems} is false.
@@ -361,19 +292,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Group-on-read variant of {@link #findGlobalByFilters}: instead of returning the individual
-   * rows, it collapses the scoped, filtered non-personal inventory into one {@link
-   * InventoryStackAggregate} per stock identity (the inventory natural key) directly in SQL —
-   * {@code SUM(amount)}, the amount-weighted quality sum, {@code MAX(quality)} and the entry count.
-   * The underlying entries are never loaded here (append-only rows grow unboundedly per stack);
-   * they are fetched lazily and paginated via {@link #findGlobalStackEntries}. The stack list
-   * itself is bounded by the number of distinct stock identities, so it is returned unpaged. Same
-   * scope-triple + optional-filter contract as {@link #findGlobalByFilters}.
+   * Aggregates the scoped, filtered non-personal material stock into one {@link
+   * InventoryStackAggregate} per stock identity, unpaged; entries load via {@link
+   * #findGlobalStackEntries}.
    *
-   * <p>Material rows only ({@code catalog=MATERIAL}): {@code material} joins explicitly ({@code
-   * LEFT JOIN}, mirroring {@code owningOrgUnit}) and the {@code i.material IS NOT NULL} guard keeps
-   * game-item rows (V220, REQ-INV-029) from surfacing as a null-material group that would NPE the
-   * grouped assembly. The item variant is {@link #findGlobalItemStacks}.
+   * <p>Same filters as {@link #findGlobalByFilters}; the item variant is {@link
+   * #findGlobalItemStacks}.
    */
   @Query(
       """
@@ -407,20 +331,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
-   * Per-user group-on-read variant of {@link #findUserByFilters}: collapses the user's filtered
-   * inventory (shared and personal alike) into one {@link InventoryStackAggregate} per stock
-   * identity in SQL. Entries are fetched lazily via {@link #findUserStackEntries}. Same
-   * optional-filter contract as {@link #findUserByFilters}, plus the mutually exclusive {@code
-   * personalOnly} / {@code nonPersonalOnly} toggles: {@code personalOnly = true} narrows to the
-   * caller's private stock ({@code personal = true} rows) and {@code nonPersonalOnly = true}
-   * narrows to the shared stock ({@code personal = false} rows) — the "Mein Lager" personal- /
-   * non-personal-entries-only filters. When both are {@code false} both shared and personal stacks
-   * are returned as before; the UI keeps them mutually exclusive so they are never both {@code
-   * true}, but were that to happen the two clauses simply intersect to the empty set.
+   * Aggregates the user's filtered material stock into one {@link InventoryStackAggregate} per
+   * stock identity; entries load via {@link #findUserStackEntries}.
    *
-   * <p>Material rows only ({@code catalog=MATERIAL}): explicit {@code LEFT JOIN i.material} +
-   * {@code i.material IS NOT NULL} keep game-item rows (V220, REQ-INV-029) from surfacing as a
-   * null-material group. The item variant is {@link #findUserItemStacks}.
+   * <p>Same filters as {@link #findUserByFilters}, plus {@code personalOnly} / {@code
+   * nonPersonalOnly} to narrow to private or shared rows. The item variant is {@link
+   * #findUserItemStacks}.
    */
   @Query(
       """
@@ -455,13 +371,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("nonPersonalOnly") boolean nonPersonalOnly);
 
   /**
-   * Game-item sibling of {@link #findGlobalStacks} (REQ-INV-029): collapses the scoped, filtered
-   * non-personal game-item stock into one {@link InventoryItemStackAggregate} per item stack key —
-   * user · gameItem · location · personal · owningOrgUnit, with <em>no</em> quality dimension
-   * (items carry none) — directly in SQL. Entries are fetched lazily via {@link
-   * #findGlobalItemStackEntries} (REQ-INV-005). Item filter surface only ({@code gameItemIds},
-   * {@code jobOrderIds}); no quality floor, no mission filter (REQ-INV-031). Same scope-triple
-   * contract as {@link #findGlobalStacks}.
+   * Aggregates the scoped, filtered non-personal game-item stock into one {@link
+   * InventoryItemStackAggregate} per item stack key (REQ-INV-029); entries load via {@link
+   * #findGlobalItemStackEntries}.
    *
    * @param hasGameItems gates the {@code gameItemIds} clause.
    * @param gameItemIds the game items to narrow to; ignored when {@code hasGameItems} is false.
@@ -502,12 +414,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
-   * Game-item sibling of {@link #findUserStacks} (REQ-INV-029): collapses the calling user's
-   * game-item stock (shared and personal alike) into one {@link InventoryItemStackAggregate} per
-   * item stack key in SQL, with the same mutually exclusive {@code personalOnly} / {@code
-   * nonPersonalOnly} narrowing toggles as the material variant. Entries are fetched lazily via
-   * {@link #findUserItemStackEntries} (REQ-INV-005). Item filter surface only ({@code gameItemIds},
-   * {@code jobOrderIds}); no quality floor, no mission filter (REQ-INV-031).
+   * Aggregates the user's filtered game-item stock into one {@link InventoryItemStackAggregate} per
+   * item stack key (REQ-INV-029); entries load via {@link #findUserItemStackEntries}.
    *
    * @param userId the owning user whose stacks to aggregate.
    * @param hasGameItems gates the {@code gameItemIds} clause.
@@ -549,21 +457,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("nonPersonalOnly") boolean nonPersonalOnly);
 
   /**
-   * Flat companion of {@link #findUserStacks} (REQ-INV-034): returns the ids of <em>every</em>
-   * individual material {@link InventoryItem} the calling user owns that matches the "Mein Lager"
-   * material filter surface — across every stack and unbounded by the lazy per-stack pagination —
-   * so the frontend's "Alle markieren" (select-all) can drive a bulk check-out over the complete
-   * filtered view rather than only the entries currently expanded on screen. The {@code WHERE}
-   * clause is byte-for-byte the same optional-filter contract as {@link #findUserStacks} (same
-   * material / min-quality / job-order / mission gates and the mutually exclusive {@code
-   * personalOnly} / {@code nonPersonalOnly} toggles), minus the aggregation: it selects the raw
-   * entry ids instead of the per-stack roll-up, so it can never widen the row set the grouped view
-   * shows. Owner-scoped to {@code :userId} at the data layer (no impersonation). Ordered by {@code
-   * createdAt} for a stable result.
-   *
-   * <p>Material rows only ({@code catalog=MATERIAL}): the {@code i.material IS NOT NULL} guard
-   * keeps game-item rows (V220, REQ-INV-029) out; the item companion is {@link
-   * #findUserItemEntryIds}.
+   * Returns the ids of every material entry the user owns that matches the {@link #findUserStacks}
+   * filters, ordered by {@code createdAt}, for the "Alle markieren" bulk action (REQ-INV-034).
    *
    * @param userId the owning user whose entry ids to collect.
    * @param hasMaterials gates the {@code materialIds} clause.
@@ -611,13 +506,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("nonPersonalOnly") boolean nonPersonalOnly);
 
   /**
-   * Game-item companion of {@link #findUserEntryIds} (REQ-INV-034): returns the ids of every
-   * individual game-item {@link InventoryItem} the calling user owns that matches the item-view
-   * filter surface, so the "Alle markieren" select-all covers the whole filtered {@code view=items}
-   * tree and not only the expanded stacks. Same optional-filter contract as {@link
-   * #findUserItemStacks} (game-item / job-order gates and the mutually exclusive personal toggles);
-   * no quality floor and no mission filter exist for items (REQ-INV-031). Owner-scoped to {@code
-   * :userId}; ordered by {@code createdAt} for stability.
+   * Returns the ids of every game-item entry the user owns that matches the {@link
+   * #findUserItemStacks} filters, ordered by {@code createdAt} (REQ-INV-034).
    *
    * @param userId the owning user whose item entry ids to collect.
    * @param hasGameItems gates the {@code gameItemIds} clause.
@@ -656,18 +546,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("nonPersonalOnly") boolean nonPersonalOnly);
 
   /**
-   * Lazily loads one global stack's underlying entries, oldest-first, paginated — the per-stack
-   * drill-down for the squadron-wide Lager view. The stack is identified by its stock-identity
-   * tuple (material, owner, location, quality, optional job order / mission, owning org-unit pool);
-   * {@code null} job-order / mission / owning-org-unit arguments match rows where that association
-   * is itself {@code null}. The same scope triple as {@link #findGlobalByFilters} is applied so the
-   * drill-down can never widen visibility beyond the caller's org-unit slice. Only non-personal
-   * stock is exposed here, mirroring the global grouped view.
-   *
-   * <p>Material-addressed by design ({@code catalog=MATERIAL}): the non-null {@code :materialId}
-   * equality is an id-only FK-column dereference that never matches game-item rows' {@code NULL} FK
-   * (V220, REQ-INV-029), so item rows cannot leak in. Item stacks drill down via {@link
-   * #findGlobalItemStackEntries}.
+   * Pages one non-personal material stack's entries, oldest first, within the caller's org-unit
+   * scope; {@code null} job-order, mission or owning-org-unit arguments match rows without that
+   * association.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
@@ -691,16 +572,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Lazily loads one of the caller's own stacks' entries, oldest-first, paginated — the per-stack
-   * drill-down for the "my inventory" view. Scoped to {@code :user} (the caller) so isolation is
-   * enforced at the data layer; the {@code personal} flag is part of the stock identity, so a
-   * private and a shared stack at the same location/quality drill down separately. {@code null}
-   * job-order / mission / owning-org-unit arguments match rows where that association is {@code
-   * null}.
-   *
-   * <p>Material-addressed by design ({@code catalog=MATERIAL}): the non-null {@code :materialId}
-   * equality never matches game-item rows' {@code NULL} FK (V220, REQ-INV-029). Item stacks drill
-   * down via {@link #findUserItemStackEntries}.
+   * Pages one of the caller's own material stacks' entries, oldest first; {@code null} job-order,
+   * mission or owning-org-unit arguments match rows without that association.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
@@ -721,13 +594,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Game-item sibling of {@link #findGlobalStackEntries} (REQ-INV-029): lazily loads one global
-   * item stack's underlying entries, oldest-first, paginated (REQ-INV-005). The stack is addressed
-   * by {@code gameItemId} with <em>no</em> quality key — items carry no quality dimension — plus
-   * the shared identity dimensions (owner, location, optional owning org-unit pool; {@code null}
-   * matches rows without one). The same scope triple as the grouped item view applies, and only
-   * non-personal stock is exposed, mirroring the material variant. {@code gameItem.manufacturer} is
-   * graphed because the item reference DTO renders the manufacturer name.
+   * Pages one non-personal game-item stack's entries, oldest first, within the caller's org-unit
+   * scope (REQ-INV-029).
    *
    * @param gameItemId the stack's game item; never {@code null}.
    * @param userId the stack's owning user.
@@ -761,10 +629,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Game-item sibling of {@link #findUserStackEntries} (REQ-INV-029): lazily loads one of the
-   * caller's own item stacks' entries, oldest-first, paginated (REQ-INV-005). Addressed by {@code
-   * gameItemId} with no quality key; owner-scoped to {@code :userId} at the data layer, with the
-   * {@code personal} flag part of the stock identity exactly as for material stacks.
+   * Pages one of the caller's own game-item stacks' entries, oldest first (REQ-INV-029).
    *
    * @param userId the calling owner whose stack to drill into.
    * @param gameItemId the stack's game item; never {@code null}.
@@ -793,22 +658,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Aggregates non-personal inventory by {@code material}: total amount, plus an amount-weighted
-   * mean quality (so 10 units at quality 800 plus 5 units at quality 600 land at {@code (10*800 +
-   * 5*600) / 15}). Used by the global "aggregated inventory" view; returns raw {@code Object[]}
-   * tuples - the service layer projects them into {@code AggregatedInventoryDto}.
-   *
-   * <p>Multi-tenant: {@code owningSquadronId} restricts to the caller's squadron stock. {@code
-   * null} means admin "all squadrons" mode (aggregated across the whole org).
-   *
-   * <p>Material rows only ({@code catalog=MATERIAL}): the {@code i.material IS NOT NULL} guard
-   * keeps game-item rows (V220, REQ-INV-029) from surfacing as a null group. Unlike the stack
-   * projections this query deliberately keeps the implicit root path ({@code i.material}) instead
-   * of an explicit {@code LEFT JOIN}: the caller-whitelisted {@code material.name} sort is appended
-   * by Spring Data as the implicit path {@code i.material.name}, which Hibernate resolves onto the
-   * <em>same</em> join as the {@code GROUP BY i.material} — an explicit join alias would make the
-   * appended sort spawn a second, ungrouped join and fail PostgreSQL's functional-dependency check.
-   * With the NOT-NULL guard in place the implicit inner join drops no rows.
+   * Aggregates the scoped non-personal material stock per material into the total amount and the
+   * amount-weighted mean quality, as raw {@code Object[]} tuples.
    */
   @Query(
       """
@@ -826,13 +677,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Game-item sibling of {@link #getAggregatedInventory} (REQ-INV-028/029): aggregates the scoped
-   * non-personal game-item stock to one total per game item — no quality columns, because items
-   * carry no quality dimension. Returns raw {@code Object[]} tuples ({@code [0]} the {@code
-   * GameItem}, {@code [1]} the summed amount) exactly like the material variant so the service
-   * layer projects both shapes the same way. Keeps the implicit root path ({@code i.gameItem})
-   * rather than an explicit join for the same appended-{@code gameItem.name}-sort reason documented
-   * on the material variant.
+   * Aggregates the scoped non-personal game-item stock to one total per game item, as raw {@code
+   * Object[]} tuples ({@code [0]} the {@code GameItem}, {@code [1]} the summed amount).
    *
    * @param isAdminAllScope admin all-scopes mode (scope triple, REQ-ORG-003).
    * @param activeOrgUnitId the pinned active org unit, or {@code null}.
@@ -867,14 +713,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 
   /**
-   * Lists every <em>material</em> inventory row allocated to the given job order, pre-sorted for
-   * the order-detail Materialsammlung (owner, location, material name, quality desc, amount desc).
-   * Deliberately material-only ({@code i.material IS NOT NULL}): the Materialsammlung is a material
-   * surface whose consumers ({@code InventoryAggregationService.getMaterialCollection}, the
-   * orphaned-link warning) dereference {@code material.getName()} unconditionally, and the
-   * production auto-earmark creates game-item rows linked to orders on its default flow (V220,
-   * REQ-INV-029) — without the guard every such earmark would 500 the order page. Item earmarks get
-   * their own projection with the order-detail item-stock panel (design §11.3).
+   * Lists every material inventory row allocated to the given job order, sorted by owner, location,
+   * material name, quality desc and amount desc.
    *
    * @param jobOrderId the order whose allocated material rows to list.
    * @return the order's material rows, display associations graphed, never {@code null}.
@@ -890,15 +730,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<InventoryItem> findByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Game-item sibling of {@link #findByJobOrderIdOrdered(UUID)}: lists every <em>game-item</em>
-   * inventory row allocated to the given job order (V220, REQ-INV-029), pre-sorted for display
-   * (owner, location, game-item name, amount desc — no quality dimension). Serves the orphaned-link
-   * warning (REQ-ORDERS-019), which must also flag item earmarks whose ITEM order no longer
-   * requests the game item — the material-only seam above deliberately excludes item rows, so
-   * without this query a stale item earmark would stay invisible forever — and the order-detail
-   * Item-Bestand panel ({@code InventoryAggregationService.getItemStockForJobOrder},
-   * REQ-ORDERS-028). {@code gameItem.manufacturer} is graphed because the item reference DTO
-   * renders the manufacturer name.
+   * Lists every game-item inventory row allocated to the given job order, sorted by owner,
+   * location, game-item name and amount desc (REQ-ORDERS-028).
    *
    * @param jobOrderId the order whose allocated game-item rows to list.
    * @return the order's game-item rows, display associations graphed, never {@code null}.
@@ -915,20 +748,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<InventoryItem> findGameItemRowsByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Loads every <em>game-item</em> inventory row that carries {@code gameItemId} and is earmarked
-   * to {@code jobOrderId}, oldest-first ({@code createdAt}, {@code id} tiebreak) and locked {@code
-   * PESSIMISTIC_WRITE} ({@code FOR UPDATE}) — the consumption source of the best-effort
-   * delivery-consumes-stock step (REQ-ORDERS-030). An item handover of {@code N} units of a line
-   * draws down the order's own earmark on these rows oldest-first, so two racing writers against
-   * the same order/game-item pool serialise on the row lock rather than both committing a
-   * decrement.
-   *
-   * <p>{@code i.gameItem.id = :gameItemId} is an id-only dereference resolved straight from the FK
-   * column (no join, no NULL-row surprise — game-item rows always carry a game item, ADR-0101), and
-   * the {@code EXISTS} sub-select restricts the set to rows this order earmarks. Deliberately not
-   * {@code @EntityGraph}-fetched: the caller reads each row's {@code jobOrderAllocations} slice
-   * (batch-loaded) to cap the draw at this order's own earmark, and join-fetching a collection
-   * under a pessimistic lock is avoided (mirrors {@link #findMergeGroupForUpdate}).
+   * Loads the game-item rows of {@code gameItemId} earmarked to {@code jobOrderId}, oldest first,
+   * under a pessimistic write lock, as the stock a delivery consumes (REQ-ORDERS-030).
    *
    * @param jobOrderId the order whose earmarked game-item rows to consume from; never {@code null}.
    * @param gameItemId the game item being delivered; never {@code null}.
@@ -946,11 +767,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderId") UUID jobOrderId, @Param("gameItemId") UUID gameItemId);
 
   /**
-   * Returns the total quantity of one material <em>allocated</em> to one job-order whose entry
-   * quality meets or exceeds the threshold; {@code 0.0} if there is no matching allocation. Since
-   * Variante C (REQ-INV-027) the sum is over the per-entry job-order allocation amounts, so an
-   * order is credited only its allocated share of a split entry, not the whole row. A {@code null}
-   * minQuality (Keine) imposes no quality floor — all qualities count.
+   * Sums the amounts of one material allocated to one job order from entries meeting the quality
+   * floor, or {@code 0.0} when none; a {@code null} minQuality applies no floor (REQ-INV-027).
    */
   @Query(
       """
@@ -964,17 +782,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("minQuality") Integer minQuality);
 
   /**
-   * Batched counterpart to {@link #sumAmountByMaterialAndJobOrderAndMinQuality} for the paged
-   * job-order list: returns every job-order-linked inventory row (one per item, carrying its
-   * material, quality grade and amount) for all given orders in a single query, so the list path
-   * can sum the per-(order, material) buckets in memory at each bucket's own quality floor instead
-   * of firing one {@code SUM} aggregate per bucket per order (REQ-DATA-003). Only rows whose {@code
-   * jobOrder} is one of {@code jobOrderIds} are returned; unlinked stock is excluded by the join.
-   *
-   * <p>Material allocations only: the {@code material IS NOT NULL} guard keeps game-item earmarks
-   * (V220, REQ-INV-029 — created by the production auto-earmark) from emitting {@code materialId =
-   * null} rows, which would NPE the consumer's {@code Collectors.groupingBy} and 500 the paged
-   * order list. Item earmarks get their own projection when the order UI surfaces them.
+   * Returns every material allocation of the given job orders as one row each (material, quality,
+   * amount), in a single query (REQ-DATA-003).
    *
    * @param jobOrderIds the orders whose linked stock to project; an empty collection yields an
    *     empty list.
@@ -991,15 +800,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderIds") Collection<UUID> jobOrderIds);
 
   /**
-   * The game-item sibling of {@link #findMaterialStockRowsByJobOrderIds}: every job-order-linked
-   * <em>item</em> earmark for all given orders in one query, so the allocation pickers can sum the
-   * per-(order, game item) buckets in memory instead of firing one read per order (REQ-DATA-003,
-   * REQ-INV-039). This is the projection the material query's Javadoc anticipated when it excluded
-   * item earmarks from its own result.
-   *
-   * <p>Mirror-image guard: {@code gameItem IS NOT NULL} keeps material earmarks out, exactly as the
-   * material query keeps item earmarks out. No quality is projected — item rows carry none
-   * (REQ-INV-029).
+   * Returns every game-item allocation of the given job orders as one row each, in a single query
+   * (REQ-INV-039).
    *
    * @param jobOrderIds the orders whose earmarked item stock to project; an empty collection yields
    *     an empty list.
@@ -1016,12 +818,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderIds") Collection<UUID> jobOrderIds);
 
   /**
-   * Drops every job-order allocation of the given order (Variante C, REQ-INV-027) so an order
-   * activity that detaches stock releases only the order's allocated slice while the owning entries
-   * survive as (partially) unassigned stock (R2). A plain bulk {@code DELETE}: {@code
-   * a.jobOrder.id} is the allocation's own FK column, so no join is implied. Not needed on a
-   * job-order <em>delete</em>, where the {@code job_order_id ON DELETE CASCADE} (V217) removes the
-   * allocations for free.
+   * Deletes every job-order allocation of the given order; the inventory entries themselves stay
+   * (REQ-INV-027).
    *
    * @param jobOrderId the order whose allocations to drop.
    */
@@ -1030,15 +828,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   void deleteJobOrderAllocationsByJobOrder(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Drops the job-order allocations of one specific material under the order (Variante C,
-   * REQ-INV-027), run in the handover / material-removal flows so released stock loses only that
-   * order's slice while the entry (its other allocations and its amount) survives (R2). The
-   * material filter is a subquery over {@link InventoryItem} because {@code
-   * a.inventoryItem.material.id} would imply a join a bulk {@code DELETE} may not carry, whereas
-   * {@code a.inventoryItem.id} is the allocation's own FK column. Carries {@code clearAutomatically
-   * = flushAutomatically = true} so a subsequent {@code repository.save(entity)} in the same
-   * handover loop does not collide with a stale {@code @Version} — the loop-bulk-update discipline
-   * (CLAUDE.md).
+   * Deletes the order's job-order allocations on entries of one material; the entries themselves
+   * stay (REQ-INV-027). Flushes before and clears the persistence context after.
    *
    * @param jobOrderId the order whose allocations to drop.
    * @param materialId the material to restrict the drop to.
@@ -1053,14 +844,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 
   /**
-   * Game-item sibling of {@link #deleteJobOrderAllocationsByJobOrderAndMaterial(UUID, UUID)}: drops
-   * the order's allocation slices on game-item rows stocking one specific game item (REQ-INV-031,
-   * R2 semantics of REQ-INV-027) — run by the requester item-line edit when the rebuilt line set no
-   * longer requests the game item, so released item stock loses only that order's earmark while the
-   * entry survives. The game-item filter is a subquery over {@link InventoryItem} for the same
-   * bulk-{@code DELETE}-join reason as the material variant, and it carries the same {@code
-   * clearAutomatically = flushAutomatically = true} so a caller following the loop-bulk-update
-   * discipline (CLAUDE.md) stays version-safe.
+   * Deletes the order's job-order allocations on entries of one game item; the entries themselves
+   * stay (REQ-INV-031). Flushes before and clears the persistence context after.
    *
    * @param jobOrderId the order whose allocations to drop.
    * @param gameItemId the game item to restrict the drop to.
@@ -1084,17 +869,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
 
   /**
-   * Loads one row of a bulk rebooking (Massen-Umbuchen, REQ-INV-036) under a pessimistic write
-   * lock.
-   *
-   * <p>Same locking as {@link #findByIdForUpdate} — the bulk bar carries no {@code @Version} to
-   * echo (its "Alle markieren" id set is resolved server-side), so the row lock, not an optimistic
-   * token, is what serialises two concurrent writers. Unlike {@code findByIdForUpdate} the graph
-   * also pulls {@code gameItem}: a rebooking copies the catalog reference <em>pair</em> onto the
-   * moved row (design §4.4), so fetching only {@code material} would lazy-load the game item once
-   * per row. Kept as its own method rather than widening {@code findByIdForUpdate}, whose
-   * bulk-checkout caller never reads the catalog reference. The two allocation collections stay
-   * lazy — both are bags, so graphing them together would raise {@code MultipleBagFetchException}.
+   * Loads one row of a bulk rebooking (REQ-INV-036) under a pessimistic write lock, with material
+   * and game item fetched.
    *
    * @param id the inventory row id.
    * @return the locked row, or empty when unknown.
@@ -1105,29 +881,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Optional<InventoryItem> findByIdForRebook(@Param("id") UUID id);
 
   /**
-   * Loads every warehouse row that shares the <em>physical</em> stock identity of a just-written
-   * row, locked {@code PESSIMISTIC_WRITE} ({@code FOR UPDATE}) — the merge candidates for the
-   * write-time stock merge (REQ-INV-026). Since Variante C (REQ-INV-027) the group key is the row's
-   * physical identity only — user · catalog reference · location · quality · personal ·
-   * owningOrgUnit; job-order / mission earmarks are NOT part of it, so matching rows are folded and
-   * their allocations unioned (R1). {@code delivered} is likewise not part of the key (the merged
-   * survivor resets to not-delivered).
+   * Loads the rows sharing a stock's physical identity (user, catalog reference, location, quality,
+   * personal, owning org unit), oldest first and pessimistically locked, as merge candidates
+   * (REQ-INV-026).
    *
-   * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0101): the stack key carries exactly one
-   * of {@code materialId} / {@code gameItemId}, and each keys with a NULL-branch — a material merge
-   * group passes ({@code materialId}, {@code quality}, {@code gameItemId = null}) so item rows
-   * never match; a game-item merge group passes ({@code gameItemId}, {@code materialId = null},
-   * {@code quality = null}) and matches only rows whose material <em>and</em> quality are {@code
-   * NULL}. Without the NULL-branches the former plain equalities silently matched nothing for item
-   * rows, degenerating their merge to a permanent no-op.
-   *
-   * <p>Rows backing a {@link de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer} are
-   * excluded via {@code NOT EXISTS} so a merge never deletes stock the Materialbörse still
-   * references ({@code ON DELETE CASCADE}, V210) — the offer and its offered quantity stay
-   * untouched. The pessimistic lock serialises two racing writers to the same stack: the merge
-   * reads, sums and deletes siblings, which is exactly the read-add-write the append-only model
-   * (ADR-0003) removed, so it re-introduces the lock only on this one path. Ordered oldest-first
-   * for a deterministic survivor tie-break.
+   * <p>Earmarks and {@code delivered} are not part of the key. {@code null} material, game item or
+   * quality match only rows where that column is {@code NULL}. Rows backing a {@link
+   * de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer} are excluded.
    *
    * @param userId the owning user of the stack; never {@code null}.
    * @param materialId the stack's material, or {@code null} for a game-item stack (matches rows
@@ -1166,12 +926,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("owningOrgUnitId") UUID owningOrgUnitId);
 
   /**
-   * Material-stack convenience overload of {@link #findMergeGroupForUpdate(UUID, UUID, UUID, UUID,
-   * Integer, Boolean, UUID)} preserving the pre-V220 six-argument call shape: passes {@code
-   * gameItemId = null}, whose NULL-branch restricts the merge group to rows with no game item —
-   * byte-for-byte the behaviour material callers relied on before the catalog split (REQ-INV-029).
-   * Game-item merge groups call the full variant with ({@code materialId = null}, {@code quality =
-   * null}) instead.
+   * Material-stack overload of {@link #findMergeGroupForUpdate(UUID, UUID, UUID, UUID, Integer,
+   * Boolean, UUID)} that passes {@code gameItemId = null}.
    *
    * @param userId the owning user of the stack; never {@code null}.
    * @param materialId the stack's material; never {@code null} on this overload.
@@ -1195,23 +951,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   }
 
   /**
-   * Bulk-deletes every non-personal inventory item (the "globales Lager" stock). Personal rows
-   * ({@code personal = true}) are explicitly left untouched so the admin "clear global inventory"
-   * action does not nuke individual users' private entries. The {@code job_order_handover_item ->
-   * inventory_item} FK was removed in {@code V64} (the handover row already snapshots the relevant
-   * material data), so a single bulk-delete is safe — no pre-cleanup loop is required.
+   * Bulk-deletes the non-personal inventory within the given org-unit scope; personal rows are
+   * never touched. Callers must enforce access first.
    *
-   * <p>Multi-tenant: uses the standard R6.c scope predicate triple. Admin all-scope wipes every
-   * non-personal item; a specific active OrgUnit limits the wipe to that OrgUnit; non-admin
-   * callers' membership union scopes the wipe to the caller's OrgUnits. Service-layer enforces the
-   * access check before reaching this method.
-   *
-   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
-   *     — wipes every non-personal item regardless of owner.
-   * @param activeOrgUnitId the single OrgUnit to scope the wipe to (admin pinning), or {@code
-   *     null}.
-   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
-   *     admins and anonymous.
+   * @param isAdminAllScope {@code true} for an admin without an active org unit; wipes every
+   *     non-personal item
+   * @param activeOrgUnitId the single org unit to scope the wipe to, or {@code null}
+   * @param memberOrgUnitIds the caller's org units (non-admin path); empty for admins
    * @return number of deleted rows
    */
   @Modifying
@@ -1224,25 +970,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
-   * Deletes every warehouse row held by the given user — personal and shared alike — as part of the
-   * hard account deletion (REQ-DATA-008). Replaces the former reassignment to a fallback admin: a
-   * departing member's stock leaves the Lager with them rather than accumulating on an admin
-   * account.
+   * Deletes every inventory row of the given user, personal and shared, as part of the hard account
+   * deletion (REQ-DATA-008).
    *
-   * <p>The three child tables that reference {@code inventory_item(id)} — {@code
-   * inventory_job_order_allocation} and {@code inventory_mission_allocation} (V217) and {@code
-   * material_exchange_offer} (V210) — all declare {@code ON DELETE CASCADE}, so the job-order and
-   * mission links and any open Materialbörse offer are removed by the database along with the row.
-   * The fourth, {@code job_order_handover_item.inventory_item_id}, is {@code ON DELETE SET NULL}
-   * (V58) so the handover history survives with its snapshot intact. No pre-cleanup loop is
-   * required.
-   *
-   * <p>Set-based by necessity, not for speed: {@code InventoryItem.user} is
-   * {@code @ManyToOne(optional = false)}, so loading the rows as managed entities before {@code
-   * userRepository.delete(user)} would abort the flush with {@code TransientPropertyValueException}
-   * — the same failure class documented on {@link
-   * OrgUnitMembershipRepository#findOrgUnitIdsByUserId(UUID)}. Never replace this with a
-   * find-then-{@code deleteAll}.
+   * <p>Allocations and Materialbörse offers cascade; handover items keep their snapshot. Must stay
+   * a bulk delete, since loading the rows as entities breaks the subsequent user delete.
    *
    * @param userId the owner whose warehouse rows are removed; never {@code null}.
    * @return the number of deleted rows, for the audit summary event.
@@ -1252,32 +984,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   int deleteByUserId(@Param("userId") UUID userId);
 
   /**
-   * Loads the caller's own Lager rows for the Materialbörse release picker — <b>both</b> material
-   * rows ("Material anbieten") and game-item rows ("Item anbieten" from stock, REQ-MARKET-014,
-   * design §8) — optionally filtered by a name fragment and capped by the {@link Pageable}.
-   * Owner-scoped by {@code user.id} (a member may only offer their own stock), with material, game
-   * item and location eager-loaded so the picker renders without an N+1, ordered by the row's
-   * catalog name. Location is loaded here only because it is the owner's own picker — it is never
-   * exposed on the public board.
+   * Pages the caller's own material and game-item Lager rows for the Materialbörse release picker,
+   * optionally filtered by name and ordered by catalog name (REQ-MARKET-014).
    *
-   * <p>Search and ordering go through explicit {@code LEFT JOIN}s on both {@code i.material} and
-   * {@code i.gameItem} with a {@code COALESCE(m.name, gi.name)} name — the {@code
-   * MaterialExchangeOfferRepository.findBoard} pattern — because attribute navigation ({@code
-   * i.material.name}) would smuggle in an implicit <em>inner</em> join that silently drops the
-   * other kind's rows (a game-item row has a {@code NULL} material, a material row a {@code NULL}
-   * game item). Since stock-backed item offers shipped (design §8) the former {@code i.material IS
-   * NOT NULL} guard is dropped so both kinds surface; the release service branches on the picked
-   * row's kind (material offer vs stock-backed item offer).
-   *
-   * <p>The {@code includeMaterial} / {@code includeItem} flags gate the row <b>kind</b> so the
-   * release dialog's Material/Item radio can restrict the picker to one kind (REQ-MARKET-002). The
-   * split must happen here, inside the DB query and <em>before</em> the {@link Pageable} cap, not
-   * by filtering the returned list — a post-cap client/service filter would drop every row of the
-   * wanted kind that fell past the row cap, silently hiding the tail (the reachability guarantee
-   * the server-side picker search exists to protect). A material row is discriminated by {@code
-   * i.gameItem IS NULL} and a game-item row by {@code i.gameItem IS NOT NULL} — the same XOR the
-   * service maps to the DTO kind. Passing both flags {@code true} returns both kinds (the
-   * unfiltered default); both {@code false} returns nothing.
+   * <p>The kind flags are applied in the query before the page cap (REQ-MARKET-002); both {@code
+   * false} returns nothing.
    *
    * @param userId the caller (the picker only ever shows the caller's own rows).
    * @param query a pre-lowercased {@code %fragment%} matched against the material or game-item

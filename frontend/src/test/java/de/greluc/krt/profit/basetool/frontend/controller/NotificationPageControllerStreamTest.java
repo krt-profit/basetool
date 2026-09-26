@@ -51,13 +51,9 @@ import reactor.core.publisher.Flux;
 
 /**
  * Unit tests for {@link NotificationPageController#stream(HttpServletRequest, Authentication)}: the
- * notification SSE relay must resolve the OAuth2 bearer <b>read-only</b> and never drive a token
- * refresh on this long-lived request (REQ-SEC-012, ADR-0019). A refresh here would rotate the
- * session's online refresh token and a late session write-back could resurrect a stale token,
- * tripping Keycloak's reuse detection and revoking the whole session. The relay attaches the
- * snapshot token as a plain {@code Authorization} header on the filter-free {@code sseWebClient},
- * so it is structurally refresh-incapable — these tests pin that it fails soft without a usable
- * token and otherwise relays the snapshot bearer verbatim, even when expired.
+ * SSE relay resolves the bearer read-only and never refreshes the token (REQ-SEC-012, ADR-0019). It
+ * fails soft without a usable token and otherwise relays the snapshot bearer verbatim, even when
+ * expired.
  */
 class NotificationPageControllerStreamTest {
 
@@ -65,7 +61,6 @@ class NotificationPageControllerStreamTest {
 
   @Test
   void stream_withNoBoundToken_failsSoft_withoutCallingTheBackendStream() {
-    // Given a session whose authorized client cannot be loaded (e.g. a freshly-lost session)
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MessageSource messageSource = mock(MessageSource.class);
     WebClient sseWebClient = mock(WebClient.class);
@@ -84,11 +79,8 @@ class NotificationPageControllerStreamTest {
     when(authorizedClientRepository.loadAuthorizedClient(REGISTRATION_ID, authentication, request))
         .thenReturn(null);
 
-    // When the browser opens the stream
     SseEmitter emitter = controller.stream(request, authentication);
 
-    // Then the token was resolved read-only and the relay failed soft: no upstream subscription,
-    // so the long-lived request never asks the manager to refresh/rotate the token.
     assertNotNull(emitter);
     verify(authorizedClientRepository)
         .loadAuthorizedClient(REGISTRATION_ID, authentication, request);
@@ -97,7 +89,6 @@ class NotificationPageControllerStreamTest {
 
   @Test
   void stream_withTokenlessClient_failsSoft_withoutCallingTheBackendStream() {
-    // Given an authorized client present in the session but carrying no access token
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MessageSource messageSource = mock(MessageSource.class);
     WebClient sseWebClient = mock(WebClient.class);
@@ -118,10 +109,8 @@ class NotificationPageControllerStreamTest {
     when(authorizedClientRepository.loadAuthorizedClient(REGISTRATION_ID, authentication, request))
         .thenReturn(client);
 
-    // When the browser opens the stream
     SseEmitter emitter = controller.stream(request, authentication);
 
-    // Then it still fails soft rather than relaying a tokenless call.
     assertNotNull(emitter);
     verifyNoInteractions(sseWebClient);
   }
@@ -129,11 +118,6 @@ class NotificationPageControllerStreamTest {
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void stream_withExpiredClient_relaysSnapshotBearerVerbatim_withoutRefreshing() {
-    // Given a session whose authorized client is PRESENT but its access token has already expired —
-    // the exact production condition that fired the incident. The relay must NOT refresh it (a
-    // refresh would rotate the online refresh token and trip Keycloak's reuse detection); it must
-    // relay the snapshot token verbatim as a plain bearer and let the backend reject it, leaving
-    // re-authentication to the 60s unread-count poll.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MessageSource messageSource = mock(MessageSource.class);
     WebClient sseWebClient = mock(WebClient.class);
@@ -169,11 +153,8 @@ class NotificationPageControllerStreamTest {
     when(headersSpec.retrieve()).thenReturn(responseSpec);
     when(responseSpec.bodyToFlux(anyTypeRef())).thenReturn(Flux.empty());
 
-    // When the browser opens the stream
     SseEmitter emitter = controller.stream(request, authentication);
 
-    // Then the upstream call was issued (no fail-soft on a present token) carrying the snapshot
-    // bearer verbatim — proving the relay used the read-only token without obtaining a fresh one.
     assertNotNull(emitter);
     ArgumentCaptor<Consumer<HttpHeaders>> headersCaptor = ArgumentCaptor.captor();
     verify(headersSpec).headers(headersCaptor.capture());
@@ -185,7 +166,6 @@ class NotificationPageControllerStreamTest {
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void stream_withOpenUpstream_countsTheRelayInTheConnectionsGauge() {
-    // Given a valid token and an upstream that never terminates (a live relay)
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MessageSource messageSource = mock(MessageSource.class);
     WebClient sseWebClient = mock(WebClient.class);
@@ -219,21 +199,14 @@ class NotificationPageControllerStreamTest {
     when(headersSpec.retrieve()).thenReturn(responseSpec);
     when(responseSpec.bodyToFlux(anyTypeRef())).thenReturn(Flux.never());
 
-    // When the browser opens the stream
     controller.stream(request, authentication);
 
-    // Then the live relay is reflected in the gauge — doFinally has not fired, the stream is open
     assertEquals(1.0, registry.get(MetricNames.NOTIFICATION_RELAY_CONNECTIONS).gauge().value());
   }
 
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void stream_withValidToken_commitsWithAnInitialSseCommentFromTheRequestThread() throws Exception {
-    // Given a valid token and an upstream that never emits (Flux.never), so the ONLY send is the
-    // controller's own initial commit. The relay MUST flush its response headers from the request
-    // thread (ADR-0113 / spring-ai #6169): its forwarded writes arrive on a reactor-netty thread
-    // that Spring Web 7 + Tomcat 11 never commit, so without an initial request-thread send every
-    // stream header-times-out at the proxy (the 100%-dead-SSE incident).
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MessageSource messageSource = mock(MessageSource.class);
     WebClient sseWebClient = mock(WebClient.class);
@@ -275,11 +248,8 @@ class NotificationPageControllerStreamTest {
     when(headersSpec.retrieve()).thenReturn(responseSpec);
     when(responseSpec.bodyToFlux(anyTypeRef())).thenReturn(Flux.never());
 
-    // When the browser opens the stream
     controller.stream(request, authentication);
 
-    // Then exactly one send ran synchronously (the request thread) carrying an SSE comment — the
-    // response is committed before any reactor-netty forward could run (none does; Flux.never).
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor = ArgumentCaptor.captor();
     verify(mockEmitter).send(captor.capture());
     String serialized =

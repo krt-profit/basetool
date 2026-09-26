@@ -49,17 +49,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read-only chart-assembly half of {@link OrgChartService}, split out under audit Thema 7 (#14). It
- * owns {@link #getOrgChart()} and the nested projection helpers that fold the persisted {@code
- * OrgChartPosition} rows into the nested {@link OrgChartDto} read model (OL tier, per-Bereich
- * tiers, ungrouped Staffeln/SKs, Kommandos and their Ensigns). The position editor CRUD, the
- * cardinality/scope write guards and the {@code @Transactional(propagation = MANDATORY)} chart
- * mirror hooks (invoked from the membership / Kommandogruppe write flows) stay in {@link
- * OrgChartService}, which keeps the shared {@code MAX_*} cardinality constants this half references
- * for its "can add another" flags.
- *
- * <p>Like {@link OrgChartService} the chart is deliberately <em>not</em> org-unit-scoped — it is
- * descriptive and grants nothing — so it wires no {@code OwnerScopeService}.
+ * Assembles the nested {@link OrgChartDto} read model from the persisted {@code OrgChartPosition}
+ * rows. The chart is descriptive and grants nothing, so it is not org-unit-scoped; writes live in
+ * {@link OrgChartService}.
  */
 @Service
 @RequiredArgsConstructor
@@ -87,7 +79,6 @@ public class OrgChartReadService {
     final List<OrgChartPosition> areaPositions =
         positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc();
 
-    // Positions for every org-unit-bound tier: profit-eligible Staffeln/SKs + Bereiche + the OL.
     Set<UUID> chartedUnitIds = new HashSet<>();
     units.forEach(u -> chartedUnitIds.add(u.getId()));
     chartedUnitIds.addAll(bereichIds);
@@ -102,12 +93,6 @@ public class OrgChartReadService {
     Map<UUID, List<OrgChartPosition>> positionsByUnit =
         unitPositions.stream().collect(Collectors.groupingBy(p -> p.getOrgUnit().getId()));
 
-    // OL tier at the very top (null when no OL exists, so the chart omits the tier). The Grand
-    // Admiral (REQ-ORG-021) is surfaced above the rest of the OL. It is held by EITHER an account
-    // (an OL member split out of the member list — keeps the OL_MEMBER rank, so rights are
-    // unaffected) OR a free-text name for a member without an account (a synthesized node that
-    // grants
-    // nothing, like every other free-text holder) — the two are mutually exclusive.
     OlChartDto olTier = null;
     if (ol != null) {
       List<OrgChartNodeDto> olMembers =
@@ -136,16 +121,12 @@ public class OrgChartReadService {
       olTier = new OlChartDto(ol.getId(), ol.getName(), ol.getShorthand(), grandAdmiral, members);
     }
 
-    // One tier per Bereich: its Bereichsleitung sub-tree + the Staffeln/SKs wired under it.
     List<BereichChartDto> bereichDtos =
         bereiche.stream()
             .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
             .map(b -> buildBereich(b, units, positionsByUnit))
             .toList();
 
-    // Ungrouped/legacy tier: active Staffeln/SKs NOT wired under a (charted) Bereich. Until
-    // an admin creates Bereiche and assigns parents this holds every unit, so the chart degrades to
-    // the pre-#692 single-tree view.
     List<SquadronChartDto> ungroupedSquadrons =
         units.stream()
             .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
@@ -170,9 +151,8 @@ public class OrgChartReadService {
   }
 
   /**
-   * {@code true} iff {@code unit}'s parent is one of the charted Bereiche — i.e. the unit renders
-   * under that Bereich's tier rather than in the ungrouped tier. A {@code null} parent (or a parent
-   * that is not an active Bereich) means the unit stays ungrouped, preserving the pre-#692 view.
+   * Returns whether {@code unit}'s parent is one of the charted Bereiche, so it renders under that
+   * Bereich's tier rather than in the ungrouped tier.
    *
    * @param unit the Staffel/SK to classify; never {@code null}.
    * @param bereichIds the ids of the active Bereiche.
@@ -183,8 +163,8 @@ public class OrgChartReadService {
   }
 
   /**
-   * Assembles one Bereich tier (epic #692, REQ-ORG-026): its Bereichsleitung sub-tree plus the
-   * Staffeln/SKs whose parent is this Bereich, carrying the Bereich's Bereichsfarbe.
+   * Assembles one Bereich tier (REQ-ORG-026): its Bereichsleitung sub-tree plus the Staffeln/SKs
+   * whose parent is this Bereich, carrying the Bereichsfarbe.
    *
    * @param bereich the Bereich org unit.
    * @param units all active Staffeln/SKs (filtered here to this Bereich's children).
@@ -293,11 +273,8 @@ public class OrgChartReadService {
   }
 
   /**
-   * Projects one Kommando row plus its children into a {@link CommandChartDto}. The Kommandoleiter
-   * lives on the Kommando row itself, so it is carried inline ({@code null} while vacant); the Stv.
-   * and Ensigns are the rows whose {@code parent_id} points back at this Kommando. The row's {@code
-   * kommando_group} link is projected so the chart editor can render a group-linked Kommando
-   * read-only (epic #800, REQ-ROLE-006) — it is managed under Organisation -&gt; Leitung.
+   * Projects one Kommando row plus its deputy and Ensigns into a {@link CommandChartDto}, including
+   * its Kommandogruppe link so the editor renders a group-linked Kommando read-only (REQ-ROLE-006).
    *
    * @param command the Kommando ({@code COMMAND_LEAD}) row, with its user fetched.
    * @param siblings every position of the owning Staffel, used to find this Kommando's children.

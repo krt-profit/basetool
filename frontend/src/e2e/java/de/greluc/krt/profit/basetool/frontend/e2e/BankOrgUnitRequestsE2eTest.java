@@ -36,25 +36,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Org-unit officer/lead bank features end to end (epic #666, REQ-BANK-021/-022/-023). Proves the
- * full confirm-before-post lifecycle across two audiences on the real UI:
+ * End-to-end tests of the org-unit bank requests (REQ-BANK-021, REQ-BANK-022, REQ-BANK-023):
+ * officers see the balance card and raise requests, bank employees confirm or reject them, and the
+ * role boundaries hold.
  *
- * <ul>
- *   <li><b>F1:</b> an officer who oversees a Staffel sees the balance-only card on the slim {@code
- *       /org-unit-bank} page; a plain member may open the same member-or-above page and sees its
- *       nav entry, but — overseeing and granted no account — no balance card (REQ-BANK-038).
- *   <li><b>F2:</b> the officer raises a deposit request through the modal (recorded {@code
- *       PENDING}, no money moved); a granted bank employee confirms it from the staff queue,
- *       recording a holder, which books the deposit onto the org-unit account; the requester can
- *       cancel a pending request, and the employee can reject one.
- *   <li><b>Role matrix:</b> the officer cannot reach the {@code BANK_EMPLOYEE}-only staff queue,
- *       and a pure bank employee cannot reach the officer/lead page.
- * </ul>
- *
- * <p><b>Drive via UI, verify via API.</b> Every mutation is driven through the real modal/form, but
- * the outcome (the request's status, the account balance) is read back from the backend so the
- * assertions never race the in-place AJAX swap. Each test uses a distinct amount so it can target
- * exactly the request it raised on the shared ephemeral stack.
+ * <p>Mutations are driven through the UI and verified through the backend API; each test uses a
+ * distinct amount to find its own request.
  */
 @Tag("e2e")
 class BankOrgUnitRequestsE2eTest {
@@ -92,22 +79,17 @@ class BankOrgUnitRequestsE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // The officer holds the Keycloak OFFICER role; making them a member of IRIDIUM gives them
-    // oversight of IRIDIUM (currentOversightScope → their own Staffel).
     String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
     seeder.assignStaffelMembership(
         ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false, false);
 
-    // The ORG_UNIT account IRIDIUM owns (get-or-create: at most one per org unit).
     accountId =
         seeder.ensureOrgUnitBankAccount(
             MGMT_USER, MGMT_PASSWORD, "E2E Org-Unit Bank", IRIDIUM_SQUADRON_ID);
 
-    // A registered holder the employee records on confirmation (a neutral player).
     String memberId = seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD);
     holderId = seeder.registerBankHolder(MGMT_USER, MGMT_PASSWORD, memberId);
 
-    // The employee may deposit/withdraw on the account (so they can confirm requests on it).
     String employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
     seeder.createBankGrant(MGMT_USER, MGMT_PASSWORD, employeeId, accountId, true, true, false);
   }
@@ -152,8 +134,6 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.waitForLoadState();
-        // The page opened to every member (REQ-BANK-038), so the member reaches it and sees the
-        // nav entry; overseeing and granted no account, they still see no balance card.
         assertThat(page.locator("[data-testid='nav-org-unit-bank']")).isVisible();
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
@@ -244,8 +224,6 @@ class BankOrgUnitRequestsE2eTest {
       try {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
-        // The own-requests list now lives behind the "Meine Anträge" tab; activate it so the cancel
-        // control inside the (otherwise hidden) panel becomes clickable.
         page.locator("[data-testid='org-unit-bank-tab-requests']")
             .click(new Locator.ClickOptions().setTimeout(20_000));
         Locator cancelButton =
@@ -327,16 +305,8 @@ class BankOrgUnitRequestsE2eTest {
   }
 
   /**
-   * Role matrix: the officer cannot reach the {@code BANK_EMPLOYEE}-only staff queue, and a bank
-   * employee with no officer/lead role cannot reach the officer/lead org-unit page.
-   *
-   * <p><b>The employee's half asserts the PAGE, not the nav link.</b> It used to assert both, which
-   * worked only while {@code test-bank-employee} held its bank role alone — an account shape
-   * Keycloak cannot produce, because {@code default-roles-iri} grants {@code KRT Member} to every
-   * account it creates (REQ-SEC-053). The fixture was corrected on 2026-09-06, and the link
-   * legitimately appears now: {@code nav-org-unit-bank} is gated on {@code hasAnyRole(ADMIN,
-   * OFFICER, LOGISTICIAN, MISSION_MANAGER, KRT_MEMBER)} and every real member passes that. What the
-   * boundary was ever about is the page, and the page still refuses.
+   * Asserts that the officer cannot reach the staff queue and a bank employee without an officer or
+   * lead role cannot reach the org-unit bank page.
    */
   @Test
   void roleBoundariesAreEnforced() {
@@ -363,8 +333,6 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.login(page, baseUrl, EMPLOYEE_USER, EMPLOYEE_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.waitForLoadState();
-        // The page renders nothing for a bank employee — that is the boundary. The nav LINK is a
-        // different rule (every member sees it) and is no longer asserted here; see the Javadoc.
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-employee-page-forbidden");
@@ -397,20 +365,10 @@ class BankOrgUnitRequestsE2eTest {
         page.locator("[data-testid='org-unit-request-type']").selectOption("WITHDRAWAL");
         page.locator("[data-testid='org-unit-request-account']").selectOption(accountId);
         page.locator("[data-testid='org-unit-request-amount']").fill(Long.toString(amount));
-        // REQ-BANK-055: the Empfaenger picker is seeded server-side with the requester, so the
-        // common case needs no interaction at all. Asserting merely "not blank" is too weak - the
-        // regression that shipped seeded the USERNAME, which is also not blank and which the
-        // backend then rejected as a malformed UUID. Pin the SUBMITTED value to the officer's id.
-        //
-        // Target the hidden input by its id, not by data-testid: krt-searchable-select transplants
-        // the original select's `id` onto the hidden value input but moves `data-testid` to the
-        // VISIBLE textbox, which carries the human-readable label. Asserting on the testid compares
-        // the label against a UUID and always fails.
         assertThat(page.locator("#org-unit-request-cp-user"))
             .hasValue(
                 seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
                 new LocatorAssertions.HasValueOptions().setTimeout(10_000));
-        // ... and the visible textbox shows a label, so the box does not merely look empty.
         assertThat(page.locator("[data-testid='org-unit-request-cp-user']"))
             .not()
             .hasValue("", new LocatorAssertions.HasValueOptions().setTimeout(10_000));
@@ -439,10 +397,6 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.locator("[data-testid='org-unit-bank-tab-requests']")
             .click(new Locator.ClickOptions().setTimeout(20_000));
-        // Target this request's edit button by the modal id it opens. The `preceding::` axis would
-        // be wrong here: every edit modal is rendered AFTER the whole table, so the nearest
-        // preceding edit button is the LAST row's regardless of which modal it is measured from —
-        // and the shared stack carries pending requests from the sibling tests.
         Locator editButton =
             page.locator(
                 "[data-testid='org-unit-bank-edit-btn'][data-modal-id='ou-req-edit-"
@@ -486,10 +440,6 @@ class BankOrgUnitRequestsE2eTest {
         .first()
         .click(new Locator.ClickOptions().setTimeout(20_000));
     page.locator("[data-testid='org-unit-request-type']").selectOption(type);
-    // The deposit picker lists EVERY active account (REQ-BANK-042) and the stack may hold several,
-    // so pin the IRIDIUM org-unit account explicitly rather than relying on the first option (the
-    // selection is made after the type so the type-driven option filter does not reset it). For a
-    // withdrawal it is the debitable account the officer oversees.
     page.locator("[data-testid='org-unit-request-account']").selectOption(accountId);
     page.locator("[data-testid='org-unit-request-amount']").fill(amount);
     dropFooter(page);

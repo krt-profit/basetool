@@ -60,7 +60,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Unit tests for {@link PendingApprovalAccessFilter} (PR review #1: REQ-SEC-017 backend gate). */
+/** Unit tests for {@link PendingApprovalAccessFilter} (REQ-SEC-017). */
 class PendingApprovalAccessFilterTest {
 
   private PendingApprovalAccessFilter filter;
@@ -71,8 +71,6 @@ class PendingApprovalAccessFilterTest {
 
   @BeforeEach
   void setUp() {
-    // Message source returns the caller-supplied default (arg 2) so the assertions run against a
-    // stable, locale-independent body; the i18n wiring itself is covered by the bundle test.
     MessageSource messageSource = mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any()))
         .thenAnswer(invocation -> invocation.getArgument(2));
@@ -181,15 +179,8 @@ class PendingApprovalAccessFilterTest {
   }
 
   /**
-   * A percent-encoded path prefix does not slip past the gate.
-   *
-   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
-   * path, so the {@code startsWith("/api/")} test this replaced let {@code /%61pi/v1/missions}
-   * through — and {@code RequestMappingHandlerMapping} then decodes {@code %61pi} to {@code api}
-   * and dispatches it, handing a non-approved account the {@code isAuthenticated()}-only writes.
-   * The default {@code StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not
-   * {@code %61}. Must be a direct filter test: MockMvc normalises the path before the filter sees
-   * it, so it cannot reproduce this.
+   * A percent-encoded path prefix such as {@code /%61pi/v1/missions} does not slip past the gate.
+   * Tested on the filter directly because MockMvc normalises the path first.
    */
   @Test
   void pendingUser_cannotBypassTheGateByPercentEncodingThePathPrefix() throws Exception {
@@ -247,9 +238,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void pendingUser_isForbidden_incrementsHttpErrorCounter() throws Exception {
-    // REQ-OBS-011: the 403 is written at the filter level, bypassing GlobalExceptionHandler, so it
-    // must increment basetool_http_error_total{code=PENDING_APPROVAL} here
-    // (PendingApprovalBlockSpike).
     authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
 
     run("POST", "/api/v1/inventory", mock(FilterChain.class));
@@ -266,10 +254,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void roleLessUser_isCountedAsASubject_notJustAsARequest() throws Exception {
-    // REQ-SEC-053 / REQ-OBS-011: NoRoleBlockSpike reads the SUBJECT gauge, because the refusal
-    // rate cannot separate one member's polling tab from a locked-out membership - and the event
-    // the alert exists for, a realm-side role rename, happens when the request rate is near zero.
-    // Three requests from one subject are one subject.
     UUID subject = UUID.randomUUID();
     authenticateWithJwt(subject.toString(), PendingApprovalAccessFilter.NO_ROLE_AUTHORITY);
 
@@ -282,7 +266,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void roleLessUsers_areCountedSeparately() throws Exception {
-    // The counterpart, so the case above cannot pass because the window counts nothing.
     for (int i = 0; i < 3; i++) {
       authenticateWithJwt(
           UUID.randomUUID().toString(), PendingApprovalAccessFilter.NO_ROLE_AUTHORITY);
@@ -294,8 +277,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void pendingUser_doesNotEnterTheRoleLessWindow() throws Exception {
-    // Two gates, two populations. Sharing a window would report a pending member as a role-less
-    // one and inflate the lockout signal with the approval queue.
     authenticateWithJwt(
         UUID.randomUUID().toString(), PendingApprovalAccessFilter.PENDING_AUTHORITY);
 
@@ -335,10 +316,8 @@ class PendingApprovalAccessFilterTest {
   private record CapturedEvent(Level level, String message, String userId) {}
 
   /**
-   * Records the {@code userId} MDC value as it stands <em>at append time</em>, which is the only
-   * point where the logback pattern would read it. {@code ILoggingEvent.getMDCPropertyMap()}
-   * resolves lazily, so inspecting it after the filter's {@code finally} has removed the key would
-   * observe the post-removal state and silently pass whatever the filter did.
+   * Appender that records the {@code userId} MDC value at append time, since the event's MDC map
+   * resolves lazily and would otherwise show the post-removal state.
    */
   private static final class UserIdCapturingAppender extends AppenderBase<ILoggingEvent> {
 
@@ -424,8 +403,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void pendingUser_withoutABearerToken_leavesUserIdUnset() throws Exception {
-    // REQ-OBS-004: there is no sub to stamp here, and the principal name is the callsign — so the
-    // key stays unset and the pattern's 'anonymous' default remains the truthful rendering.
     authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
 
     UserIdCapturingAppender appender = runBlockedWithCapture();

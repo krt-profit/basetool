@@ -88,9 +88,8 @@ class HandoffStagingServiceTest {
   }
 
   /**
-   * The single-use consume, as the frontend performs it: an atomic {@code GETDEL} on {@code
-   * ingest:handoff:<sub>:<id>}. It lived on the gateway's service although only these tests called
-   * it; it now lives here, reading the frontend's key schema (ING-PERF-02).
+   * Consumes a staged handoff the way the frontend does: an atomic {@code GETDEL} on {@code
+   * ingest:handoff:<sub>:<id>}.
    *
    * @param sub the subject to consume under
    * @param handoffId the handoff id
@@ -106,14 +105,11 @@ class HandoffStagingServiceTest {
 
   @Test
   void shouldStageAndConsumeOnce() {
-    // Given
     String handoffId = service.stage("user-1", HandoffKind.REFINERY, "{\"goodsMatched\":2}");
 
-    // When
     Optional<StagedHandoff> first = consume("user-1", handoffId);
     Optional<StagedHandoff> second = consume("user-1", handoffId);
 
-    // Then
     assertThat(first).isPresent();
     assertThat(first.get().kind()).isEqualTo(HandoffKind.REFINERY);
     assertThat(first.get().draftJson()).isEqualTo("{\"goodsMatched\":2}");
@@ -122,9 +118,6 @@ class HandoffStagingServiceTest {
 
   @Test
   void shouldLogTheDraftLengthButNeverTheDraftOrTheRawIds() {
-    // "Das vorausgefüllte Formular ist leer" is answered by draftLen alone: a 2-byte draft is an
-    // empty backend response. The draft, the raw sub and the raw handoff id must all stay out —
-    // the id is bearer-grade and travels in the browser URL (REQ-OBS-004, REQ-INGEST-003).
     List<ILoggingEvent> events =
         LogCapture.capture(
             HandoffStagingService.class,
@@ -139,12 +132,9 @@ class HandoffStagingServiceTest {
 
   @Test
   void shouldNotConsumeUnderADifferentSubject() {
-    // Given
     String handoffId = service.stage("owner", HandoffKind.BLUEPRINT, "{\"total\":1}");
 
-    // When / Then
     assertThat(consume("intruder", handoffId)).isEmpty();
-    // The rightful owner can still consume it (the foreign read did not delete it).
     assertThat(consume("owner", handoffId)).isPresent();
   }
 
@@ -154,11 +144,8 @@ class HandoffStagingServiceTest {
   }
 
   /**
-   * Audit HIGH-2: the staging store shares the Redis instance that holds the frontend's Spring
-   * Session store, and that instance runs {@code --maxmemory-policy noeviction} - reaching the
-   * ceiling refuses writes, so the symptom is that nobody can log in. Staging had no per-subject
-   * quota at all: only a rate limit of 30 requests/minute against a 30-minute TTL, i.e. up to 900
-   * live entries of up to the 2 MiB ingress cap each.
+   * Staging beyond the per-subject cap evicts the oldest handoffs, bounding the memory used in the
+   * shared, non-evicting Redis instance.
    */
   @Test
   void shouldEvictTheOldestHandoffsBeyondThePerSubjectCap() {

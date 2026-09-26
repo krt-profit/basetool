@@ -24,6 +24,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,11 +39,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Integration tests for the configured state of the {@code /actuator/prometheus} scrape chain
- * (REQ-OBS-005, epic #936 Phase 1): only the dedicated basic-auth identity may read the metrics
- * payload — anonymous callers, wrong passwords, raw bearer headers and even fully valid JWT
- * identities are rejected — while {@code /actuator/health} stays public for the Docker HEALTHCHECK.
- * Test-only credentials, never production values.
+ * Integration tests for the configured {@code /actuator/prometheus} scrape chain (REQ-OBS-005):
+ * only the dedicated basic-auth identity may read metrics, every other caller including valid JWTs
+ * is rejected, and {@code /actuator/health} stays public. Uses test-only credentials.
  */
 @SpringBootTest(
     properties = {
@@ -64,7 +63,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldReject401WithoutCredentials() throws Exception {
-    // Given / When / Then
     mockMvc
         .perform(get(PROMETHEUS))
         .andExpect(status().isUnauthorized())
@@ -73,8 +71,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldServeMetricsWithValidBasicCredentials() throws Exception {
-    // Given / When / Then: the payload carries the module tag and the Caffeine cache meters
-    // (backend `cities` cache) — the epic's original trigger.
     mockMvc
         .perform(get(PROMETHEUS).with(httpBasic("metrics-scraper", "test-scrape-password")))
         .andExpect(status().isOk())
@@ -83,9 +79,19 @@ class MonitoringScrapeSecurityConfigTest {
         .andExpect(content().string(containsString("cache=\"cities\"")));
   }
 
+  /**
+   * A state-changing request is refused by CSRF even with the scrape identity, and sets no cookie.
+   */
+  @Test
+  void shouldRejectPostWithValidBasicCredentialsByCsrf() throws Exception {
+    mockMvc
+        .perform(post(PROMETHEUS).with(httpBasic("metrics-scraper", "test-scrape-password")))
+        .andExpect(status().isForbidden())
+        .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+  }
+
   @Test
   void shouldReject401WithWrongPassword() throws Exception {
-    // Given / When / Then
     mockMvc
         .perform(get(PROMETHEUS).with(httpBasic("metrics-scraper", "wrong-password")))
         .andExpect(status().isUnauthorized());
@@ -93,8 +99,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldReject401WithRawBearerHeader() throws Exception {
-    // Given / When / Then: the scrape chain has no bearer-token support — a raw Authorization:
-    // Bearer header is simply not an authentication here and the basic entry point answers 401.
     mockMvc
         .perform(get(PROMETHEUS).header(HttpHeaders.AUTHORIZATION, "Bearer some-token"))
         .andExpect(status().isUnauthorized());
@@ -102,8 +106,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldReject403WithValidJwtIdentity() throws Exception {
-    // Given / When / Then: even a fully authenticated Keycloak user (valid JWT) must not read the
-    // metrics payload — only the dedicated scrape identity counts (REQ-OBS-005).
     mockMvc
         .perform(get(PROMETHEUS).with(jwt().jwt(j -> j.subject("some-user"))))
         .andExpect(status().isForbidden());
@@ -111,7 +113,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldKeepHealthEndpointPublic() throws Exception {
-    // Given / When / Then: regression guard — the Docker HEALTHCHECK relies on anonymous access.
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
   }
 }

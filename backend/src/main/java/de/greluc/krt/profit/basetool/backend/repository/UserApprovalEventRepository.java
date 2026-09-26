@@ -32,26 +32,20 @@ import org.springframework.stereotype.Repository;
 public interface UserApprovalEventRepository extends JpaRepository<UserApprovalEvent, UUID> {
 
   /**
-   * Bulk-deletes every audit row whose subject is the given user. Called by the user-delete flow so
-   * hard-deleting a since-removed (no-longer-in-Keycloak) account is not blocked by the NOT-NULL
-   * {@code user_id} foreign key of this V173 audit table, which carries no {@code ON DELETE} clause
-   * (Postgres {@code NO ACTION}). The row's whole purpose is "this user's registration was
-   * decided", so it is removed together with the user rather than orphaned.
+   * Bulk-deletes every approval audit row whose subject is the given user, so deleting that user is
+   * not blocked by the {@code user_id} foreign key.
    *
-   * @param userId the subject user whose audit rows to delete; never {@code null}.
+   * @param userId the subject user whose audit rows to delete; never {@code null}
    */
   @Modifying
   @Query("DELETE FROM UserApprovalEvent e WHERE e.userId = :userId")
   void deleteByUserId(@Param("userId") UUID userId);
 
   /**
-   * Bulk-nulls the {@code decided_by_id} attribution on every audit row decided by the given admin.
-   * Called by the user-delete flow when the deleted account had itself decided registrations, so
-   * the still-valid audit of those <em>other</em> users survives but drops its now-gone decider
-   * reference — matching the entity's nullable "system action" contract — instead of blocking the
-   * delete on the {@code decided_by_id} foreign key (also no {@code ON DELETE} clause).
+   * Bulk-nulls {@code decided_by_id} on every audit row decided by the given admin, so deleting
+   * that admin keeps the other users' audit rows and is not blocked by the foreign key.
    *
-   * @param adminId the deciding admin being deleted; never {@code null}.
+   * @param adminId the deciding admin being deleted; never {@code null}
    */
   @Modifying
   @Query("UPDATE UserApprovalEvent e SET e.decidedById = null WHERE e.decidedById = :adminId")

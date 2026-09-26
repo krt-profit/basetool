@@ -39,11 +39,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface of the refinery screenshot import (#434, epic #439): accepts the desktop extractor's
- * {@code RefineryExtract} JSON and returns a non-persisted {@link RefineryImportDraftDto} the
- * frontend pours into the existing create form. Deliberately separate from {@link
- * RefineryOrderController} — this controller never persists anything; saving the reviewed draft
- * still goes through the untouched {@code POST /api/v1/refinery-orders}.
+ * REST surface of the refinery screenshot import: turns the desktop extractor's {@code
+ * RefineryExtract} JSON into a non-persisted {@link RefineryImportDraftDto} for the create form.
+ *
+ * <p>Never persists anything; saving the reviewed draft goes through {@link
+ * RefineryOrderController}.
  */
 @RestController
 @RequestMapping("/api/v1/refinery-orders")
@@ -54,14 +54,15 @@ public class RefineryImportController {
   private final RefineryImportService refineryImportService;
 
   /**
-   * Builds a best-effort draft from an uploaded {@code RefineryExtract} (frozen contract v1, plan
-   * §5). Envelope-level problems (wrong {@code schemaVersion}, non-SETUP panel, empty orders)
-   * reject with 400 problem+json; content-level problems (unmatched names, skipped or un-quoted
-   * rows, checksum mismatches) always return 200 with a draft plus issues.
+   * Builds a best-effort draft from an uploaded {@code RefineryExtract}.
    *
-   * @param owner the acting member; for an ingest-gateway call this is the member it acts for
+   * <p>Envelope-level problems (wrong {@code schemaVersion}, non-SETUP panel, empty orders) reject
+   * with 400; content-level problems (unmatched names, skipped rows, checksum mismatches) return
+   * 200 with the draft plus issues.
+   *
+   * @param owner the acting member, or the member an ingest-gateway call acts for
    * @param extract the validated extract payload
-   * @return the draft order with issues and match counters — never persisted
+   * @return the draft order with issues and match counters; never persisted
    */
   @PostMapping(value = "/import-extract", consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("isAuthenticated()")
@@ -78,11 +79,6 @@ public class RefineryImportController {
   })
   public RefineryImportDraftDto importExtract(
       @CurrentUserId UUID owner, @RequestBody @Valid @NotNull RefineryExtractDto extract) {
-    // Plain @CurrentUserId again. When the ingest gateway calls this, ActingMemberFilter has
-    // already
-    // replaced the security identity with the member it acts for (ADR-0129), so there is nothing
-    // special to do here — which is exactly the point of doing it in the filter rather than at the
-    // call site: EVERY identity consumer sees the member, not just the two that were remembered.
     return refineryImportService.buildDraft(extract, owner);
   }
 }

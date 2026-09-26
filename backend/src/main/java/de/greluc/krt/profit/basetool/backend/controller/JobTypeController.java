@@ -47,12 +47,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the job-type reference table. Read is public; mutations are OFFICER/ADMIN;
- * activate is ADMIN-only.
+ * REST surface for the job-type reference table. Reads need authentication; mutations are
+ * OFFICER/ADMIN; activate is ADMIN-only.
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
+ * gate takes precedence (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/api/v1/job-types")
@@ -94,8 +93,6 @@ public class JobTypeController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public JobTypeDto createJobType(@RequestBody @Valid JobTypeDto jobTypeDto) {
     JobType toCreate = jobTypeMapper.toEntity(jobTypeDto);
-    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
-    // row.
     toCreate.setId(null);
     toCreate.setVersion(null);
     return jobTypeMapper.toDto(jobTypeService.createJobType(toCreate));

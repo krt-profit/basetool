@@ -25,20 +25,14 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 
 /**
- * Provenance descriptor for one source screenshot of an extracted order ({@code sourceImages[]} in
- * the frozen contract, plan §5). The backend never sees the image itself, only this metadata the
- * desktop extractor recorded; {@code capturedAt} is the one field the import consumes beyond
- * display — the latest capture of an order becomes the draft's {@code startedAt}
- * (REQ-REFINERY-017).
+ * Metadata of one source screenshot of an extracted order; the latest {@code capturedAt} becomes
+ * the draft's {@code startedAt} (REQ-REFINERY-017).
  *
- * @param name screenshot file name on the user's machine, e.g. {@code "frame_213823.png"}
- * @param width capture width in pixels (native, before client-side normalization)
+ * @param name screenshot file name on the user's machine
+ * @param width capture width in pixels
  * @param height capture height in pixels
- * @param cropMode how the work-order panel was isolated: {@code vlm} (model-located), {@code
- *     manual} (user-drawn crop) or {@code precropped} (input already was a panel-only image)
- * @param capturedAt UTC capture instant the extractor derived from the screenshot file (name
- *     timestamp, else file modified time); optional additive v1 field (ADR-0008), {@code null} when
- *     the producer is older or the capture time was undeterminable
+ * @param cropMode how the panel was isolated: {@code vlm}, {@code manual} or {@code precropped}
+ * @param capturedAt UTC capture instant, or {@code null} when unknown
  */
 public record RefineryExtractImageDto(
     @NotNull @Size(max = 255) String name,

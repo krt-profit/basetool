@@ -47,31 +47,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
- * Guards the {@code @Order} on {@link GlobalExceptionHandler} against a second, competing
- * {@code @ControllerAdvice}.
+ * Verifies that {@link GlobalExceptionHandler} wins over Spring Boot's {@code @Order(0)}
+ * problem-details advice for every exception type both declare.
  *
- * <p>{@code application.yml} sets {@code spring.mvc.problemdetails.enabled: true}, so Spring Boot
- * registers its own {@code ProblemDetailsExceptionHandler} — a {@link
- * ResponseEntityExceptionHandler} subclass annotated {@code @ControllerAdvice} and
- * {@code @Order(0)}. An unordered {@code @ControllerAdvice} sits at {@code LOWEST_PRECEDENCE} and
- * loses to it for every exception type both declare, which shipped to production: {@code
- * MethodArgumentNotValidException} was answered by Spring's advice with a bare {@link
- * org.springframework.http.ProblemDetail} — no {@code code}, no {@code correlationId}, no {@code
- * fieldErrors}, untranslated {@code "Invalid request content."} — so the frontend could not place
- * an inline error at the offending field and {@link
- * GlobalExceptionHandler#handleValidationExceptions}'s diagnostic WARN log never ran. A bank
- * employee confirming a booking request saw only "some fields are invalid", and the production log
- * held nothing at all.
- *
- * <p>{@link GlobalExceptionHandlerTest} cannot catch this: it invokes the handler methods directly
- * and so is blind to which advice bean Spring MVC would actually pick. This test instead drives
- * Spring's own advice discovery ({@link ControllerAdviceBean#findAnnotatedBeans}, which sorts by
- * order) and reproduces {@code ExceptionHandlerExceptionResolver}'s first-advice-wins lookup across
- * the sorted list.
- *
- * <p>Spring Boot's {@code ProblemDetailsExceptionHandler} is package-private and cannot be
- * instantiated here, so {@link CompetingSpringAdvice} stands in for it with the same shape and the
- * same {@code @Order(0)}.
+ * <p>Drives Spring's own advice discovery and first-advice-wins lookup; {@link
+ * CompetingSpringAdvice} stands in for Spring Boot's package-private handler.
  */
 class GlobalExceptionHandlerAdviceOrderTest {
 
@@ -92,7 +72,6 @@ class GlobalExceptionHandlerAdviceOrderTest {
    */
   private static List<ControllerAdviceBean> sortedAdvice(
       AnnotationConfigApplicationContext context) {
-    // Registered competitor-first so a passing result can never be an artefact of definition order.
     context.registerBean("competingSpringAdvice", CompetingSpringAdvice.class);
     context.registerBean(
         "globalExceptionHandler",

@@ -38,14 +38,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * The mission page's two free-text user autocompletes (participant add, party lead) announce an
- * overflow instead of looking complete (REQ-FE-016).
+ * Verifies that the mission page's two user autocompletes (participant add, party lead) render at
+ * most 50 rows and show the "keep typing" hint when a 51st arrives (REQ-FE-016).
  *
- * <p>The {@code /users/search} relay fetches {@code PickerSearch.PAGE_SIZE} (51) rows; the lists
- * render 50 and show the "keep typing" row when the 51st arrives. The e2e realm has a handful of
- * users, so the relay is answered by a Playwright route with a synthetic roster: what is under test
- * is the browser half — the render cap and the hint — while the page size itself is pinned by
- * {@code UserProxyControllerTest} and the cap parity by {@code PickerSearchLimitsParityTest}.
+ * <p>The {@code /users/search} relay is answered by a Playwright route with a synthetic roster.
  */
 @Tag("e2e")
 class MissionUserAutocompleteOverflowE2eTest {
@@ -195,7 +191,6 @@ class MissionUserAutocompleteOverflowE2eTest {
         assertThat(page.locator("#party-lead-search-results > div:not(.autocomplete-notice)"))
             .hasCount(RENDER_CAP);
 
-        // A result that fits renders whole, with no hint.
         context.unrouteAll();
         stubUserSearch(context, 3);
         page.locator("#party-lead-search-input").fill("Overflow P");

@@ -25,21 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
-// covers REQ-MISSION-001 (whole-aUEC HALF_UP display rounding) - see
-// docs/specs/whole-number-amounts.md
 /**
- * Unit tests for {@link MoneyFormat} — the Thymeleaf-facing rounding helper used by the operation
- * and mission detail templates to render aUEC totals without decimal places. The tests pin two
- * properties that the templates rely on:
+ * Unit tests for {@link MoneyFormat}, the template helper rendering aUEC totals without decimals.
  *
  * <ol>
- *   <li><b>HALF_UP semantics, not HALF_EVEN.</b> The whole point of this bean is to bypass the
- *       default {@link java.text.DecimalFormat} rounding mode that Thymeleaf's {@code
- *       #numbers.formatInteger} would otherwise apply, so the boundary cases that distinguish the
- *       two modes ({@code 0.5}, {@code 1.5}, {@code 2.5}, {@code 3.5}) are exercised explicitly.
- *   <li><b>Null safety.</b> Templates pass nullable BigDecimals through without an {@code th:if}
- *       guard in a few places; the bean must mirror Thymeleaf's "null renders as empty" contract
- *       instead of throwing an NPE during render.
+ *   <li>Rounding is HALF_UP, not HALF_EVEN, checked at {@code 0.5}, {@code 1.5}, {@code 2.5} and
+ *       {@code 3.5}.
+ *   <li>A {@code null} input renders as empty instead of throwing.
  * </ol>
  */
 class MoneyFormatTest {

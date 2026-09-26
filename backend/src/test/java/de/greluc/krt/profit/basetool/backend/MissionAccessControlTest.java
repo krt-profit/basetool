@@ -85,13 +85,8 @@ class MissionAccessControlTest {
   private User officerUser;
 
   /**
-   * An ordinary member who signs up for the mission - the counterpart to {@link #officerUser}.
-   *
-   * <p>Named {@code guestUser} until ADR-0159, when the tier it referred to stopped existing. It
-   * was always a real {@code User} row with an IRIDIUM membership, and its tokens now carry {@code
-   * ROLE_KRT_MEMBER} explicitly: {@code default-roles-iri} grants it to every account Keycloak
-   * creates, so a token without it models an account shape that cannot occur, and the mission gates
-   * ask for membership since REQ-SEC-007.
+   * An ordinary member who signs up for the mission, the counterpart to {@link #officerUser}. Its
+   * tokens carry {@code ROLE_KRT_MEMBER}, as every real account's do.
    */
   private User memberUser;
 
@@ -159,10 +154,7 @@ class MissionAccessControlTest {
         .andExpect(status().isUnauthorized());
   }
 
-  /**
-   * The next-mission banner used to answer an anonymous caller (with 204 on an empty database).
-   * REQ-SEC-052 closed the whole mission read surface, so it is turned away at the entry point.
-   */
+  /** Verifies that the next-mission banner refuses an anonymous caller (REQ-SEC-052). */
   @Test
   void testGetNextMission_Unauthenticated_Refused() throws Exception {
     mockMvc.perform(get("/api/v1/missions/next")).andExpect(status().isUnauthorized());
@@ -183,7 +175,6 @@ class MissionAccessControlTest {
                     .jwt(builder -> builder.subject(memberUser.getId().toString()))
                     .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
-    // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
@@ -216,7 +207,6 @@ class MissionAccessControlTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // The member joins
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
             .with(
@@ -230,7 +220,6 @@ class MissionAccessControlTest {
     userRepository.save(otherMember);
     saveIridiumMembership(otherMember);
 
-    // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
@@ -243,7 +232,6 @@ class MissionAccessControlTest {
             + testJobType.getId()
             + "\", \"comment\": \"Malicious\", \"version\": 0}";
 
-    // The other member tries to edit the first one's row -> forbidden
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
@@ -264,7 +252,6 @@ class MissionAccessControlTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // The member joins
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
             .with(
@@ -272,7 +259,6 @@ class MissionAccessControlTest {
                     .jwt(builder -> builder.subject(memberUser.getId().toString()))
                     .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
-    // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
@@ -285,7 +271,6 @@ class MissionAccessControlTest {
             + testJobType.getId()
             + "\", \"comment\": \"Approved\", \"version\": 0}";
 
-    // Officer updates the member's row
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
@@ -318,7 +303,6 @@ class MissionAccessControlTest {
                     .jwt(builder -> builder.subject(memberUser.getId().toString()))
                     .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
-    // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
@@ -326,11 +310,6 @@ class MissionAccessControlTest {
             .findFirst()
             .orElseThrow();
 
-    // The PLANNED job type is the organisation's assignment - it carries the Einsatzleiter
-    // designation - so a self-editing participant who cannot manage the mission is refused it
-    // (audit MEDIUM-9). This test asserted the opposite until then: it drove a role-less setting
-    // their OWN planned job type and expected 200, which is precisely the self-designation the
-    // single-lead rule then held against the real leader.
     String plannedAttempt =
         String.format(
             "{\"desiredMissionJobTypeId\": \"%s\", \"plannedMissionJobTypeId\": \"%s\","
@@ -348,7 +327,6 @@ class MissionAccessControlTest {
                 .content(plannedAttempt))
         .andExpect(status().isForbidden());
 
-    // The rest of the payload is still the participant's own to edit.
     String ownFieldsUpdate =
         String.format(
             "{\"desiredMissionJobTypeId\": \"%s\", \"comment\": \"Full Update\","
@@ -366,7 +344,6 @@ class MissionAccessControlTest {
                 .content(ownFieldsUpdate))
         .andExpect(status().isOk());
 
-    // Verification via Repository
     de.greluc.krt.profit.basetool.backend.model.MissionParticipant participant =
         missionRepository.findById(mission.getId()).orElseThrow().getParticipants().stream()
             .filter(mp1 -> mp1.getUser().getId().equals(memberUser.getId()))
@@ -382,10 +359,8 @@ class MissionAccessControlTest {
   }
 
   /**
-   * Recording an external participant is a member's action now (ADR-0159, decision D4).
-   *
-   * <p>The endpoint kept its shape — a {@code guestName} without a {@code userId} — and any member
-   * who can see the mission may still use it. What went is the caller who had no account at all.
+   * Verifies that recording an external participant refuses an anonymous caller; it is a member
+   * action (ADR-0159).
    */
   @Test
   void testAddExternalParticipant_Unauthenticated_Refused() throws Exception {

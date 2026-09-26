@@ -45,13 +45,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the admin announcement-management page ({@code /admin/announcement}).
- *
- * <p>The announcement is a single shared record across the squadron — the page reads it via the
- * {@code /admin} endpoint (returns the record even when no public announcement is currently
- * published) and exposes Create/Update/Delete actions. PUT carries an optimistic-lock version so a
- * second admin editing the same announcement concurrently sees a 409 toast rather than silently
- * overwriting the other person's text.
+ * Controller for the admin announcement page ({@code /admin/announcement}): reads the single shared
+ * announcement and offers create, update and delete. Updates carry the optimistic-lock version.
  */
 @Controller
 @UsesLayoutModel
@@ -129,14 +124,9 @@ public class AdminAnnouncementPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #updateAnnouncement} — routed here ahead of the classic handler
-   * by the {@code X-Requested-With} header so the no-JS form keeps its redirect fallback.
-   *
-   * <p>Persists the new text, then re-reads the admin record to obtain the bumped optimistic-lock
-   * version and returns it as {@code {"version": <n>}} so the page can write it back into the
-   * hidden version input (the next edit would otherwise 409). A backend conflict is relayed
-   * verbatim as {@code application/problem+json} (carrying the {@code OPTIMISTIC_LOCK} code) so the
-   * shared {@code krtFetch} client shows the reload-confirm prompt instead of a full reload.
+   * AJAX variant of {@link #updateAnnouncement}, selected by the {@code X-Requested-With} header.
+   * Returns the bumped version so the page can update its hidden input; backend errors are relayed
+   * as {@code application/problem+json}.
    *
    * @param request JSON body with {@code content} (required) and optional {@code version}
    * @return {@code 200 {"version": <n>}} on success, the relayed backend status on
@@ -190,9 +180,7 @@ public class AdminAnnouncementPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #deleteAnnouncement}. On success the page clears its form in
-   * place (empty text, version reset to the create state) rather than reloading; a backend failure
-   * is relayed so the client surfaces an inline toast.
+   * AJAX variant of {@link #deleteAnnouncement}; backend failures are relayed for an inline toast.
    *
    * @return {@code 200} on success, the relayed backend status on failure, {@code 500} on an
    *     unexpected error

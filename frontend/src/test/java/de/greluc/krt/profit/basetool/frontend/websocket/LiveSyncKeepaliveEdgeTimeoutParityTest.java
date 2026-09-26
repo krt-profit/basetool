@@ -31,20 +31,8 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@link LiveSyncWebSocketHandler#KEEPALIVE_INTERVAL} against the edge proxy's {@code
- * proxy_read_timeout}, the number it exists to stay under.
- *
- * <p>The two live in different worlds — a Java constant and an nginx directive, one deployed with
- * the application and one with the proxy — and nothing connects them but intent. That is exactly
- * how the defect this test guards arose: the timeout was set at 90 s and the socket sent nothing at
- * all, so every idle {@code /ws/sync} connection was closed on a 90-second cadence, each close
- * costing a reconnect, one authorization probe per subscribed room and a full page-wide resync.
- * Nothing failed, nothing alerted, and it read from the outside as an unexplained 403 every ninety
- * seconds.
- *
- * <p>Asserting a 2x margin rather than mere inequality: one lost or delayed tick must not be enough
- * to reach the ceiling, and a keepalive that only just fits is a keepalive that stops working the
- * first time a sweep runs late.
+ * Verifies that {@link LiveSyncWebSocketHandler#KEEPALIVE_INTERVAL} is at most half the edge
+ * proxy's {@code proxy_read_timeout}, so idle sockets are never closed by the proxy.
  */
 class LiveSyncKeepaliveEdgeTimeoutParityTest {
 
@@ -52,12 +40,8 @@ class LiveSyncKeepaliveEdgeTimeoutParityTest {
   private static final Path EDGE_NGINX_CONF = Path.of("..", "docker", "edge", "nginx.conf");
 
   /**
-   * Matches the http-level {@code proxy_read_timeout 90s;} directive and captures the seconds.
-   *
-   * <p>The digit run is bounded at nine — some 31 years, far above any timeout anyone would write —
-   * so the capture can never overflow {@link Long#parseLong(String)}. A longer run simply does not
-   * match, and the {@code find()} assertion below then fails saying the directive was not found,
-   * which is a better answer than a {@code NumberFormatException} stack trace.
+   * Matches the http-level {@code proxy_read_timeout <n>s;} directive and captures up to nine
+   * digits of seconds.
    */
   private static final Pattern PROXY_READ_TIMEOUT =
       Pattern.compile("^\\s*proxy_read_timeout\\s+(\\d{1,9})s\\s*;", Pattern.MULTILINE);

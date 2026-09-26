@@ -92,8 +92,6 @@ class IngestServiceTest {
 
   @Test
   void ingestRefinery_logsThePayloadShapeWithoutAnyScreenRead() {
-    // The gateway interprets nothing, so these counts are the only handle on "what did the client
-    // actually push?". No material name and no quantity is logged — only structure.
     when(backendImportClient.forwardRefineryExtract(any(), any(), any()))
         .thenReturn("{\"draft\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-1");
@@ -116,7 +114,6 @@ class IngestServiceTest {
 
   @Test
   void ingestRefinery_sanitisesClientSuppliedProvenanceBeforeLoggingIt() {
-    // `tool` is free text from an internet-facing client; a newline in it would forge a log line.
     when(backendImportClient.forwardRefineryExtract(any(), any(), any()))
         .thenReturn("{\"draft\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-1");
@@ -149,8 +146,6 @@ class IngestServiceTest {
                 service.ingestBlueprint("sub-1", null, new byte[] {1, 2, 3}, BLUEPRINT_PROVENANCE));
 
     assertThat(events).hasSize(1);
-    // The provenance triple rides along: this path used to log only the byte count, which left a
-    // structurally odd blueprint export indistinguishable from a normal one (REQ-INGEST-011).
     assertThat(events.getFirst().getFormattedMessage())
         .isEqualTo(
             "Relaying blueprint export (3 bytes, schemaVersion=1, tool=krt-extractor/1.2.3)");

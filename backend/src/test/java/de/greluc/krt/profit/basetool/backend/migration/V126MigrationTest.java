@@ -43,8 +43,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-// The owner rows this class inserts must not survive it: the test database is shared across the
-// suite, and a leftover login-capable app_user shifts the totals other classes assert over.
 @Transactional
 class V126MigrationTest {
 
@@ -57,11 +55,6 @@ class V126MigrationTest {
     assertEquals("bigint", types.get("version"));
     assertEquals("timestamp with time zone", types.get("created_at"));
     assertEquals("timestamp with time zone", types.get("updated_at"));
-    // V235 (issue #1638) recast owner_user_id to UUID so it can carry a foreign key to
-    // app_user(id);
-    // V126 created it as VARCHAR(64). The later migration wins -- this asserts the schema as it
-    // actually stands after the full chain, which is what ddl-auto=validate checks the entity
-    // against.
     assertEquals("uuid", types.get("owner_user_id"));
     assertEquals("character varying", types.get("product_key"));
     assertEquals("character varying", types.get("product_name"));
@@ -99,10 +92,7 @@ class V126MigrationTest {
   }
 
   /**
-   * Creates an {@code app_user} row and returns its id.
-   *
-   * <p>Needed since V235: {@code owner_user_id} is a foreign key to {@code app_user(id)}, so a
-   * blueprint for an invented owner no longer inserts at all.
+   * Creates an {@code app_user} row to satisfy the {@code owner_user_id} foreign key.
    *
    * @return the new user's id, usable as an {@code owner_user_id}
    */

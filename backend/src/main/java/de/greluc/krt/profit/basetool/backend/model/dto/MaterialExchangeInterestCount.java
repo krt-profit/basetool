@@ -22,11 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * A grouped interest-count projection — one row per offer carrying how many members have registered
- * interest. Populated by a JPQL constructor expression so the board list can attach the "N
- * Interessenten" count to every offer in a single grouped query instead of one count per offer (no
- * N+1). Carries only the offer id and the count — never any interessent identity, honouring the
- * owner-only-names anonymity rule (REQ-MARKET-006).
+ * Grouped interest count per Materialbörse offer, filled by a JPQL constructor expression; carries
+ * no interessent identity (REQ-MARKET-006).
  *
  * @param offerId the offer the count belongs to.
  * @param count the number of members who have registered interest on that offer.

@@ -1,7 +1,3 @@
-/* Page stylesheet of templates/operation-detail.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
@@ -41,14 +37,6 @@
         min-width: 250px;
     }
 
-    /* =========================================================
-   Operation-Detail Tab Layout (final Einsatz design, #818):
-   sticky head + facts bar + tab nav, five panes. Mirrors the
-   mission-detail tab shell (Variante B). The shell/panel CSS is
-   duplicated here intentionally — extracting it into a shared
-   stylesheet would touch the shipped mission page; kept local
-   to keep this change frontend-only and regression-free.
-   ========================================================= */
     html,
     body {
         margin: 0;
@@ -62,10 +50,6 @@
         box-sizing: border-box;
         padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
     }
-    /* The phone-class reserve for this page lives in styles.css's `width <= 768px`
-   block, with every other page's, written `div.page-wrapper` so it out-specifies this
-   rule — head.html renders the per-page style block after styles.css, so an equal-specificity
-   override there loses the source-order tie. The DESKTOP reserve stays here. */
     .mission-head-sticky {
         position: sticky;
         top: 0;
@@ -200,7 +184,6 @@
         color: var(--color-primary);
     }
 
-    /* Finance summary strip (matches the mission Finanzen tab). */
     .sumstrip {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -249,7 +232,6 @@
         margin-top: 2px;
     }
 
-    /* "Ergebnis je Einsatz" proportional result bars (Übersicht). */
     .holder-row {
         display: flex;
         align-items: center;
@@ -296,7 +278,6 @@
         font-size: 0.85rem;
     }
 
-    /* Markdown description editor (Verwaltung): Bearbeiten / Vorschau + formatting toolbar. */
     .md-toolbar {
         display: flex;
         gap: 6px;
@@ -325,11 +306,6 @@
         font-style: italic;
     }
 
-    /* =========================================================
-   Auszahlungen panel — Payout table layout (preserved verbatim
-   from the previous column layout; the table itself is unchanged,
-   only its container moved into the Auszahlung tab).
-   ========================================================= */
     .payout-table {
         margin-top: 1rem;
     }

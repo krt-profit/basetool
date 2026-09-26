@@ -58,17 +58,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Renders the bank account statement PDF (REQ-BANK-014, epic #556 Phase 3): for a caller-chosen
- * period it shows the opening balance, every posting of the account in chronological order with a
- * running balance and the booking holder (derived from the holder ledger by amount sign, ADR-0039),
- * and the closing balance. Since holders are decoupled from accounts there is no per-account
- * closing holder distribution any more (REQ-BANK-003). Statements are computed on demand from the
- * append-only ledger and never persisted (owner decision on spec question 4); each export writes
- * one {@code STATEMENT_EXPORTED} audit event carrying the period (REQ-BANK-012).
+ * Renders the account statement PDF (REQ-BANK-014): opening balance, every posting of the period
+ * with running balance and booking holder, and closing balance.
  *
- * <p>Labels come from the backend message bundle and are German by design — the documents are
- * org-internal DAS KARTELL paperwork. The visual layer (Lato, dark background, orange accents) is
- * the shared {@link KrtPdfSupport}.
+ * <p>Computed on demand from the ledger and never persisted; each export writes a {@code
+ * STATEMENT_EXPORTED} audit event (REQ-BANK-012).
  */
 @Service
 @RequiredArgsConstructor
@@ -86,14 +80,12 @@ public class BankStatementReportService {
   private final MessageSource messageSource;
 
   /**
-   * Generates the full bank-staff statement PDF (with the holder/Halter column) for one account and
-   * period and records the export. Equivalent to {@link #generateStatement(UUID, Instant, Instant,
-   * ZoneId, boolean)} with {@code redactHolders = false}.
+   * Generates the full staff statement PDF, including the holder column, and records the export.
    *
    * @param accountId the account
    * @param from period start (inclusive)
    * @param to period end (inclusive); must not be before {@code from}
-   * @param userZone the zone to render timestamps in; {@code null} falls back to UTC
+   * @param userZone the rendering zone; {@code null} falls back to UTC
    * @return the PDF bytes
    * @throws NotFoundException when the account is unknown
    * @throws BadRequestException when the period is inverted
@@ -109,22 +101,15 @@ public class BankStatementReportService {
 
   /**
    * Generates the statement PDF for one account and period and records the export in the audit log.
-   * Write transaction on purpose: the audit insert runs {@code MANDATORY} inside it.
    *
-   * <p>When {@code redactHolders} is {@code true} only the player-custody ("Halter") column is
-   * omitted — the redacted variant the org-unit-aware seam ({@code OrgUnitBankAccessService}) hands
-   * to org-unit viewers of an account they may see but do not staff (REQ-BANK-038): they keep the
-   * full history (date / type / Quell-/Zielkonto / amount / running balance, plus the
-   * Begr&uuml;ndung and Notiz in the per-booking sub-row) — including the counter-account and the
-   * counterparty Einzahler/Empf&auml;nger (REQ-BANK-044, owner decision) — but not who physically
-   * holds the money. Bank staff pass {@code false} and additionally get the Halter column
-   * (REQ-BANK-014).
+   * <p>With {@code redactHolders} only the holder ("Halter") column is omitted, the variant for
+   * org-unit viewers (REQ-BANK-038).
    *
    * @param accountId the account
    * @param from period start (inclusive)
    * @param to period end (inclusive); must not be before {@code from}
-   * @param userZone the zone to render timestamps in; {@code null} falls back to UTC
-   * @param redactHolders {@code true} to omit the holder/Halter column (org-unit viewers)
+   * @param userZone the rendering zone; {@code null} falls back to UTC
+   * @param redactHolders {@code true} to omit the holder column
    * @return the PDF bytes
    * @throws NotFoundException when the account is unknown
    * @throws BadRequestException when the period is inverted
@@ -145,16 +130,11 @@ public class BankStatementReportService {
     BigDecimal opening = bankPostingRepository.accountBalanceBefore(accountId, from);
     List<BankBookingRow> rows = bankPostingRepository.findBookingsInPeriod(accountId, from, to);
     List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
-    // The holder column is redacted for org-unit viewers, so the holder-leg query is skipped too.
     Map<UUID, List<BankHolderLeg>> holderLegsByTx =
         (redactHolders || txIds.isEmpty())
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    // Account legs back the "Quell-/Zielkonto" column's transfer counter-account (REQ-BANK-044).
-    // Fetched for both variants: the member-facing redacted statement keeps that column too — only
-    // the aUEC-custody Halter is redacted now (REQ-BANK-038 amended), not the
-    // counter-account/party.
     Map<UUID, List<BankCounterLeg>> accountLegsByTx =
         txIds.isEmpty()
             ? Map.of()
@@ -224,13 +204,6 @@ public class BankStatementReportService {
 
       KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.statement.bookings"));
 
-      // Org-unit viewers get the same history without the player-custody "Halter" column
-      // (REQ-BANK-038): only the aUEC-custody holder is redacted. The "Quell-/Zielkonto" column
-      // (the
-      // transfer counter-account, or the Einzahler/Empfänger of a deposit/withdrawal, REQ-BANK-044)
-      // is kept for them too (owner decision). The Begründung + Notiz of each booking move into an
-      // indented sub-row beneath the row (REQ-BANK-045), reason first, so the main row stays
-      // narrow.
       int columns = redactHolders ? 5 : 6;
       PdfPTable table = new PdfPTable(columns);
       table.setWidthPercentage(100);
@@ -264,11 +237,6 @@ public class BankStatementReportService {
                   : matchHolderHandle(
                       holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
                       row.amount().signum());
-          // Humanised like the Gegenpartei column four lines below, and for the same reason.
-          // bank_holder.user_id is ON DELETE SET NULL, so after a deletion the display name falls
-          // back to the handle snapshot -- which a granted erasure has rewritten. Rendering it raw
-          // put #ANONYMISED# in the Halter column while the next column on the same row already
-          // read "Anonymisiert" (REQ-SEC-062).
           KrtPdfSupport.addTableCell(
               table,
               HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
@@ -284,9 +252,6 @@ public class BankStatementReportService {
         KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running), bg, true);
         String reason = row.justification() != null ? row.justification() : "";
         String note = row.note() != null ? row.note() : "";
-        // REQ-BANK-054: the employee's own note is internal. The Halter-redacted member statement
-        // (REQ-BANK-038) is the same generator with redactHolders=true, so it is dropped there for
-        // the same reason the Halter column is.
         String staffNote = redactHolders || row.staffNote() == null ? "" : row.staffNote();
         if (!reason.isEmpty() || !note.isEmpty() || !staffNote.isEmpty()) {
           KrtPdfSupport.addDetailSubRow(
@@ -310,16 +275,12 @@ public class BankStatementReportService {
   }
 
   /**
-   * Renders the "Quell-/Zielkonto" cell for a statement row (REQ-BANK-044) — the far side of the
-   * booking: for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler /
-   * Empf&auml;nger) with their org unit in parentheses; for a {@code TRANSFER} the counter
-   * account's number (the account leg on the other account); empty for every other type or when
-   * nothing was recorded. The type column and the amount sign already convey the direction, so no
-   * arrow glyph is rendered (WinAnsi carries no arrow glyph either).
+   * Renders the "Quell-/Zielkonto" cell of a statement row (REQ-BANK-044): the counterparty with
+   * org unit for a {@code DEPOSIT}/{@code WITHDRAWAL}, the counter account's number for a {@code
+   * TRANSFER}, empty otherwise.
    *
    * @param row the statement row
-   * @param accountLegsByTx the page's account legs grouped by transaction (for transfer counter
-   *     accounts)
+   * @param accountLegsByTx the page's account legs grouped by transaction
    * @return the cell text, never {@code null}
    */
   private static @NotNull String counterpartyCell(
@@ -331,9 +292,6 @@ public class BankStatementReportService {
         if (row.counterpartyHandle() == null) {
           yield "";
         }
-        // A counterparty whose handle an Art. 17 request erased renders as the placeholder rather
-        // than as the raw sentinel (REQ-SEC-062). The booking itself is untouched -- amount, date
-        // and account all stand; only the name is gone.
         String handle = HandleAnonymisation.humanise(row.counterpartyHandle(), anonymisedLabel);
         yield row.counterpartyOrgUnitName() == null
             ? handle

@@ -56,25 +56,10 @@ import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.i18n.CookieLocaleResolver;
 
 /**
- * Pins the properties that decide whether an iPhone or iPad can install the Basetool at all
- * (REQ-UI-020, ADR-0164).
+ * Tests the properties that decide whether iOS devices can install the Basetool (REQ-UI-020,
+ * ADR-0164): the manifest response and the {@code <head>} tags of the rendered landing page.
  *
- * <p>Every assertion here stands for a failure mode that produces no error anywhere. A manifest
- * that redirects, arrives with the wrong content type, or names the app after the login page breaks
- * no build, no log line and no page — it silently degrades an install that nobody re-tests
- * afterwards. {@link AssetLinksController} beside it exists because exactly that happened once on
- * the Android side, and was found only from a member's account of a broken login.
- *
- * <p>The {@code <head>} half is asserted against the <strong>rendered</strong> landing page rather
- * than against the template source, for the same reason {@code BrandMarkRenderMvcTest} is: only the
- * rendered output proves that the tags survive the fragment include chain and that Thymeleaf
- * actually resolved the message key behind the iOS app title.
- *
- * <p><strong>Assert whole tags, never a bare attribute.</strong> An earlier revision checked for
- * the substring {@code crossorigin="use-credentials"} anywhere in the response; the rationale
- * comment above the tag contained those very characters and was emitted into the page, so deleting
- * the attribute from the {@code <link>} kept the suite green. Any assertion here that names an
- * attribute names the element it belongs to as well.
+ * <p>Assertions name whole tags, never a bare attribute.
  */
 @SpringBootTest
 @DisplayName("Web app manifest")
@@ -104,12 +89,8 @@ class WebAppManifestControllerTest {
   @MockitoBean private BackendApiClient backendApiClient;
 
   /**
-   * Keeps the real client registration out of the context.
-   *
-   * <p>Building it performs OIDC discovery against the configured issuer, which no unit test can
-   * reach — the context then fails with an {@code UnknownHostException} that says nothing about the
-   * endpoint under test. Every other {@code @SpringBootTest} in this module mocks it for the same
-   * reason.
+   * Mocks the client registration so the context does not perform OIDC discovery against an
+   * unreachable issuer.
    */
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
@@ -118,14 +99,10 @@ class WebAppManifestControllerTest {
   private MockMvc mockMvc;
 
   /**
-   * Reads one CSS custom property out of {@link #STYLES_CSS} and normalises it to six-digit hex.
-   *
-   * <p>Three-digit shorthand is expanded, because {@code --color-bg-black} is written {@code #000}
-   * while a manifest member has to be a full {@code #000000} — comparing the two literally would
-   * fail on a difference that does not exist.
+   * Reads one CSS custom property from {@link #STYLES_CSS}, expanding three-digit shorthand.
    *
    * @param property the custom-property name, including the leading {@code --}
-   * @return the declared colour as {@code #rrggbb}, lower-case
+   * @return the declared colour as lower-case {@code #rrggbb}
    * @throws IOException when the stylesheet cannot be read
    */
   private static String cssColour(String property) throws IOException {
@@ -161,8 +138,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("is served to an anonymous visitor, as a manifest, with no redirect")
   void servedAnonymously() throws Exception {
-    // The browser fetches this on the landing page, before any login. None of the three properties
-    // holds by default: the path would otherwise fall through to anyRequest().authenticated().
     mockMvc
         .perform(get(MANIFEST_PATH))
         .andExpect(status().isOk())
@@ -172,11 +147,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("answers every Accept header, because content negotiation must not gate it")
   void answersEveryAcceptHeader() throws Exception {
-    // A `produces` on the mapping made this a 500: application/json is NOT compatible with
-    // application/manifest+json, so a caller asking for JSON got
-    // HttpMediaTypeNotAcceptableException,
-    // which the Exception catch-all in GlobalExceptionHandler renders as an error page and logs at
-    // ERROR. krtFetch sends exactly that Accept, and so does a blackbox probe with a header set.
     for (MediaType accept :
         List.of(MediaType.APPLICATION_JSON, MediaType.TEXT_HTML, MediaType.ALL)) {
       mockMvc
@@ -190,10 +160,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("declares a standalone app scoped to the whole origin, starting at /")
   void declaresStandaloneApp() throws Exception {
-    // start_url "/" is deliberate: it answers with the landing page for a visitor and the dashboard
-    // for a member, so one installed icon serves both states. scope "/" keeps in-app navigation out
-    // of the browser, and a stable id keeps a later start_url change an update rather than a second
-    // installation beside the first.
     mockMvc
         .perform(get(MANIFEST_PATH))
         .andExpect(jsonPath("$.display").value("standalone"))
@@ -205,15 +171,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("offers exactly one opaque, content-hashed app icon, and never claims maskable")
   void offersTheOpaqueAppIcon() throws Exception {
-    // REQ-UI-019 designates this asset for the home screen. Three separate properties:
-    //
-    // 1. The URL is FINGERPRINTED. /logos/** is served `immutable` for a year, so a manifest naming
-    //    the bare path would pin every installed home screen to a URL no browser revalidates — a
-    //    redesigned icon would never arrive.
-    // 2. There is exactly ONE entry. Asserting only icons[0] would let a second, maskable entry
-    //    through, which is the thing the spec says must never appear.
-    // 3. purpose is "any". Android crops a maskable icon to its own shape and guarantees only the
-    //    inner ~40 %, so claiming it for artwork drawn without that safe zone cuts into the mark.
     mockMvc
         .perform(get(MANIFEST_PATH))
         .andExpect(jsonPath("$.icons.length()").value(1))
@@ -228,12 +185,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("is German when the URL names no locale, because German is the app's default")
   void germanByDefault() throws Exception {
-    // No ?locale= means German — the application's default, not the platform's. The description is
-    // asserted through its umlauts: the bundles store those as backslash-u Unicode escapes and
-    // never as the literal character, so a broken escape surfaces here as mojibake rather than
-    // as a build failure. The escape cannot be spelled out even in this comment: javac resolves
-    // those sequences BEFORE tokenising, so an invalid one inside a comment is still a compile
-    // error -- which is exactly what an earlier attempt at this sentence produced.
     mockMvc
         .perform(get(MANIFEST_PATH))
         .andExpect(jsonPath("$.lang").value("de"))
@@ -247,10 +198,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("follows ?locale=, so an English reader installs an English-described app")
   void followsTheLocaleQueryParameter() throws Exception {
-    // The locale travels in the URL rather than in a cookie, which is what keeps the fetch
-    // anonymous. Note what does NOT change: name and short_name are identical in both bundles
-    // (the product name is a proper noun), so `description` and `lang` are the only members a
-    // locale can move — see ADR-0164.
     mockMvc
         .perform(get(MANIFEST_PATH).param("locale", "en"))
         .andExpect(jsonPath("$.lang").value("en"))
@@ -263,10 +210,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("never declares a language it cannot render, whatever the URL asks for")
   void clampsUnsupportedLocales() throws Exception {
-    // `fallback-to-system-locale` is false and the base bundle holds GERMAN copy, so passing the
-    // requested tag straight through produced a manifest that declared `"lang": "fr"` over German
-    // text. A region-qualified tag must still resolve to its language, and a malformed one must not
-    // produce an empty `lang`, which the specification does not permit.
     for (String requested : List.of("fr", "he", "xx", "_DE", "")) {
       mockMvc
           .perform(get(MANIFEST_PATH).param("locale", requested))
@@ -287,16 +230,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("an unparseable ?lang= cannot turn the always-200 endpoint into a 500")
   void survivesAnUnparseableLangParameter() throws Exception {
-    // `?lang=` is NOT this controller's parameter — it is LocaleChangeInterceptor's, registered for
-    // every path in LocaleConfig — so all the care this controller takes over `?locale=` above runs
-    // AFTER it and cannot help. With `ignoreInvalidLocale` left at its default false,
-    // StringUtils.parseLocale throws before the handler is entered, GlobalExceptionHandler's
-    // catch-all renders the 500 page, and the endpoint that blackbox probes with
-    // `valid_status_codes: [200]` behind EdgePublicSurfaceNot200 pages the on-call for a query
-    // parameter anyone can type.
-    //
-    // The values are the ones that actually throw rather than merely resolving oddly: a lone
-    // punctuation mark, a tag with an empty subtag, and one with an illegal separator.
     for (String requested : List.of("!", "de_", "de__DE", "a b")) {
       mockMvc
           .perform(get(MANIFEST_PATH).param("lang", requested))
@@ -309,10 +242,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("is publicly cacheable, because the body is a pure function of its URL")
   void cachedPublicly() throws Exception {
-    // The locale is in the URL and nothing is read from the session, so there is no cookie to vary
-    // on. An earlier revision sent `private` + `Vary: Cookie`; `private` already forbids a shared
-    // cache, and `Vary: Cookie` keyed the browser's own cache on the whole Cookie header, so every
-    // SESSION rotation threw the entry away.
     mockMvc
         .perform(get(MANIFEST_PATH))
         .andExpect(header().string("Cache-Control", "max-age=3600, public"))
@@ -322,9 +251,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("is linked from the rendered page with the reader's locale in the URL")
   void linkedFromTheRenderedPage() throws Exception {
-    // "/" is permitAll, so the anonymous landing page is the earliest surface a visitor sees and
-    // the one a browser reads the manifest link from. The WHOLE tag is asserted: a bare-attribute
-    // substring check was satisfied by the rationale comment above it, which ships in the response.
     mockMvc
         .perform(get("/"))
         .andExpect(status().isOk())
@@ -333,18 +259,12 @@ class WebAppManifestControllerTest {
                 .string(
                     containsString(
                         "<link rel=\"manifest\" href=\"/manifest.webmanifest?locale=de\">")))
-        // The attribute that is gone is as load-bearing as the one that is there: it made every
-        // fetch authenticated, for a document that needs no session.
         .andExpect(content().string(not(containsString("crossorigin=\"use-credentials\""))));
   }
 
   @Test
   @DisplayName("keeps both the standard and the legacy iOS standalone hints")
   void keepsBothStandaloneHints() throws Exception {
-    // iOS still honours the prefixed spelling; dropping it downgrades older iPhones from a
-    // standalone window back to a Safari tab, with no warning anywhere. The status bar stays
-    // `black` rather than `black-translucent`, because translucent draws the page under the status
-    // bar and needs safe-area padding the layout does not have.
     mockMvc
         .perform(get("/"))
         .andExpect(
@@ -359,9 +279,6 @@ class WebAppManifestControllerTest {
                 .string(
                     containsString(
                         "<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black\">")))
-        // The iOS home-screen label comes from the bundle, so this also proves Thymeleaf resolved
-        // the key rather than rendering it literally. It is the same in both locales on purpose —
-        // REQ-UI-020 no longer claims otherwise.
         .andExpect(
             content()
                 .string(
@@ -372,18 +289,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("agrees with the rendered page AND with the stylesheet about the header fill")
   void themeColourMatchesTheRenderedPageAndTheStylesheet() throws Exception {
-    // Three places state the same colour and none can read the others: a <meta> tag cannot resolve
-    // a CSS custom property, the controller cannot read the template, and neither reads the
-    // stylesheet. The stylesheet is the one that matters — it is what actually paints the header —
-    // and it used to be the one nothing checked, so a design refresh could move it while all the
-    // tests stayed green. The symptom is a phone status bar one shade off the header it sits above:
-    // invisible in review and on every desktop browser.
-    // The STYLESHEET is the reference, read at run time — this test holds no colour of its own.
-    // It used to carry a literal and pin the other three to it, which made it a FOURTH copy of a
-    // value that already existed in three places: change the design token and the test failed
-    // saying the controller was wrong, when what had actually happened is that the token moved and
-    // the controller had not followed. Deriving the expectation says that directly, and there is
-    // one less place to update when the design does change.
     String headerFill = cssColour("--color-bg-dark-gray");
     String pageBackground = cssColour("--color-bg-black");
 
@@ -403,10 +308,6 @@ class WebAppManifestControllerTest {
   @Test
   @DisplayName("registers no service worker anywhere in the frontend")
   void registersNoServiceWorker() throws Exception {
-    // REQ-UI-020 lists this as an acceptance criterion and ADR-0164's whole privacy argument rests
-    // on it, but nothing enforced it: a worker caching navigations would copy balances, rosters and
-    // stock into a store outside every path that clears the session, against REQ-SEC-031. Adding
-    // one is an ADR, not a refactor — and this is what makes that true rather than aspirational.
     Pattern worker =
         Pattern.compile(
             "serviceWorker|service-worker|navigator\\.serviceworker", Pattern.CASE_INSENSITIVE);
@@ -431,16 +332,7 @@ class WebAppManifestControllerTest {
         .isEmpty();
   }
 
-  /**
-   * The manifest's fallback language is the one the application actually defaults to.
-   *
-   * <p>{@code WebAppManifestController.DEFAULT_LOCALE} and {@code LocaleConfig}'s {@code
-   * clr.setDefaultLocale(...)} are two declarations of one fact with nothing tying them together.
-   * Changing the resolver alone leaves the manifest emitting {@code "lang": "de"} over German
-   * {@code pwa.*} strings while every page renders English — and because the body is cached {@code
-   * public, max-age=1h} and read by installers, every home screen added afterwards keeps the wrong
-   * name, with no error raised anywhere. This is the assertion that makes the pair break loudly.
-   */
+  /** The manifest's fallback language equals the default locale of {@code LocaleConfig}. */
   @Test
   void theDefaultLocaleMatchesTheResolvers() throws Exception {
     LocaleResolver resolver = context.getBean(LocaleResolver.class);

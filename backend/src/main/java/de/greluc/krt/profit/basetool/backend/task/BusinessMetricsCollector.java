@@ -53,25 +53,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Samples the approval- and work-queue depths (and the age of the oldest waiting item) into {@code
- * basetool_*_pending_*} / {@code basetool_*_open_*} gauges on a fixed cadence (REQ-OBS-011).
+ * Samples approval- and work-queue depths and the age of the oldest waiting item into {@code
+ * basetool_*_pending_*} / {@code basetool_*_open_*} gauges (REQ-OBS-011).
  *
- * <p>Unlike the point-hook counters, queue depth is a snapshot, so it is polled rather than
- * event-driven: every {@code app.monitoring.business-metrics.interval-ms} (default 60&nbsp;s)
- * {@link #refresh()} runs the {@code countBy…} / {@code MIN(createdAt)} queries once inside a
- * single read-only transaction and pushes the results into the gauge holders. Sampling on a fixed
- * timer (rather than binding each gauge to a live repository supplier that would re-query on every
- * Prometheus scrape) bounds the DB load to one pass per minute regardless of scrape frequency.
- *
- * <p>Every gauge carries only bounded labels — the {@code status} value is an application enum, and
- * the counts/ages are pure numbers (no ids, names or amounts), satisfying REQ-OBS-006. Sources that
- * lack a bounded queue notion are deliberately excluded: notifications (per-recipient unread only,
- * no org-wide queue), org units (no lifecycle status) and missions (free-text {@code status}
- * column, not a bounded enum).
- *
- * <p>Lives in the {@code task} package — a top consumer nothing else depends on — so its downward
- * edges onto {@code repository} stay acyclic (ADR-0047). Config-gated off under the test profile so
- * it never queries the DB mid-{@code @SpringBootTest}.
+ * <p>Polled every {@code app.monitoring.business-metrics.interval-ms} (default 60 s) in one
+ * read-only transaction, so DB load is independent of scrape frequency. All labels are bounded
+ * (REQ-OBS-006).
  */
 @Component
 @ConditionalOnProperty(
@@ -124,8 +111,6 @@ public class BusinessMetricsCollector {
    */
   @PostConstruct
   void registerGauges() {
-    // A bean @ConditionalOnProperty never created publishes nothing, and that
-    // absence is what lets ScheduledJobStale tell "switched off" from "never ran".
     taskMetrics.markEnabled(ScheduledJob.BUSINESS_METRICS);
     countGauge(MetricNames.REGISTRATION_PENDING, registrationPending);
     ageGauge(MetricNames.REGISTRATION_PENDING_OLDEST_AGE, registrationOldestAge);
@@ -170,17 +155,11 @@ public class BusinessMetricsCollector {
   }
 
   /**
-   * Re-samples every queue depth and oldest-pending age into the gauge holders. Runs on a fixed
-   * timer in a single read-only transaction; the first execution fires shortly after startup, so
-   * the gauges leave their initial {@code 0} within moments of boot.
+   * Re-samples every queue depth and oldest-pending age into the gauge holders in one read-only
+   * transaction.
    *
-   * <p>The sampling body is wrapped in {@link TaskMetrics#record} under {@link
-   * ScheduledJob#BUSINESS_METRICS} so a wedged sampler is not a silent failure: if a query throws,
-   * the run is recorded as a {@code failure}, its {@code last_success} timestamp freezes, and the
-   * {@code BusinessMetricsStale} alert fires — otherwise every {@code *_pending_*} / {@code
-   * *_open_*} gauge would freeze at its last value while the {@code *ApprovalOverdue} alerts kept
-   * evaluating stale numbers (#1041 item 3). The wrapper also swallows the exception so the
-   * scheduler thread survives.
+   * <p>Wrapped in {@link TaskMetrics#record} as {@link ScheduledJob#BUSINESS_METRICS}, so a failing
+   * query is recorded as a failure and swallowed.
    */
   @Scheduled(fixedRateString = "${app.monitoring.business-metrics.interval-ms:60000}")
   @Transactional(readOnly = true)
@@ -189,32 +168,20 @@ public class BusinessMetricsCollector {
   }
 
   /**
-   * Runs the queue-depth / oldest-age queries once and writes the results into the gauge holders.
-   * Executes within the read-only transaction opened by {@link #refresh()} and carries no
-   * transaction annotation of its own; separated from {@code refresh()} only so the whole body can
-   * be handed to {@link TaskMetrics#record} as a single instrumented unit.
+   * Runs the queue-depth and oldest-age queries and writes the results into the gauge holders,
+   * inside the transaction opened by {@link #refresh()}.
    */
   private void sample() {
     registrationPending.set(userRepository.countByApprovalStatus(ApprovalStatus.PENDING));
     registrationOldestAge.set(
         ageSeconds(userRepository.findOldestCreatedAtByApprovalStatus(ApprovalStatus.PENDING)));
 
-    // Members' Art. 17 erasure requests awaiting a decision (REQ-SEC-061). Art. 12(3) sets a
-    // one-month response deadline, so this queue's age gauge measures against a statute rather
-    // than against an operational preference.
     deletionRequestPending.set(
         deletionRequestRepository.countByStatus(DeletionRequestStatus.PENDING));
     deletionRequestOldestAge.set(
         ageSeconds(
             deletionRequestRepository.findOldestCreatedAtByStatus(DeletionRequestStatus.PENDING)));
 
-    // Accounts already gone from Keycloak but still present locally: a deletion whose second half
-    // was forgotten (REQ-SEC-059). Unlike the queues above nothing enqueues these, so a non-zero
-    // value is always somebody's unfinished work -- which holds only because service-account rows
-    // are excluded. Such a row is permanently flagged and cannot be un-flagged, so counting it
-    // made the alert fire seven days after deploy and never resolve. The exclusion is
-    // unconditional and lower-cased: it used to depend on a property that defaults empty, and
-    // empty is exactly the configuration in which the row gets created.
     usersPendingDeletion.set(userRepository.countOrphanedMemberAccounts());
     usersPendingDeletionOldestAge.set(
         ageSeconds(userRepository.findOldestOrphanedMemberAbsenceStamp()));

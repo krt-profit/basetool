@@ -51,12 +51,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for the holder detail page and its {@code holderBookings} AJAX fragment
- * (REQ-BANK-032): proves the template resolves and renders the holder header plus a custody-history
- * row — including the {@code DEPOSIT}→account annotation and the {@code HOLDER_TRANSFER}→counter
- * holder annotation — through the real {@code @moneyFormat} bean. A pure controller unit test only
- * pins the view-name string; this fails if the template breaks or a fragment selector is
- * misspelled.
+ * MVC render test for the holder detail page and its {@code holderBookings} fragment
+ * (REQ-BANK-032), including the {@code DEPOSIT} and {@code HOLDER_TRANSFER} annotations rendered
+ * through the real {@code @moneyFormat} bean.
  */
 @SpringBootTest
 class BankHolderDetailFragmentMvcTest {
@@ -112,9 +109,8 @@ class BankHolderDetailFragmentMvcTest {
   }
 
   /**
-   * A withdrawal's outgoing holder leg carrying a fee (negative: paid out). The fee is added on top
-   * (REQ-BANK-033, ADR-0052), so the leg is the gross debited (500) and the recipient received
-   * {@code 500 - 3 = 497} — the holder history shows that arriving amount.
+   * A withdrawal's outgoing holder leg of 500 carrying a fee of 3 (REQ-BANK-033, ADR-0052); the
+   * history shows the 497 received.
    */
   private static BankHolderBookingDto withdrawalRow() {
     return new BankHolderBookingDto(
@@ -131,9 +127,6 @@ class BankHolderDetailFragmentMvcTest {
         new BigDecimal("3"));
   }
 
-  // covers REQ-BANK-032 — the full holder detail page renders the header (handle + total) and the
-  // history with both annotation flavours: the deposit's account and the Umbuchung's counter
-  // holder.
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void holderDetail_rendersHeaderAndHistory() throws Exception {
@@ -155,29 +148,20 @@ class BankHolderDetailFragmentMvcTest {
             .andExpect(content().string(containsString("Mission payout")))
             .andExpect(content().string(containsString("KB-0001")))
             .andExpect(content().string(containsString("carol")))
-            // The fee-bearing withdrawal leg (-500, fee 3) shows what actually arrived (497).
             .andExpect(content().string(containsString("497")))
             .andExpect(content().string(containsString("bank-holder-back-link")))
-            // The balance-split calculator (REQ-BANK-032) is on the page, seeded with the holder's
-            // custody total via data-reserved.
             .andExpect(content().string(containsString("bank-holder-balance-calc")))
             .andExpect(content().string(containsString("bank-holder-balance-input")))
             .andReturn()
             .getResponse()
             .getContentAsString();
-    // The fee annotation renders exactly once — on the fee-bearing withdrawal leg — and never on
-    // the
-    // fee-free holder Umbuchung leg (REQ-BANK-031/-033, ADR-0052).
     assertEquals(1, StringUtils.countOccurrencesOf(body, "bank-holder-booking-fee"));
   }
 
-  // covers REQ-FE-002 — fragment=holderBookings renders only the history block: the booking row +
-  // page-nav are present, but the page chrome (header, back link, swap-target wrapper) is not.
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void holderDetail_fragmentHolderBookings_rendersOnlyHistoryFragment() throws Exception {
     UUID holderId = UUID.randomUUID();
-    // Two pages so the embedded pager renders.
     when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(umbuchungRow()), 0, 20, 25L, 2, List.of()));
 
@@ -187,8 +171,6 @@ class BankHolderDetailFragmentMvcTest {
         .andExpect(content().string(containsString("Reconcile")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("/bank/holders/" + holderId + "?page=1")))
-        // Wrapper div and the page chrome (header, back link, balance calculator) live outside the
-        // fragment.
         .andExpect(content().string(not(containsString("id=\"bank-holder-bookings-results\""))))
         .andExpect(content().string(not(containsString("bank-holder-back-link"))))
         .andExpect(content().string(not(containsString("bank-holder-balance-calc"))));

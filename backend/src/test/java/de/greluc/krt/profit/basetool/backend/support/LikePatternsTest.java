@@ -34,9 +34,7 @@ class LikePatternsTest {
   void escape_neutralisesWildcardsAndBackslash_backslashFirst() {
     assertThat(LikePatterns.escape("50%")).isEqualTo("50\\%");
     assertThat(LikePatterns.escape("a_b")).isEqualTo("a\\_b");
-    // A backslash is doubled, not left able to escape the following char.
     assertThat(LikePatterns.escape("a\\b")).isEqualTo("a\\\\b");
-    // Combined: backslash first, then % and _ each get a single leading backslash.
     assertThat(LikePatterns.escape("a%b_c\\d")).isEqualTo("a\\%b\\_c\\\\d");
   }
 

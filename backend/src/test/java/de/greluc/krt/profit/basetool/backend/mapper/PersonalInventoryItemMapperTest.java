@@ -40,7 +40,6 @@ class PersonalInventoryItemMapperTest {
 
   @Test
   void shouldMapEntityToResponseAndExposeSnapshotAsLocationName() {
-    // Given
     UUID id = UUID.randomUUID();
     PersonalInventoryItem entity =
         PersonalInventoryItem.builder()
@@ -58,10 +57,8 @@ class PersonalInventoryItemMapperTest {
     entity.setCreatedAt(now);
     entity.setUpdatedAt(now);
 
-    // When
     PersonalInventoryItemResponse response = mapper.toResponse(entity);
 
-    // Then
     assertNotNull(response);
     assertEquals(id, response.id());
     assertEquals("Medkit", response.name());
@@ -80,15 +77,12 @@ class PersonalInventoryItemMapperTest {
 
   @Test
   void toEntityShouldNotPopulateOwnerOrSnapshot() {
-    // Given
     PersonalInventoryItemCreateRequest req =
         new PersonalInventoryItemCreateRequest(
             "Ammo", null, 10, PersonalInventoryLocationType.SPACE_STATION, 200);
 
-    // When
     PersonalInventoryItem entity = mapper.toEntity(req);
 
-    // Then – owner sub and snapshot must be set explicitly by the service, not by the mapper
     assertNotNull(entity);
     assertEquals("Ammo", entity.getName());
     assertEquals(PersonalInventoryLocationType.SPACE_STATION, entity.getLocationType());
@@ -102,7 +96,6 @@ class PersonalInventoryItemMapperTest {
 
   @Test
   void updateEntityShouldPreserveOwnerVersionAndSnapshot() {
-    // Given
     PersonalInventoryItem managed =
         PersonalInventoryItem.builder()
             .id(UUID.randomUUID())
@@ -120,10 +113,8 @@ class PersonalInventoryItemMapperTest {
         new PersonalInventoryItemUpdateRequest(
             "New", "New note", 2, PersonalInventoryLocationType.SPACE_STATION, 9, 5L);
 
-    // When
     mapper.updateEntity(managed, req);
 
-    // Then
     assertEquals("New", managed.getName());
     assertEquals("New note", managed.getNote());
     assertEquals(2, managed.getLocationUexId());

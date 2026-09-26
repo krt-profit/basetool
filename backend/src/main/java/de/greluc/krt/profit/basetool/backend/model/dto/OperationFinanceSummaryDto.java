@@ -24,26 +24,17 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Lightweight operation finance roll-up served by {@code GET
- * /api/v1/operations/{id}/finance-summary}: the operation-wide total plus a per-mission total line,
- * computed from grouped SQL aggregates instead of the full {@link OperationFinanceDto} ledger
- * load-all.
+ * Operation finance roll-up served by {@code GET /api/v1/operations/{id}/finance-summary}: the
+ * operation-wide total plus one total line per mission, computed from grouped SQL aggregates.
  *
- * <p>This is the operation-side mirror of the mission finance summary aggregate (ADR-0078): the
- * operation-detail page renders the "Ergebnis je Einsatz" bars and the Gesamtergebnis from this
- * DTO, and lazy-loads each mission's per-entry breakdown on demand via {@code GET
- * /api/v1/operations/{id}/finances/{missionId}} — so the finance render no longer scans and
- * materializes every finance entry / refinery order across every child mission under a held Hikari
- * connection (#1121). The per-mission breakdown is capped: at most {@code
- * OperationFinanceService.MAX_FINANCE_SUMMARY_MISSIONS} mission lines are returned and {@link
- * #truncated} is set when the operation has more (the Gesamtergebnis then sums only the returned
- * lines). Carries no participant PII, so it needs no redaction.
+ * <p>At most {@code OperationFinanceService.MAX_FINANCE_SUMMARY_MISSIONS} mission lines are
+ * returned; {@link #truncated} flags a clipped list, and the total then covers only the returned
+ * lines. Carries no participant PII.
  *
  * @param operationId the operation the roll-up belongs to
- * @param totalSum operation-wide signed bottom line — the sum of the returned mission totals
- * @param missions per-mission roll-up lines (id + name + total), capped, ordered by mission name
- * @param truncated {@code true} when the operation has more missions than the cap and the breakdown
- *     was clipped
+ * @param totalSum signed bottom line, the sum of the returned mission totals
+ * @param missions per-mission lines, capped, ordered by mission name
+ * @param truncated {@code true} when the mission list was clipped at the cap
  */
 public record OperationFinanceSummaryDto(
     UUID operationId,

@@ -115,8 +115,6 @@ class JobTypeControllerTest {
 
   @Test
   void update_passesIdAndDtoDirectly_noMapperOnInput() {
-    // The service's update method accepts the DTO directly so it can pick
-    // which fields are mutable. The controller MUST forward the raw DTO.
     UUID id = UUID.randomUUID();
     JobTypeDto request =
         new JobTypeDto(id, "Renamed", null, JobTypeArchetype.CREW, null, true, true, false, 4L);

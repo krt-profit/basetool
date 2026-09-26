@@ -48,14 +48,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Full Thymeleaf render / proxy tests for the Discord registration-approval queue. Covers the
- * server-nickname column (REQ-DATA-018) — a captured per-guild nickname is shown next to the name,
- * a registration without one falls back to the muted em-dash — and the admin
- * link-to-existing-account action (REQ-SEC-026): the "Verknüpfen" button and the remote-users
- * account picker render, and the {@code linkAjax} proxy forwards to the backend. Also covers the
- * rejected table and its reopen action (REQ-SEC-034), including the deliberate degradation when
- * only the rejected read fails. The render assertions key off controlled values / stable markers,
- * so they are locale-independent.
+ * Full Thymeleaf render and proxy tests for the Discord registration-approval queue: the
+ * server-nickname column (REQ-DATA-018), the link-to-existing-account action (REQ-SEC-026) and the
+ * rejected table with its reopen action (REQ-SEC-034). Assertions are locale-independent.
  */
 @SpringBootTest
 class AdminDiscordRegistrationsNicknameRenderTest {
@@ -118,14 +113,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
         .isEqualTo(1);
   }
 
-  /**
-   * The queue marks a registration whose callsign a second account already holds (#1639).
-   *
-   * <p>This is the surface the removed name-matching fallback is replaced by: the login no longer
-   * adopts the other account silently, so the admin has to be told that approving this row creates
-   * a <b>second</b> account for one callsign. Rendered on the row rather than as a page-level
-   * banner, because the decision is per row.
-   */
+  /** The queue marks, on the row, a registration whose callsign another account already holds. */
   @Test
   void queue_marksARegistrationWhoseCallsignAnotherAccountHolds() throws Exception {
     PendingRegistrationDto colliding =
@@ -263,8 +251,6 @@ class AdminDiscordRegistrationsNicknameRenderTest {
 
   @Test
   void rejectedListFailure_doesNotBlankThePendingQueue() throws Exception {
-    // The rejected read is the secondary surface; a failure there (e.g. a backend that predates
-    // ?status= during a rolling deploy) must not take the pending queue down with it.
     when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
         .thenReturn(
             List.of(

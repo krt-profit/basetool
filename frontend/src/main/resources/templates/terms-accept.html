@@ -7,13 +7,6 @@
     </th:block>
 </head>
 <body>
-<!--/*
-  Deliberately WITHOUT the sidebar: a user who has not consented may not navigate into the tool, and
-  showing them a menu of links that all bounce back here would read as the page being broken. The
-  only ways out are forward (accept) or back out (log off) - plus the imprint, privacy policy and
-  the public terms page, which stay reachable because nobody can be asked to agree to something
-  they are prevented from reading.
-*/-->
 <header>
     <nav>
         <a th:href="@{/}" class="brand">

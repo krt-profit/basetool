@@ -24,24 +24,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend's {@code CreateMissionRequest} write-only DTO at {@code POST
- * /api/v1/missions}. Separate from {@link MissionDto} so the create flow does not have to thread
- * dozens of read-only fields (sub-missions, participants, inventory, version counters) through a
- * null-filled constructor every time.
+ * Frontend mirror of the backend's write-only {@code CreateMissionRequest} for {@code POST
+ * /api/v1/missions}, separate from {@link MissionDto}.
  *
- * <p>R5.d.d added the trailing {@link #owningOrgUnitId} picker output — the backend resolves it
- * through {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable}, which accepts all four
- * org-unit kinds (Staffel, Spezialkommando, Bereich, Organisationsleitung). A non-null value is
- * honoured when it is one of the mission owner's DIRECT memberships or an org unit the caller may
- * edit ({@code AccessGateService.canEditOrgUnit}, cascade-aware — epic #692 Phase 4 / REQ-ORG-016),
- * and rejected with 400 otherwise. {@code null} auto-stamps a single-membership owner, honours an
- * active-context pin (REQ-ORG-017), 400s a multi-membership owner with neither, and leaves the
- * mission ownerless for a membershipless leadership owner (V144 / ADR-0004).
- *
- * <p>{@link #objectives} / {@link #steps} carry the optional Ziele / Ablauf rows the create form
- * seeds together with the mission (both {@code null} when none). The write controller builds them
- * from the form's JSON carriers; the backend maps each {@code kind} string to its {@code
- * MissionObjectiveKind} and validates title/kind before persisting.
+ * <p>{@link #owningOrgUnitId} is the owner picker output (REQ-ORG-016, REQ-ORG-017); {@code null}
+ * lets the backend stamp the owner. {@link #objectives} and {@link #steps} carry the optional Ziele
+ * and Ablauf rows created with the mission, {@code null} when none.
  */
 public record CreateMissionRequest(
     String name,

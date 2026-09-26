@@ -51,18 +51,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Pins BE-PERF-02 (REQ-DATA-003): no paged finder fetch-joins a collection, and the Hibernate gate
- * that backs it is actually on.
- *
- * <p>A collection fetch on a paged query multiplies each page row by the collection's size, and
- * where Hibernate cannot push the {@code OFFSET}/{@code LIMIT} into a derived table it loads every
- * matching row and pages in memory (HHH90003004). With {@code
- * hibernate.query.fail_on_pagination_over_collection_fetch=true} the in-memory case throws instead.
- * The first test proves the flag is live on a shape Hibernate cannot push down (a green run of the
- * others would otherwise prove nothing). The second loads a page from every finder that used to
- * graph a collection and asserts the collection arrives <em>uninitialised</em> — the direct
- * evidence that no graph fetched it. The third proves the cached role page still arrives with its
- * permissions initialised after its transaction has closed.
+ * Verifies that no paged finder fetch-joins a collection and that Hibernate's {@code
+ * fail_on_pagination_over_collection_fetch} gate is active (REQ-DATA-003).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -82,10 +72,6 @@ class PagedFindersNoCollectionFetchTest {
 
   @Test
   void gateIsLive_aPagedCollectionFetchThatMustPageInMemoryFails() {
-    // Hibernate 7 pushes most paged collection fetches into a derived table, so a plain
-    // "LEFT JOIN FETCH u.roles" + setMaxResults no longer pages in memory and would not trip the
-    // gate (verified 2026-09-22: it passed silently). Ordering by the fetched collection before
-    // the owner is one of the shapes it cannot push down; that one must fail, not warn.
     assertThrows(
         RuntimeException.class,
         () ->
@@ -122,7 +108,7 @@ class PagedFindersNoCollectionFetchTest {
                       "paged-", "paged-", PAGE)
                   .getContent(),
               User::getRoles);
-          userRepository.findEvaluatableMembers(null, PAGE); // must not throw
+          userRepository.findEvaluatableMembers(null, PAGE);
           assertUnfetched(
               missionRepository
                   .searchMissions(

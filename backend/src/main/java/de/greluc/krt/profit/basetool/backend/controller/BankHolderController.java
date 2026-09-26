@@ -53,10 +53,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the bank-local holder registry (epic #556, REQ-BANK-003): listing with global
- * custody totals, manual registration via the user lookup, activity toggling, and the holder→holder
- * Umbuchung (REQ-BANK-031). Reads and the Umbuchung are open to all bank staff (the holder menu,
- * REQ-BANK-030); manual registration and (de)activation are management-only.
+ * REST surface for the bank-local holder registry (REQ-BANK-003): listing with custody totals,
+ * manual registration, activity toggling and the holder-to-holder Umbuchung (REQ-BANK-031). Reads
+ * and the Umbuchung are open to bank staff; registration and (de)activation are management-only.
  */
 @RestController
 @RequestMapping("/api/v1/bank/holders")

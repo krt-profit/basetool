@@ -52,15 +52,12 @@ class SsoReAuthenticationEntryPointTest {
   @Test
   void commence_shouldRedirectToSilentSsoAndSetAttemptedCookie_whenNoAttemptCookiePresent()
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI("/dashboard");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     entryPoint.commence(request, response, authException);
 
-    // Then
     String redirectedUrl = response.getRedirectedUrl();
     assertNotNull(redirectedUrl);
     assertTrue(
@@ -82,17 +79,14 @@ class SsoReAuthenticationEntryPointTest {
   @Test
   void commence_shouldRedirectToLoginPageAndClearCookie_whenAttemptCookieAlreadyPresent()
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI("/dashboard");
     Cookie existingCookie = new Cookie(SsoReAuthenticationEntryPoint.SSO_ATTEMPTED_COOKIE, "1");
     request.setCookies(existingCookie);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     entryPoint.commence(request, response, authException);
 
-    // Then
     String redirectedUrl = response.getRedirectedUrl();
     assertNotNull(redirectedUrl);
     assertTrue(
@@ -107,13 +101,10 @@ class SsoReAuthenticationEntryPointTest {
 
   @Test
   void commence_shouldHandleNullCookies_whenNoCookiesPresent() throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI("/missions");
-    // No cookies set – getCookies() returns null
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When / Then – should not throw
     assertDoesNotThrow(() -> entryPoint.commence(request, response, authException));
     String redirectedUrl = response.getRedirectedUrl();
     assertNotNull(redirectedUrl);
@@ -136,15 +127,12 @@ class SsoReAuthenticationEntryPointTest {
       })
   void commence_shouldTriggerSilentSso_whenLegitimateAppPathRequested(String appUri)
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI(appUri);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     entryPoint.commence(request, response, authException);
 
-    // Then
     String redirectedUrl = response.getRedirectedUrl();
     assertNotNull(redirectedUrl, "Legitimate app path should trigger SSO redirect. URI=" + appUri);
     assertTrue(
@@ -155,37 +143,28 @@ class SsoReAuthenticationEntryPointTest {
 
   @Test
   void commence_shouldNotSetSsoAttemptedCookie_whenCookieAlreadyPresent() throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI("/orders");
     Cookie existingCookie = new Cookie(SsoReAuthenticationEntryPoint.SSO_ATTEMPTED_COOKIE, "1");
     request.setCookies(existingCookie);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     entryPoint.commence(request, response, authException);
 
-    // Then – cookie should be cleared (maxAge=0), not re-set to 60
     Cookie cookie = response.getCookie(SsoReAuthenticationEntryPoint.SSO_ATTEMPTED_COOKIE);
     assertNotNull(cookie);
     assertEquals(0, cookie.getMaxAge(), "Cookie should be cleared, not re-set");
   }
 
-  // --- #1137: background requests get a 401 challenge, never a saved-request-clobbering redirect
-  // ---
-
   @Test
   void commence_shouldReturn401WithReauthHeader_forBackgroundFetch() throws Exception {
-    // Given – a fetch/XHR write: Sec-Fetch-Mode is not "navigate"
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI("/notifications/unread-count");
     request.addHeader("Sec-Fetch-Mode", "cors");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     entryPoint.commence(request, response, authException);
 
-    // Then – 401 + X-Reauthenticate, NO redirect and NO SSO cookie / saved-request mutation
     assertEquals(401, response.getStatus(), "Background fetch must get a 401, not a 302 redirect");
     assertNull(response.getRedirectedUrl(), "Background fetch must not be redirected");
     assertEquals(
@@ -202,16 +181,13 @@ class SsoReAuthenticationEntryPointTest {
 
   @Test
   void commence_shouldReturn401_forEventStreamAcceptWithoutSecFetchMode() throws Exception {
-    // Given – an EventSource-style request on an older client (no Sec-Fetch-Mode metadata)
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI("/notifications/stream");
     request.addHeader("Accept", "text/event-stream");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     entryPoint.commence(request, response, authException);
 
-    // Then
     assertEquals(401, response.getStatus());
     assertEquals("/oauth2/authorization/keycloak", response.getHeader("X-Reauthenticate"));
     assertNull(response.getRedirectedUrl());
@@ -219,16 +195,13 @@ class SsoReAuthenticationEntryPointTest {
 
   @Test
   void commence_shouldReturn401_forXmlHttpRequestMarker() throws Exception {
-    // Given – legacy XHR marker, no fetch metadata
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI("/missions/some-id/units/slim");
     request.addHeader("X-Requested-With", "XMLHttpRequest");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     entryPoint.commence(request, response, authException);
 
-    // Then
     assertEquals(401, response.getStatus());
     assertEquals("/oauth2/authorization/keycloak", response.getHeader("X-Reauthenticate"));
     assertNull(response.getRedirectedUrl());
@@ -236,17 +209,14 @@ class SsoReAuthenticationEntryPointTest {
 
   @Test
   void commence_shouldStillRedirect_forTopLevelNavigation() throws Exception {
-    // Given – a genuine top-level navigation stamps Sec-Fetch-Mode: navigate
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setRequestURI("/missions/some-id");
     request.addHeader("Sec-Fetch-Mode", "navigate");
     request.addHeader("Accept", "text/html,application/xhtml+xml");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     entryPoint.commence(request, response, authException);
 
-    // Then – the silent-SSO redirect flow is preserved for real navigations
     assertEquals(302, response.getStatus());
     String redirectedUrl = response.getRedirectedUrl();
     assertNotNull(redirectedUrl);
@@ -260,8 +230,6 @@ class SsoReAuthenticationEntryPointTest {
 
   @Test
   void commence_logsASessionFingerprintAndNeverTheRawSessionId() throws Exception {
-    // APPSEC-12: the silent-SSO INFO line used to carry the raw session id, a bearer credential,
-    // into every log file and Loki.
     Logger logger = (Logger) LoggerFactory.getLogger(SsoReAuthenticationEntryPoint.class);
     ListAppender<ILoggingEvent> appender = new ListAppender<>();
     appender.start();

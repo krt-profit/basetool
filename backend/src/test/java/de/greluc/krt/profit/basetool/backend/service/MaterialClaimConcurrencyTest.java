@@ -60,38 +60,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Reproduces the two concurrent <em>first-claim</em> races on the squadron sign-up path against the
- * real Postgres test container and pins their guarantees:
+ * Races two concurrent first claims on one material bucket against the real Postgres container
+ * (REQ-ORDERS-024, ADR-0092).
  *
- * <ul>
- *   <li><b>Same squadron (last-writer-wins).</b> Two logisticians of the same squadron lodging the
- *       first {@link MaterialClaim} on one material bucket at the same instant must <b>both</b>
- *       complete without any thread seeing a 500 / propagated conflict, and the DB must end up with
- *       exactly one row for the {@code (bucket, squadron)} pair.
- *   <li><b>Different squadrons (no overclaim).</b> Two different squadrons racing their first claim
- *       past the bucket's required amount must resolve to exactly one winner and one overclaim
- *       rejection ({@link BadRequestException}), so the committed sum never exceeds the requirement
- *       (REQ-ORDERS-024, ADR-0092).
- * </ul>
- *
- * <p>The row carries a JPA {@code @Version} (via {@code AbstractEntity}) <em>and</em> the unique
- * index {@code uq_material_claim_bucket_org_unit} (V131), so the loser of a same-squadron parallel
- * INSERT hits a {@code DataIntegrityViolationException} (or, on the repeat edit, an {@code
- * ObjectOptimisticLockingFailureException}). Before the fix that violation poisoned the writer's
- * single transaction and surfaced as an HTTP 500; {@link MaterialClaimService#upsertClaim} is now a
- * non-transactional orchestrator that retries each attempt in its own {@code REQUIRES_NEW}
- * transaction, so the loser reloads the winner's committed row and UPDATEs it in place. The
- * cross-squadron overclaim is a different race the unique index cannot catch — it is guarded by a
- * pessimistic {@code PESSIMISTIC_WRITE} lock on the order taken before the claim sum is read
- * ({@code JobOrderRepository.lockForClaimUpsert}). These tests are the dynamic regression guards
- * for both behaviours; the deterministic retry-count contract lives in {@code
- * MaterialClaimServiceTest.UpsertClaimConcurrencyTests}.
- *
- * <p>Deliberately <strong>not</strong> {@code @Transactional}: each worker runs in its own session
- * so the versions actually race, and the seed rows are removed via {@code @AfterEach}. Runs as an
- * ADMIN so the service permission matrix short-circuits to "allowed"; the {@code @WithMockUser}
- * context is captured on the test thread and re-applied inside each worker because {@code
- * SecurityContextHolder}'s default strategy does not inherit into a thread pool.
+ * <p>Same squadron: both writers succeed and exactly one row remains (last writer wins). Different
+ * squadrons past the required amount: exactly one wins and the other gets a {@link
+ * BadRequestException}. Not {@code @Transactional}, so each worker runs its own session.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -122,14 +96,13 @@ class MaterialClaimConcurrencyTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   /**
-   * The seeded fixture ids for one test run — the SK order, its single material bucket, the
-   * claiming squadron and the responsible SK — captured so {@code @AfterEach} can delete the rows.
+   * Seeded fixture ids of one test run, deleted in {@code @AfterEach}.
    *
    * @param orderId the seeded SK job order
    * @param materialId the bucket's material
    * @param squadronId the first claiming squadron
-   * @param squadronBId the second claiming squadron for the cross-squadron race, or {@code null}
-   *     for the single-squadron fixture
+   * @param squadronBId the second claiming squadron, or {@code null} for the single-squadron
+   *     fixture
    * @param skId the responsible Spezialkommando
    */
   private record Fixture(
@@ -159,23 +132,16 @@ class MaterialClaimConcurrencyTest {
   }
 
   /**
-   * Two threads lodge the first claim for the <em>same</em> squadron on the same bucket in
-   * lockstep, with distinct amounts. The {@code go} latch releases both workers together so their
-   * find-or-create + INSERT statements race against the unique index. The guarantee: no worker
-   * throws (the loser retries in a fresh transaction instead of surfacing a 500), both upserts
-   * report success, and the bucket ends up with exactly one claim carrying one of the two amounts
-   * (last-writer-wins).
+   * Two threads lodge the first claim for the same squadron in lockstep; neither throws, and
+   * exactly one claim with one of the two amounts remains.
    *
-   * @throws Exception if a worker future fails to complete within the finish timeout
+   * @throws Exception if a worker future does not complete within the timeout
    */
   @Test
   void firstClaimRace_sameSquadron_lastWriterWins_noServerError() throws Exception {
     fixture = seed();
     final List<CreateClaimDto> payloads = List.of(claim(AMOUNT_A), claim(AMOUNT_B));
 
-    // Capture the @WithMockUser admin context on the test thread so each worker can re-apply it —
-    // the service permission gate (assertCanManage → isAdmin) reads SecurityContextHolder, whose
-    // default MODE_THREADLOCAL strategy does not propagate into a thread pool.
     final SecurityContext adminContext = SecurityContextHolder.getContext();
 
     CountDownLatch ready = new CountDownLatch(THREADS);
@@ -291,30 +257,20 @@ class MaterialClaimConcurrencyTest {
   }
 
   /**
-   * Two different profit-eligible squadrons lodge their first claim on the same bucket at once,
-   * each requesting {@link #OVERCLAIM_EACH} of a {@link #REQUIRED_AMOUNT} bucket (70 + 70 = 140
-   * &gt; 100). The no-overclaim invariant is a cross-row aggregate the per-(bucket, squadron)
-   * unique index cannot protect, so the guarantee rests entirely on the pessimistic order-row lock
-   * (REQ-ORDERS-024, ADR-0092): claimants of the order serialise, so <b>exactly one</b> squadron
-   * wins and the other reads the winner's committed 70, fails the guard and is rejected with a
-   * {@link BadRequestException}. The committed row-sum must never exceed 100.
+   * Two squadrons claim {@link #OVERCLAIM_EACH} each of a {@link #REQUIRED_AMOUNT} bucket at once;
+   * exactly one wins, the other gets a {@link BadRequestException}, and the committed sum never
+   * exceeds the requirement.
    *
-   * <p>Before the lock both writers read a zero already-claimed sum under {@code READ COMMITTED}
-   * and both committed a 70-claim (sum 140) with no error — this test is red against that state.
-   *
-   * @throws Exception if a worker future fails to complete within the finish timeout
+   * @throws Exception if a worker future does not complete within the timeout
    */
   @Test
   void firstClaimRace_differentSquadrons_neverOverclaims() throws Exception {
-    // covers REQ-ORDERS-024 — cross-squadron no-overclaim is concurrency-safe (ADR-0092)
     fixture = seedTwoSquadrons();
     final List<CreateClaimDto> payloads =
         List.of(
             claimFor(fixture.squadronId(), OVERCLAIM_EACH),
             claimFor(fixture.squadronBId(), OVERCLAIM_EACH));
 
-    // See the same-squadron test: the admin permission context is captured here and re-applied
-    // inside each worker because SecurityContextHolder does not propagate into a thread pool.
     final SecurityContext adminContext = SecurityContextHolder.getContext();
 
     CountDownLatch ready = new CountDownLatch(THREADS);
@@ -397,8 +353,7 @@ class MaterialClaimConcurrencyTest {
   }
 
   /**
-   * Builds a claim payload for the seeded bucket at the given amount for an explicit squadron — the
-   * cross-squadron race needs the two writers to name different claiming squadrons.
+   * Builds a claim payload for the seeded bucket for an explicit squadron.
    *
    * @param squadronId the claiming squadron
    * @param amount the claimed partial quantity

@@ -36,13 +36,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Unit tests for {@link SquadronAdminProxyController}. The controller is a thin admin-only proxy
- * that forwards two per-squadron flag toggles to the backend. Both flags live on the cached {@code
- * SquadronDto} that {@code OrgUnitContextAdvice} reads on every authenticated render, so the
- * contract under test (REQ-DATA-007) is: each toggle forwards the PATCH and then evicts the {@code
- * SQUADRON} + {@code ORG_UNIT} caches — in that order — so the shared squadron catalogue cannot
- * serve a stale flag up to the cache TTL after the toggle. Without the eviction the sidebar/title
- * promotion gate would lag behind the admin's change.
+ * Unit tests for {@link SquadronAdminProxyController}: each flag toggle forwards the PATCH and then
+ * evicts the {@code SQUADRON} and {@code ORG_UNIT} caches, in that order (REQ-DATA-007).
  */
 @ExtendWith(MockitoExtension.class)
 class SquadronAdminProxyControllerTest {
@@ -53,15 +48,11 @@ class SquadronAdminProxyControllerTest {
 
   @Test
   void setPromotionEnabled_forwardsPatch_thenEvictsStaticDataCache() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("enabled", true);
 
-    // When
     ResponseEntity<Void> response = controller.setPromotionEnabled(id, body);
 
-    // Then — 204. Eviction runs AFTER the write so the cleared cache repopulates from the
-    // already-mutated backend state, never the reverse (which would re-cache stale data).
     assertEquals(204, response.getStatusCode().value());
     InOrder inOrder = inOrder(backendApiClient);
     inOrder
@@ -73,14 +64,11 @@ class SquadronAdminProxyControllerTest {
 
   @Test
   void setProfitEligible_forwardsPatch_thenEvictsStaticDataCache() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("eligible", false);
 
-    // When
     ResponseEntity<Void> response = controller.setProfitEligible(id, body);
 
-    // Then
     assertEquals(204, response.getStatusCode().value());
     InOrder inOrder = inOrder(backendApiClient);
     inOrder

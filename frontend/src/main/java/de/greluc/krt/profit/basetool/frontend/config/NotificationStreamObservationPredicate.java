@@ -27,26 +27,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Excludes the long-lived notification SSE relay endpoint from the {@code http.server.requests}
- * observation (REQ-OBS-009). Boot registers every {@link ObservationPredicate} bean on the
- * observation registry; when {@link #test} returns {@code false} the observation is a no-op, so the
- * request produces neither a Micrometer timer sample nor a trace span.
+ * observation (REQ-OBS-009), so its lifetime-long duration does not distort the latency metrics.
  *
- * <p>Why: {@code GET /notifications/stream} relays the backend SSE stream to the browser and holds
- * its own {@link org.springframework.web.servlet.mvc.method.annotation.SseEmitter} open for up to
- * 30 minutes ({@code NotificationPageController.STREAM_TIMEOUT_MS}). Spring MVC books the request's
- * <em>whole lifetime</em> into {@code http.server.requests} when the async request finally
- * completes, so each closed relay records an ~1800s latency observation. That value lands in the
- * {@code +Inf} bucket of the histogram (capped at a 10s {@code maximum-expected-value}), and once
- * relay turnover exceeds ~5% of requests in a scrape window it pins the aggregate {@code
- * histogram_quantile(0.95, …)} to the top bucket — firing {@code HttpLatencyP95High} (a p95 &gt;2s
- * warning) with no real user-facing slowness. Skipping the observation keeps the relay lifetime out
- * of the latency metric entirely.
- *
- * <p>This is the servlet-inbound mirror of leaving the outbound {@code sseWebClient} off the
- * observation registry ({@code WebClientConfig}); the relay's health is instead tracked by the
- * dedicated {@code basetool_notification_relay_connections} gauge, so nothing observable is lost.
- * Mirrored across backend/frontend per the no-shared-module convention, each with its own
- * module-local stream path.
+ * <p>Relay health is tracked by the {@code basetool_notification_relay_connections} gauge instead.
  */
 @Component
 public class NotificationStreamObservationPredicate implements ObservationPredicate {
@@ -58,10 +41,8 @@ public class NotificationStreamObservationPredicate implements ObservationPredic
   private static final String STREAM_PATH = "/notifications/stream";
 
   /**
-   * Skips the {@code http.server.requests} observation for the notification SSE relay and lets
-   * every other observation through unchanged. Matches on the raw request path ({@link
-   * HttpServletRequest#getRequestURI()}, query string already excluded) because the endpoint
-   * carries no path variables, so the actual path equals its route template.
+   * Skips the {@code http.server.requests} observation for the notification SSE relay, matched on
+   * {@link HttpServletRequest#getRequestURI()}, and passes every other observation.
    *
    * @param name the observation name being evaluated by the registry
    * @param context the observation context; a {@link ServerRequestObservationContext} for inbound

@@ -18,42 +18,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * The Lager behaviour the global ("Lager", /inventory/all, inventory-admin.js) and the personal
- * ("Mein Lager", /inventory/my, inventory-my.js) pages share (FE-SIMP-03). Until 2026-09 both page
- * scripts carried their own copy of every function below — about 700 lines, byte-identical or
- * differing only in the data-trigger prefix, the route root and the post-write refresh — and had to
- * prefix their module state (`adminBookOutItemId`, …) so a page loading both would not collide.
- *
- * Covers: the multi-select filter dropdowns (one header behaviour on both pages); the
- * material-group / stack tree with its per-user localStorage expansion (REQ-INV-002,
- * REQ-INV-030) and the lazy, paginated stack-entry load; the book-out (Ausbuchen: DISCARD / SELL)
- * modal including the terminal lookup for a sale; the amount <-> target-amount coupling of the
- * book-out and Umbuchen modals, the Umbuchen close and its target-OrgUnit picker (#1328); the
- * Variante-C allocation chips and their popover (REQ-INV-027); and the cross-room live-sync pokes
- * a stock write owes the order and Materialbörse rooms (#1309).
- *
- * What stays in the page scripts is what genuinely differs: the filters, the Umbuchen open/submit
- * (the personal page adds the personal <-> shared toggle), the bulk operations of the personal page,
- * the admin delete-all, and each page's own `inventory` live-sync room.
- *
- * `window.krtInventory.createLager(config)` returns one instance per page; the page calls its
- * `bind()` once, at the position its own bindings used to run, which installs the delegated
- * `<prefix>-*` krtEvents handlers, the book-out form's submit listener and the initial tree restore.
- * Localized strings come from the page's th:inline bootstrap (`stackEntriesI18n`, `bookOutI18n`,
- * `inventoryConflictI18n`, `assocI18n`), so this file must load after that block and before the
- * page script.
- */
 /* global stackEntriesI18n, bookOutI18n, inventoryConflictI18n, assocI18n */
 (function () {
     'use strict';
 
-    // Chip-display epsilon (three-decimal SCU): a |rest| within this reads as an exact zero.
     const ASSOC_EPS = 0.0005;
 
     /**
-     * An element by id, typed as the input it is used as. Every lookup here names a control the
-     * page template renders; a missing one makes the caller return rather than throw.
+     * Looks up an element by id, typed as an input.
      *
      * @param {string} id the element id
      * @returns {HTMLInputElement | null} the element, or null when the page does not render it
@@ -63,8 +35,8 @@
     }
 
     /**
-     * Replaces a select's options with one disabled, pre-selected placeholder. Built as an Option
-     * node rather than an HTML string, so the localized text is never parsed as markup.
+     * Replaces a select's options with one disabled, pre-selected placeholder. The text is never
+     * parsed as markup.
      *
      * @param {HTMLSelectElement} select the select to reset
      * @param {string} text the localized placeholder text
@@ -91,23 +63,14 @@
             return cfg.triggerPrefix + '-' + action;
         }
 
-        // The item id the open book-out modal targets; set when the modal opens, read on submit.
         /** @type {string | null} */
         let bookOutItemId = null;
-        // Guards against a second submit (Enter / rapid click) landing while the first write is in
-        // flight — a duplicate book-out on the same version would otherwise 409.
         let bookOutInFlight = false;
-        // #1328: the Umbuchen row's current owning org-unit id, used to preset the target-OrgUnit
-        // picker so a submit that does not touch it keeps the stock in its current unit.
         /** @type {string | null} */
         let umbuchenCurrentOwningOrgUnitId = null;
 
-        // ===================== Tree view (REQ-INV-002 / REQ-INV-030) ==========================
-
         /**
-         * Which Lager view is active: the Material <-> Items switch is server-rendered navigation,
-         * so the authoritative state is the page URL's view= parameter, which every filter re-swap
-         * also carries (history.replaceState keeps the address bar in sync).
+         * Reports whether the Items view of the Lager is active, read from the URL's `view` parameter.
          *
          * @returns {boolean} true on the items view
          */
@@ -172,13 +135,9 @@
         }
 
         /**
-         * Builds the lazy stack-entries fetch URL from the stack-key data-attributes the server
-         * stamped on the stack-header row. An absent dimension is omitted so the backend's null-safe
-         * match selects rows where it is itself absent. A game-item stack is addressed by gameItemId
-         * with no quality key and goes to the item sibling endpoint. The parameter order is also the
-         * persisted stack identity (see stackKey), so it must stay exactly as the two page copies
-         * built it: the global Lager's stacks are per owner (userId after the grouping id), the
-         * personal Lager's carry the personal flag after the quality.
+         * Builds the stack-entries fetch URL from the stack-header row's data-attributes. A
+         * game-item stack uses gameItemId and the game-item endpoint. The parameter order is part
+         * of the persisted stack identity, so it must not change.
          *
          * @param {Element} headerRow the stack header row
          * @param {number | null} page the entries page, or null for the page-less identity
@@ -215,9 +174,8 @@
         }
 
         /**
-         * A stack's identity is exactly the page-less stack-entries URL its data-attributes build,
-         * so the same stack maps to the same key across re-renders and a /all stack can never
-         * collide with a /my one (they carry a different path prefix).
+         * The persisted identity of a stack: its page-less stack-entries URL, stable across
+         * re-renders.
          *
          * @param {Element} headerRow the stack header row
          * @returns {string} the stack key
@@ -286,9 +244,8 @@
         }
 
         /**
-         * Re-applies the persisted stack expansion and re-triggers the lazy entry load for each
-         * restored stack (the re-rendered header comes back with data-stack-loaded="false", so the
-         * leaf rows — carrying the fresh post-write amounts — are fetched again).
+         * Re-applies the persisted stack expansion and re-fetches the entries of each restored
+         * stack that is not yet loaded.
          */
         function restoreExpandedStacks() {
             const expandedStacks = readExpanded(stackStorageKey());
@@ -306,9 +263,8 @@
         }
 
         /**
-         * Restores the whole tree (groups first, then their stacks) — run on initial load and after
-         * every in-place grouped-table re-swap, because a fragment swap does not re-fire
-         * DOMContentLoaded and would otherwise collapse every row the user had opened.
+         * Restores the persisted tree expansion, groups first, then stacks. Runs on initial load
+         * and after every grouped-table re-swap.
          */
         function restoreExpandedTree() {
             restoreExpandedGroups();
@@ -344,9 +300,8 @@
         }
 
         /**
-         * Expands or collapses a stack, persists the choice and — append-only Lager — fetches the
-         * stack's entries on its first expand (ADR-0003, REQ-INV-002); later toggles only reveal
-         * the rows already loaded.
+         * Expands or collapses a stack, persists the choice and fetches the stack's entries on its
+         * first expand (REQ-INV-002).
          *
          * @param {Element} row the stack header row
          */
@@ -358,7 +313,6 @@
             const id = stackKey(row);
             if (window.getComputedStyle(nextRow).display === 'none') {
                 setExpanded(row, nextRow, true);
-                // Persist so a later in-place re-swap (filter change or modal write) re-opens it.
                 if (id && !expandedStacks.includes(id)) {
                     expandedStacks.push(id);
                     writeExpanded(key, expandedStacks);
@@ -378,8 +332,7 @@
         }
 
         /**
-         * Replaces a stack's entries container with a single status line (loading / error), built
-         * via textContent so the i18n string is never interpreted as HTML.
+         * Replaces a stack's entries container with a single loading or error status line.
          *
          * @param {Element} content the entries container
          * @param {string} message the localized status text
@@ -397,9 +350,7 @@
         }
 
         /**
-         * Fetches one page of a stack's entries and injects the server-rendered fragment. The
-         * injected rows carry the page's data-trigger hooks, so the delegated handlers keep working
-         * without re-binding.
+         * Fetches one page of a stack's entries and injects the server-rendered fragment.
          *
          * @param {Element} headerRow the stack header row
          * @param {number} page the zero-based entries page
@@ -422,10 +373,6 @@
                 .then(function (html) {
                     window.krtFetch.setTrustedHtml(content, html);
                     headerRow.setAttribute('data-stack-loaded', 'true');
-                    // The entries are injected via innerHTML (not krtFetch.swap), so no
-                    // krt:swapped fires — enhance the Variante-C allocation "+ Zuordnen"
-                    // <select data-krt-combobox> popovers by hand (REQ-INV-027), else they stay
-                    // raw native selects and the add-open reset has nothing to target.
                     if (typeof window.krtEnhanceComboboxes === 'function') {
                         window.krtEnhanceComboboxes(content);
                     }
@@ -451,12 +398,6 @@
             const page = parseInt(btn.getAttribute('data-page') ?? '', 10);
             loadStackEntries(headerRow, isNaN(page) ? 0 : page);
         }
-
-        // ===================== Multi-select filter dropdowns =================================
-        // One behaviour on both Lager pages (owner decision 2026-09-23): the header reads the
-        // "all" label when no box or every box is ticked (both mean "no filter"), the one ticked
-        // option's own label, or "<n> <selected>". The labels come from the header's
-        // data-all / data-selected attributes (filter.all / filter.selected in the bundles).
 
         /**
          * Opens one multi-select dropdown and closes every other one; a second click closes it.
@@ -590,13 +531,9 @@
             });
         }
 
-        // ===================== Cross-feature live-sync (#1309) ================================
-
         /**
-         * Tells each affected job order's detail viewers to re-pull their material collection (its
-         * stock column tracks the earmark roll-up) and item-stock panel, plus — once — the
-         * cross-order material-demand overview in the global `orders` room. The actor is not in
-         * those rooms, so there is no self-refresh.
+         * Broadcasts a live-sync change to each affected job order's viewers and, once, to the
+         * global `orders` demand overview.
          *
          * @param {Array<string | null | undefined> | null | undefined} orderIds the affected orders
          */
@@ -619,8 +556,7 @@
         }
 
         /**
-         * Tells the Materialbörse to re-pull its board after a stock-reducing write (the backend
-         * clamps an offer down to the remaining stock).
+         * Tells the Materialbörse to re-pull its board after a stock-reducing write.
          */
         function broadcastBoardChanged() {
             if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
@@ -629,8 +565,7 @@
         }
 
         /**
-         * The job-order ids currently earmarked on an entry's leaf row — read before a stock write,
-         * so the affected orders are known even for a rest-first book-out the backend distributes.
+         * The job-order ids currently earmarked on an entry's leaf row, read before a stock write.
          *
          * @param {string | null} itemId the inventory entry id
          * @returns {string[]} the distinct order ids
@@ -648,8 +583,6 @@
             });
             return ids;
         }
-
-        // ===================== Amount <-> target coupling =====================================
 
         /**
          * Keeps an amount field and its "target stock" twin consistent: writing one sets the other
@@ -690,8 +623,6 @@
         function updateUmbuchenTargetFromAmount() {
             coupleAmounts('umbuchenAmount', 'umbuchenTargetAmount', 'umbuchenMaxAmount');
         }
-
-        // ===================== Book-out modal (Ausbuchen) =====================================
 
         /**
          * Shows the sell fields (terminal + proceeds, both required) for a SELL and hides them for a
@@ -874,10 +805,7 @@
             if (sellNotPossibleReason) sellNotPossibleReason.style.display = 'none';
             loadSellTerminals(materialId, terminalSelect, sellRadio, sellNotPossibleReason);
 
-            // Inline `flex` (not `block`) so `.modal`'s flex centring is preserved (#1328).
             window.krtModal.open(modal);
-            // Variante C (REQ-INV-027): build the "Herkunft" (deduct-from) picker from this
-            // entry's chips now that the modal is shown, so its initial validity gates the submit.
             if (window.krtHerkunft && id) {
                 window.krtHerkunft.populate('bookout', id);
             }
@@ -896,15 +824,12 @@
         }
 
         /**
-         * Submits the book-out in place through krtFetch (#577 part 2), reusing the POST
-         * /inventory/{id}/transfer proxy. On success the grouped table is re-pulled (the server
-         * regroups) instead of the page reloading; the classic POST stays the no-JS fallback.
+         * Submits the book-out in place through krtFetch to POST /inventory/{id}/transfer and
+         * re-pulls the grouped table on success.
          *
          * @param {SubmitEvent} event the form submit
          */
         function submitBookOut(event) {
-            // scu-decimal-input.js canonicalises + validates the amount fields in the capture phase
-            // first; if it found an invalid amount it already blocked the submit. Respect that.
             if (event.defaultPrevented) return;
             event.preventDefault();
             if (bookOutInFlight || !window.krtFetch || !bookOutItemId) return;
@@ -923,9 +848,6 @@
             const amount = window.krtScuInput
                 ? window.krtScuInput.parse(amountEl.value)
                 : parseFloat(amountEl.value);
-            // Variante C (REQ-INV-027): the "Herkunft" picker chooses which order/mission slices
-            // (or the rest) the deduction comes from. An invalid plan already disables the submit
-            // button; guard the Enter-key path too. A null list means "take it from the rest".
             if (window.krtHerkunft && !window.krtHerkunft.isValid('bookout')) {
                 if (typeof window.showFrontendErrorToast === 'function') {
                     window.showFrontendErrorToast(assocI18n.overallocated);
@@ -935,7 +857,6 @@
             const reductions = window.krtHerkunft
                 ? window.krtHerkunft.collect('bookout')
                 : { jobOrderReductions: null, missionReductions: null };
-            // Ausbuchen only discards or sells — the transfer-only fields stay null.
             const payload = {
                 amount,
                 type,
@@ -951,7 +872,6 @@
             const submitBtn = /** @type {HTMLButtonElement | null} */ (
                 document.getElementById('bookOutSubmitBtn')
             );
-            // Read the earmarked orders before the write (the leaf is replaced on the re-swap).
             const affectedOrderIds = collectLeafOrderIds(itemId);
             bookOutInFlight = true;
             if (submitBtn) submitBtn.disabled = true;
@@ -977,8 +897,6 @@
                 });
         }
 
-        // ===================== Umbuchen (shared parts) ========================================
-
         /** Closes the Umbuchen modal and resets its unsaved-changes and Herkunft state. */
         function closeUmbuchenModal() {
             if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
@@ -990,8 +908,8 @@
         }
 
         /**
-         * Records the Umbuchen row's current owning org unit, which the target-OrgUnit picker is
-         * preset to (#1328). Called by the page's Umbuchen open.
+         * Records the Umbuchen row's current owning org unit, used to preset the target-OrgUnit
+         * picker.
          *
          * @param {string | null} orgUnitId the row's owning org unit, or null for an ownerless row
          */
@@ -1000,11 +918,9 @@
         }
 
         /**
-         * Fills the Umbuchen target-OrgUnit picker with the selected target user's direct
-         * memberships across all four org-unit kinds (#1328, `?allKinds=true`, mirroring the bank
-         * counterparty picker REQ-BANK-044), preset to the row's current owning unit when the
-         * target is a member of it. Hidden for a membershipless target. The fetch goes through the
-         * frontend's /users/{id}/memberships proxy — the frontend origin maps no /api/v1/users/**.
+         * Fills the Umbuchen target-OrgUnit picker with the target user's direct memberships of
+         * all org-unit kinds, preset to the row's current owning unit when the target is a member
+         * of it. Hidden when the target has no membership.
          */
         function refreshUmbuchenTransferOrgUnitPicker() {
             const wrapper = document.getElementById('umbuchenTargetOwningOrgUnitWrapper');
@@ -1053,14 +969,6 @@
                 });
         }
 
-        // ===================== Variante C allocation chips (REQ-INV-027) ======================
-        // Each .assoc-split (one per dimension per entry) renders its job-order / mission
-        // allocations as chips + a trailing rest chip, plus a "+ Zuordnen" combobox popover. Add /
-        // edit / remove call the per-allocation endpoints (POST/PATCH/DELETE
-        // /inventory/{id}/allocation) and update the split in place from the returned
-        // InventoryItemDto (chips + rest + version), so the drilled-down stack stays expanded and
-        // no full-page reload is needed (REQ-FE-001).
-
         /**
          * Formats an amount for a chip / rest label: whole for PIECE, three decimals for SCU.
          *
@@ -1086,10 +994,8 @@
         }
 
         /**
-         * Anchors a `position: fixed` allocation popover to its trigger in viewport space (fixed so
-         * the horizontally scrolling table containers cannot crop it). Flips above the trigger only
-         * when it actually fits there, and clamps into the viewport either way, since a fixed box
-         * cannot be scrolled into view (REQ-UI-011). Runs while the popover is visible.
+         * Anchors a `position: fixed` allocation popover to its trigger, flipping it above when it
+         * fits there and clamping it into the viewport (REQ-UI-011). The popover must be visible.
          *
          * @param {HTMLElement} pop the popover
          */
@@ -1107,8 +1013,6 @@
             const top = Math.max(gap, Math.min(wantedTop, maxTop));
             pop.style.left = rect.left + 'px';
             if (flipUp) {
-                // Bottom-anchored so a later switch to the taller/shorter amount section keeps the
-                // popover's lower edge glued to the trigger.
                 pop.style.top = 'auto';
                 pop.style.bottom = window.innerHeight - top - popHeight + 'px';
             } else {
@@ -1118,8 +1022,7 @@
         }
 
         /**
-         * Keeps the open popover glued to its trigger while the window or the table's own scroll
-         * container moves. Only one popover is open at a time, so the first visible one wins.
+         * Re-anchors the open allocation popover after a scroll or resize.
          */
         function assocRepositionOpenPop() {
             const pop = /** @type {HTMLElement | null} */ (
@@ -1141,8 +1044,7 @@
         }
 
         /**
-         * Switches a popover to its amount-editor section; `showRemove` reveals the remove button
-         * (edit mode).
+         * Switches a popover to its amount-editor section.
          *
          * @param {Element} pop the popover
          * @param {boolean} showRemove whether the slice exists and can be removed
@@ -1185,8 +1087,8 @@
         }
 
         /**
-         * Recomputes a rest chip's tone + label: 0 -> success, unassigned remainder -> muted,
-         * over-allocation (negative) -> danger.
+         * Recomputes a rest chip's tone and label: success at zero, muted for an unassigned
+         * remainder, danger for an over-allocation.
          *
          * @param {Element | null} el the rest chip
          * @param {number | null | undefined} rest the dimension's rest
@@ -1214,8 +1116,8 @@
         }
 
         /**
-         * Re-renders a split's chips + rest from the returned entry DTO and propagates the fresh
-         * entry version to every data-version control in the leaf row (both dimensions share it).
+         * Re-renders a split's chips and rest from the returned entry DTO and syncs the new entry
+         * version into the leaf row.
          *
          * @param {Element} split the .assoc-split
          * @param {any} dto the returned InventoryItemDto
@@ -1248,9 +1150,7 @@
         }
 
         /**
-         * The chip for `targetId` in this split, or null. The chips are re-rendered from each
-         * write's own response, so — unlike the picker's server-rendered option list — they always
-         * reflect what is currently allocated.
+         * The allocation chip for `targetId` in this split.
          *
          * @param {Element | null} split the .assoc-split
          * @param {string} targetId the order or mission id
@@ -1266,10 +1166,8 @@
         }
 
         /**
-         * Sends the allocation write through krtFetch (CSRF, the bare-403 retry, the re-auth
-         * redirect). The DELETE mapping reads the same body, hence bodyOnDelete. A 422
-         * over-allocation toasts and keeps the popover open; anything else falls through to
-         * krtFetch (a 409 gets the conflict confirm, other refusals toast the backend's detail).
+         * Sends the allocation write through krtFetch; DELETE carries the body too. A 422
+         * over-allocation toasts and keeps the popover open.
          *
          * @param {string | null} entryId the inventory entry id
          * @param {string} method POST, PATCH or DELETE
@@ -1294,7 +1192,6 @@
                     if (dto && typeof dto === 'object') assocRerender(split, dto);
                     pop.classList.add('krtm-hidden');
                     cfg.notifyInventoryChanged();
-                    // A job-order earmark change shifts that order's material collection.
                     if (body && body.field === 'JOB_ORDER') {
                         broadcastOrdersChanged([body.targetId]);
                     }
@@ -1312,10 +1209,8 @@
         }
 
         /**
-         * Sends an allocation write, serialized per entry so a rapid second edit of the same row
-         * waits for the fresh version (REQ-INV-026 / REQ-FE-003). Guards double-submit itself —
-         * krtFetch's submitter capture only sees form submits — by disabling the popover's buttons
-         * synchronously, before the serialized send is deferred.
+         * Validates the amount and sends an allocation write, serialized per entry (REQ-INV-026).
+         * The popover's buttons stay disabled until the write settles.
          *
          * @param {Element} split the .assoc-split
          * @param {Element} pop the popover
@@ -1352,8 +1247,6 @@
                 });
             };
             const run = function () {
-                // Read the entry version at SEND time, not click time (REQ-FE-003): a queued second
-                // edit of the same entry picks up the version the first one synced onto the split.
                 const version = parseInt(split.getAttribute('data-version') ?? '', 10);
                 const body = { field, targetId, amount, version };
                 return assocSend(entryId, method, body, split, pop);
@@ -1418,10 +1311,6 @@
                 if (!value) return;
                 const pop = el.closest('[data-assoc-pop]');
                 if (!pop) return;
-                // The <option> list drops already-allocated targets at fragment-RENDER time only,
-                // so a target THIS viewer allocated since the render is still listed. The chips are
-                // current: resolve the pick against them and open an existing slice in edit mode
-                // instead of POSTing a duplicate.
                 const existing = assocFindChip(pop.closest('.assoc-split'), value);
                 pop.setAttribute('data-assoc-target', value);
                 pop.setAttribute('data-assoc-mode', existing ? 'edit' : 'add');
@@ -1464,12 +1353,8 @@
                 if (!pop || !split) return;
                 assocSubmit(split, pop, 'DELETE');
             });
-            // Keep the fixed popover anchored while the page or the table's own horizontal scroll
-            // container moves (capture reaches inner-container scrolls that don't bubble).
             window.addEventListener('scroll', assocRepositionOpenPop, true);
             window.addEventListener('resize', assocRepositionOpenPop);
-            // Close popovers on an outside click; keyboard: Enter saves the amount, Enter/Space
-            // opens a chip's editor (a role=button <span> gets no synthetic click on key press).
             document.addEventListener('click', function (e) {
                 const target = /** @type {Element} */ (e.target);
                 if (
@@ -1499,10 +1384,8 @@
         }
 
         /**
-         * Installs everything the shared Lager behaviour listens to: the delegated `<prefix>-*`
-         * handlers for the tree, the allocation chips, the book-out modal and the Umbuchen parts
-         * shared here; the book-out form's submit listener; the book-out backdrop close; and the
-         * initial tree restore. Call once, where the page's own bindings run.
+         * Installs the shared Lager handlers: tree, allocation chips, book-out and Umbuchen triggers,
+         * the book-out submit and the initial tree restore. Call once per page.
          */
         function bind() {
             document.addEventListener('DOMContentLoaded', restoreExpandedTree);
@@ -1546,8 +1429,6 @@
                     refreshUmbuchenTransferOrgUnitPicker,
                 );
             }
-            // The book-out form is a stable top-level element (outside the swapped table
-            // container), so a submit listener bound once survives the grouped-table re-swaps.
             const bookOutForm = document.getElementById('bookOutForm');
             if (bookOutForm) {
                 bookOutForm.addEventListener('submit', function (e) {

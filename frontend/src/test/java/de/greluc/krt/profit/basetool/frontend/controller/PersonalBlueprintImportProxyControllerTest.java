@@ -83,7 +83,6 @@ class PersonalBlueprintImportProxyControllerTest {
     try {
       server.shutdown();
     } catch (Exception ignored) {
-      // already shut down in connection-failure tests
     }
   }
 

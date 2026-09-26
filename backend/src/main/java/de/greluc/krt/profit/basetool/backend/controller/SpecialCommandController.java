@@ -52,16 +52,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for {@link SpecialCommand} — the Spezialkommando tenant kind. Mirrors the {@link
- * SquadronController} CRUD surface except for the per-row promotion toggle, which has no
- * counterpart on Spezialkommandos by data-layer constraint.
+ * REST surface for {@link SpecialCommand} (Spezialkommando) CRUD, mirroring {@link
+ * SquadronController} without the promotion toggle.
  *
- * <p>All write paths are ADMIN-gated, matching the SK-administration decision recorded in {@code
- * SPEZIALKOMMANDO_PLAN.md} §2 (D2): SK lifecycle is admin-only; per-SK Lead capabilities for
- * membership management are a separate authorisation surface that lives on the membership endpoints
- * (R5.b). The single-row read shares that surface's gate so the lead's member page can show its SK.
- * The list endpoint is open to any authenticated caller so the owner picker fragment can populate
- * its dropdown without elevated rights.
+ * <p>Writes are ADMIN-only. The list is open to every authenticated caller for the owner picker;
+ * the single-row read uses the SK membership-management gate.
  */
 @RestController
 @RequestMapping("/api/v1/special-commands")
@@ -76,9 +71,8 @@ public class SpecialCommandController {
   private final AuthHelperService authHelperService;
 
   /**
-   * Paged list of Spezialkommandos for the admin overview and the owner-picker dropdown. The {@code
-   * includeInactive=true} flavour requires ADMIN — soft-deleted SK descriptions can carry internal
-   * context, mirroring the {@link SquadronController#getAllSquadrons} guard.
+   * Paged list of Spezialkommandos for the admin overview and the owner picker. Including inactive
+   * rows requires ADMIN.
    *
    * @param page page number, defaults to 0.
    * @param size page size, defaults to the platform default.
@@ -117,21 +111,16 @@ public class SpecialCommandController {
   }
 
   /**
-   * Returns a single Spezialkommando by id. Used by the SK member-management page ({@code
-   * /organisation/special-commands/{id}}) to render the SK header above its roster.
+   * Returns a single Spezialkommando by id, active or not, for the SK member-management page.
    *
-   * <p>Gated exactly like the membership endpoints it sits beside, via {@link
+   * <p>Gated by {@link
    * de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService#canManageMembers}:
-   * an admin may read any SK, a non-admin only the SK on which their own membership carries {@code
-   * SK_LEAD}. The row is returned whether or not it is active — a soft-deleted SK's description is
-   * then visible to its own lead, who already had it, and to nobody else, so the inactive-row rule
-   * of {@link #getAllSpecialCommands} (admin-only across all SKs) is not widened.
+   * an admin reads any SK, a non-admin only an SK where they hold {@code SK_LEAD}.
    *
    * @param id Spezialkommando id.
    * @return the matching DTO.
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException if no SK matches and
-   *     the caller is an admin (a non-admin is denied first, because an unknown id carries no lead
-   *     membership).
+   *     the caller is an admin.
    */
   @GetMapping("/{id}")
   @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")
@@ -173,8 +162,6 @@ public class SpecialCommandController {
   })
   public SpecialCommandDto createSpecialCommand(@RequestBody @Valid SpecialCommandDto dto) {
     var toCreate = specialCommandMapper.toEntity(dto);
-    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
-    // row.
     toCreate.setId(null);
     toCreate.setVersion(null);
     return specialCommandMapper.toDto(specialCommandService.createSpecialCommand(toCreate));
@@ -251,11 +238,8 @@ public class SpecialCommandController {
   }
 
   /**
-   * Per-SK profit-eligibility toggle. Admins flip the flag to opt a Spezialkommando in or out of
-   * the Job-Order responsible (processing) picker. Only Profit-department SKs should carry {@code
-   * true}; SKs of other departments stay {@code false} (they may place orders but not process
-   * them). ADMIN-only and isolated from the regular update path so an accidental description edit
-   * cannot change a SK's eligibility.
+   * Toggles whether a Spezialkommando appears in the Job-Order responsible (processing) picker.
+   * ADMIN-only and separate from the regular update path.
    *
    * @param id Spezialkommando id.
    * @param body request payload {@code { "eligible": true|false }}.

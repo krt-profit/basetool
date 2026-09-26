@@ -48,17 +48,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 /**
- * Wiring guard for {@link WebClientConfig#sseWebClient()} (#1110): the notification SSE relay MUST
- * carry the client-IP relay filter, otherwise every live viewer's stream — and every reconnect
- * after a redeploy — collapses onto the single frontend-container IP bucket (REQ-SEC-011).
- *
- * <p>{@link ClientIpRelayFilter} itself is unit-tested in {@code ClientIpRelayFilterTest}; this
- * test proves the filter is actually <em>attached to the SSE client</em> by capturing the built
- * client's exchange-filter chain and asserting it emits {@code X-Forwarded-For} for a bound client
- * IP. So deleting the {@code .filter(clientIpRelayFilter.relayClientIp())} line can no longer
- * compile and pass while silently re-opening the bug. Runs fully offline — the {@code "test"}
- * profile pins the insecure trust manager, so {@code connector(true)} builds without a network or
- * SSL bundle.
+ * Verifies that {@link WebClientConfig#sseWebClient()} carries the {@link ClientIpRelayFilter}, so
+ * the notification SSE relay forwards {@code X-Forwarded-For} (REQ-SEC-011).
  */
 class WebClientConfigSseRelayTest {
 
@@ -79,8 +70,6 @@ class WebClientConfigSseRelayTest {
     when(locale.relayUserLocale()).thenReturn(passthrough);
 
     Environment environment = mock(Environment.class);
-    // "test" profile => connector(true) pins InsecureTrustManagerFactory and never reads
-    // SslBundles.
     when(environment.getActiveProfiles()).thenReturn(new String[] {"test"});
 
     WebClientConfig config =

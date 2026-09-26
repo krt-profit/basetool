@@ -31,19 +31,11 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Converts a notification's i18n render parameters between the in-memory {@code Map<String,String>}
- * form and the opaque JSON text stored in {@code notification.params}.
+ * Converts a notification's i18n render parameters between a {@code Map<String,String>} and the
+ * JSON text stored in {@code notification.params}.
  *
- * <p>Registered as a MapStruct {@code uses} helper so {@code
- * de.greluc.krt.profit.basetool.backend.mapper.NotificationMapper} maps the stored JSON column
- * straight to the DTO's parameter map; the creation path uses {@link #serialize(Map)} to write
- * rows. The shared Jackson 3 {@link ObjectMapper} is injected by constructor (the project runs on
- * {@code tools.jackson}). Deserialization is defensive: a malformed payload yields an empty map and
- * a log line rather than failing the inbox read.
- *
- * <p>Lives in the dependency-leaf {@code support} package (it depends only on Jackson) so {@code
- * mapper} can reuse it through MapStruct {@code uses=} without a {@code mapper} &rarr; {@code
- * service} package cycle.
+ * <p>Used as a MapStruct {@code uses} helper by the notification mapper. A malformed payload
+ * deserializes to an empty map and a log line rather than failing the read.
  */
 @Component
 @RequiredArgsConstructor
@@ -70,7 +62,6 @@ public class NotificationParamsCodec {
     try {
       return objectMapper.writeValueAsString(params);
     } catch (JacksonException e) {
-      // A Map<String,String> is always serializable; treat the impossible case as "no params".
       log.warn("Failed to serialize notification params; storing none — {}", e.getMessage());
       return null;
     }

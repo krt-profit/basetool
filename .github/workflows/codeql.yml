@@ -1,49 +1,5 @@
 name: CodeQL
 
-# Semantic SAST via GitHub CodeQL. Closes the gap left by Checkstyle (style),
-# SpotBugs (local bug patterns) and OWASP Dependency-Check (third-party CVEs):
-# CodeQL performs taint-tracking and data-flow analysis on the project's own
-# code and surfaces SQL/Path/XSS/SSRF-style vulnerabilities that the other
-# tools cannot see.
-#
-# Languages:
-#   - java-kotlin     -> backend + frontend Java sources (build-mode: manual,
-#                        Gradle compiles main + test sources for extraction).
-#   - javascript-typescript -> frontend's own JS under
-#                        `frontend/src/main/resources/static/js/` (vendor
-#                        bundles excluded via the inline config below).
-#   - actions          -> the workflows themselves (template injection,
-#                        over-broad permissions).
-#   - python           -> the CI and ops scripts under `.github/scripts/` and
-#                        `scripts/`, some of which run with write tokens.
-#
-# Advanced setup, not GitHub's default setup (2026-09-22). This file was
-# switched off on 2026-05-20 and the repository ran default setup instead, so
-# none of the settings below were in effect: not `security-extended`, not the
-# `java/log-injection` filter, not the `paths-ignore`, and not
-# `dependency-caching: false` - whose absence let default setup's ~1.2 GB
-# per-run dependency caches evict the NVD and Playwright caches again. The two
-# cannot run side by side: GitHub rejects this workflow's uploads while default
-# setup is configured, so default setup is switched off in the repository's
-# code-security settings. The four languages above are the four default setup
-# covered, so the switch loses no coverage.
-#
-# Trigger model:
-#   - push to main     -> establishes the baseline so PRs can diff against it.
-#   - pull_request     -> required check candidate; results show up inline in
-#                        the PR's Files Changed tab and as a PR check.
-#   - schedule (weekly Tuesday 06:17 UTC, offset from the Monday OWASP
-#                        dependency-check run) -> picks up new CodeQL queries
-#                        that GitHub ships, even on quiet branches.
-#   - workflow_dispatch -> manual re-run from the Actions UI.
-#
-# Blocking is enforced via branch protection in repository settings: the two
-# matrix check names ("CodeQL / Analyze (java-kotlin)" and
-# "CodeQL / Analyze (javascript-typescript)") must be marked as required
-# status checks against `main` AFTER this workflow has run at least once on
-# main so the check names are known to GitHub. See CHANGELOG.md entry for
-# the exact gh CLI commands.
-
 on:
   push:
     branches: [main]
@@ -84,7 +40,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
@@ -94,34 +50,12 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # `security-extended` adds the precision-2/3 security queries on top of
-      # the default suite. `security-and-quality` would also pull in
-      # maintainability/style queries that overlap with Checkstyle/SpotBugs
-      # and produce noise. The inline `paths-ignore` keeps vendor bundles and
-      # generated artefacts out of the JS extraction (no point scanning
-      # minified third-party libraries — their CVEs are covered by the OWASP
-      # dependency-check workflow).
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
+        uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
-          # OFF because it was starving a different workflow. CodeQL's dependency cache is written
-          # under a key that embeds a per-run hash, so nothing is ever restored from it - it only
-          # ever grows. On 2026-09-10 a single pull request produced NINE of them at 804 MiB each:
-          # 7.2 GB of the repository's 9.86 GB against GitHub's 10 GB per-repository cap.
-          #
-          # Past that cap GitHub evicts least-recently-used entries, and the NVD dataset that
-          # `dependency-check.yml` caches is read by exactly one workflow, which makes it the
-          # least-recently-used large entry and therefore the first evicted. Losing it forces a
-          # 31-38 minute cold rebuild on EVERY dependency-check run, and a run killed at the job
-          # ceiling never reaches its `actions/cache` post step - so it saves nothing and the next
-          # run is cold again. Five consecutive runs died that way on 2026-09-10/11.
-          #
-          # The Java dependencies are already cached by `gradle/actions/setup-gradle` above, so this
-          # second copy bought nothing even in principle. Re-enable only with a key that is actually
-          # reused, and only with headroom under the cap.
           dependency-caching: false
           config: |
             paths-ignore:
@@ -130,54 +64,15 @@ jobs:
               - 'frontend/src/main/resources/static/js/vendor/**'
               - '**/*.min.js'
 
-            # `java/log-injection` fires on every SLF4J parameterised call
-            # `log.X("text {}", userValue)` where the argument is a method
-            # parameter, request body, JWT claim, etc. SLF4J's `{}` placeholder
-            # substitution is performed by MessageFormatter AFTER the log
-            # appender's pattern has been resolved -- the user value is
-            # interpolated as a plain string, never re-parsed as a format
-            # directive. That makes SLF4J parameterised logging the standard
-            # defence against log-injection by construction, so the rule
-            # produces a False Positive on every call site in this codebase
-            # (56 sites flagged in the PR #65 initial scan; CodeQL does not
-            # recognise SLF4J's interpolation step as a sanitiser).
-            #
-            # If a future module emits log lines built with String.format()
-            # or concatenation (`"text " + userValue`), THAT pattern is the
-            # real injection vector and should be hand-fixed at the call site
-            # rather than caught by this rule. Re-enable selectively if such
-            # a module appears.
             query-filters:
               - exclude:
                   id: java/log-injection
 
-      # CodeQL's Java extractor reads `.class` files produced by the Gradle
-      # compile tasks plus the source tree. `compileJava` covers
-      # `src/main/java/`; `compileTestJava` covers `src/test/java/` so test
-      # helpers and architectural assertions in `ArchitectureTest` are
-      # included in the analysis. Running `build` would also execute the
-      # JUnit suite + Checkstyle + SpotBugs + JaCoCo, which the dedicated
-      # `ci.yml` already does — duplicating that here would just burn
-      # runner minutes without adding extraction value.
-      #
-      # `--no-build-cache` is load-bearing: CodeQL's Java extractor traces
-      # `javac` via `LD_PRELOAD` and only records source it sees the compiler
-      # process. When the Gradle build cache (populated by the main-branch
-      # CodeQL run, read-only on PR branches per the `setup-gradle` config
-      # above) serves `compileJava`/`compileTestJava` as `FROM-CACHE` — which
-      # happens on every PR that does not touch any Java file — `javac` is
-      # never invoked, the tracer captures nothing, and the analyze step
-      # fails with "CodeQL could not process any code written in
-      # Java/Kotlin". Disabling the build cache here forces actual
-      # compilation each run so the tracer always has events to record.
-      # Gradle's task-output up-to-date check (which lives on disk per
-      # workspace, not in the shared cache) is unaffected, but CI workspaces
-      # are ephemeral so every run effectively does a clean compile anyway.
       - name: Compile Java sources for extraction
         if: matrix.language == 'java-kotlin'
         run: ./gradlew compileJava compileTestJava --no-build-cache --stacktrace
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
+        uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd
         with:
           category: /language:${{ matrix.language }}

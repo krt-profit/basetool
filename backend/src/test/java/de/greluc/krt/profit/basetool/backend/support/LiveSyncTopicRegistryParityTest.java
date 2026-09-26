@@ -37,19 +37,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The build gate that keeps the backend's live-sync registry a subset of the frontend's (ADR-0143).
- *
- * <p>The two modules cannot share code — there is no dependency between them, by design — but they
- * do share a Redis channel and a payload. A prefix or a section key that exists on one side and not
- * the other produces the worst failure shape this bridge has: nothing throws, nothing is logged, a
- * screen simply stops updating. That is invisible in production and invisible in every test that
- * exercises one module alone, which is why it is caught here, by reading the other module's source.
- *
- * <p>Parsing a sibling's source as a gate is the established move in this repo — the frontend's own
- * {@code LiveSyncSectionMapParityTest} derives the client seam maps from the shipped JavaScript for
- * exactly this reason. The parse is deliberately narrow: it reads the first three constructor
- * arguments of each enum constant and nothing else, so a change to any other argument leaves it
- * alone.
+ * Build gate that keeps the backend's live-sync topic registry a subset of the frontend's
+ * (ADR-0143), by parsing the frontend's source. Reads only the first three constructor arguments of
+ * each enum constant.
  */
 class LiveSyncTopicRegistryParityTest {
 
@@ -96,7 +86,6 @@ class LiveSyncTopicRegistryParityTest {
     for (LiveSyncTopicClass backendClass : LiveSyncTopicClass.values()) {
       FrontendClass peer = frontend.get(key(backendClass.prefix(), backendClass.perResource()));
       if (peer == null) {
-        // Reported by the sibling test; not worth failing twice for one cause.
         continue;
       }
       assertThat(peer.sections())
@@ -113,8 +102,6 @@ class LiveSyncTopicRegistryParityTest {
   @DisplayName("the frontend's staff-only rooms stay out of the backend registry")
   void staffOnlyRoomsAreNotBridged() throws IOException {
     Map<String, FrontendClass> frontend = parseFrontendRegistry();
-    // Guards the omission rather than the presence: the admin area is web-only permanently (app
-    // plan Q7), so these must never drift in by someone "completing" the registry.
     assertThat(frontend).containsKey(key("bank", false));
 
     Set<String> backendKeys = new LinkedHashSet<>();
@@ -218,10 +205,6 @@ class LiveSyncTopicRegistryParityTest {
 
   /**
    * Walks up from the working directory to the repository root.
-   *
-   * <p>Gradle runs a module's tests with the module directory as the working directory, but that is
-   * a default rather than a guarantee, so the root is found by looking for it instead of assuming
-   * one level up.
    *
    * @return the directory holding both modules
    */

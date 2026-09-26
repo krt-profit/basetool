@@ -51,8 +51,7 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
   Page<ExternalSyncReport> findAllByOrderByRanAtDesc(Pageable pageable);
 
   /**
-   * Paged, most-recent-first view filtered to one source. Backs the {@code
-   * /admin/sync-reports/scwiki} and {@code /uex} pages.
+   * Pages one source's sync events, newest first.
    *
    * @param sourceSystem the catalogue to filter to
    * @param pageable paging
@@ -62,8 +61,8 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
       SyncSourceSystem sourceSystem, Pageable pageable);
 
   /**
-   * Returns the {@code run_id}s of the most recent runs for a source, newest-first, capped by the
-   * {@code pageable}'s page size. Used by the retention sweep to compute the "keep" set.
+   * Returns the {@code run_id}s of a source's most recent runs, newest first, for the retention
+   * sweep's keep set.
    *
    * @param sourceSystem the catalogue to scope to
    * @param pageable a {@code PageRequest.of(0, N)} limiting the result to the newest N runs
@@ -77,9 +76,8 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
   List<UUID> findRecentRunIds(@Param("source") SyncSourceSystem sourceSystem, Pageable pageable);
 
   /**
-   * Deletes every event of a source whose {@code run_id} is NOT in the keep set. Called by the
-   * retention sweep after {@link #findRecentRunIds} computes the newest-N run ids. Guard against an
-   * empty keep set in the caller — {@code NOT IN ()} is invalid SQL.
+   * Deletes every event of a source whose {@code run_id} is not in the keep set. Callers must pass
+   * a non-empty keep set.
    *
    * @param sourceSystem the catalogue to scope the delete to
    * @param keptRunIds run ids to preserve (the newest N)
@@ -96,9 +94,7 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
       @Param("keptRunIds") Collection<UUID> keptRunIds);
 
   /**
-   * Deletes every event, regardless of source, whose {@code ran_at} predates {@code cutoff}. Backs
-   * the admin "delete reports older than X days" action when no source filter is chosen (the
-   * combined view).
+   * Deletes every event of any source whose {@code ran_at} predates {@code cutoff}.
    *
    * @param cutoff the exclusive upper bound; rows strictly older than this are removed
    * @return number of rows deleted
@@ -108,8 +104,7 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
   int deleteByRanAtBefore(@Param("cutoff") Instant cutoff);
 
   /**
-   * Deletes every event of one source whose {@code ran_at} predates {@code cutoff}. Backs the admin
-   * "delete reports older than X days" action when a single source tab (UEX / SCWIKI) is active.
+   * Deletes every event of one source whose {@code ran_at} predates {@code cutoff}.
    *
    * @param sourceSystem the catalogue to scope the delete to
    * @param cutoff the exclusive upper bound; rows strictly older than this are removed

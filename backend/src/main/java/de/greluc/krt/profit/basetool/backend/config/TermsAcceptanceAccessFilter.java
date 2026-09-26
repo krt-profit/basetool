@@ -51,28 +51,12 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Refuses the API to a caller who has not accepted the Terms of Use (REQ-SEC-028).
+ * Refuses the API with an RFC 7807 403 to an authenticated caller who has not accepted the Terms of
+ * Use (REQ-SEC-028).
  *
- * <p>This is the boundary, not the frontend's redirect. It is enforced here because the backend is
- * the only place every caller passes through: the web UI, and — since {@link ActingMemberFilter}
- * runs ahead of this one and makes an ingest-gateway request carry the sending member's identity
- * (ADR-0129) — the desktop extractor too. The gateway does not relay that member's token: it
- * authenticates with its own service account and names the member in an on-behalf-of header, so it
- * is the identity substitution, not a relayed bearer, that puts a person in front of this gate. One
- * filter therefore covers both, and the gateway inherits the refusal without needing its own copy
- * of the rule.
- *
- * <p>Mirrors {@link PendingApprovalAccessFilter} in shape: RFC 7807 body, stable {@code code},
- * minted correlation id, {@code basetool_http_error_total} increment, and the JWT {@code sub}
- * stamped into the MDC only for the duration of the rejection write.
- *
- * <p>Three exemptions and no more. The consent endpoints themselves, or there is no way through the
- * gate — refusing those would make the block permanent for everyone. The registration-status
- * endpoint, so a user who is <em>also</em> pending approval still gets routed to the waiting page
- * rather than to a consent page for a tool they cannot enter yet. And the served-version floor
- * ({@code /api/v1/app/version-policy}, REQ-SEC-052): it answers without a token at all, and the app
- * sends its bearer on every call once a session exists, so gating it here would refuse the
- * forced-update check to exactly the callers who cannot complete the consent flow.
+ * <p>Runs after {@link ActingMemberFilter}, so ingest-gateway requests are judged as the acting
+ * member. Exempt are the consent endpoints, the registration-status endpoint and {@code
+ * /api/v1/app/version-policy}. Shaped like {@link PendingApprovalAccessFilter}.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -81,26 +65,14 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
   /** Stable machine-readable code the frontend and the extractor map to a consent prompt. */
   static final String CODE_TERMS_NOT_ACCEPTED = "TERMS_NOT_ACCEPTED";
 
-  /** Parses the patterns below once; matching is per request and allocation-light. */
+  /** The shared parser for this filter's path patterns. */
   private static final PathPatternParser PATH_PARSER = PathPatternParser.defaultInstance;
 
   /**
-   * The surface this filter guards.
+   * The guarded surface, {@code /api/**}.
    *
-   * <p>Matched as a parsed {@link PathPattern} rather than with {@code
-   * requestURI.startsWith("/api/")}, because {@code getRequestURI()} is the <em>raw</em>
-   * percent-encoded URI while Spring MVC routes on the <em>decoded</em> path. A request for {@code
-   * /%61pi/v1/missions} fails a raw prefix test, so the gate would wave it through, and {@code
-   * RequestMappingHandlerMapping} would then decode {@code %61pi} to {@code api} and dispatch it —
-   * the consent record REQ-SEC-028 exists to produce would silently not be required. The default
-   * {@code StrictHttpFirewall} blocks {@code %2e}, {@code %2f}, {@code %25} and friends, but not
-   * {@code %61}.
-   *
-   * <p>{@link PathPattern} matches on {@code PathSegment#valueToMatch()}, which is decoded, so
-   * filter and routing agree. Note that {@code ServletRequestPathUtils} does <em>not</em> solve
-   * this: {@code PathContainer.Element#value()} is contractually the unmodified original.
-   *
-   * <p>Precedent: {@code filter.RateLimitingFilter} matches its configured paths the same way.
+   * <p>Matched as a {@link PathPattern} on the decoded path, so a percent-encoded request such as
+   * {@code /%61pi/...} cannot bypass the gate while still being routed.
    */
   private static final PathPattern API_SCOPE = PATH_PARSER.parse("/api/**");
 
@@ -110,18 +82,9 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
    */
   private static final List<PathPattern> EXEMPT_PATHS =
       List.of(
-          // The consent resource and its sub-resources — refusing these makes the block permanent
-          // for everyone, because no request would be left that could record consent.
           PATH_PARSER.parse("/api/v1/terms"),
           PATH_PARSER.parse("/api/v1/terms/**"),
-          // Lets a caller who is ALSO pending approval be routed to the waiting page instead.
           PATH_PARSER.parse("/api/v1/users/me/registration-status"),
-          // REQ-SEC-052: the second of the two reads that answer without any token. The terms
-          // wording above is already exempt via /api/v1/terms/**; this one is not covered by any
-          // pattern here and needs naming. The Android app attaches its bearer to every call once
-          // a session exists, so an unconsented member asking whether their build is still served
-          // would otherwise be refused — and the forced-update gate exists precisely for the case
-          // where the member cannot get through the flow that would let them consent.
           PATH_PARSER.parse("/api/v1/app/version-policy"));
 
   /** App-wide correlation-id response header. */
@@ -154,11 +117,8 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
   /**
    * Resolves the caller and decides whether they must be refused.
    *
-   * <p>Returns {@code null} — meaning "let through" — for anything that is not an authenticated
-   * {@code /api} call, for the exempt endpoints, and for a {@code sub} that is not a UUID. That
-   * last case is a service account or a malformed token, neither of which is a person who can
-   * accept anything; refusing them here would be the wrong control in the wrong place, and they are
-   * already governed by the audience and scope checks.
+   * <p>Lets through non-{@code /api} and unauthenticated requests, the exempt endpoints, and a
+   * {@code sub} that is not a UUID (a service account or malformed token).
    *
    * @param request the current request
    * @return the blocked user's id, or {@code null} when the request may proceed
@@ -171,18 +131,9 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
     if (!API_SCOPE.matches(path) || EXEMPT_PATHS.stream().anyMatch(p -> p.matches(path))) {
       return null;
     }
-    // Asked of AuthenticatedSubject, not of the type — and this one failed OPEN. A request the
-    // ingest gateway makes on behalf of a member carries no token (ADR-0129), so the old
-    // `instanceof JwtAuthenticationToken` test found none and returned null, which here means "let
-    // through". The consent gate silently stopped applying to the one path REQ-SEC-028 was extended
-    // to cover. A type check that waves callers through is the worst kind to get wrong.
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     UUID userId = AuthenticatedSubject.idOf(auth).orElse(null);
     if (userId == null) {
-      // No subject the seam recognises as a member id. NOT because a service account's `sub` looks
-      // different - a Keycloak service-account subject IS a UUID - but because the seam resolves a
-      // subject to a LOCAL member and a service account has no member row. Either way it is not a
-      // person who can accept anything; the audience and scope checks govern those callers.
       return null;
     }
     return termsConsentCheck.hasAcceptedCurrentTerms(userId) ? null : userId;
@@ -198,8 +149,6 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
    */
   private void writeForbidden(HttpServletRequest request, HttpServletResponse response, UUID userId)
       throws IOException {
-    // Counted as a distinct subject, not just as a request. See MetricNames.TERMS_REFUSED_SUBJECTS:
-    // the refusal rate alone cannot separate a locked-out membership from one client retrying.
     refusedSubjects.record(userId);
     boolean owned = stampUserId(userId);
     try {
@@ -236,9 +185,6 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
   private void writeForbiddenBody(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
     String correlationId = UUID.randomUUID().toString();
-    // DEBUG, not WARN: after a terms change this fires once per request for everyone who has not
-    // accepted yet, which is the feature working, not an incident. The metric below is the
-    // monitoring signal.
     log.debug(
         "Consent missing; refused {} {} [correlationId={}]",
         request.getMethod(),
@@ -249,9 +195,6 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
         .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, CODE_TERMS_NOT_ACCEPTED)
         .increment();
 
-    // Declared here rather than at the top of the method so each sits next to its use
-    // (Checkstyle VariableDeclarationUsageDistance). LocaleContextHolder is not populated this
-    // early in the filter chain, so the request's own Accept-Language is the authoritative source.
     Locale locale = request.getLocale();
     String title =
         messageSource.getMessage("problem.terms_not_accepted.title", null, "Forbidden", locale);

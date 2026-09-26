@@ -38,13 +38,10 @@ import lombok.Setter;
 /**
  * A single notification addressed to exactly one recipient.
  *
- * <p>Notifications form a per-user inbox isolated by {@link #recipientUserId} (the Keycloak {@code
- * sub}, which equals {@code app_user.id}); they are deliberately <b>not</b> org-unit scoped, so
- * this entity carries no owning org unit and is excluded from the staffel-scoped service whitelist
- * (REQ-NOTIF-004, mirrors the bank per-grant model). The {@link #type} plus the JSON {@link
- * #params} let the frontend render localized text without the backend ever storing a language
- * string, and the loose {@link #entityType}/{@link #entityId} pair deep-links back to the
- * originating aggregate while surviving its deletion.
+ * <p>Isolated per user by {@link #recipientUserId} and not org-unit scoped (REQ-NOTIF-004). The
+ * {@link #type} plus the JSON {@link #params} are rendered to localized text by the frontend; the
+ * loose {@link #entityType}/{@link #entityId} pair deep-links to the originating aggregate and
+ * survives its deletion.
  */
 @Entity
 @Table(name = "notification")

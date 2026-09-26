@@ -25,45 +25,12 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Fluent composer for the space-separated {@code key=value} {@code details} payload passed to
- * {@code AuditService.record(...)} / {@code BankAuditService.record(...)} (S8, #914).
+ * {@code AuditService.record(...)} / {@code BankAuditService.record(...)}.
  *
- * <p>Before this class the {@code details} string was hand-assembled as ad-hoc {@code "k=" + v + "
- * k2=" + v2} concatenation at ~100 call sites, which invited two recurring defects: format drift (a
- * missing separator space fusing {@code k1=v1k2=v2}, an inconsistent separator) and — because the
- * "no user free text / no PII in the details payload" rule of REQ-AUDIT-001 has no programmatic
- * enforcement — accidental copy-paste of a free-text or PII-bearing value into a detail. This
- * builder fixes the format in one place: {@link #of(String, Object)} starts the payload and each
- * {@link #with(String, Object)} appends {@code " key=value"}, so every migrated site emits exactly
- * {@code key=value key=value ...}.
- *
- * <p><b>The builder is the type-level seam.</b> {@code AuditService.record(...)} / {@code
- * BankAuditService.record(...)} take the {@code details} argument as {@link CharSequence}, and this
- * class implements it, so a migrated call site hands the composed {@code AuditDetails}
- * <em>directly</em> — {@code record(type, id, label, user, AuditDetails.of("k", v).with(...))} —
- * with no trailing {@code .toString()}. {@code record} renders it via {@link #toString()} before
- * persistence. A raw {@code String} is still a {@link CharSequence}, so the few non-{@code
- * key=value} payloads (bare tokens, free-form labels) keep passing a string unchanged; the builder
- * simply becomes the obvious path for the {@code key=value} shape.
- *
- * <p><b>Byte-equivalence contract (critical — audit is binding).</b> This composer is a drop-in for
- * the old concatenation: {@code AuditDetails.of("a", x).with("b", y).toString()} produces a string
- * <em>character-identical</em> to {@code "a=" + x + " b=" + y}. It achieves this by stringifying
- * every value through {@link String#valueOf(Object)} — the exact function the Java {@code +}
- * operator applies to a reference operand — so an enum renders as its {@code toString()}/{@code
- * name()}, a {@code UUID}/number/boolean as its {@code toString()}, and a {@code null} value as the
- * literal {@code "null"}, all identical to the pre-migration output. Values are never trimmed,
- * quoted, or otherwise altered.
- *
- * <p><b>Guard scope.</b> The only validation is on the <em>key</em>: it must be non-empty and
- * contain neither {@code '='} nor whitespace (a malformed key would corrupt the {@code key=value}
- * grammar or fuse two pairs). Keys are compile-time string literals at every call site, so a
- * violation is a deterministic programming error surfaced on the first test run — never data
- * dependent. The builder deliberately does <b>not</b> validate or reject value <em>content</em>:
- * {@code AuditService.record} is written to never throw and roll back the business transaction it
- * runs inside (it truncates rather than throws), and a value-content guard would be runtime-data
- * dependent and could do exactly that. The structural {@code key=value} uniformity this builder
- * enforces is the enabler for a future centralized policy check; the "no free-text/PII in values"
- * rule of REQ-AUDIT-001 remains a review-time discipline.
+ * <p>Implements {@link CharSequence} so it can be passed directly. Values are stringified with
+ * {@link String#valueOf(Object)}, so the output is identical to {@code "a=" + x + " b=" + y}. Only
+ * keys are validated; value content is not, and must contain no user free text or PII
+ * (REQ-AUDIT-001).
  */
 public final class AuditDetails implements CharSequence {
 
@@ -148,8 +115,7 @@ public final class AuditDetails implements CharSequence {
   }
 
   /**
-   * The character at the given index of the composed payload — the {@link CharSequence} contract,
-   * delegated to the backing buffer.
+   * Returns the character at the given index of the composed payload.
    *
    * @param index the zero-based character index
    * @return the character at {@code index}
@@ -162,8 +128,7 @@ public final class AuditDetails implements CharSequence {
   }
 
   /**
-   * A subsequence of the composed payload — the {@link CharSequence} contract, delegated to the
-   * backing buffer.
+   * Returns a subsequence of the composed payload.
    *
    * @param start the start index, inclusive
    * @param end the end index, exclusive

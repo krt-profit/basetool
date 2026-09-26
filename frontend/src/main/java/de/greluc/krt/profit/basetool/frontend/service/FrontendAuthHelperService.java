@@ -26,20 +26,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 /**
- * Centralised access point for the Spring Security {@link SecurityContextHolder} on the frontend
- * side.
- *
- * <p>The frontend module renders Thymeleaf pages on behalf of an OAuth2 browser session rather than
- * processing a JWT-bearing API call, so it has no JWT {@code sub} the way the backend does; the
- * helper therefore exposes only the predicates the rendering layer actually needs (is the caller
- * authenticated / anonymous? do they reach the admin or member role?). New callers should depend on
- * this bean instead of touching {@link SecurityContextHolder} directly so the request-scoped auth
- * contract stays testable through a single, mock-friendly seam.
- *
- * <p>Existing frontend touch points that still call {@link SecurityContextHolder} directly
- * (filters, exception handler, page controllers that propagate the JWT to the backend) are
- * out-of-scope for the Phase-6 follow-up — those reach into security context for low-level concerns
- * (bearer-token relay, MDC logging) where the indirection would not pay for itself.
+ * Centralised access to the Spring Security {@link SecurityContextHolder} for the frontend's
+ * rendering layer, exposing only the predicates it needs (authenticated, anonymous, admin, member
+ * or above).
  */
 @Service
 public class FrontendAuthHelperService {
@@ -80,17 +69,12 @@ public class FrontendAuthHelperService {
    * Roles#MEMBER_AUTHORITIES} authority, i.e. the caller is a registered organisation member or
    * above.
    *
-   * <p>Reads the authorities from the request {@link Authentication} — the SAME source {@code
-   * sec:authorize} and {@code @PreAuthorize} consult — rather than from {@code
-   * OidcUser#getAuthorities()}. Spring's {@code userAuthoritiesMapper} maps the Keycloak realm
-   * roles onto the {@link Authentication} token, NOT onto the {@code OidcUser} principal object, so
-   * a member check that reads the principal misses every {@code ROLE_*} unless {@code
-   * BackendRoleSyncFilter} happened to rebuild the principal that session — which made the
-   * member-only mission finance/refinery panel silently collapse whenever that one-shot sync was
-   * skipped (REQ-SEC-013). Anonymous tokens, missing security contexts and role-less callers all
-   * yield {@code false}.
+   * <p>Reads the authorities from the request {@link Authentication}, the same source {@code
+   * sec:authorize} and {@code @PreAuthorize} use, not from the {@code OidcUser} principal, which
+   * does not carry the mapped roles (REQ-SEC-013). Anonymous, missing and role-less callers yield
+   * {@code false}.
    *
-   * @return whether the current principal is a registered member or above.
+   * @return whether the current principal is a registered member or above
    */
   public boolean isMemberOrAbove() {
     Authentication auth = currentAuthentication();

@@ -46,15 +46,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for the two orchestration-level guard seams of {@link BankLedgerService#bookTransfer}
- * that fire before any ledger row is written: the destination-visibility gate (REQ-BANK-011) that
- * the orchestrator itself enforces, and the wiring that routes a holder-changing fee-inclusive
- * transfer through {@link BankBookingGuards#requireAmountExceedsFee} (REQ-BANK-033, #999) and
- * aborts the booking when it rejects. Pure Mockito with the extracted {@code BankPostingWriter} /
- * {@code BankBookingGuards} collaborators stubbed — the guards' own decision logic and the
- * KRT-account cap (REQ-BANK-047) are covered directly by {@link BankBookingGuardsTest}, and the
- * account-locking, overdraft and posting arithmetic by the Testcontainers {@code
- * BankLedgerServiceTest} / {@code BankLedgerSplitDepositTest}.
+ * Unit tests for the pre-write guards of {@link BankLedgerService#bookTransfer}: the
+ * destination-visibility gate (REQ-BANK-011) and the routing through {@link
+ * BankBookingGuards#requireAmountExceedsFee} (REQ-BANK-033).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -66,11 +60,8 @@ class BankLedgerServiceGuardTest {
 
   @InjectMocks private BankLedgerService bankLedgerService;
 
-  // ---- bookTransfer destination-visibility gate (REQ-BANK-011) ---------------------------------
-
   @Test
   void bookTransfer_destinationNotVisible_throwsAccessDeniedAndBooksNothing() {
-    // Given: a valid transfer to a DIFFERENT account whose destination the caller may not see.
     BankTransferRequest request =
         new BankTransferRequest(
             UUID.randomUUID(),
@@ -80,8 +71,6 @@ class BankLedgerServiceGuardTest {
             new BigDecimal("100"),
             "Bereichsanteil");
 
-    // When / Then: an invisible destination is refused before any account is locked or booked, so a
-    // dropped/inverted guard cannot leak money into an account the caller may not see.
     assertThrows(AccessDeniedException.class, () -> bankLedgerService.bookTransfer(request, false));
     verify(writer, never()).lockAccount(any());
     verify(writer, never())
@@ -90,14 +79,8 @@ class BankLedgerServiceGuardTest {
     verify(writer, never()).persistHolderPosting(any(), any(), any(), any());
   }
 
-  // ---- bookTransfer fee-inclusive amount<=fee guard wiring (REQ-BANK-033, #999) ----------------
-
   @Test
   void bookTransfer_feeInclusive_holderChange_delegatesToGuardAndBooksNothingWhenItRejects() {
-    // Given: a holder-CHANGING transfer in fee-inclusive mode where a punitive fee consumes the
-    // whole entered amount (fee 1 on amount 1 -> amount - fee = 0), so the extracted inclusive
-    // guard
-    // rejects it.
     UUID sourceAccountId = UUID.randomUUID();
     UUID destinationAccountId = UUID.randomUUID();
     when(writer.lockAccount(sourceAccountId)).thenReturn(areaAccount(sourceAccountId));
@@ -128,9 +111,6 @@ class BankLedgerServiceGuardTest {
             null,
             true);
 
-    // When / Then: bookTransfer routes the holder-changing inclusive path through the guard and
-    // propagates its rejection with the stable code, booking nothing — without the wiring the
-    // destination would get a zero/negative credit leg while the source was debited.
     BankConflictException ex =
         assertThrows(
             BankConflictException.class, () -> bankLedgerService.bookTransfer(request, true));
@@ -141,8 +121,6 @@ class BankLedgerServiceGuardTest {
     verify(writer, never()).persistAccountPosting(any(), any(), any(), any());
     verify(writer, never()).persistHolderPosting(any(), any(), any(), any());
   }
-
-  // ---- fixtures --------------------------------------------------------------------------------
 
   /**
    * Builds an active {@code AREA} account — a non-CARTEL, justification-optional type.

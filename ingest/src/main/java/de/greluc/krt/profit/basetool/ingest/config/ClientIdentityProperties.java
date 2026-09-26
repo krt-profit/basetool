@@ -26,46 +26,19 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration for the client-identity gate (prefix {@code app.ingest.client-identity},
- * REQ-INGEST-011). This is the control that decides <em>which client software</em> may drive the
- * gateway, as opposed to <em>which user</em> — the latter stays {@code isAuthenticated()} for every
- * member (REQ-INGEST-002/-008, unchanged).
+ * Configuration of the client-identity gate ({@code app.ingest.client-identity}, REQ-INGEST-011),
+ * which decides which client software may call the gateway. Every check is disabled while its value
+ * is empty or blank; values come from {@code APP_INGEST_CLIENT_IDENTITY_*}.
  *
- * <p><b>Every check is inert until configured.</b> An empty list or a blank string disables that
- * check entirely, exactly like the {@code app.security.jwt.expected-audiences} knob this module
- * already carries. That is deliberate and load-bearing: the Keycloak-side mappers, scopes and
- * audiences are an <em>operator</em> step that cannot be done by a PR ({@code
- * docs/INGEST_KEYCLOAK_SETUP.md}), so a build that shipped these gates pre-enabled would reject
- * every real extractor token the moment it deployed. Configure, verify against a live token, then
- * enable — the same sequencing discipline REQ-INGEST-008 imposes on the audience validator.
- *
- * <p>No value carries a default. The allowlist contents are operational configuration, not source:
- * the code shows <em>that</em> a gate exists, the environment decides <em>who</em> passes it.
- * Values come from the environment ({@code APP_INGEST_CLIENT_IDENTITY_*}) so a client can be added
- * or revoked without a rebuild — which also makes the allowlist the fast kill switch for a client
- * whose access must end now rather than at the next release.
- *
- * @param allowedClientIds Keycloak client ids ({@code azp} claim) allowed to call the ingest
- *     endpoints — normally just the desktop extractor's {@code basetool-sc-extractor}. Empty (the
- *     default) disables the check. When non-empty the check is <b>fail-closed in both
- *     directions</b>: a token whose {@code azp} is absent is rejected just like one whose {@code
- *     azp} is unknown. Holding several ids at once makes a client-id rotation possible without
- *     downtime
- * @param requiredScope OAuth scope an ingest caller's token must carry, mapped by Spring Security
- *     to the {@code SCOPE_<value>} authority; blank (the default) disables the check. <b>Operator
- *     trap:</b> do <em>not</em> set this to {@code extractor-ingest} — per {@code
- *     docs/keycloak/realm-config.reference.json} that scope is a default scope on the frontend
- *     client as well and carries {@code include.in.token.scope: "false"}, so it can neither
- *     discriminate nor reach the {@code scope} claim; the setup runbook provisions {@code
- *     extractor-ingest-only} for exactly this reason (step 7a)
- * @param allowedTools producer identifiers ({@code tool} field of the extract / blueprint export)
- *     accepted as provenance. Empty (the default) disables the check. The weakest of the gates and
- *     not load-bearing: the field is client-supplied and therefore trivially forgeable — telemetry
- *     with a reject attached, never authentication
- * @param auditOnly when {@code true}, every configured check above logs and counts its verdict but
- *     <b>never rejects</b> the request. The safe way to turn the gates on in production: configure
- *     the values, watch {@code basetool_ingest_client_rejected_total} for a scrape interval, and
- *     flip this off once it stays at zero
+ * @param allowedClientIds Keycloak client ids ({@code azp}) allowed to call the ingest endpoints;
+ *     empty disables the check. When set, a token with an absent or unknown {@code azp} is rejected
+ * @param requiredScope OAuth scope the token must carry (as {@code SCOPE_<value>}); blank disables
+ *     the check. Must be a scope present only on extractor tokens, e.g. {@code
+ *     extractor-ingest-only}
+ * @param allowedTools accepted producer identifiers ({@code tool} field); empty disables the check.
+ *     Client-supplied, so provenance only, not authentication
+ * @param auditOnly when {@code true}, configured checks log and count their verdict but never
+ *     reject
  */
 @Validated
 @ConfigurationProperties(prefix = "app.ingest.client-identity")

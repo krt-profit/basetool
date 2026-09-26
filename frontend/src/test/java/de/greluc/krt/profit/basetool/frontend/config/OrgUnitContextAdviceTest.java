@@ -47,13 +47,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * Unit tests for {@link OrgUnitContextAdvice}. Two groups: (1) the slow-changing catalogue reads —
- * both {@code availableSquadrons()} and the admin switcher's {@code availableOrgUnits()} must route
- * the Squadron / SpecialCommand catalogues through the URI-keyed {@code getCached} path
- * (REQ-DATA-007), never a plain per-render GET; (2) the {@code activeSquadronId} resolver and its
- * four branches (session pin, admin-without-pin → all-scopes null, non-admin → backend
- * active-org-unit fallback, and backend-failure → null) — the value every OrgUnit-derived attribute
- * (title, badge, all-squadrons mode, promotion visibility) hangs off.
+ * Unit tests for {@link OrgUnitContextAdvice}: the catalogue reads go through the cached path
+ * (REQ-DATA-007), and {@code activeSquadronId} resolves correctly in its four branches.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitContextAdviceTest {
@@ -69,10 +64,6 @@ class OrgUnitContextAdviceTest {
 
   @Test
   void availableSquadrons_routesSquadronCatalogueThroughCache() {
-    // REQ-DATA-007: the squadron catalogue is a slow-changing global list fetched on every
-    // authenticated render; it must go through the CacheDomain.SQUADRON cache (getCached), not a
-    // per-render plain GET. getCached is unstubbed (returns null → advice degrades to empty); the
-    // assertion is about the routing, not the payload.
     when(authHelper.isAuthenticated()).thenReturn(true);
 
     advice().availableSquadrons(new MockHttpServletRequest());
@@ -84,18 +75,12 @@ class OrgUnitContextAdviceTest {
 
   @Test
   void switcher_asksTheServerWhichOrgUnitsMayBePinned_ratherThanBranchingItself() {
-    // Replaces the pair of tests that pinned this class's own admin/non-admin fork. The rule moved
-    // to GET /api/v1/me/org-units (ADR-0151, REQ-SEC-048): an admin gets the active catalogue,
-    // everyone else their memberships, decided once on the server. Two clients each knowing the
-    // rule is how the Android app came to offer an admin nothing to pin at all.
     when(authHelper.isAuthenticated()).thenReturn(true);
 
     advice().availableOrgUnits(new MockHttpServletRequest());
 
-    // FE-PERF-01: the answer is the orgUnits part of the one /me/layout read.
     verify(backendApiClient).get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class);
     verify(backendApiClient, never()).get(eq("/api/v1/me/org-units"), anyTypeRef());
-    // The catalogues this class used to page-walk for admins are no longer its business.
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
   }
@@ -110,9 +95,6 @@ class OrgUnitContextAdviceTest {
 
   @Test
   void activeSquadronId_sessionPin_isReturned() {
-    // Branch 1: an active session pin (set by MeFrontendController) wins outright — no isAdmin
-    // check, no backend round-trip. A regression here makes an admin's pinned OrgUnit invisible to
-    // the layout (title/badge show "Alle Staffeln" while data is scoped to the pin).
     UUID pinned = UUID.randomUUID();
     when(authHelper.isAuthenticated()).thenReturn(true);
     HttpSession session = mock(HttpSession.class);
@@ -125,8 +107,6 @@ class OrgUnitContextAdviceTest {
 
   @Test
   void activeSquadronId_adminWithoutPin_isNull() {
-    // Branch 2: an authenticated admin with no session pin resolves to null (all-scopes mode) and
-    // must NOT fall through to the non-admin backend lookup.
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(request.getSession(false)).thenReturn(null);
     when(authHelper.isAdmin()).thenReturn(true);
@@ -137,9 +117,6 @@ class OrgUnitContextAdviceTest {
 
   @Test
   void activeSquadronId_nonAdmin_fallsBackToBackendActiveOrgUnit() {
-    // Branch 3: a non-admin without a session pin resolves the persistent home Staffel via the
-    // activeOrgUnitId part of GET /api/v1/me/layout (formerly /me/active-org-unit). A break here
-    // stops resolving the home staffel.
     UUID home = UUID.randomUUID();
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(request.getSession(false)).thenReturn(null);
@@ -152,8 +129,6 @@ class OrgUnitContextAdviceTest {
 
   @Test
   void activeSquadronId_backendFailure_degradesToNull() {
-    // Branch 4: a backend hiccup on the non-admin fallback degrades silently to null rather than
-    // 500ing the layout render.
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(request.getSession(false)).thenReturn(null);
     when(authHelper.isAdmin()).thenReturn(false);

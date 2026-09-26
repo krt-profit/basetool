@@ -1,28 +1,4 @@
 #!/usr/bin/env bash
-# =============================================================================================
-# Self-test for scripts/cgroup-container-metrics.py
-#
-# The collector reads cgroup v2 files and writes them where node_exporter's textfile collector
-# will serve them. Two things make it worth testing hermetically rather than against a live host:
-#
-#   - the values it produces feed alerts that replace the cAdvisor ones, so a silent parsing bug
-#     is an alert that never fires, which looks exactly like a healthy system;
-#   - the cases that matter most are the ones a healthy host never shows -- a prior OOM kill, a
-#     throttled cgroup, an unlimited one -- and waiting for production to produce them is not a
-#     test strategy.
-#
-# So it builds a fake cgroup tree with those states baked in and asserts the output. No kernel, no
-# containers, no privileges. The layout mirrors rootless Quadlet exactly, so the collector's
-# DEFAULT pattern is what gets exercised rather than a convenient one.
-#
-# If docker is available it also runs `promtool check metrics` over the result, because "I read
-# the output and it looked like exposition format" is not the same claim as "Prometheus accepts
-# it". Skipped, not failed, where docker is absent.
-#
-# Requires: bash, python3. Optional: docker (for the promtool leg).
-#
-#   bash scripts/cgroup-container-metrics.test.sh
-# =============================================================================================
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,7 +20,6 @@ say() { printf '%s\n' "$*"; }
 ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
 bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
 
-# assert_line <label> <extended-regex>
 assert_line() {
   local label=$1 pattern=$2
   if grep -Eq -- "$pattern" "$OUT"; then
@@ -63,12 +38,9 @@ assert_absent() {
   fi
 }
 
-# ---------------------------------------------------------------------------------------------
-# A fake cgroup tree, shaped exactly like rootless Quadlet's so the DEFAULT pattern is tested.
-# ---------------------------------------------------------------------------------------------
 USER_SLICE="${FAKE}/user.slice/user-1000.slice/user@1000.service"
 
-make_container() { # dir  memory.max  pids.max  oom_kill  nr_throttled  [nr_periods]
+make_container() {
   local dir=$1 memmax=$2 pidsmax=$3 oom=$4 throttled=$5 periods=${6:-4200}
   mkdir -p "$dir"
   cat > "${dir}/cpu.stat" <<EOF
@@ -103,13 +75,7 @@ EOF
   printf '%s\n' "${pidsmax}" > "${dir}/pids.max"
 }
 
-# A Quadlet container as podman actually lays it out under --cgroups=split: the unit's cgroup is
-# only a parent, with NO limit of its own (memory.max "max", pids.max the user manager's default,
-# zero CFS periods), and the container's limits sit on its libpod-payload-<id> child beside
-# conmon's `runtime`. Measured on production 2026-09-22. Until then this fixture put the limits on
-# the unit itself -- the one place they never are -- so it stayed green while production reported
-# every container as unlimited and never throttled.
-make_quadlet() { # unit-dir  memory.max  pids.max  oom_kill  nr_throttled
+make_quadlet() {
   local unit=$1
   make_container "$unit" max 97670 0 0 0
   make_container "${unit}/runtime" max max 0 0 0
@@ -118,21 +84,12 @@ make_quadlet() { # unit-dir  memory.max  pids.max  oom_kill  nr_throttled
 }
 
 say "building a fake cgroup tree in ${FAKE}"
-# limits set, quiet
 make_quadlet "${USER_SLICE}/backend.service" 268435456 100 0 0
-# unlimited -- both ceilings read the literal string "max"
 make_quadlet "${USER_SLICE}/app.slice/edge.service" max max 0 0
-# has been OOM-killed before and is being throttled now
 make_quadlet "${USER_SLICE}/acme.service" 268435456 100 3 7
-# A plain user service with no payload child -- prometheus-podman-exporter is one on production.
-# It is read from its own cgroup, because there is nothing below it to prefer.
 make_container "${USER_SLICE}/app.slice/podman-exporter.service" 67108864 max 0 0
-# A Podman healthcheck in flight: a transient unit named <64-hex id>-<hex>, in the same slice as
-# the containers, matching the default pattern. It must never become a "container".
 make_container \
   "${USER_SLICE}/app.slice/$(printf 'e%.0s' {1..64})-623ad299e33d18f7.service" max max 0 0
-# A recreate caught mid-way: the old payload is still there but empty, the new one holds the
-# process. The live one must win even though the dead one sorts first.
 make_container "${USER_SLICE}/app.slice/keycloak.service" max 97670 0 0 0
 make_container "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf '0%.0s' {1..64})" \
   111 max 0 0
@@ -140,21 +97,13 @@ make_container "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf
   2684354560 2048 0 0
 printf '%s\n' "4343" \
   > "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf 'f%.0s' {1..64})/cgroup.procs"
-# a directory that matches the pattern but publishes nothing: a container that exited between
-# the walk and the read. It must be dropped, not emitted with zeros.
 mkdir -p "${USER_SLICE}/ghost.service"
-# The two HOST services, in the system slice where systemd puts them. alloy has a limit and has been
-# OOM-killed once; node-exporter has a limit and a clean record. Neither matches the container
-# pattern, so only the host-service lookup can find them.
 make_container "${FAKE}/system.slice/alloy.service" 536870912 max 1 0
 make_container "${FAKE}/system.slice/prometheus-node-exporter.service" 67108864 max 0 0
-# A system unit that is NOT named must stay invisible: the host runs dozens of them.
 make_container "${FAKE}/system.slice/sshd.service" max max 0 0
 
-# =============================================================================================
 say ""
 say "== it reads a rootless-Quadlet tree with the default pattern =="
-# =============================================================================================
 if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --output "$OUT" >/dev/null 2>&1; then
   ok "exits 0 and writes the file"
 else
@@ -171,13 +120,8 @@ assert_absent "neither is the payload or conmon's runtime cgroup" 'name="(libpod
 assert_line "counts only the containers it emitted" '^basetool_container_metrics_containers 5$'
 assert_line "stamps when it ran"              '^basetool_container_metrics_timestamp_seconds [0-9]'
 
-# =============================================================================================
 say ""
 say "== a Quadlet container is read from its payload cgroup, not from its unit =="
-# =============================================================================================
-# The unit's own cgroup reads memory.max "max", pids.max 97670 and zero CFS periods. Reading it
-# made every container look unlimited, which left ContainerMemoryHigh, ContainerPidsHigh and
-# ContainerCpuThrottledHigh without a denominator and three dashboard panels empty.
 assert_line "the memory limit is the payload's" \
   '^basetool_container_memory_limit_bytes\{name="backend"\} 268435456$'
 assert_line "the pids ceiling is the payload's" \
@@ -189,12 +133,8 @@ assert_line "a unit without a payload is read from its own cgroup" \
 assert_line "mid-recreate, the payload that holds a process wins" \
   '^basetool_container_memory_limit_bytes\{name="keycloak"\} 2684354560$'
 
-# =============================================================================================
 say ""
 say "== the two host services are read too, under the names they had as containers =="
-# =============================================================================================
-# Under Compose alloy and node-exporter were containers and the container alerts watched them.
-# Under Podman they are host services, and until 2026-09-22 nothing read their cgroups at all.
 assert_line "alloy is read from system.slice/alloy.service" \
   '^basetool_container_memory_limit_bytes\{name="alloy"\} 536870912$'
 assert_line "...under its container name, so ContainerOomKilled keeps its meaning" \
@@ -203,8 +143,6 @@ assert_line "node-exporter is read from its package's unit name" \
   '^basetool_container_memory_limit_bytes\{name="node-exporter"\} 67108864$'
 assert_absent "an unnamed system unit stays invisible" 'name="sshd'
 assert_line "host services are counted on their own" '^basetool_container_metrics_host_services 2$'
-# The container count must not include them, or FoundNothing could never fire on a host whose
-# container layout stopped matching while its host services kept running.
 assert_line "...and not as containers" '^basetool_container_metrics_containers 5$'
 
 if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --no-host-services --dry-run 2>/dev/null \
@@ -218,8 +156,6 @@ if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --host-service 'alloy.service' --dry
 else
   ok "a --host-service without =NAME is rejected"
 fi
-# A host whose stack is deliberately down still gets a file, and it says "0 containers" -- which is
-# what ContainerCgroupCollectorFoundNothing reads -- instead of no file at all.
 if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --pattern 'nothing-(?P<name>x)$' --dry-run 2>/dev/null \
      | grep -q '^basetool_container_metrics_containers 0$'; then
   ok "no containers but running host services writes containers 0"
@@ -227,24 +163,16 @@ else
   bad "no containers but running host services writes containers 0"
 fi
 
-# =============================================================================================
 say ""
 say "== the values are the ones the alerts will read =="
-# =============================================================================================
 assert_line "memory limit from memory.max" \
   '^basetool_container_memory_limit_bytes\{name="backend"\} 268435456$'
 assert_line "pids ceiling from pids.max" \
   '^basetool_container_pids_max\{name="backend"\} 100$'
 assert_line "anon memory is the RSS analogue" \
   '^basetool_container_memory_anon_bytes\{name="backend"\} 104857600$'
-# 134217728 - 20971520 = 113246208
 assert_line "working set is current minus reclaimable page cache" \
   '^basetool_container_memory_working_set_bytes\{name="backend"\} 113246208$'
-# The third series of the dashboard's memory breakdown. Mapped executables and libraries are page
-# cache, so they count toward the working set and toward no process's RSS -- which is what makes
-# the gap between anon and working set readable at all. The panel asked cAdvisor's
-# container_memory_mapped_file for it, and cAdvisor is deleted on this runtime, so the series was
-# absent and read as "this container maps nothing".
 assert_line "mapped file pages, the third series of the memory breakdown" \
   '^basetool_container_memory_mapped_file_bytes\{name="backend"\} 31457280$'
 assert_line "cpu seconds scaled from usec" \
@@ -252,8 +180,6 @@ assert_line "cpu seconds scaled from usec" \
 assert_line "throttled seconds scaled from usec" \
   '^basetool_container_cpu_throttled_seconds_total\{name="backend"\} 1\.25$'
 
-# The three signals prometheus-podman-exporter does not have at all. If any of these regresses,
-# ContainerOomKilled, ContainerCpuThrottledHigh and half of ContainerPidsHigh go blind.
 assert_line "OOM kills survive from memory.events" \
   '^basetool_container_oom_kills_total\{name="acme"\} 3$'
 assert_line "throttled periods survive from cpu.stat" \
@@ -261,23 +187,15 @@ assert_line "throttled periods survive from cpu.stat" \
 assert_line "a quiet container reports zero OOM kills, not nothing" \
   '^basetool_container_oom_kills_total\{name="backend"\} 0$'
 
-# =============================================================================================
 say ""
 say "== an unlimited cgroup becomes +Inf, not a sentinel =="
-# =============================================================================================
-# A ratio against +Inf is zero, so `used / limit > 0.9` simply never fires for an unlimited
-# container. A 0 there would divide by zero and a -1 would make it fire forever.
 assert_line "memory.max=max renders +Inf" \
   '^basetool_container_memory_limit_bytes\{name="edge"\} \+Inf$'
 assert_line "pids.max=max renders +Inf" \
   '^basetool_container_pids_max\{name="edge"\} \+Inf$'
 
-# =============================================================================================
 say ""
 say "== the file is well-formed and written atomically =="
-# =============================================================================================
-# node_exporter refuses a textfile that declares the same metric's type twice, which is what a
-# per-container layout produces and which parses fine by eye.
 DUPES="$(grep -E '^# TYPE ' "$OUT" | awk '{print $3}' | sort | uniq -d)"
 if [ -z "$DUPES" ]; then
   ok "each metric declares its TYPE exactly once"
@@ -297,13 +215,8 @@ else
   bad "ends with a newline"
 fi
 
-# =============================================================================================
 say ""
 say "== it refuses to produce a misleading file =="
-# =============================================================================================
-# An empty metrics file and a broken pattern look identical to Prometheus, and only one of them
-# is benign -- so finding nothing is an error rather than a file with nothing in it. "Nothing" means
-# no container AND no host service; the fake tree has host services, so they are switched off here.
 if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --no-host-services --pattern 'nothing-(?P<name>x)$' \
      --dry-run >/dev/null 2>&1; then
   bad "a pattern that matches nothing is an error"
@@ -331,10 +244,8 @@ else
   ok "an unwritable output is an error"
 fi
 
-# =============================================================================================
 say ""
 say "== Prometheus itself accepts the output =="
-# =============================================================================================
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   if docker run --rm -i --entrypoint promtool prom/prometheus:v3.14.0 check metrics < "$OUT" \
        >/dev/null 2>&1; then
@@ -348,7 +259,6 @@ else
   say "  skip  promtool leg - docker is not available here"
 fi
 
-# =============================================================================================
 say ""
 say "-------------------------------------------------------------"
 say "${PASSED} passed, ${FAILED} failed"

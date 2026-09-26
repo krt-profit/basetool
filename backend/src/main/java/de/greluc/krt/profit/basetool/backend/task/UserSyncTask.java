@@ -29,16 +29,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduled trigger for the Keycloak-&gt;local user reconciliation.
+ * Scheduled trigger for the Keycloak-to-local user reconciliation.
  *
- * <p>Runs {@link UserSyncService#syncFromKeycloak()} once per day on {@code app.keycloak.sync.cron}
- * in {@code app.keycloak.sync.zone} (default {@code 0 0 5 * * *} / {@code Europe/Berlin} — 05:00
- * local, off-peak). The reconciliation is a drift-correction safety net, not a live feed, and the
- * pre-2026-07 1-minute cadence was the accelerant behind the native-thread exhaustion incident; a
- * single daily off-peak burst keeps the Admin-API load bounded even at 5000 accounts. The
- * reconciliation logic lives in {@link UserSyncService} so it can be shared with the
- * admin-triggered manual run ({@code POST /api/v1/users/sync}) — the on-demand refresh path now
- * that the schedule is daily; this task is only the scheduled entry point plus its instrumentation.
+ * <p>Runs {@link UserSyncService#syncFromKeycloak()} on {@code app.keycloak.sync.cron} in {@code
+ * app.keycloak.sync.zone} (default daily at 05:00 {@code Europe/Berlin}). Admins can also trigger
+ * it on demand via {@code POST /api/v1/users/sync}.
  */
 @Component
 @RequiredArgsConstructor
@@ -50,10 +45,8 @@ public class UserSyncTask {
 
   /**
    * Runs the Keycloak reconciliation through {@link TaskMetrics}, publishing the {@code user_sync}
-   * execution counter, duration timer and last-success gauge (the source of the {@code
-   * UserSyncStale} alert). A whole-batch failure is recorded as {@code failure} and swallowed by
-   * the wrapper so the scheduler thread survives; the admin-triggered manual run uses {@link
-   * TaskMetrics#recordCountingRethrow} instead so the failure surfaces to the caller.
+   * execution metrics and last-success gauge. A failure is recorded and swallowed so the scheduler
+   * thread survives.
    */
   @Scheduled(
       cron = "${app.keycloak.sync.cron:0 0 5 * * *}",
@@ -63,13 +56,8 @@ public class UserSyncTask {
   }
 
   /**
-   * Publishes {@code basetool_scheduled_job_enabled{task="user_sync"} = 1}.
-   *
-   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
-   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
-   * Without it, following the documented instruction to disable a sweep before its first
-   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
-   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   * Publishes {@code basetool_scheduled_job_enabled{task="user_sync"} = 1}, so the stale-job alert
+   * can tell a disabled task from one that never succeeded.
    */
   @PostConstruct
   void publishEnabledGauge() {

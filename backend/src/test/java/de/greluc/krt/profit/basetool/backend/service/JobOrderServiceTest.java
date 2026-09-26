@@ -98,27 +98,12 @@ class JobOrderServiceTest {
 
   @Mock private AuditService auditService;
 
-  // The org-unit resolution, stock/claim DTO projection and priority queue were extracted to
-  // JobOrderOrgUnitResolver / JobOrderStockProjectionService / JobOrderPriorityService (L2, #921);
-  // JobOrderService now calls them. Mockito builds real instances from the same mocks, wired into
-  // jobOrderService via reflection in setUp() (Mockito does not inject one @InjectMocks into
-  // another; the priority service also gets the real projection chained in), so the
-  // create/update/delete/read paths keep exercising the real logic.
   @InjectMocks private JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
-  // of its arguments
   private JobOrderPriorityService jobOrderPriorityService;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: three of its collaborators are
-  // real, co-built services
   private JobOrderService jobOrderService;
 
-  // Read/write split (#14): the list/detail/picker reads moved to JobOrderQueryService, built from
-  // the same mocks with the real stock projection wired in below, so the moved read paths keep
-  // exercising the real logic from this fixture.
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
-  // of its arguments
   private JobOrderQueryService jobOrderQueryService;
 
   private Material material;
@@ -132,12 +117,6 @@ class JobOrderServiceTest {
 
   @BeforeEach
   void setUp() {
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     jobOrderPriorityService =
         new JobOrderPriorityService(
             jobOrderRepository, auditService, jobOrderStockProjectionService);
@@ -146,7 +125,7 @@ class JobOrderServiceTest {
             jobOrderRepository,
             materialRepository,
             inventoryItemRepository,
-            null, // jobOrderAssigneeService
+            null,
             orgUnitRepository,
             jobOrderOrgUnitResolver,
             authHelperService,
@@ -166,14 +145,11 @@ class JobOrderServiceTest {
             squadronMapper,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            null, // materialRequirementResolver
+            null,
             inventoryItemMapper);
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
-    // Phase 2 org-unit stamping: createJobOrder resolves a profit-eligible responsible org unit and
-    // a requesting org unit via OrgUnitRepository. Lenient defaults cover the authenticated happy
-    // path — guest-path and error-path tests override isAuthenticated / the repo stubs as needed.
     responsibleOrgUnitId = UUID.randomUUID();
     requestingOrgUnitId = UUID.randomUUID();
     Squadron responsible = new Squadron();
@@ -215,8 +191,6 @@ class JobOrderServiceTest {
 
     jobOrder = new JobOrder();
     jobOrder.setId(orderId);
-    // Fixtures stamp both org-unit refs explicitly (the responsible governs visibility from Phase 3
-    // on; the requesting is the customer).
     Squadron alpha = new Squadron();
     alpha.setShorthand("Alpha");
     jobOrder.setRequestingOrgUnit(alpha);
@@ -260,9 +234,6 @@ class JobOrderServiceTest {
 
   @Test
   void getAllJobOrders_nonViewer_returnsEmptyPageWithoutQuerying() {
-    // A caller who may not view orders (non-admin, no profit-eligible membership) short-circuits to
-    // an empty page — the scope predicate and the repository query are never reached, so the
-    // SK-public union can never leak to them.
     when(ownerScopeService.canViewJobOrders()).thenReturn(false);
 
     org.springframework.data.domain.Page<JobOrderDto> result =
@@ -277,7 +248,6 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_ShouldCalculateStockAndReturnDto() {
-    // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -297,10 +267,8 @@ class JobOrderServiceTest {
     when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
         .thenReturn(25.0);
 
-    // When
     JobOrderDto result = jobOrderService.createJobOrder(createDto);
 
-    // Then
     assertNotNull(result);
     assertEquals(orderId, result.id());
     assertEquals(1, result.priority());
@@ -310,7 +278,6 @@ class JobOrderServiceTest {
     verify(jobOrderRepository, times(2)).lockAllJobOrders();
     verify(jobOrderRepository).findMaxPriority();
     verify(jobOrderRepository).save(any(JobOrder.class));
-    // REQ-AUDIT-001: a material job-order create records exactly one JOB_ORDER_CREATED audit event.
     verify(auditService)
         .record(
             eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_CREATED),
@@ -322,8 +289,6 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_ShouldHonorMinQualityFromDto() {
-    // Given — DTO carries 650 (the predefined value); the service must persist it verbatim (650),
-    // not force a default.
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -343,11 +308,8 @@ class JobOrderServiceTest {
     when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
         .thenReturn(0.0);
 
-    // When
     jobOrderService.createJobOrder(createDto);
 
-    // Then — the saved JobOrder must carry minQuality == 650 (honored, not forced) on every
-    // material.
     verify(jobOrderRepository)
         .save(
             argThat(
@@ -358,8 +320,6 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_NullMinQuality_PersistsNull() {
-    // Given — DTO carries a null minQuality ("Keine"); the service must persist null (no floor),
-    // not coerce it to 650 or 0.
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, null, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -379,18 +339,14 @@ class JobOrderServiceTest {
     when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
         .thenReturn(0.0);
 
-    // When
     jobOrderService.createJobOrder(createDto);
 
-    // Then — every saved material's minQuality must be null. Use == null (not == 650) to avoid an
-    // NPE unbox.
     verify(jobOrderRepository)
         .save(argThat(jo -> jo.getMaterials().stream().allMatch(m -> m.getMinQuality() == null)));
   }
 
   @Test
   void createJobOrder_PersistsComment() {
-    // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
@@ -407,7 +363,6 @@ class JobOrderServiceTest {
     when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
         .thenReturn(0.0);
 
-    // When — comment with surrounding whitespace must be trimmed before persisting.
     jobOrderService.createJobOrder(
         new CreateJobOrderDto(
             responsibleOrgUnitId,
@@ -417,21 +372,17 @@ class JobOrderServiceTest {
             List.of(createMat),
             null));
 
-    // Then — trimmed value persisted.
     verify(jobOrderRepository).save(argThat(jo -> "Deliver fast".equals(jo.getComment())));
 
-    // When — a blank comment must normalise to null.
     jobOrderService.createJobOrder(
         new CreateJobOrderDto(
             responsibleOrgUnitId, requestingOrgUnitId, "Tester", "   ", List.of(createMat), null));
 
-    // Then — null comment persisted.
     verify(jobOrderRepository).save(argThat(jo -> jo.getComment() == null));
   }
 
   @Test
   void createJobOrder_MaterialNotFound_ShouldThrowException() {
-    // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -440,16 +391,12 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
 
-    // When/Then
     assertThrows(NotFoundException.class, () -> jobOrderService.createJobOrder(createDto));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
   @Test
   void createJobOrder_MissingResponsible_Throws() {
-    // Creating an order requires a login (ADR-0149), so there is no forgiving path any more: the
-    // responsible pick is mandatory for everyone. This replaces four guest tests that pinned the
-    // intake-Spezialkommando fallback -- the whole mechanism went with the public request form.
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 5.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(null, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
@@ -460,8 +407,6 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_NonProfitEligibleResponsible_Throws() {
-    // The profit-eligibility rule used to have two readings -- a 400 for an authenticated caller,
-    // a silent fallback for a guest. One caller kind is left, so one reading is left.
     Squadron notEligible = new Squadron();
     notEligible.setId(responsibleOrgUnitId);
     notEligible.setShorthand("NOPE");
@@ -479,7 +424,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderPriority_ShouldReorderAndNormalize() {
-    // Given
     JobOrder otherJob = new JobOrder();
     otherJob.setId(UUID.randomUUID());
     otherJob.setPriority(2);
@@ -492,10 +436,8 @@ class JobOrderServiceTest {
             any(UUID.class), any(UUID.class), any()))
         .thenReturn(10.0);
 
-    // When
     JobOrderDto result = jobOrderService.updateJobOrderPriority(orderId, 2);
 
-    // Then
     assertEquals(2, jobOrder.getPriority());
     assertEquals(1, otherJob.getPriority());
     assertNotNull(result);
@@ -503,7 +445,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderStatus_ToCompleted_ShouldRemovePriorityAndNormalize() {
-    // Given
     jobOrder.setPriority(3);
     jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
     jobOrder.setVersion(1L);
@@ -515,12 +456,10 @@ class JobOrderServiceTest {
             any(UUID.class), any(UUID.class), any()))
         .thenReturn(10.0);
 
-    // When
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
             orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
 
-    // Then
     assertNull(jobOrder.getPriority());
     assertEquals(JobOrderStatus.COMPLETED, jobOrder.getStatus());
     assertNotNull(result);
@@ -530,7 +469,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderStatus_ToRejected_ShouldRemovePriorityAndNormalizeAndUnlink() {
-    // Given
     jobOrder.setPriority(3);
     jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
     jobOrder.setVersion(1L);
@@ -542,12 +480,10 @@ class JobOrderServiceTest {
             any(UUID.class), any(UUID.class), any()))
         .thenReturn(10.0);
 
-    // When
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
             orderId, new UpdateJobOrderStatusDto(JobOrderStatus.REJECTED, 1L));
 
-    // Then
     assertNull(jobOrder.getPriority());
     assertEquals(JobOrderStatus.REJECTED, jobOrder.getStatus());
     assertNotNull(result);
@@ -557,7 +493,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderStatus_ToInProgress_ShouldNotUnlink() {
-    // Given
     jobOrder.setPriority(2);
     jobOrder.setStatus(JobOrderStatus.OPEN);
     jobOrder.setVersion(1L);
@@ -568,12 +503,10 @@ class JobOrderServiceTest {
             any(UUID.class), any(UUID.class), any()))
         .thenReturn(10.0);
 
-    // When
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
             orderId, new UpdateJobOrderStatusDto(JobOrderStatus.IN_PROGRESS, 1L));
 
-    // Then
     assertEquals(JobOrderStatus.IN_PROGRESS, jobOrder.getStatus());
     assertNotNull(result);
     verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
@@ -581,12 +514,10 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderStatus_VersionMismatch_ShouldThrow409() {
-    // Given
     jobOrder.setVersion(5L);
     jobOrder.setStatus(JobOrderStatus.OPEN);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
-    // When / Then
     assertThrows(
         org.springframework.orm.ObjectOptimisticLockingFailureException.class,
         () ->
@@ -598,7 +529,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderStatus_ToActive_FromCompleted_ShouldAssignNewPriority() {
-    // Given
     jobOrder.setPriority(null);
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
     jobOrder.setVersion(2L);
@@ -611,12 +541,10 @@ class JobOrderServiceTest {
             any(UUID.class), any(UUID.class), any()))
         .thenReturn(10.0);
 
-    // When
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
             orderId, new UpdateJobOrderStatusDto(JobOrderStatus.OPEN, 2L));
 
-    // Then
     assertEquals(1, jobOrder.getPriority());
     assertEquals(JobOrderStatus.OPEN, jobOrder.getStatus());
     assertNotNull(result);
@@ -624,12 +552,10 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderPriority_CompletedJobOrder_ShouldThrowException() {
-    // Given
     jobOrder.setPriority(null);
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
-    // When/Then
     assertThrows(
         BadRequestException.class,
         () -> {
@@ -640,32 +566,25 @@ class JobOrderServiceTest {
 
   @Test
   void deleteJobOrder_ShouldLockAndNormalize() {
-    // Given
     jobOrder.setPriority(3);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
 
-    // When
     jobOrderService.deleteJobOrder(orderId);
 
-    // Then
     verify(jobOrderRepository, times(2)).lockAllJobOrders();
     verify(jobOrderRepository).delete(jobOrder);
-    // Allocations cascade with the order (job_order_id ON DELETE CASCADE, V217) — no explicit call.
   }
 
   @Test
   void updateJobOrder_OptimisticLockingFailure_ShouldThrowException() {
-    // Given
     jobOrder.setVersion(2L);
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(
-            null, null, "Tester", null, List.of(updateMat), 1L); // version mismatch
+        new CreateJobOrderDto(null, null, "Tester", null, List.of(updateMat), 1L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
-    // When/Then
     assertThrows(
         org.springframework.orm.ObjectOptimisticLockingFailureException.class,
         () -> {
@@ -676,9 +595,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrder_RetargetsRequesting_AndIgnoresResponsible() {
-    // The regular update path retargets the requesting (customer) org unit but NEVER touches the
-    // responsible (processing) org unit — that is changed only via the dedicated reassignment
-    // endpoint. Any responsibleOrgUnitId in the update DTO is ignored.
     Squadron responsibleOriginal = new Squadron();
     responsibleOriginal.setId(UUID.randomUUID());
     responsibleOriginal.setShorthand("RESP");
@@ -695,7 +611,6 @@ class JobOrderServiceTest {
     bravo.setShorthand("Bravo");
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
-    // A non-null responsibleOrgUnitId is supplied but must be ignored by the update path.
     CreateJobOrderDto updateDto =
         new CreateJobOrderDto(UUID.randomUUID(), bravoId, "Tester", null, List.of(updateMat), null);
 
@@ -707,7 +622,6 @@ class JobOrderServiceTest {
 
     jobOrderService.updateJobOrder(orderId, updateDto);
 
-    // Responsible unchanged (same reference); requesting flipped to "Bravo".
     assertSame(responsibleOriginal, jobOrder.getResponsibleOrgUnit());
     assertNotNull(jobOrder.getRequestingOrgUnit());
     assertEquals("Bravo", jobOrder.getRequestingOrgUnit().getShorthand());
@@ -715,7 +629,6 @@ class JobOrderServiceTest {
 
   @Test
   void reassignResponsibleOrgUnit_Admin_MovesToProfitEligibleTarget() {
-    // Admin may reassign freely to any profit-eligible org unit.
     Squadron current = new Squadron();
     current.setId(UUID.randomUUID());
     current.setShorthand("CUR");
@@ -732,8 +645,6 @@ class JobOrderServiceTest {
     when(authHelperService.isAdmin()).thenReturn(true);
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    // The order is now responsible to an SK, so mapToDtoWithStock enriches it with the claim view
-    // (Phase 5, #345).
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
         .thenReturn(java.util.List.of());
 
@@ -760,14 +671,10 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrder_ShouldUpdateFieldsAndUnlinkRemovedMaterials() {
-    // Given
     UUID newMaterialId = UUID.randomUUID();
     Material newMaterial = new Material();
     newMaterial.setId(newMaterialId);
 
-    // Post Phase 7 part 3 / V90 the resolver is UUID-only; pass a typed `requestingSquadronId`
-    // and stub the repository to map it to a "Beta" squadron so the assertion below pins the
-    // requesting-squadron-flip contract.
     UUID betaId = UUID.randomUUID();
     Squadron beta = new Squadron();
     beta.setId(betaId);
@@ -783,29 +690,20 @@ class JobOrderServiceTest {
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
-    // When
     jobOrderService.updateJobOrder(orderId, updateDto);
 
-    // Then — requesting squadron flipped to the resolved "Beta" target.
     assertNotNull(jobOrder.getRequestingOrgUnit());
     assertEquals("Beta", jobOrder.getRequestingOrgUnit().getShorthand());
     assertEquals("NewTester", jobOrder.getHandle());
 
-    // Check if the old material was unlinked
     verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
 
-    // Verify the persist flushes (saveAndFlush) so the in-place response carries the fresh
-    // @Version.
     verify(jobOrderRepository).saveAndFlush(jobOrder);
   }
 
   @Test
   void updateJobOrder_flushesSoReturnedVersionIsFresh() {
-    // Regression (#571): updateJobOrder maps the response DTO inside the open transaction, so the
-    // @Version bump must be flushed (saveAndFlush) before toDto — otherwise the in-place edit modal
-    // receives a stale pre-flush version and the user's next consecutive edit 409s. Assert the
-    // flush, and that a plain save() (which defers the bump to commit) is never used on this path.
     UUID betaId = UUID.randomUUID();
     Squadron beta = new Squadron();
     beta.setId(betaId);
@@ -828,8 +726,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderAsRequester_publishesEventAndAudits() {
-    // REQ-ORDERS-023: a requester's material edit audits as JOB_ORDER_UPDATED and notifies the
-    // processing unit (a JobOrderUpdatedByRequesterEvent is published on commit).
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
         new CreateJobOrderDto(null, null, null, "requester note", List.of(updateMat), null);
@@ -855,7 +751,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderAsRequester_frozenOnceDelivered_throws400() {
-    // Whole-order freeze: a requester cannot edit an order that already has a delivery.
     jobOrder.getHandovers().add(new de.greluc.krt.profit.basetool.backend.model.JobOrderHandover());
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
@@ -870,8 +765,6 @@ class JobOrderServiceTest {
 
   @Test
   void getRequestedJobOrders_emptyMembership_returnsEmptyPageWithoutHittingRepo() {
-    // REQ-ORDERS-023: an anonymous / memberless caller resolves to zero direct memberships and gets
-    // an empty page — the scoped query is never issued (no all-orders leak).
     when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(java.util.Set.of());
 
     org.springframework.data.domain.Page<JobOrderDto> page =
@@ -884,8 +777,6 @@ class JobOrderServiceTest {
 
   @Test
   void getRequestedJobOrders_nullStatuses_defaultsToAllStatuses_scopedToDirectMembership() {
-    // A null/empty status filter expands to every status, and the scope is the caller's OWN direct
-    // memberships (resolved server-side — clients cannot inject org-unit ids).
     UUID requestingUnitId = UUID.randomUUID();
     when(ownerScopeService.currentDirectMembershipOrgUnitIds())
         .thenReturn(java.util.Set.of(requestingUnitId));
@@ -909,7 +800,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateItemJobOrderAsRequester_nonItemOrder_throws400() {
-    // The requester item endpoint refuses a MATERIAL order (mirrors the logistician item path).
     JobOrder materialOrder = new JobOrder();
     materialOrder.setId(orderId);
     materialOrder.setType(JobOrderType.MATERIAL);
@@ -928,7 +818,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateItemJobOrderAsRequester_frozenOnceItemDelivered_throws400() {
-    // Whole-order freeze: an item order that already has an item handover cannot be edited.
     JobOrder itemOrder = new JobOrder();
     itemOrder.setId(orderId);
     itemOrder.setType(JobOrderType.ITEM);
@@ -951,16 +840,11 @@ class JobOrderServiceTest {
 
   @Test
   void updateItemJobOrderAsRequester_rebuildsUnlinksRemovedMaterialNotifiesAndAudits() {
-    // REQ-ORDERS-023 canonical unlink ordering: rebuild the lines and saveAndFlush FIRST, THEN run
-    // the clearAutomatically unlink for every material no longer required, then re-fetch, withdraw
-    // orphan claims, notify the processing unit and audit as JOB_ORDER_ITEM_UPDATED (byRequester).
     JobOrder itemOrder = new JobOrder();
     itemOrder.setId(orderId);
     itemOrder.setType(JobOrderType.ITEM);
     itemOrder.setVersion(1L);
     itemOrder.setHandle("Tester");
-    // The requester-update notification reads the responsible + requesting org-unit refs, so stamp
-    // both (a bare order would NPE in publishJobOrderUpdatedByRequester).
     Squadron responsibleUnit = new Squadron();
     responsibleUnit.setId(UUID.randomUUID());
     responsibleUnit.setShorthand("RESP");
@@ -974,9 +858,6 @@ class JobOrderServiceTest {
         .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
     UUID keptMaterial = UUID.randomUUID();
     UUID removedMaterial = UUID.randomUUID();
-    // requiredMaterialIds: {kept, removed} before the rebuild, {kept} after -> `removed` is
-    // unlinked.
-    // Chained thenReturn (not varargs) to avoid the unchecked generic-array varargs warning.
     when(jobOrderItemService.requiredMaterialIds(itemOrder))
         .thenReturn(java.util.Set.of(keptMaterial, removedMaterial))
         .thenReturn(java.util.Set.of(keptMaterial));
@@ -1020,17 +901,11 @@ class JobOrderServiceTest {
 
   @Test
   void updateItemJobOrderAsRequester_rebuildsUnlinksRemovedGameItemNotifiesAndAudits() {
-    // Game-item sibling of the removed-material unlink (REQ-INV-031): rebuild the lines and
-    // saveAndFlush FIRST, THEN drop the order's allocation slices for exactly the game item the
-    // rebuilt line set no longer requests — a surviving line's game item is never unlinked, and the
-    // material-side unlink stays untouched when no material was removed.
     JobOrder itemOrder = new JobOrder();
     itemOrder.setId(orderId);
     itemOrder.setType(JobOrderType.ITEM);
     itemOrder.setVersion(1L);
     itemOrder.setHandle("Tester");
-    // The requester-update notification reads the responsible + requesting org-unit refs, so stamp
-    // both (a bare order would NPE in publishJobOrderUpdatedByRequester).
     Squadron responsibleUnit = new Squadron();
     responsibleUnit.setId(UUID.randomUUID());
     responsibleUnit.setShorthand("RESP");
@@ -1044,10 +919,6 @@ class JobOrderServiceTest {
         .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
     UUID keptGameItem = UUID.randomUUID();
     UUID removedGameItem = UUID.randomUUID();
-    // requiredGameItemIds: {kept, removed} before the rebuild, {kept} after -> `removed` is
-    // unlinked. requiredMaterialIds stays unstubbed (empty both times), so the material unlink
-    // loop never runs. Chained thenReturn (not varargs) to avoid the unchecked generic-array
-    // varargs warning.
     when(jobOrderItemService.requiredGameItemIds(itemOrder))
         .thenReturn(java.util.Set.of(keptGameItem, removedGameItem))
         .thenReturn(java.util.Set.of(keptGameItem));
@@ -1074,12 +945,10 @@ class JobOrderServiceTest {
     inOrder
         .verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndGameItem(orderId, removedGameItem);
-    // Exactly ONE game-item unlink runs — for the removed game item, never the surviving one.
     verify(inventoryItemRepository, times(1))
         .deleteJobOrderAllocationsByJobOrderAndGameItem(any(), any());
     verify(inventoryItemRepository, never())
         .deleteJobOrderAllocationsByJobOrderAndGameItem(orderId, keptGameItem);
-    // No material vanished from the requirement set, so the material-side unlink is untouched.
     verify(inventoryItemRepository, never())
         .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
     verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(itemOrder);
@@ -1098,21 +967,12 @@ class JobOrderServiceTest {
   @Test
   void
       completeJobOrderWithinTransaction_ShouldFlushBeforeLockQuery_ToAvoidOptimisticLockConflict() {
-    // Given — reproduces the root cause of the 409 bug:
-    // completeJobOrderWithinTransaction() modifies jobOrder in-memory (status, priority),
-    // then calls normalizePriorities() which issues a PESSIMISTIC_WRITE lock query via
-    // lockAllJobOrders(). Without a flush() before that query, the DB still holds the old
-    // @Version value while Hibernate has already incremented it in-memory, causing an
-    // ObjectOptimisticLockingFailureException on the final transaction flush.
-    // Fix: jobOrderRepository.flush() is called before normalizePriorities().
     jobOrder.setStatus(JobOrderStatus.OPEN);
     jobOrder.setPriority(1);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
 
-    // When — must not throw any exception
     assertDoesNotThrow(() -> jobOrderService.completeJobOrderWithinTransaction(jobOrder));
 
-    // Then — flush() must be called BEFORE lockAllJobOrders() to sync the @Version to DB
     var inOrder = inOrder(jobOrderRepository);
     inOrder.verify(jobOrderRepository).flush();
     inOrder.verify(jobOrderRepository).lockAllJobOrders();
@@ -1124,14 +984,11 @@ class JobOrderServiceTest {
 
   @Test
   void completeJobOrderWithinTransaction_ShouldNotNormalize_WhenAlreadyTerminal() {
-    // Given — if the order is already COMPLETED, normalizePriorities() must NOT be called
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
     jobOrder.setPriority(null);
 
-    // When
     assertDoesNotThrow(() -> jobOrderService.completeJobOrderWithinTransaction(jobOrder));
 
-    // Then — no flush, no lock query, no unlink since wasTerminal=true
     verify(jobOrderRepository, never()).flush();
     verify(jobOrderRepository, never()).lockAllJobOrders();
     verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
@@ -1139,7 +996,6 @@ class JobOrderServiceTest {
 
   @Test
   void getInventoryItemsForJobOrderMaterial_ShouldReturnMappedDtos() {
-    // Given
     de.greluc.krt.profit.basetool.backend.model.InventoryItem item =
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(UUID.randomUUID());
@@ -1171,11 +1027,9 @@ class JobOrderServiceTest {
         .thenReturn(List.of(item));
     when(inventoryItemMapper.toDto(item)).thenReturn(itemDto);
 
-    // When
     List<InventoryItemDto> result =
         jobOrderQueryService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
 
-    // Then
     assertNotNull(result);
     assertEquals(1, result.size());
     assertEquals(itemDto.id(), result.get(0).id());
@@ -1187,14 +1041,11 @@ class JobOrderServiceTest {
 
   @Test
   void unlinkMaterial_ShouldCallUnlinkAndRemoveMaterialFromJobOrder() {
-    // Given
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
 
-    // When
     jobOrderService.unlinkMaterial(orderId, materialId);
 
-    // Then
     verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
     verify(jobOrderRepository).save(jobOrder);
@@ -1204,10 +1055,8 @@ class JobOrderServiceTest {
 
   @Test
   void unlinkMaterial_WhenJobOrderNotFound_ShouldThrowNotFound() {
-    // Given
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-    // When / Then
     NotFoundException ex =
         assertThrows(
             NotFoundException.class, () -> jobOrderService.unlinkMaterial(orderId, materialId));
@@ -1217,11 +1066,9 @@ class JobOrderServiceTest {
 
   @Test
   void unlinkMaterial_WhenMaterialNotLinked_ShouldThrowNotFound() {
-    // Given
     UUID otherMaterialId = UUID.randomUUID();
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
-    // When / Then
     NotFoundException ex =
         assertThrows(
             NotFoundException.class,
@@ -1232,8 +1079,6 @@ class JobOrderServiceTest {
 
   @Test
   void unlinkInventoryItem_ShouldDropTheOrdersAllocationSlice() {
-    // Given — an entry earmarked to this order via a job-order allocation slice (Variante C,
-    // REQ-INV-027). Unlinking must drop that slice (R2) while the entry survives in the Lager.
     UUID inventoryItemId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.backend.model.InventoryItem item =
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
@@ -1244,10 +1089,8 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
 
-    // When
     jobOrderService.unlinkInventoryItem(orderId, inventoryItemId);
 
-    // Then — the order's slice is gone; the entry keeps no earmark to it.
     assertTrue(
         item.getJobOrderAllocations().stream()
             .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(orderId)),
@@ -1258,11 +1101,9 @@ class JobOrderServiceTest {
 
   @Test
   void unlinkInventoryItem_WhenJobOrderNotFound_ShouldThrowNotFound() {
-    // Given
     UUID inventoryItemId = UUID.randomUUID();
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-    // When / Then
     NotFoundException ex =
         assertThrows(
             NotFoundException.class,
@@ -1272,12 +1113,10 @@ class JobOrderServiceTest {
 
   @Test
   void unlinkInventoryItem_WhenInventoryItemNotFound_ShouldThrowNotFound() {
-    // Given
     UUID inventoryItemId = UUID.randomUUID();
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.empty());
 
-    // When / Then
     NotFoundException ex =
         assertThrows(
             NotFoundException.class,
@@ -1286,7 +1125,6 @@ class JobOrderServiceTest {
 
   @Test
   void unlinkInventoryItem_WhenItemNotLinkedToOrder_ShouldThrowNotFound() {
-    // Given
     UUID inventoryItemId = UUID.randomUUID();
     UUID otherOrderId = UUID.randomUUID();
     JobOrder otherOrder = new JobOrder();
@@ -1296,13 +1134,11 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
     item.setAmount(10.0);
-    // Earmarked to a DIFFERENT order, so this order has no slice to drop -> NotFound.
     InventoryAllocations.addJobOrder(item, otherOrder, 10.0, false);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
 
-    // When / Then
     NotFoundException ex =
         assertThrows(
             NotFoundException.class,
@@ -1312,7 +1148,6 @@ class JobOrderServiceTest {
   @Test
   void
       getInventoryItemsForJobOrderMaterial_ShouldReturnItemsSortedByOwnerAscQualityDescLocationAscAmountDesc() {
-    // Given
     de.greluc.krt.profit.basetool.backend.model.InventoryItem i1 =
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     i1.setId(UUID.randomUUID());
@@ -1332,7 +1167,6 @@ class JobOrderServiceTest {
     LocationReferenceDto locA = new LocationReferenceDto(UUID.randomUUID(), "ArcCorp");
     LocationReferenceDto locB = new LocationReferenceDto(UUID.randomUUID(), "Baijini");
 
-    // Same owner "Alpha", same quality 80, different location → ArcCorp before Baijini
     InventoryItemDto dto1 =
         new InventoryItemDto(
             i1.getId(),
@@ -1352,7 +1186,6 @@ class JobOrderServiceTest {
             1L,
             null,
             null);
-    // Same owner "Alpha", higher quality 90 → comes before quality 80
     InventoryItemDto dto2 =
         new InventoryItemDto(
             i2.getId(),
@@ -1372,7 +1205,6 @@ class JobOrderServiceTest {
             1L,
             null,
             null);
-    // Owner "Beta" → after all "Alpha" entries
     InventoryItemDto dto3 =
         new InventoryItemDto(
             i3.getId(),
@@ -1392,8 +1224,6 @@ class JobOrderServiceTest {
             1L,
             null,
             null);
-    // Same owner "Alpha", same quality 80, same location ArcCorp, higher amount → comes before
-    // lower amount
     InventoryItemDto dto4 =
         new InventoryItemDto(
             i4.getId(),
@@ -1423,13 +1253,9 @@ class JobOrderServiceTest {
     when(inventoryItemMapper.toDto(i3)).thenReturn(dto3);
     when(inventoryItemMapper.toDto(i4)).thenReturn(dto4);
 
-    // When
     List<InventoryItemDto> result =
         jobOrderQueryService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
 
-    // Then
-    // Expected order: dto2 (Alpha, q90, ArcCorp, 3), dto4 (Alpha, q80, ArcCorp, 10), dto1 (Alpha,
-    // q80, Baijini, 5), dto3 (Beta, q70, ArcCorp, 20)
     assertNotNull(result);
     assertEquals(4, result.size());
     assertEquals(dto2.id(), result.get(0).id(), "1st: Alpha, quality 90, ArcCorp");
@@ -1440,8 +1266,6 @@ class JobOrderServiceTest {
 
   @Test
   void getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired() {
-    // REQ-ORDERS-019: of the inventory linked to the order, only the item whose material is NOT a
-    // requirement is returned (the invisible, orphaned link — the Torite -> #71 case).
     UUID orderId = UUID.randomUUID();
     UUID requiredMatId = UUID.randomUUID();
     UUID orphanMatId = UUID.randomUUID();
@@ -1502,9 +1326,6 @@ class JobOrderServiceTest {
 
   @Test
   void getOrphanedLinkedInventoryReturnsOnlyItemEarmarksWhoseGameItemIsNotRequested() {
-    // REQ-INV-031: of the item stock earmarked to an ITEM order, only the row whose game item no
-    // line of the order requests anymore is flagged orphaned — the game-item sibling of the
-    // REQ-ORDERS-019 material case, loaded through its own dedicated repository seam.
     UUID orderId = UUID.randomUUID();
     UUID requestedGameItemId = UUID.randomUUID();
     UUID orphanGameItemId = UUID.randomUUID();
@@ -1530,7 +1351,6 @@ class JobOrderServiceTest {
     orphanRow.setId(UUID.randomUUID());
     orphanRow.setGameItem(orphanGameItem);
 
-    // A game-item row carries no material and no quality (REQ-INV-029).
     InventoryItemDto orphanDto =
         new InventoryItemDto(
             orphanRow.getId(),
@@ -1552,7 +1372,6 @@ class JobOrderServiceTest {
             null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    // The order's lines request only game item A; the material seam stays empty (unstubbed).
     when(jobOrderItemService.requiredGameItemIds(order))
         .thenReturn(java.util.Set.of(requestedGameItemId));
     when(inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(orderId))
@@ -1566,17 +1385,8 @@ class JobOrderServiceTest {
     verify(inventoryItemMapper, never()).toDto(requestedRow);
   }
 
-  // ---------------------------------------------------------------
-  // updateJobOrderStatus — COMPLETED audit edge-gating (JobOrderService.java:568-582)
-  // ---------------------------------------------------------------
-
   @Test
   void updateJobOrderStatus_openToCompleted_recordsJobOrderCompletedNotStatusChanged() {
-    // A genuine OPEN -> COMPLETED manual transition crosses the completion EDGE
-    // (previousStatus != COMPLETED), so the endpoint records exactly one JOB_ORDER_COMPLETED
-    // (autoCompleted=false) and NEVER a JOB_ORDER_STATUS_CHANGED — the same single-event funnel the
-    // auto-completion path uses. Gating on the edge (not on status alone) is what keeps a real
-    // completion from being misclassified as a plain status change.
     jobOrder.setPriority(3);
     jobOrder.setStatus(JobOrderStatus.OPEN);
     jobOrder.setVersion(1L);
@@ -1591,7 +1401,6 @@ class JobOrderServiceTest {
     jobOrderService.updateJobOrderStatus(
         orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
 
-    // Exactly one JOB_ORDER_COMPLETED, carrying the from-status and the autoCompleted=false marker.
     verify(auditService)
         .record(
             eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_COMPLETED),
@@ -1599,7 +1408,6 @@ class JobOrderServiceTest {
             any(),
             any(),
             argThat(d -> d != null && d.toString().equals("from=OPEN autoCompleted=false")));
-    // The manual completion is NOT also emitted as a STATUS_CHANGED (no duplicate audit row).
     verify(auditService, never())
         .record(
             eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_STATUS_CHANGED),
@@ -1611,11 +1419,6 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderStatus_completedToCompleted_recordsStatusChangedOnly() {
-    // An idempotent re-save of an already-COMPLETED order does NOT cross the completion edge
-    // (previousStatus == COMPLETED), so it is a plain JOB_ORDER_STATUS_CHANGED and must NEVER emit
-    // a
-    // second JOB_ORDER_COMPLETED — otherwise every no-op PUT status=COMPLETED would double-count a
-    // completion in the audit log and any basetool_* completion metric derived from it.
     jobOrder.setPriority(null);
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
     jobOrder.setVersion(1L);
@@ -1629,7 +1432,6 @@ class JobOrderServiceTest {
     jobOrderService.updateJobOrderStatus(
         orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
 
-    // A no-op completed->completed re-save records STATUS_CHANGED (from == to), not COMPLETED.
     verify(auditService)
         .record(
             eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_STATUS_CHANGED),
@@ -1644,20 +1446,11 @@ class JobOrderServiceTest {
             any(),
             any(),
             any());
-    // Not a terminal EDGE, so no priority reshuffle / inventory unlink runs on the idempotent save.
     verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
   }
 
-  // ---------------------------------------------------------------
-  // reassignResponsibleOrgUnit — non-admin escalation gate (JobOrderService.java:1310-1320)
-  // ---------------------------------------------------------------
-
   @Test
   void reassignResponsibleOrgUnit_NonAdmin_EscalatesOwnSquadronToSk_succeeds() {
-    // The one move a non-admin logistician/officer may make: escalate an order responsible to a
-    // squadron they may edit up to a Spezialkommando. All three sub-conditions hold
-    // (currentIsSquadron && targetIsSpecialCommand && mayEditCurrent), so the gate lets it through
-    // and the responsible org unit is flipped to the SK target.
     UUID currentId = UUID.randomUUID();
     Squadron current = new Squadron();
     current.setId(currentId);
@@ -1676,7 +1469,6 @@ class JobOrderServiceTest {
     when(authHelperService.canEditOrgUnit(currentId)).thenReturn(true);
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    // The order is now SK-responsible, so mapToDtoWithStock enriches it with the claim view.
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
         .thenReturn(java.util.List.of());
 
@@ -1688,9 +1480,6 @@ class JobOrderServiceTest {
 
   @Test
   void reassignResponsibleOrgUnit_NonAdmin_ToAnotherSquadron_throwsAccessDenied() {
-    // targetIsSpecialCommand regression guard: even from an editable own squadron, a non-admin may
-    // NOT hand the order to another squadron — only escalate to an SK. The target is a squadron, so
-    // the gate denies it and nothing is persisted (cross-tenant escalation prevented).
     UUID currentId = UUID.randomUUID();
     Squadron current = new Squadron();
     current.setId(currentId);
@@ -1716,10 +1505,6 @@ class JobOrderServiceTest {
 
   @Test
   void reassignResponsibleOrgUnit_NonAdmin_OnSkResponsibleOrder_throwsAccessDenied() {
-    // currentIsSquadron regression guard: a non-admin may not mutate an order already responsible
-    // to
-    // an SK (currentIsSquadron == false), even when the target is a profit-eligible SK and the
-    // caller may edit the current unit. The gate denies it and nothing is persisted.
     UUID currentId = UUID.randomUUID();
     SpecialCommand current = new SpecialCommand();
     current.setId(currentId);
@@ -1745,11 +1530,6 @@ class JobOrderServiceTest {
 
   @Test
   void reassignResponsibleOrgUnit_NonAdmin_CannotEditCurrentSquadron_throwsAccessDenied() {
-    // mayEditCurrent regression guard: escalating to an SK is allowed only for a squadron the
-    // caller
-    // may edit. A foreign squadron's order (canEditOrgUnit == false) must be denied so a
-    // logistician
-    // cannot escalate another squadron's order across the tenant boundary.
     UUID currentId = UUID.randomUUID();
     Squadron current = new Squadron();
     current.setId(currentId);
@@ -1772,10 +1552,6 @@ class JobOrderServiceTest {
         () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
-
-  // ---------------------------------------------------------------
-  // updateItemJobOrder — item-order edit (item lines + metadata)
-  // ---------------------------------------------------------------
 
   @org.junit.jupiter.api.Nested
   class UpdateItemJobOrderTests {
@@ -1846,14 +1622,11 @@ class JobOrderServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
       when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
       when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-      // mapToDtoWithStock reads the item projections for an ITEM order.
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
-      // Each line builds a distinct managed JobOrderItem.
       when(jobOrderItemService.buildItemLine(any()))
           .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
 
-      // Two lines, the second adopted as a sub-assembly of the first (parentClientLineId = 1).
       de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
           new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
               null,
@@ -1869,7 +1642,6 @@ class JobOrderServiceTest {
 
       jobOrderService.updateItemJobOrder(orderId, dto);
 
-      // Both lines were (re-)built and attached, and the orphan-claim reconciliation ran.
       verify(jobOrderItemService, times(2)).buildItemLine(any());
       assertEquals(2, order.getItems().size(), "the two new lines replace the old set");
       java.util.List<de.greluc.krt.profit.basetool.backend.model.JobOrderItem> items =
@@ -1881,10 +1653,8 @@ class JobOrderServiceTest {
       assertEquals("edited", order.getHandle());
     }
 
-    // covers REQ-ORDERS-032 (an edit re-derives a matched line in place; production is not lost)
     @Test
     void matchedLine_isReDerivedInPlace_soBookedProductionSurvives() {
-      // Given an order whose single line already has 6 of 10 units manufactured...
       JobOrder order = itemOrder();
       de.greluc.krt.profit.basetool.backend.model.JobOrderItem existing =
           new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
@@ -1900,7 +1670,6 @@ class JobOrderServiceTest {
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
 
-      // ...and an edit that echoes the line's id (what the editor posts back).
       de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
           new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
               null,
@@ -1914,7 +1683,6 @@ class JobOrderServiceTest {
 
       jobOrderService.updateItemJobOrder(orderId, dto);
 
-      // The very same row is re-derived — not deleted and rebuilt — so the counter is intact.
       verify(jobOrderItemService, never()).buildItemLine(any());
       verify(jobOrderItemService).applyItemLine(eq(existing), any());
       assertEquals(1, order.getItems().size());
@@ -1922,10 +1690,8 @@ class JobOrderServiceTest {
       assertEquals(6, existing.getManufacturedAmount(), "booked production survives the edit");
     }
 
-    // covers REQ-ORDERS-032 (a line with booked production may not be dropped by an edit)
     @Test
     void droppingALineWithBookedProduction_throwsBadRequest() {
-      // Given an order whose line already has production booked...
       JobOrder order = itemOrder();
       de.greluc.krt.profit.basetool.backend.model.JobOrderItem produced =
           new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
@@ -1937,14 +1703,12 @@ class JobOrderServiceTest {
       when(jobOrderItemService.buildItemLine(any()))
           .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
 
-      // ...when the payload no longer mentions it (a different, brand-new line instead)
       assertThrows(
           de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
           () -> jobOrderService.updateItemJobOrder(orderId, oneLine(1L)));
       verify(jobOrderRepository, never()).save(any(JobOrder.class));
     }
 
-    // covers REQ-ORDERS-032 (a payload claiming one line twice is rejected, not silently collapsed)
     @Test
     void twoPayloadLinesClaimingTheSameExistingLine_throwsBadRequest() {
       JobOrder order = itemOrder();
@@ -1975,7 +1739,6 @@ class JobOrderServiceTest {
       verify(jobOrderRepository, never()).save(any(JobOrder.class));
     }
 
-    // covers REQ-ORDERS-032 (the amount may not fall below what was already produced)
     @Test
     void loweringAmountBelowManufactured_throwsBadRequest() {
       JobOrder order = itemOrder();
@@ -2007,13 +1770,9 @@ class JobOrderServiceTest {
 
     @Test
     void happyPath_enrichesAggregatedMaterialsWithCollectionStock() {
-      // #595: the order overview shows an item order's aggregated material list with collection
-      // progress, so every aggregated bucket must carry currentStock — the order-linked inventory
-      // summed at the bucket's quality floor (GOOD -> 650), exactly like the MATERIAL rows.
       JobOrder order = itemOrder();
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
       when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-      // An ITEM base DTO with no MATERIAL lines, so only the aggregated path computes stock here.
       JobOrderDto itemBase =
           new JobOrderDto(
               orderId,
@@ -2063,10 +1822,6 @@ class JobOrderServiceTest {
           "GOOD bucket sums order-linked inventory at the 650 floor as collection progress");
     }
   }
-
-  // ---------------------------------------------------------------
-  // updateBlueprintVariantCounting — REQ-ORDERS-021 / #822
-  // ---------------------------------------------------------------
 
   @org.junit.jupiter.api.Nested
   class UpdateBlueprintVariantCountingTests {

@@ -25,24 +25,16 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /**
- * Entity → DTO mapper for {@link PersonalBlueprint}.
+ * Entity-to-DTO mapper for {@link PersonalBlueprint}.
  *
- * <p>The {@code ownerUserId} is never copied into the response — it is the internal isolation key
- * and must not leak to clients (see the multi-user data isolation rule). The optional output-item
- * association is flattened to its id; writes are applied field-by-field in the service (only {@code
- * acquiredAt} / {@code note} are mutable), so no entity-write mapping is needed here.
- *
- * <p>{@code removable} is not derivable from the entity alone — it depends on whether the product
- * is in the admin-managed default set (REQ-INV-016) — so the service computes it (from the cached
- * default-key set) and passes it in.
+ * <p>The {@code ownerUserId} is never exposed; {@code removable} is computed by the service
+ * (REQ-INV-016) and passed in.
  */
 @Mapper(config = CentralMapperConfig.class)
 public interface PersonalBlueprintMapper {
 
   /**
-   * Maps an owned blueprint to its response DTO, flattening the optional {@code outputItem}
-   * association to {@code outputItemId} ({@code null} when unresolved) and copying the
-   * service-computed {@code removable} flag.
+   * Maps an owned blueprint to its response DTO, flattening {@code outputItem} to its id.
    *
    * @param entity the owned blueprint
    * @param removable whether the owner may delete the entry ({@code false} for a default blueprint)

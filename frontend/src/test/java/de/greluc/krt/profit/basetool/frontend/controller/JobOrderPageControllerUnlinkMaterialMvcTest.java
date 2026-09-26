@@ -44,15 +44,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-Tests fuer den unlinkMaterial-POST-Pfad in {@link JobOrderWriteController#unlinkMaterial}.
- *
- * <p>Testet, dass Logistiker/Officer/Admin ein Material aus einem Auftrag entlinken koennen:
- *
- * <ul>
- *   <li>Logistiker kann Material entlinken (success-Toast + Redirect).
- *   <li>Einfacher Member ohne Logistiker-Rechte erhaelt 403 Forbidden.
- *   <li>Backend-Fehler bei Logistiker → error-Toast + Redirect.
- * </ul>
+ * MVC tests for {@link JobOrderWriteController#unlinkMaterial}: a logistician unlinks with a
+ * success toast, a plain member gets 403, and a backend error yields an error toast.
  */
 @SpringBootTest
 class JobOrderPageControllerUnlinkMaterialMvcTest {
@@ -76,7 +69,6 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkMaterial_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
       throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
 
@@ -84,13 +76,11 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
         .when(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/materials/" + materialId), eq(Void.class));
 
-    // When
     mockMvc
         .perform(
             post("/orders/" + orderId + "/materials/unlink")
                 .with(csrf())
                 .param("materialId", materialId.toString()))
-        // Then
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/orders/" + orderId))
         .andExpect(flash().attribute("successToast", "orders.detail.material.unlink.success"));
@@ -102,11 +92,9 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void unlinkMaterial_AsPlainMember_ShouldReturn403() throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
 
-    // When / Then
     mockMvc
         .perform(
             post("/orders/" + orderId + "/materials/unlink")
@@ -118,7 +106,6 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkMaterial_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
 
@@ -126,13 +113,11 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
         .when(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/materials/" + materialId), eq(Void.class));
 
-    // When
     mockMvc
         .perform(
             post("/orders/" + orderId + "/materials/unlink")
                 .with(csrf())
                 .param("materialId", materialId.toString()))
-        // Then
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/orders/" + orderId))
         .andExpect(flash().attribute("errorToast", "orders.detail.material.unlink.error"));

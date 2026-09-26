@@ -29,9 +29,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Unit test for {@link PdfResponses#pdfAttachment(byte[], String)}, pinning the exact status,
- * {@code Content-Type} and {@code Content-Disposition} that the former per-controller assembly
- * produced so the extraction is byte-for-byte behavior-preserving.
+ * Unit test for {@link PdfResponses#pdfAttachment(byte[], String)}, pinning the status, {@code
+ * Content-Type} and {@code Content-Disposition}.
  */
 class PdfResponsesTest {
 

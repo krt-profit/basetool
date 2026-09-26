@@ -47,13 +47,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Admin CRUD service for {@link NotificationRule}s.
  *
- * <p>Updates replace the selector collection wholesale (clear + re-add, relying on orphan removal)
- * and use an explicit optimistic-lock check mirrored from {@code SystemSettingService}; {@code
- * saveAndFlush} returns the bumped version so the admin form can write it straight back.
- *
- * <p>All six {@link SelectorKind}s are writable (REQ-NOTIF-007: every rule, seeded or not, is
- * editable at runtime). The three event-derived kinds ({@code ACCOUNT_GRANT}, {@code
- * EVENT_RECIPIENT}, {@code ACCOUNT_RESPONSIBLE}) are stored with every selector column null.
+ * <p>Updates replace the selectors wholesale under an optimistic-lock check. All {@link
+ * SelectorKind}s are writable (REQ-NOTIF-007); event-derived kinds are stored with every selector
+ * column null.
  */
 @Service
 @RequiredArgsConstructor
@@ -156,16 +152,8 @@ public class NotificationRuleService {
   private void applySelectors(
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     for (NotificationRuleSelectorWriteRequest selectorRequest : request.selectors()) {
-      // One catalogue read per ROLE selector, not two. validateSelector resolved the code to check
-      // it exists and canonicalRoleCode resolved the same string again to read its casing, inside
-      // the write transaction - so a rule with eight role selectors issued sixteen reads to answer
-      // eight questions. The validation now returns what it looked up.
       Role resolvedRole = validateSelector(selectorRequest);
       if (readsOnlyTheEvent(selectorRequest.kind())) {
-        // ACCOUNT_GRANT / EVENT_RECIPIENT / ACCOUNT_RESPONSIBLE take the account or the recipient
-        // from the event and read none of the selector columns. Whatever the request carried in
-        // them is dropped, so a stray value can never sit in a row looking as if it meant
-        // something.
         rule.addSelector(NotificationRuleSelector.builder().kind(selectorRequest.kind()).build());
         continue;
       }
@@ -173,9 +161,6 @@ public class NotificationRuleService {
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
               .userId(selectorRequest.userId())
-              // Stored in the catalogue's own casing, not the caller's: the recipient query is
-              // the case-sensitive `r.code = :roleCode`, so a rule saved as `admin` would match
-              // nobody while looking perfectly valid on the admin screen.
               .roleCode(resolvedRole != null ? resolvedRole.getCode() : null)
               .orgRelativeRole(selectorRequest.orgRelativeRole())
               .contextRole(selectorRequest.contextRole())
@@ -205,13 +190,6 @@ public class NotificationRuleService {
         if (roleCode == null) {
           throw new IllegalArgumentException("ROLE selector requires roleCode");
         }
-        // REQ-SEC-053: the code has to name a role that exists. It used to be any string the admin
-        // screen sent, and the screen offered `GUEST` — a role V239 deleted, so the rule would
-        // have addressed nobody, for ever, without saying so. A selector nobody can match is a
-        // notification silently not sent, which is the hardest kind of defect to notice.
-        //
-        // The resolved row is RETURNED rather than discarded: the caller needs its canonical
-        // casing, and looking the same string up twice for that is a read per selector wasted.
         return roleRepository
             .findByCodeIgnoreCase(roleCode)
             .orElseThrow(
@@ -225,27 +203,20 @@ public class NotificationRuleService {
               "ORG_RELATIVE_ROLE selector requires orgRelativeRole and contextRole");
         }
       }
-      case ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE -> {
-        // Nothing to validate: these kinds need no selector field, the account or the recipient
-        // comes from the event. They used to be refused here as "seed-only", which made every
-        // seeded rule carrying one (all the bank booking-request rules among them) impossible to
-        // save from the admin editor - not even to disable it - against REQ-NOTIF-007.
-      }
+      case ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE -> {}
       default ->
           throw new IllegalArgumentException("Unsupported selector kind: " + selector.kind());
     }
-    // Every arm but ROLE resolves no role, and the caller stores null for their roleCode.
     return null;
   }
 
   /**
-   * Tells whether a selector kind resolves its recipients purely from the event and therefore reads
-   * none of the selector columns ({@code userId}, {@code roleCode}, {@code orgRelativeRole}, {@code
-   * contextRole}).
+   * Tells whether a selector kind resolves its recipients purely from the event and reads no
+   * selector columns.
    *
    * @param kind the selector kind
    * @return {@code true} for {@code ACCOUNT_GRANT}, {@code EVENT_RECIPIENT} and {@code
-   *     ACCOUNT_RESPONSIBLE}, {@code false} for every kind that is configured through its columns
+   *     ACCOUNT_RESPONSIBLE}
    */
   private static boolean readsOnlyTheEvent(@NotNull SelectorKind kind) {
     return kind == SelectorKind.ACCOUNT_GRANT

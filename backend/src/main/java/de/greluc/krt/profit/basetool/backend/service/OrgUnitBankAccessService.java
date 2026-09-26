@@ -87,63 +87,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The org-unit-aware bridge between the bank and the org-unit oversight scope (ADR-0020/0028/0043).
+ * The single org-unit-aware seam between the bank and the org-unit oversight scope (ADR-0020): it
+ * authorizes against {@link OwnerScopeService} and then reuses the org-unit-blind bank code ({@link
+ * BankAccountService}, {@link BankStatementReportService}).
  *
- * <p>The bank's own authorization ({@code BankSecurityService}) is, by construction, blind to
- * org-unit membership — it decides visibility solely from the bank roles and {@code
- * bank_account_grant} rows (REQ-BANK-008, ADR-0011), and the {@code
- * bankClassesMustNotConsultOrgUnitScope} ArchUnit rule pins that by forbidding every {@code
- * Bank*}-named class from depending on {@link OwnerScopeService}. The org-unit features need
- * exactly the opposite input: who oversees / is responsible for which org unit. This class is the
- * single, deliberately non-{@code Bank*}-named seam that carries that org-unit logic; it authorizes
- * here and then reuses the bank's own org-unit-blind read/PDF code ({@link BankAccountService},
- * {@link BankStatementReportService}), so the bank stays 100% org-unit-blind.
- *
- * <p>The org-unit authorization brain (who may view / configure / is responsible for an account)
- * stays in this bridge, because it couples {@link OwnerScopeService} to the bank-account repository
- * and only this class may (ADR-0020, {@code orgUnitAwareBankSeamIsContainedToOneClass}). The L3
- * split (#922) extracted the two write-mechanics slabs it orchestrates — the view-grant
- * grant/revoke ({@link OrgUnitBankVisibilityService}, incl. the shared {@code createViewGrant}
- * factory) and the approval-limit upsert/clear ({@link OrgUnitBankApprovalLimitService}) — into
- * focused collaborators that hold no org-unit scope: each facade settings method still loads +
- * authorizes + validates here, then delegates the persistence + audit to the collaborator and
- * re-reads the settings snapshot.
- *
- * <p>The OwnerScope-free responsible-holder reverse-resolution (who oversees an account, resolved
- * from the outside with no current principal) and its leadership-change audit were split out under
- * audit Thema 7 (#14) into {@link OrgUnitBankResponsibilityService}: those methods wire no {@link
- * OwnerScopeService}, so they legally sit outside this seam without eroding {@code
- * orgUnitAwareBankSeamIsContainedToOneClass} (ADR-0020).
- *
- * <p>It serves four things on the org-unit bank page:
- *
- * <ul>
- *   <li><b>The card list</b> (F1, REQ-BANK-021/-027/-028): the balance — and, since REQ-BANK-036,
- *       the balance target — of every account the caller may view ({@link #canView}).
- *   <li><b>The read-only drill-in</b> (REQ-BANK-038): the account detail + history + a
- *       Halter-redacted Kontoauszug for any account the caller may view; no booking actions.
- *   <li><b>Booking requests</b> (F2): a <em>deposit</em> against any active account by any caller
- *       (REQ-BANK-042); a <em>withdrawal / transfer</em> only against an account the caller may
- *       view (REQ-BANK-039), subject to the per-tier approval limits (REQ-BANK-041).
- *   <li><b>The responsibility settings</b> (REQ-BANK-035/-036): the derived responsible holder
- *       (and, for Sonderkonten, the OL) configures who else may view the account and sets the
- *       balance target.
- * </ul>
- *
- * <p><b>Who may view an account</b> ({@link #canView}) — admins see all; otherwise by type:
- *
- * <ul>
- *   <li>{@code ORG_UNIT}/{@code AREA}: the cascading oversight scope ({@link
- *       OwnerScopeService#currentOversightScope()}) <em>or</em> a holder-configured view grant
- *       (membership-role bucket / all-members / individual user).
- *   <li>{@code CARTEL} (the KRT account): every KRT member (fixed, REQ-BANK-037), plus the OL via
- *       oversight.
- *   <li>{@code CARTEL_BANK}: only its responsible holder — the {@code BEREICHSLEITER} of a {@code
- *       Department.PROFIT} Bereich (bank staff use the bank surface).
- *   <li>{@code SPECIAL} (Sonderkonten, REQ-BANK-037): every OL member and every {@code
- *       BEREICHSLEITER} automatically, plus OL-configured grants (global-role / all-members /
- *       individual user). Bereichskoordinatoren/-operatoren and officers do <em>not</em> see them.
- * </ul>
+ * <p>Serves the org-unit bank page: the account cards, the read-only drill-in, booking requests,
+ * and the responsibility settings (view grants, balance target, approval limits). Visibility is
+ * decided by {@link #canView}.
  */
 @Service
 @RequiredArgsConstructor
@@ -196,20 +146,11 @@ public class OrgUnitBankAccessService {
   private final OrgUnitBankVisibilityService orgUnitBankVisibilityService;
   private final OrgUnitBankApprovalLimitService orgUnitBankApprovalLimitService;
 
-  // ---------------------------------------------------------------------------------------------
-  // F1 — card list
-  // ---------------------------------------------------------------------------------------------
-
   /**
-   * Lists the balance of every active bank account the caller may view on the org-unit bank page
-   * (REQ-BANK-021/-027/-028/-035/-037, F1). The visible set is decided by {@link #canView} per
-   * account; the view grants of the candidate accounts are loaded in one batched query so the
-   * filter adds no per-account N+1 (REQ-DATA-003). Each card also carries the 30-day trend
-   * (REQ-BANK-016), the balance target (REQ-BANK-036) and whether the caller may open the account's
-   * settings.
+   * Lists every active account the caller may view, with balance, 30-day trend, balance target and
+   * settings affordance (REQ-BANK-021).
    *
-   * @return the visible account balances, ordered by account number; never {@code null}, empty when
-   *     the caller may view no active account
+   * @return the visible account balances ordered by account number; empty when none
    */
   @NotNull
   @Transactional(readOnly = true)
@@ -255,11 +196,7 @@ public class OrgUnitBankAccessService {
               List<BankPostingSlice> slices =
                   slicesByAccount.getOrDefault(account.getId(), List.of());
               BigDecimal delta = BankTrendCalculator.windowDelta(slices);
-              // REQ-BANK-039: eligibility = view eligibility — every viewable, request-capable
-              // account the caller can already see is requestable.
               boolean canRequest = isRequestCapable(account);
-              // REQ-BANK-041 (owner decision): the responsible holder is bound by no ceiling on
-              // their own account, so no limit is resolved and the card carries the exempt flag.
               boolean approvalExempt = canRequest && isApprovalExempt(account);
               BigDecimal approvalLimit =
                   canRequest && !approvalExempt
@@ -279,15 +216,9 @@ public class OrgUnitBankAccessService {
         .toList();
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // Read-only drill-in (REQ-BANK-038)
-  // ---------------------------------------------------------------------------------------------
-
   /**
-   * Returns the read-only account detail for an account the caller may view (REQ-BANK-038). Reuses
-   * the bank-staff detail aggregate ({@link BankAccountService#getAccountDetail}) but with
-   * all-false capabilities, and adds the org-unit-side affordances (export statement, manage
-   * settings, raise a request).
+   * Returns the read-only detail of an account the caller may view (REQ-BANK-038), with all
+   * bank-staff capabilities off.
    *
    * @param accountId the account to open
    * @return the read-only detail
@@ -300,10 +231,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireViewableAccount(accountId);
     BankAccountDetailDto detail =
         bankAccountService.getAccountDetail(accountId, READ_ONLY_CAPABILITIES);
-    // REQ-BANK-039: any viewer of a request-capable account may request against it.
     boolean canRequest = isRequestCapable(account);
-    // REQ-BANK-041 (owner decision): an exempt holder is subject to no ceiling at all, so the
-    // display limit stays null and the flag tells the form to suppress the approval warning.
     boolean approvalExempt = canRequest && isApprovalExempt(account);
     BigDecimal applicableLimit =
         canRequest && !approvalExempt ? resolveApplicableLimit(account) : null;
@@ -319,15 +247,14 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Returns one page of an account's booking history for an org-unit viewer (REQ-BANK-038), with
-   * the player-custody ("Halter") columns <b>redacted</b> — {@code holderHandle} and {@code
-   * counterHolderHandle} are nulled so custody never crosses the wire to org-unit viewers.
+   * Returns one page of an account's booking history with the holder handles redacted
+   * (REQ-BANK-038).
    *
    * @param accountId the account to read
    * @param pageable page, size and whitelisted sort
-   * @param from inclusive lower bound on the booking instant, or {@code null} for no lower bound
-   * @param to inclusive upper bound on the booking instant, or {@code null} for no upper bound
-   * @return one page of redacted booking rows inside the (optionally bounded) period
+   * @param from inclusive lower bound on the booking instant, or {@code null}
+   * @param to inclusive upper bound on the booking instant, or {@code null}
+   * @return one page of redacted booking rows
    * @throws NotFoundException when the account does not exist
    * @throws AccessDeniedException when the caller may not view the account
    */
@@ -345,11 +272,7 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Returns the balance-over-time series of an account an org-unit viewer may see (REQ-BANK-049),
-   * for the detail page's balance chart. The org-unit view authorization is enforced here; the
-   * series itself is pure balance math with no holder/counterparty data, so nothing is redacted —
-   * every viewer who may see the account (and thus its current balance in the facts strip) may see
-   * how that balance moved over time.
+   * Returns the balance-over-time series of an account the caller may view (REQ-BANK-049).
    *
    * @param accountId the account
    * @param from inclusive period start
@@ -367,15 +290,12 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Generates the Halter-redacted account statement PDF for an org-unit viewer (REQ-BANK-038). The
-   * org-unit authorization is enforced here; the generation reuses {@link
-   * BankStatementReportService#generateStatement(UUID, Instant, Instant, ZoneId, boolean)} with
-   * redaction on, which also records the {@code STATEMENT_EXPORTED} audit event for the org-unit
-   * actor.
+   * Generates the holder-redacted statement PDF for an account the caller may view (REQ-BANK-038)
+   * and records the {@code STATEMENT_EXPORTED} audit event.
    *
    * @param accountId the account
-   * @param from period start (inclusive)
-   * @param to period end (inclusive)
+   * @param from inclusive period start
+   * @param to inclusive period end
    * @param userZone the zone to render timestamps in, or {@code null} for UTC
    * @return the redacted PDF bytes
    * @throws NotFoundException when the account does not exist
@@ -392,14 +312,9 @@ public class OrgUnitBankAccessService {
     return bankStatementReportService.generateStatement(accountId, from, to, userZone, true);
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // Settings — balance target + configurable visibility (REQ-BANK-035/-036)
-  // ---------------------------------------------------------------------------------------------
-
   /**
-   * Returns the responsibility settings of one account for its holder/OL settings panel
-   * (REQ-BANK-035/-036): the current balance target, the configurable role/all-members/user grants,
-   * and which controls the caller may use.
+   * Returns an account's responsibility settings: balance target, view grants and the controls the
+   * caller may use (REQ-BANK-035).
    *
    * @param accountId the account
    * @return the settings snapshot
@@ -418,22 +333,15 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Sets, changes or clears an account's balance target (REQ-BANK-036). Only the responsible holder
-   * may do this from the org-unit side; bank staff use the bank surface. A {@code null} target
-   * clears the goal; a present target is a positive whole amount — enforced at the API boundary by
-   * the {@code @Valid} {@code OrgUnitBalanceTargetRequest}'s
-   * {@code @DecimalMin("1")}/{@code @WholeNumber} constraints (same gate the bank-surface path
-   * relies on), so the service trusts the validated input rather than re-checking it. {@code
-   * saveAndFlush} writes back the bumped {@code @Version} within the transaction so the form can
-   * echo it next time (REQ-FE-003).
+   * Sets, changes or clears an account's balance target as its responsible holder (REQ-BANK-036).
    *
    * @param accountId the account
    * @param target the new target, or {@code null} to clear it
-   * @param version the echoed optimistic-locking version
+   * @param version the echoed optimistic-lock version
    * @return the refreshed settings
    * @throws NotFoundException when the account does not exist
    * @throws AccessDeniedException when the caller may not set the target
-   * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
+   * @throws ObjectOptimisticLockingFailureException on a version mismatch
    */
   @NotNull
   @Transactional
@@ -456,13 +364,13 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Adds a role-bucket view grant to an account (REQ-BANK-035). The bucket kind is derived from the
-   * account type — a {@code MembershipRole} on the owning unit for org-unit accounts, a global role
-   * code for a Sonderkonto — and the role code is validated against the buckets that apply to this
-   * account. Idempotent: granting an already-granted bucket is a no-op.
+   * Adds a role-bucket view grant to an account (REQ-BANK-035); idempotent.
+   *
+   * <p>The bucket is a {@code MembershipRole} for org-unit accounts and a global role for a
+   * Sonderkonto.
    *
    * @param accountId the account
-   * @param roleCode the role bucket to grant (a {@code MembershipRole} name or a global role code)
+   * @param roleCode the role bucket to grant
    * @return the refreshed settings
    * @throws NotFoundException when the account does not exist
    * @throws AccessDeniedException when the caller may not configure visibility
@@ -501,8 +409,7 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Enables or disables the all-members view grant of an account (REQ-BANK-035): every member of
-   * the owning unit (org-unit accounts) or every KRT member (Sonderkonten) may view it. Idempotent.
+   * Enables or disables the all-members view grant of an account (REQ-BANK-035); idempotent.
    *
    * @param accountId the account
    * @param enabled whether all members may view the account
@@ -563,10 +470,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Enables or disables the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
-   * (REQ-BANK-048): every member of the whole area cascade — the Bereichsleitung plus every member
-   * of the Bereich's child Staffeln/SKs — may view it. Idempotent; only valid for {@code AREA}
-   * accounts.
+   * Enables or disables the area-cascade view grant of an {@code AREA} account (REQ-BANK-048);
+   * idempotent.
    *
    * @param accountId the account
    * @param enabled whether the whole area cascade may view the account
@@ -588,18 +493,12 @@ public class OrgUnitBankAccessService {
     return toSettingsDto(account);
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // Settings — per-tier approval limits (REQ-BANK-041)
-  // ---------------------------------------------------------------------------------------------
-
   /**
-   * Sets or changes a role-bucket approval limit on an account (REQ-BANK-041). The role code is
-   * validated against the account's limit buckets (squadron / Bereich sub-ranks); the limit is an
-   * idempotent upsert.
+   * Upserts a role-bucket approval limit on an account (REQ-BANK-041).
    *
    * @param accountId the account
-   * @param roleCode the role bucket ({@code MembershipRole} name)
-   * @param limit the whole-aUEC ceiling (>= 0)
+   * @param roleCode the role bucket, a {@code MembershipRole} name
+   * @param limit the non-negative ceiling in whole aUEC
    * @return the refreshed settings
    * @throws NotFoundException when the account does not exist
    * @throws AccessDeniedException when the caller may not configure approval limits
@@ -638,11 +537,10 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Sets or changes the all-members approval limit on an account (REQ-BANK-041): the ceiling for
-   * any member who may view the account but matches no more specific tier.
+   * Upserts the all-members approval limit of an account (REQ-BANK-041).
    *
    * @param accountId the account
-   * @param limit the whole-aUEC ceiling (>= 0)
+   * @param limit the non-negative ceiling in whole aUEC
    * @return the refreshed settings
    * @throws NotFoundException when the account does not exist
    * @throws AccessDeniedException when the caller may not configure approval limits
@@ -679,12 +577,10 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Sets or changes the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
-   * (REQ-BANK-048): the ceiling for any member of the whole area cascade (Bereichsleitung + child
-   * Staffel/SK members) who matches no more specific tier.
+   * Upserts the area-cascade approval limit of an {@code AREA} account (REQ-BANK-048).
    *
    * @param accountId the account
-   * @param limit the whole-aUEC ceiling (>= 0)
+   * @param limit the non-negative ceiling in whole aUEC
    * @return the refreshed settings
    * @throws NotFoundException when the account does not exist
    * @throws AccessDeniedException when the caller may not configure approval limits
@@ -704,8 +600,7 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Removes the "Mitglieder des Bereichs" cascade approval limit from a Bereichskonto
-   * (REQ-BANK-048).
+   * Removes the area-cascade approval limit from an {@code AREA} account (REQ-BANK-048).
    *
    * @param accountId the account
    * @return the refreshed settings
@@ -722,12 +617,12 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Sets or changes an individual user's approval limit on an account (REQ-BANK-041); the most
-   * specific tier, overriding any role/all-members limit for that user.
+   * Upserts an individual user's approval limit on an account, which overrides every other tier for
+   * that user (REQ-BANK-041).
    *
    * @param accountId the account
    * @param userId the user the limit addresses
-   * @param limit the whole-aUEC ceiling (>= 0)
+   * @param limit the non-negative ceiling in whole aUEC
    * @return the refreshed settings
    * @throws NotFoundException when the account or the user does not exist
    * @throws AccessDeniedException when the caller may not configure approval limits
@@ -761,34 +656,19 @@ public class OrgUnitBankAccessService {
     return toSettingsDto(account);
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // F2 — booking requests, "Fremde Anträge" and the responsible-holder in-app approval
-  // ---------------------------------------------------------------------------------------------
-
   /**
-   * Raises a confirm-before-post booking request and delegates persistence to the org-unit-blind
-   * {@link BankBookingRequestService}. Eligibility is <b>type-dependent</b>:
+   * Raises a booking request and delegates persistence to {@link BankBookingRequestService}.
    *
-   * <ul>
-   *   <li><b>Deposit (REQ-BANK-042):</b> any authenticated caller may request a deposit against
-   *       <em>any active account</em> — every type, regardless of whether the caller may view it —
-   *       and a deposit is <em>never</em> subject to an approval limit ({@code
-   *       requiresOwnerApproval = false}, {@code applicableLimit = null}). Whoever pays money in
-   *       only needs a bank employee to confirm receipt; no {@code canView} / {@code
-   *       isRequestCapable} gate and no limit resolution run. The account-active guard lives in
-   *       {@link BankBookingRequestService#create}.
-   *   <li><b>Withdrawal / transfer (REQ-BANK-039/-040/-041):</b> these debit a balance, so they
-   *       stay gated by view eligibility ({@link #canView}), restricted to the request-capable
-   *       account types ({@link #isRequestCapable}) and subject to the requester's approval limit
-   *       ({@link #resolveApplicableLimit}); the snapshot drives the org-unit-blind confirm path.
-   * </ul>
+   * <p>A deposit may be requested by anyone against any active account and needs no approval
+   * (REQ-BANK-042). A withdrawal or transfer requires {@link #canView}, a request-capable account
+   * and the approval routing of {@link #resolveApplicableLimit} (REQ-BANK-039).
    *
-   * @param request the create payload (source account, type, amount, optional destination, note)
+   * @param request the create payload
    * @return the created pending request
-   * @throws AccessDeniedException when a withdrawal/transfer caller may not view the source account
-   * @throws BadRequestException when the destination account is missing for a transfer or present
-   *     for a deposit/withdrawal, or the account does not accept withdrawals/transfers
-   * @throws NotFoundException when the (source) account does not exist
+   * @throws AccessDeniedException when a withdrawal or transfer caller may not view the account
+   * @throws BadRequestException when the destination account is missing or superfluous for the
+   *     type, or the account accepts no withdrawals or transfers
+   * @throws NotFoundException when the source account does not exist
    */
   @NotNull
   @Transactional
@@ -798,45 +678,31 @@ public class OrgUnitBankAccessService {
             bankAccountRepository.findById(request.sourceAccountId()), "Bank account not found");
 
     if (request.type() == BankBookingRequestType.DEPOSIT) {
-      // REQ-BANK-042: a deposit is requestable by ANY authenticated caller against ANY active
-      // account (every type) and is NEVER approval-limited — no view gate, no request-capability
-      // gate, no limit resolution. The account-active guard is enforced downstream in
-      // BankBookingRequestService.create.
       if (request.targetAccountId() != null) {
         throw new BadRequestException("A deposit request must not carry a destination account");
       }
-      // REQ-BANK-043: a deposit request may carry a split snapshot (whole-percent distributed
-      // across
-      // the squadron accounts on confirmation); the DTO already pins split = DEPOSIT-only.
       return bankBookingRequestService.create(
           account.getId(),
           BankBookingRequestType.DEPOSIT,
           request.amount(),
           request.note(),
-          // REQ-BANK-045: a deposit never captures a justification.
           null,
           null,
           false,
           null,
-          // A deposit is never approval-limited, so it needs no approver (REQ-BANK-042).
           null,
           request.splitEnabled(),
           request.splitPercent(),
-          // REQ-BANK-042/-055: a deposit request records no Empfaenger -- the requester IS the
-          // depositor, which confirmation derives.
           null,
           null);
     }
 
-    // REQ-BANK-039: a withdrawal/transfer stays gated by view eligibility — only a caller who may
-    // view the account may debit it.
     if (!canView(account)) {
       throw new AccessDeniedException("The caller may not raise a booking request on this account");
     }
     if (!isRequestCapable(account)) {
       throw new BadRequestException("This account does not accept booking requests");
     }
-    // REQ-BANK-040: a transfer names a destination (any active account); a withdrawal must not.
     UUID targetAccountId = null;
     if (request.type() == BankBookingRequestType.TRANSFER) {
       if (request.targetAccountId() == null) {
@@ -847,7 +713,6 @@ public class OrgUnitBankAccessService {
       throw new BadRequestException("A non-transfer request must not carry a destination account");
     }
     ApprovalRouting routing = resolveApprovalRouting(account, request.amount());
-    // A withdrawal/transfer never carries a split (REQ-BANK-043, DEPOSIT-only).
     return bankBookingRequestService.create(
         account.getId(),
         request.type(),
@@ -860,20 +725,15 @@ public class OrgUnitBankAccessService {
         routing.requiredApprover(),
         false,
         null,
-        // REQ-BANK-055: the Empfaenger the requester named. A TRANSFER must not carry one (the
-        // counter-account already names the other side) — the service rejects that, it is not
-        // silently dropped here.
         request.counterpartyUserId(),
         request.counterpartyOrgUnitId());
   }
 
   /**
-   * The resolved approval routing snapshot for a withdrawal/transfer booking request: whether it
-   * needs an approver at all, the requester's applicable limit (the display ceiling) and which
-   * approver class must sign off (REQ-BANK-041/-046/-047).
+   * Approval routing of a withdrawal or transfer request (REQ-BANK-041).
    *
    * @param requiresOwnerApproval whether confirmation needs the approver's attestation
-   * @param applicableLimit the requester's resolved limit / display ceiling, or {@code null}
+   * @param applicableLimit the requester's display ceiling, or {@code null}
    * @param requiredApprover the approver class, or {@code null} when no approval is needed
    */
   private record ApprovalRouting(
@@ -882,16 +742,13 @@ public class OrgUnitBankAccessService {
       @Nullable BankRequestApprover requiredApprover) {}
 
   /**
-   * Resolves the KRT ({@code CARTEL}) account amount-band routing (REQ-BANK-047, ADR-0109): {@code
-   * amount <= T1} the bank employee self-approves (no approver); {@code T1 < amount <= T2} the
-   * Bankleitung ({@code BANK_MANAGEMENT}); {@code amount > T2} the Organisationsleitung. An unset
-   * {@code T1} is treated as {@code 0} (no employee self-approval band); an unset {@code T2} as
-   * {@code +infinity} (the Bankleitung covers everything above {@code T1}, the OL band empty). The
-   * applicable limit is always {@code T1} (the ceiling shown to the requester). Shared by the
-   * officer/lead request-create path and the bank-staff over-ceiling auto-request path ({@link
-   * #raiseCartelDirectBookingRequest}).
+   * Resolves the amount-band routing of the KRT ({@code CARTEL}) account (REQ-BANK-047, ADR-0109).
    *
-   * @param account the KRT ({@code CARTEL}) account
+   * <p>Up to {@code T1} needs no approver, up to {@code T2} the Bankleitung, above that the
+   * Organisationsleitung; an unset {@code T1} counts as 0 and an unset {@code T2} as unbounded. The
+   * applicable limit is always {@code T1}.
+   *
+   * @param account the KRT account
    * @param amount the whole-aUEC amount leaving the account
    * @return the resolved approval routing
    */
@@ -913,24 +770,18 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Files a {@code PENDING} approval request for a bank-staff <em>direct</em> withdrawal / transfer
-   * that exceeded the KRT bank-employee ceiling {@code T1} (REQ-BANK-047, ADR-0109). Instead of
-   * rejecting the over-ceiling attempt, {@code BankBookingController} routes it here so it becomes
-   * a band-routed request (Bankleitung for {@code T1..T2}, Organisationsleitung above {@code T2})
-   * that the Bankleitung then approves and confirms in the bank-staff queue. Unlike {@link
-   * #createBookingRequest} this trusts the caller's already-passed {@code BankSecurityService}
-   * capability gate ({@code canWithdraw} / {@code canTransfer} on the account) rather than the
-   * org-unit view eligibility, because the requester is the acting bank employee, not an org-unit
-   * officer. The holder and any Empf&auml;nger from the direct-booking form are intentionally not
-   * carried over — like every booking request they are (re-)recorded by the confirming bank
-   * employee (REQ-BANK-040); only the amount, note and justification (Begr&uuml;ndung) transfer.
+   * Files a pending, band-routed request for a bank-staff direct withdrawal or transfer that
+   * exceeds the KRT employee ceiling {@code T1} (REQ-BANK-047).
    *
-   * @param accountId the KRT ({@code CARTEL}) source account the attempt debited
+   * <p>Relies on the caller having passed the bank capability gate; only amount, note,
+   * justification and target carry over.
+   *
+   * @param accountId the KRT source account
    * @param type {@code WITHDRAWAL} or {@code TRANSFER}
    * @param amount the whole-aUEC amount leaving the account
-   * @param note the optional note from the direct-booking form
-   * @param justification the justification (Begr&uuml;ndung) from the direct-booking form
-   * @param targetAccountId the transfer destination for a {@code TRANSFER}, else {@code null}
+   * @param note the optional note
+   * @param justification the justification
+   * @param targetAccountId the destination for a {@code TRANSFER}, else {@code null}
    * @return the filed pending booking request
    * @throws NotFoundException when the account does not exist
    */
@@ -945,10 +796,6 @@ public class OrgUnitBankAccessService {
       @Nullable UUID targetAccountId) {
     BankAccount account =
         Entities.require(bankAccountRepository.findById(accountId), "Bank account not found");
-    // REQ-BANK-041 (owner decision): an acting bank employee who is also the account's responsible
-    // holder (an OL member on the KRT account) is exempt, so the filed request carries no approver
-    // rather than routing back to themselves. The direct-booking ceiling that sent the attempt here
-    // is a separate bank-staff ledger control (REQ-BANK-047) and still applies.
     ApprovalRouting routing =
         isApprovalExempt(account)
             ? new ApprovalRouting(false, null, null)
@@ -965,21 +812,14 @@ public class OrgUnitBankAccessService {
         routing.requiredApprover(),
         false,
         null,
-        // The employee's over-ceiling direct booking is auto-filed as a request; its counterparty
-        // is not carried across (pre-existing, unchanged by REQ-BANK-055) and confirmation derives
-        // the requester as before.
         null,
         null);
   }
 
   /**
-   * Resolves which approver (if any) a debit request against this account for this amount needs,
-   * and snapshots the requester's applicable ceiling (REQ-BANK-041/-046/-047).
-   *
-   * <p>Extracted so the create path and the {@linkplain #updateOwnBookingRequest edit} path cannot
-   * drift apart. They must not: the whole point of re-deriving this on an edit is that raising the
-   * amount past the requester's limit re-arms the approval gate, and a second, subtly different
-   * copy of this rule would be an approval-gate bypass rather than a cosmetic inconsistency.
+   * Resolves which approver a debit request of this amount needs and the requester's applicable
+   * ceiling (REQ-BANK-041); shared by the create and {@linkplain #updateOwnBookingRequest edit}
+   * paths.
    *
    * @param account the source account
    * @param amount the requested amount
@@ -989,17 +829,11 @@ public class OrgUnitBankAccessService {
   private ApprovalRouting resolveApprovalRouting(
       @NotNull BankAccount account, @NotNull BigDecimal amount) {
     if (isApprovalExempt(account)) {
-      // REQ-BANK-041 (owner decision): the responsible holder disposes freely over their own
-      // account. Neither a per-audience limit nor the KRT amount ladder binds them — asking a
-      // holder to counter-sign their own request would be a no-op click.
       return new ApprovalRouting(false, null, null);
     }
     if (account.getType() == BankAccountType.CARTEL) {
       return resolveCartelApprovalRouting(account, amount);
     }
-    // Every other request-capable account: a configured per-audience limit lets the requester
-    // through up to its ceiling; no matching limit ⇒ the responsible holder's approval is the
-    // safe default (REQ-BANK-041).
     BigDecimal limit = resolveApplicableLimit(account);
     boolean needsApproval = limit == null || amount.compareTo(limit) > 0;
     return new ApprovalRouting(
@@ -1007,17 +841,14 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Applies a requester's correction to their own still-pending booking request (REQ-BANK-056) and
-   * re-derives the approval snapshot from the new amount.
+   * Applies a requester's correction to their own pending booking request and re-derives the
+   * approval snapshot (REQ-BANK-056).
    *
-   * <p>The ownership check here is an early-out only — it avoids resolving an approval limit for a
-   * request the caller may not touch, and reports a foreign id as "not found" so the endpoint never
-   * reveals that it exists. {@link BankBookingRequestService#updateOwn} re-checks ownership,
-   * pending-ness, the un-approved precondition and the version <em>under the row lock</em>, which
-   * is where those guards are authoritative.
+   * <p>{@link BankBookingRequestService#updateOwn} re-checks ownership, state and version under the
+   * row lock.
    *
    * @param requestId the request to correct
-   * @param request the corrected values plus the echoed version
+   * @param request the corrected values and the echoed version
    * @return the updated request
    * @throws NotFoundException when the request does not exist or belongs to another user
    */
@@ -1042,16 +873,10 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Lists the caller's own booking requests (REQ-BANK-022), with the bank employee's "Notiz
-   * Bankmitarbeiter" redacted (REQ-BANK-054).
+   * Lists the caller's own booking requests with the staff note removed (REQ-BANK-022,
+   * REQ-BANK-054).
    *
-   * <p>The requester sees their own Notiz and Begr&uuml;ndung expanded in "Meine Antr&auml;ge", but
-   * the staff note is an internal remark and is stripped <em>here</em>, at the seam, rather than
-   * merely omitted from the template — so it never reaches the rendering layer at all. The
-   * responsible holder's {@link #listRequestsForResponsibleAccounts()} keeps it: that is the
-   * approver lens the note exists to inform.
-   *
-   * @return the caller's requests, newest first, without staff notes
+   * @return the caller's requests, newest first
    */
   @NotNull
   public List<BankBookingRequestDto> listOwnBookingRequests() {
@@ -1092,23 +917,16 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Lists the booking requests the caller may act on in the "Fremde Anträge" tab
-   * (REQ-BANK-041/-046). For every account the caller is the responsible holder of, all its
-   * requests are listed; the KRT account's amount-band-routed requests are additionally surfaced to
-   * their band approver — the {@code BANK_MANAGEMENT} band to the Bankleitung, the {@code
-   * ORGANISATIONSLEITUNG} band to the OL. An admin sees every account's requests.
+   * Lists the booking requests the caller may act on: all requests of accounts they hold, the KRT
+   * band requests routed to them, or everything for an admin (REQ-BANK-046).
    *
-   * @return the requests the caller may act on; never {@code null}, empty when there are none
+   * @return the requests the caller may act on; empty when none
    */
   @NotNull
   @Transactional(readOnly = true)
   public List<BankBookingRequestDto> listRequestsForResponsibleAccounts() {
     boolean admin = authHelperService.isAdmin();
     boolean bankMgmt = hasBankManagement();
-    // One pass over the accounts (findAllByOrderByAccountNoAsc carries @EntityGraph(orgUnit) so
-    // isResponsibleHolder's org-unit dereference is N+1-free, REQ-DATA-003): the accounts the
-    // caller is the responsible holder of, plus the KRT account for the Bankleitung (who approves
-    // its middle band without being its responsible holder, REQ-BANK-047/ADR-0109).
     Set<UUID> responsibleIds = new LinkedHashSet<>();
     Set<UUID> cartelIds = new LinkedHashSet<>();
     for (BankAccount account : bankAccountRepository.findAllByOrderByAccountNoAsc()) {
@@ -1133,17 +951,15 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Whether a "Fremde Anträge" row is visible to the caller (REQ-BANK-047/ADR-0109 band routing): a
-   * KRT-account band-flagged request is shown only to its band approver (the Bankleitung for {@code
-   * BANK_MANAGEMENT}, the OL for {@code ORGANISATIONSLEITUNG}); every other request stays visible
-   * to the account's responsible holder. Admins see all.
+   * Whether a foreign booking request is visible to the caller: a KRT band request only to its band
+   * approver, any other request to the account's responsible holder, everything to an admin.
    *
    * @param request the request row
    * @param admin whether the caller is an admin
-   * @param bankMgmt whether the caller holds the {@code BANK_MANAGEMENT} role (Bankleitung)
+   * @param bankMgmt whether the caller holds {@code BANK_MANAGEMENT}
    * @param olMember whether the caller is an OL member
-   * @param responsibleIds the ids of accounts the caller is the responsible holder of
-   * @return whether the caller may see (and, if flagged and pending, approve) the request
+   * @param responsibleIds ids of the accounts the caller is responsible holder of
+   * @return whether the caller may see the request
    */
   private static boolean canSeeForeignRequest(
       @NotNull BankBookingRequestDto request,
@@ -1165,11 +981,7 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Grants the required approver's in-app approval for an over-limit booking request
-   * (REQ-BANK-041/-046), which pre-fills the bank employee's confirmation checkbox. Only the
-   * request's required approver — the account's responsible holder, or for a KRT amount band the
-   * Bankleitung / Organisationsleitung — or an admin may do this ({@link #canApprove}); the request
-   * must currently require approval and still be pending.
+   * Grants the required approver's approval of an over-limit booking request (REQ-BANK-041).
    *
    * @param requestId the request to approve
    * @return the updated request
@@ -1198,15 +1010,12 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Loads and locks a request, authorizes the caller as the request's required approver — the
-   * account's responsible holder, or for a KRT amount band the Bankleitung ({@code
-   * BANK_MANAGEMENT}) / Organisationsleitung ({@code ORGANISATIONSLEITUNG}); admins always pass
-   * ({@link #canApprove}) — the org-unit-aware half — then delegates the blind mutation + audit to
-   * {@link BankBookingRequestService#applyOwnerApprovalWithinTransaction(BankBookingRequest,
-   * boolean)}.
+   * Loads and locks a request, authorizes the caller via {@link #canApprove}, and delegates the
+   * mutation and audit to {@link
+   * BankBookingRequestService#applyOwnerApprovalWithinTransaction(BankBookingRequest, boolean)}.
    *
    * @param requestId the request
-   * @param granted whether to grant ({@code true}) or revoke ({@code false}) the approval
+   * @param granted {@code true} to grant, {@code false} to revoke the approval
    * @return the updated request
    */
   @NotNull
@@ -1221,11 +1030,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff the caller may grant/revoke the in-app approval of a booking request
-   * (REQ-BANK-041/-046): an admin always; for a KRT amount band the band approver (Bankleitung for
-   * {@code BANK_MANAGEMENT}, OL for {@code ORGANISATIONSLEITUNG}); otherwise the account's
-   * responsible holder. The single-request authorization counterpart of {@link
-   * #canSeeForeignRequest}.
+   * Whether the caller may grant or revoke a request's approval: an admin, the KRT band approver,
+   * or otherwise the account's responsible holder.
    *
    * @param request the request entity
    * @return whether the caller may act on its approval
@@ -1246,25 +1052,17 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff the caller holds the {@code BANK_MANAGEMENT} role (Bankleitung), reachable via
-   * the role hierarchy — the middle-band approver of the KRT amount ladder (REQ-BANK-047/ADR-0109).
-   * Unlike the org-unit responsible-holder predicates this is a plain Keycloak-role check, so it
-   * needs no org-unit dereference.
+   * Whether the caller reaches the {@code BANK_MANAGEMENT} role, the middle-band KRT approver
+   * (REQ-BANK-047).
    *
-   * @return whether the current caller is (or outranks) the Bankleitung
+   * @return whether the caller is or outranks the Bankleitung
    */
   private boolean hasBankManagement() {
     return authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT));
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // Capability predicates
-  // ---------------------------------------------------------------------------------------------
-
   /**
-   * {@code true} iff the current caller may view the given account (balance + read-only drill-in).
-   * Loads the account's view grants on demand — for the batched card-list path use {@link
-   * #canViewInternal}.
+   * Whether the caller may view the account; loads its view grants on demand.
    *
    * @param account the account to test
    * @return {@code true} iff the caller may view it
@@ -1281,9 +1079,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Non-admin view decision over a single account given the caller's oversight scope and that
-   * account's view grants — the shared core of {@link #canView} and the batched card list. Admins
-   * are short-circuited by the callers.
+   * Non-admin view decision for one account from the caller's oversight scope and the account's
+   * view grants.
    *
    * @param account the account
    * @param viewScope the caller's cascading oversight scope
@@ -1306,9 +1103,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff a view grant on an <em>org-unit</em> account (Staffel/SK/Bereich) matches the
-   * caller: a membership-role bucket they hold on the owning unit, an all-members grant when they
-   * are a member of the owning unit, or an individual-user grant naming them.
+   * Whether a view grant of an org-unit account admits the caller: a role bucket held on the owning
+   * unit, all-members as a member of it, or an individual grant.
    *
    * @param owningOrgUnitId the account's owning org unit id
    * @param grants the account's view grants
@@ -1326,8 +1122,6 @@ public class OrgUnitBankAccessService {
                   && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owningOrgUnitId, role);
             }
             case ALL_MEMBERS -> ownerScopeService.currentUserIsMemberOfOrgUnit(owningOrgUnitId);
-            // "Mitglieder des Bereichs" (REQ-BANK-048): the whole area cascade of a Bereichskonto.
-            // Only ever granted on AREA accounts, whose owning unit is the Bereich.
             case AREA_MEMBERS ->
                 ownerScopeService.currentUserIsMemberOfAreaCascade(owningOrgUnitId);
             case USER -> userId.isPresent() && userId.get().equals(grant.getGranteeUserId());
@@ -1341,9 +1135,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff a view grant on a {@code SPECIAL} account matches the caller: a global-role
-   * bucket they reach, an all-members grant (any KRT member), or an individual-user grant naming
-   * them.
+   * Whether a view grant of a {@code SPECIAL} account admits the caller: a reachable global role,
+   * all-members, or an individual grant.
    *
    * @param grants the account's view grants
    * @return {@code true} iff a grant admits the caller
@@ -1357,8 +1150,6 @@ public class OrgUnitBankAccessService {
                 authHelperService.hasReachableRole(Roles.authority(grant.getRoleCode()));
             case ALL_MEMBERS -> authHelperService.isMemberOrAbove();
             case USER -> userId.isPresent() && userId.get().equals(grant.getGranteeUserId());
-            // SPECIAL accounts have no owning org unit, so neither membership-role nor the
-            // Bereich-cascade audience applies to them.
             case MEMBERSHIP_ROLE, AREA_MEMBERS -> false;
           };
       if (match) {
@@ -1380,10 +1171,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff the caller is the {@code BEREICHSLEITER} of a {@code Department.PROFIT}
-   * Bereich — the responsible holder of the {@code CARTEL_BANK} account (REQ-BANK-037). Since
-   * ADR-0109 the Profit Bereichsleiter is no longer the KRT middle-band approver (that is the
-   * Bankleitung, {@link #hasBankManagement()}); this predicate is now CARTEL_BANK-only.
+   * Whether the caller is the {@code BEREICHSLEITER} of a {@code Department.PROFIT} Bereich, the
+   * responsible holder of the {@code CARTEL_BANK} account (REQ-BANK-037).
    *
    * @return {@code true} iff the caller leads a PROFIT Bereich
    */
@@ -1399,9 +1188,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff the caller is the derived responsible holder of the account (REQ-BANK-034):
-   * Staffelleiter / SK-Leiter (ORG_UNIT), Bereichsleiter (AREA), any OL member (CARTEL), the
-   * Profit-Bereichsleiter (CARTEL_BANK). Sonderkonten have no responsible holder.
+   * Whether the caller is the account's derived responsible holder (REQ-BANK-034); Sonderkonten
+   * have none.
    *
    * @param account the account
    * @return {@code true} iff the caller is its responsible holder
@@ -1430,35 +1218,24 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff the current caller is exempt from every approval gate on this account
-   * (REQ-BANK-041, owner decision): the account's <b>responsible holder</b> — the Staffelleiter /
-   * SK-Leiter of an {@code ORG_UNIT} account, the Bereichsleiter of an {@code AREA} account, any OL
-   * member on the KRT ({@code CARTEL}) account — disposes freely over the account they are
-   * responsible for. Approval limits bind every requester <em>except</em> the holder, and the KRT
-   * amount ladder (REQ-BANK-047) is bypassed for them too, so a holder is never asked to
-   * counter-sign their own request. Sonderkonten ({@code SPECIAL}) have no responsible holder and
-   * are not request-capable, so this is always {@code false} there.
+   * Whether the caller, as the account's responsible holder, is exempt from every approval gate
+   * including the KRT ladder (REQ-BANK-041).
    *
    * @param account the account a request would debit
-   * @return whether the caller may debit this account without any approver's sign-off
+   * @return whether the caller may debit it without any approver's sign-off
    */
   private boolean isApprovalExempt(@NotNull BankAccount account) {
     return isResponsibleHolder(account);
   }
 
   /**
-   * {@code true} iff the caller may configure who else may view the account (REQ-BANK-035): the
-   * responsible holder for an org-unit account; for a Sonderkonto an OL member <em>or</em> bank
-   * management (REQ-BANK-037 — "neben den Bankmitarbeitern/-verwaltung"). {@code CARTEL} (fixed
-   * all-members) and {@code CARTEL_BANK} (internal) are not configurable.
+   * Whether the caller may configure the account's view grants (REQ-BANK-035): the responsible
+   * holder of an org-unit account, or an OL member or bank management for a Sonderkonto.
    *
    * @param account the account
-   * @return {@code true} iff the caller may add/remove view grants
+   * @return {@code true} iff the caller may add or remove view grants
    */
   private boolean canConfigureVisibility(@NotNull BankAccount account) {
-    // Admin override: an admin manages the permissions of every account whose visibility is
-    // configurable at all. CARTEL (all-members) and CARTEL_BANK (internal) audiences are fixed
-    // (REQ-BANK-037) — nothing to configure there, not even for an admin.
     if (authHelperService.isAdmin()) {
       return visibilityConfigurable(account.getType());
     }
@@ -1479,9 +1256,6 @@ public class OrgUnitBankAccessService {
    * @return {@code true} iff the caller may set the target
    */
   private boolean canSetTarget(@NotNull BankAccount account) {
-    // An admin may set the target on any account (admin override); otherwise the responsible
-    // holder.
-    // Sonderkonto targets are bank-staff-only for non-admins (set via the bank surface).
     if (authHelperService.isAdmin()) {
       return true;
     }
@@ -1503,9 +1277,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff the account accepts booking requests (REQ-BANK-039/-040): an {@code ACTIVE}
-   * account of a request-capable type ({@code ORG_UNIT} / {@code AREA} / {@code CARTEL}).
-   * Sonderkonten and the bank-operating account are never request targets.
+   * Whether the account accepts booking requests: {@code ACTIVE} and of type {@code ORG_UNIT},
+   * {@code AREA} or {@code CARTEL}.
    *
    * @param account the account
    * @return whether a booking request may be raised against it
@@ -1516,17 +1289,13 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff the caller may set/clear this account's approval limits (REQ-BANK-041): the
-   * responsible holder, bank management or an admin — never a plain bank employee. Only the
-   * request-capable types carry limits.
+   * Whether the caller may set or clear the account's approval limits (REQ-BANK-041): its
+   * responsible holder, bank management or an admin.
    *
    * @param account the account
    * @return whether the caller may configure approval limits
    */
   private boolean canConfigureApprovalLimits(@NotNull BankAccount account) {
-    // Per-audience limits are editable only on ORG_UNIT / AREA accounts (REQ-BANK-041). The KRT
-    // account (CARTEL) is request-capable but uses the Verwaltung-managed amount ladder instead
-    // (REQ-BANK-047), so it is not per-audience-configurable here.
     if (!BankApprovalLimitService.audienceLimitsSupported(account.getType())) {
       return false;
     }
@@ -1576,40 +1345,15 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Resolves the current caller's applicable approval limit from the given limit rows
-   * (REQ-BANK-041, amended by REQ-BANK-047/-048).
+   * Resolves the caller's applicable approval limit (REQ-BANK-041, REQ-BANK-047).
    *
-   * <ul>
-   *   <li>The KRT account ({@code CARTEL}) does not use per-audience limits at all — its ladder
-   *       (REQ-BANK-047) governs approval; the value returned here is only the display/self-approve
-   *       ceiling, the bank-employee band {@code T1} (its {@code employeeApprovalCeiling}).
-   *   <li>Otherwise an individual-user limit wins outright; else the <em>most permissive</em>
-   *       (maximum) of every membership tier the caller actually matches — a role bucket held on
-   *       the owning unit, the whole-area cascade ({@code AREA_MEMBERS}) when the caller is
-   *       anywhere in it, and the all-members ceiling <em>only when the caller is a member of the
-   *       owning org unit</em> ("Alle Mitglieder der Org-Einheit" = the account's own org unit,
-   *       REQ-BANK-047); else {@code null}.
-   * </ul>
-   *
-   * <p>The tiers are <strong>maxed, not ranked</strong>: a Kommandoleiter who is also a member of
-   * the owning unit matches both {@code MEMBERSHIP_ROLE} and {@code ALL_MEMBERS} and gets the
-   * larger of the two, so the all-members value is a <em>floor</em> under every role tier, not a
-   * fallback below them.
-   *
-   * <p>The members-only gating of the {@code ALL_MEMBERS} tier means an outsider holding only an
-   * individual view grant matches no membership tier and falls through to {@code null} (⇒ the
-   * caller needs an explicit USER limit, else the request requires approval) — retiring the former
-   * catch-all-for-everyone behaviour.
-   *
-   * <p><strong>{@code null} does not mean "unlimited".</strong> It is the "no tier matched"
-   * sentinel, and the sole caller ({@code createBookingRequest}) turns it into {@code needsApproval
-   * = true} for <em>any</em> amount — the owner-approved inversion of the original "missing limit =
-   * unlimited" rule (REQ-BANK-041). Older comments on {@code BankAccountApprovalLimit} and in V193
-   * still carry the retired wording; this method is the authority.
+   * <p>For the KRT account it is the employee ceiling {@code T1}. Otherwise an individual limit
+   * wins; else the maximum of every matching membership tier, where the all-members tier matches
+   * only members of the owning unit. {@code null} means no tier matched, so approval is required.
    *
    * @param account the account
-   * @param limits the account's approval-limit rows (possibly empty)
-   * @return the caller's limit, or {@code null} when no tier matched (⇒ approval required)
+   * @param limits the account's approval-limit rows; may be empty
+   * @return the caller's limit, or {@code null} when no tier matched
    */
   @Nullable
   private BigDecimal resolveApplicableLimit(
@@ -1653,10 +1397,6 @@ public class OrgUnitBankAccessService {
     }
     return best;
   }
-
-  // ---------------------------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------------------------
 
   /**
    * Builds the settings snapshot for one account.
@@ -1746,8 +1486,8 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Validates a role-bucket code against the account and returns the grant kind it maps to ({@code
-   * GLOBAL_ROLE} for a Sonderkonto, else {@code MEMBERSHIP_ROLE}).
+   * Validates a role-bucket code against the account and returns its grant kind: {@code
+   * GLOBAL_ROLE} for a Sonderkonto, else {@code MEMBERSHIP_ROLE}.
    *
    * @param account the account
    * @param roleCode the role code to validate
@@ -1865,8 +1605,7 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Explicit optimistic-lock check before mutating the account (mirrors {@code
-   * BankAccountService}).
+   * Checks the client-echoed version against the account before a mutation.
    *
    * @param account the loaded account
    * @param version the client-echoed version
@@ -1907,18 +1646,11 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Redacts the player-custody ("Halter") columns of a booking row for an org-unit viewer
-   * (REQ-BANK-038): the holder and counter-holder handles — the aUEC-custody chain — are nulled.
-   * The deposit/withdrawal counterparty (Einzahler / Empf&auml;nger and their org unit,
-   * REQ-BANK-044) is <em>kept</em>: the "von wem / an wen" of a booking on the member's own
-   * org-unit account is shown to viewers (owner decision, amends REQ-BANK-044/-038 — only the
-   * custody Halter stays hidden). The counter-<em>account</em> (transfer target/source) and the
-   * note/justification were never redacted. The booking employee's own {@code staffNote}
-   * (REQ-BANK-054) <em>is</em> redacted, unlike those two: it is an internal bank remark, not
-   * something the requester wrote, so an org-unit member must not read it.
+   * Redacts a booking row for an org-unit viewer (REQ-BANK-038): nulls the holder and
+   * counter-holder handles and the internal staff note; the counterparty stays visible.
    *
    * @param booking the bank-staff booking row
-   * @return a copy with the holder/counter-holder handles and the internal staff note removed
+   * @return a redacted copy
    */
   @NotNull
   private static BankBookingDto redact(@NotNull BankBookingDto booking) {
@@ -1930,8 +1662,6 @@ public class OrgUnitBankAccessService {
         null,
         booking.note(),
         booking.justification(),
-        // REQ-BANK-054: the employee's own note is internal and is redacted here exactly like
-        // the Halter columns above — an org-unit member must not read bank-internal remarks.
         null,
         booking.createdAt(),
         booking.reversedTransactionId(),
@@ -1977,20 +1707,17 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Projects one visible account and its resolved figures into the balance-card wire shape, now
-   * carrying the balance target (REQ-BANK-036) and the settings affordance.
+   * Projects a visible account and its resolved figures into the balance-card DTO.
    *
    * @param account the visible account
-   * @param balance the resolved balance (zero when it has no postings)
-   * @param canRequest {@code true} iff this is the caller's own-level account (F2 affordance)
-   * @param delta30d the 30-day net change (signed)
-   * @param sparkline the 30 end-of-day balances of the window, oldest first
+   * @param balance the resolved balance; zero without postings
+   * @param canRequest {@code true} iff this is the caller's own-level account
+   * @param delta30d the signed 30-day net change
+   * @param sparkline the 30 end-of-day balances, oldest first
    * @param canManageSettings whether the caller may open the account's settings
-   * @param approvalLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
-   *     {@code null} when no limit applies — which means approval is required, unless {@code
-   *     approvalExempt} says otherwise
-   * @param approvalExempt whether the caller is the account's responsible holder and therefore
-   *     bound by no ceiling at all (REQ-BANK-041, owner decision)
+   * @param approvalLimit the caller's approval limit (REQ-BANK-041), or {@code null} when none
+   *     applies
+   * @param approvalExempt whether the caller is the responsible holder and bound by no ceiling
    * @return the balance-card DTO
    */
   @NotNull

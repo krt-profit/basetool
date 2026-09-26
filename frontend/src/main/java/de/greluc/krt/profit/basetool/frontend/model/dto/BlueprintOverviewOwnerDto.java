@@ -20,13 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Frontend mirror of the backend {@code BlueprintOverviewOwnerDto} (#364): one owner of a blueprint
- * in the availability drill-down, carrying the display name only (never the sub or e-mail).
+ * Frontend mirror of the backend {@code BlueprintOverviewOwnerDto}: one owner of a blueprint in the
+ * overview drill-down, by display name only.
  *
  * @param ownerName the member's effective display name
- * @param orgUnitMember {@code true} when this owner is a member of the caller's oversight org
- *     unit(s) (always {@code true} for an admin "all org units" scope); {@code false} when they
- *     appear only via global blueprint sharing (REQ-INV-018), which the drill-down marks with a
- *     discreet hint
+ * @param orgUnitMember {@code true} when the owner belongs to the caller's oversight org units (or
+ *     the admin "all org units" scope); {@code false} when visible only via global sharing
+ *     (REQ-INV-018)
  */
 public record BlueprintOverviewOwnerDto(String ownerName, boolean orgUnitMember) {}

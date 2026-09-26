@@ -1,51 +1,21 @@
 #!/usr/bin/env python3
 """Profit Basetool - external conformance suite.
 
-Phase 0 of ``docs/archive/PODMAN_MIGRATION_PLAN.md``: the regression net the container-runtime
-migration is gated on. It asserts invariants against a **running host** rather than against
-configuration files, because the whole class of defect this project keeps hitting is a config
-that is correct on disk and not in force in the process.
-
-It had to go green against the Docker stack **first**, before the cutover. A suite that has
-never passed proves nothing when it passes later, and a check that has never been red is decoration -
-``check-conformance.test.sh`` is what keeps that honest by breaking every check on purpose.
-
-What this does NOT cover, deliberately
---------------------------------------
-The **deny families** - the Keycloak admin lockdown, the ``/actuator`` deny and the API vhost
-allow-list table - are already asserted from a genuinely external vantage point by
-``.github/workflows/edge-deny-probe.yml``, on a daily schedule. Re-implementing them here would
-create a second copy that can drift from the first. This suite covers what that workflow cannot:
-the client address the edge actually sees, the certificate handover, and the host-side signals
-(container metrics, log streams) that no external probe can reach.
-
-Read-only
----------
-Every check is a GET or a host-side read. Nothing mutates. The one exception is opt-in and
-off by default: ``--include-load`` sends a burst to trip the rate limiter, which is a load
-action against production and needs a deliberate flag.
-
-The credential rule
--------------------
-The Prometheus web password is interpolated into a ``curl`` config on **stdin, inside the remote
-shell**, and never printed, never placed on a command line where ``ps`` could read it, and never
-returned to the caller. If a check cannot be made without reading a credential out, it is not
-written.
+Asserts invariants against a running host rather than against configuration files. The edge
+deny families are covered by ``.github/workflows/edge-deny-probe.yml``, not here. Every check is
+read-only except the opt-in ``--include-load`` rate-limiter burst. No credential is ever read
+out of the host.
 
 Usage
 -----
 ::
 
-    # external checks only
     python scripts/check-conformance.py
 
-    # plus the host-side checks (read-only SSH)
     python scripts/check-conformance.py --ssh root@198.51.100.10
 
-    # include the rate-limiter burst (load against the target - deliberate)
     python scripts/check-conformance.py --ssh root@198.51.100.10 --include-load
 
-    # machine-readable, and the check inventory
     python scripts/check-conformance.py --json
     python scripts/check-conformance.py --list
 
@@ -74,10 +44,6 @@ import sys
 import uuid
 from typing import Callable, Iterable, Sequence
 
-# --------------------------------------------------------------------------------------------
-# Defaults. These four names are public: they are in .env.example and in edge-deny-probe.yml.
-# Nothing secret is defaulted here, and nothing is read out of the host .env.
-# --------------------------------------------------------------------------------------------
 DEFAULT_HOSTS = {
     "frontend": "profit-base.online",
     "ingest": "ingest.profit-base.online",
@@ -85,16 +51,8 @@ DEFAULT_HOSTS = {
     "api": "api.profit-base.online",
 }
 
-#: lego renews at 30 days (``--renew-days 30``); alert below 21 so a stuck renewal is visible
-#: while there is still a fortnight to fix it rather than on the morning it expires.
 CERT_MIN_DAYS = 21
 
-#: The prod-profile containers the app deploy owns. ``npm`` is the retired proxy and lives in the
-#: ``rollback`` profile, so it is deliberately absent.
-#: Containers that must not be running as root inside themselves, and the uid each must be.
-#: The same numbers scripts/generate-quadlet.py pins with RUN_AS and the bootstrap role owns the
-#: data directories as -- see ADR-0189. Deliberately NOT derived from either at runtime: this suite
-#: has to be able to disagree with them, which is the whole point of an acceptance check.
 UNPRIVILEGED_CONTAINERS = {
     "db-backend": 70,
     "db-keycloak": 70,
@@ -113,14 +71,6 @@ EXPECTED_APP_CONTAINERS = (
     "redis",
 )
 
-#: The container series the alert rules in monitoring/prometheus/alerts/ actually read, as
-#: `scripts/cgroup-container-metrics.py` publishes them through node_exporter's textfile collector.
-#: An alert whose input silently disappears does not fire, which looks exactly like a healthy
-#: system.
-#:
-#: These were pairs -- the cAdvisor name and this one -- while the Docker host and cAdvisor still
-#: existed. Both were retired at the 2026-09-22 cutover, so the cAdvisor half, which nothing on the
-#: remaining host can produce, went with them (OPS-SIMP-01/02).
 REQUIRED_CONTAINER_SERIES = (
     "basetool_container_memory_working_set_bytes",
     "basetool_container_memory_limit_bytes",
@@ -130,30 +80,15 @@ REQUIRED_CONTAINER_SERIES = (
     "basetool_container_cpu_usage_seconds_total",
 )
 
-#: Ranges an edge must never report as a client address. If our own probe comes back wearing one,
-#: a userland port forwarder is rewriting the source - which is the 2026-07-20 outage, and the
-#: failure mode rootless Podman's ``rootlessport`` would reintroduce.
-#:
-#: These were TEXT PREFIXES until 2026-09-18, and the spelling was the whole problem twice over:
-#: `::ffff:172.28.15.10` -- the IPv4-mapped form a single dual-stack bind produces -- began with
-#: none of them and read as public, while the entry `"172.2"`, written to cover 172.20-172.29,
-#: also matched `172.2.3.4`, which is ordinary public space. Networks answer both correctly.
 NEVER_A_CLIENT = (
-    ipaddress.ip_network("10.0.0.0/8"),        # RFC 1918
-    ipaddress.ip_network("172.16.0.0/12"),     # RFC 1918 -- 172.16 through 172.31, and no further
-    ipaddress.ip_network("192.168.0.0/16"),    # RFC 1918
-    ipaddress.ip_network("fc00::/7"),          # RFC 4193 unique-local
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("fc00::/7"),
 )
 
 PROBE_HEADER = "X-Basetool-Conformance"
 
-# --------------------------------------------------------------------------------------------
-# Test seams. Three environment variables let check-conformance.test.sh point the external
-# checks at a local fixture instead of the internet. They are unset in every real invocation,
-# and the suite says so in its report when they are not - so a run that silently probed a
-# fixture cannot be mistaken for a run that probed production. Same principle as deploy.test.sh
-# stubbing podman and cosign on PATH.
-# --------------------------------------------------------------------------------------------
 HTTPS_PORT = int(os.environ.get("BASETOOL_CONFORMANCE_HTTPS_PORT", "443"))
 HTTP_PORT = int(os.environ.get("BASETOOL_CONFORMANCE_HTTP_PORT", "80"))
 CA_BUNDLE = os.environ.get("BASETOOL_CONFORMANCE_CA_BUNDLE") or None
@@ -163,25 +98,16 @@ def _ssl_context() -> ssl.SSLContext:
     """Build the TLS context the external checks verify certificates with.
 
     Returns:
-        A default-verifying context, loading ``BASETOOL_CONFORMANCE_CA_BUNDLE`` as an extra
-        anchor when that test seam is set. Verification is never switched off: a check that
-        accepted any certificate could not report a certificate failure, which is half of what
-        this suite is for.
+        A verifying context (TLS 1.2+), with ``BASETOOL_CONFORMANCE_CA_BUNDLE`` as an extra
+        anchor when set.
     """
     ctx = ssl.create_default_context()
-    # The default context still PERMITS TLS 1.0 and 1.1 -- CodeQL flags it, and it is right to.
-    # It matters more here than in a client: this suite asserts what the edge offers, and a probe
-    # willing to negotiate a protocol the edge should refuse cannot report that the edge stopped
-    # refusing it. The floor is the one the edge itself serves.
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     if CA_BUNDLE:
         ctx.load_verify_locations(cafile=CA_BUNDLE)
     return ctx
 
 
-# ============================================================================================
-# Result plumbing
-# ============================================================================================
 @dataclasses.dataclass
 class Result:
     """The outcome of one check.
@@ -190,8 +116,7 @@ class Result:
         check: the check's stable id, as ``--list`` prints it.
         requirement: the requirement or decision the check exists to defend.
         status: ``pass``, ``fail`` or ``skip``.
-        detail: one line a human can act on. On a failure it says what was observed, not
-            merely that something was wrong.
+        detail: one actionable line; on a failure, what was observed.
     """
 
     check: str
@@ -204,8 +129,7 @@ class Result:
         """Whether this result should fail the run.
 
         Returns:
-            ``True`` only for ``fail``. A skip is not a failure - an absent SSH target or a
-            runner with no IPv6 must not turn into a red that hides a real one.
+            ``True`` only for ``fail``; a skip is not a failure.
         """
         return self.status == "fail"
 
@@ -218,22 +142,15 @@ class CheckFailed(Exception):
     """Raised by a check that ran and found the invariant broken."""
 
 
-# ============================================================================================
-# Host access
-# ============================================================================================
 class HostRunner:
     """Runs read-only commands on the deployment host.
 
-    Two implementations in one class so the suite is testable without a host: a real one that
-    shells out to ``ssh``, and a stub that executes a local script instead. The stub is what
-    ``check-conformance.test.sh`` drives, and it is the only way every host-side check can be
-    shown red without breaking production to do it.
+    Shells out to ``ssh``, or to a local stub script (as ``check-conformance.test.sh`` does).
 
     Args:
         ssh_target: ``user@host`` for the real runner, or ``None``.
         stub: a command line, split with :func:`shlex.split`, that receives the host command
-            as its last argument and prints what the host would have printed. Takes precedence
-            over ``ssh_target``.
+            as its last argument; takes precedence over ``ssh_target``.
         timeout: seconds before a command is abandoned.
     """
 
@@ -241,7 +158,6 @@ class HostRunner:
         self.ssh_target = ssh_target
         self.stub = stub
         self.timeout = timeout
-        #: Cached container-runtime prefix; detected once, on first use. See `container_cli`.
         self._container_cli: str | None = None
 
     @property
@@ -257,8 +173,7 @@ class HostRunner:
         """Execute one read-only command on the host and return its stdout.
 
         Args:
-            command: a shell command line, run by the remote login shell. Both hosts run bash,
-                which a couple of probes rely on.
+            command: a shell command line, run by the remote login shell (bash).
 
         Returns:
             The command's stdout, with trailing whitespace stripped.
@@ -270,37 +185,14 @@ class HostRunner:
         if not self.available:
             raise Skip("no --ssh target and no --host-stub")
 
-        # EVERY host command runs from `/`, and that is load-bearing rather than tidy.
-        #
-        # `ssh root@<host>` starts in /root, which is 0550 root:root on the RHEL family. sudo keeps
-        # the CALLER's working directory, so the moment a probe reaches the rootless containers --
-        # `sudo -n -u <service-user> XDG_RUNTIME_DIR=... podman ps` -- sudo tries to chdir there as
-        # that user and fails with
-        #
-        #     cannot chdir to /root: Permission denied
-        #
-        # The runtime-detection loop in `container_cli` swallows that (`2>/dev/null`), finds no
-        # candidate, falls back to bare `podman`, and root's own podman has no containers. The
-        # result is not an error: it is NINE checks reporting a perfectly healthy host as absent,
-        # from the exact invocation the cutover runbook prescribes. Measured on the testing host
-        # 2026-09-21 -- from /root the probe lists nothing, from / it lists every container.
-        #
-        # `cd /;` rather than `cd / &&` on purpose: `&&` binds looser than `|`, and a couple of
-        # probes are pipelines. A semicolon cannot change how the command that follows parses.
         command = f"cd /; {command}"
 
         if self.stub:
-            # A command LINE, not a path: the stub has to be launchable on every platform the
-            # self-test runs on, and Windows cannot exec a .sh directly. Splitting it means the
-            # caller writes `--host-stub "bash /path/to/stub.sh"` and the seam stays general.
             argv = shlex.split(self.stub) + [command]
         else:
             ssh = shutil.which("ssh")
             if not ssh:
                 raise Skip("ssh not found on PATH")
-            # The command is passed as one argument and ssh runs it through the remote login
-            # shell. An earlier version wrapped it in `sh -c '...'`, which forbade single quotes
-            # in every probe for no benefit -- ssh was already going to invoke a shell.
             argv = [ssh, "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
                     self.ssh_target or "", command]
 
@@ -315,27 +207,10 @@ class HostRunner:
 
     @property
     def container_cli(self) -> str:
-        """The command prefix that reaches THIS host's containers.
+        """The command prefix that reaches this host's containers, detected once and cached.
 
-        The suite shelled out to a literal ``docker`` in eight places while
-        ``ansible/roles/basetool_host`` installs podman, crun, netavark, aardvark-dns and passt --
-        and no ``podman-docker`` shim. On a host this repository bootstraps there is no ``docker``
-        binary at all, so the three checks written specifically to assert the new ADR-0189/0190
-        posture were the ones that could never run against the runtime they were written for.
-
-        It is detected, not configured, and detected by TRYING rather than by inferring. The first
-        version of this looked the owning user up with
-        ``ls /home/*/.config/containers/systemd/*.container``; ``/home/iri`` is ``0750`` and the
-        runner is ``sysadm``, so the glob expanded to nothing, the fallback picked the current
-        user, and bare ``podman`` answered ``no such object`` for eight healthy containers --
-        every arm of the suite would have reported a dead stack. So each candidate is asked
-        whether it can actually see containers, and the first that can is the answer.
-
-        Measured on the testing host, 2026-09-18: all eight command shapes the suite uses
-        (``ps --format``, ``inspect --format`` over ``.State.Pid``, ``.HostConfig.ReadonlyRootfs``,
-        ``.NetworkSettings.Networks``, ``.NetworkSettings.Ports``, ``.Config.Env``) return
-        identically under ``podman`` and ``docker``. ``logs`` does not -- see
-        :meth:`container_log_cmd`.
+        Tries plain ``podman`` first, then each lingering user's rootless ``podman``, and takes
+        the first that lists containers.
 
         Returns:
             ``podman``, or a ``sudo -n -u <user> XDG_RUNTIME_DIR=… podman`` prefix for a rootless
@@ -345,8 +220,6 @@ class HostRunner:
             Skip: when no host access is configured, or the host has neither runtime.
         """
         if self._container_cli is None:
-            # Podman only since 2026-09-22 (OPS-SIMP-01): the probe's Docker branch went with the
-            # retired Docker host.
             probe = (
                 "if command -v podman >/dev/null 2>&1; then "
                 "  if podman ps --format '{{.Names}}' 2>/dev/null | grep -q .; then echo podman; "
@@ -372,25 +245,8 @@ class HostRunner:
     def container_log_cmd(self, name: str, minutes: int) -> str:
         """A command that prints one container's logs, bounded by time.
 
-        ``logs`` is the one shape that does **not** survive the runtime swap, which is why it has
-        its own method instead of riding on :attr:`container_cli`. Measured on the testing host,
-        2026-09-18: those Quadlet units ran with the ``journald`` log driver, and
-        ``podman logs edge --since 60m`` returned **zero lines** for a container that was logging,
-        while ``journalctl CONTAINER_NAME=edge`` over the same window returned 67 access-log
-        lines. Swapping the binary alone would have left two checks reading an empty log and
-        reporting on it.
-
-        That measurement was then generalised into "podman's rootless default", and it is not one.
-        The production host resolves ``k8s-file`` -- ``podman info`` says so and every container
-        inspects to it -- where the journalctl form returns zero lines forever. Both defaults are
-        real, neither is safe to assume, so the driver is now READ per container below.
-
-        ``journalctl`` needs no ``sudo`` for this: the entries carry no ``_UID`` restriction and
-        the runner (``sysadm``, in ``wheel``) read them unprivileged in the same measurement.
-
-        Note this never merges stderr. The distinct-client-address count used ``2>&1`` and so
-        counted nginx's own error log as clients -- on real data the distinct first fields include
-        ``2026/09/17``, a date, from a ``[notice]`` line.
+        The container's log driver decides the form: ``journalctl`` for ``journald``, ``logs``
+        otherwise, both when the driver cannot be read. Stderr is never merged.
 
         Args:
             name: the container name.
@@ -401,18 +257,6 @@ class HostRunner:
         """
         cli = self.container_cli
 
-        # ASK which driver this container has; do not assume one. `journalctl CONTAINER_NAME=` only
-        # ever sees a container whose log driver is `journald`, and that is not podman's default
-        # everywhere. The testing host used journald (measured 2026-09-18, which is where the
-        # journalctl form came from); the PRODUCTION host uses `k8s-file` (measured 2026-09-22) and
-        # has never returned a single line to that command -- `journalctl CONTAINER_NAME=edge`
-        # without a time bound: zero, for the whole life of the host.
-        #
-        # What that cost is the reason this asks. `client-address-visible` read an empty log and
-        # concluded "the request did not reach this edge", about an edge that was serving every
-        # request on the machine -- the most misleading verdict the suite can produce, on the check
-        # its own docstring calls "the check the whole suite exists for". The address was in fact
-        # correct: `podman logs edge` showed the probe logged from the prober's real public IPv6.
         driver = self.run(
             f"{cli} inspect {name} --format '{{{{.HostConfig.LogConfig.Type}}}}' 2>/dev/null"
         ).strip()
@@ -426,21 +270,13 @@ class HostRunner:
             return journal
         if driver:
             return podman_logs
-        # Inconclusive -- and there is no safe default, because each form returns EMPTY rather than
-        # an error against the other driver. Reading both is the only answer that cannot silently
-        # say "nothing happened": every caller greps or counts distinct values, so a duplicate line
-        # costs nothing and a missing one costs the check its meaning.
         return f"{{ {podman_logs}; {journal}; }}"
 
     def ssh_client_address(self) -> str | None:
         """Report the address this machine presents to the host over SSH.
 
-        This is how ``client-address-visible`` learns its own public address without asking a
-        third-party echo service: the host already knows, because we are logged into it.
-
         Returns:
-            The client address from ``SSH_CLIENT``/``SSH_CONNECTION``, or ``None`` when it is
-            unavailable - which is normal under the stub and inside a ``sudo`` session.
+            The client address from ``SSH_CONNECTION``/``SSH_CLIENT``, or ``None`` when unavailable.
         """
         try:
             out = self.run("echo ${SSH_CONNECTION:-${SSH_CLIENT:-}}")
@@ -449,16 +285,11 @@ class HostRunner:
         return out.split()[0] if out.split() else None
 
 
-# ============================================================================================
-# HTTP / TLS helpers
-# ============================================================================================
 def _https_get(host: str, path: str = "/", family: int = 0, timeout: int = 20,
                headers: dict[str, str] | None = None) -> tuple[int, dict[str, str]]:
     """Issue one HTTPS GET and return the status and response headers.
 
-    Deliberately hand-rolled on ``http.client`` rather than ``urllib``: the suite has to pin the
-    address *family* (an IPv4 and an IPv6 request to the same name are two different assertions,
-    per ADR-0112) and must not follow redirects, because a redirect is often the finding.
+    Pins the address family and never follows redirects.
 
     Args:
         host: the vhost name, used for SNI, ``Host`` and certificate validation.
@@ -513,16 +344,8 @@ def _connect(host: str, port: int, family: int, timeout: int) -> socket.socket:
             sock.settimeout(timeout)
             sock.connect(addr)
             return sock
-        except OSError as exc:  # try the next record rather than failing on the first
+        except OSError as exc:
             last = exc
-    # CARRY THE ERRNO. This used to raise OSError(f"..."), a single-argument OSError whose `errno`
-    # is None -- and check_ipv6_reachable decides whether a failure is the DEPLOYMENT'S or THIS
-    # MACHINE'S by reading exactly that attribute. The effect was that its skip path could never be
-    # taken: run from a v4-only network, the suite reported `ipv6-reachable FAIL ... [Errno 101]
-    # Network is unreachable` about four vhosts that were serving IPv6 correctly (measured
-    # 2026-09-22, from a WSL host with no global v6 address and no route to any). A red that means
-    # "the runner has no IPv6" and a red that means "the edge lost its AAAA" were indistinguishable,
-    # which is the exact failure the check's own docstring exists to prevent.
     raise OSError(getattr(last, "errno", None),
                   f"{host}:{port} unreachable: {last}") from last
 
@@ -537,8 +360,7 @@ def _peer_certificate(host: str, family: int = 0, timeout: int = 20) -> dict:
 
     Returns:
         A dict with ``not_after`` (``datetime``), ``sans`` (tuple of DNS names) and
-        ``fingerprint`` (SHA-256 hex of the DER, which is how two vhosts are compared for
-        being served the *same* certificate).
+        ``fingerprint`` (SHA-256 hex of the DER).
 
     Raises:
         OSError: on a connection or TLS failure.
@@ -560,10 +382,8 @@ def _peer_certificate(host: str, family: int = 0, timeout: int = 20) -> dict:
 def _san_covers(host: str, sans: Sequence[str]) -> bool:
     """Whether any DNS SAN entry covers this host name.
 
-    Implements the wildcard rule of RFC 6125 §6.4.3 rather than comparing strings: a leftmost
-    ``*`` matches exactly one label, so ``*.example.com`` covers ``api.example.com`` but neither
-    ``example.com`` itself nor ``a.b.example.com``. Comparison is case-insensitive and ignores a
-    trailing dot.
+    A leftmost ``*`` matches exactly one label (RFC 6125 §6.4.3); comparison is case-insensitive
+    and ignores a trailing dot.
 
     Args:
         host: the vhost name being checked.
@@ -578,7 +398,7 @@ def _san_covers(host: str, sans: Sequence[str]) -> bool:
         if san == h:
             return True
         if san.startswith("*."):
-            suffix = san[1:]  # ".example.com"
+            suffix = san[1:]
             if h.endswith(suffix) and "." not in h[: -len(suffix)]:
                 return True
     return False
@@ -592,13 +412,12 @@ def _parse_address(text: str) -> ipaddress._BaseAddress | None:
 
     Returns:
         The address, with ``::ffff:a.b.c.d`` reduced to ``a.b.c.d``, or ``None`` when the text is
-        not an address at all -- which on real data includes ``2026/09/17``, the first field of
-        every nginx ``[notice]`` line.
+        not an address.
     """
     candidate = text.strip().lower().rstrip(",")
     if not candidate:
         return None
-    candidate = candidate.split("%", 1)[0]  # fe80::1%eth0 -- drop the zone id
+    candidate = candidate.split("%", 1)[0]
     try:
         parsed = ipaddress.ip_address(candidate)
     except ValueError:
@@ -610,29 +429,15 @@ def _parse_address(text: str) -> ipaddress._BaseAddress | None:
 def _is_private(address: str) -> bool:
     """Whether an address is one a first-hop edge must never report as a client.
 
-    This compared PREFIX STRINGS until 2026-09-18, and so classified ``::ffff:172.28.15.10`` --
-    the IPv4-mapped IPv6 form -- as **public**: none of ``"10."``, ``"172."…``, ``"127."``,
-    ``"fd"``, ``"::1"`` is a prefix of it. That is precisely the shape a single dual-stack bind
-    produces, and `check_client_address_visible`, documented as "the check the whole suite exists
-    for", therefore returned PASS on the exact collapse it was written to catch.
-
-    Parsing the address instead of its spelling removes the whole class: ``ipaddress`` knows that
-    ``::ffff:10.9.0.14`` is ``10.9.0.14``, and that ``10.9.0.14`` is private, without a table of
-    text prefixes that has to enumerate ``"172.2"`` to cover ``172.20``–``172.29``.
+    The address is parsed (IPv4-mapped IPv6 unwrapped) and checked against
+    :data:`NEVER_A_CLIENT`, not ``ipaddress.is_private``, so documentation ranges count as public.
 
     Args:
         address: an IPv4 or IPv6 address in text form, in any spelling.
 
-    The ranges are named explicitly rather than deferred to ``ipaddress.is_private``, which is a
-    wider question than this one: it answers "is this address special-purpose in any registry",
-    and so covers the RFC 5737 documentation ranges -- ``203.0.113.0/24`` and friends -- that this
-    repository's own fixtures use as stand-ins for a *public* client. A check that calls
-    ``203.0.113.42`` a bridge address is a false red on every test host.
-
     Returns:
-        ``True`` for loopback, RFC 1918, RFC 4193 and link-local addresses -- and for anything
-        that is not an address at all, because a first-hop edge reporting a non-address as its
-        client is not a passing state either.
+        ``True`` for loopback, unspecified, link-local, RFC 1918 and RFC 4193 addresses, and for
+        anything that is not an address.
     """
     parsed = _parse_address(address)
     if parsed is None:
@@ -642,9 +447,6 @@ def _is_private(address: str) -> bool:
     return any(parsed in net for net in NEVER_A_CLIENT if net.version == parsed.version)
 
 
-# ============================================================================================
-# Context
-# ============================================================================================
 @dataclasses.dataclass
 class Context:
     """Everything a check needs to run.
@@ -662,14 +464,8 @@ class Context:
     log_window: int = 10
 
 
-# ============================================================================================
-# Checks - external
-# ============================================================================================
 def check_vhost_reachable(ctx: Context) -> str:
-    """Every configured vhost answers over HTTPS.
-
-    The weakest check in the suite and the one whose failure explains every other failure, so it
-    runs first and reports each host separately rather than stopping at the first.
+    """Every configured vhost answers over HTTPS with a status below 500.
 
     Args:
         ctx: the run context.
@@ -696,10 +492,6 @@ def check_vhost_reachable(ctx: Context) -> str:
 
 def check_certificate_valid(ctx: Context) -> str:
     """Each vhost serves a certificate that covers it and is not near expiry.
-
-    Two failures in one check on purpose: a certificate that does not cover the name it is
-    served for, and one that is about to expire, are both "the handover stopped working" and
-    both surface here rather than as a browser error.
 
     Args:
         ctx: the run context.
@@ -732,16 +524,8 @@ def check_certificate_valid(ctx: Context) -> str:
 def check_certificate_shared(ctx: Context) -> str:
     """All vhosts are served the same multi-SAN certificate.
 
-    ``acme`` obtains ONE certificate whose first ``-d`` names it and whose SAN list carries the
-    rest, then publishes that same pair under every host directory. If two vhosts serve
-    different leaves, the publish loop reached one and not the other - which is exactly the
-    defect REQ-OPS-026 exists for, and it is invisible until the unreached one expires.
-
-    This is a property of *this deployment issuing its own certificates*, not a universal one.
-    An environment whose certificate is provided rather than issued sets ``ACME_HOSTS`` empty,
-    which makes the acme container idle by design, and may legitimately serve several - the
-    testing host serves a wildcard for its subdomains and a separate one for the apex. So the
-    check reads that variable and skips rather than inventing a finding.
+    Applies only where the ``acme`` container issues certificates (non-empty ``ACME_HOSTS``;
+    REQ-OPS-026).
 
     Args:
         ctx: the run context.
@@ -755,8 +539,6 @@ def check_certificate_shared(ctx: Context) -> str:
     """
     if ctx.runner.available:
         try:
-            # Only ACME_HOSTS is extracted, on the host. The same environment carries
-            # ACME_EMAIL, and an address must not cross into this process or the report.
             managed = ctx.runner.run(
                 f'{ctx.runner.container_cli} inspect acme '
                 '--format "{{range .Config.Env}}{{println .}}{{end}}" '
@@ -811,40 +593,11 @@ def check_http_redirects(ctx: Context) -> str:
     return f"all {len(ctx.hosts)} vhosts redirect :80 to HTTPS"
 
 
-# DO NOT add an up-front "can this machine route IPv6?" probe here. One was written on
-# 2026-09-22 and removed the same hour: it connected a UDP socket to a documentation address
-# (2001:db8::1) and skipped the whole check on ENETUNREACH, which asks about GLOBAL routing -- while
-# the self-test's fixture serves on ::1, where global routing is absent and irrelevant. Every ipv6
-# scenario in the suite turned from pass/fail into skip, including the one that proves the check can
-# go red at all.
-#
-# It also passed locally and failed in CI, which is the part worth remembering: Windows lets that
-# UDP connect succeed and Linux does not, so the probe's verdict depended on the operating system
-# rather than on the network.
-#
-# The question is answered where it is actually asked -- by the real connection attempt, whose
-# errno _connect now preserves. That is the whole fix.
-
-
 def check_ipv6_reachable(ctx: Context) -> str:
     """Every vhost has an AAAA record and answers over IPv6.
 
-    ADR-0112 is why this is an assertion and not a nicety: the dual-stack ingress bridge exists
-    so an IPv6 client's own address reaches nginx instead of being relayed through the bridge
-    gateway. A vhost that quietly loses its AAAA takes that property with it, and the symptom is
-    the 2026-07-20 outage rather than an error.
-
-    The check separates two things a naive probe conflates. **A missing AAAA record, or a
-    refused connection, is the target's problem** and fails. **No usable IPv6 route from this
-    machine** is the runner's problem and skips - otherwise the suite would report a red about
-    the deployment every time it ran from a v4-only network.
-
-    That separation was written from the start and did not work until 2026-09-22: ``_connect``
-    raised a single-argument ``OSError`` whose ``errno`` was ``None``, so the branch that reads the
-    errno could never be taken and the suite reported ``FAIL ... [Errno 101] Network is
-    unreachable`` about four vhosts that were serving IPv6 correctly. Preserving the errno is the
-    whole fix; see the comment above this function for the up-front probe that was tried instead and
-    why it must not come back.
+    A missing AAAA record or a failed connection fails (ADR-0112); no usable IPv6 route from this
+    machine skips.
 
     Args:
         ctx: the run context.
@@ -870,14 +623,9 @@ def check_ipv6_reachable(ctx: Context) -> str:
             status, _ = _https_get(host, "/", family=socket.AF_INET6)
             seen.append(f"{host}={status}")
         except OSError as exc:
-            # ENETUNREACH / EAFNOSUPPORT mean this machine cannot route v6 at all. That is not a
-            # finding about the deployment, and reporting it as one would train the reader to
-            # ignore this check.
             if getattr(exc, "errno", None) in (
                     getattr(__import__("errno"), "ENETUNREACH", -1),
                     getattr(__import__("errno"), "EAFNOSUPPORT", -2)):
-                # exc.strerror, not exc: the wrapped message already carries "[Errno 101]", and
-                # str(OSError(errno, msg)) prefixes it a second time.
                 raise Skip(f"no usable IPv6 route from this machine "
                            f"({exc.strerror or exc}) - this says nothing about the "
                            f"deployment") from exc
@@ -896,14 +644,8 @@ def check_ipv6_reachable(ctx: Context) -> str:
 def check_scrape_targets_up(ctx: Context) -> str:
     """Every application scrape target reports ``up``.
 
-    This is what "the health endpoints" means in a deployment whose edge health endpoint is
-    deliberately loopback-only: each module serves Prometheus metrics on its own management
-    port, and ``up`` is Prometheus's verdict on whether that endpoint answered.
-
-    It is a different signal from :func:`check_containers_running`, and the difference is the
-    point. A container can be ``Up`` while its actuator is unreachable or failing - the deploy
-    health gate has been fooled by exactly that shape before - so the container state and the
-    scrape state are asserted separately rather than one standing in for the other.
+    Asserted separately from :func:`check_containers_running`, since a running container can
+    still have a failing actuator.
 
     Args:
         ctx: the run context.
@@ -916,9 +658,6 @@ def check_scrape_targets_up(ctx: Context) -> str:
         CheckFailed: when an expected target is down or absent entirely.
     """
     wanted = ("basetool-backend", "basetool-frontend", "basetool-ingest", "keycloak")
-    # `up` is queried bare and filtered here rather than with a label matcher, because a PromQL
-    # matcher needs a quote character and every quote style collides with one of the three
-    # shells this command passes through.
     payload = _promql(ctx, "up")
     state: dict[str, float] = {}
     for sample in payload.get("data", {}).get("result", []):
@@ -936,31 +675,12 @@ def check_scrape_targets_up(ctx: Context) -> str:
     return f"all {len(wanted)} application scrape targets up"
 
 
-# ============================================================================================
-# Checks - host-side
-# ============================================================================================
 def check_client_address_visible(ctx: Context) -> str:
-    """The edge logs the CLIENT's address, not a proxy's.
+    """The edge logs the client's address, not a proxy's (REQ-SEC-023, ADR-0112).
 
-    **This is the check the whole suite exists for.** Six things in the edge configuration read
-    ``$remote_addr``: the per-IP limiter (REQ-SEC-023), the ADR-0112 IPv6 ``/64`` bucket key, the
-    Keycloak admin allow-list, the default-server allow-list, the API allow-list, and the access
-    log that is the only record of a refused request's origin. All six are correct only while the
-    edge's TCP peer is the real client.
-
-    A userland port forwarder in front of the edge collapses every client onto one address. Under
-    Docker that happened once, to IPv6 clients only, and cost the 2026-07-20 outage; under
-    rootless Podman's ``rootlessport`` it would happen to every client - which is why
-    ``PODMAN_MIGRATION_PLAN.md`` §3.1 rejects that configuration.
-
-    The check issues a marked request and then reads the edge's log for it, and asserts two
-    independent things:
-
-    1. the address the edge logged for **our** request is public, not a bridge or loopback
-       address, and equals the address the host sees our SSH session coming from when the two
-       can be compared;
-    2. the edge has seen **more than one** distinct client address recently - a collapsed edge
-       sees exactly one, forever.
+    Issues a marked request and asserts that the edge logged it from a public address equal to
+    our SSH source where comparable, and that the edge saw more than one distinct client
+    address in the last hour.
 
     Args:
         ctx: the run context.
@@ -979,10 +699,6 @@ def check_client_address_visible(ctx: Context) -> str:
     except OSError as exc:
         raise CheckFailed(f"could not issue the marked probe to {frontend}: {exc}") from exc
 
-    # The container log, never tail: /var/log/nginx/access.log inside the container is a symlink
-    # to /dev/stdout, so tail/grep/wc block on a pipe that never ends. Always bounded by time, and
-    # always read through HostRunner.container_log_cmd -- under podman's journald driver
-    # `podman logs` returns nothing at all, measured.
     logs = ctx.runner.run(
         f"{ctx.runner.container_log_cmd('edge', ctx.log_window)} | grep -F {marker} | head -5")
     if not logs.strip():
@@ -1001,9 +717,6 @@ def check_client_address_visible(ctx: Context) -> str:
     matched = ""
     logged = _parse_address(first_field)
     ssh_parsed = _parse_address(ssh_addr or "")
-    # Compare the PARSED addresses, not the spellings. `(":" in a) == (":" in b)` was a test for
-    # "same family" that reads `::ffff:10.9.0.14` as IPv6 and `10.9.0.14` as IPv4, so it skipped
-    # the cross-check on the one pairing where the two are the same address written two ways.
     if ssh_parsed is not None and logged is not None and ssh_parsed.version == logged.version:
         if ssh_parsed != logged:
             raise CheckFailed(
@@ -1011,11 +724,6 @@ def check_client_address_visible(ctx: Context) -> str:
                 f"{ssh_addr} - the address is being rewritten in flight")
         matched = ", and it matches our SSH source"
 
-    # Counted here rather than with `cut | sort -u | wc -l` on the host, and over stdout only.
-    # The old pipeline merged stderr, so nginx's error log contributed distinct first fields --
-    # on this deployment's real log the distinct set includes `2026/09/17`, the date that opens
-    # every [notice] line. A fully collapsed edge logging exactly ONE client address still reached
-    # `count >= 2` that way, and the check reported green on the failure it was added to catch.
     raw_lines = ctx.runner.run(f"{ctx.runner.container_log_cmd('edge', 60)} | head -20000")
     addresses = set()
     for line in raw_lines.splitlines():
@@ -1037,22 +745,7 @@ def check_client_address_visible(ctx: Context) -> str:
 def check_redis_requires_auth(ctx: Context) -> str:
     """An unauthenticated client must not be able to talk to Redis.
 
-    This exists because of a specific production defect, on 2026-07-10. Redis is started with
-    ``--aclfile``, and once that is in play the file is the source of truth for **every** user
-    including ``default`` -- a file omitting a ``default`` entry makes Redis reset it to
-    ``nopass ~* &* +@all`` at load. Production shipped exactly that, leaving the session store,
-    OAuth2 refresh tokens included, readable and writable with no authentication on the internal
-    network.
-
-    ``--requirepass`` did not save it and never could: measured against ``redis:8-alpine`` on
-    2026-09-16, an ACL file without a ``default`` line leaves Redis open **whether or not**
-    ``--requirepass`` is given, and an ACL file with one wins over it. It was removed on that
-    evidence, which makes the ACL file the whole of the protection -- and makes asserting it worth
-    a check rather than a runbook line nobody runs.
-
-    The probe needs **no credential**: it opens a socket and sends ``PING``. A Redis that answers
-    ``+PONG`` to that is open; one that answers ``-NOAUTH`` is doing its job. Nothing is written,
-    and no password is read from anywhere.
+    Sends an unauthenticated ``PING``; ``-NOAUTH`` passes, ``+PONG`` fails. No credential is used.
 
     Args:
         ctx: the run context.
@@ -1064,31 +757,6 @@ def check_redis_requires_auth(ctx: Context) -> str:
         Skip: when no host access is configured.
         CheckFailed: when Redis answers an unauthenticated PING, or cannot be found.
     """
-    # Everything is reported on stdout with exit 0, so the outcome is read from the ANSWER rather
-    # than from an exception. The first draft raised on a non-zero exit and then matched the reason
-    # out of the error text -- which happily matched the marker in the command it was quoting, and
-    # reported "no redis container" for what was really a read timeout.
-    #
-    # `head -n 1`, not `head -c N`: Redis keeps the connection open, so a byte count blocks until
-    # it is reached and -NOAUTH is shorter than any sensible count. That cost one confusing run.
-    #
-    # **The ping is sent from inside the container now**, and that is a fix. It used to read the
-    # container's IP out of `inspect` and open /dev/tcp to it FROM THE HOST -- fine on Docker, whose
-    # bridge is host-visible. Under rootless Podman the container network is in a user namespace and
-    # the host has no route into it: measured on the testing host 2026-09-21, this check did not
-    # fail, it HUNG, and was killed by the runner's 45-second timeout. The one check whose purpose
-    # is catching unauthenticated access to the session store could not run at all.
-    #
-    # `redis-cli` is an unauthenticated client here and -NOAUTH is a protocol-level answer, so the
-    # assertion is unchanged in substance: it is still "an anonymous client is refused". What is
-    # lost is the proof that the PORT is closed to the network, and nothing here proved that anyway
-    # -- the network segmentation is `edge-not-directly-reachable`'s and the firewall's job.
-    #
-    # `env -u REDISCLI_AUTH` is not decoration. redis-cli reads that variable and would authenticate
-    # itself, turning the answer into +PONG and this check into a PASS on exactly the state it
-    # exists to catch. Measured: the container carries REDIS_PASSWORD but not REDISCLI_AUTH, so it
-    # does not happen today -- and a check that is only correct until someone adds an environment
-    # variable is not correct.
     cmd = (
         f"{ctx.runner.container_cli} exec redis sh -c "
         "'env -u REDISCLI_AUTH redis-cli --no-auth-warning ping 2>&1 | head -n 1' "
@@ -1155,34 +823,8 @@ def check_containers_running(ctx: Context) -> str:
 def _promql(ctx: Context, query: str) -> dict:
     """Run one instant PromQL query on the host and return the parsed response.
 
-    Prometheus is not published on the host: it lives on ``net-monitoring-core`` and its web
-    server is basic-auth protected over **plain http** - ``https://`` fails with exit 35 and
-    prints nothing, which reads exactly like a quoting failure and is not one.
-
-    **The query is asked from INSIDE the container, and that is a fix rather than a style.** This
-    used to read the container's IP out of ``inspect`` and curl it FROM THE HOST, which works on
-    Docker because its bridge is host-visible. Under rootless Podman the container network lives in
-    a user namespace and the host has no route into it at all: measured on the testing host
-    2026-09-21, ``inspect`` returned ``10.89.0.22`` and a curl to it timed out after six seconds.
-    Three checks read Prometheus - ``scrape-targets-up``, ``container-metrics``, ``log-streams`` -
-    and all three failed that way, at the two cutover steps that exist to catch exactly this.
-
-    ``wget`` rather than curl because the Prometheus image carries no curl, and the query is
-    percent-encoded HERE rather than handed to ``--data-urlencode``: doing it in Python keeps the
-    shell fragment free of spaces and quotes, which is what makes it safe to pass through
-    ``sh -c``. The password is read inside the container from its own mounted secret, so it never
-    crosses the SSH boundary and never reaches this process.
-
-    Args:
-        ctx: the run context.
-        query: the PromQL expression.
-
-    Returns:
-        The decoded ``/api/v1/query`` response.
-
-    Raises:
-        Skip: when no host access is configured.
-        CheckFailed: when Prometheus cannot be reached or does not answer ``status: success``.
+    The query runs inside the ``prometheus`` container via ``wget`` over plain HTTP with basic
+    auth; the password is read from the container's own mounted secret and never leaves it.
 
     Args:
         ctx: the run context.
@@ -1195,8 +837,6 @@ def _promql(ctx: Context, query: str) -> dict:
         Skip: when no host access is configured.
         CheckFailed: when Prometheus cannot be reached or does not answer ``status: success``.
     """
-    # The secret as the CONTAINER sees it, not as the host does. The host copy lives at
-    # /var/iri/monitoring/secrets/prometheus_web_password and is mounted here.
     secret = "/etc/prometheus/secrets/web_password"
     encoded = urllib.parse.quote(query, safe="")
     inner = (
@@ -1209,11 +849,6 @@ def _promql(ctx: Context, query: str) -> dict:
     try:
         raw = ctx.runner.run(cmd)
     except CheckFailed as exc:
-        # Match on what the RUNTIME says, not on a sentinel of our own. The previous version
-        # tested `"NO_PROMETHEUS_ADDRESS" in str(exc)` -- and CheckFailed's message quotes the
-        # command, which itself contained `echo NO_PROMETHEUS_ADDRESS`. Every failure of this
-        # helper, including a plain timeout, therefore reported "no running prometheus container".
-        # That is what sent two separate investigations after a container that was running fine.
         text = str(exc).lower()
         if "no such object" in text or "no such container" in text:
             raise CheckFailed(
@@ -1233,9 +868,7 @@ def _promql(ctx: Context, query: str) -> dict:
 def _translate_uid(host_uid: int, uid_map: list) -> int | None:
     """Translate a host uid into the uid a container sees, using that container's ``uid_map``.
 
-    Each row is ``(container_start, host_start, count)``, the triple ``/proc/<pid>/uid_map``
-    prints. A container with no user namespace carries the identity map, so the same code answers
-    for rootful Docker and for rootless Podman without having to know which it is looking at.
+    Each row is ``(container_start, host_start, count)``, as ``/proc/<pid>/uid_map`` prints it.
 
     Args:
         host_uid: the uid the host sees the process running as.
@@ -1253,18 +886,8 @@ def _translate_uid(host_uid: int, uid_map: list) -> int | None:
 def check_containers_unprivileged(ctx: Context) -> str:
     """The stateful containers run as their own uid, not as root inside the container.
 
-    This exists because of a measurement on 2026-09-16 that went the wrong way. Dropping redis's
-    ``SETUID``/``SETGID`` does **not** stop it: its entrypoint tests ``has_cap setuid && has_cap
-    setgid`` and, finding neither, skips the privilege drop and carries on as root. The container
-    is up, answers ``PING``, and passes ``containers-running``. It then writes its append-only
-    files as ``0:0``, and the correct configuration afterwards refuses to start on them. A
-    hardening change that reads as a success is how that happens, and no other check here notices.
-
-    Read from the HOST, without ``docker exec``: the container's pid, that pid's real uid, and its
-    ``uid_map``. Translating the host uid back through the map gives the uid **as the container
-    sees it**, which is the number that matters -- and makes the check identical on a rootful
-    Docker host, where the map is the identity, and on a rootless Podman one, where the same
-    container uid appears as a subuid. On Podman it therefore asserts the translation as well.
+    Reads pid 1's host uid and ``uid_map`` from the host and translates the uid into the
+    container's view.
 
     Args:
         ctx: the run context.
@@ -1274,8 +897,8 @@ def check_containers_unprivileged(ctx: Context) -> str:
 
     Raises:
         Skip: when no host access is configured.
-        CheckFailed: when a container is absent, unreadable, or running as a uid other than the
-            one the units and the bootstrap role agree on.
+        CheckFailed: when a container is absent, unreadable, or running as a uid other than
+            the one in :data:`UNPRIVILEGED_CONTAINERS`.
     """
     problems, good = [], []
     for name, expected in sorted(UNPRIVILEGED_CONTAINERS.items()):
@@ -1323,24 +946,6 @@ def check_containers_unprivileged(ctx: Context) -> str:
 def check_containers_read_only(ctx: Context) -> str:
     """Every app container runs on a read-only root filesystem.
 
-    Read-only is not defence in depth here so much as a statement about what the image is allowed
-    to become: a container that cannot rewrite its own installation cannot be persistently
-    modified by anything that gets inside it, and the next restart is the image again.
-
-    Measured service by service before it was required of them (section 21 of the migration plan).
-    Nine of the ten third-party images write nothing outside their mounts or write only under
-    /tmp; a healthy Spring Boot module writes Tomcat's work directory, its docbase and the JVM
-    perf data, all three under /tmp. Podman mounts /run, /tmp and /var/tmp as tmpfs under
-    ``--read-only`` and copies the image's content up into them, which is why none of them needs
-    an explicit tmpfs -- and why this is expressed in the Quadlet units rather than in the compose
-    file, since Docker does not do that.
-
-    ``keycloak`` needed two passes. Plain read-only stops its start-time Quarkus re-augmentation
-    dead, and the first reading of that was that it could not have a read-only root filesystem at
-    all. A tmpfs over the one directory it rewrites -- with ``tmpcopyup``, so the image content is
-    there -- costs 4.7M and works, because that augmentation was already being thrown away at
-    every start.
-
     Args:
         ctx: the run context.
 
@@ -1380,10 +985,7 @@ def check_containers_read_only(ctx: Context) -> str:
 def check_container_metrics(ctx: Context) -> str:
     """The container metric series the alert rules read are present and populated.
 
-    Not "the collector is up" - the specific series. ``ContainerOomKilled``, ``ContainerRestartLoop``,
-    ``ContainerMemoryHigh``, ``ContainerPidsHigh`` and both ``*MetricsMissing`` guards all read
-    from this family, and an alert whose series has silently gone away does not fire. It looks
-    identical to a healthy system, which is the whole reason this check exists.
+    Each series in :data:`REQUIRED_CONTAINER_SERIES` must carry at least one sample.
 
     Args:
         ctx: the run context.
@@ -1417,11 +1019,7 @@ def check_container_metrics(ctx: Context) -> str:
 
 
 def check_log_streams(ctx: Context) -> str:
-    """Loki is ingesting, and recently.
-
-    A log pipeline that stopped is not visible from the application side at all: the app keeps
-    writing, the dashboards keep rendering the last window, and only the absence of new lines
-    says anything. Asserting recency rather than presence is the difference.
+    """Loki has ingested lines within the last five minutes.
 
     Args:
         ctx: the run context.
@@ -1450,22 +1048,8 @@ def check_log_streams(ctx: Context) -> str:
 def check_trace_pipeline(ctx: Context) -> str:
     """Spans reach Alloy's OTLP receiver, when the apps are configured to emit any.
 
-    The trace path has no alert of any kind -- not on `otelcol_receiver_accepted_spans_total`, not
-    on `tempo_distributor_spans_received_total` -- so a broken one reports nothing anywhere. It is
-    also the path most likely to break on a runtime change, because the apps address Alloy by a
-    NAME and a service that moves to the host stops answering to it. Measured on the testing host
-    on 2026-09-20: both counters ABSENT rather than zero, i.e. the pipeline had never carried a
-    single span, while every dashboard and every alert reported a healthy monitoring plane.
-
-    Absent is deliberately treated as the failure and not as "nothing yet". These are counters
-    Alloy creates on the first span it accepts; the apps emit on every request, so on a host that
-    serves at all, absence means the spans are being dropped before they arrive -- in each app's own
-    exporter, where nothing looks.
-
-    The check reads `MONITORING_TRACING_ENABLED` from the host `.env` first and skips when tracing
-    is off, because an app that is not emitting is not a fault. That is one grep for one name, in
-    the same narrow shape `check_env_reaches_the_units` uses so the rest of the credential set never
-    crosses the SSH boundary.
+    Skips unless ``MONITORING_TRACING_ENABLED=true`` in the host ``.env`` (read by one narrow
+    grep). An absent span counter counts as a failure, not as "nothing yet".
 
     Args:
         ctx: the run context.
@@ -1480,11 +1064,6 @@ def check_trace_pipeline(ctx: Context) -> str:
     raw = ctx.runner.run(
         "grep -E '^MONITORING_TRACING_ENABLED=' /var/iri/code/.env 2>/dev/null || true")
     if not raw.strip():
-        # Same distinction as check_env_reaches_the_units, and one more: an ABSENT file, an
-        # UNREADABLE one and one without the key all produce nothing here. Run against the
-        # migration target before its first deploy, this reported ".env is not readable by this
-        # SSH account" about a file that simply did not exist yet -- a true statement that points
-        # at the wrong problem, and the kind that sends someone checking sudo rules for an hour.
         if not ctx.runner.run("test -e /var/iri/code/.env && echo yes || true").strip():
             raise Skip("no /var/iri/code/.env on this host yet -- it arrives with the restore, so "
                        "before that there is nothing to read and nothing to conclude")
@@ -1515,19 +1094,11 @@ def check_trace_pipeline(ctx: Context) -> str:
     return f"Alloy has accepted {spans:.0f} spans"
 
 
-
-# ============================================================================================
-# Checks - load (opt-in)
-# ============================================================================================
 def check_rate_limit_active(ctx: Context) -> str:
     """A burst past the per-IP cap is refused with 429.
 
-    REQ-SEC-023 sets 20 r/s with a burst of 80. This sends past that and requires the edge to
-    refuse - the point being not that a limiter exists but that it is **reachable through the
-    real request path**, which a configuration check cannot establish.
-
-    Opt-in because it is load against the target, and because it deliberately consumes this
-    client's own bucket for a few seconds.
+    Sends 200 requests against the REQ-SEC-023 limit (20 r/s, burst 80). Opt-in, since it is
+    load against the target.
 
     Args:
         ctx: the run context.
@@ -1561,9 +1132,6 @@ def check_rate_limit_active(ctx: Context) -> str:
     return f"{refused}/200 refused with 429"
 
 
-# ============================================================================================
-# Registry
-# ============================================================================================
 @dataclasses.dataclass(frozen=True)
 class Check:
     """One registered check.
@@ -1581,17 +1149,6 @@ class Check:
     fn: Callable[[Context], str]
 
 
-#: The compose variables that `scripts/generate-quadlet.py` BAKES into the units at generation
-#: time, mapped to the unit directive each one ends up in. Quadlet performs no interpolation, so a
-#: `${VAR}` reaching a unit file would be written there literally -- the generator therefore
-#: resolves each one to the value the promoted bundle carries.
-#:
-#: That is correct, and it has a consequence nothing states: setting any of these in the host
-#: `.env` does NOTHING. The variable is in the file, it looks effective, and the unit ignores it.
-#: Three separate hours were spent on this in one day -- IRI_KEYCLOAK_HOST_ALIAS (a container
-#: timing out against its own issuer), IRI_TRUSTSTORE_HOST_PATH (PKIX failures against a private
-#: CA) and IRI_BASETOOL_VERSION (harmless only because both tags happened to point at one digest).
-#: Each looked like a different problem.
 BAKED_INTO_UNITS = {
     "IRI_IMAGE_NAMESPACE": "Image=",
     "IRI_BASETOOL_VERSION": "Image=",
@@ -1612,17 +1169,8 @@ BAKED_INTO_UNITS = {
 def check_env_reaches_the_units(ctx: Context) -> str:
     """A value set in the host `.env` must actually be in the units, or be absent from both.
 
-    Under compose, every one of these variables reached the container because compose interpolated
-    the file at `up` time. Under Quadlet there is no interpolation: the generator resolves them
-    once, into a promotable artifact that is the same on every host. A host that sets one of them
-    in its `.env` is therefore writing a line with no effect -- and the failure that follows is
-    never about a variable. It is a container that will not start, a PKIX error, or a service
-    quietly running the wrong image.
-
-    The check does not demand that the units follow the `.env`; the units are deliberately
-    host-independent. It demands that the two do not **disagree silently**. A host that needs a
-    different value supplies a systemd drop-in, and the drop-in is what this reads -- so the
-    intended mechanism passes and the trap fails.
+    Quadlet does not interpolate the ``.env``, so each :data:`BAKED_INTO_UNITS` value set there
+    must appear in a unit or a systemd drop-in.
 
     Args:
         ctx: the run context.
@@ -1634,25 +1182,12 @@ def check_env_reaches_the_units(ctx: Context) -> str:
         Skip: when no host access is configured, or the host carries no `.env`.
         CheckFailed: when the `.env` sets a value that neither the unit nor a drop-in carries.
     """
-    # Only the seven keys this check is about, filtered ON THE HOST -- the same shape
-    # check_certificate_shared already uses. `cat /var/iri/code/.env` pulled the whole production
-    # credential set across the SSH boundary into this process, and although nothing here could
-    # print one (BAKED_INTO_UNITS holds image tags, a host alias and four paths, and the message
-    # loop iterates only over those), the narrower read means the values never arrive at all. The
-    # names are module constants, so nothing caller-supplied reaches the pattern.
     wanted = "|".join(sorted(BAKED_INTO_UNITS))
     env_raw = ctx.runner.run(
         f"grep -E '^({wanted})=' /var/iri/code/.env 2>/dev/null || true")
     if not env_raw.strip():
         if not ctx.runner.run("test -f /var/iri/code/.env && echo yes || true").strip():
             raise Skip("no /var/iri/code/.env on this host")
-        # `test -r`, not `test -f`, and the distinction is the whole of this branch. The grep above
-        # ends in `|| true`, so it produces empty output both when the file HAS none of these keys
-        # and when the runner could not open it at all -- and .env is 0640 deploy:deploy, which an
-        # ordinary login account cannot read. Measured 2026-09-20: run as `sysadm` against the
-        # testing host, this check reported "sets none of the variables" about a file that sets
-        # IRI_KEYCLOAK_HOST_ALIAS. A check that draws a conclusion from a file it could not open is
-        # the exact failure this one exists to report about others.
         if not ctx.runner.run("test -r /var/iri/code/.env && echo yes || true").strip():
             raise Skip("/var/iri/code/.env is not readable by this SSH account (it is 0640 "
                        "deploy:deploy) -- rerun with an account that can read it, or this check "
@@ -1666,24 +1201,6 @@ def check_env_reaches_the_units(ctx: Context) -> str:
             key, value = line.split("=", 1)
             env[key.strip()] = value.strip()
 
-    # The effective unit text INCLUDING drop-ins, which is what podman actually generates from.
-    #
-    # NOT `~`. The first version of this used it and skipped with "no Quadlet units on this host"
-    # against a host that had thirty-nine of them: `~` is the home of whoever the runner executes
-    # as, and on a rootless deployment the units live in the DEPLOY user's home while the runner
-    # may be root or another account entirely. A check that looks in the wrong place does not fail,
-    # it skips -- which is indistinguishable from a host that has nothing to check.
-    #
-    # Both locations, no assumption about the user: /etc for a rootful install, every home for a
-    # rootless one.
-    #
-    # THREE locations, and the third is the one that matters on this deployment. Added 2026-09-20:
-    # podman-systemd.unit(5) lists /etc/containers/systemd/users/$(UID) as a rootless search path,
-    # and it is where `deploy.sh` installs and where the role writes its drop-ins -- because it is
-    # the only one of the four an account other than the owner can write. Neither glob above
-    # matched it, so this check skipped with "no Quadlet units found" against a host carrying 39
-    # units and two drop-ins. The same shape as the `~` bug the comment above already records,
-    # one directory deeper.
     units = ctx.runner.run(
         "cat /etc/containers/systemd/*.container "
         "/etc/containers/systemd/*.container.d/*.conf "
@@ -1699,7 +1216,7 @@ def check_env_reaches_the_units(ctx: Context) -> str:
     for var, directive in sorted(BAKED_INTO_UNITS.items()):
         value = env.get(var, "")
         if not value:
-            continue  # unset in the .env: the unit's baked default is the only claim, and it stands
+            continue
         if value in units:
             good.append(f"{var} ({directive})")
         else:
@@ -1718,23 +1235,10 @@ def check_env_reaches_the_units(ctx: Context) -> str:
 
 
 def check_edge_not_directly_reachable(ctx: Context) -> str:
-    """The edge's own port must be reachable from nothing but the front end.
+    """The edge's own port must be reachable from nothing but the front end (ADR-0187).
 
-    This is the invariant ADR-0187 rests on, and it is the one that turns the decision into its
-    opposite when it slips. The front end hands the edge the client's address in a PROXY protocol
-    header, and the edge believes it -- because the header **asserts** a source address, it does not
-    prove one. So if anything else can open a connection to the edge's port, it can invent a client
-    address, and walk past the per-client rate limiter (``REQ-SEC-023``) and the Keycloak admin
-    allow-list, which are exactly the two controls the front end exists to preserve.
-
-    The property that closes it is that the container publishes on **loopback only**. That is one
-    line in the unit file, it is invisible in every screenshot of a working system, and nothing about
-    a healthy stack would reveal its absence. Hence a check rather than a comment.
-
-    The probe deliberately runs **from the host**, against the host's own routable addresses rather
-    than against ``127.0.0.1``: loopback is where the port is *supposed* to answer. A connection that
-    succeeds there proves nothing, and one that succeeds on the public address proves the invariant
-    is gone.
+    Probes ports 8080 and 8443 from the host on each global address; the edge trusts the PROXY
+    header, so it must publish on loopback only.
 
     Args:
         ctx: the run context.
@@ -1743,8 +1247,7 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
         A summary naming the addresses that were tried and refused.
 
     Raises:
-        Skip: when no host access is configured, or the edge does not publish on loopback at all --
-            which is the pre-ADR-0187 shape and not a failure of this check.
+        Skip: when no host access is configured, or the edge does not publish on loopback at all.
         CheckFailed: when the edge answers on an address other than loopback.
     """
     published = ctx.runner.run(
@@ -1757,9 +1260,6 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
             "(ADR-0187 not in effect on this host)"
         )
 
-    # Every routable address the host has, v4 and v6 -- not a hardcoded one. A host gains an
-    # interface and the check has to follow it, or it proves the invariant for the address somebody
-    # thought of in 2026 and not for the one that was added later.
     addrs = ctx.runner.run(
         "ip -o addr show scope global | awk '{print $4}' | cut -d/ -f1"
     ).split()
@@ -1770,17 +1270,6 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
     for addr in addrs:
         target = f"[{addr}]" if ":" in addr else addr
         for port in ("8080", "8443"):
-            # curl's EXIT CODE, not its %{http_code}. The question here is whether a TCP
-            # connection can be established from a routable address -- not whether HTTP came back
-            # over it. `%{http_code}` answers `000` for both "connection refused" and "connected,
-            # then the server said nothing usable", and the second is exactly what :8443 does when
-            # it speaks PROXY protocol at a client that does not: an edge fully reachable from the
-            # internet read as refused.
-            #
-            #   7  could not connect        -> refused or filtered. This is the passing state.
-            #   28 operation timed out      -> filtered. Also passing.
-            #   anything else, 0 included   -> the connection was ESTABLISHED, which is the defect;
-            #                                  52 (empty reply) and 35 (TLS error) both land here.
             code = ctx.runner.run(
                 f"curl -s -o /dev/null --connect-timeout 4 --max-time 6 "
                 f"http://{target}:{port}/ >/dev/null 2>&1; echo $?"
@@ -1798,15 +1287,11 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
     return f"refused on {len(addrs)} global address(es), on both 8080 and 8443"
 
 
-#: The two monitoring components that run as HOST packages rather than containers, the compose
-#: service whose image pin names the version the rest of the stack was tested against, and the
-#: local endpoint whose ``*_build_info`` reports what is actually running.
 HOST_EXPORTERS = {
     "node-exporter": ("node_exporter_build_info", "http://127.0.0.1:9100/metrics"),
     "alloy": ("alloy_build_info", "http://127.0.0.1:12345/metrics"),
 }
 
-#: The compose file the pins are read from, beside this script in the repository.
 COMPOSE_MONITORING = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docker-compose.monitoring.yml")
 
@@ -1814,9 +1299,7 @@ COMPOSE_MONITORING = os.path.join(
 def _compose_pinned_version(service: str, path: str = COMPOSE_MONITORING) -> str | None:
     """Read the version tag of one compose service's image, without a YAML parser.
 
-    The suite runs from a bare checkout with the standard library only, so the ``image:`` line
-    under the service's key is found textually. It is our own file, one service per two-space
-    indented key, and the image line is always within that block.
+    The ``image:`` line is found textually inside the service's two-space-indented block.
 
     Args:
         service: the compose service name.
@@ -1836,7 +1319,7 @@ def _compose_pinned_version(service: str, path: str = COMPOSE_MONITORING) -> str
             inside = True
             continue
         if inside and line.startswith("  ") and not line.startswith("   ") and line.strip():
-            break  # the next service
+            break
         if inside:
             match = re.match(r"\s+image:\s*\S+?:v?([0-9][^@\s]*)", line)
             if match:
@@ -1847,18 +1330,8 @@ def _compose_pinned_version(service: str, path: str = COMPOSE_MONITORING) -> str
 def check_host_exporter_versions(ctx: Context) -> str:
     """The host-native node_exporter and Alloy run the versions the compose file pins.
 
-    Both became HOST packages at the Podman cutover (arc42 §7.3), installed by the bootstrap role
-    with ``state: present`` -- so a host keeps whatever version it was provisioned with, and the
-    role never follows the compose pin that Dependabot moves. Nothing else compares the two: the
-    configuration the release ships (``config.alloy``, the scrape set, the dashboards) is written
-    and tested against the compose version, and a drift between that and the process actually
-    running shows up, if at all, as a component that half understands its own configuration.
-
-    A check rather than a pinned RPM version in the role (OPS-SEC-06, decided 2026-09-22): a pin in
-    the role is a second copy of the version that has to be moved by hand in step with the compose
-    pin, which is the drift source this deployment removed on purpose (defaults/main.yml), and it
-    would block the security updates dnf-automatic now applies to both packages. The check keeps the
-    compose file the one place a version is chosen and makes a disagreement loud.
+    Both are host packages; ``docker-compose.monitoring.yml`` is the one place their version is
+    chosen.
 
     Args:
         ctx: the run context.
@@ -1878,7 +1351,6 @@ def check_host_exporter_versions(ctx: Context) -> str:
             continue
         line = ctx.runner.run(
             f"curl -s --max-time 5 {url} 2>/dev/null | grep '^{metric}' | head -n 1 || true")
-        # Anchored on the label boundary: `goversion=` precedes `version=` in both exporters.
         match = re.search(r'[{,]version="v?([^"]+)"', line)
         if not match:
             problems.append(
@@ -1901,10 +1373,7 @@ def check_host_exporter_versions(ctx: Context) -> str:
 def check_security_updates_enabled(ctx: Context) -> str:
     """The host applies security updates unattended, and only security updates.
 
-    Until 2026-09-22 nothing on this host patched it: the bootstrap role installed no
-    ``dnf-automatic``, and the retired Ubuntu host's unattended-upgrades had no successor. A timer
-    that is installed but disabled, or a configuration that downloads without applying, looks from
-    outside exactly like a patched host -- which is why the check asks the timer AND the file.
+    Checks both the ``dnf-automatic.timer`` state and ``/etc/dnf/automatic.conf``.
 
     Args:
         ctx: the run context.
@@ -1984,9 +1453,7 @@ CHECKS: tuple[Check, ...] = (
 def run_checks(ctx: Context, selected: Sequence[str] | None) -> list[Result]:
     """Run the selected checks and collect their results.
 
-    A check that raises anything unexpected is reported as a failure carrying the exception
-    text, rather than aborting the run: the suite's job is to report on every invariant it was
-    asked about, and one broken check must not hide the state of the others.
+    An unexpected exception is reported as a failure of that check instead of aborting the run.
 
     Args:
         ctx: the run context.
@@ -2010,15 +1477,12 @@ def run_checks(ctx: Context, selected: Sequence[str] | None) -> list[Result]:
             results.append(Result(check.name, check.requirement, "skip", str(exc)))
         except CheckFailed as exc:
             results.append(Result(check.name, check.requirement, "fail", str(exc)))
-        except Exception as exc:  # noqa: BLE001 - a broken check is a finding, not a crash
+        except Exception as exc:  # noqa: BLE001
             results.append(Result(check.name, check.requirement, "fail",
                                   f"{type(exc).__name__}: {exc}"))
     return results
 
 
-# ============================================================================================
-# CLI
-# ============================================================================================
 def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     """Parse the command line.
 
@@ -2054,9 +1518,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
 def _resolve_hosts(overrides: Iterable[str]) -> dict[str, str]:
     """Build the vhost map from the defaults, the environment and ``--host`` overrides.
 
-    Precedence is defaults < ``EDGE_HOST_*`` environment < ``--host``. The environment is read
-    because the same four names already live there for the compose stack; the host ``.env`` file
-    itself is never opened, because it carries credentials.
+    Precedence is defaults < ``EDGE_HOST_*`` environment < ``--host``.
 
     Args:
         overrides: ``ROLE=NAME`` strings from the command line.
@@ -2107,7 +1569,7 @@ def _report(results: Sequence[Result], as_json: bool) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Entry point.
+    """List the checks, or run the selected ones and print the report.
 
     Args:
         argv: arguments without the program name, or ``None`` to read ``sys.argv``.

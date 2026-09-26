@@ -23,14 +23,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Marker contract implemented by write-DTOs that carry a material reference and an amount and
- * therefore need to be validated by {@link ValidQuantityAmountValidator}.
- *
- * <p>Implementing this interface lets the validator pull both fields without reflection or
- * MapStruct introspection, and lets us put {@code @ValidQuantityAmount} on any DTO that exposes the
- * pair regardless of unrelated fields. The validator looks up the material's {@link
- * de.greluc.krt.profit.basetool.backend.model.QuantityType} and enforces either integer (PIECE) or
- * &le;3-decimal (SCU) precision on {@link #amount()}.
+ * Contract for write DTOs that carry a catalog reference and an amount, validated by {@link
+ * ValidQuantityAmountValidator} against the material's {@link
+ * de.greluc.krt.profit.basetool.backend.model.QuantityType}.
  */
 public interface QuantityAware {
   /**
@@ -52,10 +47,9 @@ public interface QuantityAware {
   Double amount();
 
   /**
-   * Returns the UUID of the referenced {@link de.greluc.krt.profit.basetool.backend.model.GameItem}
-   * for a game-item payload (REQ-INV-029), or {@code null} for a material payload. Game-item
-   * amounts are unconditionally positive whole units, so the validator needs no catalog lookup for
-   * them. Default {@code null} keeps every existing material-only implementor source-compatible.
+   * Returns the referenced {@link de.greluc.krt.profit.basetool.backend.model.GameItem} id for a
+   * game-item payload (REQ-INV-029), whose amounts must be positive whole units. Defaults to {@code
+   * null}.
    *
    * @return the referenced game-item id, or {@code null} when the payload targets a material
    */

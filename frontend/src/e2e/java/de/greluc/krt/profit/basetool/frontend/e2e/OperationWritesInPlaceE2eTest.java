@@ -37,13 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow (#576): operation writes save in place. Proves the three conversions: creating an
- * operation from the list modal swaps the list with no full-page reload, editing an operation on
- * the detail page saves in place and a second consecutive save does not 409 (the version
- * writeback), and deleting from the detail page navigates back to the list (the entity is gone).
+ * Verifies that operation writes save in place: create from the list modal without a reload, edit
+ * on the detail page twice without a 409, and delete from the detail page back to the list.
  *
- * <p>Drive via UI, verify via API ({@link BackendSeeder}). The actor is {@code test-admin}, who can
- * create, edit and delete every operation through the role hierarchy.
+ * <p>Drives the UI and verifies via {@link BackendSeeder}, as {@code test-admin}.
  */
 @Tag("e2e")
 class OperationWritesInPlaceE2eTest {
@@ -97,9 +94,6 @@ class OperationWritesInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/operations");
         page.waitForLoadState();
 
-        // Scope to the open-trigger: the modal's "Abbrechen" button also carries
-        // data-modal-id='create-operation-modal' (close-trigger), so the bare attribute selector
-        // matches two elements and trips Playwright strict mode.
         page.locator(
                 "button[data-trigger='open-modal-display'][data-modal-id='create-operation-modal']")
             .click();
@@ -111,7 +105,6 @@ class OperationWritesInPlaceE2eTest {
                     && "POST".equals(response.request().method()),
             () -> page.locator("#create-operation-form button[type='submit']").click());
 
-        // The new operation appears in the in-place-swapped list and no full reload happened.
         assertThat(page.locator("#operations-results").getByText(name))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertEquals(
@@ -144,8 +137,6 @@ class OperationWritesInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // The details form (name/save) lives in the Verwaltung tab of the new tab layout; deeplink
-        // straight to it via ?tab=verw so the inputs are visible on load.
         E2eSupport.navigate(page, baseUrl + "/operations/" + operationId + "?tab=verw");
         page.waitForLoadState();
 
@@ -162,9 +153,6 @@ class OperationWritesInPlaceE2eTest {
             "the save must update in place — no full-page reload cleared the marker");
         assertEquals(firstName, operationName(operationId), "the first edit must persist");
 
-        // Second save on the same form, without reloading: only succeeds if the twin wrote the
-        // fresh
-        // version back into the hidden input (otherwise the stale version 409s).
         page.locator("#op-name").fill(secondName);
         page.waitForResponse(
             response ->
@@ -198,11 +186,9 @@ class OperationWritesInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // The delete action lives in the Verwaltung tab; deeplink to it so the button is visible.
         E2eSupport.navigate(page, baseUrl + "/operations/" + operationId + "?tab=verw");
         page.waitForLoadState();
 
-        // Open the confirm modal, then confirm — the AJAX delete navigates back to the list.
         page.locator("[data-trigger='operation-open-delete']").click();
         page.locator("#delete-operation-form button[type='submit']").click();
         page.waitForURL(java.util.regex.Pattern.compile(".*/operations$"));

@@ -23,22 +23,11 @@ import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Central constant holder for role codes on the frontend side (S3 Phase 3, part of #909), replacing
- * the raw string literals that used to be copy-pasted across {@code @PreAuthorize} expressions,
- * {@code sec:authorize} template attributes' Java counterparts and {@code
- * FrontendAuthHelperService}'s literal authority comparisons.
+ * Role-code constants for the frontend; they must stay identical to the backend's {@code
+ * support.Roles}, since authorities are relayed verbatim.
  *
- * <p>The frontend module cannot depend on the backend's {@code support.Roles} (separate Gradle
- * module — the frontend never talks to the backend's Java code directly, only via {@code
- * BackendApiClient}), so the values are intentionally duplicated here. They must stay
- * <b>byte-identical</b> to the backend's {@code support.Roles} — a changed constant here is a
- * breaking change against the bearer-token relay, which forwards Keycloak/backend-issued
- * authorities to the frontend verbatim.
- *
- * <p>The frontend does not configure a role hierarchy of its own ({@link
- * de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService}) — every authority
- * check here is a literal match against the authorities the bearer-token relay forwarded, never a
- * reachability computation.
+ * <p>The frontend has no role hierarchy: every check is a literal match against the relayed
+ * authorities.
  */
 public final class Roles {
 
@@ -47,8 +36,6 @@ public final class Roles {
 
   /** Prefix Spring Security authorities carry; {@code hasRole(...)} strips/re-adds it itself. */
   public static final String ROLE_PREFIX = "ROLE_";
-
-  // --- Bare role codes, mirroring the backend's support.Roles (must stay byte-identical) --------
 
   public static final String ADMIN = "ADMIN";
   public static final String OFFICER = "OFFICER";
@@ -59,10 +46,8 @@ public final class Roles {
   public static final String MISSION_MANAGER = "MISSION_MANAGER";
 
   /**
-   * Returns the {@code ROLE_}-prefixed Spring-authority form of a bare role code — the form every
-   * frontend authority literally carries (the bearer-token relay forwards authorities verbatim, so
-   * unlike {@code hasRole(...)} SpEL, direct {@code GrantedAuthority} comparisons here need the
-   * prefixed string).
+   * Returns the {@code ROLE_}-prefixed authority for a bare role code, the form relayed authorities
+   * carry.
    *
    * @param code a bare role code, e.g. {@link #ADMIN}
    * @return the prefixed authority, e.g. {@code "ROLE_ADMIN"}
@@ -73,18 +58,8 @@ public final class Roles {
   }
 
   /**
-   * The "registered member or above" authority set: holding any one of these marks the caller as an
-   * organisation member or above. Kept in sync with the backend role matrix in {@code
-   * ROLES_AND_PERMISSIONS.md}.
-   *
-   * <p><b>Not "all roles."</b> {@link #BANK_EMPLOYEE} and {@link #BANK_MANAGEMENT} are deliberately
-   * excluded — a bank-only authority does not by itself make the caller an organisation member. Do
-   * not widen this to a generic "every constant in this class" helper; that would silently admit
-   * both into every member-or-above check.
-   *
-   * <p>{@code GUEST} was a third exclusion until ADR-0159 removed the role. Nothing holds an empty
-   * authority set any more: such a token is refused with {@code 403 NO_ROLE} (REQ-SEC-053) before a
-   * request reaches a handler.
+   * The authorities that mark the caller as an organisation member or above. {@link #BANK_EMPLOYEE}
+   * and {@link #BANK_MANAGEMENT} are deliberately excluded.
    */
   public static final Set<String> MEMBER_AUTHORITIES =
       Set.of(
@@ -95,9 +70,8 @@ public final class Roles {
           authority(KRT_MEMBER));
 
   /**
-   * Pre-built {@code @PreAuthorize} SpEL expression for the "admin or officer" gate repeated
-   * verbatim across the promotion proxy/page controllers. A compile-time constant per JLS
-   * 4.12.4/15.28, so {@code @PreAuthorize(Roles.ADMIN_OR_OFFICER)} is a legal annotation value.
+   * {@code @PreAuthorize} expression for the "admin or officer" gate; a compile-time constant
+   * usable as an annotation value.
    */
   public static final String ADMIN_OR_OFFICER = "hasAnyRole('" + ADMIN + "','" + OFFICER + "')";
 }

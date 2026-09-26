@@ -82,7 +82,6 @@ class BankGrantsPageControllerTest {
 
   @Test
   void grants_ShouldFilterByAccount_andSeedSelectedAccountForCombobox() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -90,29 +89,23 @@ class BankGrantsPageControllerTest {
     UUID user = UUID.randomUUID();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(List.of(grant(user, "alpha", accountId)));
-    // The account roster is no longer preloaded (remote-bank-accounts combobox); only the selected
-    // account is resolved for the filter's edit-mode seed.
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
         .thenReturn(detail(accountId));
 
-    // When
     String view = controller.grants(null, accountId, null, null, model);
 
-    // Then
     assertEquals("bank-grants", view);
     assertEquals(Boolean.FALSE, model.getAttribute("byEmployee"));
     BankAccountDto selected = (BankAccountDto) model.getAttribute("selectedAccount");
     assertNotNull(selected);
     assertEquals("KB-0001", selected.accountNo());
     verify(backendApiClient).get(eq("/api/v1/bank/grants?accountId=" + accountId), anyTypeRef());
-    // No full account roster is preloaded (the picker searches on demand).
     verify(backendApiClient, never()).get(startsWith("/api/v1/bank/accounts?"), anyTypeRef());
   }
 
   @Test
   void grants_ShouldFilterByUserInEmployeeViewAndCollectGrantees() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -127,13 +120,10 @@ class BankGrantsPageControllerTest {
         .thenReturn(List.of(allGrants.get(0)));
     when(backendApiClient.get(eq("/api/v1/bank/grants"), anyTypeRef())).thenReturn(allGrants);
 
-    // When
     controller.grants("employee", null, userId, null, model);
 
-    // Then
     assertEquals(Boolean.TRUE, model.getAttribute("byEmployee"));
     assertEquals(userId, model.getAttribute("selectedUserId"));
-    // The per-employee view resolves no account (the account seed is account-view only).
     assertNull(model.getAttribute("selectedAccount"));
     Map<UUID, String> grantees = (Map<UUID, String>) model.getAttribute("grantees");
     assertNotNull(grantees);
@@ -142,12 +132,8 @@ class BankGrantsPageControllerTest {
     assertEquals("bravo", grantees.get(otherUser));
   }
 
-  // covers REQ-FE-005 (#579) — an in-place re-render (fragment=grantsMatrix) returns only the
-  // matrix fragment honouring the active filter, and skips the all-grants / account-seed lookups
-  // that feed the filter selectors and the create modal (all outside the swapped region).
   @Test
   void grants_fragmentGrantsMatrix_rendersOnlyMatrixFragment_andSkipsFilterAndModalLookups() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -156,16 +142,12 @@ class BankGrantsPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/bank/grants?accountId=" + accountId), anyTypeRef()))
         .thenReturn(List.of(grant(user, "alpha", accountId)));
 
-    // When
     String view = controller.grants(null, accountId, null, "grantsMatrix", model);
 
-    // Then
     assertEquals("bank-grants :: grantsMatrix", view);
     List<BankGrantDto> grants = (List<BankGrantDto>) model.getAttribute("grants");
     assertNotNull(grants);
     assertEquals(1, grants.size());
-    // The fragment path must not load the filter selectors / create-modal lookups or the account
-    // seed.
     verify(backendApiClient, never())
         .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
     verify(backendApiClient, never()).get(eq("/api/v1/bank/grants"), anyTypeRef());

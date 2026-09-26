@@ -1,21 +1,3 @@
-# promtool unit test for the monitoring plane's two HOST services (added 2026-09-22).
-#
-# Under Compose, alloy and node-exporter were containers, so ContainerMemoryHigh, ContainerOomKilled
-# and ContainerPidsHigh watched them. Under Podman both are systemd system units, and from the
-# cutover on nothing read their cgroups: no memory alert could fire for either, and neither had a
-# memory ceiling to alert against. scripts/cgroup-container-metrics.py now reads their unit cgroups
-# and publishes them under the old container names, so the existing alerts cover them again with no
-# change of their own.
-#
-# Two things are locked here:
-#   1. the existing ContainerMemoryHigh really does fire for `alloy` when fed from the collector's
-#      series -- i.e. the recording rules carry a host service through exactly like a container;
-#   2. HostServiceMetricsMissing fires when one of the two disappears while the collector is known to
-#      look for them, and stays inert where it is not (an older collector without the
-#      `_host_services` gauge).
-#
-# Run it the way the other tests in this directory are run -- see monitoring/README.md.
-
 rule_files:
   - ../alerts/containers-runtime.yml
   - ../alerts/infrastructure.yml
@@ -26,7 +8,6 @@ tests:
   - name: ContainerMemoryHigh watches alloy as a host service
     interval: 1m
     input_series:
-      # 480 MiB anonymous against a 512M ceiling: 93.75 %, over the 0.90 line.
       - series: 'basetool_container_memory_anon_bytes{name="alloy"}'
         values: "503316480x20"
       - series: 'basetool_container_memory_limit_bytes{name="alloy"}'
@@ -47,7 +28,6 @@ tests:
             exp_annotations:
               summary: "Container anonymous memory >90% of limit: alloy"
               description: "Container alloy holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check basetool:container:memory_working_set_bytes only to explain a gap, never to size."
-      # Both host services are present, so the coverage alert stays quiet.
       - eval_time: 15m
         alertname: HostServiceMetricsMissing
         exp_alerts: []
@@ -76,7 +56,6 @@ tests:
   - name: HostServiceMetricsMissing is inert where the collector does not look for host services
     interval: 1m
     input_series:
-      # An older collector: container series only, and no _host_services gauge.
       - series: 'basetool_container_memory_usage_bytes{name="backend"}'
         values: "100000000x40"
       - series: 'basetool_container_metrics_containers'

@@ -44,34 +44,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * End-to-end verification that the P4K import's reconciliation actually <b>matches and merges</b>
- * against existing UEX / SC-Wiki master data — the part the empty-database parse test cannot cover.
- * Runs against the real Testcontainers Postgres of the {@code test} profile and uses <em>real</em>
- * DataForge identifiers lifted from the live catalog (Upsiders, a Gyson undersuit, the Drake
- * Clipper, Zeta-Prolanide, a real {@code BP_CRAFT_*} blueprint and one of its resource
- * ingredients).
+ * Verifies against Postgres that a P4K import matches and merges existing master data: rows seeded
+ * with canonical UUIDs are stripped of them, re-imported, and must re-match by name, class name,
+ * code or key, backfill the UUID and re-resolve a blueprint ingredient without creating rows.
  *
- * <p>The match-key contract under test: the P4K {@code guid} is the DataForge {@code __ref}, which
- * is the same UUID SC-Wiki publishes (so it equals {@code game_item.external_uuid} / {@code
- * ship_type.external_uuid} and {@code manufacturer.scwiki_uuid} / {@code material.scwiki_uuid} /
- * {@code blueprint.scwiki_uuid}). UEX-origin rows that never received that canonical UUID are still
- * merged via the case-insensitive {@code class_name} / {@code name} / {@code code} / {@code key}
- * fallback, which then backfills the UUID ({@code LINKED_VIA_NAME}).
- *
- * <p>Strategy (all inside one rolled-back transaction):
- *
- * <ol>
- *   <li><b>Seed</b> the "existing" master data by applying the catalog with seeding on — this
- *       creates a row of every type carrying the canonical UUID, exactly as a UEX/Wiki sync would.
- *   <li><b>Strip</b> the canonical UUIDs ({@code external_uuid} / {@code scwiki_uuid}) from those
- *       rows and clear one blueprint ingredient's resolved material, simulating the UEX-origin "no
- *       UUID yet" / "unresolved ingredient" state the merge is meant to repair.
- *   <li><b>Re-import</b> (apply, seeding off): every row must now re-match by name / class_name /
- *       code / key, backfill its canonical UUID, and the blueprint ingredient must re-resolve —
- *       with <em>zero</em> new rows created.
- * </ol>
- *
- * {@link JwtDecoder} is mocked so the resource-server context boots without Keycloak.
+ * <p>Runs in one rolled-back transaction; {@link JwtDecoder} is mocked.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -136,8 +113,6 @@ class P4kImportMatchingVerificationTest {
   void reimport_matchesEveryType_backfillsUuidsAndResolvesIngredient_withoutCreatingRows() {
     byte[] bytes = catalog();
 
-    // 1) Seed the "existing" UEX/Wiki master data (one row of every type, carrying the canonical
-    // UUID) via the seed path.
     P4kImportResultDto seeded = service.applyImport(bytes, true);
     assertEquals(1, seeded.manufacturers().created(), "manufacturer seeded");
     assertEquals(1, seeded.items().created(), "item seeded");
@@ -145,8 +120,6 @@ class P4kImportMatchingVerificationTest {
     assertEquals(2, seeded.commodities().created(), "both commodities seeded");
     assertEquals(1, seeded.blueprints().created(), "blueprint seeded");
 
-    // 2) Strip the canonical UUIDs (the UEX-origin "no UUID yet" state) and unresolve the blueprint
-    // ingredient. The resource material keeps its UUID so the ingredient can resolve back to it.
     Manufacturer mfg =
         manufacturerRepository
             .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("UPS")
@@ -171,8 +144,6 @@ class P4kImportMatchingVerificationTest {
     blueprint.getIngredients().get(0).setMaterial(null);
     blueprintRepository.saveAndFlush(blueprint);
 
-    // 3) Re-import without seeding: every row must re-match by name/class_name/code/key, backfill
-    // its canonical UUID, and the ingredient must re-resolve — with no new rows created.
     P4kImportResultDto merged = service.applyImport(bytes, false);
 
     assertEquals(1, merged.manufacturers().matched(), "manufacturer re-matched by code");
@@ -193,7 +164,6 @@ class P4kImportMatchingVerificationTest {
     assertEquals(0, merged.blueprints().created(), "no blueprint re-created");
     assertTrue(merged.ingredientsResolved() >= 1, "the unresolved ingredient was re-linked");
 
-    // The backfill actually restored the canonical UUIDs on the rows.
     assertEquals(
         UUID.fromString(MFG_GUID),
         manufacturerRepository

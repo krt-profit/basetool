@@ -20,11 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Discriminates the two kinds of {@link JobOrder}. A {@link #MATERIAL} order lists raw materials to
- * procure and deliver (the legacy behaviour); an {@link #ITEM} order lists finished items to
- * produce, from which the required materials are derived and aggregated via blueprint data.
- * Existing rows are backfilled to {@link #MATERIAL} by migration V123, so the discriminator never
- * widens the behaviour of historical orders.
+ * Discriminates the two kinds of {@link JobOrder}: a {@link #MATERIAL} order lists raw materials to
+ * deliver; an {@link #ITEM} order lists finished items whose materials are derived from blueprint
+ * data.
  */
 public enum JobOrderType {
 

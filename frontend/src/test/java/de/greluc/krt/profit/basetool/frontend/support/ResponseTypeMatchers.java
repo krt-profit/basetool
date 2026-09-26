@@ -23,34 +23,22 @@ import org.mockito.ArgumentMatchers;
 import org.springframework.core.ParameterizedTypeReference;
 
 /**
- * Type-safe Mockito argument matchers for the generic response-type parameter of {@code
- * BackendApiClient}'s {@code get}/{@code getCached}/{@code post}/… overloads.
- *
- * <p>Stubbing or verifying those calls needs a matcher that (a) selects the right overload — {@link
- * ParameterizedTypeReference} versus {@link Class} — and (b) carries a concrete generic type so
- * {@code javac} emits no {@code [unchecked]} warning. The naive {@code
- * any(ParameterizedTypeReference.class)} / {@code any(Class.class)} passes a <em>raw</em> {@code
- * Class} token, which erases the method's type variable and produces exactly that warning at every
- * call site.
- *
- * <p>These helpers wrap {@link ArgumentMatchers#any()} behind a parameterized return type instead.
- * The type variable {@code T} is inferred from each call site (the stubbed method's return type for
- * {@code when(...).thenReturn(...)}, or {@link Object} when the result is discarded by {@code
- * verify(...)}), so the matcher stays fully typed and no suppression is required. Runtime behaviour
- * is that of {@code any()}: it matches any argument, including {@code null}.
+ * Type-safe Mockito matchers for the generic response-type parameter of {@code BackendApiClient}'s
+ * overloads. Unlike {@code any(Class.class)}, they select the right overload and infer {@code T}
+ * from the call site, so no {@code [unchecked]} warning arises; they match any argument, including
+ * {@code null}.
  */
 public final class ResponseTypeMatchers {
 
   private ResponseTypeMatchers() {}
 
   /**
-   * Matches any {@link ParameterizedTypeReference} argument, typed to the stubbed method's inferred
-   * return type so the {@code ParameterizedTypeReference}-based overload is selected without an
-   * unchecked cast.
+   * Matches any {@link ParameterizedTypeReference} argument, typed to the inferred return type so
+   * the matching overload is selected without an unchecked cast.
    *
-   * @param <T> the payload type carried by the {@link ParameterizedTypeReference}, inferred from
-   *     the call site
-   * @return {@code null}, after registering an "any" matcher on Mockito's matcher stack
+   * @param <T> the payload type of the {@link ParameterizedTypeReference}, inferred from the call
+   *     site
+   * @return {@code null}, after registering an "any" matcher with Mockito
    */
   public static <T> ParameterizedTypeReference<T> anyTypeRef() {
     return ArgumentMatchers.any();

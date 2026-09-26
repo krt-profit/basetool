@@ -25,17 +25,8 @@ import java.util.function.Function;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Shared alphabetical ordering for the bank account lists the bank surfaces render in selection
- * fields and overviews. Every account picker and listing — the dashboard cards ({@code
- * BankPageController}), the management table ({@code BankManagePageController}), the grant filters
- * ({@code BankGrantsPageController}), the transfer-target select and the org-unit balance cards /
- * request source picker ({@code OrgUnitBankPageController}) — orders accounts the same way: A→Z by
- * name, case-insensitively, so the order reads identically wherever an account appears.
- *
- * <p>Sorting lives in the presentation layer (not the paged backend query) because the listings are
- * single fetched pages and the comparison must be case-insensitive to match the dashboard's
- * long-standing behaviour, which a raw SQL {@code ORDER BY name} could not guarantee across DB
- * collations.
+ * Shared ordering for every bank account picker and listing: A→Z by name, case-insensitively, so
+ * accounts appear in the same order everywhere.
  */
 public final class BankAccountOrder {
 

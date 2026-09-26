@@ -26,28 +26,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Process-wide mutual-exclusion gate shared by the UEX and SC Wiki schedulers so the two external
- * data syncs never run at the same time.
+ * Process-wide lock ensuring the UEX and SC Wiki syncs never run at the same time.
  *
- * <p>Both {@code UexScheduler} and {@code ScWikiScheduler} funnel their whole sweep through {@link
- * #runExclusively(String, Runnable)} on the one shared singleton. The gate is a <b>fair</b> {@link
- * ReentrantLock} acquired with a bounded {@link ReentrantLock#tryLock(long, TimeUnit) timed
- * tryLock}: a tick that finds the lock held <b>waits</b> for the in-flight sync to finish and then
- * runs, rather than being dropped. Because both syncs run only once a day, dropping a blocked tick
- * would mean waiting a full day for the next one — so the blocked sync queues behind the running
- * one and proceeds as soon as it is released.
- *
- * <p>The wait is bounded by {@code krt.sync.coordinator.max-wait-ms} (default 1 h): a normal sync
- * finishes in minutes, so the cap only trips when a sync is genuinely stuck. If the holder does not
- * release within the cap, the waiting tick is skipped (logged) instead of blocking its executor
- * thread indefinitely — that is the hung-sync safety net, and the next daily tick retries.
- *
- * <p>The fair lock guarantees the waiter acquires the gate the moment the holder releases (FIFO),
- * so a UEX and an SC Wiki tick that fire close together always run back-to-back, never interleaved.
- * This removes the concurrent-write races (e.g. the {@code game_item} optimistic-lock collisions)
- * that overlapping UEX and SC Wiki runs used to cause. The schedulers additionally stagger their
- * start offsets so they do not even attempt to start together under normal operation; this gate is
- * the safety net for the case where their daily cadences drift back into alignment.
+ * <p>A fair {@link ReentrantLock} with a timed wait: a blocked sync waits for the running one, up
+ * to {@code krt.sync.coordinator.max-wait-ms} (default 1 h), and is skipped if the cap elapses.
  */
 @Slf4j
 @Component
@@ -80,14 +62,8 @@ public class SyncCoordinator {
   }
 
   /**
-   * Runs {@code task} under the shared lock, waiting for any in-flight sync to finish first.
-   *
-   * <p>Acquires the gate with a timed {@code tryLock(maxWaitMillis)}. If another sync is running
-   * the call blocks until that sync releases the lock (then runs {@code task}) or until the wait
-   * cap is reached (then skips, logging a WARN — the holder is presumed stuck). On success the lock
-   * is released in a {@code finally} block so a thrown task still frees the gate. The exclusion
-   * spans both schedulers, so a running UEX sweep makes a concurrent SC Wiki tick wait and vice
-   * versa, and the two never execute at the same time.
+   * Runs {@code task} under the shared lock, waiting up to the configured cap for a running sync to
+   * finish; the lock is released even if the task throws.
    *
    * @param label short human-readable name of the sync ({@code "UEX"} / {@code "SC Wiki"}) used in
    *     the wait/skip log lines and to report which sync is holding the gate

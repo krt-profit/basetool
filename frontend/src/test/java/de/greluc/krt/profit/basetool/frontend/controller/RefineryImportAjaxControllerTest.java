@@ -65,12 +65,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #591 in-place screenshot-import twin {@code
- * RefineryOrderPageController.importExtractAjax}. Drives the real Thymeleaf render of the {@code
- * refinery-orders-create :: refineryImportFormBody} fragment so a render-time 500 (which pure
- * controller tests miss — it has bitten this project before) cannot slip through, and asserts that
- * every branch returns the fragment inline (never a redirect) and that the file-picker chrome stays
- * OUTSIDE the swapped fragment.
+ * MVC tests for the in-place screenshot-import twin {@code
+ * RefineryOrderPageController.importExtractAjax}, rendering the real {@code refinery-orders-create
+ * :: refineryImportFormBody} fragment: every branch returns the fragment inline, never a redirect,
+ * and the file-picker stays outside it.
  */
 @SpringBootTest
 class RefineryImportAjaxControllerTest {
@@ -92,8 +90,6 @@ class RefineryImportAjaxControllerTest {
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // The goods-row selects render from the cached material catalog; the matched row keeps its
-    // pre-selected option and the unmatched row offers the suggested material as a chip.
     PageResponse<MaterialDto> materials =
         new PageResponse<>(
             List.of(
@@ -161,17 +157,12 @@ class RefineryImportAjaxControllerTest {
                 .with(csrf()))
         .andExpect(status().isOk())
         .andExpect(view().name(FRAGMENT))
-        // banner with counters + the order-level finding
         .andExpect(content().string(containsString("data-testid=\"refinery-import-banner\"")))
-        // both goods rows render their input-material selects
         .andExpect(content().string(containsString("inputMaterialId_0")))
         .andExpect(content().string(containsString("inputMaterialId_1")))
-        // the unmatched row carries the inline flag block + the one-click suggestion chip
         .andExpect(content().string(containsString("data-testid=\"refinery-import-row-flags-1\"")))
         .andExpect(content().string(containsString("data-testid=\"refinery-import-suggestion-1\"")))
         .andExpect(content().string(containsString("data-material-id=\"" + SUGGESTION_ID + "\"")))
-        // the swapped fragment must NOT carry the file-picker chrome — it stays OUTSIDE the
-        // fragment so its delegated triggers survive every swap
         .andExpect(content().string(not(containsString("data-testid=\"refinery-import-button\""))))
         .andExpect(content().string(not(containsString("id=\"refineryImportForm\""))));
 

@@ -6,8 +6,6 @@
     const loadingIndicator = document.getElementById('operations-loading-indicator');
     const resetBtn = document.getElementById('operations-filter-reset');
 
-    // krtFetch (fragments/head.html) owns the fragment swap + the in-results pagination
-    // interception, so the whole list — filter, sort and paginate — stays in place.
     if (!form || !resultsContainer || !window.krtFetch) return;
 
     let debounceTimer = null;
@@ -31,8 +29,6 @@
         });
     }
 
-    // Exposed so the page-local create/delete handlers (operations-index.html) can refresh the list
-    // in place after an in-place write, reusing the active filter query — no full-page reload (#576).
     window.krtOperationsReload = loadResults;
 
     function onFilterChange() {
@@ -40,10 +36,6 @@
         debounceTimer = setTimeout(loadResults, 300);
     }
 
-    // Per-browser persistence of the "show past" toggle (REQ-UI-017): one JSON object under a
-    // single localStorage key. The search text and the start/end range inputs are deliberately
-    // NOT persisted. Absent key = no saved preference = the server-rendered default (unchecked).
-    // Guarded so privacy modes that deny storage degrade to the default instead of breaking.
     const FILTER_PREF_KEY = 'operations_filter';
 
     function showPastInput() {
@@ -62,9 +54,7 @@
     function writeFilterPref(value) {
         try {
             localStorage.setItem(FILTER_PREF_KEY, JSON.stringify(value));
-        } catch (_e) {
-            /* storage unavailable */
-        }
+        } catch (_e) {}
     }
 
     function persistFilters() {
@@ -74,11 +64,6 @@
         }
     }
 
-    // Restores the persisted toggle at init, driving the existing swap exactly once when the
-    // restored state differs from what the server rendered. An explicit showPast query param
-    // (deep link / back-nav — the swaps run history:true) wins over the stored state and is
-    // re-persisted; only a bare URL restores from storage. The checkbox is absent for anonymous
-    // visitors, in which case this is a no-op.
     function restoreFilters() {
         const input = showPastInput();
         if (!input) return;
@@ -101,7 +86,6 @@
 
     const showPastToggle = showPastInput();
     if (showPastToggle) {
-        // Persist immediately on every toggle (the debounced re-fetch stays onFilterChange's job).
         showPastToggle.addEventListener('change', persistFilters);
     }
 
@@ -115,7 +99,7 @@
             form.querySelectorAll('input[type="checkbox"]').forEach(function (el) {
                 el.checked = false;
             });
-            persistFilters(); // REQ-UI-017: a reset persists the cleared state
+            persistFilters();
             loadResults();
         });
     }

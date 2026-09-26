@@ -75,11 +75,8 @@ public class JobOrderMaterial extends AbstractEntity<UUID> {
 
   /**
    * Rounds the requirement {@code amount} to SCU scale (three decimals, {@code HALF_UP}) on every
-   * insert and update. This is the persistence chokepoint that normalises both the value
-   * snapshotted at order creation and the result of the handover decrement ({@code amount -=
-   * delivered}), so no row is ever stored with more than three decimals. Rounding is unconditional
-   * — {@code PIECE} amounts are whole, so it is a no-op for them, and reading {@link #material}
-   * inside a lifecycle callback would force a lazy-load of the proxy on every flush.
+   * insert and update, covering both the creation snapshot and handover decrements; a no-op for
+   * whole {@code PIECE} amounts.
    *
    * @see InventoryItem#roundToScuScale(Double)
    */

@@ -58,10 +58,8 @@ public interface JobTypeRepository extends LookupTableRepository<JobType, UUID> 
   List<JobType> findByParentId(UUID parentId);
 
   /**
-   * Returns the job type(s) currently designated as the "Einsatzleiter" (mission lead). A partial
-   * unique index (V200) keeps this to at most one row, but the query returns a list so the
-   * re-designation path can defensively clear any stragglers. JPQL is used (not a derived query) to
-   * reference the {@code isMissionLead} field unambiguously.
+   * Returns the job types designated as "Einsatzleiter" (mission lead). A partial unique index
+   * allows at most one, but a list lets re-designation clear any stragglers.
    *
    * @return the designated mission-lead job types (normally zero or one)
    */

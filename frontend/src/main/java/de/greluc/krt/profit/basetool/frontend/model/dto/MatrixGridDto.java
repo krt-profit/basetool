@@ -25,16 +25,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Lean, render-ready projection of the materials trade matrix, serialized to JSON and consumed by
- * the client-side virtual-scroll grid ({@code /js/materials-matrix.js}).
+ * Render-ready projection of the materials trade matrix for the client-side virtual-scroll grid
+ * ({@code /js/materials-matrix.js}).
  *
- * <p>Unlike the flat {@link MaterialMatrixItemDto} stream (one row per material×terminal price),
- * this payload is already reshaped into the grid the browser draws: an ordered list of terminal
- * <i>columns</i>, the spanning star-system header counts, and the material <i>rows</i> grouped by
- * category. Crucially the per-row price map is <b>sparse</b> — it only carries the terminals that
- * actually trade the material — so the payload scales with the number of real prices, not with
- * {@code materials × terminals}. The browser then materializes only the handful of currently
- * visible rows into the DOM, keeping it small regardless of universe size.
+ * <p>Holds terminal columns, star-system header spans and material rows grouped by category; each
+ * row's price map is sparse, containing only terminals that trade the material.
  *
  * @param terminals the matrix columns, in display order (left to right)
  * @param systemGroups adjacent-column counts for the spanning star-system header row, aligned to

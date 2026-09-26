@@ -30,11 +30,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V209__restore_mission_status_covering_index.sql}
- * (#1122). Asserts the restored 3-column status-covering index {@code
- * idx_mission_owning_org_unit_internal_status} exists and that the now-redundant 2-column {@code
- * idx_mission_owning_org_unit_internal} (a prefix the 3-column index already serves) was dropped.
- * The context boots the full migration chain, so the end state is asserted.
+ * Migration test for {@code V209__restore_mission_status_covering_index.sql}: the three-column
+ * index {@code idx_mission_owning_org_unit_internal_status} exists and the redundant two-column
+ * index is dropped.
  */
 @SpringBootTest
 @ActiveProfiles("test")

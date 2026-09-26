@@ -27,45 +27,12 @@ import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
- * The GET families whose bodies must not be stored by anyone (REQ-SEC-031), in one place.
+ * The GET families whose response bodies must not be stored anywhere (REQ-SEC-031), shared by
+ * {@link ApiCacheControlFilter} and the ETag filter.
  *
- * <p><b>Why this is its own class rather than a constant on a filter.</b> Two filters need the same
- * answer for opposite reasons, and they sit in different packages. {@link ApiCacheControlFilter}
- * reads it to decide between {@code private, no-store} and {@code no-cache, must-revalidate}; the
- * ETag filter reads it to decide whether buffering the response could ever pay for itself. A second
- * copy of the list would be a divergence waiting to happen — the same argument ADR-0135 makes about
- * a second copy of an authorisation rule — and the failure would be silent in both directions: a
- * family added here but not there keeps paying for a buffer nobody can use, and a family added
- * there but not here is <em>downgraded</em> from {@code no-store} to a storable directive.
- *
- * <p><b>The list is load-bearing, not advisory</b> (REQ-SEC-031), and a missing entry costs more
- * than an opt-out. {@link ApiCacheControlFilter} runs at {@code HIGHEST_PRECEDENCE + 20}, ahead of
- * the Spring Security chain, so it sets {@code Cache-Control} before {@code
- * CacheControlHeadersWriter} would — and that writer only acts when the header is unset. A
- * sensitive family missing from this list is therefore actively <em>downgraded</em> from the
- * framework's default {@code no-store} to the storable {@code must-revalidate}, rather than merely
- * failing to opt in. Since 2026-09-10 it also decides whether the response pays for an ETag buffer
- * it can never use. Adding a sensitive GET family means adding it here.
- *
- * <ul>
- *   <li>{@code bank} and {@code org-units/bank} — account balances, bookings and the ledger. Both
- *       spellings, because they are <em>different</em> surfaces: {@code /api/v1/bank/**} is the
- *       bank-employee one, while the member-facing account a client actually reads lives under
- *       {@code /api/v1/org-units/bank/**} and its transaction rows carry a {@code holderHandle};
- *   <li>{@code users} and {@code me} — member records, the only PII the API serves;
- *   <li>{@code notifications} — one member's personal feed, including the SSE stream;
- *   <li>{@code finance-entries} (both the standalone write family and the per-mission read) and
- *       {@code operations} — the mission/operation payout ledgers and their rollups;
- *   <li>{@code personal-inventory}, {@code personal-blueprints}, {@code inventory}, {@code hangar}
- *       and {@code refinery-orders} — a member's own holdings and the org stock/fleet they name
- *       members in;
- *   <li>{@code promotion} — a member's own evaluation and eligibility record.
- * </ul>
- *
- * <p>The Materialbörse ({@code material-exchange} / {@code material-requests}) is deliberately
- * <em>not</em> here: it is an org-wide shared board, and the handles it carries are the same public
- * callsign tuple the public mission roster already serves, so it belongs in the revalidate bucket
- * with the other shared listings.
+ * <p>A sensitive family missing here is downgraded from {@code no-store} to a storable directive,
+ * so every sensitive GET family must be added. The Materialbörse is deliberately excluded as an
+ * org-wide shared board.
  */
 public final class NoStoreApiScopes {
 
@@ -93,33 +60,21 @@ public final class NoStoreApiScopes {
   private NoStoreApiScopes() {}
 
   /**
-   * Answers whether a request URI names one of the families above.
+   * Answers whether a request URI names a no-store family, matched against the decoded path
+   * (REQ-SEC-029).
    *
-   * <p>Matched against the decoded path rather than the raw {@code getRequestURI()} string
-   * (REQ-SEC-029): the raw URI is percent-encoded while Spring MVC routes on the decoded path, so a
-   * spelling such as {@code /api/v1/%62ank/accounts} must not slip out of the stricter bucket by
-   * failing a literal prefix test.
-   *
-   * @param uri the raw request URI, as {@code HttpServletRequest#getRequestURI()} returns it;
-   *     {@code null} answers {@code false} rather than throwing, because a request with no URI
-   *     cannot be shown to belong to a sensitive family and both callers treat "unknown" as "apply
-   *     the ordinary path".
-   * @return {@code true} when the path belongs to a family whose body must not be stored.
+   * @param uri the raw request URI; {@code null} answers {@code false}
+   * @return {@code true} when the path belongs to a family whose body must not be stored
    */
   public static boolean matches(@Nullable String uri) {
     return uri != null && matches(PathContainer.parsePath(uri));
   }
 
   /**
-   * The same question, asked with an already-parsed path.
-   *
-   * <p>Both callers are filters that parse the request URI for their own patterns anyway, and
-   * handing the string across made them parse it a second time on every request. An overload rather
-   * than a replacement because {@link ApiCacheControlFilter} has a string in hand at the point it
-   * asks.
+   * Answers whether an already-parsed request path names a no-store family.
    *
    * @param path the parsed request path
-   * @return {@code true} when the path belongs to a family whose body must not be stored.
+   * @return {@code true} when the path belongs to a family whose body must not be stored
    */
   public static boolean matches(PathContainer path) {
     for (PathPattern scope : SCOPES) {

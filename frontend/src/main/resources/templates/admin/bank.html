@@ -30,7 +30,6 @@
            th:text="#{admin.bank.subtitle}">Gef&auml;hrliche Wartungsaktionen der Kartellbank.</p>
     </div>
 
-    <!--/* Flash banners: success counts / idempotent no-op / error. */-->
     <div th:if="${wipeResult != null}" class="hud-box mt-2 krtm-border-color-var-color-success-77db"
          data-testid="bank-wipe-success">
         <p th:text="#{admin.bank.wipe.success(${wipeResult.accountsReset()}, ${wipeResult.holderStashesZeroed()})}">
@@ -44,7 +43,6 @@
         <p th:text="#{${error}}">Fehler.</p>
     </div>
 
-    <!--/* A1 danger card. */-->
     <div class="bank-danger-card mt-2" data-testid="bank-wipe-card">
         <div class="bank-danger-head">
             <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-reset"/></svg>
@@ -56,7 +54,6 @@
                 th:text="#{admin.bank.wipe.button}">Wipe-Reset ausf&uuml;hren</button>
     </div>
 
-    <!--/* Type-to-confirm danger modal (reserved for wipe-reset-grade actions). */-->
     <div th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-wipe-modal', titleKey='admin.bank.wipe.modal.title', variant='krt-modal--danger', body=~{::.bank-wipe-form})}">
             <form method="post" th:action="@{/admin/bank/wipe-reset}" class="no-track bank-wipe-form" data-bank-wipe
                   th:data-wipe-success="#{admin.bank.wipe.success}"

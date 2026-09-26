@@ -1,19 +1,9 @@
 #!/usr/bin/env python3
 """Advance (or show) the local release-notes progress pointer.
 
-Run this once a batch of release notes has actually been written, so the next
-``/release-notes`` run with no start point resumes from exactly where these notes
-ended. The pointer is stored in ``.release-notes-state.json`` inside the shared git
-directory (``git rev-parse --git-common-dir``), so one pointer is shared across all
-worktrees and can never be committed -- it is purely local tracking (see
-``release_state.py`` for the storage details, including the working-tree-root
-fallback).
-
-The pointer only ever moves *forward*: ``--set`` refuses to record an endpoint
-that is not a descendant of the current pointer (which would make the next resume
-re-emit already-announced changes), unless ``--force`` is given. That keeps an
-occasional historical/back-fill run -- e.g. ``--since v0.3.40 --until v0.3.45``
-while the pointer already sits at v0.3.57 -- from rewinding the tracker.
+Run after writing release notes so the next no-argument run resumes here. The pointer
+only moves forward unless ``--force`` is given. Exit codes: 1 unresolvable ref,
+3 refused rewind.
 
 Usage:
     python track_release_notes.py --show              # print the current pointer
@@ -30,7 +20,7 @@ import argparse
 import os
 import sys
 
-import release_state as st  # sibling module in this scripts/ directory
+import release_state as st
 
 
 def show(repo: str) -> None:

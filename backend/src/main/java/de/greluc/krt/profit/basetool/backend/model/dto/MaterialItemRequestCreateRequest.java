@@ -26,23 +26,16 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Write payload for posting a craftable-item wanted-listing (Gesuch) to the Materialbörse ("Item
- * suchen", REQ-MARKET-015) — the request-side counterpart to {@link
- * MaterialExchangeItemReleaseRequest}.
+ * Payload for posting a craftable-item wanted-listing (Gesuch) to the Materialbörse
+ * (REQ-MARKET-015).
  *
- * <p>The {@link #productKey} is the normalized blueprint {@code product_key} chosen from the
- * blueprint-product search; the service validates it against {@code
- * BlueprintProductService.resolveByProductKey(...)}, so only items an active blueprint produces can
- * be requested, and it snapshots the canonical display name from that resolution rather than
- * trusting client text. The requester states the desired whole-piece {@link #quantity} and may add
- * an optional minimum quality (a pure preference — items carry no intrinsic quality,
- * REQ-MARKET-015). Owner and squadron are stamped from the acting member.
+ * <p>The {@link #productKey} must resolve to an item an active blueprint produces; the display
+ * name, owner and squadron are set server-side.
  *
- * @param productKey the normalized blueprint product key of the item being requested; must resolve
- *     to an item an active blueprint produces.
+ * @param productKey the normalized blueprint product key of the requested item.
  * @param minQuality the optional minimum desired quality (0–1000), or {@code null} for no floor.
- * @param quantity the desired whole-piece quantity; must be at least 1.
- * @param remark the free-form Markdown description, at most 20 000 characters (may be blank).
+ * @param quantity the desired whole-piece quantity; at least 1.
+ * @param remark the Markdown description, at most 20 000 characters (may be blank).
  */
 public record MaterialItemRequestCreateRequest(
     @NotBlank @Size(max = 255) String productKey,

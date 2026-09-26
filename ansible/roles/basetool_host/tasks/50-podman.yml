@@ -15,9 +15,6 @@
     group: "{{ basetool_host_service_group }}"
     mode: "0755"
 
-# The setting the whole migration turns on. Without it, published ports on user-defined bridge
-# networks go through rootlessport -- a userspace proxy that replaces the client's address with its
-# own -- and every $remote_addr rule in the edge stops discriminating.
 - name: Configure rootless port forwarding
   ansible.builtin.template:
     src: containers.conf.j2
@@ -26,10 +23,6 @@
     group: "{{ basetool_host_service_group }}"
     mode: "0644"
 
-# In --check the service user does not exist, so becoming it is meaningless -- and `acl`,
-# which Ansible needs to hand its temp files to an unprivileged become_user, has not been
-# installed either. Both are properties of a dry run rather than defects, and without this
-# guard the run dies on a chmod error that reads like a permissions problem.
 - name: Read back what podman actually resolved the setting to
   when: not ansible_check_mode
   become: true
@@ -54,29 +47,6 @@
   changed_when: false
   check_mode: false
 
-# --- the public-name alias, which the units deliberately cannot carry ------------------------------
-#
-# `docker-compose.yml` has `extra_hosts: - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"`, and
-# compose interpolates that at `up` time against the host's own `.env`. Quadlet interpolates
-# nothing, so `scripts/generate-quadlet.py` resolves it once, at generation time, to the no-op
-# default -- ON PURPOSE: the units are one promotable artifact for every environment, and a
-# host-specific alias cannot live in them. The generator says so in its VALUE_VARS comment, names
-# this exact drop-in as the mechanism, and says it "belongs to Ansible".
-#
-# Nothing implemented it. Measured on the testing host 2026-09-20: `.env` carried
-# `IRI_KEYCLOAK_HOST_ALIAS=basetool.greluc.me:10.98.0.13`, all three units carried
-# `AddHost=localhost:127.0.0.1`, the running containers reported `[localhost:127.0.0.1]`, and inside
-# the container the name resolved to the PUBLIC address with no route to it. The frontend then
-# crash-looped on "Unable to resolve Configuration with the provided Issuer ... Connect timed out",
-# which reads as a Keycloak outage and is a missing file.
-#
-# `check-conformance.py` already fails when the `.env` and the units disagree and no drop-in
-# explains it (BAKED_INTO_UNITS), and `deploy.sh` already leaves host-specific drop-ins alone --
-# "the `.container.d` directories are never touched". This is the one part that was missing.
-# The uid, looked up HERE and not taken from 22-deploy-user.yml's register. This file is tagged
-# [podman], so `--tags podman` skips that file and leaves the variable undefined -- and the run then
-# dies with "'basetool_host_service_uid' is undefined", which says nothing about tags. The same trap
-# and the same fix as 27-observability.yml's own lookup.
 - name: Read the service user's uid for the unit path
   ansible.builtin.getent:
     database: passwd
@@ -88,10 +58,6 @@
     basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
 
 - name: Refuse an inventory still carrying the singular alias variable
-  # Renamed to a LIST on 2026-09-22, and the rename has to be loud. A string satisfies
-  # `| length > 0` just as a list does, and the template below would then iterate its CHARACTERS
-  # and write one AddHost line per letter -- a drop-in that parses, generates units that start,
-  # and resolves nothing. An inventory that was not migrated must stop the run instead.
   ansible.builtin.assert:
     that:
       - basetool_host_public_name_alias is not defined
@@ -109,28 +75,11 @@
     group: "{{ basetool_host_deploy_user }}"
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
-      #
-      # Host configuration, not release configuration: the delivered unit carries the no-op default
-      # because it is the same artifact on every host. See generate-quadlet.py's VALUE_VARS.
-      #
-      # The FIRST entry must match IRI_KEYCLOAK_HOST_ALIAS in {{ basetool_host_root_dir }}/code/.env;
-      # scripts/check-conformance.py fails the host when the two disagree.
       [Container]
-      {# A LOOP, not join('\nAddHost='), and the difference is an outage. Ansible does not process
-         the escape in that string literal: measured on ansible-core 2.16.3 with jinja2 3.1.2, the
-         join writes ONE line carrying the two characters backslash and n, so four aliases become
-         one AddHost whose value is nonsense. The same expression rendered through plain jinja2 in
-         python DOES produce newlines, which is how it passed review with a green check beside it.
-         A loop cannot depend on an escape at all. #}
       {% for alias in basetool_host_public_name_aliases %}
       AddHost={{ alias }}
       {% endfor %}
       {% if item in basetool_host_public_name_alias_v6_services and basetool_host_public_name_aliases_v6 | length > 0 %}
-      # The IPv6 half (ADR-0196 amendment 1). Only for a service on an IPv6-capable network, and
-      # only useful because containers.conf gives the rootless netns pasta a v6 --map-guest-addr.
-      # Without BOTH, the ip6-pinned probes fail locally with "no suitable address found" and
-      # EdgeIpv6Unreachable fires about the monitoring instead of about the edge.
       {% for alias in basetool_host_public_name_aliases_v6 %}
       AddHost={{ alias }}
       {% endfor %}
@@ -139,12 +88,6 @@
   when: basetool_host_public_name_aliases | length > 0
   notify: Reload the service user's units
 
-# Read back what was actually written, because the failure this guards against is SILENT: a drop-in
-# whose addresses did not become separate lines still parses, the units still generate, the
-# containers still start, and every one of them resolves the public names to nothing. That is the
-# cutover-day outage -- backend down, Grafana sign-in broken, every probe 0 -- arriving from a
-# successful play. Caught on 2026-09-22 by a --check --diff run against production, which is the
-# only reason it never landed.
 - name: Read the alias drop-ins back
   ansible.builtin.slurp:
     src: >-
@@ -174,9 +117,6 @@
     - basetool_host_public_name_aliases | length > 0
     - not ansible_check_mode
 
-# Clearing the variable has to clear the alias. Without this the drop-in outlives the decision that
-# put it there, and the next reader finds a unit whose effective configuration is not in the unit,
-# not in the .env and not in this role.
 - name: Remove the alias drop-in where no alias is configured
   ansible.builtin.file:
     path: >-
@@ -186,20 +126,6 @@
   when: basetool_host_public_name_aliases | length == 0
   notify: Reload the service user's units
 
-# The truststore drop-in, and it is a SECOND mount rather than a replacement of the first.
-#
-# Two facts, both measured on the testing host 2026-09-20 and neither obvious:
-#
-#   * a drop-in whose mode is 0640 is IGNORED IN SILENCE. The file is read by the SERVICE user's
-#     Quadlet generator, which owns neither the file nor its group, so it simply does not see it --
-#     no warning, no error, the unit generates as if the drop-in were not there. Rocky's umask is
-#     027, so a hand-written one lands at 0640 by default. Hence the explicit 0644 below.
-#   * a drop-in `Volume=` APPENDS to the unit's list. Pointing it at a destination the unit already
-#     mounts (`/run/secrets/truststore.p12`) produced two mounts on one path and podman refused to
-#     start the container at all. Overriding would mean restating every Volume= the unit has, in a
-#     file that then drifts on the next release.
-#
-# So the JVM truststore gets its own destination and the .env points the JVM at that.
 - name: Write the JVM truststore drop-in
   ansible.builtin.copy:
     dest: >-
@@ -208,25 +134,13 @@
     group: "{{ basetool_host_deploy_user }}"
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
-      #
-      # A SECOND mount, not a replacement: a drop-in Volume= appends, and re-using a destination the
-      # unit already mounts makes podman refuse the container. The JVM is pointed here by
-      # IRI_EXTRA_JAVA_OPTS in {{ basetool_host_root_dir }}/code/.env, which is rendered on the host.
       [Container]
       Volume={{ basetool_host_jvm_truststore_path }}:{{ basetool_host_jvm_truststore_dest }}:ro
-  # The JVM services, NOT basetool_host_public_name_alias_services -- that list grew to five on
-  # 2026-09-22 when grafana and blackbox-exporter turned out to need the public-name alias too, and
-  # neither of them is a JVM. Sharing one list would have mounted a Java truststore into a Go
-  # process: inert, and a lie in the unit about what the container is.
   loop: "{{ basetool_host_jvm_truststore_services }}"
   when: basetool_host_jvm_truststore_path | length > 0
   notify: Reload the service user's units
 
 - name: Refuse a truststore drop-in that points at nothing
-  # A bind-mount source that does not exist is not a warning under Podman -- the container does not
-  # start, with `statfs ...: no such file or directory`, which reads as a broken image. Cheaper to
-  # fail here, where the message names the variable.
   ansible.builtin.stat:
     path: "{{ basetool_host_jvm_truststore_path }}"
   register: basetool_host_jvm_truststore_stat

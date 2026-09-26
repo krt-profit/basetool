@@ -54,10 +54,6 @@ import tools.jackson.databind.json.JsonMapper;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-// REQ-SEC-052: the participant writes these cases exercise require a login. The rows they
-// create are EXTERNAL participants now (ADR-0159, decision D4) — a named person without an
-// account, recorded by a member who can see the Einsatz — which is the same row shape and a
-// different author.
 @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
 class MissionValidationTest {
 
@@ -139,12 +135,12 @@ class MissionValidationTest {
 
     taskJobType = new JobType();
     taskJobType.setName("Task Job");
-    taskJobType.setArchetype(JobTypeArchetype.MISSION); // Incorrect archetype for crew
+    taskJobType.setArchetype(JobTypeArchetype.MISSION);
     taskJobType = jobTypeRepository.save(taskJobType);
 
     crewJobType = new JobType();
     crewJobType.setName("Crew Job");
-    crewJobType.setArchetype(JobTypeArchetype.CREW); // Incorrect archetype for participant fields
+    crewJobType.setArchetype(JobTypeArchetype.CREW);
     crewJobType = jobTypeRepository.save(crewJobType);
   }
 
@@ -184,7 +180,7 @@ class MissionValidationTest {
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest()); // Expecting 400
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -233,11 +229,6 @@ class MissionValidationTest {
 
   @Test
   void testAddParticipantPublic_NameOfAnotherMember_ShouldReturn403() throws Exception {
-    // A free-text name that resolves to a registered member is LINKED to that member, which makes
-    // this a request to sign somebody else up — and that needs canManageMission. It answered 400
-    // ("Guest name is already taken") while the caller could be anonymous and the branch was
-    // spoofing protection; with the anonymous caller gone (REQ-SEC-052) one rule covers both
-    // spellings of "somebody else", by id and by resolved name.
     AddExternalParticipantRequest request =
         new AddExternalParticipantRequest(null, "officer1", null, null, null, null);
 
@@ -277,11 +268,6 @@ class MissionValidationTest {
   @Test
   void testAddParticipantPublic_AuthenticatedFreetextNameMatchesCaller_resolvesToSelf()
       throws Exception {
-    // Original "freetext name is resolved" scenario, narrowed to self-enrol per audit finding H-1
-    // (2026-05-20): the caller may always look themselves up by name; adding *another* registered
-    // user requires {@code canManageMission}. The test below exercises the self-resolve branch —
-    // the caller types their own name (mixed case + whitespace) instead of using the autocomplete
-    // dropdown, and the backend must transparently link them.
     User caller = new User();
     caller.setId(UUID.randomUUID());
     caller.setUsername("lord_adley");
@@ -311,10 +297,8 @@ class MissionValidationTest {
   }
 
   /**
-   * Audit finding H-1 (2026-05-20): an authenticated squadron member typing the name of ANOTHER
-   * registered member must not silently end up signing that member up — only mission managers may
-   * add foreign users as participants (the {@code addParticipantSlim} branch already enforced this;
-   * the legacy {@code /participants/add} path used to let any authenticated caller through).
+   * Verifies that an authenticated non-manager cannot sign up another registered member as a
+   * participant; only mission managers may add other users.
    */
   @Test
   void testAddParticipantPublic_AuthenticatedNonManager_addingOtherMember_isForbidden()

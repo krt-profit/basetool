@@ -58,16 +58,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin queue for Discord registration approvals (epic #720, Track 1, REQ-SEC-017). Lists the
- * pending registrations and approves/rejects them. Admin-only; every decision is optimistic-locked
- * (a stale {@code version} surfaces as HTTP 409) and audited in {@code user_approval_event}.
+ * Admin queue for Discord registration approvals: lists pending or rejected registrations and
+ * approves, rejects, reopens, links or merges them (REQ-SEC-017).
  *
- * <p>Approval grants no Basetool roles by itself — after approval the admin seats the user's
- * roles/units via the existing tooling (Track 1 keeps role assignment manual).
- *
- * <p>The queue read also serves the rejected rows ({@code ?status=REJECTED}) and {@link #reopen}
- * reverses an erroneous rejection back into the queue (REQ-SEC-034) — the two halves of making a
- * mistaken rejection recoverable without a manual database write.
+ * <p>Every decision is optimistic-locked (stale {@code version} gives 409) and audited in {@code
+ * user_approval_event}. Approval grants no Basetool roles by itself.
  */
 @RestController
 @RequestMapping("/api/v1/admin/registrations")
@@ -81,12 +76,8 @@ public class DiscordRegistrationAdminController {
   private final UserAccountMergeService userAccountMergeService;
 
   /**
-   * Lists registrations by approval status, oldest first — the pending queue by default, or the
-   * rejected rows so an erroneous rejection can be found and reopened (REQ-SEC-034).
-   *
-   * <p>Only {@code PENDING} and {@code REJECTED} are accepted. {@code ACTIVE} is refused rather
-   * than served: it would turn this small admin queue into an unbounded dump of every member, which
-   * is the user-administration surface's job and carries a different DTO.
+   * Lists registrations by approval status, oldest first (REQ-SEC-034). Only {@code PENDING} and
+   * {@code REJECTED} are accepted.
    *
    * @param status the approval status to list; defaults to {@code PENDING} when absent
    * @return the registrations in that status, oldest registration first
@@ -103,9 +94,6 @@ public class DiscordRegistrationAdminController {
   public List<PendingRegistrationDto> list(
       @RequestParam(name = "status", required = false)
           @Nullable
-          // ACTIVE is a legal ApprovalStatus but not a legal argument here (it would dump every
-          // member), so the published schema advertises only the two values that can succeed
-          // rather than the whole enum springdoc would otherwise reflect.
           @Parameter(schema = @Schema(allowableValues = {"PENDING", "REJECTED"}))
           ApprovalStatus status) {
     List<User> users =
@@ -162,10 +150,8 @@ public class DiscordRegistrationAdminController {
   }
 
   /**
-   * Reopens a rejected registration (moves it back to {@code PENDING} so it re-enters the queue and
-   * can be decided again). This is the supported reversal of an erroneous rejection (REQ-SEC-034);
-   * previously the only ways back were a manual production {@code UPDATE}, which bypasses the audit
-   * trail, or deleting the account outright, which destroys its data.
+   * Reopens a rejected registration, moving it back to {@code PENDING} so it can be decided again
+   * (REQ-SEC-034).
    *
    * @param id the rejected registration to reopen
    * @param jwt the calling admin's token (for the audit's acting-admin id)
@@ -196,10 +182,8 @@ public class DiscordRegistrationAdminController {
   }
 
   /**
-   * Links a pending Discord registration onto an existing account (REQ-SEC-026): moves the Discord
-   * identity onto the chosen account and removes the throwaway Discord-registered account. Used
-   * when a member who already had an account registered anew via Discord (e.g. their Discord handle
-   * differs from their in-app name, so the automatic collision check did not recognise them).
+   * Links a pending Discord registration onto an existing account: moves the Discord identity onto
+   * the chosen account and removes the throwaway Discord-registered account (REQ-SEC-026).
    *
    * @param id the pending registration to link away
    * @param jwt the calling admin's token (for the audit's deciding-admin id)
@@ -219,20 +203,13 @@ public class DiscordRegistrationAdminController {
   }
 
   /**
-   * Merges an older account into this registration (REQ-SEC-046, ADR-0142 point 5).
+   * Merges an older account into this registration (REQ-SEC-046, ADR-0142).
    *
-   * <p>The remedy for the "same callsign, different account" marker on this queue. Everything the
-   * source account <em>owns</em> — stock, hangar, personal inventory and blueprints, memberships,
-   * sign-ups, bank grants, notifications, evaluations — moves onto the registration named in the
-   * path; everything that records who <em>did</em> something stays where it happened, because
-   * re-pointing it would falsify history rather than repair an identity.
+   * <p>Everything the source account owns moves onto the registration; records of who did something
+   * stay where they are. Does not approve the registration, and leaves the emptied source row in
+   * place.
    *
-   * <p>Deliberately separate from approving: the merge repairs the data, the approval admits the
-   * member, and an admin should be able to do the first without being forced into the second. The
-   * source row is left in place, emptied — removing it is the user-deletion flow's job and carries
-   * its own fail-closed Keycloak probe.
-   *
-   * @param id the surviving registration — the account the member logs into now
+   * @param id the surviving registration the member logs into
    * @param adminUserId the acting admin, recorded as the audit actor
    * @param body the source account to empty, and the registration's optimistic-lock version
    * @return the surviving account
@@ -258,10 +235,8 @@ public class DiscordRegistrationAdminController {
   }
 
   /**
-   * Maps one registration, resolving its callsign collision on its own.
-   *
-   * <p>For the single-row responses of approve / reject / reopen / link. The list path uses {@link
-   * #toDto(User, Set)} with a set resolved once for the whole page instead (REQ-DATA-003).
+   * Maps one registration, resolving its callsign collision for that row alone; list reads use
+   * {@link #toDto(User, Set)} instead.
    *
    * @param user the registration to map
    * @return the DTO, with {@code callsignCollision} resolved for this row

@@ -94,29 +94,17 @@ class MissionCreateE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/missions");
         page.getByTestId("missions-create-link").click();
-        // Wait for the create page to finish loading: datetime-splitter.js clears the date/time
-        // pickers on DOMContentLoaded (from the empty hidden field), so filling before that init
-        // runs would be wiped out — the flaky cause of a silently-blocked submit.
         page.waitForURL(url -> url.contains("/missions/new"));
         page.waitForLoadState();
 
         page.getByTestId("mission-name-input").fill(missionName);
-        // Planned start is the only required datetime (client-side `required` on the date/time
-        // pickers, which feed the hidden plannedStartTime field on submit); without it the browser
-        // silently blocks the submit. A future date also passes the not-in-the-past check.
         page.getByTestId("mission-start-date")
             .fill(java.time.LocalDate.now().plusDays(7).toString());
         page.getByTestId("mission-start-time").fill("12:00");
-        // The save button is bound to the form via the form= attribute and now floats fixed at the
-        // bottom-right of the Verwaltung pane, above the fixed footer (REQ-MISSION-015). The
-        // footer-safe submit (scroll + dispatch) still submits it robustly regardless of position.
         E2eSupport.clickSubmitClearingFooter(
             page.locator("button[type='submit'][form='mission-form']"));
         page.waitForLoadState();
 
-        // Back on the list, the freshly created mission must be present (auto-waiting assertion).
-        // Post-submit GET via the retry helper — WebKit can abort it (HTTP/2 INTERNAL_ERROR) even
-        // after the redirect settled. See E2eSupport#navigate.
         E2eSupport.navigate(page, baseUrl + "/missions");
         assertThat(
                 page.getByTestId("mission-row")

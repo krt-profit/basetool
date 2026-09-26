@@ -1,27 +1,5 @@
 name: Secret Scan
 
-# Scans for committed secrets with gitleaks. Complements CodeQL (which does
-# taint analysis on code, not credential detection) and is the machine-enforced
-# backstop for the project's hard rule that real credentials never enter the
-# repository (CLAUDE.md "Never use production / real credentials ...").
-#
-# Why the gitleaks BINARY and not gitleaks/gitleaks-action: the action's v2
-# requires a paid GITLEAKS_LICENSE for commits under a GitHub Organization
-# (this repo lives under the `krt-profit` org). Running the pinned release binary
-# directly sidesteps that, keeps the tool version explicit, and adds no new
-# third-party action to the supply chain.
-#
-# Scan scope:
-#   - pull_request -> RANGE-scoped to the commits the PR introduces
-#       (base..head). A pre-existing committed fixture therefore never trips
-#       the check; only a secret a PR actually adds fails it. This mirrors the
-#       DCO / Flyway PR checks and is what makes the gate safe to mark
-#       required without first scrubbing history.
-#   - workflow_dispatch -> full-history scan (the .gitleaks.toml allowlist
-#       covers the two known throwaway fixtures).
-#
-# Findings are --redact-ed so a matched secret value never lands in the log.
-
 on:
   pull_request:
     branches: [main]
@@ -37,9 +15,6 @@ permissions:
 
 env:
   GITLEAKS_VERSION: 8.30.1
-  # SHA-256 of gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz, from the release's
-  # gitleaks_<version>_checksums.txt. Bump BOTH together; a version without its digest fails the
-  # install on purpose (audit item CI-SEC-12).
   GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
 
 jobs:
@@ -50,11 +25,8 @@ jobs:
 
     steps:
       - name: Checkout (full history)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          # fetch-depth: 0 so gitleaks can walk the base..head commit range on
-          # a PR; a shallow clone has no merge-base and the range walk degrades
-          # to "nothing to scan".
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
@@ -69,10 +41,6 @@ jobs:
           sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
           gitleaks version
 
-      # On a PR, restrict the scan to the commits the PR adds (base..head). The
-      # SHAs are passed via env, never interpolated into the script, so a
-      # crafted ref cannot inject shell. Empty on workflow_dispatch => full
-      # history scan.
       - name: Resolve scan range
         id: range
         env:
@@ -86,14 +54,6 @@ jobs:
             echo "log_opts=" >> "$GITHUB_OUTPUT"
           fi
 
-      # The allowlist decides what counts as a secret, so on a pull request it is read from the
-      # BASE commit, never from the head being scanned (audit item CI-SEC-11). Read from the head,
-      # a PR could add its secret and, in the same diff, an allowlist entry or a disabled rule that
-      # waves it through -- and this gate would report green on exactly the change it exists to
-      # stop. A PR that legitimately edits `.gitleaks.toml` therefore takes effect from the next
-      # PR on, once it is on `main`; that delay is the point.
-      #
-      # workflow_dispatch has no base and scans the checked-out ref with that ref's own config.
       - name: Resolve the gitleaks configuration
         id: config
         env:

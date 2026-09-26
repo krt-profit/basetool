@@ -99,8 +99,6 @@ public class AdminDefaultBlueprintController {
   public DefaultBlueprintResponse add(
       @NotNull @Valid @RequestBody DefaultBlueprintCreateRequest request,
       @NotNull @CurrentUserId UUID adminUserId) {
-    // created_by is a provenance column that also holds the literal "system" for seeded
-    // rows, so it stays text and takes the rendered id rather than a foreign key.
     return service.add(request.productKey(), adminUserId.toString());
   }
 

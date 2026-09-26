@@ -32,14 +32,8 @@ import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.provider.ProviderConfigProperty;
 
 /**
- * Factory for {@link DiscordGuildRoleGateAuthenticator}.
- *
- * <p>Registered via {@code META-INF/services/org.keycloak.authentication.AuthenticatorFactory} so
- * the gate can be added as a {@code REQUIRED} execution to a custom <em>First Broker Login</em>
- * flow and bound to the Discord IdP. The config properties (guild id, KRT-Mitglied role id, API
- * base URL) are declared here so they are editable in the admin console; {@link
- * DiscordGuildRoleGateAuthenticator} reads them at authentication time to enforce the membership
- * gate.
+ * Factory for {@link DiscordGuildRoleGateAuthenticator}, declaring its admin-console config
+ * properties (guild id, KRT-Mitglied role id, API base URL).
  */
 public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFactory {
 
@@ -71,18 +65,9 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   private static final String DEFAULT_API_BASE_URL = "https://discord.com/api/v10";
   private static final Duration HTTP_TIMEOUT = DiscordHttp.TIMEOUT;
 
-  // One shared, stateless authenticator + checker (per-login config arrives via the flow context).
-  // A bounded 429 retry budget honours Discord rate limits without blocking the login indefinitely.
-  // The checker's single guild-member read also supplies the server nickname for the precheck, so
-  // this factory no longer builds a separate nickname reader with a client of its own (KC-PERF-01);
-  // it shares the one Discord client of the whole provider JAR (KC-SIMP-01).
   private static final DiscordMembershipChecker CHECKER =
       new DiscordMembershipChecker(DiscordHttp.CLIENT, HTTP_TIMEOUT, 2, Duration.ofSeconds(2));
 
-  // Fail-open backend account-existence client (REQ-SEC-022). Its HTTPS client trusts the backend's
-  // (self-signed) certificate via the configured PKCS#12 truststore; never trust-all. A missing or
-  // broken truststore degrades to default trust, so the HTTPS call fails the handshake and the
-  // precheck fails open rather than skipping certificate verification.
   private static final BackendAccountChecker BACKEND_CHECKER =
       new BackendAccountChecker(
           BackendTrustSupport.httpClient(
@@ -105,19 +90,13 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   }
 
   @Override
-  public void init(Config.Scope config) {
-    // No realm-independent bootstrap state.
-  }
+  public void init(Config.Scope config) {}
 
   @Override
-  public void postInit(KeycloakSessionFactory factory) {
-    // No cross-provider wiring needed.
-  }
+  public void postInit(KeycloakSessionFactory factory) {}
 
   @Override
-  public void close() {
-    // Stateless singleton; nothing to release.
-  }
+  public void close() {}
 
   @Override
   public @NotNull String getId() {

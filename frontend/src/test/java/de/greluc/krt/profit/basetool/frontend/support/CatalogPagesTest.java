@@ -44,14 +44,11 @@ class CatalogPagesTest {
     return new PageResponse<>(content, pageIndex, content.size(), totalElements, totalPages, null);
   }
 
-  // covers REQ-ADMIN-001 — every page is fetched and concatenated in backend order
   @Test
   void fetchAll_concatenatesAllPagesInOrder() {
-    // Given
     List<List<String>> pages = List.of(List.of("a", "b"), List.of("c", "d"), List.of("e"));
     AtomicInteger calls = new AtomicInteger();
 
-    // When
     CompleteCatalog<String> catalog =
         CatalogPages.fetchAll(
             p -> {
@@ -59,20 +56,16 @@ class CatalogPagesTest {
               return page(pages.get(p), p, 5, 3);
             });
 
-    // Then
     assertEquals(List.of("a", "b", "c", "d", "e"), catalog.items());
     assertEquals(5L, catalog.totalElements());
     assertFalse(catalog.truncated(), "a completed walk must not be flagged truncated");
     assertEquals(3, calls.get(), "exactly one request per backend page");
   }
 
-  // covers REQ-ADMIN-001 — a catalogue that fits one chunk costs exactly one request
   @Test
   void fetchAll_singlePage_issuesExactlyOneRequest() {
-    // Given
     AtomicInteger calls = new AtomicInteger();
 
-    // When
     CompleteCatalog<String> catalog =
         CatalogPages.fetchAll(
             p -> {
@@ -80,20 +73,16 @@ class CatalogPagesTest {
               return page(List.of("only"), p, 1, 1);
             });
 
-    // Then
     assertEquals(List.of("only"), catalog.items());
     assertEquals(1, calls.get(), "the common case must stay a single round-trip");
     assertFalse(catalog.truncated());
   }
 
-  // covers REQ-ADMIN-002 — hitting the safety cap flags truncation and keeps the backend total
   @Test
   void fetchAll_capHit_flagsTruncated_andKeepsBackendTotal() {
-    // Given — a backend that always reports more pages than the cap allows
     int reportedPages = CatalogPages.MAX_CATALOG_PAGES + 5;
     AtomicInteger calls = new AtomicInteger();
 
-    // When
     CompleteCatalog<String> catalog =
         CatalogPages.fetchAll(
             p -> {
@@ -101,7 +90,6 @@ class CatalogPagesTest {
               return page(List.of("row-" + p), p, reportedPages, reportedPages);
             });
 
-    // Then
     assertTrue(catalog.truncated(), "stopping at the cap must be loud, never silent");
     assertEquals(CatalogPages.MAX_CATALOG_PAGES, calls.get(), "the walk must stop at the cap");
     assertEquals(CatalogPages.MAX_CATALOG_PAGES, catalog.items().size());
@@ -111,25 +99,19 @@ class CatalogPagesTest {
         "the reported total must stay the backend's full count, not the gathered size");
   }
 
-  // covers REQ-ADMIN-001 — a null backend response degrades to an empty, non-truncated catalogue
   @Test
   void fetchAll_nullResponse_yieldsEmptyCatalog() {
-    // When
     CompleteCatalog<String> catalog = CatalogPages.fetchAll(p -> null);
 
-    // Then
     assertTrue(catalog.items().isEmpty());
     assertEquals(0L, catalog.totalElements());
     assertFalse(catalog.truncated());
   }
 
-  // covers REQ-ADMIN-001 — an empty page ends the walk even when the page math claims more
   @Test
   void fetchAll_emptyPage_endsWalk() {
-    // Given — inconsistent backend math: empty content but totalPages=3
     AtomicInteger calls = new AtomicInteger();
 
-    // When
     CompleteCatalog<String> catalog =
         CatalogPages.fetchAll(
             p -> {
@@ -137,29 +119,22 @@ class CatalogPagesTest {
               return page(List.of(), p, 3, 3);
             });
 
-    // Then
     assertTrue(catalog.items().isEmpty());
     assertEquals(1, calls.get(), "an empty page must terminate the walk");
     assertFalse(catalog.truncated());
   }
 
-  // covers REQ-ADMIN-002 — the total never under-reports what was actually gathered
   @Test
   void fetchAll_totalNeverBelowGatheredSize() {
-    // Given — a backend that leaves totalElements at 0 despite returning rows
     CompleteCatalog<String> catalog = CatalogPages.fetchAll(p -> page(List.of("a", "b"), p, 0, 1));
 
-    // Then
     assertEquals(2L, catalog.totalElements());
   }
 
-  // covers REQ-ADMIN-001 — fetch failures keep each caller's own error contract
   @Test
   void fetchAll_propagatesFetcherException() {
-    // Given
     RuntimeException boom = new RuntimeException("backend down");
 
-    // When / Then
     RuntimeException thrown =
         assertThrows(
             RuntimeException.class,

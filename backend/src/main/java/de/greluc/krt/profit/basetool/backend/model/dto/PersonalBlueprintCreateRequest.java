@@ -24,14 +24,12 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 
 /**
- * Write payload for adding a single blueprint to the caller's owned set (#327). The product is
- * referenced by its normalized {@code productKey}; the server resolves the display name and output
- * item, so neither is accepted from the client.
+ * Payload adding one blueprint to the caller's owned set; the server resolves display name and
+ * output item.
  *
- * @param productKey normalized product key of the blueprint to add (max 255 chars, matching the
- *     {@code personal_blueprint.product_key} column)
+ * @param productKey normalized product key of the blueprint, max 255 chars
  * @param acquiredAt optional in-game acquisition time
- * @param note optional free-form note (max 2000 chars)
+ * @param note optional free-form note, max 2000 chars
  */
 public record PersonalBlueprintCreateRequest(
     @NotBlank @Size(max = 255) String productKey,

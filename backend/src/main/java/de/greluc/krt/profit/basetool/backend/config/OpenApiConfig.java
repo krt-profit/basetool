@@ -31,23 +31,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Top-level OpenAPI document for the backend module.
- *
- * <p>Sets the spec version, declares the {@code bearer-jwt} security scheme so generated clients
- * know every authenticated endpoint expects a Keycloak JWT, and marks {@code bearer-jwt} as the
- * default security requirement so endpoints without an explicit override inherit it. The project
- * ships only the OpenAPI document ({@code openapi.json}) — Swagger UI is not bundled.
+ * Top-level OpenAPI document of the backend, declaring the {@code bearer-jwt} security scheme as
+ * the default requirement.
  */
 @Configuration
 public class OpenApiConfig {
 
   static {
-    // These parameters are resolved from the request out-of-band (the JWT principal for
-    // @CurrentUserId, the X-User-Time-Zone header for @UserZone), not from a
-    // request line SpringDoc can introspect — so tell SpringDoc to skip them entirely (S11, #917).
-    // Otherwise SpringDoc would try to expand the ZoneId parameter into bogus query parameters. The
-    // @UserZone endpoints re-declare the X-User-Time-Zone header via a method-level @Parameter, so
-    // the generated document still advertises the header exactly as before.
     SpringDocUtils.getConfig().addAnnotationsToIgnore(CurrentUserId.class, UserZone.class);
   }
 

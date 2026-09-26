@@ -34,6 +34,23 @@ and attributes, redirect URIs, scope assignments, mapper configs, service-accoun
 policies, token settings) to `diff` two **environments**; and `scripts/check-keycloak-issuer.py`
 asserts that the issuer the apps validate is the one Keycloak advertises (ADR-0166).
 
+The snapshot opens a read-only session and prints a client secret only as `present`/`absent`. Feed
+it on stdin, so `$POSTGRES_USER` / `$POSTGRES_DB` expand inside the container and no credential
+reaches a command line; from PowerShell, strip carriage returns from the file first (a CRLF copy
+makes psql read `\pset footer off\r`):
+
+```sh
+ssh <host> 'cd / && sudo -n -u iri podman exec -i db-keycloak sh -c "psql -qAt -U \$POSTGRES_USER -d \$POSTGRES_DB -p 15433 -f -"' \
+    < scripts/keycloak-config-snapshot.sql > realm-<env>.txt
+diff realm-prod.txt realm-testing.txt
+```
+
+Lines that legitimately differ between two environments: the public origin in redirect URIs, web
+origins and `post.logout.redirect.uris`; `realm_client` on every client and the `basic` / `acr` /
+`service_account` scope mapper configs of Keycloak's built-ins (artefacts of the Keycloak version a
+realm was created under); anything the provisioner reports as *only on this realm*. Every other line
+is drift.
+
 **One script writes the whole Basetool-owned part of a realm:** `scripts/provision-keycloak-realm.py`
 brings a realm to the production shape of the table above (`grafana` only with `--grafana-origin`),
 dry run by default, never deleting what only the target has, and never printing a secret

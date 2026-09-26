@@ -42,19 +42,15 @@ import org.springframework.ui.Model;
 
 class ParticipationCalculationTest {
 
-  // Real loader so the parallelized finance/refinery fetches actually run their suppliers (against
-  // the mocked BackendApiClient) on a worker thread, exactly as in production. Shared across the
-  // method-local controller instances; harmless when a test never reaches the member finance block.
   private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
 
   @Test
   void testParticipationCalculation_KeyType() {
-    // Arrange
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
     Instant missionStart = Instant.parse("2024-04-04T10:00:00Z");
-    Instant missionEnd = Instant.parse("2024-04-04T12:00:00Z"); // 2 hours
+    Instant missionEnd = Instant.parse("2024-04-04T12:00:00Z");
 
     MissionParticipantDto participant =
         new MissionParticipantDto(
@@ -118,39 +114,26 @@ class ParticipationCalculationTest {
             backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
     Model model = new ConcurrentModel();
 
-    // Act
     controller.missionDetail(missionId, model, null, null);
 
-    // Assert
     Map<?, ?> percentages = (Map<?, ?>) model.getAttribute("participationPercentages");
     assertNotNull(percentages);
 
-    // Should use UUID keys now
     assertNotNull(percentages.get(participantId), "Map should contain UUID keys");
-    // No follow-up `get(participantId.toString())` assertion: the declared type
-    // `Map<UUID, Double>` already prevents String keys at the put-site (erasure
-    // aside, the controller code is type-checked against the same UUID key type),
-    // and the runtime `get(Object)` lookup with a String would never match a UUID
-    // entry — CodeQL's "Type mismatch on container access" flagged the same call
-    // as a tautology.
   }
 
   @Test
-  void testParticipationCalculation_Algorithm() {
-    // ... (existing test code)
-  }
+  void testParticipationCalculation_Algorithm() {}
 
   @Test
   void testParticipationCalculation_MissingStartTime() {
-    // Arrange
     UUID missionId = UUID.randomUUID();
     UUID p1Id = UUID.randomUUID();
-    UUID p2Id = UUID.randomUUID(); // No startTime
+    UUID p2Id = UUID.randomUUID();
 
     Instant missionStart = Instant.parse("2024-04-04T10:00:00Z");
     Instant missionEnd = Instant.parse("2024-04-04T12:00:00Z");
 
-    // P1 was there for 1 hour
     MissionParticipantDto p1 =
         new MissionParticipantDto(
             p1Id,
@@ -165,7 +148,6 @@ class ParticipationCalculationTest {
             PayoutPreference.PAYOUT,
             1L);
 
-    // P2 has no startTime (not checked in yet)
     MissionParticipantDto p2 =
         new MissionParticipantDto(
             p2Id, null, "P2", null, null, null, null, null, null, PayoutPreference.PAYOUT, 1L);
@@ -218,10 +200,8 @@ class ParticipationCalculationTest {
             backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
     Model model = new ConcurrentModel();
 
-    // Act
     controller.missionDetail(missionId, model, null, null);
 
-    // Assert
     Map<?, ?> percentages = (Map<?, ?>) model.getAttribute("participationPercentages");
     assertNotNull(percentages);
 

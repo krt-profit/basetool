@@ -183,7 +183,7 @@ until then the risk is bounded, named and watched, which is the most this layer 
   precheck (REQ-SEC-022) is fail-open by design, and its only witness is a Keycloak `WARN`. On
   production the truststore `.env` named never existed and the warning repeated at every start for
   at least seven days before a rollout step found it (2026-09-25, fixed the same day). No alert reads
-  that line — `KeycloakErrorRateHigh`, whose comment names this very path, counts `ERROR` lines, and
+  that line — `KeycloakErrorRateHigh`, whose description names this very path, counts `ERROR` lines, and
   this is one `WARN` per start. The runbook's verify step now reads it; an alert is not built.
 - **A drift re-apply could destroy the only rollback anchor.** A re-apply of the deployed release
   ("drift: frontend: no container") saved the deployed pin over `previous-digest-pin.yml` — and, with

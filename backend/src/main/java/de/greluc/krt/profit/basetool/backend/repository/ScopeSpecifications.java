@@ -20,61 +20,20 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 /**
- * Shared JPQL fragments for the org-unit scope-predicate triple (S5, #911): {@code :isAdminAllScope
- * = true OR (:activeOrgUnitId IS NOT NULL AND &lt;alias&gt;.owningOrgUnit.id = :activeOrgUnitId) OR
- * (:activeOrgUnitId IS NULL AND &lt;alias&gt;.owningOrgUnit.id IN :memberOrgUnitIds)} — see {@code
- * de.greluc.krt.profit.basetool.backend.service.ScopePredicate} for the three-parameter shape these
- * fragments bind against, and REQ-ORG-003 in {@code docs/specs/org-unit-tenancy.md} for the scope
- * kinds themselves.
+ * Shared JPQL fragments for the org-unit scope-predicate triple (REQ-ORG-003): admin all-scope,
+ * else the pinned {@code activeOrgUnitId}, else the {@code memberOrgUnitIds} (see {@code
+ * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}).
  *
- * <p><b>Why constants and not a runtime builder.</b> Every consumer is a repository method's
- * {@code @Query} annotation value, which the Java Language Specification requires to be a
- * compile-time constant expression (JLS 15.28/4.12.4) — an annotation cannot invoke a method. A
- * {@code public static final String} initialized from a text block, referenced from another class
- * as {@code ScopeSpecifications.SHIP_SCOPE_TRIPLE}, is itself a compile-time constant (a "qualified
- * name of a constant variable" per JLS 15.28 — text blocks without embedded expressions are String
- * literals like any other) and folds byte-for-byte into the referencing {@code @Query} value at
- * compile time — the same technique S3 (#909) used to reference {@code Roles.ADMIN} from
- * {@code @PreAuthorize}. This keeps the six call sites that repeat the triple verbatim in one place
- * without paying a runtime cost or requiring {@code JpaSpecificationExecutor} (unused anywhere in
- * this codebase — every scoped query is a hand-written {@code @Query}, not a {@code
- * Specification}). Query methods whose body needs more than the triple splice this constant after a
- * leading text block ({@code """head""" + ScopeSpecifications.X + " tail"}, S7 Option A, #913); any
- * further content after the constant stays a plain string literal, not a second text block — Google
- * Java Format always collapses a text block onto the same line as a preceding {@code +}, which then
- * fails this project's {@code TextBlockGoogleStyleFormatting} Checkstyle rule (opening quotes must
- * start their own line), so a text block can only be the <em>first</em> operand of a concatenation
- * here, never a later one. The whole expression is still one compile-time constant per the same JLS
- * rule regardless of which operands are text blocks vs. quoted literals.
+ * <p>The fragments are compile-time constants so they can be spliced into {@code @Query} values;
+ * one exists per aggregate because each bakes in its entity's alias. A query that needs more than
+ * the triple starts with a text block, appends the constant and continues only with plain string
+ * literals. The class is {@code public} because constant folding leaves no compiled reference to
+ * it.
  *
- * <p><b>Why {@code public} and not package-private.</b> Although every consumer lives in this same
- * {@code repository} package, the type is declared {@code public} on purpose: its constants are
- * referenced only inside {@code @Query} annotation values, so constant folding (see above) inlines
- * each value and leaves no reference to this type in the compiled output. A package-private holder
- * would therefore be reported as an unused type by reference analysis (e.g. CodeQL {@code
- * java/unused-reference-type}) even though it backs every scoped query — declaring it {@code
- * public} keeps that analysis correct without changing any behaviour.
- *
- * <p><b>The alias is baked into each constant, not parameterized.</b> Each entity's repository
- * picks its own JPQL alias ({@code o} for Operation, {@code m} for Mission, {@code s} for Ship,
- * {@code r} for RefineryOrder, {@code i} for InventoryItem, {@code o} for JobOrder), and a
- * compile-time constant cannot be built with a runtime alias substitution — so one constant exists
- * per aggregate rather than one generic template. This is why the base is a handful of named
- * constants, not a single shared string.
- *
- * <p><b>Escape tails stay baked into the owning aggregate's constant, not composed on top.</b>
- * Three of the six aggregates layer an extra {@code OR} clause onto the plain three-branch triple:
- * {@link #OPERATION_SCOPE_PREDICATE} adds the ownerless-leadership escape and the mission-
- * participant escape (REQ-ORG-003), {@link #MISSION_SCOPE_PREDICATE} adds the cross-staffel public
- * escape ({@code isInternal = false}) and its own ownerless-leadership escape, and {@link
- * #JOB_ORDER_SCOPE_PREDICATE} adds the SK-public-queue escape. These are still each one
- * compile-time constant (a single text-block literal), not a runtime "prefix + tail" join — Java
- * constant folding cannot compose two separately-referenced constants from two different
- * {@code @Query} annotations at different call sites into one value; each full predicate, tail
- * included, is declared once here and reused verbatim everywhere that aggregate's scope applies.
- * {@link #SHIP_SCOPE_TRIPLE}, {@link #REFINERY_ORDER_SCOPE_TRIPLE} and {@link
- * #INVENTORY_ITEM_SCOPE_TRIPLE} carry no escape tail — those three aggregates are strict-staffel
- * with no cross-squadron visibility beyond the triple (REQ-ORG-003).
+ * <p>{@link #OPERATION_SCOPE_PREDICATE}, {@link #MISSION_SCOPE_PREDICATE} and {@link
+ * #JOB_ORDER_SCOPE_PREDICATE} include their aggregate's visibility escapes; {@link
+ * #SHIP_SCOPE_TRIPLE}, {@link #REFINERY_ORDER_SCOPE_TRIPLE} and {@link
+ * #INVENTORY_ITEM_SCOPE_TRIPLE} are the plain strict-staffel triple.
  */
 public final class ScopeSpecifications {
 
@@ -82,13 +41,9 @@ public final class ScopeSpecifications {
   private ScopeSpecifications() {}
 
   /**
-   * Operation's scope predicate (alias {@code o}, field {@code owningOrgUnit}): the plain triple
-   * plus the two read-only escapes documented under REQ-ORG-003 — an ownerless leadership operation
-   * surfaces to organisation members-or-above, and any authenticated user who participated in one
-   * of the operation's linked missions sees it regardless of owning OrgUnit. Reused verbatim by
-   * {@code OperationRepository.findAllScoped}, {@code #findAllReferenceScoped} and {@code
-   * #searchOperations} — mirroring them was previously a manual copy-paste (the pre-S5 Javadoc on
-   * {@code findAllReferenceScoped} admitted as much).
+   * Operation's scope predicate (alias {@code o}): the triple plus the read escapes of REQ-ORG-003,
+   * so an ownerless leadership operation is visible to organisation members and above, and a
+   * participant of one of its missions sees it regardless of owning org unit.
    */
   static final String OPERATION_SCOPE_PREDICATE =
       """
@@ -103,10 +58,8 @@ public final class ScopeSpecifications {
       """;
 
   /**
-   * Mission's scope predicate (alias {@code m}, field {@code owningOrgUnit}): the plain triple plus
-   * the cross-staffel public escape ({@code isInternal = false} missions stay visible outside the
-   * owning scope) and the ownerless-leadership-mission escape, per REQ-ORG-003. Reused verbatim by
-   * {@code MissionRepository.findAllActiveReference} and the paged {@code searchMissions}.
+   * Mission's scope predicate (alias {@code m}): the triple plus the public escape ({@code
+   * isInternal = false}) and the ownerless-leadership escape (REQ-ORG-003).
    */
   static final String MISSION_SCOPE_PREDICATE =
       """
@@ -120,10 +73,8 @@ public final class ScopeSpecifications {
       """;
 
   /**
-   * Ship's scope predicate (alias {@code s}, field {@code owningOrgUnit}): the plain triple with no
-   * escape tail — Ship (Hangar) is strict-staffel per REQ-ORG-003. Reused verbatim by {@code
-   * ShipRepository.resetAllFittedScoped}, {@code #findAllScoped}, {@code #countShipsByType} (both
-   * its value and count query) and {@code #findByShipTypeInScoped}.
+   * Ship's scope predicate (alias {@code s}): the plain triple; the hangar is strict-staffel
+   * (REQ-ORG-003).
    */
   static final String SHIP_SCOPE_TRIPLE =
       """
@@ -135,10 +86,8 @@ public final class ScopeSpecifications {
       """;
 
   /**
-   * RefineryOrder's scope predicate (alias {@code r}, field {@code owningOrgUnit}): the plain
-   * triple with no escape tail — Refinery is strict-staffel per REQ-ORG-003. Reused verbatim by
-   * {@code RefineryOrderRepository.findByMissionIdScoped}, {@code #findByOwnerIdScoped}, {@code
-   * #findAllScoped} and {@code #findByStatusInScoped}.
+   * RefineryOrder's scope predicate (alias {@code r}): the plain triple; refinery is strict-staffel
+   * (REQ-ORG-003).
    */
   static final String REFINERY_ORDER_SCOPE_TRIPLE =
       """
@@ -150,13 +99,8 @@ public final class ScopeSpecifications {
       """;
 
   /**
-   * InventoryItem's scope predicate (alias {@code i}, field {@code owningOrgUnit}): the plain
-   * triple with no escape tail — the direct Lager-View is strict-staffel per REQ-ORG-003. Reused
-   * verbatim by {@code InventoryItemRepository.findByMaterialAndPersonalFalseScoped}, {@code
-   * #findByGameItemAndPersonalFalseScoped}, {@code #findGlobalByFilters}, {@code
-   * #findGlobalItemsByFilters}, {@code #findGlobalStacks}, {@code #findGlobalItemStacks}, {@code
-   * #findGlobalStackEntries}, {@code #findGlobalItemStackEntries}, {@code #getAggregatedInventory},
-   * {@code #getAggregatedItemInventory} and {@code #deleteAllNonPersonal}.
+   * InventoryItem's scope predicate (alias {@code i}): the plain triple; the direct Lager view is
+   * strict-staffel (REQ-ORG-003).
    */
   static final String INVENTORY_ITEM_SCOPE_TRIPLE =
       """
@@ -168,14 +112,9 @@ public final class ScopeSpecifications {
       """;
 
   /**
-   * JobOrder's scope predicate (alias {@code o}, field {@code responsibleOrgUnit} — NOT {@code
-   * owningOrgUnit}): the plain triple against the <em>responsible</em> (processing) OrgUnit, plus
-   * the SK-public-queue escape ({@code TYPE(responsibleOrgUnit) = SpecialCommand} orders are
-   * visible to every squadron), per REQ-ORG-003. Currently reused by the single scoped list query
-   * {@code JobOrderRepository.findScopedJobOrders}; centralised here (rather than left inline)
-   * because a future second JobOrder-scoped query must reuse this exact predicate — re-deriving it
-   * by hand risks silently dropping the SK-public escape and reintroducing a #343-style visibility
-   * bug.
+   * JobOrder's scope predicate (alias {@code o}): the triple against {@code responsibleOrgUnit},
+   * not {@code owningOrgUnit}, plus the SK-public-queue escape that shows orders of a {@code
+   * SpecialCommand} to every squadron (REQ-ORG-003).
    */
   static final String JOB_ORDER_SCOPE_PREDICATE =
       """

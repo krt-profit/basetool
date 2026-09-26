@@ -54,12 +54,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Aggregates finance data across all missions that belong to an operation.
- *
- * <p>The operation level is purely a roll-up of its missions: per-mission finance entries (income
- * vs expense) plus the profit/loss contribution of refinery orders linked to those missions (ore
- * sales minus expenses and other expenses). Returns a structured DTO that the frontend turns into a
- * per-mission breakdown plus an operation-wide total.
+ * Aggregates the finance data of an operation's missions: their finance entries plus the
+ * profit/loss of their linked refinery orders.
  */
 @Slf4j
 @Service
@@ -68,12 +64,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class OperationFinanceService {
 
   /**
-   * Upper bound on the number of per-mission roll-up lines {@link #getOperationFinanceSummary}
-   * returns. An operation groups a handful of missions in practice, but the cap keeps the summary
-   * response and its two grouped aggregate queries bounded even for a pathological operation with
-   * thousands of missions (#1121, part b). When exceeded the breakdown is clipped to the first
-   * {@code MAX_FINANCE_SUMMARY_MISSIONS} missions (by name) and the DTO's {@code truncated} flag is
-   * set.
+   * Maximum number of per-mission lines {@link #getOperationFinanceSummary} returns; beyond it the
+   * breakdown is clipped and flagged {@code truncated}.
    */
   static final int MAX_FINANCE_SUMMARY_MISSIONS = 500;
 
@@ -84,12 +76,7 @@ public class OperationFinanceService {
   private final RefineryOrderMapper refineryOrderMapper;
 
   /**
-   * Builds the aggregated finance DTO for the operation.
-   *
-   * <p>Loads the operation and groups all its missions' finance entries and refinery orders in
-   * memory rather than firing one query per mission — for a typical 5-mission operation this cuts
-   * the number of round trips from 1+2N (one for entries, one for refinery orders per mission) to 3
-   * fixed.
+   * Builds the full aggregated finance DTO for the operation with a fixed number of queries.
    *
    * @param operationId operation primary key
    * @return aggregated finance summary
@@ -135,8 +122,6 @@ public class OperationFinanceService {
         }
       }
 
-      // Refinery orders contribute their profit/loss (oreSales - expenses - otherExpenses)
-      // rather than only their costs. Legacy data with null values is treated as 0.
       for (RefineryOrder order : orders) {
         double sales = order.getOreSales() != null ? order.getOreSales() : 0d;
         double costs = order.getExpenses() != null ? order.getExpenses() : 0d;
@@ -162,20 +147,14 @@ public class OperationFinanceService {
   }
 
   /**
-   * Builds the lightweight operation finance roll-up: the operation-wide total plus one total line
-   * per mission, computed from two grouped SQL aggregates instead of the {@link
-   * #getOperationFinances} ledger load-all. Backs the operation-detail "Ergebnis je Einsatz" bars +
-   * the Gesamtergebnis; each mission's per-entry breakdown loads lazily via {@link
-   * #getMissionFinanceDetail} when the panel expands. This is the operation-side mirror of the
-   * mission finance summary aggregate (ADR-0078, #1121): the finance render no longer scans every
-   * finance entry / refinery order across every child mission under a held Hikari connection.
+   * Builds the operation finance roll-up: the operation-wide total plus one total line per mission,
+   * from two grouped SQL aggregates (ADR-0078).
    *
-   * <p>The per-mission breakdown is capped at {@link #MAX_FINANCE_SUMMARY_MISSIONS} (missions
-   * ordered by name); when the operation has more the list is clipped, {@code truncated} is set,
-   * and the Gesamtergebnis sums only the returned lines — an intentional bound, not a silent one.
+   * <p>At most {@link #MAX_FINANCE_SUMMARY_MISSIONS} missions, ordered by name, are returned; when
+   * clipped, {@code truncated} is set and the total covers only the returned lines.
    *
    * @param operationId operation primary key
-   * @return the operation-wide total plus the (capped) per-mission roll-up lines
+   * @return the operation-wide total plus the capped per-mission lines
    * @throws NotFoundException when no operation matches the id
    */
   @NotNull
@@ -226,16 +205,12 @@ public class OperationFinanceService {
   }
 
   /**
-   * Loads one mission's full finance detail (its finance entries + refinery orders) for the lazy
-   * per-mission breakdown of the operation finance panel. Scoped to a single mission of the
-   * operation, so it materializes only that one mission's rows rather than the whole operation's
-   * ledger — the load-all this replaces on the render path (#1121). The mission's signed total is
-   * recomputed here identically to {@link #getOperationFinanceSummary} so the expanded breakdown's
-   * header matches the collapsed summary line.
+   * Loads one mission's finance entries and refinery orders for the lazy per-mission breakdown of
+   * the operation finance panel.
    *
    * @param operationId operation primary key (authorization scope)
    * @param missionId the mission whose detail to load; must belong to the operation
-   * @return the mission's finance detail (entries + refinery orders + recomputed total)
+   * @return the mission's finance detail, with the same total as the summary line
    * @throws NotFoundException when the operation does not exist or the mission is not one of its
    *     child missions
    */
@@ -278,11 +253,8 @@ public class OperationFinanceService {
   }
 
   /**
-   * Computes a mission's signed bottom line from its coalesced income/expense sums and refinery
-   * profit — {@code income − expense + refineryProfit}. Null sums (no entry of that type) and a
-   * null refinery profit (no refinery order) collapse to zero; a refinery profit of exactly zero
-   * adds nothing. Shared by the summary roll-up and the lazy per-mission detail so both agree on a
-   * mission's total.
+   * Computes a mission's signed total as {@code income − expense + refineryProfit}, treating {@code
+   * null} sums as zero.
    *
    * @param incomeSum summed INCOME amount, or {@code null} when none
    * @param expenseSum summed EXPENSE amount, or {@code null} when none

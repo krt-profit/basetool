@@ -90,10 +90,6 @@ class ScWikiVehicleSyncServiceTest {
 
   @Test
   void syncVehicles_requestsTheVehicleSpecificPageSize() {
-    // A vehicle row carries its whole port / shield / power tree, so at the shared page size of 200
-    // page 1 alone is 10.4 MB against the client's 16 MB codec ceiling - and an overrun is not a
-    // truncation but a decode failure that this client swallows into an empty list, stopping the
-    // sync silently. The walk must therefore ask for the vehicle-specific page size.
     config.put("vehicles-page-size", 50);
     rebuild();
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
@@ -113,8 +109,8 @@ class ScWikiVehicleSyncServiceTest {
     uexShip.setName("100i");
     uexShip.setExternalUuid(uuid);
     uexShip.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
-    uexShip.setIsBomber(true); // UEX-owned flag — must survive
-    uexShip.setDescriptionEn("UEX English desc"); // UEX already set it — Wiki must not clobber
+    uexShip.setIsBomber(true);
+    uexShip.setDescriptionEn("UEX English desc");
 
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(
@@ -143,7 +139,6 @@ class ScWikiVehicleSyncServiceTest {
     assertEquals("ORIG_100i", result.getClassName());
     assertEquals(2.0, result.getVehicleInventoryScu());
     assertEquals("Wiki Deutsch", result.getDescriptionDe());
-    // Conflict policy: UEX-set descriptionEn is NOT overwritten; UEX flag survives.
     assertEquals("UEX English desc", result.getDescriptionEn());
     assertTrue(result.getIsBomber());
   }
@@ -176,7 +171,6 @@ class ScWikiVehicleSyncServiceTest {
     legacy.setId(UUID.randomUUID());
     legacy.setName("Cutlass Black");
     legacy.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
-    // legacy: externalUuid null (pre-R2 row never UUID-stamped)
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(uuid, "drake-cutlass", "Cutlass Black", null, null, null, null);
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
@@ -204,14 +198,11 @@ class ScWikiVehicleSyncServiceTest {
 
     verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(shipTypeRepository, never()).save(any());
-    // An empty Wiki response writes no rows → 0 items (#1041 item 2, SyncZeroItems).
     assertEquals(0, written, "an empty Wiki response must report zero written rows");
   }
 
   @Test
   void syncVehicles_notModified_reportsLiveCount_andSkipsSyncAndSweep() {
-    // A 304 (unchanged) catalogue must report the live Wiki-linked ship_type count, NOT 0 — an
-    // all-304 run is healthy, not a zero-item outage (#1182).
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.unchanged());
     when(shipTypeRepository.countLiveScwikiShipTypes()).thenReturn(42L);
@@ -225,10 +216,6 @@ class ScWikiVehicleSyncServiceTest {
 
   @Test
   void syncVehicles_incompletePageWalk_upsertsTheRows_butSkipsOrphanSweep() {
-    // H5: a page walk that could not enumerate the whole feed still returns real rows, so the
-    // "did we see anything?" gate passes — and every ship_type on the pages that were never
-    // fetched would be marked scwiki_deleted for exactly that reason. The rows that DID arrive are
-    // still upserted; only the tombstone sweep stands down until a complete run.
     UUID uuid = UUID.randomUUID();
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(uuid, "drake-caterpillar", "Caterpillar", null, null, null, null);

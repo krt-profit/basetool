@@ -32,32 +32,13 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Keeps the committed Terms-of-Use version honest (REQ-SEC-028).
- *
- * <p>The version is a digest of the terms wording, and it is <strong>committed</strong> to {@code
- * backend/src/main/resources/terms-version.properties} rather than generated during the build. The
- * original reason was a cross-module read: the digest hashed a <em>frontend</em> source file, and
- * the backend Docker image copies only {@code frontend/build.gradle.kts} for layer caching, so the
- * image build died with "Input file does not exist" while every local build stayed green. That
- * particular hazard is gone — the wording moved into this module's own bundle with ADR-0138 — but
- * the artifact stays committed, because a generated one would still have to be produced before the
- * image is assembled and there is nothing to gain from re-acquiring that coupling.
- *
- * <p>What a committed artifact loses is the guarantee that it matches the text, which is the whole
- * point of deriving it. This test is that guarantee: it re-derives the digest from the German
- * bundle and fails when the committed file disagrees — so editing the terms and forgetting to
- * regenerate breaks the build instead of silently leaving everyone consented to wording that no
- * longer exists.
+ * Verifies that the committed {@code terms-version.properties} digest matches the digest re-derived
+ * from the German bundle (REQ-SEC-028).
  */
 class TermsVersionParityTest {
 
   /**
-   * The authoritative wording; path is relative to the backend module directory.
-   *
-   * <p>This module's own bundle since ADR-0138. It has to be the bundle the document endpoint
-   * serves: pointed anywhere else, the digest would keep hashing text nobody reads, and a wording
-   * change would ship with an unchanged version — a consent gate that never re-prompts and gives no
-   * sign it has stopped working.
+   * The German bundle the terms document is served from; relative to the backend module directory.
    */
   private static final Path BUNDLE = Path.of("src/main/resources/messages_de.properties");
 

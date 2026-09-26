@@ -44,14 +44,9 @@ import org.springframework.data.redis.connection.DefaultMessage;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
- * Unit tests for {@link RedisLiveSyncFanout} using a mocked {@link StringRedisTemplate} and
- * handler, so the publish/consume logic, own-origin skip and error counting are verified
- * deterministically without a Redis container (the end-to-end round trip is covered by {@code
- * RedisLiveSyncFanoutIntegrationTest}).
- *
- * <p>Covers both channels: the {@code changed} relay (ADR-0094) and the editor-presence gossip
- * (ADR-0126), including that a message is routed by the channel it arrived on and that the two
- * streams keep separate publish / consume / error series.
+ * Unit tests for {@link RedisLiveSyncFanout} with a mocked {@link StringRedisTemplate}: publish,
+ * consume, own-origin skip and error counting on both the {@code changed} channel (ADR-0094) and
+ * the presence channel (ADR-0126), each with separate series.
  */
 class RedisLiveSyncFanoutTest {
 
@@ -99,7 +94,6 @@ class RedisLiveSyncFanoutTest {
         .when(redisTemplate)
         .convertAndSend(anyString(), anyString());
 
-    // Must not propagate — the local relay already delivered to this instance's viewers.
     fanout.publish("mission:5f1d2c3b-0000-0000-0000-000000000001", List.of("crew"));
 
     assertThat(errorCount(MetricNames.OP_PUBLISH)).isEqualTo(1.0);
@@ -117,7 +111,6 @@ class RedisLiveSyncFanoutTest {
     fanout.onMessage(
         new DefaultMessage(CHANNEL.getBytes(StandardCharsets.UTF_8), bytes(body)), null);
 
-    // Our own publication looped back — the local relay already delivered it.
     verify(handler, never()).deliverFromFanout(anyString(), anyList());
     assertThat(consumedCount("mission")).isZero();
   }
@@ -162,8 +155,6 @@ class RedisLiveSyncFanoutTest {
         .contains("\"userId\":\"user-1\"")
         .contains("\"displayName\":\"Alice\"");
     assertThat(presencePublishedCount("mission")).isEqualTo(1.0);
-    // The changed relay must stay untouched — its dashboard panel and alert key off that stream
-    // alone.
     assertThat(publishedCount("mission")).isZero();
   }
 
@@ -177,8 +168,6 @@ class RedisLiveSyncFanoutTest {
         "mission:5f1d2c3b-0000-0000-0000-000000000001",
         Map.of("crew", List.of(new LiveSyncPresenceService.PresenceEditor("user-1", "Alice"))));
 
-    // A distinct op value keeps LiveSyncRedisFanoutBroken firing on the changed relay only: a lost
-    // gossip costs a cosmetic dot, a lost changed frame costs correctness.
     assertThat(errorCount(MetricNames.OP_PRESENCE_PUBLISH)).isEqualTo(1.0);
     assertThat(errorCount(MetricNames.OP_PUBLISH)).isZero();
   }
@@ -204,7 +193,6 @@ class RedisLiveSyncFanoutTest {
             Map.entry(
                 "crew", List.of(new LiveSyncPresenceService.PresenceEditor("user-2", "Bob"))));
     assertThat(presenceConsumedCount("mission")).isEqualTo(1.0);
-    // A presence payload must never be mistaken for a changed frame: the channel decides.
     verify(handler, never()).deliverFromFanout(anyString(), anyList());
   }
 
@@ -216,8 +204,6 @@ class RedisLiveSyncFanoutTest {
     fanout.onMessage(
         new DefaultMessage(PRESENCE_CHANNEL.getBytes(StandardCharsets.UTF_8), bytes(body)), null);
 
-    // "Nobody is editing here any more" is a message, not a no-op: it drops the peer's partition
-    // immediately instead of leaving stale dots up until the partition TTL.
     verify(handler).deliverPresenceFromFanout(topic, "instance-B", Map.of());
   }
 

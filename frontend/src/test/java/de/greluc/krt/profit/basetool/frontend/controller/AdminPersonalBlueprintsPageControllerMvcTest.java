@@ -81,8 +81,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_rendersForAdmin_withUserPicker() throws Exception {
-    // #1193: the bare page (no user selected) makes no backend call — the picker searches on
-    // demand.
     mockMvc
         .perform(get("/admin/personal-blueprints"))
         .andExpect(status().isOk())
@@ -92,10 +90,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(model().attribute("adminMode", Boolean.TRUE));
   }
 
-  // REQ-UI-013: a dialog renders only together with its openers and its script. Without a member
-  // selected the page shows the picker and the global purge danger zone; the member's edit, remove
-  // and import dialogs, their openers and the import script appear only once a member is chosen.
-  // Until 2026-09-23 the three dialogs rendered on the bare page as dead markup.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_withoutMember_rendersOnlyThePurgeDialog() throws Exception {
@@ -141,9 +135,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     PageResponse<UserDto> empty = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
 
-    // With a user selected, the inline-JS endpoint map renders. The per-row updateNote/remove
-    // URLs must keep the literal ID_PLACEHOLDER token verbatim; a double-underscore __ID__ would
-    // be eaten by Thymeleaf preprocessing and render "ID", 400ing on UUID parse.
     mockMvc
         .perform(
             get("/admin/personal-blueprints")
@@ -152,9 +143,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("ID_PLACEHOLDER")));
   }
 
-  // covers REQ-FE-002 — an AJAX filter swap (fragment=results) for a selected user renders only the
-  // owned-blueprint table fragment: the row is present, but the swap-target wrapper, the admin
-  // banner and the edit modal (all outside the fragment) are not.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_fragmentResults_rendersOnlyTableFragment() throws Exception {
@@ -170,8 +158,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
             0L,
             null,
             null);
-    // On the fragment path the controller skips the user-list fetch, so the only backend call is
-    // fetchOwned — the single stub returns this blueprint page for it.
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1L, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
@@ -189,12 +175,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("krt-admin-banner"))));
   }
 
-  // Regression guard for the enc(...)-wrapped frontend-proxy double-encoding sub-class (REQ-FE-016,
-  // the site PR #1347's URLEncoder.encode( sweep missed): the admin owned-blueprint filter must
-  // forward a multi-word free-text term as a WebClient URI-template variable ({q}), not enc(...) it
-  // into the URI string, so the backend @RequestParam decodes the exact typed term. Form-encoding
-  // (space -> '+') double-encodes across the frontend->backend hop and yields zero matches.
-  // fragment=results skips the selected-member lookup, leaving fetchOwned as the only read.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_passesMultiWordQueryAsUriVariable() throws Exception {
@@ -218,9 +198,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     assertEquals("Arclight Pistol", qCaptor.getValue());
   }
 
-  // Same guard with an umlaut term: "Größe Röhre" encodes to Gr%C3%B6%C3%9Fe… under enc(...), which
-  // the hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
-  // backend intact.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
@@ -245,9 +222,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     assertEquals(term, qCaptor.getValue());
   }
 
-  // covers REQ-FE-011 (post-#1193) — the admin member picker is the shared searchable combobox in
-  // server-side-search mode: it carries the remote-users marker and, with no selection, ships NO
-  // preloaded option roster (no data-search terms), so it scales to the 5000-account target.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_userPicker_isRemoteSearchCombobox_withoutRosterPreload() throws Exception {
@@ -258,9 +232,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("data-search"))));
   }
 
-  // covers REQ-FE-011 (post-#1193) — edit mode: when a member is selected the picker seeds exactly
-  // that member's option (id + display name) via the single-user lookup, so the box shows the name
-  // rather than a raw sub even though the roster is no longer preloaded.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_userPicker_seedsSelectedMemberInEditMode() throws Exception {
@@ -286,9 +257,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
             null);
     PageResponse<PersonalBlueprintDto> emptyBlueprints =
         new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
-    // fetchUser uses the Class overload (UserDto.class); fetchOwned uses the
-    // ParameterizedTypeReference
-    // overload — stub each so the seed option and the (empty) blueprint table both resolve.
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(user);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyBlueprints);
 
@@ -302,9 +270,6 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("00000000-0000-0000-0000-000000000009")));
   }
 
-  // covers REQ-INV-024 — the global "delete all users' blueprints" danger zone renders for an admin
-  // independently of the member picker, carrying the type-to-confirm token input and the purge form
-  // that targets the ADMIN purge endpoint.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_rendersGlobalPurgeDangerZone() throws Exception {

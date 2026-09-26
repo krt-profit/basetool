@@ -27,13 +27,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link UexValues#parseCrew(String)}.
- *
- * <p>The parser exists because UEX serves a vehicle's crew complement as one compact string and
- * <em>not</em> as the {@code crew_min} / {@code crew_max} fields this project used to bind — those
- * decoded to {@code null} and cleared both columns on every sync (REQ-DATA-015, ADR-0148). These
- * cases are the shapes the live {@code /vehicles} payload actually contains ({@code "1"}, {@code
- * "1,2"}, {@code "1,1"}, {@code ""} and absent), plus the malformed ones the parser must refuse.
+ * Unit tests for {@link UexValues#parseCrew(String)} over the crew-string shapes of the UEX {@code
+ * /vehicles} payload and malformed input (REQ-DATA-015, ADR-0148).
  */
 class UexValuesTest {
 
@@ -55,15 +50,12 @@ class UexValuesTest {
   @Test
   @DisplayName("a reversed pair never yields a max below its min")
   void reversedPair_isNormalised() {
-    // Not seen in the live feed, but a max below the min would be a nonsense range to store and
-    // would read as a data-entry error rather than as the upstream typo it is.
     assertEquals(new CrewRange(3, 3), UexValues.parseCrew("3,1"));
   }
 
   @Test
   @DisplayName("absent, blank and unparseable crews leave BOTH bounds null")
   void unparseable_yieldsNoBounds() {
-    // Half a range is not a fact UEX stated: "1 to ?" must not be stored as a crew of 1.
     for (String raw : new String[] {null, "", "   ", "x", "1,x", "1,", ","}) {
       CrewRange range = UexValues.parseCrew(raw);
       assertNull(range.min(), "min for '" + raw + "'");

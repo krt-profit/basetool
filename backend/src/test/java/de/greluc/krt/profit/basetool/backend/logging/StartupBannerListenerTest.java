@@ -24,10 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 /**
- * Contract for {@link StartupBannerListener#sanitiseJdbcUrl(String)}.
- *
- * <p>The banner must never echo credentials. This test pins down the supported URL variants and
- * null-safety so a regression would be caught immediately.
+ * Contract for {@link StartupBannerListener#sanitiseJdbcUrl(String)}: supported URL variants never
+ * echo credentials, and null input is safe.
  */
 class StartupBannerListenerTest {
 

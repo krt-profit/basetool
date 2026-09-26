@@ -115,11 +115,7 @@ public class NotificationPageController {
   /** Live browser-to-backend SSE relays open on this instance (relay-connections gauge source). */
   private final AtomicInteger relayConnections = new AtomicInteger();
 
-  /**
-   * Binds the {@code basetool_notification_relay_connections} gauge to the live relay count once
-   * the bean is constructed (#1041 item 17). Zero here while users are online means the
-   * browser-to-backend notification push is dead and clients fell back to the unread-count poll.
-   */
+  /** Binds the {@code basetool_notification_relay_connections} gauge to the live relay count. */
   @PostConstruct
   void registerRelayGauge() {
     Gauge.builder(
@@ -131,10 +127,7 @@ public class NotificationPageController {
   }
 
   /**
-   * Creates the {@link SseEmitter} backing a new browser relay, with the registry's 30-minute
-   * timeout. Extracted as a seam so a test can substitute a mock emitter and assert the relay's
-   * initial request-thread commit (mirrors {@code NotificationStreamService.newEmitter()} on the
-   * backend).
+   * Creates the {@link SseEmitter} backing a new browser relay; overridable in tests.
    *
    * @return a fresh emitter holding the browser connection open for {@link #STREAM_TIMEOUT_MS}
    */
@@ -144,10 +137,8 @@ public class NotificationPageController {
   }
 
   /**
-   * Renders the full notifications page: the newest {@value #PAGE_LIMIT} notifications plus the
-   * paging facts (total count, more-pages flag) that drive the "showing X of Y" hint and the
-   * load-more control, so a cap-exceeding inbox is visibly — never silently — truncated
-   * (REQ-NOTIF-019). Fail-soft to an empty list on a backend hiccup.
+   * Renders the notifications page with the newest {@value #PAGE_LIMIT} notifications, the total
+   * count and the more-pages flag (REQ-NOTIF-019); falls back to an empty list on a backend error.
    *
    * @param model the view model
    * @return the notifications template name
@@ -162,8 +153,6 @@ public class NotificationPageController {
       model.addAttribute("notifTotal", firstPage == null ? 0L : firstPage.totalElements());
       model.addAttribute("notifHasMore", hasMore(firstPage));
     } catch (ReauthenticationRequiredException e) {
-      // Let GlobalExceptionHandler bounce the user through a fresh Keycloak login (302) rather than
-      // rendering an empty inbox on a dead session.
       throw e;
     } catch (Exception e) {
       log.debug("Failed to load notifications page", e);
@@ -176,9 +165,7 @@ public class NotificationPageController {
   }
 
   /**
-   * Returns one further inbox page for the load-more control on the {@code /notifications} page
-   * (REQ-NOTIF-019). Items are localized server-side exactly like the initial render, so appended
-   * entries are indistinguishable from server-rendered ones.
+   * Returns one further server-localized inbox page for the load-more control (REQ-NOTIF-019).
    *
    * @param page the zero-based page index to fetch (page 0 is the initial server render)
    * @return the localized page slice with the total count and the more-pages flag
@@ -204,21 +191,10 @@ public class NotificationPageController {
   }
 
   /**
-   * Relays the backend notification SSE stream to the browser (REQ-NOTIF-010). The browser opens an
-   * {@code EventSource} here; this controller forwards each backend event over the resilience-free
-   * {@code sseWebClient}. Best-effort: if the backend stream errors, the emitter completes with the
-   * error and the browser's polling fallback keeps the badge fresh.
+   * Relays the backend notification SSE stream to the browser (REQ-NOTIF-010).
    *
-   * <p>The OAuth2 bearer is resolved <b>read-only</b> on the servlet thread and set as a plain
-   * {@code Authorization} header on the upstream call. The {@code sseWebClient} carries no OAuth2
-   * exchange filter (see the {@code sseWebClient} bean in {@code WebClientConfig}), so this
-   * long-lived relay is structurally incapable of asking the {@code OAuth2AuthorizedClientManager}
-   * to refresh — it can neither rotate the session's online refresh token nor write a stale one
-   * back, which Keycloak's reuse detection would otherwise punish by revoking the whole SSO session
-   * and forcing an interactive re-login (REQ-SEC-012). The snapshot token is relayed verbatim even
-   * when already expired: the backend rejects it, the stream fails soft, and the always-on
-   * unread-count poll — not this relay — keeps the token fresh and drives any re-authentication.
-   * When no usable token is bound the stream fails soft immediately.
+   * <p>The bearer token is read once, without refresh, and sent as a plain {@code Authorization}
+   * header (REQ-SEC-012). Without a usable token, or on a backend error, the stream fails soft.
    *
    * @param request the current servlet request, used to read the session-stored authorized client
    * @param authentication the authenticated principal owning the session
@@ -231,40 +207,19 @@ public class NotificationPageController {
     OAuth2AuthorizedClient authorizedClient =
         authorizedClientRepository.loadAuthorizedClient(REGISTRATION_ID, authentication, request);
     if (authorizedClient == null || authorizedClient.getAccessToken() == null) {
-      // No usable token snapshot (e.g. a freshly-lost session): fail soft. The 60s unread-count
-      // poll runs the same backend call through BackendApiClient and drives re-authentication.
       emitter.complete();
       return emitter;
     }
     String bearerToken = authorizedClient.getAccessToken().getTokenValue();
-    // Commit the SSE response NOW, on the request thread, with an initial keep-alive comment.
-    // Load-bearing (ADR-0113) — do NOT remove as "redundant" next to the forwarded backend
-    // `connected`: this relay's first real write is forward() below, invoked on a reactor-netty
-    // event-loop thread, and Spring Web 7 + Tomcat 11 do NOT commit an async SSE response whose
-    // first write lands on a non-container thread (spring-ai #6169) — without this the status line
-    // + headers never reach the browser/NPM and every stream 60s-header-times-out (the
-    // 100%-dead-SSE
-    // incident of 2026-07-20). Spring replays this pre-initialize send on the request (dispatch)
-    // thread when it initializes the emitter, committing the response there, on a container thread
-    // —
-    // the same request-thread-first-write pattern the backend's
-    // NotificationStreamService.subscribe()
-    // already uses. A comment (not a named event) is invisible to EventSource, so it only flushes
-    // the
-    // headers; the forwarded backend events (incl. the backend's own `connected`) follow normally.
     try {
       emitter.send(SseEmitter.event().comment("ready"));
     } catch (IOException | RuntimeException e) {
-      // Browser already gone before we could commit: fail soft, do not wire the relay.
       log.debug(
           "Notification stream initial commit failed ({}); completing",
           e.getClass().getSimpleName());
       emitter.complete();
       return emitter;
     }
-    // Count this relay for the whole lifetime of the upstream subscription. doFinally fires exactly
-    // once on any terminal signal — upstream complete/error, or a cancel when the browser
-    // disconnects and onCompletion/onTimeout dispose the subscription below — so it stays balanced.
     relayConnections.incrementAndGet();
     Disposable subscription =
         sseWebClient
@@ -404,9 +359,7 @@ public class NotificationPageController {
   }
 
   /**
-   * Fetches one page of the caller's inbox from the paginated backend listing, newest first. Used
-   * by the initial page render (page 0) and the load-more relay, unlike the bell dropdown which
-   * keeps the lighter {@code /recent} endpoint.
+   * Fetches one page of the caller's inbox from the paginated backend listing, newest first.
    *
    * @param page the zero-based page index
    * @return the backend page response, or {@code null} when the backend returned none
@@ -478,8 +431,6 @@ public class NotificationPageController {
           backendApiClient.get(BACKEND_BASE + "/unread-count", NotificationCountResponse.class);
       return response != null && response.count() != null ? response.count() : 0L;
     } catch (ReauthenticationRequiredException e) {
-      // Surface a 401 + X-Reauthenticate (via GlobalExceptionHandler) so the always-on badge poll
-      // re-logs the user in instead of silently reporting zero on a dead session.
       throw e;
     } catch (Exception e) {
       log.debug("Failed to load unread count", e);
@@ -488,17 +439,10 @@ public class NotificationPageController {
   }
 
   /**
-   * Terminates the relayed SSE stream on a backend error. When the error is a re-authentication
-   * signal (the session's OAuth2 token is gone, see {@link
-   * ReauthenticationRequiredException#isReauthSignal}), a named {@code reauth} event carrying the
-   * Keycloak login path is pushed so the browser can redirect the whole window instead of entering
-   * an {@code EventSource} reconnect loop against a dead session; the stream then completes
-   * cleanly. Any other error also completes the emitter <b>cleanly</b> (not {@code
-   * completeWithError}): SSE push is best-effort (REQ-NOTIF-010) and the unread-count poll is the
-   * guaranteed fallback, so a dropped/unavailable backend stream is not an application fault.
-   * {@code completeWithError} would re-dispatch the error through the MVC {@code @ExceptionHandler}
-   * and log a spurious ERROR per dropped stream — the dominant source of frontend ERROR-log noise
-   * while the backend/Keycloak has a blip; a clean completion just lets the browser reconnect.
+   * Terminates the relayed SSE stream on a backend error.
+   *
+   * <p>A re-authentication signal first sends a named {@code reauth} event carrying the login path.
+   * Every error completes the emitter cleanly, never with {@code completeWithError}.
    *
    * @param emitter the browser-facing emitter to terminate
    * @param error the error raised by the backend stream subscription
@@ -526,9 +470,6 @@ public class NotificationPageController {
       }
       return;
     }
-    // Best-effort SSE: complete cleanly (browser reconnects, poll keeps the badge fresh) instead of
-    // completeWithError(), which re-dispatches through the MVC exception handler and logs an ERROR
-    // for every transient backend-stream drop (REQ-NOTIF-010). DEBUG only.
     log.debug(
         "Notification stream dropped ({}); completing cleanly, poll fallback keeps the badge fresh",
         error.getClass().getSimpleName());
@@ -536,30 +477,14 @@ public class NotificationPageController {
   }
 
   /**
-   * Reports whether {@code error} — or anything in its cause chain — is the backend refusing this
-   * stream because the caller has not accepted the Terms of Use (REQ-SEC-028).
-   *
-   * <p>The frontend's own {@code TermsAcceptanceGateFilter} normally intercepts a gated stream
-   * before it ever reaches this relay, so this covers the two windows where it cannot: its verdict
-   * cache holds a still-fresh {@code true} from the 60 s before a wording change took effect, or
-   * its status read failed and it deliberately let the request through (the boundary is the
-   * backend, so it fails open). In both cases the refusal arrives here instead — and without this
-   * branch it would complete as a generic drop, which an {@code EventSource} answers by
-   * reconnecting into exactly the loop the gate's SSE handoff exists to prevent.
-   *
-   * <p>Matched on the {@code 403} plus the stable problem {@code code} rather than the status
-   * alone: a plain {@code ACCESS_DENIED} must keep completing cleanly, because navigating the
-   * window would be wrong for it.
+   * Reports whether {@code error} or its cause chain is the backend's 403 refusal for missing Terms
+   * of Use consent, matched on the problem {@code code} (REQ-SEC-028).
    *
    * @param error the error raised by the backend stream subscription
    * @return {@code true} when the backend refused the stream for missing consent
    */
   private static boolean isTermsGateSignal(Throwable error) {
     Throwable current = error;
-    // Depth-capped rather than cycle-detecting, mirroring
-    // ReauthenticationRequiredException.isReauthSignal: a self-referential cause chain must not
-    // spin
-    // a Reactor worker thread.
     for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
       if (current instanceof WebClientResponseException response
           && response.getStatusCode() == HttpStatus.FORBIDDEN
@@ -587,12 +512,6 @@ public class NotificationPageController {
       }
       emitter.send(builder);
     } catch (IOException | RuntimeException e) {
-      // REQ-OBS-001 / REQ-NOTIF-010: a send failure here is almost always a routine client
-      // disconnect (broken pipe when the viewer closes the tab mid-event). completeWithError()
-      // re-dispatches through the MVC @ExceptionHandler and logs a spurious ERROR per dropped
-      // stream — the dominant source of frontend ERROR-log noise during a backend/Keycloak blip.
-      // Complete cleanly instead (onCompletion disposes the upstream subscription), mirroring
-      // handleStreamError(); the poll fallback keeps the badge fresh.
       log.debug(
           "Notification stream send failed ({}); completing cleanly", e.getClass().getSimpleName());
       emitter.complete();

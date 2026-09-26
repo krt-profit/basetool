@@ -40,11 +40,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Unit tests for the filter-level 401/403 problem responses. Before this handler the gateway
- * answered both with an <em>empty</em> body and logged nothing, so an extractor with an expired
- * token got a response it could not branch on and the operator saw no trace of it at all.
- */
+/** Unit tests for the filter-level 401/403 problem responses and their logging. */
 class SecurityProblemResponseHandlerTest {
 
   private static final String URI = "/v1/refinery-extract";
@@ -88,10 +84,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void unauthenticatedRequestIsCountedUnderItsBoundedBearerErrorCode() throws Exception {
-    // A 401 was undiagnosable: it logs at DEBUG (invisible in prod, by design) and nothing else
-    // distinguished "malformed header" from "bad signature / wrong issuer / expired / failed
-    // audience". That cost real time on 2026-08-03, when a client reporting "you must sign in"
-    // could have meant any of them.
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     handler.commence(request(), response, new InvalidBearerTokenException("expired"));
@@ -101,8 +93,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void aNonOauthAuthenticationFailureCollapsesToTheBoundedOtherLiteral() throws Exception {
-    // The label must never be derived from an arbitrary exception: outside the fixed RFC 6750 set
-    // it collapses to `other`, so the series stays bounded (REQ-OBS-011).
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     handler.commence(
@@ -116,10 +106,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void aRequestWithNoCredentialAtAllReadsAsNoCredentials() throws Exception {
-    // The production case this gateway is dominated by: its own root is probed with the
-    // http_2xx_or_401 blackbox module, and every such probe presents no Authorization header at
-    // all. ExceptionTranslationFilter raises this rather than an OAuth2AuthenticationException, so
-    // before the split all 4 927 of the gateway's 401s sat on `other` (REQ-OBS-018).
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     handler.commence(
@@ -134,8 +120,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void aRejectedTokenStaysOffTheNoCredentialSeries() throws Exception {
-    // IngestAuthFailureSpike watches invalid_token alone; merging the two would put the probe
-    // baseline back into a brute-force alert (ADR-0173).
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     handler.commence(request(), response, new InvalidBearerTokenException("bad signature"));
@@ -161,8 +145,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void unauthenticatedRequestKeepsTheBearerChallenge() throws Exception {
-    // RFC 6750: the extractor's OAuth client reads WWW-Authenticate to tell "refresh the token"
-    // from "you are not allowed". Writing our own body must not cost that header.
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     handler.commence(request(), response, new InvalidBearerTokenException("expired"));
@@ -172,8 +154,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void unauthenticatedRequestIsLoggedAtDebugAndNeverEchoesTheTokenError() {
-    // DEBUG per REQ-OBS-001: on an internet-facing surface a WARN per unauthenticated probe is a
-    // log flood, and the counter keeps the signal. The decode message can quote the presented JWT.
     List<ILoggingEvent> events =
         LogCapture.capture(
             SecurityProblemResponseHandler.class,
@@ -194,7 +174,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void accessDeniedGetsAProblemBodyAndIsLoggedAtWarn() throws Exception {
-    // WARN, unlike the 401: "authenticated but not allowed" is the security-relevant case.
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     List<ILoggingEvent> events =
@@ -213,8 +192,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void theProblemBodyCarriesTheCorrelationIdTheOuterFilterAlreadyMinted() throws Exception {
-    // The gateway's CorrelationIdFilter runs OUTSIDE the security chain, so unlike the backend no
-    // id has to be minted here — body, log line and the echoed header share the existing one.
     MDC.put("correlationId", "cid-991");
     MockHttpServletResponse response = new MockHttpServletResponse();
 

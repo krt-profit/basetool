@@ -38,26 +38,11 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Curated cross-reference row mapping an external catalogue's commodity name onto a local {@link
- * Material}.
+ * Curated mapping from an external catalogue's commodity name onto a local {@link Material}, used
+ * by the syncs after a direct UUID match fails.
  *
- * <p>The R3 SC Wiki commodity sync (and a future R6 UEX-side counterpart) consult this table as the
- * alias-resolution layer in their {@code findMaterialFor(dto)} chain: after a direct UUID match
- * fails, the sync looks up the {@code (source_system, external_name)} pair here and dereferences
- * {@link #material} to the local row. Without this table the only fallback would be a fuzzy name
- * match — see SC_WIKI_SYNC_PLAN.md §8.1.1 for the full resolution order.
- *
- * <p>R1 ships the V108 seed entries (4 fuzzy + 2 manual aliases verified on 2026-05-27) plus this
- * entity, repository, service and the {@code /admin/material-aliases} CRUD page. Aliases not in the
- * V108 seed (Construction-* triplet, Combat Supplies) are intentionally created manually by an
- * admin after in-game grade verification.
- *
- * <p>Uniqueness on {@code (source_system, LOWER(external_name))} guarantees that an external name
- * resolves deterministically for the case-insensitive resolution lookup — adding a duplicate
- * (including a case-only variant) via the admin form returns HTTP 409. The constraint lives in the
- * DB as the functional unique index {@code uq_material_external_alias_source_lower_name} (V146); it
- * cannot be expressed as a JPA {@code @UniqueConstraint} because of the {@code LOWER()} expression,
- * so there is intentionally no {@code uniqueConstraints} declaration here (REQ-REFINERY-010).
+ * <p>{@code (source_system, LOWER(external_name))} is unique via a functional DB index, so a
+ * duplicate (including a case-only variant) is rejected with HTTP 409 (REQ-REFINERY-010).
  */
 @Entity
 @Table(name = "material_external_alias")

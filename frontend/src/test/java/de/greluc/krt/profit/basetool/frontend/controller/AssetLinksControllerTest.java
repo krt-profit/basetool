@@ -35,15 +35,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Guards the three properties Android actually checks when it decides whether the Basetool app may
- * open {@code https://profit-base.online/app/callback}.
- *
- * <p>This exists because the first release shipped without the file. The path fell through the
- * security chain to {@code anyRequest().authenticated()} and answered {@code 302} into the OAuth
- * entry point; Android's verification failed silently, the login callback opened in a browser
- * instead of the app, and the member landed on the 404 page in the middle of signing in. Nothing in
- * the build could see it — the app was correct, the server was correct, and only their agreement
- * was missing.
+ * Tests the three properties Android checks before letting the Basetool app open {@code
+ * https://profit-base.online/app/callback} via Digital Asset Links.
  */
 @SpringBootTest
 @DisplayName("Digital Asset Links")
@@ -55,14 +48,7 @@ class AssetLinksControllerTest {
 
   @Autowired private WebApplicationContext context;
 
-  /**
-   * Keeps the real client registration out of the context.
-   *
-   * <p>Building it performs OIDC discovery against the configured issuer, which no unit test can
-   * reach — the context then fails with an {@code UnknownHostException} that says nothing about the
-   * endpoint under test. Every other {@code @SpringBootTest} in this module mocks it for the same
-   * reason.
-   */
+  /** Keeps the real client registration, which performs OIDC discovery, out of the test context. */
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
       clientRegistrationRepository;
@@ -86,8 +72,6 @@ class AssetLinksControllerTest {
   @Test
   @DisplayName("is served anonymously, as JSON, with no redirect")
   void servedAnonymouslyAsJson() throws Exception {
-    // All three matter to Android and none of them held before this endpoint existed: an
-    // unauthenticated GET answered 302 into the OAuth entry point.
     mvc()
         .perform(get("/.well-known/assetlinks.json"))
         .andExpect(status().isOk())
@@ -109,9 +93,6 @@ class AssetLinksControllerTest {
   @Test
   @DisplayName("publishes the digests as a list, so a key rotation can name two at once")
   void fingerprintsAreAList() throws Exception {
-    // A rotation must publish the new digest while the old key is still installed everywhere. If
-    // this ever became a bare string, that overlap would be impossible and one population would
-    // break for the length of the rollout.
     mvc()
         .perform(get("/.well-known/assetlinks.json"))
         .andExpect(jsonPath("$[0].target.sha256_cert_fingerprints").isArray())

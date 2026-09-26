@@ -67,12 +67,7 @@ public class IngestService {
    */
   public @NotNull IngestResponseDto ingestRefinery(
       @NotNull String sub, String acceptLanguage, @NotNull RefineryExtractDto extract) {
-    // Per-subject throttle (REQ-INGEST-005): bound how hard one authenticated caller can drive the
-    // backend import endpoints. Checked before the backend relay so an over-budget caller is
-    // rejected without forwarding.
     subjectRateLimiter.requireWithinLimit(sub);
-    // Payload-level client-identity check (REQ-INGEST-011), before the "Relaying…" line so a
-    // rejected producer never reads as an accepted send in the log.
     provenanceGuard.requireApprovedTool(Provenance.from(extract));
     logAcceptedExtract(extract);
     String draftJson = backendImportClient.forwardRefineryExtract(sub, acceptLanguage, extract);
@@ -82,15 +77,10 @@ public class IngestService {
   }
 
   /**
-   * Records the <em>shape</em> of an accepted extract before it is relayed: the contract version,
-   * the producing tool, and how many orders / goods rows / source images it carries. Without this
-   * line an extractor that sends a structurally odd payload (a v2 envelope, zero goods, fifty
-   * stitched images) is indistinguishable in the log from a normal send — the gateway itself
-   * interprets nothing, so the counts are the only handle on "what did the client actually push?".
+   * Logs the shape of an accepted extract: contract version, producing tool, and counts of orders,
+   * goods rows and source images.
    *
-   * <p>No screen read and no material name is logged: only counts, the numeric schema version and
-   * the provenance strings, and those go through {@link LogSafe} because they are client-supplied
-   * free text that could otherwise forge a second log line.
+   * <p>No screen read is logged; client-supplied strings go through {@link LogSafe}.
    *
    * @param extract the validated extract about to be forwarded
    */
@@ -132,16 +122,8 @@ public class IngestService {
       String acceptLanguage,
       byte @NotNull [] blueprintJson,
       @NotNull Provenance provenance) {
-    // Per-subject throttle (REQ-INGEST-005); see ingestRefinery for the rationale.
     subjectRateLimiter.requireWithinLimit(sub);
-    // Payload-level client-identity check (REQ-INGEST-011); see ingestRefinery.
     provenanceGuard.requireApprovedTool(provenance);
-    // The export body stays opaque to the gateway (the backend owns that contract), so the size is
-    // the only shape there is — it separates "the extractor sent an empty file" from a genuine
-    // backend reject. The envelope's provenance triple is logged alongside it: this path used to
-    // record nothing but the byte count, which left a structurally odd blueprint export
-    // indistinguishable from a normal one while the refinery path had its shape line from day one.
-    // Both provenance strings are client-supplied free text and go through LogSafe.
     log.info(
         "Relaying blueprint export ({} bytes, schemaVersion={}, tool={}/{})",
         blueprintJson.length,

@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * Read model for a Kommandogruppe (epic #800, REQ-ROLE-003) — a named sub-structure of a Staffel.
- * Descriptive only: a Kommandogruppe grants no rights; the rank-bearing authority lives on the
- * member's {@code org_unit_membership.role} row.
+ * Read model for a Kommandogruppe, a named sub-structure of a Staffel that grants no rights
+ * (REQ-ROLE-003).
  *
  * @param id the Kommandogruppe id; never {@code null} for a persisted group.
  * @param squadronId the owning Staffel ({@code SQUADRON}) org-unit id; never {@code null}.

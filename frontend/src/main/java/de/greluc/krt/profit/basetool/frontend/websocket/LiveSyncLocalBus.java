@@ -25,20 +25,9 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Server-side seam for publishing a live-sync {@code changed} signal from a controller rather than
- * from a client socket (REQ-FE-015, ADR-0094).
- *
- * <p>Most {@code changed} signals originate from the acting user's own {@code /ws/sync} socket. But
- * some mutations cannot publish from one. The original case was an <b>anonymous guest order
- * create</b>, where the guest never opened a socket at all; ADR-0159 removed that caller, and what
- * remains is the same shape one step in: the creating member's socket is not subscribed to the
- * staff {@code orders} room when they may not browse the queue, yet every viewer who is subscribed
- * must still update in place. Such controllers inject this seam and call {@link #publish(String,
- * List)} after a successful mutation; the signal is relayed to this instance's local room and
- * fanned out to peer replicas exactly like a client publish (the sections are re-validated against
- * the topic class's whitelist). Depending on the seam rather than the WebSocket handler keeps
- * controllers decoupled from the relay internals and lets a controller test assert the publish with
- * a simple mock.
+ * Publishes a live-sync {@code changed} signal from a controller rather than a client socket
+ * (REQ-FE-015, ADR-0094), for mutations whose actor is not subscribed to the affected room. The
+ * signal is relayed locally and fanned out like a client publish, with sections re-validated.
  */
 @Component
 @RequiredArgsConstructor

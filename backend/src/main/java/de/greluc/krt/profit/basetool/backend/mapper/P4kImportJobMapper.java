@@ -80,12 +80,10 @@ public class P4kImportJobMapper {
   }
 
   /**
-   * Deserializes a stored {@code result_json} back into a {@link P4kImportResultDto}. A {@code
-   * null} / blank value (pending / running / failed run) yields {@code null}; a value that fails to
-   * parse (it should not happen, the worker wrote it) is logged and treated as absent rather than
-   * failing the whole response.
+   * Deserializes a stored {@code result_json} into a {@link P4kImportResultDto}; blank or
+   * unparseable values yield {@code null}, the latter logged.
    *
-   * @param resultJson the stored JSON text, or {@code null}
+   * @param resultJson the stored JSON, or {@code null}
    * @return the parsed result, or {@code null}
    */
   @Nullable

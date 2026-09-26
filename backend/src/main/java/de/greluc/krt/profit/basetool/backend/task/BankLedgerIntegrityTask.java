@@ -37,11 +37,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduled ledger-integrity sweep for the bank (REQ-BANK-020, epic #556 Phase 5; pattern: {@link
- * UserSyncTask}). Runs every {@code app.bank.integrity.interval} (default {@code PT1H}) and
- * delegates to {@link BankLedgerIntegrityService#verify()}, which logs each violation at {@code
- * ERROR}. The whole task is gated by {@code app.bank.integrity.enabled} (default {@code true}); set
- * it to {@code false} to disable the schedule (e.g. in tests that drive the verification directly).
+ * Scheduled bank ledger-integrity sweep (REQ-BANK-020) that runs {@link
+ * BankLedgerIntegrityService#verify()} every {@code app.bank.integrity.interval} (default {@code
+ * PT1H}). Gated by {@code app.bank.integrity.enabled} (default {@code true}).
  */
 @Component
 @ConditionalOnProperty(
@@ -58,21 +56,14 @@ public class BankLedgerIntegrityTask {
   private final MeterRegistry meterRegistry;
 
   /**
-   * Per-category violation-count holders backing {@code basetool_bank_ledger_integrity_violations}.
-   * Insertion-ordered for a stable registration order; each holder is fed by the hourly sweep, so a
-   * value {@code > 0} in any category means the ledger broke that invariant (CRITICAL alert in
-   * Phase 2). Registered once in {@link #registerViolationGauges()} and only mutated on the
-   * scheduler thread.
+   * Per-category violation counts backing {@code basetool_bank_ledger_integrity_violations}; a
+   * value above zero means the ledger broke that invariant. Mutated only on the scheduler thread.
    */
   private final Map<String, AtomicInteger> violationGauges = new LinkedHashMap<>();
 
   /**
    * Registers one {@code basetool_bank_ledger_integrity_violations{category}} gauge per invariant
-   * category, each backed by a zero-initialised holder the hourly sweep updates. Registration
-   * happens once after construction; the gauge exists (reporting {@code 0}) even before the first
-   * sweep so the CRITICAL alert has a series to evaluate. Because the enclosing bean is
-   * config-gated ({@code app.bank.integrity.enabled}), disabling the check also removes these
-   * gauges, which is intended.
+   * category, reporting {@code 0} until the first sweep.
    */
   @PostConstruct
   void registerViolationGauges() {
@@ -96,11 +87,9 @@ public class BankLedgerIntegrityTask {
   }
 
   /**
-   * Fires the integrity verification on the configured schedule through {@link TaskMetrics},
-   * publishing the {@code bank_ledger_integrity} job metrics. A transient DB hiccup is recorded as
-   * a failed run and swallowed so the scheduler thread survives; the next tick retries. A run that
-   * completes but reports violations is still a {@code success} — the violation count is the
-   * separate {@code basetool_bank_ledger_integrity_violations} gauge.
+   * Runs the integrity verification through {@link TaskMetrics} as the {@code
+   * bank_ledger_integrity} job. Failures are recorded and swallowed; a run that finds violations
+   * still counts as a success.
    */
   @Scheduled(fixedDelayString = "${app.bank.integrity.interval:PT1H}")
   public void runIntegrityCheck() {
@@ -143,13 +132,8 @@ public class BankLedgerIntegrityTask {
   }
 
   /**
-   * Publishes {@code basetool_scheduled_job_enabled{task="bank_ledger_integrity"} = 1}.
-   *
-   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
-   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
-   * Without it, following the documented instruction to disable a sweep before its first
-   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
-   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   * Publishes {@code basetool_scheduled_job_enabled{task="bank_ledger_integrity"} = 1}, so {@code
+   * ScheduledJobStale} can tell a disabled sweep (no bean, no gauge) from one that never succeeded.
    */
   @PostConstruct
   void publishEnabledGauge() {

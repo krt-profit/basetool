@@ -34,44 +34,12 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 /**
- * Shared instrumentation wrapper for the backend {@code @Scheduled} batch jobs (REQ-OBS-011).
+ * Instrumentation wrapper for the backend {@code @Scheduled} batch jobs (REQ-OBS-011).
  *
- * <p>Wrapping a job body in {@link #record(ScheduledJob, ThrowingRunnable)} produces, per {@link
- * ScheduledJob}:
- *
- * <ul>
- *   <li>{@code basetool_scheduled_job_executions_total{job,outcome}} — one increment per run,
- *       tagged {@code success} or {@code failure};
- *   <li>{@code basetool_scheduled_job_duration_seconds{job}} — the wall-clock run time;
- *   <li>{@code basetool_scheduled_job_last_success_timestamp_seconds{job}} — epoch seconds of the
- *       last successful run, the source of the "sync gone stale" alerts (e.g. {@code user_sync} not
- *       succeeding within 26 h). Absent until the job's first success — see the sentinel note
- *       below.
- * </ul>
- *
- * <p>The wrapper <strong>catches and swallows</strong> any exception the body throws, after
- * recording it as a {@code failure} and logging it at {@code ERROR}: a scheduled sweep must never
- * let a transient failure tear the scheduler thread down, and this centralises that contract (the
- * jobs previously each hand-rolled their own catch-and-log). A run that returns normally counts as
- * {@code success} even if it found problems — a bank integrity sweep that reports violations is a
- * successful run; the violation count is a separate gauge.
- *
- * <p><b>The last-success gauge is registered on a job's first SUCCESS — never earlier, and never
- * with a {@code 0} sentinel.</b> Every staleness alert reads it as {@code time() - gauge > N},
- * which turns a published {@code 0} into "last succeeded on 1970-01-01" — an age that exceeds every
- * threshold in {@code monitoring/prometheus/alerts/business.yml}. The holder is a per-process
- * {@link AtomicLong}, so it starts empty again after every backend restart; registering it at the
- * START of a run (as this class did until 2026-08-10) therefore published {@code 0} for the whole
- * duration of each job's first post-restart run. The prod SC-Wiki sweep takes ~10–15 min ({@code
- * sync-all-items}), which outlasts {@code ExternalSyncStale}'s {@code for: 10m}, so that alert
- * fired on every backend restart and self-resolved the moment the sweep finished. Registering on
- * first success instead leaves the series simply ABSENT until there is a real timestamp to report,
- * and {@code time() - <absent>} yields an empty vector — no alert. That also preserves the original
- * intent: a job whose bean is absent or config-gated off never publishes the gauge at all.
- *
- * <p>This class lives in the {@code metrics} leaf package and depends only on the Micrometer
- * registry, so every layer (task, service, filter) can reuse it without forming a package cycle
- * (ADR-0047).
+ * <p>{@link #record(ScheduledJob, ThrowingRunnable)} publishes per job an executions counter tagged
+ * by outcome, a duration timer and a last-success timestamp gauge, and swallows any exception after
+ * recording and logging it. The last-success gauge is registered only on a job's first success,
+ * never with a {@code 0} sentinel.
  */
 @Component
 @Slf4j
@@ -98,12 +66,10 @@ public class TaskMetrics {
    * Runs {@code work} while recording the executions counter, duration timer and last-success gauge
    * for {@code job}.
    *
-   * <p>Any exception thrown by {@code work} is recorded as a {@code failure}, logged at {@code
-   * ERROR} (with the job label only — never a payload that could carry PII) and then swallowed so
-   * the scheduler thread survives; the last-success gauge advances only on a clean return.
+   * <p>An exception is recorded as a {@code failure}, logged at {@code ERROR} and swallowed; the
+   * last-success gauge advances only on a clean return.
    *
-   * @param job the scheduled job being instrumented (its {@link ScheduledJob#label()} is the {@code
-   *     job} tag)
+   * @param job the job being instrumented; its {@link ScheduledJob#label()} is the tag value
    * @param work the job body to execute and measure
    */
   public void record(@NotNull ScheduledJob job, @NotNull ThrowingRunnable work) {
@@ -116,27 +82,22 @@ public class TaskMetrics {
   }
 
   /**
-   * Item-counting variant of {@link #record(ScheduledJob, ThrowingRunnable)}: the same executions
-   * counter, duration timer and last-success gauge, plus {@code basetool_scheduled_job_items_total{
-   * job}} incremented by the number of items the run reports it processed (users synced,
-   * notifications purged, rows granted, …). Use this for jobs that process a countable batch; jobs
-   * without a meaningful single count use the {@link ThrowingRunnable} overload.
+   * Item-counting variant of {@link #record(ScheduledJob, ThrowingRunnable)} that also adds the
+   * returned count to {@code basetool_scheduled_job_items_total}.
    *
-   * @param job the scheduled job being instrumented
-   * @param work the job body; its return value is the item count added to the items counter on a
-   *     clean run
+   * @param job the job being instrumented
+   * @param work the job body; its return value is the item count added on a clean run
    */
   public void recordCounting(@NotNull ScheduledJob job, @NotNull ThrowingIntSupplier work) {
     recordInternal(job, work::getAsInt);
   }
 
   /**
-   * Shared instrumentation core: runs {@code work}, records the executions counter, duration timer
-   * and last-success gauge, and — when the body returns a non-null count on a clean run — the items
-   * counter. Any exception is recorded as a {@code failure}, logged and swallowed.
+   * Runs {@code work} and records the job meters, plus the items counter when a clean run returns a
+   * non-null count. Any exception is recorded as a {@code failure}, logged and swallowed.
    *
-   * @param job the scheduled job being instrumented
-   * @param work the job body returning an optional item count ({@code null} = no count reported)
+   * @param job the job being instrumented
+   * @param work the job body returning an optional item count ({@code null} = none)
    */
   private void recordInternal(@NotNull ScheduledJob job, @NotNull ThrowingItemWork work) {
     long startNanos = System.nanoTime();
@@ -158,23 +119,11 @@ public class TaskMetrics {
   }
 
   /**
-   * Tags this run with its own {@code correlationId} so every line it emits — the job body's own
-   * start/finish lines, anything the services it calls log, and the failure {@code ERROR} above —
-   * can be pulled out as one unit.
-   *
-   * <p>A scheduler thread carries no request, so {@code CorrelationIdFilter} never runs for it and
-   * the field was previously empty on every scheduled line. With eight jobs on overlapping
-   * schedules that made a nightly window unreadable: the lines interleave with nothing to say which
-   * run they belong to. The id is {@code <job-label>-<8 hex>}, so it is greppable by job as well as
-   * by run ({@code |= "user_sync"} finds every line of every user-sync run, the full id narrows it
-   * to one).
-   *
-   * <p>An id that is already present is left untouched and not cleared afterwards: {@link
-   * #recordCountingRethrow} runs inside an admin request that already owns a real request
-   * correlation id, and overwriting it would sever the manual trigger from its HTTP call.
+   * Installs a {@code <job-label>-<8 hex>} {@code correlationId} in the MDC for this run, unless
+   * one is already present.
    *
    * @param job the job about to run
-   * @return {@code true} when this call installed the id and must therefore remove it again
+   * @return {@code true} when this call installed the id and must remove it again
    */
   private static boolean openRunContext(@NotNull ScheduledJob job) {
     String existing = MDC.get(MDC_CORRELATION_ID);
@@ -187,21 +136,15 @@ public class TaskMetrics {
   }
 
   /**
-   * Rethrowing counting variant for a SYNCHRONOUS, caller-facing invocation of a job that also runs
-   * on a schedule — e.g. an admin-triggered manual user sync ({@code POST /api/v1/users/sync}). It
-   * records the identical executions counter, duration timer, last-success gauge and items counter
-   * as {@link #recordCounting}, so the manual run is indistinguishable in monitoring and refreshes
-   * the same {@code user_sync} staleness gauge; but, UNLIKE the schedule-facing overloads, it
-   * RETURNS the item count and RE-THROWS the body's failure (unchecked, wrapping a checked one) so
-   * the caller can surface it as an RFC 7807 error rather than the run being silently swallowed.
+   * Rethrowing counting variant for a synchronous, caller-facing run of a scheduled job, such as
+   * the admin-triggered manual user sync. It records the same meters as {@link #recordCounting} but
+   * returns the item count and rethrows the body's failure (a checked one wrapped unchecked).
    *
-   * <p>Use only from a request-scoped caller that owns error handling. The scheduler paths must
-   * keep using the swallowing overloads so a transient failure never tears the scheduler thread
-   * down.
+   * <p>Use only from a request-scoped caller that owns error handling.
    *
-   * @param job the scheduled job being instrumented
-   * @param work the job body; its return value is the item count returned to the caller
-   * @return the item count the body reported on a clean run
+   * @param job the job being instrumented
+   * @param work the job body; its return value is returned to the caller
+   * @return the item count the body reported
    */
   public int recordCountingRethrow(@NotNull ScheduledJob job, @NotNull ThrowingIntSupplier work) {
     long startNanos = System.nanoTime();
@@ -224,14 +167,13 @@ public class TaskMetrics {
   }
 
   /**
-   * Emits the duration timer, executions counter and (when a count was reported) items counter for
-   * a finished job run. Shared by the swallowing {@link #recordInternal} and the rethrowing {@link
-   * #recordCountingRethrow} so both paths publish byte-identical meters.
+   * Emits the duration timer, executions counter and, when a count was reported, the items counter
+   * for a finished run.
    *
-   * @param job the scheduled job being instrumented
+   * @param job the job being instrumented
    * @param outcome {@code success} or {@code failure}
    * @param startNanos the {@link System#nanoTime()} reading taken before the body ran
-   * @param items the item count the body reported, or {@code null} when none
+   * @param items the reported item count, or {@code null} when none
    */
   private void emitJobMetrics(
       @NotNull ScheduledJob job, @NotNull String outcome, long startNanos, Integer items) {
@@ -257,17 +199,8 @@ public class TaskMetrics {
   /**
    * Publishes {@code basetool_scheduled_job_enabled{task} = 1} for this job.
    *
-   * <p>Called once, from the scheduled task's own {@code @PostConstruct} — so a bean that
-   * {@code @ConditionalOnProperty} never created publishes nothing, and that absence is the signal.
-   * {@code ScWikiScheduler} is the one job whose switch is a runtime property rather than bean
-   * existence, so it calls this only when that property is on; the metric means "this job is
-   * configured to run", not "this bean exists". It is what lets {@code ScheduledJobStale}
-   * distinguish "has never succeeded" from "was switched off on purpose": without it, following the
-   * documented instruction to disable a retention sweep before its first irreversible run raised a
-   * permanent warning, because the last-success gauge is registered lazily on first success and
-   * never appeared.
-   *
-   * <p>Idempotent: registering twice for the same job is a no-op rather than a duplicate series.
+   * <p>Called from the job bean's own {@code @PostConstruct} (or, for {@code ScWikiScheduler}, only
+   * while its runtime switch is on). Idempotent.
    *
    * @param job the job whose bean has just been created
    */
@@ -286,19 +219,11 @@ public class TaskMetrics {
   }
 
   /**
-   * Stamps the current epoch second into {@code job}'s last-success gauge, registering that gauge
-   * on the job's very first success.
+   * Stamps the current epoch second into {@code job}'s last-success gauge, registering the gauge on
+   * the job's first success.
    *
-   * <p>Called ONLY from the success path of the three public entry points — never before or during
-   * a run. That ordering is the whole point: the gauge must not exist until there is a real
-   * timestamp to publish, because the staleness alerts compute {@code time() - gauge} and would
-   * read an as-yet-unset {@code 0} as a 56-year-old success (see the class Javadoc for the {@code
-   * ExternalSyncStale} false positive this caused on every backend restart).
-   *
-   * <p>The timestamp is taken BEFORE {@code computeIfAbsent} and passed into the registration, so
-   * the gauge is already carrying it the instant Micrometer can scrape it — a holder registered at
-   * {@code 0} and set immediately afterwards would leave a scrape-sized window in which the
-   * sentinel is observable again, which is exactly the bug being fixed.
+   * <p>Called only on the success path; the timestamp is taken before registration so the gauge
+   * never publishes a {@code 0}.
    *
    * @param job the job whose run just completed cleanly
    */
@@ -313,9 +238,8 @@ public class TaskMetrics {
    * Registers the last-success timestamp gauge for {@code job} and returns its backing holder.
    *
    * @param job the job to register the gauge for
-   * @param epochSeconds the first successful run's completion time, seeded into the holder so the
-   *     gauge never publishes a {@code 0} sentinel
-   * @return the holder strongly referenced by the gauge, pre-set to {@code epochSeconds}
+   * @param epochSeconds the first successful run's completion time, seeded into the holder
+   * @return the holder referenced by the gauge, pre-set to {@code epochSeconds}
    */
   private @NotNull AtomicLong registerLastSuccessGauge(
       @NotNull ScheduledJob job, long epochSeconds) {

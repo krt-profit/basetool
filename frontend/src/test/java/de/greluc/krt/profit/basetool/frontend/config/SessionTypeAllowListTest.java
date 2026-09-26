@@ -93,22 +93,9 @@ import org.springframework.web.servlet.FlashMap;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pins the session type allow-list (REQ-SEC-067, ADR-0206): every value a real session holds is
- * read under {@code ENFORCE} exactly as under the permissive validator of before, and a class
- * outside the list is refused before it is instantiated.
- *
- * <p><strong>Why a parity test rather than a list of successes.</strong> Switching the validator
- * cannot change what is <em>written</em>, only what is <em>read</em>, so the question a deploy
- * poses is precisely "does anything that was readable yesterday stop being readable today". Each
- * value below is written once and read under {@code OFF} and under {@code ENFORCE}; whatever the
- * permissive validator could read, the enforcing one must read to the same bytes. A value neither
- * can read (there are none today, but a flash-map shape once was) is not this list's business.
- *
- * <p>The sample is the session as production writes it: the OIDC security context, the authorized
- * client with both tokens, the pre-login authorization request, the CSRF token, the saved request,
- * a redirect's flash maps with a form and the refinery-import DTOs (and one with a form's {@code
- * BindingResult}, which no validator can read — see {@link #realisticSession()}), the attributes
- * our own filters write, and Tomcat's WebSocket binding listener.
+ * Verifies the session type allow-list (REQ-SEC-067, ADR-0206): every value of a realistic session
+ * reads the same under {@code ENFORCE} as under {@code OFF}, and a class outside the list is
+ * refused before instantiation.
  */
 class SessionTypeAllowListTest {
 
@@ -144,8 +131,6 @@ class SessionTypeAllowListTest {
           .isEqualTo(new String(permissive.serialize(before), StandardCharsets.UTF_8));
     }
 
-    // The parity is only worth something if the sample actually exercised the load-bearing values:
-    // a signed-in member, their tokens and the login in flight must all have been readable before.
     assertThat(readableBefore)
         .contains(
             "SPRING_SECURITY_CONTEXT",
@@ -164,12 +149,6 @@ class SessionTypeAllowListTest {
 
   @Test
   void aRealOidcLoginsIdTokenIsReadUnderEnforce() {
-    // The 2026-09-23 defect in the first version of the list: an ID token decoded by Nimbus and
-    // converted by Spring's OIDC claim converter carries `iss` as java.net.URL, numeric claims as
-    // java.lang.Long and nested claims as Nimbus's shaded LinkedTreeMap. All three are written with
-    // a type id inside the claims map, and none was on the list, so ENFORCE would have made every
-    // signed-in member's security context unreadable. REPORT (the shipped default) would have
-    // named them; this case makes sure it never has to.
     OidcIdToken token = decodedIdToken(Instant.parse("2026-09-23T10:00:00Z"));
 
     Object back = enforcing.deserialize(enforcing.serialize(new ArrayList<>(List.of(token))));
@@ -182,10 +161,6 @@ class SessionTypeAllowListTest {
 
   @Test
   void theTokenResponsesOrderedMapIsReadUnderEnforce() {
-    // The second 2026-09-23 gap: on a real Keycloak login the stored authorized client carries a
-    // JSON object the Nimbus OAuth 2.0 SDK parsed into its OrderedJSONObject, written with a type
-    // id. Refused under ENFORCE it dropped AUTHORIZED_CLIENTS on every request and the E2E stack's
-    // login looped until the browser gave up (ERR_TOO_MANY_REDIRECTS).
     com.nimbusds.oauth2.sdk.util.OrderedJSONObject parsed =
         new com.nimbusds.oauth2.sdk.util.OrderedJSONObject();
     parsed.put("session_state", "e2e");
@@ -228,8 +203,6 @@ class SessionTypeAllowListTest {
 
   @Test
   void theSameGadget_isStillReadUnderReportAndOff() {
-    // REPORT is what a merge deploys: it must read exactly what the frontend read before, gadget
-    // and all, or the first deploy would already be the enforcement it is meant to precede.
     byte[] written = permissive.serialize(new ArrayList<>(List.of(new GadgetLikeBean())));
     List<String> reported = new ArrayList<>();
     RedisSerializer<Object> reporting =
@@ -246,8 +219,6 @@ class SessionTypeAllowListTest {
 
   @Test
   void aJdkSubpackageIsNotCoveredByTheJdkEntry() {
-    // java.util.* means the direct members. A concurrent map is harmless, which is exactly why it
-    // is the probe: the refusal proves the pattern's boundary, not the class's danger.
     Map<String, String> concurrent = new ConcurrentHashMap<>(Map.of("k", "v"));
     byte[] written = permissive.serialize(concurrent);
 
@@ -401,13 +372,11 @@ class SessionTypeAllowListTest {
   }
 
   /**
-   * An ID token exactly as a real login produces it: signed, decoded by Nimbus, and run through
-   * Spring's default OIDC claim-type conversion — so its claims carry the runtime types production
-   * stores ({@code URL}, {@code Instant}, {@code Long}, Nimbus's {@code LinkedTreeMap}), not the
-   * ones a hand-built map would.
+   * Builds an ID token as a real login produces it: signed, decoded by Nimbus and converted with
+   * Spring's default OIDC claim types.
    *
-   * @param now the issue time.
-   * @return the decoded token.
+   * @param now the issue time
+   * @return the decoded token
    */
   private static OidcIdToken decodedIdToken(Instant now) {
     try {
@@ -431,10 +400,6 @@ class SessionTypeAllowListTest {
           new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test").build(), claims);
       jwt.sign(new RSASSASigner(key));
       NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(key.toRSAPublicKey()).build();
-      // The issue time is fixed so the sample is reproducible, which makes the token expired on
-      // any clock past it: the decoder's default timestamp validator turned this test red from
-      // five minutes after the fixed instant on. The test is about the claims' runtime types,
-      // not about token validity, so the decode validates nothing.
       decoder.setJwtValidator(token -> OAuth2TokenValidatorResult.success());
       decoder.setClaimSetConverter(
           new MappedJwtClaimSetConverter(
@@ -537,16 +502,8 @@ class SessionTypeAllowListTest {
     flash.put("importRowIssues", rowIssues);
     flash.put("errorToast", "error.inventory.save");
     flash.put("showItemModal", true);
-    // AdminSyncReportsPageController flashes a count, which may be a Long: a final type in an
-    // Object slot, written as ["java.lang.Long", 3].
     flash.put("deletedCount", 3L);
     flash.startExpirationPeriod(180);
-    // A flash map carrying a form's BindingResult is unreadable under EVERY validator:
-    // BeanPropertyBindingResult has no creator Jackson can use (InvalidDefinitionException), so
-    // the whole flash list is dropped on the redirect's GET. Since 2026-09-23 no controller flashes
-    // one (FlashAttributeTypesTest; the admin personal-inventory form was the last and re-renders
-    // inline now). It stays in the sample because it is still what the session would hold if that
-    // rule broke, and the parity check must keep treating it identically under every mode.
     FlashMap flashWithErrors = new FlashMap();
     flashWithErrors.setTargetRequestPath("/inventory");
     flashWithErrors.put("inventoryForm", form);
@@ -562,9 +519,6 @@ class SessionTypeAllowListTest {
     session.put("flashMaps", new ArrayList<>(List.of(flash)));
     session.put("flashMapsWithErrors", new ArrayList<>(List.of(flashWithErrors)));
     session.put("rolesSyncedAt", now.toEpochMilli());
-    // Not an attribute but read through the same serializer: the payload Spring Session publishes
-    // on basetool:session:event:0:created:<id> and every frontend reads back to raise
-    // SessionCreatedEvent (the active-sessions gauge). Its timestamps are Longs inside a HashMap.
     Map<String, Object> createdEvent = new HashMap<>();
     createdEvent.put("creationTime", now.toEpochMilli());
     createdEvent.put("lastAccessedTime", now.toEpochMilli());

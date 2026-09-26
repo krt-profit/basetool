@@ -70,9 +70,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Unit tests of the refinery screenshot import draft building (#434): the §7.3 material-matching
- * stages, the §5 skip / un-quoted / checksum rules and the order-level field mapping — all against
- * mocked repositories with the real fuzzy matcher and real MapStruct mappers.
+ * Unit tests of the refinery screenshot import draft: material matching, the skip, un-quoted and
+ * checksum rules, and the order field mapping, with the real fuzzy matcher and mappers.
  */
 @ExtendWith(MockitoExtension.class)
 class RefineryImportServiceTest {
@@ -159,14 +158,10 @@ class RefineryImportServiceTest {
             userMapper);
   }
 
-  // ─── envelope validation ──────────────────────────────────────────────────
-
   @Test
   void buildDraft_rejectsUnsupportedSchemaVersion() {
-    // Given
     RefineryExtractDto extract = extract(2, setupOrder(List.of(quotedGood(0, "STILERON (ORE)"))));
 
-    // When / Then
     assertThatThrownBy(() -> service.buildDraft(extract, CALLER_ID))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("error.refineryImport.unsupportedSchemaVersion");
@@ -174,13 +169,11 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_rejectsProcessingPanel() {
-    // Given
     RefineryExtractOrderDto order =
         new RefineryExtractOrderDto(
             "PROCESSING", true, 0.9, null, null, null, null, null, null, null, null, List.of());
     RefineryExtractDto extract = extract(1, order);
 
-    // When / Then
     assertThatThrownBy(() -> service.buildDraft(extract, CALLER_ID))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("error.refineryImport.unsupportedPanelType");
@@ -188,28 +181,21 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_flagsMultipleOrdersAsTruncatedInfo() {
-    // Given
     RefineryExtractOrderDto first = setupOrder(List.of(quotedGood(0, "STILERON (ORE)")));
     RefineryExtractOrderDto second = setupOrder(List.of(quotedGood(0, "LINDINIUM (ORE)")));
 
-    // When
     RefineryImportDraftDto draft = service.buildDraft(extract(1, first, second), CALLER_ID);
 
-    // Then
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.MULTIPLE_ORDERS_TRUNCATED);
     assertThat(issue.severity()).isEqualTo(ImportIssueSeverity.INFO);
     assertThat(draft.order().goods()).hasSize(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().name()).isEqualTo("Stileron (Raw)");
   }
 
-  // ─── material matching stages (§7.3) ──────────────────────────────────────
-
   @Test
   void buildDraft_matchesOreSuffixAgainstRawSuffixViaCanonicalFold() {
-    // Given — master data says "Stileron (Raw)", the screen says "STILERON (ORE)"
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "STILERON (ORE)"));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id()).isEqualTo(stileron.getId());
     assertThat(issues(draft, ImportIssueCode.UNMATCHED_MATERIAL)).isEmpty();
@@ -218,26 +204,21 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_matchesCaseInsensitively() {
-    // Given
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "stileron (raw)"));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(1);
   }
 
   @Test
   void buildDraft_matchesViaRefineryScreenAlias() {
-    // Given — a name no canonical fold can place, but an admin curated an alias for it
     lenient()
         .when(
             aliasService.resolveMaterialByAlias(
                 MaterialExternalAliasSource.REFINERY_SCREEN, "SHINY ROCKS"))
         .thenReturn(lindinium);
 
-    // When
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "SHINY ROCKS"));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id()).isEqualTo(lindinium.getId());
     verify(aliasService)
@@ -246,17 +227,14 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_ignoresAliasTargetingNonCandidateMaterial() {
-    // Given — an admin mis-curated an alias onto a REFINED material the create path rejects
     lenient()
         .when(
             aliasService.resolveMaterialByAlias(
                 MaterialExternalAliasSource.REFINERY_SCREEN, "WEIRD STUFF"))
         .thenReturn(stileronRefined);
 
-    // When
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "WEIRD STUFF"));
 
-    // Then — the alias stage must not bypass the candidate gate; the row stays unmatched
     assertThat(draft.goodsMatched()).isZero();
     assertThat(draft.order().goods().getFirst().inputMaterial()).isNull();
     assertThat(issues(draft, ImportIssueCode.UNMATCHED_MATERIAL)).hasSize(1);
@@ -264,10 +242,8 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_matchesGameUiTruncatedNameViaUniqueSuffix() {
-    // Given — the game UI clipped "…Construction Salvage" to "UCTION SALVAGE" (golden set)
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id())
         .isEqualTo(constructionSalvage.getId());
@@ -275,9 +251,6 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_matchesTruncatedNameViaAliasContainmentAnchor() {
-    // Given — the catalogue names it "Construction Material Salvage" (UEX spelling), the game UI
-    // shows "Construction Salvage" and clips it to "UCTION SALVAGE"; the master name does not
-    // contain the fragment, but one curated alias of the on-screen spelling does
     Material constructionMaterialSalvage =
         material("Construction Material Salvage", MaterialType.RAW, false);
     lenient()
@@ -287,10 +260,8 @@ class RefineryImportServiceTest {
         .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
         .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", constructionMaterialSalvage)));
 
-    // When
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
 
-    // Then — a deterministic hit, not a fuzzy one
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id())
         .isEqualTo(constructionMaterialSalvage.getId());
@@ -300,7 +271,6 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_matchesBothSideTruncatedNameViaAliasContainmentAnchor() {
-    // Given — clipping on both ends still yields a contiguous fragment of the alias name
     Material constructionMaterialSalvage =
         material("Construction Material Salvage", MaterialType.RAW, false);
     lenient()
@@ -310,10 +280,8 @@ class RefineryImportServiceTest {
         .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
         .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", constructionMaterialSalvage)));
 
-    // When
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALV"));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id())
         .isEqualTo(constructionMaterialSalvage.getId());
@@ -321,16 +289,12 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_countsNameAndAliasAnchorOfSameMaterialAsOneHit() {
-    // Given — the fragment is contained in the candidate's own name AND in an alias pointing at
-    // the same material; uniqueness is judged per material, so this stays a single hit
     lenient()
         .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
         .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", constructionSalvage)));
 
-    // When
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id())
         .isEqualTo(constructionSalvage.getId());
@@ -338,8 +302,6 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_leavesAmbiguousTruncationAcrossNameAndAliasAnchorsUnmatched() {
-    // Given — the fragment hits the candidate "Construction Salvage" directly AND an alias
-    // pointing at a different material; the union has two materials, so no deterministic match
     Material constructionMaterialSalvage =
         material("Construction Material Salvage", MaterialType.RAW, false);
     lenient()
@@ -351,10 +313,8 @@ class RefineryImportServiceTest {
         .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
         .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", constructionMaterialSalvage)));
 
-    // When
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
 
-    // Then — falls through to fuzzy, which stays below the accept threshold here
     assertThat(draft.goodsMatched()).isZero();
     assertThat(draft.order().goods().getFirst().inputMaterial()).isNull();
     assertThat(issues(draft, ImportIssueCode.UNMATCHED_MATERIAL)).hasSize(1);
@@ -362,8 +322,6 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_ignoresAliasAnchorTargetingNonCandidateMaterial() {
-    // Given — the only containment anchor is an alias mis-curated onto a REFINED material; the
-    // truncation stage must honour the create-path gate just like the exact-alias stage
     lenient()
         .when(materialRepository.findRefineryInputCandidates(MaterialType.RAW))
         .thenReturn(List.of(stileron, lindinium, aluminum));
@@ -371,10 +329,8 @@ class RefineryImportServiceTest {
         .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
         .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", stileronRefined)));
 
-    // When
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
 
-    // Then
     assertThat(draft.goodsMatched()).isZero();
     assertThat(draft.order().goods().getFirst().inputMaterial()).isNull();
     assertThat(issues(draft, ImportIssueCode.UNMATCHED_MATERIAL)).hasSize(1);
@@ -382,10 +338,8 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_matchesManualRawMaterialCandidate() {
-    // Given — isManualRawMaterial materials pass the create-path gate even when not type RAW
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "QUANTAINIUM"));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id())
         .isEqualTo(quantainium.getId());
@@ -394,10 +348,8 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_acceptsFuzzyMatchAboveThresholdButFlagsIt() {
-    // Given — one-character drift on a ten-character name scores exactly 0.9
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "LINDINIUMM (ORE)"));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id()).isEqualTo(lindinium.getId());
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.LOW_CONFIDENCE_MATERIAL);
@@ -409,10 +361,8 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_leavesFuzzyBelowThresholdUnmatchedWithSuggestions() {
-    // Given — "ALUMINIUM" vs "Aluminum" scores ~0.889, below the 0.9 accept threshold
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "ALUMINIUM (ORE)"));
 
-    // Then
     assertThat(draft.goodsMatched()).isZero();
     assertThat(draft.order().goods().getFirst().inputMaterial()).isNull();
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.UNMATCHED_MATERIAL);
@@ -424,10 +374,8 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_leavesGarbageUnmatchedWithoutSuggestions() {
-    // Given
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "XQZWV"));
 
-    // Then
     assertThat(draft.goodsMatched()).isZero();
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.UNMATCHED_MATERIAL);
     assertThat(issue.suggestions()).isNull();
@@ -435,7 +383,6 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_preservesDuplicateMaterialRowsInRowIndexOrder() {
-    // Given — 4× LINDINIUM at different qualities is a normal real-world order (golden set)
     RefineryImportDraftDto draft =
         draftFor(
             good(3, "LINDINIUM (ORE)", 729, 200, 90, true),
@@ -443,7 +390,6 @@ class RefineryImportServiceTest {
             good(2, "LINDINIUM (ORE)", 618, 500, 230, true),
             good(1, "LINDINIUM (ORE)", 585, 300, 140, true));
 
-    // Then
     assertThat(draft.goodsMatched()).isEqualTo(4);
     assertThat(draft.order().goods()).hasSize(4);
     assertThat(draft.order().goods().stream().map(g -> g.quality()).toList())
@@ -452,15 +398,11 @@ class RefineryImportServiceTest {
         .allSatisfy(g -> assertThat(g.inputMaterial().id()).isEqualTo(lindinium.getId()));
   }
 
-  // ─── skip rules & un-quoted handling (§5) ─────────────────────────────────
-
   @Test
   void buildDraft_skipsRefineOffRowAsInfo() {
-    // Given — INERT MATERIALS row: refine OFF
     RefineryImportDraftDto draft =
         draftFor(quotedGood(0, "STILERON (ORE)"), good(1, "INERT MATERIALS", 0, 5449, 0, false));
 
-    // Then
     assertThat(draft.order().goods()).hasSize(1);
     assertThat(draft.rowsSkipped()).isEqualTo(1);
     assertThat(draft.goodsTotal()).isEqualTo(2);
@@ -471,10 +413,8 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_skipsZeroQuantityRowAsWarning() {
-    // Given
     RefineryImportDraftDto draft = draftFor(good(0, "STILERON (ORE)", 618, 0, 5, true));
 
-    // Then
     assertThat(draft.order().goods()).isEmpty();
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.SKIPPED_ZERO_QTY);
     assertThat(issue.severity()).isEqualTo(ImportIssueSeverity.WARNING);
@@ -482,11 +422,9 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_reportsUnquotedRowDistinctFromZeroQty() {
-    // Given — YIELD read as "--" (null) on one row, the other is quoted
     RefineryImportDraftDto draft =
         draftFor(good(0, "STILERON (ORE)", 618, 957, null, true), quotedGood(1, "LINDINIUM (ORE)"));
 
-    // Then
     assertThat(draft.order().goods()).hasSize(1);
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.UNQUOTED_ROW);
     assertThat(issue.severity()).isEqualTo(ImportIssueSeverity.WARNING);
@@ -496,13 +434,11 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_flagsAllUnquotedRowsAsBlockingUnquotedOrder() {
-    // Given — every YIELD cell is "--": captured before GET QUOTE
     RefineryImportDraftDto draft =
         draftFor(
             good(0, "STILERON (ORE)", 618, 957, null, true),
             good(1, "LINDINIUM (ORE)", 385, 300, null, true));
 
-    // Then
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.UNQUOTED_ORDER);
     assertThat(issue.severity()).isEqualTo(ImportIssueSeverity.BLOCKING);
     assertThat(draft.order().goods()).isEmpty();
@@ -511,7 +447,6 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_honoursProducerQuotedFlagForUnquotedOrder() {
-    // Given — the producer marked the capture un-quoted even though rows carry numbers
     RefineryExtractOrderDto order =
         new RefineryExtractOrderDto(
             "SETUP",
@@ -527,23 +462,16 @@ class RefineryImportServiceTest {
             null,
             List.of(quotedGood(0, "STILERON (ORE)")));
 
-    // When
     RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
 
-    // Then
     assertThat(issues(draft, ImportIssueCode.UNQUOTED_ORDER)).hasSize(1);
   }
 
-  // ─── header-total checksum (§5) ───────────────────────────────────────────
-
   @Test
   void buildDraft_flagsSumMismatchWhenRefineOnRowsExceedToRefineTotal() {
-    // Given — refine-ON qty 957 vs TO REFINE 800: exceeds the header beyond the ±1-per-row
-    // tolerance (2 rows) — a mis-read quantity or a duplicated capture
     RefineryImportDraftDto draft =
         service.buildDraft(extract(1, headerOrder(9999L, 800L)), CALLER_ID);
 
-    // Then
     ImportIssueDto mismatch = onlyIssue(draft, ImportIssueCode.SUM_MISMATCH);
     assertThat(mismatch.field()).isEqualTo("rawToRefineTotal");
     assertThat(mismatch.rawValue()).isEqualTo("800 != 957");
@@ -551,35 +479,26 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_flagsSumMismatchWhenSingleRowExceedsToRefineTotal() {
-    // Given — TO REFINE 955: the sum (957) stays within the 2-row tolerance, but the single
-    // refine-ON row (957) alone exceeds the header by more than 1
     RefineryImportDraftDto draft =
         service.buildDraft(extract(1, headerOrder(null, 955L)), CALLER_ID);
 
-    // Then
     assertThat(onlyIssue(draft, ImportIssueCode.SUM_MISMATCH).field())
         .isEqualTo("rawToRefineTotal");
   }
 
   @Test
   void buildDraft_acceptsToRefineShortfallFromScrolledOutRows() {
-    // Given — TO REFINE 5000 vs visible refine-ON qty 957: the list is a scrolling viewport,
-    // a shortfall means scrolled-out rows and is never flagged (one-sided check)
     RefineryImportDraftDto draft =
         service.buildDraft(extract(1, headerOrder(null, 5000L)), CALLER_ID);
 
-    // Then
     assertThat(issues(draft, ImportIssueCode.SUM_MISMATCH)).isEmpty();
   }
 
   @Test
   void buildDraft_ignoresInManifestTotalEvenWhenItExcludesInertRows() {
-    // Given — the 2026-06 field sample shape: IN MANIFEST (957) excludes the inert row, the
-    // all-row sum is 6406; IN MANIFEST is never validated, TO REFINE reconciles exactly
     RefineryImportDraftDto draft =
         service.buildDraft(extract(1, headerOrder(957L, 957L)), CALLER_ID);
 
-    // Then
     assertThat(issues(draft, ImportIssueCode.SUM_MISMATCH)).isEmpty();
   }
 
@@ -600,14 +519,10 @@ class RefineryImportServiceTest {
         List.of(quotedGood(0, "STILERON (ORE)"), good(1, "INERT MATERIALS", 0, 5449, 0, false)));
   }
 
-  // ─── per-good field mapping (§7.2) ────────────────────────────────────────
-
   @Test
   void buildDraft_keepsOutOfRangeQualityButWarns() {
-    // Given
     RefineryImportDraftDto draft = draftFor(good(0, "STILERON (ORE)", 1500, 957, 448, true));
 
-    // Then
     assertThat(draft.order().goods().getFirst().quality()).isEqualTo(1500);
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.OUT_OF_RANGE_QUALITY);
     assertThat(issue.field()).isEqualTo("goods[0].quality");
@@ -615,20 +530,16 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_defaultsNullQualityToZero() {
-    // Given
     RefineryImportDraftDto draft = draftFor(good(0, "STILERON (ORE)", null, 957, 448, true));
 
-    // Then
     assertThat(draft.order().goods().getFirst().quality()).isZero();
     assertThat(issues(draft, ImportIssueCode.OUT_OF_RANGE_QUALITY)).isEmpty();
   }
 
   @Test
   void buildDraft_derivesOutputMaterialFromRefinedMaterialLink() {
-    // Given
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "STILERON (ORE)"));
 
-    // Then
     assertThat(draft.order().goods().getFirst().outputMaterial().id())
         .isEqualTo(stileronRefined.getId());
     assertThat(issues(draft, ImportIssueCode.NO_REFINED_MATERIAL)).isEmpty();
@@ -636,23 +547,17 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_reportsMissingRefinedMaterialLinkAsInfo() {
-    // Given — Lindinium has no admin-curated refinedMaterial
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "LINDINIUM (ORE)"));
 
-    // Then
     assertThat(draft.order().goods().getFirst().outputMaterial()).isNull();
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.NO_REFINED_MATERIAL);
     assertThat(issue.severity()).isEqualTo(ImportIssueSeverity.INFO);
     assertThat(issue.field()).isEqualTo("goods[0].outputMaterial");
-    // row-level issues carry the row's derived read confidence (REQ-REFINERY-009)
     assertThat(issue.confidence()).isEqualTo(0.95);
   }
 
-  // ─── order-level mapping (§7.1) ───────────────────────────────────────────
-
   @Test
   void buildDraft_mapsOrderLevelFieldsAndDefaults() {
-    // Given
     RefineryExtractOrderDto order =
         new RefineryExtractOrderDto(
             "SETUP",
@@ -668,10 +573,8 @@ class RefineryImportServiceTest {
             null,
             List.of(quotedGood(0, "STILERON (ORE)")));
 
-    // When
     RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
 
-    // Then
     assertThat(draft.order().location().id()).isEqualTo(levski.getId());
     assertThat(draft.order().refiningMethod().id()).isEqualTo(ferronExchange.getId());
     assertThat(draft.order().expenses()).isEqualTo(48928.0);
@@ -686,8 +589,6 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_recoversTheVlmMethodAutocorrect() {
-    // Given — the terminal read "DINYX SOLVATION", the VLM's autocorrect of the game's
-    // "DINYX SOLVENTATION"; the closed-enum nearest-match must resolve it, not flag it unresolved.
     RefiningMethod dinyx = refiningMethod("Dinyx Solventation");
     Mockito.when(refiningMethodRepository.findAll()).thenReturn(List.of(dinyx, ferronExchange));
     RefineryExtractOrderDto order =
@@ -705,18 +606,14 @@ class RefineryImportServiceTest {
             null,
             List.of(quotedGood(0, "STILERON (ORE)")));
 
-    // When
     RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
 
-    // Then
     assertThat(draft.order().refiningMethod().id()).isEqualTo(dinyx.getId());
     assertThat(issues(draft, ImportIssueCode.UNRESOLVED_METHOD)).isEmpty();
   }
 
   @Test
   void buildDraft_derivesStartedAtFromTheLatestCapture() {
-    // Given — a scrolled three-capture order; the LAST capture marks the order start
-    // (REQ-REFINERY-017), and an image without a capture time must not disturb the max
     RefineryExtractOrderDto order =
         setupOrder(
             List.of(quotedGood(0, "STILERON (ORE)")),
@@ -725,35 +622,27 @@ class RefineryImportServiceTest {
                 image("b_lower.png", Instant.parse("2026-06-01T19:39:01Z")),
                 image("c_pasted.png", null)));
 
-    // When
     RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
 
-    // Then
     assertThat(draft.order().startedAt()).isEqualTo(Instant.parse("2026-06-01T19:39:01Z"));
   }
 
   @Test
   void buildDraft_leavesStartedAtNullWhenNoCaptureTimeIsKnown() {
-    // Given — an older extractor: source images without the additive capturedAt field
     RefineryExtractOrderDto order =
         setupOrder(List.of(quotedGood(0, "STILERON (ORE)")), List.of(image("a_upper.png", null)));
 
-    // When
     RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
 
-    // Then — the create flow keeps its "now" default at save time
     assertThat(draft.order().startedAt()).isNull();
   }
 
   @Test
   void buildDraft_flagsMissingLocationAndMethodForPreCroppedInput() {
-    // Given — pre-cropped panel input never contains the terminal header
     RefineryExtractOrderDto order = setupOrder(List.of(quotedGood(0, "STILERON (ORE)")));
 
-    // When
     RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
 
-    // Then
     assertThat(draft.order().location()).isNull();
     assertThat(draft.order().refiningMethod()).isNull();
     assertThat(onlyIssue(draft, ImportIssueCode.UNRESOLVED_LOCATION).severity())
@@ -764,20 +653,15 @@ class RefineryImportServiceTest {
 
   @Test
   void buildDraft_leavesOwnerNullWhenCallerUnknown() {
-    // Given
     UUID strangerId = UUID.randomUUID();
     lenient().when(userRepository.findPlainById(strangerId)).thenReturn(Optional.empty());
 
-    // When
     RefineryImportDraftDto draft =
         service.buildDraft(
             extract(1, setupOrder(List.of(quotedGood(0, "STILERON (ORE)")))), strangerId);
 
-    // Then
     assertThat(draft.order().owner()).isNull();
   }
-
-  // ─── standalone matchers ──────────────────────────────────────────────────
 
   @Test
   void matchMethod_isCaseInsensitiveAndNullSafe() {
@@ -788,19 +672,13 @@ class RefineryImportServiceTest {
 
   @Test
   void matchMethod_snapsAMisReadToTheClosedEnumButRejectsNonMethodText() {
-    // The VLM autocorrects the game's "DINYX SOLVENTATION" to the real word and emits
-    // "DINYX SOLVATION" (PHASE0 method taxonomy); no exact lookup resolves it, so the closed-enum
-    // nearest-match must recover the intended method.
     RefiningMethod dinyx = refiningMethod("Dinyx Solventation");
     RefiningMethod electro = refiningMethod("Electrostarolysis");
     Mockito.when(refiningMethodRepository.findAll())
         .thenReturn(List.of(dinyx, electro, ferronExchange));
 
-    // Stage 3 (fuzzy nearest-match over the nine distinct methods) recovers the autocorrect.
     assertThat(service.matchMethod("DINYX SOLVATION")).contains(dinyx);
-    // Stage 2 (canonical fold) resolves spacing / punctuation drift before the fuzzy stage.
     assertThat(service.matchMethod("ferron-exchange")).contains(ferronExchange);
-    // Non-method panel text peaks below the accept threshold and stays unresolved (no wrong snap).
     assertThat(service.matchMethod("PROCESSING SELECTION")).isEmpty();
   }
 
@@ -813,16 +691,12 @@ class RefineryImportServiceTest {
 
   @Test
   void matchRefineryLocation_returnsEmptyWhenMultipleCandidatesShareTheFold() {
-    // Given — two refinery-equipped locations whose names both fold to the canonical core
-    // "levski" ("Levski" and "LEVSKI " differ only by case and trailing space)
     Location levskiDuplicate = new Location();
     levskiDuplicate.setId(UUID.randomUUID());
     levskiDuplicate.setName("LEVSKI ");
     Mockito.when(locationRepository.findLocationsWithRefinery())
         .thenReturn(List.of(levski, levskiDuplicate));
 
-    // When / Then — ambiguity (hits.size() != 1) yields no match rather than an arbitrary
-    // first-hit guess, so the draft is left unresolved for the user to correct
     assertThat(service.matchRefineryLocation("LEVSKI")).isEmpty();
   }
 
@@ -831,8 +705,6 @@ class RefineryImportServiceTest {
     assertThat(service.matchMaterial("STILERON (ORE)")).contains(stileron);
     assertThat(service.matchMaterial("XQZWV")).isEmpty();
   }
-
-  // ─── helpers ──────────────────────────────────────────────────────────────
 
   private RefineryImportDraftDto draftFor(RefineryExtractGoodDto... goods) {
     return service.buildDraft(extract(1, setupOrder(List.of(goods))), CALLER_ID);

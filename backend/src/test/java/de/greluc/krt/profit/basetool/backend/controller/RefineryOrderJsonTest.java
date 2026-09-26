@@ -29,8 +29,6 @@ import tools.jackson.databind.json.JsonMapper;
 public class RefineryOrderJsonTest {
   @Test
   public void testDeserialize() throws Exception {
-    // Mirror JacksonConfig: the app disables FAIL_ON_NULL_FOR_PRIMITIVES (Jackson 2 leniency) so an
-    // absent nested primitive such as LocationDto.hidden defaults to false instead of failing.
     JsonMapper mapper =
         JsonMapper.builder()
             .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, false)

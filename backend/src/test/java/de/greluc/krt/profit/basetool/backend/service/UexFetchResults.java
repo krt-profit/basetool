@@ -23,25 +23,12 @@ import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import java.util.List;
 
 /**
- * Builders for the {@link UexClient.FetchResult} envelopes the UEX sync-service tests stub onto
- * their mocked {@link UexClient}.
- *
- * <p>The client's list getters return the outcome record rather than a bare {@code List} since H6,
- * because a caller that only sees an empty list cannot tell an unchanged feed ({@code 304}) from a
- * broken one — and every sync service greeted both with the same alarming "no data" WARN. Stubbing
- * that record inline reads as {@code new UexClient.FetchResult<>(List.of(dto), false)} at every one
- * of the ~100 call sites, which buries the actual fixture behind ceremony and overruns the
- * 100-column limit; these two factories keep the stub about the data again.
- *
- * <p>Deliberately mirrors the private {@code fetched} / {@code unchanged} helpers {@code
- * UexItemSyncServiceTest} already grew for the same reason — that test keeps its own because its
- * varargs shape is tailored to the per-category walk.
+ * Factories for the {@link UexClient.FetchResult} envelopes that UEX sync-service tests stub onto a
+ * mocked {@link UexClient}.
  */
 final class UexFetchResults {
 
-  private UexFetchResults() {
-    // Test fixture holder — not instantiable.
-  }
+  private UexFetchResults() {}
 
   /**
    * Wraps rows as a normal {@code 200} outcome: the feed answered with content and is therefore

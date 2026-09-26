@@ -139,12 +139,12 @@ class MissionTimeTest {
             null,
             null,
             0L,
-            Collections.emptyList(), // steps
-            0L, // stepsVersion
-            Collections.emptyList(), // objectives
-            0L, // objectivesVersion
+            Collections.emptyList(),
+            0L,
+            Collections.emptyList(),
+            0L,
             null,
-            null); // meetingPoint
+            null);
 
     mockMvc
         .perform(
@@ -197,12 +197,12 @@ class MissionTimeTest {
             null,
             null,
             0L,
-            Collections.emptyList(), // steps
-            0L, // stepsVersion
-            Collections.emptyList(), // objectives
-            0L, // objectivesVersion
+            Collections.emptyList(),
+            0L,
+            Collections.emptyList(),
+            0L,
             null,
-            null); // meetingPoint
+            null);
 
     mockMvc
         .perform(
@@ -227,12 +227,10 @@ class MissionTimeTest {
 
   @Test
   void testParticipantTimeConstraints() throws Exception {
-    // Set Mission Start Time
     Instant missionStart = Instant.now().minus(2, java.time.temporal.ChronoUnit.HOURS);
     mission.setActualStartTime(missionStart);
     missionRepository.save(mission);
 
-    // Try to set participant start before mission start - now allowed
     UpdateParticipantRequest request =
         new UpdateParticipantRequest(
             null, null, null, null, missionStart.minus(1, ChronoUnit.HOURS), null, null, null, 0L);
@@ -247,9 +245,6 @@ class MissionTimeTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
-                        // Self update, and the mission gates ask for membership (REQ-SEC-007).
-                        // `default-roles-iri` grants KRT Member to every account, so a token
-                        // without it models an account shape that cannot occur.
                         .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -288,17 +283,14 @@ class MissionTimeTest {
 
   @Test
   void testAutoCloseParticipants() throws Exception {
-    // Mission running
     Instant missionStart = Instant.now().minus(5, ChronoUnit.HOURS).truncatedTo(ChronoUnit.MILLIS);
     mission.setActualStartTime(missionStart);
     missionRepository.save(mission);
 
-    // Participant active
     MissionParticipant p = mission.getParticipants().stream().findFirst().orElseThrow();
     p.setStartTime(missionStart.plus(1, ChronoUnit.HOURS));
     missionParticipantRepository.save(p);
 
-    // End Mission
     Instant missionEnd = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     MissionDto update =
         new MissionDto(
@@ -332,12 +324,12 @@ class MissionTimeTest {
             null,
             null,
             0L,
-            Collections.emptyList(), // steps
-            0L, // stepsVersion
-            Collections.emptyList(), // objectives
-            0L, // objectivesVersion
+            Collections.emptyList(),
+            0L,
+            Collections.emptyList(),
+            0L,
             null,
-            null); // meetingPoint
+            null);
 
     mockMvc
         .perform(
@@ -350,7 +342,6 @@ class MissionTimeTest {
                 .content(objectMapper.writeValueAsString(update)))
         .andExpect(status().isOk());
 
-    // Verify participant closed
     Mission updated = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant pUpdated = updated.getParticipants().stream().findFirst().orElseThrow();
     assertEquals(missionEnd, pUpdated.getEndTime());

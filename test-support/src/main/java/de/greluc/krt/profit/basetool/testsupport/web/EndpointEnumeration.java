@@ -35,26 +35,10 @@ import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * Asks the dispatcher for every mapping it knows and expands them into concrete calls.
+ * Enumerates every dispatcher mapping as concrete calls, shared by the backend and frontend
+ * anonymous-surface sweeps.
  *
- * <p><b>Why this is shared, and why that matters (#1804).</b> The backend's {@code
- * AnonymousSurfaceSweepTest} and the frontend's {@code AnonymousSurfaceSweepMvcTest} are worth
- * having for exactly one reason: they ask the dispatcher rather than asserting a list somebody
- * remembered to write. Until this class they each carried their own copy of this engine, differing
- * in one lambda parameter name. The 2026-09-06 review of the members-only change (#1803) found two
- * ways the enumeration can quietly stop covering something — an exclusion compared with {@code
- * startsWith} swallowed a neighbouring path, and an exemption list nothing verified could claim
- * more than the filters granted — and both had to be fixed in each copy separately. That is the
- * drift this class removes.
- *
- * <p><b>A defect here blinds both guards at once</b>, which is why it carries its own tests rather
- * than being covered only through its callers: a sweep that enumerates nothing passes every
- * assertion it makes.
- *
- * <p>The two sweeps keep everything else. Their {@code NOT_SWEPT} lists differ, their public-path
- * sets differ, and their questions differ — the backend asks "nothing answers a caller who is not a
- * member", the frontend asks "a navigation goes to the login and a background call is refused".
- * This class only enumerates.
+ * <p>Only enumerates; each sweep applies its own exclusions and assertions.
  */
 public final class EndpointEnumeration {
 
@@ -67,12 +51,8 @@ public final class EndpointEnumeration {
   private static final String NIL_UUID = "00000000-0000-4000-8000-000000000000";
 
   /**
-   * The mapping registry to read, named rather than resolved by type.
-   *
-   * <p>By type alone this is ambiguous in both applications: Actuator contributes a second {@code
-   * RequestMappingHandlerMapping} ({@code controllerEndpointHandlerMapping}) and the lookup fails.
-   * The application's own mappings are the subject of both sweeps — the actuator tree is gated by
-   * the management-port configuration, which neither application-connector context models.
+   * Bean name of the application's mapping registry, since lookup by type is ambiguous with
+   * Actuator.
    */
   private static final String MAPPING_BEAN = "requestMappingHandlerMapping";
 
@@ -82,15 +62,10 @@ public final class EndpointEnumeration {
   }
 
   /**
-   * Expands every mapping the dispatcher knows into concrete (verb, path) calls.
+   * Expands every dispatcher mapping into concrete (verb, path) calls, unfiltered.
    *
-   * <p>A mapping with no declared verb (rare, but legal) is issued as {@code GET}: it answers every
-   * verb, so the read is the one that would leak. A pattern that cannot be made concrete is dropped
-   * — see {@link #substituteVariables}.
-   *
-   * <p>Nothing is filtered here. A caller that wants to skip a subtree does so itself with {@link
-   * #isUnder}, because what belongs in a {@code NOT_SWEPT} list is a property of the question being
-   * asked, not of the enumeration.
+   * <p>A mapping without a declared verb is issued as {@code GET}; a pattern without a concrete
+   * spelling is dropped (see {@link #substituteVariables}).
    *
    * @param context the web application context whose dispatcher to read
    * @return every call to sweep, deduplicated and in a stable order
@@ -118,22 +93,10 @@ public final class EndpointEnumeration {
   }
 
   /**
-   * Every path pattern the dispatcher answers with the given verb, <b>unsubstituted</b>.
+   * Every path pattern the dispatcher answers with the given verb, unsubstituted.
    *
-   * <p>The counterpart to {@link #mappings}, and the difference is the whole reason it exists: that
-   * one hands back concrete paths ready for {@code MockMvc}, which is what a sweep that issues
-   * calls needs and which throws away whether the pattern had a variable at all. A caller that has
-   * to tell {@code /missions} from {@code /missions/{id}} cannot recover that from {@code
-   * /missions/00000000-0000-4000-8000-000000000000}, except by recognising the substitution values
-   * — a coupling to this class's internals that would break silently if they changed.
-   *
-   * <p>Unlike {@link #mappings}, a pattern that cannot be made concrete is <b>kept</b>: a caller
-   * asking what the dispatcher routes wants to hear about {@code /assets/**} even though no single
-   * spelling of it can be issued.
-   *
-   * <p>A mapping with no declared verb matches every verb and is therefore reported for whichever
-   * one is asked for, which is the same reading {@link #mappings} takes when it issues such a
-   * mapping as {@code GET}.
+   * <p>Unlike {@link #mappings}, patterns without a concrete spelling are kept; a mapping without a
+   * declared verb is reported for every verb.
    *
    * @param context the web application context whose dispatcher to read
    * @param verb the verb to report patterns for
@@ -169,10 +132,7 @@ public final class EndpointEnumeration {
   }
 
   /**
-   * The verbs one mapping answers.
-   *
-   * <p>A mapping with no declared verb (rare, but legal) answers every verb; it is reported as
-   * {@code GET}, because the read is the one that would leak.
+   * The verbs one mapping answers; a mapping without a declared verb is reported as {@code GET}.
    *
    * @param info the mapping to read
    * @return its verbs, never empty
@@ -187,19 +147,13 @@ public final class EndpointEnumeration {
   }
 
   /**
-   * Whether {@code path} is the given root or sits below it, compared segment by segment.
+   * Whether {@code path} is {@code root} or below it, compared segment by segment rather than by
+   * string prefix.
    *
-   * <p><b>Not {@code startsWith}, and that is the point.</b> A plain prefix test makes {@code
-   * /internal} swallow {@code /internal-facing} and {@code /error} swallow {@code /errors} —
-   * silently removing a neighbouring path from a sweep whose entire value is that it covers
-   * everything. That is one of the two defects the 2026-09-06 review found, in both copies of this
-   * engine at once.
-   *
-   * @param path the substituted mapping path, e.g. {@code /actuator/health} or {@code
-   *     /v3/api-docs.yaml}
-   * @param root a subtree root, written without a trailing slash
-   * @return {@code true} for the root itself and anything below it, {@code false} for a sibling
-   *     that merely shares its opening characters
+   * @param path the substituted mapping path, e.g. {@code /actuator/health}
+   * @param root a subtree root, without a trailing slash
+   * @return {@code true} for the root and anything below it, {@code false} for a sibling sharing
+   *     its opening characters
    */
   @Contract(pure = true)
   public static boolean isUnder(@NotNull String path, @NotNull String root) {
@@ -207,18 +161,11 @@ public final class EndpointEnumeration {
   }
 
   /**
-   * Replaces every {@code {name}} segment with a value the binder accepts.
-   *
-   * <p>A nil UUID for anything whose name reads like an id, {@code x} otherwise. A pattern carrying
-   * a wildcard ({@code **}) or a regex constraint is skipped: it has no single concrete spelling,
-   * and guessing one would assert a path the application never routes.
-   *
-   * <p>Package-private on purpose — it is an implementation detail of {@link #mappings}, and it is
-   * visible to this package's tests because its edge cases are where a silent gap in the sweep
-   * would come from.
+   * Replaces every {@code {name}} segment with a value the binder accepts: a nil UUID for id-like
+   * names, {@code x} otherwise.
    *
    * @param pattern the mapping's path pattern
-   * @return the concrete path, or {@code null} when the pattern cannot be made concrete
+   * @return the concrete path, or {@code null} when the pattern has a wildcard or regex constraint
    */
   @Contract(pure = true)
   static @Nullable String substituteVariables(@NotNull String pattern) {

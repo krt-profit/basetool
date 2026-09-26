@@ -127,7 +127,6 @@ class CityServiceCachingTest {
     cityService.getAllCities(pageable);
     cityService.getCity(alpha.getId());
     cityService.getCity(beta.getId());
-    // Sanity: cache primed
     assertNotNull(cache().get(pageable));
     assertNotNull(cache().get(alpha.getId()));
     assertNotNull(cache().get(beta.getId()));
@@ -174,12 +173,9 @@ class CityServiceCachingTest {
   void cacheMissesOnUnknownIdDoNotPoisonTheCacheWithNullEntries() {
     UUID unknownId = UUID.randomUUID();
 
-    // CityService.getCity throws NotFoundException on miss; the cache must NOT pick that up as a
-    // negative entry — CacheConfig.setAllowNullValues(false) plus the throw guarantee that.
     try {
       cityService.getCity(unknownId);
     } catch (Exception ignored) {
-      // expected — service throws NotFoundException for the unknown id
     }
 
     assertNull(

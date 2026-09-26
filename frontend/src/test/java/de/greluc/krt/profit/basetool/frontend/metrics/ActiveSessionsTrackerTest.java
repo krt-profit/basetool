@@ -26,9 +26,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link ActiveSessionsTracker}, which backs the {@code basetool_active_sessions}
- * gauge (#1158). The behaviour that matters for the {@code SsePushChannelDead} alert is that the
- * count is finite, never negative, and idempotent under the duplicate / out-of-order lifecycle
- * events the Redis-backed session store can deliver.
+ * gauge: the count stays finite, non-negative and idempotent under duplicate or out-of-order
+ * session events.
  */
 class ActiveSessionsTrackerTest {
 
@@ -64,8 +63,6 @@ class ActiveSessionsTrackerTest {
   void endIsIdempotentAndNeverGoesNegative() {
     tracker.onSessionStarted("s1");
 
-    // A session end delivered twice (a delete AND an expire event for the same session) must not
-    // drive the count below zero.
     tracker.onSessionEnded("s1");
     tracker.onSessionEnded("s1");
     tracker.onSessionEnded("never-tracked");
@@ -76,7 +73,6 @@ class ActiveSessionsTrackerTest {
   @Test
   void seedAddsPreExistingSessionsAndIsIdempotentWithLiveEvents() {
     tracker.seed(List.of("s1", "s2", "s3"));
-    // A create event for a session already present in the seed must not double-count it.
     tracker.onSessionStarted("s2");
 
     assertThat(tracker.count()).isEqualTo(3L);

@@ -63,17 +63,12 @@ public class AnnouncementService {
   }
 
   /**
-   * Returns the announcement the admin edit screen should load. Prefers the active record so an
-   * empty content does not produce a "blank screen" admin experience; falls back to the latest
-   * record overall (including blanks) so admins reuse the existing row across edits; finally
-   * creates an empty row on first use — saves accumulate-duplicate rows from an unfortunate race.
+   * Returns the announcement for the admin edit screen: the active record, else the latest record,
+   * else a newly created empty one.
    *
    * @return the admin-view announcement record, never {@code null}
    */
   public Announcement getAdminAnnouncement() {
-    // Try the latest active announcement first; fall back to the latest entry
-    // overall (even if its content is empty/null) so admins reuse the existing
-    // row instead of accumulating duplicates. As a last resort create one.
     return getPublicAnnouncement()
         .orElseGet(
             () ->
@@ -86,14 +81,12 @@ public class AnnouncementService {
   }
 
   /**
-   * Updates the shared announcement with the given content. {@code version} is the optimistic lock
-   * value from the form; {@code null} bypasses the check (used for first-time create).
+   * Updates the shared announcement's content.
    *
    * @param content new announcement body
-   * @param version expected current version, or {@code null} for unconditional save
+   * @param version expected current version, or {@code null} for an unconditional save
    * @return the persisted announcement
-   * @throws ObjectOptimisticLockingFailureException when the current row's version no longer
-   *     matches the supplied {@code version}
+   * @throws ObjectOptimisticLockingFailureException when the version no longer matches
    */
   @Transactional
   public Announcement updateAnnouncement(@NotNull String content, @Nullable Long version) {

@@ -41,14 +41,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for the Variante-C soak drop path (REQ-INV-027) against the real Postgres
- * test schema (Testcontainers + Flyway via the {@code test} profile): that the R2 allocation-drop
- * queries release an order's job-order slice while the entry itself survives in the Lager as
- * (partially) unassigned stock, with its amount intact.
- *
- * <p>The plain Mockito service tests cannot prove this: the bulk {@code DELETE} and the flush
- * ordering only exist on the real dialect. Each method is {@link Transactional} so the seeded rows
- * roll back and never pollute the shared Testcontainers database.
+ * Verifies against PostgreSQL that the allocation-drop queries release an order's job-order slice
+ * while the inventory entry and its amount survive (REQ-INV-027). Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")

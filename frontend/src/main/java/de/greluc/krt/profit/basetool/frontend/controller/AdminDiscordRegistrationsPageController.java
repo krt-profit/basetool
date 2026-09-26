@@ -50,17 +50,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Admin queue page for Discord registration approvals (epic #720, Track 1). Lists the pending
- * registrations and approves/rejects them in place ({@code krtFetch}, no reload, no native
- * dialogs), round-tripping through the backend {@code /api/v1/admin/registrations} surface.
- * Admin-only — class-level {@code @PreAuthorize("hasRole('ADMIN')")} mirrors the backend gate.
+ * Admin-only queue page for Discord registration approvals: lists pending registrations and
+ * approves, rejects, links or merges them in place via {@code /api/v1/admin/registrations}.
  *
- * <p>Approval grants no Basetool roles — after approval the admin seats roles/units via the
- * existing tooling (Track 1 keeps role assignment manual).
- *
- * <p>The page also renders the rejected registrations and can reopen one back into the queue
- * (REQ-SEC-034), so an erroneous rejection is recoverable from the UI instead of by a manual
- * database write.
+ * <p>Approval grants no Basetool roles. Rejected registrations are listed too and can be reopened
+ * (REQ-SEC-034).
  */
 @Controller
 @UsesLayoutModel
@@ -107,9 +101,6 @@ public class AdminDiscordRegistrationsPageController {
       model.addAttribute("error", "error.admin.discordRegistrations.load");
       model.addAttribute("registrations", List.of());
     }
-    // Read the rejected list under its own guard rather than inside the block above: it is the
-    // secondary surface, and a failure there (a backend that predates ?status=, say, during a
-    // rolling deploy) must not blank out the pending queue that is this page's primary job.
     model.addAttribute("rejected", loadRejected());
     return "admin/discord-registrations";
   }
@@ -135,12 +126,12 @@ public class AdminDiscordRegistrationsPageController {
   }
 
   /**
-   * Approves a pending registration in place (krtFetch). Relays a backend conflict as {@code
-   * problem+json} so the client surfaces the reload-confirm instead of silently overwriting.
+   * Approves a pending registration in place; a backend conflict is relayed as {@code
+   * problem+json}.
    *
    * @param id the registration to approve
-   * @param body the JSON-bound optimistic-lock version
-   * @return the updated registration on success, the relayed backend status on conflict/failure
+   * @param body the optimistic-lock version
+   * @return the updated registration, or the relayed backend status on conflict or failure
    */
   @ResponseBody
   @PostMapping(value = "/{id}/approve", headers = "X-Requested-With=XMLHttpRequest")
@@ -180,13 +171,11 @@ public class AdminDiscordRegistrationsPageController {
   }
 
   /**
-   * Reopens a rejected registration in place (krtFetch): the backend moves it back to {@code
-   * PENDING} and the row migrates from the rejected table into the queue without a reload
-   * (REQ-SEC-034).
+   * Reopens a rejected registration in place, moving it back to {@code PENDING} (REQ-SEC-034).
    *
    * @param id the rejected registration to reopen
-   * @param body the JSON-bound note + optimistic-lock version
-   * @return the now-pending registration on success, the relayed backend status on conflict/failure
+   * @param body the note and optimistic-lock version
+   * @return the now-pending registration, or the relayed backend status on conflict or failure
    */
   @ResponseBody
   @PostMapping(value = "/{id}/reopen", headers = "X-Requested-With=XMLHttpRequest")
@@ -204,16 +193,12 @@ public class AdminDiscordRegistrationsPageController {
   }
 
   /**
-   * Relays the account merge (REQ-SEC-045): move an older account's own data onto this
-   * registration.
-   *
-   * <p>The remedy for the queue's duplicate-callsign marker. Unlike the link relay beside it, a
-   * successful merge does <b>not</b> retire the row: the registration still has to be approved, and
-   * folding the two decisions together would make repairing the data imply admitting the member.
+   * Relays the account merge (REQ-SEC-045), moving an older account's data onto this registration.
+   * The registration stays in the queue and still needs approval.
    *
    * @param id the surviving registration
-   * @param body the JSON-bound source account id + optimistic-lock version
-   * @return the surviving account on success, the relayed backend status on conflict/failure
+   * @param body the source account id and optimistic-lock version
+   * @return the surviving account, or the relayed backend status on conflict or failure
    */
   @ResponseBody
   @PostMapping(value = "/{id}/merge", headers = "X-Requested-With=XMLHttpRequest")
@@ -231,13 +216,12 @@ public class AdminDiscordRegistrationsPageController {
   }
 
   /**
-   * Links a pending Discord registration onto an existing account in place (krtFetch), relaying a
-   * backend conflict as {@code problem+json} so the client surfaces the reload-confirm instead of
-   * silently overwriting (REQ-SEC-026).
+   * Links a pending registration onto an existing account in place (REQ-SEC-026); a backend
+   * conflict is relayed as {@code problem+json}.
    *
    * @param id the registration to link away
-   * @param body the JSON-bound target account id + optimistic-lock version
-   * @return the surviving account on success, the relayed backend status on conflict/failure
+   * @param body the target account id and optimistic-lock version
+   * @return the surviving account, or the relayed backend status on conflict or failure
    */
   @ResponseBody
   @PostMapping(value = "/{id}/link", headers = "X-Requested-With=XMLHttpRequest")

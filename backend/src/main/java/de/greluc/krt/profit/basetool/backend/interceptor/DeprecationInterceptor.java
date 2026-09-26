@@ -55,10 +55,8 @@ public class DeprecationInterceptor implements HandlerInterceptor {
           .withZone(ZoneOffset.UTC);
 
   /**
-   * Handler methods whose {@code @ApiDeprecation.sunset} value failed to parse, so the
-   * malformed-date WARN is emitted at most once per handler instead of on every request to that
-   * endpoint. {@code sunset()} is a compile-time constant, so a bad value would otherwise re-warn
-   * on every call.
+   * Handler methods whose {@code @ApiDeprecation.sunset} failed to parse, so the malformed-date
+   * WARN is emitted at most once per handler.
    */
   private final Set<Method> warnedBadSunset = ConcurrentHashMap.newKeySet();
 
@@ -85,8 +83,6 @@ public class DeprecationInterceptor implements HandlerInterceptor {
               LocalDate sunsetDate = LocalDate.parse(deprecation.sunset());
               response.addHeader("Sunset", HTTP_DATE_FORMATTER.format(sunsetDate.atStartOfDay()));
             } catch (DateTimeParseException e) {
-              // Warn at most once per handler: sunset() is a compile-time constant, so a malformed
-              // value would otherwise WARN on every request to this still-live deprecated endpoint.
               if (warnedBadSunset.add(handlerMethod.getMethod())) {
                 log.warn(
                     "Invalid sunset date format on {}: {}. Expected YYYY-MM-DD",

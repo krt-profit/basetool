@@ -23,20 +23,15 @@ import java.util.UUID;
 
 /**
  * One ordered-item line whose chosen blueprint no longer produces the ordered game item
- * (REQ-ORDERS-033). Produced by the integrity sweep's constructor-expression query, which joins the
- * line to its game item and blueprint and keeps only the rows where the blueprint's output item is
- * absent or different.
- *
- * <p>Carries only catalogue-derived names — never the order's user-entered {@code handle} — so the
- * sweep can log a row verbatim without leaking user free text into the log stream (REQ-OBS rule "no
- * names, emails or tokens").
+ * (REQ-ORDERS-033), found by the integrity sweep. Carries only catalogue-derived names, so it is
+ * safe to log.
  *
  * @param itemId the drifted {@code job_order_item} row
  * @param orderId the owning order's primary key
- * @param orderDisplayId the owning order's human-facing sequential number, for the operator log
+ * @param orderDisplayId the owning order's human-facing sequential number
  * @param orderedItemName the name of the game item the line orders
- * @param blueprintOutputName the blueprint's current output name — what it produces *now*
- * @param blueprintKey the blueprint's SC Wiki key, the stable handle for upstream investigation
+ * @param blueprintOutputName the blueprint's current output name
+ * @param blueprintKey the blueprint's SC Wiki key
  */
 public record JobOrderItemBlueprintDrift(
     UUID itemId,

@@ -20,15 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * A member raising an Art. 17 erasure request on their own profile (REQ-SEC-061).
+ * A member's Art. 17 erasure request on their own profile (REQ-SEC-061).
  *
- * <p>Deliberately minimal: no reason field. Art. 17 does not require the data subject to justify
- * the request, and a free-text field here would create one more store of personal data about
- * somebody who is asking to be forgotten.
- *
- * @param eraseHistory whether the member also asks for the handle snapshots that survive a deletion
- *     to be anonymised - both audit trails, the bank booking history, the booking requests and the
- *     two handover recipients. A <em>wish</em>: an admin weighs it against the legitimate interest
- *     in an auditable ledger and decides it deliberately.
+ * @param eraseHistory whether the member also wishes the surviving handle snapshots to be
+ *     anonymised; an admin decides this separately
  */
 public record CreateDeletionRequestRequest(boolean eraseHistory) {}

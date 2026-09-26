@@ -42,15 +42,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Admin view of who has and has not accepted the Terms of Use (REQ-SEC-028).
- *
- * <p>Exists because the consent gate is only as good as an operator's ability to see it working:
- * after a terms change every member is blocked until they accept, and without this page the only
- * observable difference between "nobody has logged in yet" and "the gate is broken and nobody can
- * accept" is a flat gauge. The list names the individuals still outstanding so the answer is
- * actionable rather than statistical.
- */
+/** Admin view of which users have and have not accepted the Terms of Use (REQ-SEC-028). */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/admin/terms")

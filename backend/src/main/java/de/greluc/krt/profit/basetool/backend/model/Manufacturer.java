@@ -34,11 +34,8 @@ import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 
 /**
- * Manufacturer JPA entity. The class-level {@code @BatchSize} batches the initialisation of lazy
- * {@code Manufacturer} proxies (Hibernate 6 honours it on the <em>target</em> entity for to-one
- * associations): the Lager item views project {@code GameItem.manufacturer} into every stack /
- * catalog reference row (REQ-INV-029), so without batching each distinct manufacturer proxy would
- * fire its own {@code SELECT} while a grouped page is mapped.
+ * Manufacturer JPA entity. Class-level {@code @BatchSize} batches the initialisation of lazy
+ * manufacturer proxies when Lager item views are mapped (REQ-INV-029).
  */
 @Entity
 @Getter
@@ -58,14 +55,9 @@ public class Manufacturer extends AbstractEntity<UUID> {
   private String name;
 
   /**
-   * Short display code (e.g. {@code "AEGS"}, {@code "Esperia"}). Deliberately <strong>not</strong>
-   * UNIQUE (dropped in {@code V158}): the UEX {@code /companies} sync derives it from each
-   * company's nickname, and UEX ships several distinct company records for the same brand that all
-   * reduce to one code (observed: {@code 87 "Esperia"} + {@code 278 "Esperia Incorporation"} →
-   * {@code "Esperia"}). The sync now <em>merges</em> those duplicates onto one row keyed by the
-   * shared abbreviation (ADR-0023); the brand's several UEX company ids live in {@link
-   * ManufacturerUexCompany}. Identity lives on {@link #uexCompanyId} / {@link #scwikiUuid} / {@link
-   * #name}, not on this label.
+   * Short display code (e.g. {@code "AEGS"}). Not unique: several UEX company records of one brand
+   * reduce to the same code and are merged onto one row (ADR-0023). Identity lives on {@link
+   * #uexCompanyId} / {@link #scwikiUuid} / {@link #name}.
    */
   @Column(nullable = false)
   private String abbreviation;
@@ -80,12 +72,9 @@ public class Manufacturer extends AbstractEntity<UUID> {
   private boolean hidden = false;
 
   /**
-   * The <em>canonical</em> UEX integer company id for this brand — the lowest id among the
-   * duplicate company records UEX ships for it (the feed is processed ascending, so the
-   * first/lowest claims the row). UNIQUE: it owns this row's display identity. The full set of UEX
-   * company ids a brand owns (canonical + duplicates) is mapped to this row by {@link
-   * ManufacturerUexCompany}; the item and vehicle syncs resolve through that alias table, not
-   * through this single column (ADR-0023).
+   * The canonical (lowest) UEX company id of this brand; unique. All of the brand's UEX company ids
+   * map to this row through {@link ManufacturerUexCompany}, which the syncs resolve against
+   * (ADR-0023).
    */
   @Column(name = "uex_company_id", unique = true)
   private Integer uexCompanyId;
@@ -105,11 +94,13 @@ public class Manufacturer extends AbstractEntity<UUID> {
   @Column(name = "industry")
   private String industry;
 
-  /** Whether UEX flags this company as an item manufacturer. {@code null} until R2 sync runs. */
+  /** Whether UEX flags this company as an item manufacturer; {@code null} until the first sync. */
   @Column(name = "is_item_manufacturer")
   private Boolean isItemManufacturer;
 
-  /** Whether UEX flags this company as a vehicle manufacturer. {@code null} until R2 sync runs. */
+  /**
+   * Whether UEX flags this company as a vehicle manufacturer; {@code null} until the first sync.
+   */
   @Column(name = "is_vehicle_manufacturer")
   private Boolean isVehicleManufacturer;
 
@@ -131,8 +122,6 @@ public class Manufacturer extends AbstractEntity<UUID> {
   /** Soft-delete marker mirroring {@link #uexDeletedAt} for the SC Wiki side. */
   @Column(name = "scwiki_deleted_at")
   private Instant scwikiDeletedAt;
-
-  // ───── KRT P4K Reader source lane (catalog import) ─────
 
   /**
    * DataForge {@code __ref} manufacturer GUID observed by the KRT P4K Reader import. Kept alongside

@@ -34,15 +34,9 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * Fail-open matrix for {@link DiscordGuildNicknameReader} (REQ-DATA-018), served by a throwaway
- * in-process HTTP server. Covers: nickname captured on HTTP 200; empty result when {@code nick} is
- * null / blank / absent; and the fail-open empties on a non-200 status, a malformed body and a
- * timeout — capturing a nickname must never throw, so a Discord hiccup can never break the login.
- * Also covers the two views of the member object: {@link
- * DiscordGuildNicknameReader#readGuildDisplayName} falling back to {@code user.global_name} (the
- * approval-queue label), and {@code extractNick} staying nick-only (the conservative precheck
- * candidate, parsed from the member object the membership gate already read). The pure {@code
- * extractNick} / {@code extractGuildDisplayName} parsing is checked directly too.
+ * Tests {@link DiscordGuildNicknameReader} against an in-process HTTP server (REQ-DATA-018):
+ * nickname capture, empty results for missing names, the fail-open cases, the global-name fallback
+ * of {@link DiscordGuildNicknameReader#readGuildDisplayName}, and the pure parsing helpers.
  */
 class DiscordGuildNicknameReaderTest {
 
@@ -123,7 +117,6 @@ class DiscordGuildNicknameReaderTest {
               writeResponse(exchange, 200, "{\"nick\":\"too slow\"}");
             });
     try {
-      // 300 ms request timeout against a 2 s server => fail open (empty), never throws.
       assertTrue(read(server, Duration.ofMillis(300)).isEmpty());
     } finally {
       server.stop(0);
@@ -142,7 +135,6 @@ class DiscordGuildNicknameReaderTest {
 
   @Test
   void readGuildDisplayName_fallsBackToGlobalNameWhenNickAbsent() throws IOException {
-    // The reported case: no per-guild nick, server name is the global name.
     HttpServer server =
         start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"ExamplePilot\"}}"));
     try {
@@ -165,8 +157,6 @@ class DiscordGuildNicknameReaderTest {
 
   @Test
   void extractNick_ignoresGlobalName_soThePrecheckStaysConservative() {
-    // extractNick (the precheck candidate) must NOT fall back to the global name — otherwise a
-    // common display name could trigger a false account-collision denial at first-broker login.
     assertTrue(
         DiscordGuildNicknameReader.extractNick(
                 "{\"nick\":null,\"user\":{\"global_name\":\"ExamplePilot\"}}")

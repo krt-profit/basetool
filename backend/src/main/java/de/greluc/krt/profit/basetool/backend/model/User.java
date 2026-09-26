@@ -81,37 +81,19 @@ public class User extends AbstractEntity<UUID> {
   private boolean inKeycloak = true;
 
   /**
-   * When the roster sync last observed this account <em>missing</em> from Keycloak, i.e. when
-   * {@link #inKeycloak} became {@code false} (V241, REQ-SEC-059, ADR-0182).
-   *
-   * <p>{@code null} means present, which is the state of every account in normal service. It is
-   * cleared again when the sync sees the account return, so a re-created account does not stay
-   * flagged as waiting.
-   *
-   * <p><b>Why this exists as its own column.</b> Deleting a member is two acts — remove the
-   * Keycloak account, then delete the local row — and the second is only offered once this flag has
-   * flipped. A forgotten second act leaves the e-mail address, handle, Discord snowflake and
-   * description in place indefinitely. The guard that notices needs the <em>age</em> of the oldest
-   * waiting row, and neither existing timestamp carries it: {@code createdAt} is when the account
-   * was created, and {@code updatedAt} is not even written by the flip (it is a bulk JPQL update,
-   * which skips the entity lifecycle) and moves on every unrelated profile edit.
-   *
-   * <p><b>A value equal to the V241 deploy time is a placeholder, not a measurement</b> — rows
-   * already flagged when the column shipped disappeared at an unrecorded moment, and that missing
-   * record is precisely the defect the column fixes.
+   * When the roster sync observed this account missing from Keycloak, i.e. when {@link #inKeycloak}
+   * became {@code false} (REQ-SEC-059); {@code null} while the account is present, and cleared when
+   * it returns. Its age lets a guard detect local rows left undeleted after the Keycloak account
+   * was removed.
    */
   @Nullable
   @Column(name = "keycloak_absent_since")
   private Instant keycloakAbsentSince;
 
   /**
-   * The Keycloak account's {@code enabled} flag as of the last roster sync (V230, ADR-0129).
-   *
-   * <p>Separate from {@link #inKeycloak}, which records whether the sync still <em>saw</em> the
-   * account at all. Presence and being enabled are different facts with different remedies, and
-   * only the acting-member liveness guard reads either: an ordinary caller needs a token, and a
-   * deleted or disabled account stops being issued one. Defaults to {@code true} so a row created
-   * before its first sync is not locked out by a flag nothing has written yet.
+   * The Keycloak account's {@code enabled} flag as of the last roster sync (ADR-0129), distinct
+   * from the presence flag {@link #inKeycloak}. Read only by the acting-member liveness guard;
+   * defaults to {@code true} so a row not yet synced is not locked out.
    */
   @Column(name = "enabled_in_keycloak", nullable = false)
   private boolean enabledInKeycloak = true;
@@ -121,12 +103,11 @@ public class User extends AbstractEntity<UUID> {
   private LocalDate joinDate;
 
   /**
-   * The user's personal default payout preference. Pre-fills the per-participant {@code
-   * payoutPreference} when this user signs up to a mission (see {@link
+   * The user's default payout preference, pre-filled into the participant's {@code
+   * payoutPreference} on mission sign-up (see {@link
    * de.greluc.krt.profit.basetool.backend.service.MissionService#addParticipant}). {@code null}
-   * means the user has expressed no explicit choice, in which case sign-up falls back to {@link
-   * PayoutPreference#PAYOUT}; the value is never auto-populated. Editing it is a forward-only
-   * default — it does not rewrite existing {@link MissionParticipant} rows. REQ-MISSION-002.
+   * means no choice, falling back to {@link PayoutPreference#PAYOUT}; changes never rewrite
+   * existing {@link MissionParticipant} rows (REQ-MISSION-002).
    */
   @Nullable
   @Enumerated(EnumType.STRING)
@@ -134,54 +115,38 @@ public class User extends AbstractEntity<UUID> {
   private PayoutPreference defaultPayoutPreference;
 
   /**
-   * Opt-in flag: when {@code true}, the user's owned {@link PersonalBlueprint} rows are counted in
-   * the leadership blueprint-availability overview and the item-order blueprint-coverage view for
-   * <em>every</em> org unit, not only the ones the user is a member of — so a Staffel member's
-   * blueprint can satisfy an SK order's coverage even across org-unit boundaries. Defaults to
-   * {@code false}, preserving the strict org-unit scoping for everyone who does not opt in. The
-   * widening is read-only and exposes the owner by display name only (never the {@code sub} or
-   * e-mail); the viewer-access gates are unchanged. REQ-INV-018 / ADR-0024.
+   * Opt-in flag: when {@code true}, the user's {@link PersonalBlueprint} rows count in the
+   * blueprint availability and coverage views of every org unit, not only their own. Read-only
+   * widening that exposes the owner by display name only (REQ-INV-018).
    */
   @Column(name = "share_blueprints_globally", nullable = false)
   private boolean shareBlueprintsGlobally = false;
 
   /**
-   * The user's linked Discord account id (a numeric snowflake, stored as text). Written by the
-   * Keycloak Discord identity-provider mapper into the {@code discord_user_id} token claim and
-   * persisted here on login, so a returning Discord user is recognised. {@code null} for users who
-   * only ever signed in with credentials; at most one {@link User} per Discord id (DB-unique). This
-   * column merely records the federation link — the guild + KRT-Mitglied membership gate itself
-   * lives in the Keycloak SPI, never here. Epic #720, Track 1 / REQ-DATA-006.
+   * The linked Discord account id (a numeric snowflake as text), persisted from the {@code
+   * discord_user_id} token claim on login; {@code null} for credential-only users and unique per
+   * user. Records the federation link only; the membership gate lives in the Keycloak SPI
+   * (REQ-DATA-006).
    */
   @Nullable
   @Column(name = "discord_user_id", unique = true)
   private String discordUserId;
 
   /**
-   * The user's per-guild Discord server nickname (the {@code nick} they carry inside the
-   * das-kartell guild), captured best-effort at each Discord login and surfaced to an admin in the
-   * Discord registration-approval queue so the decision can be tied to a recognisable in-server
-   * identity (REQ-DATA-018). Written from the {@code discord_guild_nickname} token claim, which the
-   * Keycloak Discord IdP fills from the guild-member call — Discord's plain profile has no
-   * nickname. {@code null} when the user set no server nickname, never logged in via Discord, or
-   * the optional capture mappers are not configured. Display-only: it grants nothing and is exposed
-   * only on the admin-only approval queue, never in any shared user DTO.
+   * The user's Discord server nickname in the das-kartell guild, captured best-effort from the
+   * {@code discord_guild_nickname} token claim at each Discord login and shown only in the admin
+   * registration-approval queue (REQ-DATA-018). {@code null} when unset or not captured; grants
+   * nothing.
    */
   @Nullable
   @Column(name = "discord_guild_nickname")
   private String discordGuildNickname;
 
   /**
-   * Account approval lifecycle (epic #720, Track 1, REQ-SEC-017 — fail-safe default). A brand-new
-   * non-admin registration is {@link ApprovalStatus#PENDING} (no authorities granted — only {@code
-   * ROLE_PENDING_APPROVAL}) until an admin approves, whether it arrived via Discord or credentials;
-   * Keycloak {@code ADMIN}-realm-role holders and all pre-existing (V173-backfilled) rows are
-   * {@link ApprovalStatus#ACTIVE}. The field-level default stays {@code ACTIVE} so the
-   * admin-bootstrap path and direct test/seed construction yield an active member, but both
-   * creation paths in {@link UserService} ({@code syncUser(Jwt)} and {@code
-   * syncUser(KeycloakUserDto)}) explicitly set {@code PENDING} for every new non-admin — so the
-   * PENDING decision never depends on detecting the Discord {@code discord_user_id} claim (a
-   * missing claim mapper can no longer let a federated login skip approval).
+   * Account approval lifecycle (REQ-SEC-017). Every new non-admin registration is set to {@link
+   * ApprovalStatus#PENDING} by {@link UserService} and holds only {@code ROLE_PENDING_APPROVAL}
+   * until an admin approves; the field default {@link ApprovalStatus#ACTIVE} covers admin bootstrap
+   * and direct construction.
    */
   @Enumerated(EnumType.STRING)
   @Column(name = "approval_status", nullable = false)
@@ -213,10 +178,6 @@ public class User extends AbstractEntity<UUID> {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;
   }
 
-  // @ToString.Exclude on the LAZY @ManyToMany so a logged User outside of a
-  // Hibernate session does not trigger LazyInitializationException — and so
-  // toString() does not recurse User -> Role.permissions -> ... when Role
-  // proxies are subsequently hydrated.
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "user_roles",

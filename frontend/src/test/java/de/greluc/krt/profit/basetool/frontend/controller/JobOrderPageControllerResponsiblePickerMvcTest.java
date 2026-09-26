@@ -50,18 +50,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Owner-picker sourcing for the Job-Order create form, for an <em>authenticated</em> caller. Since
- * epic #692 the requesting (Auftraggeber) picker offers all four kinds — including Bereiche and the
- * Organisationsleitung — sourced from the authenticated {@code GET
- * /api/v1/org-units/active-all-kinds} catalog, so a Bereichsleitung/OL member can place an order on
- * behalf of their tier. The responsible picker is the {@code isProfitEligible} subset, which keeps
- * a profit-eligible SK and excludes the (never-profit) Bereich/OL — they can be the customer but
- * never the processor. This test pins that an eligible SK still reaches the responsible picker,
- * that a Bereich + OL reach the requesting picker (they are non-profit, so a rendered Bereich/OL
- * name can only have come from the requesting picker), that the all-kinds catalog is the source,
- * and that the deprecated SK-catalog call is gone. The anonymous-guest path (which keeps the
- * Staffel/SK-only {@code /active} catalog) is covered by {@link
- * JobOrderPageControllerCreateFormAnonymousMvcTest}.
+ * Owner pickers of the job-order create form for an authenticated caller: the requesting picker
+ * offers all org-unit kinds from {@code GET /api/v1/org-units/active-all-kinds}, while the
+ * responsible picker offers only profit-eligible units, so Bereiche and the Organisationsleitung
+ * appear only as requesters.
  */
 @SpringBootTest
 class JobOrderPageControllerResponsiblePickerMvcTest {
@@ -85,12 +77,8 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
   }
 
   /**
-   * REQ-FE-016: the create form's material-line select opts into the server-side-search combobox
-   * enhancement — the {@code data-krt-combobox} marker must carry the {@code
-   * remote-materials-joborder} source key (anchored via its adjacent {@code data-role}) so the
-   * global enhancer wires the job-order material search — and the material catalog must no longer
-   * be dumped into the page as a preloaded option list (the blank create row has no preselect, so
-   * no catalog material name may render at all).
+   * The create form's material select is a server-side-search combobox with source {@code
+   * remote-materials-joborder}, and no material catalog is preloaded into the page (REQ-FE-016).
    */
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
@@ -99,8 +87,6 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // The catalog stays a server-side model attribute (it gates the redisplay seed option), but
-    // with no bound row value neither material name may reach the rendered page.
     MaterialDto agricium = jobOrderMaterial("Agricium");
     MaterialDto quantainium = jobOrderMaterial("Quantainium-Distinct");
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef()))
@@ -161,12 +147,8 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Kartellleitung XYZ", "OL", "ORGANISATIONSLEITUNG", false);
 
-    // Reference catalogs (materials / orderable items / squadrons) go through the cached client;
-    // empty keeps them from blocking the render.
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // Authenticated requesting picker sources the all-kinds catalog via the authenticated client
-    // (now cached — REQ-DATA-007, eviction gated on Squadron/SK/Bereich/OL admin mutations).
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(List.of(profitStaffel, profitSk, bereich, ol));
 
@@ -174,14 +156,10 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
         .andExpect(view().name("orders-create"))
-        // The profit SK still reaches the responsible picker.
         .andExpect(content().string(Matchers.containsString("Profit Spezialkommando")))
-        // The Bereich + OL are non-profit, so a rendered Bereich/OL option name can only have come
-        // from the requesting picker (the responsible picker filters non-profit out).
         .andExpect(content().string(Matchers.containsString("Bereich Profit XYZ")))
         .andExpect(content().string(Matchers.containsString("Kartellleitung XYZ")));
 
-    // Authenticated callers source the all-kinds catalog — never the Staffel/SK-only /active.
     verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());

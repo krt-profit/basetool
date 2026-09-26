@@ -30,16 +30,8 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
- * Resolves {@link UserZone}-annotated {@link ZoneId} controller parameters from the {@code
- * X-User-Time-Zone} request header.
- *
- * <p>Consolidates the three private {@code parse}/{@code parseZone} helpers (in {@code
- * BankAccountController}, {@code OrgUnitBankController}, {@code AuditAdminController}) and the two
- * inline copies in {@code JobOrderController} into one place. The shared contract is preserved: an
- * absent, blank or invalid IANA zone resolves to {@code null} so the downstream report service
- * falls back to UTC, rather than failing the request. The value is trimmed before parsing (matching
- * the most defensive of the former helpers); {@link ZoneId#of(String)} only throws {@link
- * DateTimeException}, so every malformed input collapses to {@code null}.
+ * Resolves {@link UserZone}-annotated {@link ZoneId} parameters from the {@code X-User-Time-Zone}
+ * header. The value is trimmed; an absent, blank or invalid zone resolves to {@code null}.
  */
 public class UserZoneArgumentResolver implements HandlerMethodArgumentResolver {
 

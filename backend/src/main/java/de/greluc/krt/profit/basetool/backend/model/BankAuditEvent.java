@@ -38,18 +38,10 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One immutable bank audit-trail row (epic #556, REQ-BANK-012), persisted in the {@code
- * bank_audit_event} table created by Flyway V154 and readable only by admins.
+ * One immutable bank audit-trail row (REQ-BANK-012), readable only by admins.
  *
- * <p>Insert-only event log modeled after {@link ExternalSyncReport}: no {@code @Version}, no
- * updates, {@link #occurredAt} is the single timestamp. Every bank mutation appends exactly one row
- * in the same transaction as the business write — an audit failure fails the mutation, so the trail
- * has no silent gaps. Reference columns are plain UUIDs (no JPA relations): audit rows must outlive
- * every referenced aggregate, and the admin viewer renders the deletion-proof {@link #actorHandle}
- * snapshot rather than joining live rows.
- *
- * <p>This table is business data, not logging — the observability rule (never log names, emails or
- * tokens to the <em>log stream</em>) is unaffected and still applies to all bank code.
+ * <p>Insert-only: every bank mutation appends exactly one row in the same transaction, so an audit
+ * failure fails the mutation. References are plain UUIDs so rows outlive their aggregates.
  */
 @Entity
 @Table(name = "bank_audit_event")
@@ -111,20 +103,12 @@ public class BankAuditEvent {
   private String details;
 
   /**
-   * Which client software the mutation came through — the token's {@code azp} mapped onto the
-   * bounded known-client vocabulary (REQ-AUDIT-005, GHSA-2vq5-8p8w-5r64): a known client id
-   * verbatim, {@code other} for an unrecognised one, {@code none} for a caller with no token or a
-   * token carrying no {@code azp}.
+   * The client the mutation came through: the token's {@code azp} mapped onto the bounded
+   * known-client vocabulary, {@code other} for an unknown one, {@code none} when there is no token
+   * or no {@code azp} (REQ-AUDIT-005).
    *
-   * <p>Bounded rather than verbatim because this table is evidence: a client-chosen string is the
-   * one kind of value that must not be able to write itself into it. {@code azp} is signed by
-   * Keycloak and unsettable by the client, so recording it adds no trust that {@code
-   * IngestGatewayProperties} does not already place in it.
-   *
-   * <p>{@code null} on rows written before V238 means <strong>not recorded</strong> — and, unlike
-   * {@link AuditEvent#getClientId()}, <em>not</em> "unambiguous anyway": the bank realm roles have
-   * been on the mobile client's scope since it was provisioned, so a bank row was reachable from
-   * two clients before this column existed. A null here must never be read as "the web frontend".
+   * <p>{@code null} on rows that predate the column means "not recorded" and must never be read as
+   * the web frontend.
    */
   @Nullable
   @Column(name = "client_id", length = 60)

@@ -29,31 +29,21 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 /**
- * One refinement order read from SETUP screenshot(s) — the {@code orders[]} element of the frozen
- * {@code RefineryExtract} contract (plan §5). All {@code raw*} fields are verbatim screen reads;
- * the import service resolves them against master data and reports failures as draft issues instead
- * of rejecting the request.
+ * One refinement order read from SETUP screenshots; {@code raw*} fields are verbatim reads that the
+ * import resolves against master data, reporting failures as draft issues.
  *
- * @param panelType screen tab the capture shows: {@code SETUP} | {@code PROCESSING} | {@code
- *     UNKNOWN}; v1 accepts only {@code SETUP} (anything else is an envelope-level 400)
- * @param quoted {@code false} when the capture was taken before pressing GET QUOTE (the YIELD /
- *     cost / time cells still render {@code "--"}); {@code null} is treated as quoted
- * @param layoutConfidence derived layout-parse confidence in {@code [0,1]} (provenance/display)
- * @param rawLocationName refinery location verbatim from the terminal header — the header sits
- *     outside the work-order panel, so this is always {@code null} on pre-cropped input
- * @param rawMethodName refining method verbatim as read, e.g. {@code "FERRON EXCHANGE"}; nullable
- * @param rawInManifestTotal panel-header {@code IN MANIFEST} total; nullable completeness checksum
- *     (reconciled against the sum of all row quantities, never copied into the draft)
- * @param rawToRefineTotal panel-header {@code TO REFINE} total; nullable completeness checksum
- *     (reconciled against the sum of refine-ON row quantities, never copied into the draft)
- * @param expenses total order cost in aUEC; {@code null} when un-quoted
- * @param durationMinutes processing time in minutes (from e.g. {@code "20h 58m"}); nullable
- * @param totalYieldScu PROCESSING-only figure; always {@code null} on SETUP and ignored in v1
- * @param sourceImages screenshots this order was stitched from (provenance only); non-empty, at
- *     most 50 — a genuine extraction always has at least one capture, so an empty list marks a
- *     payload no real extraction produced (ADR-0008 amendment, REQ-INGEST-011)
- * @param goods stitched, deduplicated material rows in on-screen order; non-empty, at most 100 — an
- *     order with no rows carries nothing to import (ADR-0008 amendment)
+ * @param panelType screen tab of the capture; only {@code SETUP} is accepted
+ * @param quoted {@code false} when captured before GET QUOTE; {@code null} counts as quoted
+ * @param layoutConfidence derived layout-parse confidence in {@code [0,1]}
+ * @param rawLocationName refinery location verbatim; {@code null} on pre-cropped input
+ * @param rawMethodName refining method verbatim; nullable
+ * @param rawInManifestTotal panel {@code IN MANIFEST} total, a nullable checksum over all rows
+ * @param rawToRefineTotal panel {@code TO REFINE} total, a nullable checksum over refine-on rows
+ * @param expenses total order cost in aUEC; {@code null} when unquoted
+ * @param durationMinutes processing time in minutes; nullable
+ * @param totalYieldScu PROCESSING-only figure; ignored in v1
+ * @param sourceImages screenshots the order was stitched from; 1 to 50 (REQ-INGEST-011)
+ * @param goods deduplicated material rows in on-screen order; 1 to 100
  */
 public record RefineryExtractOrderDto(
     @NotNull @Size(max = 32) String panelType,

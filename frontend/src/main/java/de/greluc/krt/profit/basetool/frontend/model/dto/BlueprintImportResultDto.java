@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Applied-import summary mirroring the backend {@code BlueprintImportResultDto} (#327), surfaced to
- * the user as a toast.
+ * Frontend mirror of the backend {@code BlueprintImportResultDto}: the applied-import summary shown
+ * as a toast.
  *
  * @param added number of new owned-blueprint rows created
  * @param aliasesLearned number of new aliases persisted

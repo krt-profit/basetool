@@ -22,16 +22,15 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the delegated Leitung view (epic #800, REQ-ROLE-004), decoded from {@code GET
- * /api/v1/leitung/view}: the org units the caller may appoint into, grouped by tier so the page
- * renders one section per tier.
+ * Frontend mirror of the Leitung view from {@code GET /api/v1/leitung/view} (REQ-ROLE-004): the org
+ * units the caller may appoint into, grouped by tier.
  *
  * @param admin whether the caller is an admin.
  * @param organisationsleitungen the OL(s) the caller may manage.
  * @param bereiche the Bereiche the caller may appoint into.
  * @param squadrons the Staffeln the caller may appoint into.
- * @param specialCommands the Spezialkommandos the caller may appoint a lead on or manage the
- *     members of (the SK's own lead).
+ * @param specialCommands the Spezialkommandos the caller may appoint a lead on or whose members
+ *     they may manage.
  */
 public record LeitungViewDto(
     boolean admin,

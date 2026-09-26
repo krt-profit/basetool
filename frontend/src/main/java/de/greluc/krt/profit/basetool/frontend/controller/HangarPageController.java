@@ -69,17 +69,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the personal hangar pages ({@code /hangar} and {@code
- * /hangar/squadron}).
- *
- * <p>The personal hangar lists the current user's ships, server-side paginated and ordered by the
- * backend's rich multi-key comparator: manufacturer name, ship type, insurance tier (LTI &lt;
- * numeric &lt; unset), insurance number desc, location and finally fitted-status + name. The order
- * is deliberate — fleet members compare insurance state across ships of the same type, so insurance
- * grouping has to win over location. Since #773 the ordering and the text filter live in the
- * backend ({@code /my-ships} with {@code page}/{@code size}/{@code search}, REQ-HANGAR-002) so they
- * span the user's whole fleet rather than one client-fetched page. The squadron overview aggregates
- * the entire org's hangar into a count-per-type table.
+ * Controller for the personal hangar ({@code /hangar}) and the squadron hangar overview ({@code
+ * /hangar/squadron}). Sorting and text filtering happen in the backend (REQ-HANGAR-002).
  */
 @Controller
 @UsesLayoutModel
@@ -94,10 +85,7 @@ public class HangarPageController {
   private final CachedCatalogListLoader catalogListLoader;
 
   /**
-   * Publishes the ship-import upload cap to every hangar view, so the import button can carry it as
-   * {@code data-max-bytes} and {@code hangar.js} can refuse an oversized file with a localized
-   * message before a single byte is uploaded. The server-side check in {@link
-   * HangarImportProxyController} stays authoritative; this only spares the user a pointless upload.
+   * Publishes the ship-import upload cap to every hangar view for the client-side size check.
    *
    * @return {@link HangarImportProxyController#MAX_IMPORT_BYTES}, the inclusive byte limit
    */
@@ -107,16 +95,9 @@ public class HangarPageController {
   }
 
   /**
-   * Runs a backend GET whose query carries the fixed paging params plus an optional free-text
-   * {@code search} term, encoding {@code search} <em>exactly once</em> across the
-   * frontend&rarr;backend hop. The caller pre-sets the safe paging params on {@code uri}; this
-   * method appends a non-blank term as a WebClient URI-template variable ({@code search={search}})
-   * so the WebClient encodes it once per RFC 3986, rather than baking the already-encoded {@link
-   * org.springframework.web.util.UriComponentsBuilder#toUriString()} output into the {@code
-   * get(String)} call — which the WebClient would encode a second time (a space becomes {@code
-   * %2520} instead of {@code %20}, an umlaut {@code %25C3%25BC}), so a multi-word or umlaut ship
-   * search reached the backend {@code @RequestParam} mangled and matched nothing (the #371
-   * re-encoding trap). A {@code null}/blank term is omitted so the unfiltered page is fetched.
+   * Runs a backend GET with the pre-set paging params plus an optional {@code search} term passed
+   * as a URI-template variable, so the term is encoded exactly once. A {@code null}/blank term is
+   * omitted.
    *
    * @param uri the pre-built URI carrying only the safe paging params
    * @param search the free-text ship-name filter, or {@code null}/blank for no filter
@@ -137,25 +118,16 @@ public class HangarPageController {
   }
 
   /**
-   * Renders the personal hangar page, server-side paginated (REQ-HANGAR-002). Fetches one page of
-   * my ships and the three cached reference catalogs (ship types, locations, manufacturers) in
-   * parallel via {@link ParallelPageLoader}; each catalog call independently degrades to an empty
-   * list on backend failure so a single dead reference catalog never blanks the whole page. The
-   * ship page is ordered and filtered entirely by the backend (no client-side {@code SHIP_SORT}),
-   * so the order and the {@code search} term span the user's whole fleet, not one fetched page. The
-   * {@code /my-ships} call is intentionally <em>uncached</em> (per-user data must never be served
-   * from a shared cache); only the reference catalogs go through {@code getCached}.
+   * Renders the personal hangar page, server-side paginated and filtered (REQ-HANGAR-002). The
+   * uncached ship page and the cached reference catalogs load in parallel; each catalog degrades to
+   * an empty list on failure.
    *
-   * @param page zero-based page index, defaults to the first page; negatives are clamped to 0
-   * @param size page size, validated against {@link #HANGAR_PAGE_SIZES} (else snapped to the
-   *     default)
-   * @param search optional ship-type/manufacturer filter, applied server-side by the backend
-   * @param fragment when {@code "results"}, only the ship-table results fragment is rendered for an
-   *     in-place AJAX swap after a ship write or a filter/page change (epic #571 / REQ-FE-005);
-   *     otherwise the full page
-   * @param model Thymeleaf model populated with the ship form, ship page, reference catalogs and
-   *     the pagination state (page metadata, page sizes, search-preserving base URL, total ship
-   *     count)
+   * @param page zero-based page index; negatives are clamped to 0
+   * @param size page size, validated against {@link #HANGAR_PAGE_SIZES}
+   * @param search optional ship-type/manufacturer filter, applied by the backend
+   * @param fragment {@code "results"} renders only the ship-table fragment (REQ-FE-005)
+   * @param model model populated with the ship form, ship page, reference catalogs and pagination
+   *     state
    * @return the {@code hangar} view name, or its {@code hangarResults} fragment selector
    */
   @NotNull
@@ -199,10 +171,6 @@ public class HangarPageController {
                       List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
                 });
 
-    // The three sortable reference catalogs share one degrade-to-empty loader
-    // (CachedCatalogListLoader); each fetch still runs on its own virtual thread and is sorted
-    // below
-    // after the join, so a single dead catalog never blanks the whole page.
     CompletableFuture<List<ShipTypeDto>> shipTypesFuture =
         parallelPageLoader.loadAsync(
             () ->
@@ -236,10 +204,6 @@ public class HangarPageController {
                   return new ArrayList<>();
                 });
 
-    // join() blocks until every parallel fetch finishes; each call ran on its own virtual thread
-    // with the full request-scoped context (SecurityContext / RequestAttributes / squadron /
-    // correlation id) restored, so OAuth2 bearer relay and squadron-header propagation behave
-    // identically to the previous sequential implementation.
     CompletableFuture.allOf(
             shipsFuture, shipTypesFuture, locationsFuture, manufacturersFuture, homeLocationsFuture)
         .join();
@@ -253,13 +217,8 @@ public class HangarPageController {
     List<ManufacturerDto> manufacturers = manufacturersFuture.join();
     manufacturers.sort(Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
 
-    // Curated home locations for the bulk "set home location" picker. The backend already returns
-    // them alphabetically descending (Z->A); preserve that order (do not re-sort).
     List<LocationDto> homeLocations = homeLocationsFuture.join();
 
-    // Page links must keep the active filter, so the fragment's base URL carries the search term
-    // percent-encoded (toUriString() encodes — a raw term could otherwise smuggle extra query
-    // params into every pagination link); page/size are appended by the shared pagination fragment.
     String paginationBaseUrl =
         effectiveSearch == null
             ? "/hangar"
@@ -267,14 +226,10 @@ public class HangarPageController {
                 .queryParam("search", effectiveSearch)
                 .toUriString();
 
-    // The page is already ordered + filtered by the backend (REQ-HANGAR-002); render its content
-    // verbatim. No client-side SHIP_SORT — that would only reorder the rows of the current page.
     PageResponse<ShipDto> myShipsPage = shipsFuture.join();
     model.addAttribute(
         "myShips", myShipsPage.content() != null ? myShipsPage.content() : List.of());
     model.addAttribute("myShipsPage", myShipsPage);
-    // Home-location / delete-all act on ALL the user's ships (not the current page), so their count
-    // reflects the page envelope's total, not the size of the rendered page.
     model.addAttribute("totalShipCount", myShipsPage.totalElements());
     model.addAttribute("pageSizes", HANGAR_PAGE_SIZES);
     model.addAttribute("pageSize", effectiveSize);
@@ -293,19 +248,12 @@ public class HangarPageController {
   }
 
   /**
-   * Fetches the caller's OrgUnit memberships for the R5.d.f owner-picker on the add-ship modal.
-   * Ships are always added for the calling user (no admin-cross-user override on this page), so the
-   * picker reflects the caller's own memberships. Falls back to an empty list on backend hiccup;
-   * the fragment collapses to its hidden state in that case.
+   * Fetches the caller's org-unit memberships for the add-ship owner picker.
    *
-   * @return picker options or empty list; never {@code null}.
+   * @return picker options, or an empty list on backend failure; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
     try {
-      // Epic #692 Phase 5: the owner picker offers the caller's pickable org units — their direct
-      // memberships plus their cascading leadership reach (a Bereichsleitung/OL leader's own
-      // Bereich/OL + the subordinate Staffeln/SKs they oversee). For an ordinary member this equals
-      // their direct memberships, so the picker is unchanged. Resolved server-side for the caller.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
       return options != null ? options : List.of();
@@ -378,19 +326,15 @@ public class HangarPageController {
           new ParameterizedTypeReference<PageResponse<SquadronShipOverviewDto>>() {};
 
   /**
-   * Renders the squadron-wide hangar overview ({@code /hangar/squadron}), server-side paginated
-   * across every ship type in the caller's scope (REQ-HANGAR-001). The backend aggregates counts
-   * per ship type, sorted by ship-type name; page metadata, the page-size choice (10/50/100 — any
-   * other value snaps to the default) and the optional search term travel as query parameters and
-   * are echoed into the model so the pagination links and the filter form can reproduce the state.
+   * Renders the squadron hangar overview, ship counts per type in the caller's scope, server-side
+   * paginated (REQ-HANGAR-001).
    *
-   * @param page zero-based page index, defaults to the first page; negatives are clamped to 0
+   * @param page zero-based page index; negatives are clamped to 0
    * @param size page size, validated against {@link #HANGAR_PAGE_SIZES}
-   * @param search optional ship-type/manufacturer filter, applied server-side by the backend
-   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
-   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with the overview page, the picker options and the
-   *     pagination base URL (search-preserving)
+   * @param search optional ship-type/manufacturer filter, applied by the backend
+   * @param fragment {@code "results"} renders only the results + pagination fragment (REQ-FE-005)
+   * @param model model populated with the overview page, the picker options and the pagination base
+   *     URL
    * @return the {@code hangar-squadron} view name, or its {@code squadronResults} fragment selector
    */
   @NotNull
@@ -426,9 +370,6 @@ public class HangarPageController {
       model.addAttribute("error", "error.hangar.squadron.load");
     }
 
-    // Page links must keep the active filter, so the fragment's base URL carries the search term
-    // percent-encoded (toUriString() encodes — a raw term could otherwise smuggle extra query
-    // params into every pagination link); page/size are appended by the fragment itself.
     String paginationBaseUrl =
         effectiveSearch == null
             ? "/hangar/squadron"
@@ -449,9 +390,8 @@ public class HangarPageController {
   }
 
   /**
-   * Adds a new ship to the current user's hangar. Validation errors render the hangar view inline
-   * (no redirect) so the BindingResult stays request-scoped — pushing it through the Redis-backed
-   * FlashMap would crash on the self-referencing cycle.
+   * Adds a new ship to the current user's hangar. Validation errors re-render the hangar view
+   * inline instead of redirecting.
    *
    * @param form ship form
    * @param bindingResult validation errors carrier
@@ -467,8 +407,6 @@ public class HangarPageController {
       Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render directly; the BindingResult stays request-scoped so it never goes
-      // through a Redis-serialised FlashMap (see RedisSessionConfig).
       model.addAttribute("showShipModal", true);
       model.addAttribute("modalAction", "/hangar/add");
       return viewHangar(null, null, null, null, model);
@@ -534,7 +472,6 @@ public class HangarPageController {
               form.getLocationId(),
               form.isFitted(),
               form.getVersion(),
-              // Update path: owningOrgUnitId is not editable, the existing stamp survives.
               null);
       backendApiClient.put("/api/v1/hangar/ships/" + id, request, ShipDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_update");
@@ -572,10 +509,7 @@ public class HangarPageController {
   }
 
   /**
-   * Bulk-sets the chosen curated home location on every ship the calling user owns, then redirects
-   * back to the hangar — a full reload that resyncs each row's displayed location and version. The
-   * location id comes from the home-location modal's select; the backend derives the owner from the
-   * JWT and validates that the id is a selectable home location.
+   * Sets the chosen home location on every ship the caller owns, then redirects to the hangar.
    *
    * @param locationId the curated home location chosen in the modal
    * @param redirectAttributes flash attributes carrier
@@ -599,19 +533,11 @@ public class HangarPageController {
     return "redirect:/hangar";
   }
 
-  // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-005)
-
   /**
-   * Header-gated AJAX twin of {@link #addShip}: adds a ship and returns {@code 204} so {@code
-   * hangar.html} re-swaps the ship table in place via {@code GET /hangar?fragment=results} instead
-   * of the classic POST→redirect reload. The twin is selected only for an {@code
-   * X-Requested-With=XMLHttpRequest} request, so the classic handler stays the no-JS fallback. The
-   * modal's HTML5 {@code required} dropdowns guard ship-type + insurance client-side; a missing one
-   * still yields a {@code 422} so a crafted request cannot slip past, and a backend rejection is
-   * relayed verbatim as {@code problem+json}.
+   * AJAX twin of {@link #addShip}, selected by {@code X-Requested-With=XMLHttpRequest}: adds a ship
+   * and returns {@code 204} for the in-place table swap.
    *
-   * @param request the ship payload submitted as JSON ({@code version} is ignored — always a
-   *     create)
+   * @param request the ship payload as JSON ({@code version} is ignored)
    * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
    *     {@code problem+json}
    */
@@ -641,15 +567,11 @@ public class HangarPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #updateShip}: updates a ship and returns {@code 204} so the
-   * page re-swaps the ship table in place. The optimistic-lock {@code version} travels in the JSON
-   * payload; a concurrent edit surfaces as a {@code 409} {@code problem+json} carrying {@code
-   * OPTIMISTIC_LOCK}, which the client turns into the sanctioned reload-confirm. {@code
-   * owningOrgUnitId} is not editable on update (the existing stamp survives), mirroring the classic
-   * handler.
+   * AJAX twin of {@link #updateShip}: updates a ship and returns {@code 204} for the in-place table
+   * swap. {@code owningOrgUnitId} is not changed.
    *
    * @param id ship id
-   * @param request the ship payload submitted as JSON (carries the last-seen {@code version})
+   * @param request the ship payload as JSON, carrying the last-seen {@code version}
    * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
    *     {@code problem+json}
    */
@@ -680,9 +602,7 @@ public class HangarPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #deleteShip}: deletes a ship and returns {@code 204} so the
-   * page removes the row and re-swaps the table in place. A backend failure is relayed as {@code
-   * problem+json}.
+   * AJAX twin of {@link #deleteShip}: deletes a ship and returns {@code 204}.
    *
    * @param id ship id
    * @return {@code 204} on success, or the relayed backend {@code problem+json}
@@ -700,12 +620,10 @@ public class HangarPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #setHomeLocation}: bulk-sets the chosen home location on every
-   * ship the caller owns and returns {@code 204} so the page re-swaps the table (every row's
-   * location cell resyncs from the fresh fragment). A backend failure is relayed as {@code
-   * problem+json}.
+   * AJAX twin of {@link #setHomeLocation}: sets the home location on every ship the caller owns and
+   * returns {@code 204}.
    *
-   * @param request the chosen curated home location id, submitted as JSON
+   * @param request the chosen curated home location id as JSON
    * @return {@code 204} on success, {@code 422} on a missing location, or the relayed backend
    *     {@code problem+json}
    */

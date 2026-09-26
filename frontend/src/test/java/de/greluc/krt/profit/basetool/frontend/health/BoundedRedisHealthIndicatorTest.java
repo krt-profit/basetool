@@ -31,30 +31,21 @@ import org.springframework.boot.health.contributor.Status;
 import reactor.core.publisher.Mono;
 
 /**
- * Unit guard for {@link BoundedRedisHealthIndicator}'s wall-clock bound (ADR-0114 follow-up). The
- * 2026-07-22 incident proved the Lettuce command timeout alone cannot bound the reactive health
- * {@code PING} — checks queued behind a wedged shared-connection acquisition for up to 836 seconds
- * on a build that already carried {@code spring.data.redis.timeout=2s}. These tests script the
- * delegate directly: a never-completing delegate must be cut off as {@code DOWN} within the bound,
- * and a healthy delegate's result must pass through untouched.
+ * Unit tests for the wall-clock bound of {@link BoundedRedisHealthIndicator}: a never-completing
+ * delegate is cut off as {@code DOWN} within the bound, and a healthy result passes through
+ * (ADR-0114).
  */
 class BoundedRedisHealthIndicatorTest {
 
   @Test
   void hangingDelegateIsCutOffAsDownWithinTheBound() {
-    // Given: a delegate that never completes — the shape of the wedged Lettuce acquisition, which
-    // no command timeout reaches.
     BoundedRedisHealthIndicator indicator =
         new BoundedRedisHealthIndicator(Mono::never, Duration.ofMillis(200));
 
-    // When
     Instant start = Instant.now();
     Health health = indicator.health().block(Duration.ofSeconds(5));
     Duration elapsed = Duration.between(start, Instant.now());
 
-    // Then: DOWN with the timeout detail, and well before the 5s Docker HEALTHCHECK budget the
-    // bound exists to protect (a regression dropping the timeout operator would trip the block()
-    // bound instead).
     assertNotNull(health, "the bounded check must emit a health result");
     assertEquals(Status.DOWN, health.getStatus(), "a timed-out PING must report DOWN");
     assertEquals(
@@ -68,15 +59,12 @@ class BoundedRedisHealthIndicatorTest {
 
   @Test
   void healthyDelegatePassesThroughUntouched() {
-    // Given: a delegate that answers promptly with its own detail.
     Health up = Health.up().withDetail("version", "7.4.0").build();
     BoundedRedisHealthIndicator indicator =
         new BoundedRedisHealthIndicator(() -> Mono.just(up), Duration.ofSeconds(1));
 
-    // When
     Health health = indicator.health().block(Duration.ofSeconds(5));
 
-    // Then: the delegate's health arrives unmodified — the bound is transparent on the happy path.
     assertNotNull(health, "the bounded check must emit a health result");
     assertEquals(Status.UP, health.getStatus(), "a healthy delegate must stay UP");
     assertEquals("7.4.0", health.getDetails().get("version"), "delegate details must pass through");

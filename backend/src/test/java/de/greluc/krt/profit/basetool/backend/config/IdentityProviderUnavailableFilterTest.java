@@ -49,11 +49,9 @@ import org.springframework.web.client.HttpServerErrorException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Unit tests for {@link IdentityProviderUnavailableFilter} (REQ-SEC-024). The critical regression
- * guarantees: a transport / upstream-5xx failure talking to Keycloak's JWKS endpoint becomes a
- * retryable {@code 503} problem+json (with {@code Retry-After} and the error counter), while an
- * {@link AuthenticationServiceException} <em>without</em> a transport cause — and any other
- * exception — propagates unchanged, so genuine 401/403/500 semantics are never swallowed.
+ * Unit tests for {@link IdentityProviderUnavailableFilter} (REQ-SEC-024): a transport or upstream
+ * 5xx failure reaching Keycloak's JWKS becomes a retryable {@code 503} problem with {@code
+ * Retry-After}, while any other exception propagates unchanged.
  */
 class IdentityProviderUnavailableFilterTest {
 
@@ -64,8 +62,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @BeforeEach
   void setUp() {
-    // MessageSource returns the caller-supplied default (arg 2) so assertions run against a stable,
-    // locale-independent body; the i18n wiring itself is covered by the bundle test.
     MessageSource messageSource = mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any()))
         .thenAnswer(invocation -> invocation.getArgument(2));
@@ -143,9 +139,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @Test
   void authenticationServiceException_withoutTransportCause_isRethrownUnchanged() {
-    // A non-transport AuthenticationServiceException must keep its existing behaviour (escapes to
-    // the
-    // container error dispatch → 500). The filter must NOT swallow it into a 503.
     FilterChain chain =
         (req, res) -> {
           throw new AuthenticationServiceException("programming bug", new IllegalStateException());
@@ -161,9 +154,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @Test
   void unrelatedException_propagatesUnchanged() {
-    // Anything that is not an AuthenticationServiceException (e.g. a bad-token 401 is handled
-    // inside
-    // the entry point and never reaches here) must propagate untouched.
     FilterChain chain =
         (req, res) -> {
           throw new ServletException("downstream");

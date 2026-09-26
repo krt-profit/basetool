@@ -43,21 +43,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pins the Stufe-2 DB backstops the Wave-2 migrations add so the in-memory guards (which have a
- * TOCTOU window under concurrency) can never be silently bypassed:
- *
- * <ul>
- *   <li>V206 partial unique index {@code uq_mission_participant_single_lead} — at most one
- *       Einsatzleiter per mission (REQ-MISSION-013, #1113).
- *   <li>V207 unique index {@code uq_mission_crew_participant} — a participant sits in at most one
- *       crew (#1132).
- * </ul>
- *
- * <p>Each test inserts a conflicting second row and asserts Hibernate surfaces the SQL {@code
- * unique_violation} as a {@link DataIntegrityViolationException} (which {@code
- * GlobalExceptionHandler} maps to HTTP 409 — the same status as the friendly in-memory branch).
- * {@code @Transactional} so the rows roll back after each test; the unique index is checked
- * immediately by Postgres, so the violation surfaces at the conflicting {@code saveAndFlush}.
+ * Verifies the unique-index backstops behind the in-memory mission guards: at most one
+ * Einsatzleiter per mission (REQ-MISSION-013) and one crew per participant, each surfacing as a
+ * {@link DataIntegrityViolationException}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -82,7 +70,6 @@ class MissionUniqueIndexBackstopTest {
 
     MissionParticipant second = persistGuestParticipant(mission, "Lead B");
     second.setMissionLeadParticipant(true);
-    // uq_mission_participant_single_lead (mission_id) WHERE is_mission_lead_participant (#1113).
     assertThrows(
         DataIntegrityViolationException.class,
         () -> missionParticipantRepository.saveAndFlush(second));
@@ -90,8 +77,6 @@ class MissionUniqueIndexBackstopTest {
 
   @Test
   void einsatzleiterInADifferentMission_isAllowed() {
-    // The constraint is per-mission, not global: two missions may each have their own
-    // Einsatzleiter.
     MissionParticipant a = persistGuestParticipant(persistPlannedMission("Lead M1"), "Lead A");
     a.setMissionLeadParticipant(true);
     missionParticipantRepository.saveAndFlush(a);
@@ -120,8 +105,6 @@ class MissionUniqueIndexBackstopTest {
     MissionCrew secondCrew = new MissionCrew();
     secondCrew.setMissionUnit(unit);
     secondCrew.setParticipant(participant);
-    // uq_mission_crew_participant (mission_participant_id) — a participant sits in one crew
-    // (#1132).
     assertThrows(
         DataIntegrityViolationException.class,
         () -> missionCrewRepository.saveAndFlush(secondCrew));

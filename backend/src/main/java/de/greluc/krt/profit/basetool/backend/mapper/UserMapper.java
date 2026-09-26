@@ -47,79 +47,45 @@ import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * MapStruct mapper between {@link User} entities and DTOs.
+ * Maps {@link User} entities to DTOs, deriving {@code squadron}, {@code squadrons}, {@code
+ * isLogistician} and {@code isMissionManager} from the user's Staffel memberships.
  *
- * <p>After R9 Steps 4+5 the {@link User} entity no longer carries the legacy {@code squadron},
- * {@code isLogistician}, {@code isMissionManager} columns — the {@code org_unit_membership} rows
- * are now the single source of truth. The DTO contract exposes the membership-derived fields (so
- * the frontend mirror and existing API consumers stay stable); the mapper derives them by reading
- * the caller's Staffel memberships through {@link OrgUnitMembershipRepository}. Since REQ-ORG-017
- * allows up to two Staffeln, {@code squadrons} carries the complete set, {@code squadron} the
- * primary (first by name), and the {@code isLogistician} / {@code isMissionManager} indicators are
- * the OR across all Staffel rows (the flag grants flat authority regardless of which row holds it,
- * REQ-SEC-005). A user without a Staffel membership row (an admin, or any member of no Staffel)
- * maps to {@code squadron = null}, {@code squadrons = []}, {@code isLogistician = false}, {@code
- * isMissionManager = false}.
- *
- * <p>Implemented as an abstract class so MapStruct can field-inject the helper repositories. The
- * generated subclass overrides {@link #toDto(User)} with the field copy and forwards through {@link
- * #resolveSquadrons(User)} / {@link #resolveSquadron(User)} / {@link #resolveLogistician(User)} /
- * {@link #resolveMissionManager(User)} for the membership-derived projections.
+ * <p>{@code squadrons} holds all Staffeln (REQ-ORG-017), {@code squadron} the first by name, and
+ * the two flags are the OR across all Staffel rows (REQ-SEC-005). A user without a Staffel maps to
+ * {@code null}, an empty list and {@code false}.
  */
 @Mapper(
     config = CentralMapperConfig.class,
     uses = {SquadronMapper.class})
 public abstract class UserMapper {
 
-  // Field injection mirrors MissionMapper / RefineryOrderMapper — the MapStruct annotation
-  // processor generates the subclass with a default constructor, so the helper repositories must
-  // come in via field-level @Autowired.
   @Autowired protected OrgUnitMembershipRepository membershipRepository;
 
   @Autowired protected StaffelMembershipResolver staffelMembershipResolver;
 
   /**
-   * Request-attribute key under which {@link #loadStaffelMemberships(User)} memoises the per-user
-   * Staffel-membership lookup for the duration of the current HTTP request. Without it, every
-   * {@link #toDto(User)} call fires the same {@code findAllByIdUserIdAndKind} derived query four
-   * times (once each from {@link #resolveSquadron(User)} / {@link #resolveSquadrons(User)} / {@link
-   * #resolveLogistician(User)} / {@link #resolveMissionManager(User)}) because a JPQL derived query
-   * is not served from Hibernate's L1 cache — four real round-trips per user, multiplied across a
-   * whole page on the member-facing user list / search endpoints. The memo collapses that to one
-   * lookup per distinct user per request and is keyed by user id.
+   * Request-memo key for the per-user Staffel memberships loaded by {@link
+   * #loadStaffelMemberships(User)}, keyed by user id.
    */
   private static final RequestMemo.Key<Map<UUID, List<OrgUnitMembership>>> MEMBERSHIP_CACHE_ATTR =
       RequestMemo.Key.of(UserMapper.class, "staffelMembershipByUserId");
 
   /**
-   * Request-attribute key under which {@link #resolveSquadrons(User)} memoises the resolved,
-   * name-sorted Staffel references per user. {@link #toDto(User)} reads the squadrons twice ({@code
-   * squadrons} and the primary {@code squadron}), and each read resolved the Staffel entities with
-   * its own {@code findAllById}; the memo makes the second read free. The values are immutable
-   * reference records, so they are safe to reuse across transactions within the request. Seeded for
-   * a whole page at once by {@link #primeStaffelMemberships(Collection)}.
+   * Request-memo key for the name-sorted Staffel references resolved by {@link
+   * #resolveSquadrons(User)}, keyed by user id.
    */
   private static final RequestMemo.Key<Map<UUID, List<SquadronReferenceDto>>> SQUADRONS_CACHE_ATTR =
       RequestMemo.Key.of(UserMapper.class, "squadronReferencesByUserId");
 
   /**
-   * Projects a {@link User} entity to its outbound DTO. The {@code squadron}, {@code squadrons},
-   * {@code isLogistician}, {@code isMissionManager} fields are sourced from the user's Staffel
-   * membership rows (post-R9 D3) — see the class-level Javadoc for the unassigned-user fallback.
+   * Maps a {@link User} to its DTO, with the Staffel-derived fields from the user's memberships.
    *
-   * <p><strong>{@code email} is deliberately NOT mapped</strong> ({@code ignore = true}) so it is
-   * {@code null} on every DTO this method produces. Email is a profile-only field: it may be shown
-   * only to the user themselves in their own profile, never to any other user. Because every nested
-   * mapper ({@code MissionMapper}, {@code ShipMapper}, {@code JobOrderMapper}) and every list /
-   * detail / admin endpoint funnels its {@code User → UserDto} conversion through this single
-   * method, omitting email here closes all peer-exposure paths at once and keeps new endpoints safe
-   * by default. The only caller that needs the email — the user's own {@code /api/v1/users/me*}
-   * view — re-adds it explicitly (see {@code UserController}); do NOT add a second {@code User →
-   * UserDto} mapping method here, as that would make the nested-mapper delegation ambiguous.
+   * <p>{@code email} is never mapped, so no peer ever sees it; the only caller that needs it, the
+   * user's own {@code /api/v1/users/me*} view, adds it explicitly. Keep this the single {@code User
+   * → UserDto} method so nested mappers stay unambiguous.
    *
-   * @param user the user entity to project; {@code null} maps to {@code null}.
-   * @return the populated DTO with {@code email == null}, or {@code null} when {@code user} is
-   *     {@code null}.
+   * @param user the user to project; {@code null} maps to {@code null}
+   * @return the DTO with {@code email == null}, or {@code null} for a {@code null} user
    */
   @Mapping(target = "email", ignore = true)
   @Mapping(target = "roles", expression = "java(roleNames(user.getRoles()))")
@@ -151,18 +117,11 @@ public abstract class UserMapper {
   }
 
   /**
-   * Resolves the user's <em>complete</em> Staffel membership set for the DTO's {@code squadrons}
-   * projection (REQ-ORG-017 — up to two). Reads every {@code SQUADRON}-kind membership row (via the
-   * request-memoised {@link #loadStaffelMemberships(User)}) and hands them to {@link
-   * StaffelMembershipResolver#resolveNameSortedStaffeln(List)}, the single owner of the name-sort,
-   * so this projection's order agrees with {@code OwnerScopeService} and {@code
-   * OrgUnitMembershipService} by construction. Each resolved {@link Squadron} becomes a {@link
-   * SquadronReferenceDto}; a row whose squadron no longer resolves is dropped by the resolver.
-   * Returns an empty list when the user has no Staffel membership (admins, members of no Staffel)
-   * or is itself {@code null}.
+   * Resolves all of the user's Staffeln (REQ-ORG-017) as name-sorted references via {@link
+   * StaffelMembershipResolver#resolveNameSortedStaffeln(List)}.
    *
-   * @param user the user being projected; may be {@code null}.
-   * @return the user's Staffel reference DTOs, name-sorted; never {@code null}, possibly empty.
+   * @param user the user being projected; may be {@code null}
+   * @return the Staffel references, name-sorted; never {@code null}, possibly empty
    */
   protected List<SquadronReferenceDto> resolveSquadrons(User user) {
     if (user == null || user.getId() == null) {
@@ -184,20 +143,11 @@ public abstract class UserMapper {
   }
 
   /**
-   * Seeds the request memo for a whole page or aggregate of users in two queries, so the per-user
-   * projection of {@link #toDto(User)} that follows reads everything from the memo instead of
-   * issuing up to three queries per user (REQ-DATA-003). One {@code findAllByIdUserIdInAndKindIn}
-   * loads every {@code SQUADRON}-kind membership row of the given users, and one {@link
-   * StaffelMembershipResolver#resolveNameSortedStaffelnByUser(Map)} loads every Staffel they
-   * reference; both memos ({@link #MEMBERSHIP_CACHE_ATTR} and {@link #SQUADRONS_CACHE_ATTR}) are
-   * then populated for <em>every</em> given user — a user with no Staffel is seeded with an empty
-   * list, which is exactly what the single-user path would have computed.
+   * Seeds both request memos for a batch of users in two queries (REQ-DATA-003), so the following
+   * {@link #toDto(User)} calls read from the memo.
    *
-   * <p>Users already memoised are skipped, so priming twice in one request costs nothing. Outside
-   * an HTTP request there is no memo to seed and the call is a no-op: the per-user fallback of
-   * {@link #toDto(User)} still produces the same values. The same immutability assumption as {@link
-   * #loadStaffelMemberships(User)} applies — prime right before mapping, never before a membership
-   * write in the same request.
+   * <p>Already-memoised users are skipped; outside an HTTP request it is a no-op. Call it right
+   * before mapping, never before a membership write in the same request.
    *
    * @param users the users about to be mapped; {@code null} elements and users without an id are
    *     ignored. Never {@code null}.
@@ -255,10 +205,9 @@ public abstract class UserMapper {
   /**
    * Returns the request-scoped memo map stored under {@code key}, creating it on first use.
    *
-   * @param key the memo's key.
-   * @param <V> the memoised value type.
-   * @return the memo keyed by user id, or {@code null} outside an HTTP request (no request scope,
-   *     so no memo — callers fall back to a direct query).
+   * @param key the memo's key
+   * @param <V> the memoised value type
+   * @return the memo keyed by user id, or {@code null} outside an HTTP request
    */
   @Nullable
   private static <V> Map<UUID, V> requestMemo(@NotNull RequestMemo.Key<Map<UUID, V>> key) {
@@ -266,27 +215,21 @@ public abstract class UserMapper {
   }
 
   /**
-   * Resolves the user's <em>primary</em> Staffel for the DTO's {@code squadron} projection — the
-   * first of {@link #resolveSquadrons(User)} (name-sorted), retained for API stability for callers
-   * that only render a single Staffel. Returns {@code null} when the user has no Staffel
-   * membership.
+   * Resolves the user's primary Staffel, the first of {@link #resolveSquadrons(User)}.
    *
-   * @param user the user being projected; may be {@code null}.
-   * @return the user's primary Staffel reference DTO, or {@code null} when no Staffel membership
-   *     exists.
+   * @param user the user being projected; may be {@code null}
+   * @return the primary Staffel reference, or {@code null} without a Staffel membership
    */
   protected SquadronReferenceDto resolveSquadron(User user) {
     return resolveSquadrons(user).stream().findFirst().orElse(null);
   }
 
   /**
-   * Resolves the user's effective {@code isLogistician} flag — {@code true} iff <em>any</em> of the
-   * user's Staffel memberships carries {@code isLogistician = true}. The flag grants flat authority
-   * regardless of which membership holds it (REQ-SEC-005), so the DTO-level indicator is the OR
-   * across the (up to two) Staffel rows. A user without a Staffel membership returns {@code false}.
+   * Resolves the effective {@code isLogistician} flag as the OR across the user's Staffel
+   * memberships (REQ-SEC-005).
    *
-   * @param user the user being projected; may be {@code null}.
-   * @return {@code true} iff any Staffel membership carries {@code isLogistician = true}.
+   * @param user the user being projected; may be {@code null}
+   * @return {@code true} iff any Staffel membership carries {@code isLogistician = true}
    */
   protected Boolean resolveLogistician(User user) {
     if (user == null || user.getId() == null) {
@@ -296,12 +239,11 @@ public abstract class UserMapper {
   }
 
   /**
-   * Resolves the user's effective {@code isMissionManager} flag — the OR across the user's Staffel
-   * memberships. Mirrors {@link #resolveLogistician(User)} semantics — no membership row means
-   * {@code false}.
+   * Resolves the effective {@code isMissionManager} flag as the OR across the user's Staffel
+   * memberships.
    *
-   * @param user the user being projected; may be {@code null}.
-   * @return {@code true} iff any Staffel membership carries {@code isMissionManager = true}.
+   * @param user the user being projected; may be {@code null}
+   * @return {@code true} iff any Staffel membership carries {@code isMissionManager = true}
    */
   protected Boolean resolveMissionManager(User user) {
     if (user == null || user.getId() == null) {
@@ -311,14 +253,11 @@ public abstract class UserMapper {
   }
 
   /**
-   * Resolves the {@code discordLinked} indicator for the DTO. Returns {@code true} iff the user has
-   * a non-blank {@code discord_user_id} — i.e. a Discord account is federated to this Basetool
-   * account (REQ-DATA-006). The raw snowflake itself is never copied into the DTO; only this
-   * boolean fact leaves the backend, and the admin member-management page renders it as the Discord
-   * column (REQ-SEC-019). Independent of the Staffel membership, so it needs no membership lookup.
+   * Resolves whether a Discord account is linked, i.e. {@code discord_user_id} is non-blank
+   * (REQ-DATA-006); the id itself never leaves the backend.
    *
-   * @param user the user being projected; may be {@code null}.
-   * @return {@code true} iff a Discord account is linked, {@code false} otherwise.
+   * @param user the user being projected; may be {@code null}
+   * @return {@code true} iff a Discord account is linked
    */
   protected Boolean resolveDiscordLinked(User user) {
     if (user == null) {
@@ -329,27 +268,14 @@ public abstract class UserMapper {
   }
 
   /**
-   * Reads every Staffel membership of the user (REQ-ORG-017 — up to two). The list backs all of the
-   * {@code squadron(s)} / {@code isLogistician} / {@code isMissionManager} projections.
+   * Loads every Staffel membership of the user (REQ-ORG-017), memoised per request by user id;
+   * outside a request it queries directly.
    *
-   * <p>Memoised per request: the four derived-field resolvers each call this for the same user, so
-   * without caching the underlying derived query runs once per resolver per {@code toDto}. The
-   * result is cached in a {@link RequestMemo} keyed by user id ({@link #MEMBERSHIP_CACHE_ATTR}), so
-   * it runs at most once per distinct user per request. Outside an HTTP request (e.g. a scheduled
-   * task that maps a user) there is no request scope, so it falls back to the direct query with no
-   * memo. Only eagerly-loaded scalar fields of the returned memberships are read by the callers, so
-   * a value surviving into a later transaction within the same request is still safe to read.
+   * <p>The memo assumes the membership set does not change within the request; a flow that mutates
+   * and then re-maps the same user must evict {@link #MEMBERSHIP_CACHE_ATTR}.
    *
-   * <p>The memo assumes a user's Staffel membership set is <em>immutable for the duration of the
-   * request</em>: it is populated lazily on first read, so a write endpoint that mutates the
-   * memberships before mapping the affected user sees the fresh value (the memo is still empty at
-   * that point). A hypothetical endpoint that maps a user, mutates that same user's memberships,
-   * then re-maps the same user in the same request would observe the pre-mutation snapshot — no
-   * such flow exists today; one that needs it must evict {@link #MEMBERSHIP_CACHE_ATTR} after the
-   * mutation.
-   *
-   * @param user the user whose Staffel memberships to load; never {@code null}.
-   * @return the user's Staffel membership rows; never {@code null}, possibly empty.
+   * @param user the user whose memberships to load; never {@code null}
+   * @return the Staffel membership rows; never {@code null}, possibly empty
    */
   private List<OrgUnitMembership> loadStaffelMemberships(User user) {
     Map<UUID, List<OrgUnitMembership>> cache = requestMemo(MEMBERSHIP_CACHE_ATTR);

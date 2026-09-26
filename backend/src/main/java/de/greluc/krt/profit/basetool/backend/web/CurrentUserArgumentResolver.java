@@ -35,22 +35,10 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * Resolves {@link CurrentUserId}-annotated {@link UUID} controller parameters from the
  * authenticated caller's subject.
  *
- * <p>This is the single implementation of the {@code requireSub(JwtAuthenticationToken)} guard six
- * controllers once hand-rolled. It had a String-typed twin, {@code @CurrentUserSub}, which returned
- * the same value unparsed; ADR-0142 point 2 removed it, because a controller that says "sub" is
- * naming the identity provider for a value that is simply the user id. The principal is read via
- * {@link NativeWebRequest#getUserPrincipal()} — the exact source Spring MVC used to populate the
- * {@code JwtAuthenticationToken} method parameters these annotations replace — so no {@link
- * org.springframework.security.core.context.SecurityContextHolder} coupling is introduced.
- *
- * <p>The subject comes from {@link
- * de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject}, not from a type check, so a
- * caller that carries a subject without a token — the member an ingest-gateway call acts for,
- * ADR-0129 — resolves like any other. Demanding a {@code JwtAuthenticationToken} here refused every
- * such call during argument resolution, one layer past the gate it used to fail at.
- *
- * <p>An absent subject and a non-UUID subject each raise {@link AccessDeniedException}, which the
- * security layer renders as RFC 7807 {@code 403}.
+ * <p>The subject is read via {@link
+ * de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject}, so a subject without a JWT,
+ * as on ingest-gateway calls (ADR-0129), resolves too. An absent or non-UUID subject raises {@link
+ * AccessDeniedException} (403).
  */
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
@@ -93,8 +81,7 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
   }
 
   /**
-   * Extracts and validates the caller's subject from the current request, applying the
-   * blank-subject guards the controllers shared.
+   * Extracts the caller's subject from the current request and rejects a missing or blank one.
    *
    * @param webRequest the current request
    * @return the non-blank subject claim
@@ -102,10 +89,6 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
    */
   @NotNull
   private static String requireSubject(@NotNull NativeWebRequest webRequest) {
-    // Asked of AuthenticatedSubject, not of the type. A request the ingest gateway makes on behalf
-    // of a member carries that member's identity with NO token behind it (ADR-0129), so demanding a
-    // JwtAuthenticationToken here threw before the handler body ran — every gateway call 403'd at
-    // argument resolution, one layer past the gate that used to fail it.
     Principal principal = webRequest.getUserPrincipal();
     return AuthenticatedSubject.of(principal instanceof Authentication auth ? auth : null)
         .orElseThrow(() -> new AccessDeniedException("No authenticated subject."));

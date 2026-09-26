@@ -40,15 +40,10 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Mockito unit tests for {@link AuditRetentionService} — the automatic ceiling on how long both
- * audit trails are kept (REQ-AUDIT-006).
+ * Unit tests for {@link AuditRetentionService} (REQ-AUDIT-006).
  *
- * <p>Three properties carry the requirement and are each pinned down here: every activity domain
- * <em>and</em> the bank trail are swept (a trail left out would keep a named person's handle
- * forever); a domain holding nothing that old is skipped rather than purged, because {@code
- * purgeBefore} writes its {@code *_AUDIT_PURGED} marker unconditionally and a daily job would
- * otherwise grow the table it exists to bound; and one domain that cannot be purged does not abort
- * the rest of the run.
+ * <p>Covers that every activity domain and the bank trail are swept, a domain with nothing old
+ * enough is skipped, and one failing domain does not abort the run.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -63,7 +58,6 @@ class AuditRetentionServiceTest {
 
   @InjectMocks private AuditRetentionService service;
 
-  // covers REQ-AUDIT-006 — every activity domain and the bank trail are swept
   @Test
   void purgesEveryActivityDomainAndTheBankTrail() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
@@ -81,7 +75,6 @@ class AuditRetentionServiceTest {
     assertThat(deleted).isEqualTo(AuditDomain.values().length * 2 + 5);
   }
 
-  // covers REQ-AUDIT-006 — a domain with nothing that old is not purged, so no marker is minted
   @Test
   void skipsDomainsThatHoldNothingOlderThanTheCutoff() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
@@ -99,7 +92,6 @@ class AuditRetentionServiceTest {
     assertThat(deleted).isEqualTo(3);
   }
 
-  // covers REQ-AUDIT-006 — one failing domain does not abort the sweep
   @Test
   void continuesAfterADomainThatCannotBePurged() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
@@ -119,7 +111,6 @@ class AuditRetentionServiceTest {
     assertThat(deleted).isEqualTo(AuditDomain.values().length - 1 + 4);
   }
 
-  // covers REQ-AUDIT-006 — a failing bank purge is isolated the same way
   @Test
   void continuesAfterABankTrailThatCannotBePurged() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))

@@ -20,12 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Lifecycle state of a {@link BankBookingRequest} (REQ-BANK-022/-023). A request is born {@code
- * PENDING} (audited and visible, but off-ledger — it has moved no money), then reaches exactly one
- * terminal state: {@code CONFIRMED} when a bank employee books it onto the ledger, {@code REJECTED}
- * when a bank employee declines it, or {@code CANCELLED} when the requesting officer/lead withdraws
- * it. Only the {@code PENDING → terminal} transitions exist; a terminal request is immutable. V159
- * mirrors this set with a {@code CHECK} constraint.
+ * Lifecycle state of a {@link BankBookingRequest} (REQ-BANK-022). A request starts {@code PENDING}
+ * (off-ledger) and reaches exactly one terminal state: {@code CONFIRMED}, {@code REJECTED} or
+ * {@code CANCELLED}; a terminal request is immutable.
  */
 public enum BankBookingRequestStatus {
 

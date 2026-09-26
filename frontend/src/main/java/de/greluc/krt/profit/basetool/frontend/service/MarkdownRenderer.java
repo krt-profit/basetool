@@ -26,13 +26,9 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Renders user-supplied Markdown (e.g. the mission description) to HTML that is safe to emit via
- * {@code th:utext}. Two hardening switches make the output XSS-safe without a separate sanitizer:
- * raw HTML embedded in the Markdown is escaped to text ({@code escapeHtml}), and link/image URLs
- * with dangerous protocols ({@code javascript:}, {@code data:} …) are stripped ({@code
- * sanitizeUrls}). The only markup that can reach the page is therefore what the CommonMark renderer
- * itself generates. Exposed as the {@code @markdown} bean for Thymeleaf templates; parser and
- * renderer instances are thread-safe and reused.
+ * Renders user-supplied Markdown to HTML safe for {@code th:utext}: embedded raw HTML is escaped
+ * and dangerous link and image URLs are stripped. Exposed to templates as the {@code @markdown}
+ * bean; thread-safe.
  */
 @Component("markdown")
 public class MarkdownRenderer {

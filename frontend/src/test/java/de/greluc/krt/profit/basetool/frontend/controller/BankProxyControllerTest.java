@@ -50,94 +50,75 @@ class BankProxyControllerTest {
 
   @Test
   void bookDeposit_ShouldForwardBodyToBackend() {
-    // Given
     Map<String, Object> body = Map.of("accountId", "a", "holderId", "h", "amount", 100);
     when(backendApiClient.post("/api/v1/bank/deposits", body, Map.class))
         .thenReturn(Map.of("id", "x"));
 
-    // When
     Map<String, Object> result = controller.bookDeposit(body);
 
-    // Then
     assertEquals("x", result.get("id"));
     verify(backendApiClient).post("/api/v1/bank/deposits", body, Map.class);
   }
 
   @Test
   void bookTransfer_ShouldReturnEmptyMapForBodylessResponse() {
-    // Given
     Map<String, Object> body = Map.of("sourceAccountId", "a");
     when(backendApiClient.post("/api/v1/bank/transfers", body, Map.class)).thenReturn(null);
 
-    // When
     Map<String, Object> result = controller.bookTransfer(body);
 
-    // Then
     assertEquals(Map.of(), result);
   }
 
   @Test
   void reverseTransaction_ShouldForwardEmptyMapWhenBodyMissing() {
-    // Given
     UUID id = UUID.randomUUID();
     when(backendApiClient.post(
             eq("/api/v1/bank/transactions/" + id + "/reversal"), eq(Map.of()), eq(Map.class)))
         .thenReturn(Map.of());
 
-    // When
     controller.reverseTransaction(id, null);
 
-    // Then
     verify(backendApiClient)
         .post("/api/v1/bank/transactions/" + id + "/reversal", Map.of(), Map.class);
   }
 
   @Test
   void renameAccount_ShouldPatchBackend() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("name", "Neu", "version", 1);
     when(backendApiClient.patch("/api/v1/bank/accounts/" + id, body, Map.class))
         .thenReturn(Map.of("name", "Neu"));
 
-    // When
     Map<String, Object> result = controller.renameAccount(id, body);
 
-    // Then
     assertEquals("Neu", result.get("name"));
   }
 
   @Test
   void closeAndReopen_ShouldPostLifecycleEndpoints() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("version", 2);
 
-    // When
     controller.closeAccount(id, body);
     controller.reopenAccount(id, body);
 
-    // Then
     verify(backendApiClient).post("/api/v1/bank/accounts/" + id + "/close", body, Map.class);
     verify(backendApiClient).post("/api/v1/bank/accounts/" + id + "/reopen", body, Map.class);
   }
 
   @Test
   void updateHolder_ShouldPatchBackend() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("active", false, "version", 0);
 
-    // When
     controller.updateHolder(id, body);
 
-    // Then
     verify(backendApiClient).patch("/api/v1/bank/holders/" + id, body, Map.class);
   }
 
   @Test
   void searchAccounts_ShouldForwardActiveNameSortedSearch_andUnwrapContent() {
-    // Given a matching account page from the backend
     Map<String, Object> row = Map.of("id", "acc-1", "accountNo", "KB-0001", "name", "Phoenix");
     when(backendApiClient.get(
             org.mockito.ArgumentMatchers.anyString(),
@@ -145,11 +126,8 @@ class BankProxyControllerTest {
             org.mockito.ArgumentMatchers.<Object>any()))
         .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
 
-    // When
     List<Map<String, Object>> result = controller.searchAccounts("pho");
 
-    // Then — the content is unwrapped, the URI carries the picker's fixed filters plus the query as
-    // a single-encoded URI-template variable, and the raw term is forwarded verbatim.
     assertEquals(1, result.size());
     assertEquals("KB-0001", result.get(0).get("accountNo"));
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
@@ -163,9 +141,6 @@ class BankProxyControllerTest {
     assertEquals("pho", varCaptor.getValue(), "the raw query value is forwarded verbatim");
   }
 
-  // #1344 regression: a multi-word account/name query must reach the backend single-encoded (the
-  // real spaces), not double-encoded (%2520). Verify the raw value is forwarded as the URI
-  // variable.
   @Test
   void searchAccounts_passesMultiWordQueryAsUriVariable() {
     when(backendApiClient.get(
@@ -191,18 +166,14 @@ class BankProxyControllerTest {
 
   @Test
   void searchAccounts_NullQuery_matchesAll_andEmptyResponseDegradesToEmptyList() {
-    // Given a null (browse-mode) query and a null backend response
     when(backendApiClient.get(
             org.mockito.ArgumentMatchers.anyString(),
             anyTypeRef(),
             org.mockito.ArgumentMatchers.<Object>any()))
         .thenReturn(null);
 
-    // When
     List<Map<String, Object>> result = controller.searchAccounts(null);
 
-    // Then — the null query is normalised to an empty match-all filter and the null page degrades
-    // to an empty list (the picker shows "no matches", never throws).
     assertEquals(List.of(), result);
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<Object> varCaptor = ArgumentCaptor.forClass(Object.class);
@@ -213,17 +184,14 @@ class BankProxyControllerTest {
 
   @Test
   void grantLifecycle_ShouldTargetCompositeKeyPaths() {
-    // Given
     UUID userId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     Map<String, Object> flags =
         Map.of("canDeposit", true, "canWithdraw", false, "canTransfer", true, "version", 3);
 
-    // When
     controller.updateGrant(userId, accountId, flags);
     controller.deleteGrant(userId, accountId);
 
-    // Then
     verify(backendApiClient)
         .patch("/api/v1/bank/grants/" + userId + "/" + accountId, flags, Map.class);
     verify(backendApiClient).delete("/api/v1/bank/grants/" + userId + "/" + accountId, Void.class);

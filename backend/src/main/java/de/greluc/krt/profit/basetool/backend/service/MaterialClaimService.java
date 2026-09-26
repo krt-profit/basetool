@@ -65,27 +65,13 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages material claims ("Eintragungen") — the way profit squadrons sign up for partial
- * quantities of a material bucket on a public Spezialkommando job order (Job-Order rework #340,
- * Phase 4 / #344).
+ * Manages material claims ("Eintragungen"): profit squadrons signing up for partial quantities of a
+ * material bucket on a public Spezialkommando job order.
  *
- * <p>A claim is keyed on the aggregated bucket {@code (jobOrder, material, qualityRequirement)} so
- * the same flow serves both order kinds (a {@code MATERIAL} order buckets {@link JobOrderMaterial}
- * by {@code minQuality}, an {@code ITEM} order sums {@link JobOrderItemMaterial} per quality). The
- * service enforces every invariant the data layer cannot: claims live only on SK orders, the sum
- * across squadrons never exceeds the bucket's required amount (no overclaim), and a squadron holds
- * at most one claim per bucket (a repeat post updates rather than duplicates). The no-overclaim
- * invariant is a cross-row aggregate, so it is made concurrency-safe with a pessimistic lock on the
- * order (the claims' aggregate root) taken before the already-claimed sum is read — see {@link
- * #upsertClaim} (REQ-ORDERS-024, ADR-0092).
- *
- * <p>Claims are an independent aggregate — there is no mapped collection on {@link JobOrder}, so
- * the reconciliation hooks ({@link #withdrawAllForOrderWithinTransaction} on SK→Squadron
- * de-escalation, {@link #withdrawOrphanedClaimsWithinTransaction} on a bucket removal) delete rows
- * through the repository without ever bumping the parent order's {@code @Version}. This sidesteps
- * the optimistic-locking traps documented in CLAUDE.md: a withdrawal runs inside the order's edit
- * transaction but touches only {@link MaterialClaim} rows, which the order's managed graph never
- * holds.
+ * <p>A claim is keyed on the bucket {@code (jobOrder, material, qualityRequirement)} and the
+ * claiming squadron. Claims exist only on SK orders, never exceed the bucket's required amount in
+ * sum (guarded by a pessimistic order lock, REQ-ORDERS-024, ADR-0092), and are deleted through the
+ * repository without bumping the order's {@code @Version}.
  */
 @Service
 @RequiredArgsConstructor
@@ -104,24 +90,14 @@ public class MaterialClaimService {
   private final SquadronMapper squadronMapper;
 
   /**
-   * Self-reference used to invoke {@link #upsertClaimWithinTransaction} through the Spring proxy so
-   * each retry of {@link #upsertClaim} opens its OWN {@code REQUIRES_NEW} transaction. A direct
-   * {@code this} call would be self-invocation, skip the proxy and run every attempt in one
-   * transaction — fatal here, because a losing writer's {@link DataIntegrityViolationException} /
-   * {@link ObjectOptimisticLockingFailureException} poisons the whole transaction (Postgres marks
-   * it aborted), so no same-transaction retry could ever commit. An {@link ObjectProvider} defers
-   * the lookup, avoiding an eager self-injection cycle at construction. Mirrors {@code
-   * OperationPayoutService.setPayoutStatus} (#1111).
+   * Proxied self-reference so each {@link #upsertClaim} attempt runs {@link
+   * #upsertClaimWithinTransaction} in its own {@code REQUIRES_NEW} transaction.
    */
   private final ObjectProvider<MaterialClaimService> self;
 
   /**
-   * Total attempts (one initial + retries) {@link #upsertClaim} makes against a concurrent
-   * same-bucket writer before giving up and surfacing the conflict as a 409. Five gives ample
-   * head-room for the realistic case — a handful of a squadron's logisticians lodging the <em>first
-   * </em> claim on one bucket within the same instant: the round-one INSERT losers retry, find the
-   * winner's committed row and UPDATE it in place (last-writer-wins), so a genuine conflict only
-   * ever survives a pathological, never-winning race.
+   * Total attempts {@link #upsertClaim} makes against a concurrent same-bucket writer before the
+   * conflict surfaces as a 409.
    */
   private static final int MAX_UPSERT_ATTEMPTS = 5;
 
@@ -135,11 +111,9 @@ public class MaterialClaimService {
   private record Bucket(UUID materialId, QualityRequirement quality) {}
 
   /**
-   * Returns the full claim view of an order: one {@link ClaimBucketDto} per required material
-   * bucket, carrying the required amount, the collectively-claimed amount, the open remainder and
-   * the individual per-squadron claims. Visibility is gated at the controller via {@code
-   * canSeeJobOrder}; a non-SK order simply has no buckets eligible for claiming, but the read still
-   * returns its required buckets with empty claim lists for a uniform UI shell.
+   * Returns the claim view of an order: one {@link ClaimBucketDto} per required bucket with
+   * required, claimed and open amounts and the per-squadron claims. A non-SK order yields buckets
+   * with empty claim lists.
    *
    * @param jobOrderId the order to inspect.
    * @return the per-bucket claim view, never {@code null}.
@@ -151,9 +125,8 @@ public class MaterialClaimService {
   }
 
   /**
-   * Order-taking variant of {@link #getClaimBuckets(UUID)} for callers that already hold a managed
-   * {@link JobOrder} (e.g. {@code JobOrderService.mapToDtoWithStock} enriching the detail DTO with
-   * claims, Phase 5 / #345) — avoids the redundant {@code findById} reload.
+   * Variant of {@link #getClaimBuckets(UUID)} for a caller already holding the managed {@link
+   * JobOrder}.
    *
    * @param order the managed order whose buckets + claims to project.
    * @return the per-bucket claim view, never {@code null}.
@@ -165,15 +138,11 @@ public class MaterialClaimService {
   }
 
   /**
-   * Batched-list variant of {@link #getClaimBucketsForOrder(JobOrder)} that takes the order's
-   * claims pre-loaded by the caller (newest-first), so the paged job-order list can fetch every SK
-   * order's claims in one {@code findByJobOrderIdInOrderByCreatedAtDesc} query and avoid the
-   * per-order claim query (REQ-DATA-003). The {@code claims} must be exactly this order's claims;
-   * the bucketing, required-amount and open-remaining computation are identical to the single-order
-   * path.
+   * Variant of {@link #getClaimBucketsForOrder(JobOrder)} over claims the caller pre-loaded
+   * (REQ-DATA-003).
    *
    * @param order the managed order whose buckets to project.
-   * @param orderClaims this order's claims, newest-first; may be empty.
+   * @param orderClaims exactly this order's claims, newest-first; may be empty.
    * @return the per-bucket claim view, never {@code null}.
    */
   @NotNull
@@ -211,15 +180,11 @@ public class MaterialClaimService {
   }
 
   /**
-   * Batch variant of {@link #getClaimBucketsForOrder(JobOrder)} for the paged job-order list: loads
-   * the claims of all given orders in a single query and returns the per-order bucket view keyed by
-   * order id, so the list path issues one claim query instead of one per SK order (REQ-DATA-003).
-   * Pass only the orders that can carry claims (SK-responsible); other orders need no entry (their
-   * claim view is empty by construction).
+   * Batch variant of {@link #getClaimBucketsForOrder(JobOrder)} that loads the claims of all given
+   * orders in one query (REQ-DATA-003). Pass only SK-responsible orders.
    *
    * @param orders the orders whose claim views to project; an empty collection yields an empty map.
-   * @return order id → its per-bucket claim view; orders with no claims still get their required
-   *     buckets with empty claim lists.
+   * @return order id → its per-bucket claim view, with empty claim lists where none exist.
    */
   @NotNull
   public Map<UUID, List<ClaimBucketDto>> getClaimBucketsForOrders(
@@ -241,42 +206,13 @@ public class MaterialClaimService {
   }
 
   /**
-   * Creates or updates a squadron's claim on a bucket (upsert keyed on {@code (bucket, squadron)}).
-   * Enforces every invariant: the order must be a non-terminal SK order, the caller must be allowed
-   * to act for the claiming squadron, the bucket must exist on the order, the new amount must not
-   * push the bucket's total claims past its required amount, and — on a new claim — the claiming
-   * squadron must itself be profit-eligible (only Profit-side squadrons take part in the order
-   * workflow).
+   * Creates or updates a squadron's claim on a bucket, keyed on {@code (bucket, squadron)}.
    *
-   * <p><b>No cross-squadron overclaim under concurrency.</b> The no-overclaim guard sums the
-   * bucket's claims across <em>all</em> squadrons — a cross-row aggregate the unique index cannot
-   * protect. Two DIFFERENT squadrons racing their first claim on one bucket would each read a zero
-   * already-claimed sum under {@code READ COMMITTED} (the other's uncommitted INSERT is invisible)
-   * and both commit past the required amount, and because {@code uq_material_claim_bucket_org_unit}
-   * keys per claiming squadron the two rows never collide. {@link #upsertClaimWithinTransaction}
-   * therefore takes a {@code PESSIMISTIC_WRITE} row lock on the order — the claims' aggregate root,
-   * via {@code JobOrderRepository.lockForClaimUpsert} — before reading that sum: claimants of one
-   * order serialise, so the loser reads the winner's committed claim and its guard rejects the
-   * overclaim (REQ-ORDERS-024, ADR-0092).
-   *
-   * <p><b>Last-writer-wins under concurrency, for real.</b> The {@code material_claim} row carries
-   * a JPA {@code @Version} (via {@code AbstractEntity}) <em>and</em> a unique index {@code
-   * uq_material_claim_bucket_org_unit} on {@code (job_order_id, material_id, quality_requirement,
-   * claiming_org_unit_id)} (V131), so two logisticians of the same squadron lodging the
-   * <em>first</em> claim on one bucket at once do NOT both succeed: one loses the INSERT (unique
-   * constraint → {@link DataIntegrityViolationException}) or, on a repeat edit, the UPDATE
-   * ({@code @Version} → {@link ObjectOptimisticLockingFailureException}) race and its transaction
-   * is poisoned. This method is therefore a <b>non-transactional orchestrator</b> ({@code
-   * NOT_SUPPORTED}) that runs each attempt in its own {@code REQUIRES_NEW} transaction (via {@link
-   * #self}) and retries up to {@link #MAX_UPSERT_ATTEMPTS} times on either exception: by the retry
-   * the winner has committed the row, so the loser reloads it and UPDATEs in place. Unlike a
-   * boolean toggle the {@code @Version} is kept and echoed to the client through {@link ClaimDto} —
-   * a genuine concurrent same-squadron edit that outlasts the retry bound still surfaces a truthful
-   * 409, never a 500 (found in the optimistic-lock audit for #1186, pre-existing on the claim
-   * sign-up path). Now that the pessimistic order lock above serialises an order's claim writers,
-   * this retry is a defense-in-depth backstop rather than the primary guard — it still covers a
-   * same-row race the order lock does not serialise, e.g. an upsert whose row is deleted by a
-   * concurrent {@link #withdrawClaim} between the find-or-create and the save.
+   * <p>The order must be a non-terminal SK order, the caller must act for the claiming squadron,
+   * the bucket must exist, the total must not exceed the required amount, and a new claim's
+   * squadron must be profit-eligible. Non-transactional orchestrator: each attempt runs in its own
+   * transaction and is retried up to {@link #MAX_UPSERT_ATTEMPTS} times on a concurrent-write
+   * conflict (REQ-ORDERS-024, ADR-0092).
    *
    * @param jobOrderId the order.
    * @param dto the claim payload.
@@ -285,18 +221,10 @@ public class MaterialClaimService {
    * @throws BadRequestException when the order is not an open SK order, the bucket does not exist,
    *     the amount would overclaim, or a new claim names a non-profit-eligible squadron.
    * @throws AccessDeniedException when the caller may not act for the claiming squadron.
-   * @throws ObjectOptimisticLockingFailureException only if every attempt loses the race — a
-   *     persistent hot-bucket contention that still maps to a 409, never a 500.
+   * @throws ObjectOptimisticLockingFailureException if every attempt loses the race (a 409).
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public ClaimDto upsertClaim(@NotNull UUID jobOrderId, @NotNull CreateClaimDto dto) {
-    // Retry the upsert across FRESH transactions. Each attempt is REQUIRES_NEW (see self): a losing
-    // first-claim writer's unique-constraint / @Version violation poisons its own transaction, so
-    // the
-    // only correct retry is a brand-new one. All but the final attempt swallow the race and loop;
-    // the
-    // final attempt lets a persistent race propagate so it maps to a truthful 409, not a pretend
-    // success.
     for (int attempt = 1; attempt < MAX_UPSERT_ATTEMPTS; attempt++) {
       try {
         return self.getObject().upsertClaimWithinTransaction(jobOrderId, dto);
@@ -316,11 +244,8 @@ public class MaterialClaimService {
   }
 
   /**
-   * Performs one attempt of the claim upsert inside its own {@code REQUIRES_NEW} transaction — the
-   * validate + find-or-create + save + audit body that {@link #upsertClaim} retries. Kept separate
-   * (and invoked through {@link #self}) precisely so a unique-constraint / {@code @Version}
-   * violation rolls back only this attempt's transaction and the orchestrator can retry in a clean
-   * one. Must never be called directly by application code — go through {@link #upsertClaim}.
+   * Performs one claim-upsert attempt in its own {@code REQUIRES_NEW} transaction, locking the
+   * order before summing its claims. Called only through {@link #upsertClaim}.
    *
    * @param jobOrderId the order.
    * @param dto the claim payload.
@@ -352,13 +277,6 @@ public class MaterialClaimService {
               + dto.qualityRequirement());
     }
 
-    // Serialise every claim upsert on this order on its aggregate-root (job_order) row BEFORE
-    // summing the bucket's existing claims (REQ-ORDERS-024, ADR-0092). Two DIFFERENT squadrons
-    // racing their first claim on the same bucket would otherwise each read a zero already-claimed
-    // sum under READ COMMITTED (the other's uncommitted INSERT is invisible), both pass the guard
-    // below and both commit — and because uq_material_claim_bucket_org_unit keys per claiming
-    // squadron it never collides across squadrons, so the REQUIRES_NEW retry cannot catch that
-    // cross-squadron overclaim. The row lock releases at this attempt's commit/rollback.
     jobOrderRepository.lockForClaimUpsert(jobOrderId);
 
     double amount = dto.amount();
@@ -402,8 +320,6 @@ public class MaterialClaimService {
 
     boolean isNew = claim.getId() == null;
     MaterialClaim saved = materialClaimRepository.save(claim);
-    // Audit (Phase 7, #347): identifiers + amount only — never names/emails. The request-scoped MDC
-    // (correlationId / userId / orgUnitId) is attached by CorrelationIdFilter.
     log.info(
         "Material claim upserted: order={} material={} quality={} claimingOrgUnit={} amount={}",
         order.getId(),
@@ -470,15 +386,11 @@ public class MaterialClaimService {
   }
 
   /**
-   * Reconciliation hook (decision #10): withdraws every claim on an order, used when a Phase-2
-   * reassignment de-escalates the order from an SK back to a squadron — the order becomes private,
-   * so its public claims are dropped. Runs inside the reassignment transaction on the
-   * already-managed order; deletes through the repository so the order's {@code @Version} is never
-   * touched.
+   * Withdraws every claim on an order when it is reassigned from an SK back to a squadron. Runs in
+   * the caller's transaction and never touches the order's {@code @Version}.
    *
    * @param order the managed order whose claims are being withdrawn.
-   * @return the number of claims withdrawn (0 when the order had none); folded into the parent
-   *     reassignment's audit event by the caller.
+   * @return the number of claims withdrawn (0 when the order had none).
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public int withdrawAllForOrderWithinTransaction(@NotNull JobOrder order) {
@@ -495,22 +407,11 @@ public class MaterialClaimService {
   }
 
   /**
-   * Reconciliation hook (decision #6): withdraws claims whose bucket no longer exists on the order,
-   * used after an order edit removes a bucket. The bucket computation ({@link #requiredByBucket})
-   * is kind-agnostic, so this withdraws orphans for both a {@code MATERIAL} order whose material
-   * line was removed (the live path, wired into {@code JobOrderService.updateJobOrder}) and an
-   * {@code ITEM} order whose derived buckets changed. ITEM orders are immutable after creation
-   * today (no edit endpoint — the detail UI gates editing to {@code type != 'ITEM'}), so the ITEM
-   * branch is dormant but ready for a future item-edit path; it is covered by unit tests against an
-   * ITEM-typed order so it cannot rot.
-   *
-   * <p>Runs inside the edit transaction and deletes through the repository so the order's
-   * {@code @Version} is never touched — claims are an independent aggregate, which is what keeps
-   * the bulk withdrawal free of the optimistic-locking traps in CLAUDE.md.
+   * Withdraws claims whose bucket no longer exists on the order after an edit, for either order
+   * kind. Runs in the caller's transaction and never touches the order's {@code @Version}.
    *
    * @param order the managed order whose buckets define which claims survive.
-   * @return the number of orphaned claims withdrawn (0 when none); folded into the parent edit's
-   *     audit event by the caller.
+   * @return the number of orphaned claims withdrawn (0 when none).
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public int withdrawOrphanedClaimsWithinTransaction(JobOrder order) {
@@ -533,13 +434,12 @@ public class MaterialClaimService {
   }
 
   /**
-   * Computes the required amount per material bucket for either order kind: an {@code ITEM} order
-   * sums each {@link JobOrderItemMaterial#getRequiredQuantity()} per {@code (material, quality)}; a
-   * {@code MATERIAL} order sums each {@link JobOrderMaterial#getAmount()} with the bucket derived
-   * from {@code minQuality} ({@code GOOD} when a 650-floor is set, {@code NONE} otherwise).
+   * Computes the required amount per material bucket: per {@code (material, quality)} for an {@code
+   * ITEM} order, and per material with {@code GOOD} / {@code NONE} derived from {@code minQuality}
+   * for a {@code MATERIAL} order.
    *
    * @param order the order.
-   * @return required amount keyed by bucket, insertion-ordered for stable rendering.
+   * @return required amount keyed by bucket, insertion-ordered.
    */
   @NotNull
   private Map<Bucket, Double> requiredByBucket(JobOrder order) {
@@ -567,9 +467,7 @@ public class MaterialClaimService {
   }
 
   /**
-   * Builds a material lookup for the buckets of an order so the bucket DTO can carry the full
-   * {@link de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto} without a second query per
-   * row.
+   * Builds a material lookup for the buckets of an order.
    *
    * @param order the order.
    * @return material id → material, for every material referenced by a bucket.
@@ -592,9 +490,7 @@ public class MaterialClaimService {
   }
 
   /**
-   * Asserts the order accepts claim mutations: it must be responsible to a Spezialkommando (claims
-   * are public-SK-only) and not in a terminal status (terminal freezes claims read-only for
-   * history, decision #6).
+   * Asserts the order accepts claim mutations: responsible to a Spezialkommando and not terminal.
    *
    * @param order the order.
    * @throws BadRequestException when the order is not a claimable SK order.
@@ -615,15 +511,8 @@ public class MaterialClaimService {
   }
 
   /**
-   * Enforces the claim permission matrix (decision #8): an admin, or a logistician of the
-   * <em>responsible</em> SK, may manage <b>any</b> claim on that order; a squadron's
-   * logistician/officer may manage only claims for their <b>own</b> squadron ({@link
-   * AuthHelperService#canEditOrgUnit}). The SK-logistician check is the single contextual {@code
-   * LOGISTICIAN@skId} authority — and because an SK <b>lead</b> ({@code is_lead}) is automatically
-   * a logistician of its SK (granted that contextual authority by {@code
-   * CustomJwtGrantedAuthoritiesConverter}, mirroring how admin/officer outrank the role below
-   * them), this one check covers both the SK's logisticians and its leads/officers. The bare {@code
-   * hasRole('LOGISTICIAN')} controller gate has already filtered out anyone below logistician.
+   * Enforces the claim permission matrix: an admin or a logistician (incl. lead) of the responsible
+   * SK may manage any claim on the order; others only claims for a squadron they may edit.
    *
    * @param order the order whose responsible SK defines the elevated authority.
    * @param claimingOrgUnitId the squadron the claim is for.
@@ -646,8 +535,7 @@ public class MaterialClaimService {
   }
 
   /**
-   * Loads an order with its materials/items eager-fetched (via the repository's detail graph) so
-   * the bucket aggregation does not lazy-load row by row.
+   * Loads an order with its materials/items eager-fetched for bucket aggregation.
    *
    * @param jobOrderId the order id.
    * @return the managed order.
@@ -659,9 +547,7 @@ public class MaterialClaimService {
   }
 
   /**
-   * Resolves a material referenced by a create payload, requiring it to actually be a bucket on the
-   * order (the bucket existence is re-checked by the caller via {@code requiredByBucket}; this only
-   * loads the managed entity).
+   * Resolves a payload's material from the order's buckets.
    *
    * @param order the order the claim is on.
    * @param materialId the material id.
@@ -678,16 +564,7 @@ public class MaterialClaimService {
   }
 
   /**
-   * Resolves the claiming org unit and validates it may sign up for material: it must be a squadron
-   * (Spezialkommandos place orders, they never claim against them) <em>and</em> that squadron must
-   * be profit-eligible. A claim models a profit squadron volunteering to deliver part of an SK
-   * order, so a squadron an admin has not marked {@code isProfitEligible} is outside the order
-   * workflow — the claim modal's squadron picker is already filtered to the profit-eligible subset,
-   * and this check is the authoritative server-side guard behind that filter (it also blocks a
-   * hand-crafted request, and an admin or responsible-SK lead from claiming on behalf of a
-   * non-profit squadron). Reached only on the insert branch of {@link #upsertClaim}; an existing
-   * claim's squadron is not re-resolved, so a squadron that loses eligibility may still adjust or
-   * withdraw a claim it lodged while eligible.
+   * Resolves the claiming org unit for a new claim, requiring a profit-eligible squadron.
    *
    * @param claimingOrgUnitId the org unit id from the payload.
    * @return the managed, profit-eligible squadron-kind org unit.

@@ -22,8 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.math.BigDecimal;
 
 /**
- * Frontend mirror of the management-only dashboard totals strip ({@code .kpi-total} tiles, D1
- * mockup).
+ * Frontend mirror of the management-only dashboard totals strip.
  *
  * @param totalBalance sum of all account balances
  * @param inflow30d sum of all positive postings in the last 30 days

@@ -34,10 +34,6 @@
             <p th:text="#{__${errorToast}__}">Fehler</p>
         </div>
 
-        <!--/* Live-sync / in-place-save seam for the `order` section (REQ-FE-001 / REQ-FE-015): the
-             stable swap container stays put while its th:fragment body is re-rendered by
-             ?fragment=order. The fragment sits on an inner th:block so a swapped response never
-             re-nests a second #refinery-order-results inside this one. */-->
         <div class="form-container" id="refinery-order-results">
         <th:block th:fragment="refineryOrderSection">
             <form id="refineryOrderMainForm" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
@@ -46,9 +42,6 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group flex-2 mb-0">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
-                        <!--/* Server-side searchable combobox (remote-users, #1193): seed only the
-                             current owner; the roster is searched on demand. Non-logisticians keep
-                             the disabled plain select. */-->
                         <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}"
                                 th:attr="data-krt-combobox=${isLogistician ? 'remote-users' : null}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -181,10 +174,6 @@
                         <div class="material-row">
                             <div class="form-group flex-2 mb-0">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <!--/* Server-side searchable combobox (remote-materials-raw, REQ-FE-016): the raw
-                                     catalog is searched on demand, so only the row's already-chosen material is
-                                     seeded (edit/redisplay path) with the refined-output metadata the enhancer
-                                     harvests; a blank row renders just the placeholder. */-->
                                 <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox="remote-materials-raw" th:disabled="${!canEdit}">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                     <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
@@ -255,11 +244,6 @@
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='storeModal', titleKey='refineryorder.action.store', variant='krt-modal--wide', open=${showStoreModal}, closeTrigger='rod-close-store', body=~{::storeModal-body})}">
         <th:block th:ref="storeModal-body">
             
-            <!--/* Live-sync seam for the `store` section (REQ-FE-015): the dialog's rows are derived
-                 from the order's output goods, so a peer's save re-renders them here via
-                 ?fragment=store. The modal shell (and its open/closed state) stays outside the
-                 swapped region; the fragment sits on an inner th:block so a swap never re-nests a
-                 second #refinery-store-results. */-->
             <div id="refinery-store-results" class="krt-modal-flow">
             <th:block th:fragment="refineryStoreSection">
             <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" data-trigger="rod-disable-submit">
@@ -282,10 +266,6 @@
                                     <span th:text="#{inventory.form.amount}">Menge</span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:text="'(' + #{material.quantity.scu} + ')'"></span>
-                                    <!--/* SCU-only input hint. th:if must NOT share an element with th:replace: th:replace
-                                         (attribute precedence 1) runs BEFORE th:if (3), so a same-element guard is dead
-                                         and the hint would render on every row - including PIECE rows. The condition
-                                         gates an outer th:block while th:replace sits alone on the inner one. */-->
                                     <th:block th:if="*{items[__${stat.index}__].quantityType == 'SCU'}">
                                         <th:block th:replace="~{fragments/scu-hint :: scuHint(null, false)}"></th:block>
                                     </th:block>
@@ -307,20 +287,6 @@
                             </div>
                             <div class="form-group flex-1 mb-0">
                                 <label th:for="${isLogistician ? 'storeUser_' + stat.index : 'storeUserFixed_' + stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
-                                <!--/* Server-side searchable combobox (remote-users, #1193): seed only
-                                     the current receiver (defaults to the caller); the roster is
-                                     searched on demand.
-
-                                     REQ-SEC-039: booking the output onto ANOTHER member is a
-                                     logistician act, so only a logistician gets the picker. A plain
-                                     member sees their own name in a disabled field — offering a
-                                     roster picker whose every foreign choice answers 403 is worse
-                                     than not offering one. The disabled field submits nothing, so
-                                     the server falls back to the order's owner, which for a
-                                     non-logistician is the caller by the ownership check. The id
-                                     deliberately does NOT start with `storeUser_`: that prefix is
-                                     what duplicateStoreItem() looks for to graft a fresh combobox
-                                     onto a split row, which would put the picker straight back. */-->
                                 <select th:if="${isLogistician}" th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required data-krt-combobox="remote-users">
                                     <option th:if="${item.userId != null}" th:value="${item.userId}" th:text="${seedUserNames.get(item.userId)}"></option>
                                 </select>
@@ -343,11 +309,6 @@
                                 <option th:each="jo : ${jobOrders}" th:if="${(item.jobOrderId != null and item.jobOrderId == jo.id) or (jo.requiredMaterialIds != null and #lists.contains(jo.requiredMaterialIds, item.materialId))}" th:value="${jo.id}" th:text="${jo.displayId + ' - ' + (jo.requestingOrgUnit != null ? jo.requestingOrgUnit.name() : '—')}"></option>
                             </select>
                         </div>
-                        <!--/* REQ-INV-035: book this output row into the receiver's private pool
-                             instead of the shared squadron stock, mirroring the Einbuchen dialog's
-                             marker. Personal stock never carries an earmark, so refinery-orders-
-                             details.js disables + clears this row's job-order picker while the box
-                             is ticked and the backend applies no mission earmark to the row. */-->
                         <div class="form-group check-row krtm-margin-bottom-0-margin-top-1rem-7579">
                             <input type="checkbox" th:id="'storePersonal_' + ${stat.index}" th:field="*{items[__${stat.index}__].personal}">
                             <div>
@@ -373,42 +334,22 @@
         </th:block>
     </th:block>
 
-    <!--/* Section-sized inline error for an unknown / failed ?fragment= render (REQ-FE-015): a
-         peer-driven refresh that names a section the controller does not know degrades to this
-         instead of dumping a whole page into the small swap container. Parked inside a <template>
-         so it is inert on the full-page render (the browser never paints template content) while
-         Thymeleaf still resolves the th:fragment inside it — a bare <p> here would show as a stray
-         red error line on every normal page load. */-->
     <template id="refinery-fragment-error-tpl">
         <p th:fragment="fragmentError" class="desc krtm-color-danger"
            th:text="#{refineryorder.section.refresh.error}">Abschnitt konnte nicht geladen werden.</p>
     </template>
 
-    <!--/* Pristine (un-enhanced) receiver-picker template used by duplicateStoreItem(): cloning the
-         live, already-enhanced combobox DOM yields a dead control, so a split row replaces the clone
-         with a fresh <select data-krt-combobox> from here (id/name stamped per index in JS) and
-         re-enhances it via window.krtEnhanceComboboxes. */-->
     <template id="store-user-select-tpl">
-        <!--/* Fresh (un-enhanced) receiver picker for a split row (#1193): no preloaded options — the
-             combobox searches /users/search on demand once krtEnhanceComboboxes upgrades it. */-->
         <select data-krt-combobox="remote-users" required></select>
     </template>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    // Thymeleaf-interpolated i18n strings and server values only; all imperative logic lives in
-    // the refinery-orders-details.js page module loaded immediately after this bootstrap
-    // (ADR-0069). Keys and fallbacks are byte-identical to the former inline block.
     const ROUNDING_MODE = /*[[${roundingMode}]]*/ 'UP';
 
-    // Live peer sync (REQ-FE-015, ADR-0094): the id keying this page's refinery-order:{id} room and
-    // the base URL its ?fragment= section refreshes are pulled from. Both live here rather than in
-    // the module because they are the only Thymeleaf-interpolated values it needs (ADR-0069).
     window.refineryOrderId = /*[[${orderId.toString()}]]*/ null;
 
-    // Server-rendered yield-bonus map for this order's refinery + the badge help text; the page
-    // module feeds both into window.krtRefineryYield.init(...) at parse time.
     const MATERIAL_YIELD_BONUSES = /*[[${materialYieldBonuses}]]*/ {};
     const MATERIAL_YIELD_BONUS_HELP = /*[[#{refineryorder.form.material.yieldBonus.help}]]*/ '';
     const MATERIAL_ENTRY_TITLE_LABEL = /*[[#{refineryorder.form.material.entryTitle}]]*/ 'Material';
@@ -422,9 +363,6 @@
     const MSG_CANCEL_TITLE = /*[[#{refineryorder.action.cancel}]]*/ 'Cancel Order';
     const MSG_CANCEL_DISMISS = /*[[#{general.cancel}]]*/ 'Cancel';
 
-    // In-place save/store success toasts (REQ-FE-001) plus the two live-sync strings: the
-    // deferred-refresh pill label and the toast krtFetch.swap raises when a section refresh bails.
-    // Previously the page navigated away on success and the flash attributes carried these.
     const REFINERY_DETAIL_MSG = {
         updateSuccess: /*[[#{success.refineryorder.update}]]*/ 'Saved.',
         storeSuccess: /*[[#{success.refineryorder.store}]]*/ 'Stored.',
@@ -434,13 +372,9 @@
         storeSplitRemove: /*[[#{refineryorder.store.split.remove}]]*/ 'Aufteilung entfernen'
     };
 
-    // #596 store-dialog owning-org-unit picker: the order's inherited default selection (null when
-    // the order itself is ownerless) and the placeholder label for the rebuilt option list.
     const STORE_INHERITED_ORG_UNIT_ID = /*[[${orderOwningOrgUnitId}]]*/ null;
     const STORE_ORG_UNIT_PLACEHOLDER = /*[[#{refineryorder.store.orgUnit.placeholder}]]*/ 'Select org unit';
 
-    // Refining-method rating/speed labels, hoisted from updateMethodRatings() so the page module's
-    // imperative code carries no Thymeleaf interpolation.
     const RATING_LEVELS = {
         1: /*[[#{refining.rating.level.1}]]*/ 'Niedrig',
         2: /*[[#{refining.rating.level.2}]]*/ 'Mittel',

@@ -29,13 +29,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a member raises an Art. 17 erasure request (REQ-SEC-061). The seeded
- * default rule notifies every admin, because the request is a legal deadline: Art. 12(3) gives the
- * controller one month to respond, and a queue nobody is told about is how that month passes.
+ * Domain event published when a member raises an Art. 17 erasure request (REQ-SEC-061); the default
+ * rule notifies every admin.
  *
- * <p>Carries the member's id (the notification's deep-link target) and their handle for rendering.
- * The handle is the same datum the admin queue shows and the one an admin needs to act; no e-mail
- * address, Discord id or the member's reasoning rides the event.
+ * <p>Carries no e-mail address, Discord id or the member's reasoning.
  *
  * @param userId the requesting member's id, also the notification's loose entity id
  * @param handle the requesting member's effective name, for rendering; may be {@code null}
@@ -54,9 +51,6 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
 
   @Override
   public UUID actorSub() {
-    // The requesting member IS the actor, and excluding them is what the rule's exclude_actor flag
-    // is for. Returning the id lets that flag work; the seeded rule leaves it off, because the
-    // recipients are admins and the member is not among them anyway.
     return userId;
   }
 
@@ -64,7 +58,6 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
   @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
-    // Not org-unit scoped: an erasure request is answered by the controller, not by a squadron.
     return Map.of();
   }
 

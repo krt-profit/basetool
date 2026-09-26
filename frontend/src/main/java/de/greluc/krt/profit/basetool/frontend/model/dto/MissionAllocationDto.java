@@ -23,9 +23,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend mission quantity slice of an inventory entry (Variante C,
- * REQ-INV-027): the amount of an entry's stock earmarked to one mission, rendered as a chip with
- * its amount.
+ * Frontend mirror of the amount of an inventory entry's stock earmarked to one mission
+ * (REQ-INV-027), rendered as a chip.
  *
  * @param missionId the earmarked mission's id.
  * @param missionName the earmarked mission's name (chip label).

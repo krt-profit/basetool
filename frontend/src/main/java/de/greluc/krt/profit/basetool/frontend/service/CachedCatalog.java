@@ -23,29 +23,14 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Compile-time allowlist of the backend GET requests that {@link BackendApiClient#getCached} may
- * cache (FE-CACHE-1). Each constant pins its exact request URI, its invalidation {@link
- * CacheDomain} and its {@link Fetch} mode; the cache key is the constant's {@code name()}.
+ * Compile-time allowlist of the backend GET requests {@link BackendApiClient#getCached} may cache,
+ * each pinning its request URI, its {@link CacheDomain} and its {@link Fetch} mode; the cache key
+ * is the constant's {@code name()}.
  *
- * <p>This makes the unsafe state <b>unrepresentable</b>: because the only cached-read entry point
- * takes a {@code CachedCatalog} (the raw {@code getCached(String, …)} overloads were removed), a
- * per-principal / per-active-org-unit URI such as {@code /api/v1/users/me}, {@code
- * /api/v1/me/capabilities} or {@code /api/v1/me/active-org-unit} simply cannot be cached — no
- * constant names it, and adding one is a reviewable, spec-gated act (REQ-DATA-007). Every catalogue
- * here is verified <b>global</b>: no variance by caller {@code sub}, roles, the {@code
- * X-Active-Org-Unit-Id} header, or guest redaction — so the shared, URI/name-keyed cache cannot
- * cross-contaminate callers.
- *
- * <p>A {@link Fetch#PAGE_WALK} constant is a <em>paged</em> catalogue that consumers render or
- * filter as "the whole list": {@code getCached} walks every backend page of it (the {@code size=}
- * in the URI is the walk's chunk size, not a bound) and caches the merged result, so the catalogue
- * cannot silently truncate past the chunk (REQ-ADMIN-003, ADR-0103 — same defect class ADR-0102
- * fixed on the admin catalog pages). A {@link Fetch#SINGLE} constant is a non-paged endpoint (plain
- * list, subset projection, single setting) or a deliberate single-page probe.
- *
- * <p>The URIs are copied verbatim from the former inline literals; {@code FrontendCacheSplitTest}
- * pins each URI and fetch mode so a refactor cannot silently change a cache target or re-truncate a
- * page-walked catalogue.
+ * <p>Every catalogue here is global, never varying by caller, role, active org unit or guest
+ * redaction, so a per-principal URI cannot be cached (REQ-DATA-007). A {@link Fetch#PAGE_WALK}
+ * constant is walked page by page and cached complete (REQ-ADMIN-003); a {@link Fetch#SINGLE}
+ * constant is a non-paged endpoint or a deliberate single-page probe.
  */
 @Getter
 @RequiredArgsConstructor

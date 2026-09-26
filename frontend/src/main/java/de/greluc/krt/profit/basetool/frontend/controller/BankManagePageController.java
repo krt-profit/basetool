@@ -45,11 +45,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Renders the bank management page ({@code /bank/manage}, W1 mockup): the account-lifecycle tab and
- * the holder-registry tab. Open to bank employees (REQ-BANK-030, ADR-0040): employees may create
- * {@code SPECIAL} accounts and use the holder menu incl. the holder→holder Umbuchung, while
- * account-relationship lifecycle, manual holder registration and grants stay management-only —
- * enforced per-action in the template (and server-side). Admins pass via the role hierarchy.
+ * Renders the bank management page {@code /bank/manage} with its account-lifecycle and holder
+ * registry tabs. Open to bank employees for {@code SPECIAL} accounts and the holder menu; the other
+ * actions are management-only, enforced per action (REQ-BANK-030).
  */
 @Controller
 @UsesLayoutModel
@@ -78,23 +76,17 @@ public class BankManagePageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the management page with both tabs' data: all accounts (incl. balances — the
-   * zero-balance rule disables the close button server-knowledge-first) and the holder registry
-   * with custody totals. The org-unit list feeds the account-creation modal; the
-   * holder-registration modal's user picker is a server-side search combobox (#1193), so no user
-   * roster is preloaded.
+   * Renders the management page with all accounts including balances and the holder registry with
+   * custody totals.
    *
-   * @param tab the active tab ({@code halter} default/first, {@code konten})
-   * @param fragment when {@code "manageBody"} only the tab-nav + active panel are re-rendered after
-   *     an account/holder lifecycle write (REQ-FE-005), refreshing the row plus the tab-count
-   *     aggregates in place; the creation-modal lookups (org-units) are then skipped because the
-   *     modals live outside the swapped region
+   * @param tab the active tab ({@code halter} default, {@code konten})
+   * @param fragment {@code "manageBody"} to re-render only the tab navigation and active panel
+   *     (REQ-FE-005)
    * @param authentication the caller's authentication, used to detect the management perspective
-   * @param principal the authenticated OIDC user, used to read the caller's {@code sub} (Keycloak
-   *     UUID) so the holder tab can link the caller's own holder row; {@code null} for a non-OIDC
-   *     principal (e.g. a {@code @WithMockUser} test), in which case no self-link is rendered
+   * @param principal the OIDC user whose {@code sub} links the caller's own holder row; {@code
+   *     null} for a non-OIDC principal
    * @param model Spring MVC model
-   * @return the manage template, or its {@code manageBody} fragment for an AJAX swap
+   * @return the manage template, or its {@code manageBody} fragment
    */
   @NotNull
   @GetMapping("/bank/manage")
@@ -108,10 +100,6 @@ public class BankManagePageController {
       @AuthenticationPrincipal OidcUser principal,
       Model model) {
     boolean management = hasRole(authentication, Roles.authority(Roles.BANK_MANAGEMENT));
-    // The account-management table is now truly paginated (REQ-BANK-053, ADR-0106): the former
-    // unbounded size=500 preload silently dropped every account past 500. The backend already sorts
-    // by name (stable via the id tiebreaker), so the page content keeps the A→Z ordering without a
-    // client re-sort. The pager re-renders the manageBody fragment in place (REQ-FE-005).
     int effectiveSize = size == null || !PAGE_SIZES.contains(size) ? DEFAULT_PAGE_SIZE : size;
     int effectivePage = page == null || page < 0 ? 0 : page;
     PageResponse<BankAccountDto> accounts =
@@ -132,25 +120,8 @@ public class BankManagePageController {
     model.addAttribute("accountsPaginationBaseUrl", "/bank/manage?tab=konten");
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute("management", management);
-    // The KRT account (singleton CARTEL) for the Bankleitung-only "KRT-Freigaben" tab
-    // (REQ-BANK-047), where the two 3-stage thresholds T1/T2 are edited; null until a KRT account
-    // exists. Fetched by its own type-filtered one-row search rather than scanned out of the (now
-    // paged) accounts list, where the singleton might not sit on the current page.
     model.addAttribute("cartelAccount", management ? fetchCartelAccount() : null);
-    // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder
-    // row to its history; management links every row (REQ-BANK-032). The real per-holder gate is
-    // server-side (canSeeHolder) — this only governs which links the UI renders.
-    // NOTE: authentication.getName() returns the preferred_username (the frontend OAuth2
-    // user-name-attribute), NOT the Keycloak sub — comparing it against the holder's userId
-    // (== app_user.id == sub) never matched, so a plain bank employee never saw the link to their
-    // own holder. CurrentUser.userIdText is the id that equals BankHolderDto.userId; same
-    // fix as the mission participant self-edit carve-out (MissionPageController#authUserId).
     model.addAttribute("selfUserId", CurrentUser.userIdText(principal));
-    // Halter is the default-open tab (it sits first/left in the tab nav); ?tab=konten opens the
-    // accounts tab and ?tab=krt-freigaben the Bankleitung-only KRT approval-thresholds tab
-    // (REQ-BANK-047) — the latter only for a management caller, so a plain employee forcing the
-    // query
-    // param falls back to Halter and never sees the KRT-thresholds panel.
     String activeTab;
     if (management && "krt-freigaben".equalsIgnoreCase(tab)) {
       activeTab = "krt-freigaben";
@@ -164,11 +135,6 @@ public class BankManagePageController {
       return "bank-manage :: manageBody";
     }
 
-    // The org-unit lookup feeds the management-only non-special account-creation modal (it links a
-    // Bereich/OL). An employee may only create SPECIAL accounts (no org unit), so that
-    // management-gated backend read is skipped for a plain employee (REQ-BANK-030). The
-    // holder-registration modal's user picker is now a server-side search combobox (#1193,
-    // data-krt-combobox="remote-bank-users"), so no full user roster is loaded here.
     if (management) {
       List<OrgUnitMembershipOptionDto> orgUnits =
           backendApiClient.getCached(
@@ -178,20 +144,14 @@ public class BankManagePageController {
     } else {
       model.addAttribute("orgUnits", List.<OrgUnitMembershipOptionDto>of());
     }
-    // No transfer-fee rate is fetched here: the only booking modal on this page is the
-    // holder→holder
-    // Umbuchung, which is fee-free (REQ-BANK-031, ADR-0052), so it needs no live fee preview.
     return "bank-manage";
   }
 
   /**
-   * Resolves the singleton {@code CARTEL} (KRT) account for the Bankleitung-only KRT-Freigaben tab
-   * (REQ-BANK-047) via a one-row, type-filtered search rather than scanning the paged accounts list
-   * (where the singleton might not sit on the current page, REQ-BANK-053). Returns {@code null}
-   * when no KRT account exists yet or the lookup fails, so the tab shows its "no KRT account" empty
-   * state.
+   * Resolves the singleton {@code CARTEL} (KRT) account for the KRT-Freigaben tab (REQ-BANK-047)
+   * via a type-filtered one-row search.
    *
-   * @return the CARTEL account, or {@code null} when none exists / the lookup fails
+   * @return the CARTEL account, or {@code null} when none exists or the lookup fails
    */
   @Nullable
   private BankAccountDto fetchCartelAccount() {

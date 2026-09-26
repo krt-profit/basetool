@@ -56,7 +56,6 @@ class CachedCatalogListLoaderTest {
     List<String> result = loader.loadPageContent(CachedCatalog.SHIP_TYPES, PAGE_TYPE, "ship types");
 
     assertThat(result).containsExactly("Aurora", "Cutlass");
-    // Must be a fresh mutable list the caller can sort/extend in place.
     result.add("Freelancer");
     assertThat(result).hasSize(3);
   }

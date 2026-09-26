@@ -25,16 +25,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration for the cross-replica notification SSE Redis fan-out (REQ-FE-015,
- * ADR-0094).
+ * Configuration for the cross-replica notification SSE Redis fan-out (REQ-FE-015, ADR-0094).
  *
- * <p>Lives in the dependency-leaf {@code support} package (not {@code config}) to avoid a {@code
- * service}/{@code config} package cycle, like the other backend leaf
- * {@code @ConfigurationProperties} — registered by {@code @ConfigurationPropertiesScan} regardless
- * of package. The {@code enabled} flag also gates the {@code NotificationRedisConfig} beans and the
- * {@code LocalNotificationFanout}/{@code RedisNotificationFanout} selection via
- * {@code @ConditionalOnProperty}. Default off: the backend runs local-only SSE unless a deployment
- * explicitly turns the fan-out on (prod).
+ * <p>{@code enabled} also gates the Redis notification beans and the local/Redis fan-out selection;
+ * off by default.
  *
  * @param enabled whether the Redis pub/sub fan-out is wired (default {@code false})
  * @param channel the Redis channel notification signals are published on

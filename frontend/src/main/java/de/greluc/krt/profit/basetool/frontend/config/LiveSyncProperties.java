@@ -34,17 +34,13 @@ import org.springframework.validation.annotation.Validated;
 public record LiveSyncProperties(@DefaultValue Redis redis) {
 
   /**
-   * Cross-replica fan-out settings. The {@code enabled} flag also gates the {@code
-   * LiveSyncRedisConfig} beans via {@code @ConditionalOnProperty} (default on: the frontend already
-   * runs Redis for Spring Session, so single-instance-with-Redis uses the real fan-out and a Redis
-   * outage degrades to local-only relay, never worse).
+   * Cross-replica fan-out settings; {@code enabled} also gates the {@code LiveSyncRedisConfig}
+   * beans. A Redis outage degrades to local-only relay.
    *
    * @param enabled whether the Redis pub/sub fan-out is wired (default {@code true})
    * @param channel the Redis channel {@code changed} signals are published on
-   * @param presenceChannel the Redis channel editor-presence snapshots are gossiped on (ADR-0126).
-   *     Separate from {@code channel} both because the consume side tells the two payload formats
-   *     apart by arrival channel and because the periodic presence gossip must stay distinguishable
-   *     from the event-driven changed relay in the fan-out metrics
+   * @param presenceChannel the separate Redis channel editor-presence snapshots are gossiped on
+   *     (ADR-0126)
    */
   public record Redis(
       @DefaultValue("true") boolean enabled,

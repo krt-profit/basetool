@@ -28,9 +28,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Create payload for an item handover: the hand-over of one or more produced item quantities to a
- * recipient. Mirrors {@link JobOrderHandoverCreateDto} (the material counterpart) but itemises
- * delivered ordered-item lines instead of inventory items.
+ * Create payload for an item handover of one or more produced item quantities to a recipient.
  *
  * @param handoverTime when the handover occurred (UTC)
  * @param recipientHandle the recipient's handle (≤ 255 chars)

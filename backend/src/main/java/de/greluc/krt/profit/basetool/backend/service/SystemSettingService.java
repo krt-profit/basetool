@@ -101,9 +101,6 @@ public class SystemSettingService {
     OptimisticLock.check(setting.getVersion(), dto.version(), SystemSetting.class, key);
 
     setting.setValue(dto.value());
-    // saveAndFlush so the bumped @Version is mapped into the response DTO — the admin-settings form
-    // writes each setting's returned version straight back into its hidden input in place (no
-    // reload), so a plain save would hand back the stale pre-flush version and the next save 409s.
     return systemSettingMapper.toDto(systemSettingRepository.saveAndFlush(setting));
   }
 }

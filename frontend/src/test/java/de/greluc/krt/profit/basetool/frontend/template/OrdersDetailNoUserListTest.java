@@ -27,14 +27,8 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins BE-PERF-05: the order-detail page reads no preloaded user list.
- *
- * <p>The add-assignee picker searches the roster on demand ({@code data-krt-combobox=
- * "remote-users"}, #1193). The {@code users} model attribute the controllers kept filling after
- * that — {@code GET /api/v1/users?size=1000} on every Bearbeiter mutation — was never read, and was
- * removed on 2026-09-22. This test keeps the two halves in step: if a template expression starts
- * reading {@code users} again, the controllers have to supply it again, deliberately. HTML comments
- * are stripped first, because the template's own history note names the old expression.
+ * Verifies that the order-detail template reads no {@code users} model attribute, ignoring HTML
+ * comments.
  */
 class OrdersDetailNoUserListTest {
 

@@ -17,22 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Promotion admin rank-requirements page module (/promotion/admin/rank-requirements), extracted
- * verbatim from the former inline script of promotion-admin-rank-requirements.html (ADR-0069,
- * follow-up to #924).
- *
- * In-place CRUD for single-rank-step promotion requirements: create/edit modals with a topic->category
- * cascade built from AR_CATEGORIES_BY_TOPIC, single- and group-delete (sequential DELETEs), and a
- * client-side filter re-applied on krt:swapped. JSON writes go through krtFetch.write
- * (retry-on-403, 409 -> toast + fragment-swap refresh, no reload). Wired via window.krtEvents on
- * DOMContentLoaded plus a native input listener for the readonly toRank sync.
- *
- * AR_CATEGORIES_BY_TOPIC and the MSG_* strings are defined by the inline Thymeleaf bootstrap block of
- * promotion-admin-rank-requirements.html; both that block and this th:src share
- * th:unless="${isAllSquadronsMode}", so neither runs in all-squadrons mode.
- */
-
 /* global AR_CATEGORIES_BY_TOPIC, MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_INVALID_STEP, MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_DELETE_GROUP_TITLE, MSG_DELETE_GROUP_MSG, MSG_GROUP_DELETED, MSG_OK, MSG_CANCEL, MSG_REFRESH_FAILED */
 
 function toastSuccess(msg) {
@@ -42,11 +26,6 @@ function toastError(msg) {
     if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
 }
 
-// The dialogs moved from the legacy `.modal-overlay`/`.modal-box` shape (opened
-// by an `active` class) onto the canonical `.krt-modal-overlay` shell, whose
-// hidden default lives in styles.css. Visibility therefore rides the shared
-// krtm-modal-open / krtm-hidden pair, which window.krtModal drives (FE-SIMP-04) --
-// `active` styles nothing any more.
 function closeModal(id) {
     window.krtModal.close(id);
 }
@@ -54,9 +33,6 @@ function openModal(id) {
     window.krtModal.open(id);
 }
 
-// Re-renders the requirements list in place after a create / edit / delete so
-// grouping, ordering and every row's data-ar-version come back fresh. The
-// active client-side filter is re-applied via the krt:swapped listener below.
 function arRefresh() {
     if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
         window.location.reload();
@@ -80,19 +56,12 @@ function syncToRank(fromInput) {
     toInput.value = Number.isFinite(fromVal) ? String(fromVal - 1) : '';
 }
 
-/*
- * Cascading dropdown: when the Topic <select> changes, rebuild the
- * Category <select> in the same modal so it only contains categories
- * that belong to the chosen topic. An empty topic resets the category
- * dropdown to "-" only.
- */
 function rebuildCategoryDropdown(topicSelect) {
     const form = topicSelect.closest('.krt-modal');
     if (!form) return;
     const catSelect = form.querySelector('.ar-category-select');
     if (!catSelect) return;
     const previousValue = catSelect.value;
-    // Clear existing options except the leading "-" placeholder
     while (catSelect.options.length > 1) catSelect.remove(1);
     const topicId = topicSelect.value;
     if (topicId && AR_CATEGORIES_BY_TOPIC && AR_CATEGORIES_BY_TOPIC[topicId]) {
@@ -102,7 +71,6 @@ function rebuildCategoryDropdown(topicSelect) {
             opt.textContent = cat.name;
             catSelect.appendChild(opt);
         });
-        // Try to restore the previously selected category if it still belongs to this topic.
         if (previousValue && catSelect.querySelector('option[value="' + previousValue + '"]')) {
             catSelect.value = previousValue;
         }
@@ -113,10 +81,6 @@ function isValidSingleStep(fromVal, toVal) {
     return Number.isFinite(fromVal) && Number.isFinite(toVal) && fromVal - toVal === 1;
 }
 
-// JSON write through krtFetch.write (REQ-FE-002: CSRF, the bare-403 refresh-and-retry and the
-// re-auth redirect). Resolves to the response body ({} for a bodiless 2xx such as a 204), or to null
-// once the failure was surfaced: on 409 it toasts and refreshes the list in place instead of
-// reloading the whole page; any other failure toasts MSG_ERROR.
 function apiCall(url, method, body) {
     if (!window.krtFetch) {
         toastError(MSG_ERROR);
@@ -227,12 +191,6 @@ function submitEdit() {
     });
 }
 
-/*
- * Single-delete and group-delete share the underlying DELETE per id. The
- * group variant collects all <tr data-ar-req-id> inside the targeted
- * .rank-group, then fires DELETE in series so a 409 on any single row
- * still triggers a clean page reload.
- */
 function deleteRequirement(id) {
     if (!id) return Promise.resolve(false);
     return apiCall('/api/proxy/promotion/rank-requirements/' + id, 'DELETE', null);
@@ -240,7 +198,7 @@ function deleteRequirement(id) {
 
 function confirmAndDelete(id) {
     const fn = window.showKrtConfirm;
-    if (typeof fn !== 'function') return; /* defensive: toast fragment not loaded */
+    if (typeof fn !== 'function') return;
     fn(MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_OK, MSG_CANCEL).then(function (ok) {
         if (!ok) return;
         deleteRequirement(id).then(function (data) {
@@ -267,7 +225,6 @@ function confirmAndDeleteGroup(fromRank, toRank) {
         .replace('{count}', String(rows.length));
     fn(MSG_DELETE_GROUP_TITLE, msg, MSG_OK, MSG_CANCEL).then(function (ok) {
         if (!ok) return;
-        // Sequential delete so a 409 reload happens once, not N times.
         const ids = Array.from(rows).map(function (r) {
             return r.getAttribute('data-ar-req-id');
         });
@@ -287,11 +244,6 @@ function confirmAndDeleteGroup(fromRank, toRank) {
     });
 }
 
-/*
- * Filter input: matches the typed text against the joined topic name,
- * category name and description for each row (lowercased server-side
- * into data-ar-search). Groups with zero visible rows are hidden too.
- */
 function applyFilter() {
     const input = document.getElementById('ar-filter');
     const query = (input ? input.value : '').trim().toLowerCase();
@@ -322,8 +274,6 @@ function applyFilter() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Initial population of the create-modal cascade so the first open
-    // shows a sensible category list (empty topic = empty category list).
     rebuildCategoryDropdown(document.getElementById('cr-topic'));
 
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
@@ -350,10 +300,6 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtEvents.on('input', 'ar-rank-from', syncToRank);
     }
 
-    // Native input listener for the rank-from inputs so the readonly
-    // toRank reflects every keystroke (krtEvents covers most events but
-    // we keep this redundant listener for the brand-new fields that
-    // haven't carried data-trigger before).
     document.querySelectorAll('.ar-rank-from').forEach(function (el) {
         el.addEventListener('input', function () {
             syncToRank(el);
@@ -363,9 +309,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const filter = document.getElementById('ar-filter');
     if (filter) filter.addEventListener('input', applyFilter);
 
-    // After an in-place refresh the rows are re-rendered, so re-apply the
-    // active search filter (the input lives outside the swapped region and
-    // keeps its value) to restore the visible subset.
     document.addEventListener('krt:swapped', function (e) {
         if (e.detail && e.detail.container && e.detail.container.id === 'ar-results') {
             applyFilter();

@@ -36,16 +36,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Thin REST proxy for the user-autocomplete used by participant/owner pickers.
- *
- * <p>Browser-side JS calls land on {@code /users/search} (no {@code /api/} prefix because Spring
- * Security treats this path as authenticated-only-by-default); the controller forwards to the
- * backend {@code /api/v1/users/search/references} with the bearer token attached by {@link
- * BackendApiClient}. That backend endpoint projects each hit to a slim {@code UserReferenceDto}
- * (id, username, display name, effective name, rank) in SQL, which is all the pickers read; the
- * full-DTO {@code /api/v1/users/search} it replaced here hydrated every matching user with its
- * roles and three membership lookups per keystroke (BE-PERF-06). The page size is {@link
- * PickerSearch#PAGE_SIZE}, sorted by username — see {@link #forwardSearch}.
+ * REST proxy for the user autocomplete of participant and owner pickers, forwarding to the
+ * backend's slim reference search via {@link BackendApiClient} with {@link PickerSearch#PAGE_SIZE}
+ * rows sorted by username (see {@link #forwardSearch}).
  */
 @RestController
 @RequestMapping("/users")
@@ -76,15 +69,8 @@ public class UserProxyController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Forwards the autocomplete query to the backend search endpoint and unwraps the page payload
-   * into a flat list. Empty list on backend failure or missing content — the autocomplete renders
-   * an empty result rather than surfacing the error.
-   *
-   * <p>{@code query} is optional: the combobox fires an empty-query fetch when it is opened without
-   * typing (browse mode), and the global {@code emptyAsNull} string binder collapses a blank {@code
-   * ?query=} to {@code null}. Accepting it as optional — rather than a required param that 500s on
-   * the null — lets that browse click return the (scoped, capped) roster; {@link #forwardSearch}
-   * normalises {@code null} back to the empty match-all filter.
+   * Forwards the autocomplete query to the backend search and returns the hits as a flat list;
+   * empty on backend failure.
    *
    * @param query free-text query to forward to the backend, or {@code null}/blank to match all
    * @return matching user records (raw JSON maps), never {@code null}
@@ -96,12 +82,8 @@ public class UserProxyController {
   }
 
   /**
-   * Bank-audience twin of {@link #searchUsers}: forwards to the backend {@code
-   * /api/v1/users/search-bank/references}, which mirrors {@code /search} but widens the role gate
-   * to bank staff (ADR-0089, #1193). Backs the bank pickers' {@code remote-bank-users} combobox
-   * source (register holder, grant the Bank-Employee role, approval limits) so a bank
-   * employee/manager who holds no org role can still resolve candidates. The real authorization is
-   * enforced by the backend; this proxy only requires an authenticated session.
+   * Bank-audience twin of {@link #searchUsers}, forwarding to {@code
+   * /api/v1/users/search-bank/references}, which also admits bank staff (ADR-0089).
    *
    * @param query free-text query to forward to the backend, or {@code null}/blank to match all
    * @return matching user records (raw JSON maps), never {@code null}
@@ -114,37 +96,19 @@ public class UserProxyController {
   }
 
   /**
-   * Shared body of the two search proxies: builds the properly-encoded backend URI (via {@link
-   * org.springframework.web.util.UriComponentsBuilder} so a crafted {@code &} in the query cannot
-   * inject extra parameters — L-1), forwards it, and unwraps the page payload into a flat list.
-   * Empty list on backend failure or missing content — the autocomplete renders an empty result
-   * rather than surfacing the error.
+   * Forwards a search to the backend with a properly encoded URI (via {@link
+   * org.springframework.web.util.UriComponentsBuilder}) and unwraps the page into a flat list;
+   * empty on backend failure.
    *
-   * <p>A {@code null} query (the browse-mode empty fetch collapsed by the {@code emptyAsNull}
-   * string binder) is normalised to the empty string, which the backend search treats as a
-   * match-all filter, so opening the picker without typing returns the scoped roster instead of
-   * failing.
-   *
-   * <p><b>Page size.</b> {@link PickerSearch#PAGE_SIZE} rows (51), sorted by username: one more
-   * than every consumer renders, as the REQ-FE-016 overflow sentinel. The combobox pickers render
-   * {@link PickerSearch#RENDER_CAP} rows and show their "keep typing" hint on the extra one; the
-   * two free-text autocompletes on the mission page (participant and party lead, {@code
-   * mission-detail.js}) render the same cap and show the same hint since 2026-09-23. Before that
-   * they rendered every row they received, so the page size stayed at 1000 to keep them from
-   * capping silently.
+   * <p>A {@code null} query becomes the empty match-all filter. The page size is {@link
+   * PickerSearch#PAGE_SIZE}, one more than {@link PickerSearch#RENDER_CAP}, as the overflow
+   * sentinel (REQ-FE-016).
    *
    * @param backendPath the backend search endpoint path to forward to
    * @param query the free-text query to forward, or {@code null}/blank to match all
    * @return matching user records (raw JSON maps), never {@code null}
    */
   private List<Map<String, Object>> forwardSearch(String backendPath, String query) {
-    // L-1: build the URI with only the fixed (safe) paging params via UriComponentsBuilder so a
-    // crafted `&` in the term cannot inject extra parameters. The free-text `query` rides as a
-    // WebClient URI-template variable ({query}) rather than baked into the pre-encoded
-    // toUriString() output: that value would otherwise be percent-encoded a second time by the
-    // WebClient (space -> %2520, umlaut -> %25C3%25BC), so a multi-word / umlaut search reached the
-    // backend mangled and matched nothing (the #371 re-encoding trap). A null query is normalised
-    // to the empty match-all filter, still forwarded so browse mode returns the scoped roster.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath(backendPath)
             .queryParam("size", PickerSearch.PAGE_SIZE)
@@ -156,17 +120,11 @@ public class UserProxyController {
   }
 
   /**
-   * Forwards the per-user membership lookup to the backend so the bank booking form's counterparty
-   * org-unit picker (REQ-BANK-044) can populate its dependent {@code <select>} from the chosen
-   * counterparty's memberships. Returns the raw option maps ({@code orgUnitId}, {@code
-   * orgUnitName}, {@code orgUnitShorthand}, {@code kind}); an empty list on backend failure so the
-   * picker degrades to "no org unit" rather than surfacing an error. The {@link UUID} path type
-   * rejects a malformed id before any backend call.
+   * Forwards the per-user membership lookup for the bank counterparty org-unit picker
+   * (REQ-BANK-044); empty on backend failure.
    *
    * @param userId the counterparty user whose org-unit memberships to list
-   * @param allKinds when {@code true} forwards {@code allKinds=true} so the response spans all four
-   *     org-unit kinds (the bank counterparty picker; REQ-BANK-044), else the default Staffel/SK
-   *     set
+   * @param allKinds {@code true} to include all four org-unit kinds, else Staffel and SK only
    * @return the user's membership options (raw JSON maps), never {@code null}
    */
   @GetMapping("/{userId}/memberships")
@@ -184,14 +142,8 @@ public class UserProxyController {
   }
 
   /**
-   * Resolves a single user by id to their raw JSON (id, username, displayName, effectiveName, …).
-   * Backs the edit-mode seed of the {@code remote-users} combobox where the picker holds only a
-   * stored user id and must display that user's name without preloading the roster — the
-   * notification-rule SPECIFIC_USER selector (#1193). The backend {@code /api/v1/users/{id}}
-   * enforces the real role gate (and peer redaction); this proxy only requires an authenticated
-   * session and returns {@code null} on any failure so the caller can fall back to the raw id. The
-   * {@link UUID} path type rejects a malformed id before any backend call — so it never shadows the
-   * literal {@code /search} / {@code /search-bank} routes.
+   * Resolves one user by id to their raw JSON, used to seed a {@code remote-users} combobox in edit
+   * mode; the backend enforces the role gate.
    *
    * @param userId the user to resolve; never {@code null}.
    * @return the user's raw JSON map, or {@code null} when the lookup fails.

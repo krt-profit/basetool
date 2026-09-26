@@ -20,32 +20,17 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * A read-time grouping of inventory entries that share the same stock identity — what the Lager
- * used to merge into a single physical row but now keeps as separate {@code InventoryItem} rows.
- * The stack key is the inventory natural key minus the material (which is the enclosing {@link
- * GroupedInventoryDto} group): owner ({@code user}), {@code location}, {@code quality}, the {@code
- * personal} flag and the {@code owningSquadron} owner pool. Since Variante C (REQ-INV-027) the
- * job-order / mission link is no longer part of the stock identity — it lives per entry as quantity
- * allocations shown on the leaf rows — so entries differing only by their assignments now share a
- * stack. The aggregate figures ({@code totalAmount}, {@code averageQuality}, {@code maxQuality},
- * {@code entryCount}) are computed across the underlying rows directly in SQL for the collapsed
- * display row.
+ * Read-time grouping of inventory entries sharing owner, location, quality, personal flag and owner
+ * pool within one material group, with aggregates computed in SQL.
  *
- * <p>The individual entries are <em>not</em> inlined: append-only inventory grows unboundedly per
- * stack, so the entries are loaded lazily and paginated on expand via the {@code
- * /api/v1/inventory/{my-inventory|all}/stack/entries} endpoint (ADR-0003, REQ-INV-002). The lazy
- * fetch is keyed off exactly the stock-identity fields this record exposes — {@code user.id()},
- * {@code location.id()}, {@code quality}, {@code personal} and {@code owningSquadron.id()} — so the
- * client can request a stack's entries without any opaque token. Every per-entry action (book-out,
- * transfer, note, delivered, delete, allocation edit) still operates on a single fetched entry by
- * id + version.
+ * <p>Entries are not inlined; they are fetched page-wise on expand, keyed by the identity fields of
+ * this record (REQ-INV-002).
  *
  * @param user the owning user shared by every entry in the stack
  * @param location the storage location shared by every entry
  * @param quality the quality grade shared by every entry
  * @param personal whether the stack holds private (owner-only) stock
- * @param owningSquadron the owning org-unit pool shared by every entry, or {@code null} for an
- *     ownerless-personal stack
+ * @param owningSquadron the owning org-unit pool, or {@code null} for an ownerless-personal stack
  * @param totalAmount the summed quantity across all entries (SCU or pieces)
  * @param averageQuality the amount-weighted mean quality across all entries
  * @param maxQuality the highest quality value among the entries

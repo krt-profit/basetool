@@ -31,11 +31,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the edge validation of the frozen {@code RefineryExtract} contract v1 (ADR-0008). The
- * gateway rejects a malformed envelope <em>before</em> the backend relay, so these constraints are
- * what keeps a hostile or buggy extractor from reaching the import endpoint at all — and the nested
- * {@code @Valid} cascade is the part that silently stops working if a wrapper annotation is
- * dropped.
+ * Pins the gateway's edge validation of the {@code RefineryExtract} contract v1 (ADR-0008),
+ * including the nested {@code @Valid} cascade.
  */
 class RefineryExtractDtoValidationTest {
 
@@ -93,8 +90,6 @@ class RefineryExtractDtoValidationTest {
 
   @Test
   void exposesTheImageProvenanceItCarries() {
-    // Image bytes never leave the user's machine (ADR-0007) — only this metadata travels, and the
-    // backend derives the order start time from capturedAt.
     RefineryExtractImageDto image = image();
 
     assertThat(image.name()).isEqualTo("capture.png");
@@ -136,7 +131,6 @@ class RefineryExtractDtoValidationTest {
 
   @Test
   void cascadesIntoNestedGoods() {
-    // Without the @Valid on the list element the nested constraint would silently not run.
     RefineryExtractGoodDto invalid =
         new RefineryExtractGoodDto(0, null, 100, 500, 420, Boolean.TRUE, 0.95d, null);
 

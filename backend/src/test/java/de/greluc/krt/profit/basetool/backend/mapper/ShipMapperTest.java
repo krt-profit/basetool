@@ -42,13 +42,7 @@ class ShipMapperTest {
 
   @BeforeEach
   void setUp() {
-    // ShipMapperImpl receives UserMapper and SquadronMapper through its constructor
-    // (CentralMapperConfig: injectionStrategy = CONSTRUCTOR).
     UserMapper userMapper = Mappers.getMapper(UserMapper.class);
-    // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
-    // membership repository plus the StaffelMembershipResolver collaborator (both mocked / empty
-    // for
-    // this fixture, so the squadron table is never read).
     ReflectionTestUtils.setField(
         userMapper,
         "membershipRepository",
@@ -67,7 +61,6 @@ class ShipMapperTest {
 
   @Test
   void toDto_shouldMapFlatAndNestedFields() {
-    // Given
     UUID shipId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
     UUID shipTypeId = UUID.randomUUID();
@@ -103,10 +96,8 @@ class ShipMapperTest {
     ship.setOwner(owner);
     ship.setVersion(2L);
 
-    // When
     ShipDto dto = mapper.toDto(ship);
 
-    // Then
     assertNotNull(dto);
     assertEquals(shipId, dto.id());
     assertEquals("Black Beauty", dto.name());
@@ -114,40 +105,33 @@ class ShipMapperTest {
     assertTrue(dto.fitted());
     assertEquals(2L, dto.version());
 
-    // ShipType nested
     assertNotNull(dto.shipType());
     assertEquals(shipTypeId, dto.shipType().id());
     assertEquals("Cutlass Black", dto.shipType().name());
     assertEquals(46, dto.shipType().scu());
 
-    // Manufacturer (nested in ShipType)
     assertNotNull(dto.shipType().manufacturer());
     assertEquals(manufacturerId, dto.shipType().manufacturer().id());
     assertEquals("Drake Interplanetary", dto.shipType().manufacturer().name());
 
-    // Location nested
     assertNotNull(dto.location());
     assertEquals(locationId, dto.location().id());
     assertEquals("Port Olisar", dto.location().name());
 
-    // Owner nested (via UserMapper)
     assertNotNull(dto.owner());
     assertEquals(ownerId, dto.owner().id());
   }
 
   @Test
   void toDto_withoutOptionalRelations_shouldStillMap() {
-    // Given a ship with no location and no fitted flag
     Ship ship = new Ship();
     ship.setId(UUID.randomUUID());
     ship.setName("Solo");
     ship.setInsurance("0");
     ship.setFitted(false);
 
-    // When
     ShipDto dto = mapper.toDto(ship);
 
-    // Then
     assertNotNull(dto);
     assertEquals("Solo", dto.name());
     assertEquals("0", dto.insurance());
@@ -159,17 +143,14 @@ class ShipMapperTest {
 
   @Test
   void locationToDto_shouldExposePublicSurface() {
-    // Given
     Location loc = new Location();
     loc.setId(UUID.randomUUID());
     loc.setName("Lorville");
     loc.setHidden(false);
     loc.setVersion(3L);
 
-    // When
     LocationDto dto = mapper.locationToDto(loc);
 
-    // Then
     assertNotNull(dto);
     assertEquals(loc.getId(), dto.id());
     assertEquals("Lorville", dto.name());
@@ -179,17 +160,14 @@ class ShipMapperTest {
 
   @Test
   void manufacturerToDto_shouldMapAllFields() {
-    // Given
     Manufacturer mfr = new Manufacturer();
     mfr.setId(UUID.randomUUID());
     mfr.setName("Aegis Dynamics");
     mfr.setAbbreviation("AEGS");
     mfr.setNickname("Aegis");
 
-    // When
     ManufacturerDto dto = mapper.manufacturerToDto(mfr);
 
-    // Then
     assertNotNull(dto);
     assertEquals(mfr.getId(), dto.id());
     assertEquals("Aegis Dynamics", dto.name());
@@ -199,7 +177,6 @@ class ShipMapperTest {
 
   @Test
   void shipTypeToDto_shouldMapManufacturerNested() {
-    // Given
     Manufacturer mfr = new Manufacturer();
     mfr.setId(UUID.randomUUID());
     mfr.setName("Anvil");
@@ -210,10 +187,8 @@ class ShipMapperTest {
     type.setManufacturer(mfr);
     type.setScu(456);
 
-    // When
     ShipTypeDto dto = mapper.shipTypeToDto(type);
 
-    // Then
     assertNotNull(dto);
     assertEquals(type.getId(), dto.id());
     assertEquals("Carrack", dto.name());
@@ -224,8 +199,6 @@ class ShipMapperTest {
 
   @Test
   void shipTypeToDto_sourcesDescriptionFromRichColumns_germanPreferred() {
-    // R9 Step 2: the description wire field comes from the rich descriptionDe/descriptionEn columns
-    // (German preferred), not the legacy synthesised ship_type.description column.
     ShipType german = new ShipType();
     german.setName("Carrack");
     german.setDescriptionDe("Deutsche Beschreibung");

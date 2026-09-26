@@ -38,13 +38,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Renders the committed Redis ACL template ({@code scripts/redis-users.acl.tmpl}) the way {@code
- * scripts/render-redis-acl.py} does, so the Testcontainers suites and the E2E stack run against the
- * exact rules production loads (REQ-SEC-068, ADR-0207).
+ * Renders the committed Redis ACL template ({@code scripts/redis-users.acl.tmpl}) like {@code
+ * scripts/render-redis-acl.py}, so tests run against the production rules (REQ-SEC-068).
  *
- * <p>Two placeholders, and nothing else: {@code {{hash:NAME}}} becomes {@code #} plus the SHA-256
- * of NAME's value, {@code {{state:NAME}}} becomes {@code on} or {@code off}. Comment lines are
- * dropped. The Python renderer's self-test pins the same semantics from the other side.
+ * <p>{@code {{hash:NAME}}} becomes {@code #} plus the SHA-256 of NAME's value, {@code
+ * {{state:NAME}}} becomes {@code on} or {@code off}; comment lines are dropped.
  */
 public final class RedisAclTemplate {
 
@@ -89,10 +87,10 @@ public final class RedisAclTemplate {
   /**
    * Renders the repository's template.
    *
-   * @param values the variables the template names — every {@code hash} variable must be present
-   *     and non-empty; a missing {@code state} variable means {@code on}.
-   * @return the ACL file content, one {@code user} line per rule, ending in a newline.
-   * @throws IllegalArgumentException when a required value is missing or a state is invalid.
+   * @param values the template variables; every {@code hash} variable must be non-empty, a missing
+   *     {@code state} variable means {@code on}
+   * @return the ACL file content, one {@code user} line per rule, ending in a newline
+   * @throws IllegalArgumentException when a required value is missing or a state is invalid
    */
   public static @NotNull String render(@NotNull Map<String, String> values) {
     return render(readTemplate(), values);
@@ -158,9 +156,9 @@ public final class RedisAclTemplate {
    * Resolves a path under the repository root, found by walking up from the working directory to
    * the directory holding the template.
    *
-   * @param relative the path relative to the repository root.
-   * @return the absolute path.
-   * @throws IllegalStateException when no ancestor of the working directory holds the template.
+   * @param relative the path relative to the repository root
+   * @return the absolute path
+   * @throws IllegalStateException when no ancestor of the working directory holds the template
    */
   public static @NotNull Path repositoryPath(@NotNull String relative) {
     for (Path dir = Paths.get("").toAbsolutePath(); dir != null; dir = dir.getParent()) {

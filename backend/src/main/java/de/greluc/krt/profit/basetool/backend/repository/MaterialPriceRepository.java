@@ -42,26 +42,13 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
   Optional<MaterialPrice> findByMaterialIdAndTerminalId(UUID materialId, UUID terminalId);
 
   /**
-   * Nulls out the price / SCU / status columns on every {@link MaterialPrice} row whose id is NOT
-   * in {@code seenIds}. Called at the end of a UEX commodity-price sync to neutralise rows for
-   * (material, terminal) pairs that UEX no longer returns - the price-matrix sync upserts but does
-   * not delete, so without this sweep a terminal that stops listing a commodity would keep its
-   * last-known {@code priceBuy}/{@code priceSell} forever (e.g. a stale Quantanium buy price after
-   * UEX dropped the entry).
+   * Clears the price, SCU and status columns of the given stale {@link MaterialPrice} rows at the
+   * end of a UEX commodity-price sync, keeping the rows themselves.
    *
-   * <p>The row itself is kept (no FK referrers, but preserving history is cheap and lets a future
-   * UEX sync re-populate the same row via {@code findByMaterialIdAndTerminalId} without UUID
-   * churn). Overview queries already filter on {@code priceBuy > 0} / {@code priceSell > 0}, so
-   * nulled rows fall out naturally.
+   * <p>Already-cleared rows are skipped. Pending upserts are flushed first.
    *
-   * <p>The {@code OR}-chain in the predicate skips rows that are already cleared, so a steady state
-   * does not generate write traffic. {@code flushAutomatically = true} guarantees the preceding
-   * per-row upserts are flushed before the bulk UPDATE runs so the {@code id NOT IN} predicate sees
-   * the freshly-inserted rows.
-   *
-   * @param ids the stale row ids to clear, in chunks bounded by the caller; the complement is
-   *     computed in Java from {@link #findIdsWithLivePrices()} so the statement never binds one
-   *     parameter per row the feed returned
+   * @param ids the stale row ids to clear, in caller-bounded chunks computed from {@link
+   *     #findIdsWithLivePrices()}
    * @return number of rows whose prices were cleared
    */
   @Modifying(flushAutomatically = true)
@@ -88,13 +75,7 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
 
   /**
    * Returns the id of every {@link MaterialPrice} row that still carries a price, SCU or status
-   * value — the candidate set the stale-row sweep subtracts this run's seen ids from.
-   *
-   * <p>Same reasoning as {@code GameItemPriceRepository.findIdsWithLivePrices()}: the previous
-   * {@code id NOT IN :seenIds} form bound one parameter per row UEX returned, which scales with the
-   * feed and ends at PostgreSQL's 65 535 bind-parameter limit. The commodity matrix is far smaller
-   * than the item matrix (2 593 rows against 23 770 today), so it was not the one about to break —
-   * but two sweeps of the same shape with only one of them bounded is how the next one gets missed.
+   * value — the candidates for the stale-row sweep.
    *
    * @return ids of every row that currently holds a price / SCU / status value
    */
@@ -112,12 +93,8 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
   List<UUID> findIdsWithLivePrices();
 
   /**
-   * Returns paginated buy/sell prices for one material across every non-hidden terminal, projected
-   * directly into {@link MaterialPriceDto} (no need to fetch the full {@link MaterialPrice} graph).
-   * Terminals that neither buy nor sell the material are excluded - this skips rows that the UEX
-   * sync's stale-row sweep ({@link #clearStalePrices}) has just neutralised so the detail page does
-   * not render an army of empty-price terminals next to the handful that actually trade the
-   * commodity. Matches the qualifier used by {@link #findSellingTerminalsByMaterialId}.
+   * Returns paged buy/sell prices for one material across every non-hidden terminal that buys or
+   * sells it, projected into {@link MaterialPriceDto}.
    */
   @Query(
       """
@@ -156,38 +133,14 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       @Param("materialId") UUID materialId);
 
   /**
-   * Fully flattened material/terminal/price tuple feeding the trade-matrix view. {@code
-   * isIllegal/isVolatileQt/isVolatileTime} are normalised from UEX-style {@code Integer} 0/1 flags
-   * into booleans inside the JPQL via {@code CASE}; the category is left-joined because not every
-   * material has one. Excludes hidden terminals.
+   * Returns flattened material/terminal/price rows for the trade-matrix view, excluding hidden
+   * terminals and terminals with neither a buy nor a sell price.
    *
-   * <p>The projected {@code planetName} is the <i>effective</i> planet-system anchor for a
-   * terminal, resolved in this order via {@code COALESCE}:
+   * <p>{@code planetName} is the effective planet anchor: the terminal's planet, else its moon's
+   * planet, else the planet named like its orbit; {@code null} for system-level terminals.
    *
-   * <ol>
-   *   <li>{@code terminal.planet_name} (set directly when the terminal sits on a planet or a
-   *       station in that planet's orbit),
-   *   <li>{@code moon.planet_name} via {@code moon.name = terminal.moon_name} - covers terminals on
-   *       moons whose parent planet is only indirectly known,
-   *   <li>{@code planet.name} where the planet's own name matches {@code terminal.orbit_name} in
-   *       the same star system - covers Lagrange-style orbits named after their host planet.
-   * </ol>
-   *
-   * <p>The result is {@code null} for true system-level terminals (e.g. raw jump-point or
-   * interplanetary Lagrange stations) that have no parent planet at all.
-   *
-   * <p>Excludes rows with no active buy/sell side - mirrors {@link #findPricesByMaterialId} so the
-   * matrix does not surface terminals that {@link #clearStalePrices} has just neutralised after UEX
-   * dropped the (material, terminal) pair.
-   *
-   * <p><b>Server-side filtering (ADR-0105, REQ-UI-014).</b> The four optional filter dimensions are
-   * applied here so the frontend never has to fetch the whole universe and filter in memory. Each
-   * dimension follows the codebase's optional-parameter idiom ({@code :param IS NULL OR …}) so a
-   * {@code null} means "no filter" and an all-{@code null} call is byte-for-byte the historical
-   * full-matrix query. Callers MUST pass {@code null} (never an empty collection) for an
-   * unconstrained {@code IN} dimension — an empty list would render {@code IN ()} and match
-   * nothing. The boolean dimensions filter to {@code true} only when the corresponding flag is
-   * {@code TRUE}; {@code null} leaves them unconstrained.
+   * <p>Each filter is optional ({@code null} = unfiltered; ADR-0105). Pass {@code null}, never an
+   * empty collection, for an unconstrained {@code IN} filter.
    *
    * @param materialNames exact material names to keep, or {@code null} for all
    * @param starSystems exact star-system names to keep, or {@code null} for all

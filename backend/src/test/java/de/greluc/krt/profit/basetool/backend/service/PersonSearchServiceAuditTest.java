@@ -34,17 +34,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * What the Personensuche writes into its audit row (REQ-SEC-060, REQ-AUDIT-001).
- *
- * <p>The rule this pins down is the kind a later refactor "tidies up": the payload carries the
- * term's <b>length</b> and never the term. A trail of every name an admin searched for would be a
- * second store of exactly the data the search exists to help remove — so the one field that must
- * never appear is the one the caller passes in.
- *
- * <p>It used to be asserted through the controller, against a mocked {@code AuditService}. That
- * moved here when the record call moved into the service, because the controller can no longer make
- * it: {@link AuditService#record} is {@code MANDATORY}-propagated and a request handler has no
- * transaction to satisfy it with.
+ * Verifies that the Personensuche audit row records the search term's length and never the term
+ * itself (REQ-SEC-060, REQ-AUDIT-001).
  */
 @ExtendWith(MockitoExtension.class)
 class PersonSearchServiceAuditTest {
@@ -53,7 +44,6 @@ class PersonSearchServiceAuditTest {
 
   @Mock private AuditService auditService;
 
-  // covers REQ-SEC-060 — the recorded payload carries the term's length, never the term
   @Test
   void recordSearch_recordsTheLengthAndNeverTheTerm() {
     PersonSearchService service = new PersonSearchService(auditService);
@@ -67,12 +57,10 @@ class PersonSearchServiceAuditTest {
 
     String payload = details.getValue().toString();
     assertThat(payload).as("the term is somebody's name").doesNotContain(TERM);
-    // The length is the whole point: 25 characters, not the 25 characters.
     assertThat(payload).contains("termLength=" + TERM.length());
     assertThat(payload).contains("hits=2").contains("truncated=true");
   }
 
-  // covers REQ-SEC-060 — the length is of the trimmed term, as the search itself uses it
   @Test
   void recordSearch_measuresTheTrimmedTerm() {
     PersonSearchService service = new PersonSearchService(auditService);

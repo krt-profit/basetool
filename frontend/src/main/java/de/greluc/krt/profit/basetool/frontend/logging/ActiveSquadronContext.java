@@ -23,25 +23,17 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Thread-local holder for the caller's currently selected OrgUnit, so that the WebClient exchange
- * filter ({@code ActiveSquadronRelayFilter}) can attach the {@code X-Active-Org-Unit-Id} header
- * without re-reading the {@code HttpSession} from a Netty reactor thread that does not have the
- * Tomcat request bound to its {@code RequestContextHolder}.
+ * Thread-local holder for the caller's selected OrgUnit, read by {@code ActiveSquadronRelayFilter}
+ * to set the {@code X-Active-Org-Unit-Id} header on outbound WebClient calls.
  *
- * <p>Populated by {@code ActiveSquadronContextFilter} at the beginning of every servlet request
- * (snapshotted from the frontend's Spring Session) and cleared in the matching {@code finally}
- * block to avoid bleed-through on pooled / virtual threads. Mirrors the {@link CorrelationContext}
- * pattern; Reactor's automatic context propagation (enabled by Spring Boot 4) carries the
- * thread-local to the WebClient exchange filter even when the actual I/O runs on a Netty epoll
- * thread.
+ * <p>Set and cleared per request by {@code ActiveSquadronContextFilter}; Reactor context
+ * propagation carries it to the Netty threads.
  */
 public final class ActiveSquadronContext {
 
   private static final ThreadLocal<UUID> HOLDER = new ThreadLocal<>();
 
-  private ActiveSquadronContext() {
-    // utility
-  }
+  private ActiveSquadronContext() {}
 
   /**
    * Stores the given squadron id in the calling thread; a {@code null} value clears the slot.

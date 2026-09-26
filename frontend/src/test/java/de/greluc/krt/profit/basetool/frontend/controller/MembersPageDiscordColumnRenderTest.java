@@ -46,12 +46,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Full Thymeleaf render test for the member-list Discord column (REQ-SEC-019). Pins that a
- * Discord-linked member's row carries the Discord brand icon while a non-linked member's row does
- * not — i.e. exactly one icon use for the one linked user — and that the column header is rendered.
- * The icon assertion is locale-independent (the {@code <use href>} reference does not change with
- * the request locale), and the anonymous-only "Sign in with Discord" sidebar entry is not emitted
- * for an authenticated admin, so the single icon use is unambiguously the linked member's.
+ * Full Thymeleaf render test for the member-list Discord column (REQ-SEC-019): only a
+ * Discord-linked member's row carries the Discord icon, and the column header is rendered.
  */
 @SpringBootTest
 class MembersPageDiscordColumnRenderTest {
@@ -83,7 +79,6 @@ class MembersPageDiscordColumnRenderTest {
 
     when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
         .thenReturn(page);
-    // Per-user SK membership lookups (one per row) — none needed for this assertion.
     when(backendApiClient.get(contains("/memberships"), anyTypeRef())).thenReturn(List.of());
 
     String html =
@@ -107,11 +102,8 @@ class MembersPageDiscordColumnRenderTest {
   }
 
   /**
-   * REQ-SEC-055 / #1828: the consolidate action is the only remedy left once a duplicate has been
-   * approved, so it must be on <em>every</em> member row rather than gated the way the delete
-   * button is. The delete only appears for a row the sync believes Keycloak no longer holds; a
-   * duplicate an admin has just noticed is still very much in Keycloak, and gating consolidation
-   * the same way would hide it exactly when it is needed.
+   * Verifies that the consolidate action and its dialog are offered on every member row, not only
+   * where the delete button appears (REQ-SEC-055).
    */
   @Test
   void memberList_offersConsolidateOnEveryRow_andRendersTheDialog() throws Exception {
@@ -148,10 +140,10 @@ class MembersPageDiscordColumnRenderTest {
   }
 
   /**
-   * Builds a minimal member DTO for the list render, setting only the fields the row template reads
-   * plus the {@code discordLinked} indicator under test.
+   * Builds a minimal member DTO with the fields the row template reads and the {@code
+   * discordLinked} indicator.
    *
-   * @param effectiveName the visible name (also used as the row marker in assertions)
+   * @param effectiveName the visible name, also the row marker in assertions
    * @param discordLinked whether the member is Discord-linked
    * @return the populated DTO
    */

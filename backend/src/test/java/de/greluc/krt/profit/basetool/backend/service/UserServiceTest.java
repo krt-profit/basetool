@@ -38,16 +38,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Regression tests for the optimistic-lock {@code @Version} write-back on the in-place profile
- * edits ({@code updateUserDescription}, {@code updateUserDefaultPayoutPreference}, {@code
- * updateUserShareBlueprintsGlobally}). Both are {@code @Transactional}, so the commit — and thus
- * the {@code @Version} increment — happens after the method returns. The profile page writes the
- * returned version back onto every hidden version input in place via {@code syncAllVersions} (no
- * reload), so the response must be mapped from a {@code saveAndFlush}, not a plain {@code save}: a
- * plain {@code save} leaves the version unflushed, so the response carries the STALE version and
- * the user's next consecutive profile edit fails with {@code
- * ObjectOptimisticLockingFailureException} (HTTP 409). These tests pin {@code saveAndFlush},
- * mirroring {@code InventoryItemServiceVersionFlushTest}.
+ * Verifies that the in-place profile edits ({@code updateUserDescription}, {@code
+ * updateUserDefaultPayoutPreference}, {@code updateUserShareBlueprintsGlobally}) persist with
+ * {@code saveAndFlush}, so the response carries the incremented version and a consecutive edit does
+ * not 409.
  */
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -136,7 +130,7 @@ class UserServiceTest {
   @Test
   void updateUserShareBlueprintsGlobally_staleVersion_throwsAndDoesNotSave() {
     UUID id = UUID.randomUUID();
-    User user = userWithId(id); // version 0
+    User user = userWithId(id);
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
     assertThrows(

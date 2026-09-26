@@ -22,15 +22,13 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code JobOrderBlueprintOwnerDto}: one member of the responsible
- * org unit who owns the blueprint for at least one of an item order's required products, with the
- * display names of exactly those required products they hold.
+ * Frontend mirror of the backend {@code JobOrderBlueprintOwnerDto}: a member who owns the blueprint
+ * for at least one of an item order's required products, with those products.
  *
  * @param ownerName the member's effective display name
  * @param ownedProductNames the required products this member owns the blueprint for
- * @param orgUnitMember {@code true} when this owner is a member of the order's responsible org
- *     unit; {@code false} when they appear only via global blueprint sharing (REQ-INV-018), which
- *     the template marks with a discreet "not a unit member" hint
+ * @param orgUnitMember {@code true} when the owner is a member of the order's responsible org unit,
+ *     {@code false} when visible only via global blueprint sharing (REQ-INV-018)
  */
 public record JobOrderBlueprintOwnerDto(
     String ownerName, List<String> ownedProductNames, boolean orgUnitMember) {}

@@ -53,13 +53,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST API for the Materialbörse — the org-wide material-exchange trade board of Flotte &amp;
- * Logistik (REQ-MARKET-001…). The whole surface is gated on {@code KRT_MEMBER} (decision D2: an
- * authenticated caller that is not a member does not see the internal trade board — written for the
- * role-less tier ADR-0159 removed, and still the right predicate for an integration identity); the
- * read endpoints delegate to {@link MaterialExchangeBoardService} (board / detail / counts / picker
- * + the interessenten-anonymity redaction), the write endpoints to {@link MaterialExchangeService}
- * (release / edit / deactivate / interest lifecycle), which enforces per-offer ownership.
+ * REST API for the Materialbörse offer board (REQ-MARKET-001), gated on {@code KRT_MEMBER}.
+ *
+ * <p>Reads delegate to {@link MaterialExchangeBoardService}, writes to {@link
+ * MaterialExchangeService}, which enforces per-offer ownership.
  */
 @RestController
 @RequestMapping("/api/v1/material-exchange")
@@ -137,8 +134,7 @@ public class MaterialExchangeController {
   }
 
   /**
-   * Lists a craftable item on the board ("Item anbieten", #1185). Unlike a material release the
-   * caller supplies the blueprint product and the quantity; only items an active blueprint produces
+   * Lists a craftable item on the board ("Item anbieten"); only items an active blueprint produces
    * are accepted.
    *
    * @param request the blueprint product key, the whole-piece quantity and the trade remark.

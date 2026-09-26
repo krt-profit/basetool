@@ -61,7 +61,6 @@ class MissionServiceCrewDuplicationTest {
     participant.setId(participantId);
     mission.getParticipants().add(participant);
 
-    // Pre-assign participant to the same unit
     MissionCrew existingCrew = new MissionCrew();
     existingCrew.setMissionUnit(unit);
     existingCrew.setParticipant(participant);
@@ -69,7 +68,6 @@ class MissionServiceCrewDuplicationTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    // Expect exception when trying to add same participant again
     assertThrows(
         de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException.class,
         () ->
@@ -99,7 +97,6 @@ class MissionServiceCrewDuplicationTest {
     participant.setId(participantId);
     mission.getParticipants().add(participant);
 
-    // Pre-assign participant to unit 1
     MissionCrew existingCrew = new MissionCrew();
     existingCrew.setMissionUnit(unit1);
     existingCrew.setParticipant(participant);
@@ -107,7 +104,6 @@ class MissionServiceCrewDuplicationTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    // Expect exception when trying to add same participant to unit 2
     assertThrows(
         de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException.class,
         () ->

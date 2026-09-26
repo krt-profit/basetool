@@ -35,14 +35,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The ownership version against a real database: the {@code @Formula} that exposes {@code
- * mission_ownership.version} on {@link Mission}, and the versioned owner change that moves it.
+ * Integration test of the mission ownership version against a real database: the {@code @Formula}
+ * on {@link Mission} and its bump by a versioned owner change.
  *
- * <p>A mocked repository cannot prove either half. The formula is SQL that only PostgreSQL
- * evaluates, and the counter's movement is Hibernate's {@code @Version} bump on a flush — which is
- * exactly what the service relies on to hand the response the counter it just produced. Each read
- * below goes through {@link EntityManager#clear()} first, so it is the database answering and not
- * the persistence context repeating what the service set.
+ * <p>Each read follows {@link EntityManager#clear()}, so the database answers.
  */
 @SpringBootTest
 @Transactional
@@ -105,8 +101,6 @@ class MissionOwnershipVersionIntegrationTest {
 
   @Test
   void anEchoReadBeforeTheFirstChangeIsStaleAfterIt() {
-    // The lost update the counter exists for: two managers opened the page while it said 0. The
-    // first one's change must leave the second one's 0 behind, or the second overwrites unasked.
     User creator = user("creator3");
     User first = user("first3");
     User second = user("second3");

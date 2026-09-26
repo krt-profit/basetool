@@ -51,30 +51,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * R3 SC Wiki commodity merge (SC_WIKI_SYNC_PLAN.md §8.1). Pulls {@code /api/commodities}, filters
- * out non-tradeable junk (§8.9), and merges the rest into the existing {@code material} table.
+ * Merges the SC Wiki commodity feed ({@code /api/commodities}) into the {@code material} table,
+ * dropping non-tradeable junk.
  *
- * <p>Merge model (§4.6 conflict policy): UEX stays the canonical owner of {@code name} / {@code
- * code} / {@code kind} / prices / {@code is_*} flags. The Wiki sync only ever writes the Wiki-owned
- * columns ({@code scwiki_uuid} / {@code scwiki_key} / {@code scwiki_slug} / {@code
- * density_g_per_cc} / {@code scwiki_synced_at}) on a matched UEX row, and flips {@code
- * source_systems} from {@code UEX_ONLY} to {@code BOTH}. A Wiki commodity with no UEX counterpart
- * becomes a fresh {@code WIKI_ONLY} row inserted <b>invisible</b> ({@code is_visible = false}) so
- * it never pollutes the trading / refinery UI until an admin reviews it (§4.3).
- *
- * <p>Resolution chain (§8.1.1): {@code scwiki_uuid} → alias table → exact name → canonical-name
- * (qualifier-stripped) with multi-match rejection. On a canonical multi-match the row is
- * <b>skipped</b> (not turned into a {@code WIKI_ONLY} row) and a {@link
- * SyncEventType#MULTI_MATCH_AMBIGUOUS} event is logged — see {@link #resolve(ScWikiCommodityDto,
- * Map, UUID)} for why this deviates from the plan's literal pseudocode.
- *
- * <p>Gated behind {@code krt.scwiki.commodity-sync-enabled} (default {@code false}) so R3 ships
- * "dark": the code, table and admin page all land, but no live Wiki traffic is generated until an
- * operator flips the flag per the deployment runbook §3. Empty Wiki responses short-circuit without
- * touching local data; the orphan sweep is gated on a non-empty seen-set (§8.7).
- *
- * <p>Lives in {@code integration.scwiki} and injects {@link ScWikiClient} — the {@code
- * scWikiIntegrationClassesMustWireScWikiClient} ArchUnit rule enforces that.
+ * <p>Writes only the Wiki-owned columns on a matched UEX row and flips {@code source_systems} to
+ * {@code BOTH}; an unmatched commodity becomes an invisible {@code WIKI_ONLY} row, and an ambiguous
+ * canonical-name match is skipped with a {@link SyncEventType#MULTI_MATCH_AMBIGUOUS} event. Gated
+ * behind {@code krt.scwiki.commodity-sync-enabled} (default {@code false}).
  */
 @Slf4j
 @Service
@@ -83,9 +66,8 @@ import org.springframework.util.StringUtils;
 public class ScWikiCommoditySyncService {
 
   /**
-   * Atmospheric / environment-system entries that pollute the Wiki commodity pool but are not
-   * tradeable commodities (§8.9). Hard-dropped at sync time. A maintained constant — grow it via PR
-   * review, not at runtime.
+   * Atmosphere and environment-system entries in the Wiki commodity pool that are not tradeable and
+   * are dropped at sync time.
    */
   private static final Set<String> HARDCODED_ATMOSPHERE_SET =
       Set.of("Cooler", "Heat", "Oxygen", "Life Support", "EVA Fuel", "Mixed Mining");
@@ -110,23 +92,12 @@ public class ScWikiCommoditySyncService {
   private final SyncReportService syncReportService;
 
   /**
-   * Runs the full Wiki commodity merge. No-op (with an INFO line) when {@code
-   * krt.scwiki.commodity-sync-enabled} is {@code false}. An empty Wiki response short-circuits
-   * before the orphan sweep so a transient outage never wipes the merge state.
+   * Runs the full Wiki commodity merge; a no-op when {@code krt.scwiki.commodity-sync-enabled} is
+   * off, and an empty response skips the orphan sweep.
    *
-   * <p>Returns the number of {@code material} rows this run wrote — matched rows linked plus fresh
-   * {@code WIKI_ONLY} rows created (junk- and ambiguous-skips excluded) — which {@link
-   * ScWikiScheduler} accumulates into {@code
-   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and <em>genuine</em>
-   * empty-response short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run
-   * ({@code SyncZeroItems}, #1041 item 2) rather than a fresh success. A {@code 304 Not Modified}
-   * response is <b>not</b> such an outage — the catalogue is merely unchanged — so this reports
-   * {@link MaterialRepository#countLiveScwikiMaterials() the live linked-material count} instead of
-   * {@code 0}, keeping a fully-cached healthy run from false-firing {@code SyncZeroItems} (#1182).
-   *
-   * @return the number of {@code material} rows written this run ({@code linked +
-   *     createdWikiOnly}), or the live linked-material count on a {@code 304 Not Modified}
-   *     (unchanged) catalogue
+   * @return the number of {@code material} rows written ({@code linked + createdWikiOnly}), {@code
+   *     0} when disabled or empty, or {@link MaterialRepository#countLiveScwikiMaterials() the live
+   *     linked-material count} on a {@code 304 Not Modified}
    */
   @Transactional
   public int syncCommodities() {
@@ -144,9 +115,6 @@ public class ScWikiCommoditySyncService {
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiCommodityDto>>() {},
             "commodities");
     if (fetchResult.notModified()) {
-      // Catalogue unchanged since the last sync (ETag 304): nothing to merge, but this is a healthy
-      // run — report the live linked-material count so an all-304 run is not read as a zero-item
-      // outage (#1182). A genuine empty-200 falls through to the isEmpty() branch and reports 0.
       long live = materialRepository.countLiveScwikiMaterials();
       log.info(
           "SC Wiki commodity catalogue unchanged since last sync (304) — reporting {} live linked"
@@ -212,10 +180,6 @@ public class ScWikiCommoditySyncService {
     if (seenScwikiUuids.isEmpty()) {
       log.warn("Skipping orphan sweep — no SC Wiki commodity was merged this run.");
     } else if (!fetchResult.complete()) {
-      // The page walk could not vouch for the census (a page failed, the pagination metadata went
-      // missing on a full page, or meta.total disagreed with the merged rows). The uuids we did see
-      // are real, but everything on the pages we never fetched would be tombstoned for the wrong
-      // reason. Defer orphan detection to the next complete run.
       log.warn(
           "Skipping the material scwiki_deleted sweep: the Wiki commodity page walk did not"
               + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
@@ -241,33 +205,23 @@ public class ScWikiCommoditySyncService {
   }
 
   /**
-   * Resolution chain (§8.1.1). Returns a matched material, a {@code null}-material "create new"
-   * result, or a "skip" result for a canonical multi-match.
+   * Resolves a Wiki commodity by {@code scwiki_uuid}, alias, exact name, then canonical name.
    *
-   * <p><b>Deviation from the plan's literal pseudocode:</b> §8.1's pseudocode turns a {@code null}
-   * resolution into a new {@code WIKI_ONLY} row unconditionally. For the canonical multi-match case
-   * (§8.1.1 step 4) that is unsafe: creating a {@code WIKI_ONLY} row would stamp the Wiki UUID onto
-   * a fresh row, and step 1 ({@code byScwikiUuid}) would then shadow it on every subsequent run —
-   * the admin's later alias fix could never take effect. Since an ambiguous canonical match means
-   * the commodity is almost certainly already represented by one of the matched UEX rows, the
-   * correct action is to skip (no row created, no UUID stamped) and let the admin add an alias; the
-   * next run resolves it cleanly via step 2. The {@link SyncEventType#MULTI_MATCH_AMBIGUOUS} event
-   * surfaces it for review.
+   * <p>A canonical multi-match yields a skip rather than a new row, so a later admin alias can
+   * still take effect; it is reported as {@link SyncEventType#MULTI_MATCH_AMBIGUOUS}.
    *
    * @param dto the Wiki commodity row
-   * @param canonicalIndex pre-built canonical-name → unmatched-materials index
+   * @param canonicalIndex canonical-name index of unmatched materials
    * @param runId current run id for event logging
-   * @return resolution outcome
+   * @return a matched material, a "create new" result, or a skip result
    */
   private ResolveResult resolve(
       @NotNull ScWikiCommodityDto dto, Map<String, List<Material>> canonicalIndex, UUID runId) {
-    // 1. by Wiki UUID (set on a previous sync).
     Optional<Material> byUuid = materialRepository.findByScwikiUuid(dto.uuid());
     if (byUuid.isPresent()) {
       return ResolveResult.matched(byUuid.orElseThrow());
     }
 
-    // 2. by alias table (seeded §4.1/§4.2 + admin-curated).
     Material byAlias =
         aliasService.resolveMaterialByAlias(MaterialExternalAliasSource.SCWIKI, dto.name());
     if (byAlias != null) {
@@ -280,7 +234,6 @@ public class ScWikiCommoditySyncService {
       return ResolveResult.matched(byAlias);
     }
 
-    // 3. exact name.
     if (StringUtils.hasText(dto.name())) {
       Optional<Material> byName = materialRepository.findByName(dto.name());
       if (byName.isPresent()) {
@@ -288,7 +241,6 @@ public class ScWikiCommoditySyncService {
       }
     }
 
-    // 4. canonical (qualifier-stripped) name, restricted to materials without a Wiki UUID yet.
     String canon = canonicalName(dto.name());
     if (canon != null && !canon.isBlank()) {
       List<Material> candidates = canonicalIndex.getOrDefault(canon, List.of());
@@ -308,15 +260,12 @@ public class ScWikiCommoditySyncService {
       }
     }
 
-    // 5/6. no match → caller creates a WIKI_ONLY row.
     return ResolveResult.createNew();
   }
 
   /**
-   * Builds a {@code canonicalName → materials} index over the materials that do not yet carry a
-   * Wiki UUID. Materials already linked by UUID are excluded so the canonical step can never
-   * re-link a row to a second Wiki commodity. Built once per run (the commodity catalogue is a few
-   * hundred rows; the Wiki sync runs at most daily).
+   * Builds a {@code canonicalName → materials} index over materials without a Wiki UUID, so the
+   * canonical step never links a row to a second Wiki commodity.
    *
    * @return canonical-name index of unmatched materials
    */
@@ -337,10 +286,8 @@ public class ScWikiCommoditySyncService {
   }
 
   /**
-   * Creates a fresh {@code WIKI_ONLY} material for a Wiki commodity with no UEX counterpart. The
-   * row is invisible ({@code is_visible = false}) so it stays out of trading flows until an admin
-   * reviews it. Emits {@link SyncEventType#LOOKS_LIKE_ITEM} for the §4.3 "items in the commodity
-   * pool" set, otherwise {@link SyncEventType#CREATED_WIKI_ONLY}.
+   * Creates an invisible {@code WIKI_ONLY} material for a Wiki commodity with no UEX counterpart,
+   * logging {@link SyncEventType#LOOKS_LIKE_ITEM} or {@link SyncEventType#CREATED_WIKI_ONLY}.
    *
    * @param dto the Wiki commodity row
    * @param runId current run id for event logging
@@ -366,14 +313,12 @@ public class ScWikiCommoditySyncService {
   }
 
   /**
-   * Writes only the Wiki-owned columns onto a material, per the §4.6 conflict policy. Never touches
-   * {@code name} / {@code code} / {@code kind} / {@code type} / prices / {@code is_*} flags — those
-   * stay UEX-canonical. For a brand-new {@code WIKI_ONLY} row the name was already set from the
-   * Wiki at creation time.
+   * Writes only the Wiki-owned columns onto a material; the UEX-canonical name, code, kind, type,
+   * prices and {@code is_*} flags are never touched.
    *
    * @param material the row to update
    * @param dto the Wiki commodity row
-   * @param now timestamp to stamp on {@code scwiki_synced_at}
+   * @param now timestamp for {@code scwiki_synced_at}
    */
   private void applyWikiFields(
       @NotNull Material material, @NotNull ScWikiCommodityDto dto, Instant now) {
@@ -388,9 +333,8 @@ public class ScWikiCommoditySyncService {
   }
 
   /**
-   * Hard-junk name filter (§8.9). Drops placeholder / HTML / raw-asset / atmosphere entries that
-   * pollute the Wiki commodity pool. Purely name-pattern based — the verified-unreliable flag-based
-   * heuristic was removed (§4.3).
+   * Name-pattern filter that drops placeholder, HTML, raw-asset and atmosphere entries from the
+   * Wiki commodity pool.
    *
    * @param dto the Wiki commodity row
    * @return {@code true} iff the row should be dropped without import
@@ -419,15 +363,11 @@ public class ScWikiCommoditySyncService {
   }
 
   /**
-   * Computes a commodity's canonical core: lowercased, parenthetical suffixes removed, qualifier
-   * words ({@code raw} / {@code ore} / {@code refined} / {@code pure} / {@code r}) dropped, and
-   * non-alphanumeric runs folded away. {@code "Raw Silicon"}, {@code "Silicon (Raw)"} and {@code
-   * "Silicon"} all canonicalise to {@code "silicon"}. The folding itself lives in the shared {@link
-   * MaterialNameCanonicalizer} since #434 so the refinery screenshot import applies bit-identical
-   * rules; this delegate keeps the sync's historical call sites and tests stable.
+   * Computes a commodity's canonical core via {@link MaterialNameCanonicalizer}, so {@code "Raw
+   * Silicon"}, {@code "Silicon (Raw)"} and {@code "Silicon"} all yield {@code "silicon"}.
    *
    * @param name the raw commodity name
-   * @return the canonical core, or {@code null} for null / blank input
+   * @return the canonical core, or {@code null} for null or blank input
    */
   static String canonicalName(String name) {
     return MaterialNameCanonicalizer.canonicalCore(name);

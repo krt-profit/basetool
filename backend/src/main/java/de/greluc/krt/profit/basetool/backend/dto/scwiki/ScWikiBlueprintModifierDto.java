@@ -26,16 +26,11 @@ import java.util.UUID;
 
 /**
  * One stat contribution a requirement group makes to the crafted item (SC Wiki {@code
- * blueprint_modifier}), nested under {@link ScWikiBlueprintRequirementGroupDto#modifiers()}. This
- * is the "stat the ingredient delivers": {@link #propertyKey} / {@link #label} name the affected
- * output stat (e.g. {@code weapon_damage} / "Impact Force"), and {@link #modifierRange} gives the
- * multiplier band the stat moves through as the consumed ingredient's quality sweeps {@link
- * #qualityRange}.
+ * blueprint_modifier}): the stat moves through {@link #modifierRange} as ingredient quality sweeps
+ * {@link #qualityRange}.
  *
- * <p>When {@link #valueSegments} is present the stat does NOT move linearly between the two {@code
- * modifier_range} endpoints — it follows the chained per-segment ranges instead (a stepped /
- * piecewise-linear curve). Consumers must prefer {@link #valueSegments} over {@link #qualityRange}
- * / {@link #modifierRange} whenever it is non-empty.
+ * <p>When {@link #valueSegments} is non-empty it defines a piecewise-linear curve and takes
+ * precedence over the two ranges.
  *
  * @param propertyKey internal stat key (e.g. {@code "weapon_damage"}), or {@code null}
  * @param propertyUuid UUID of the property definition, or {@code null}
@@ -44,9 +39,9 @@ import java.util.UUID;
  *     lower}/{@code neutral}), or {@code null}
  * @param qualityRange the ingredient-quality band the modifier interpolates across, or {@code null}
  * @param modifierRange the stat-multiplier endpoints for that band, or {@code null}
- * @param valueRangeType interpolation type (currently {@code "linear"}), or {@code null}
- * @param valueSegments the per-segment ranges of a stepped / piecewise-linear modifier, or {@code
- *     null} / empty for the simple linear form
+ * @param valueRangeType interpolation type, e.g. {@code "linear"}, or {@code null}
+ * @param valueSegments the per-segment ranges of a piecewise-linear modifier, or {@code null} /
+ *     empty for the simple linear form
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiBlueprintModifierDto(

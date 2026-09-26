@@ -25,21 +25,10 @@ import org.mapstruct.ReportingPolicy;
 
 /**
  * Shared MapStruct configuration inherited by every mapper via {@code @Mapper(config =
- * CentralMapperConfig.class)}. It centralises three settings (REQ-API-002):
+ * CentralMapperConfig.class)} (REQ-API-002).
  *
- * <ul>
- *   <li>{@code componentModel = "spring"} — MapStruct emits Spring {@code @Component} beans.
- *   <li>{@code injectionStrategy = CONSTRUCTOR} — a generated mapper receives the mappers it {@code
- *       uses} through its constructor, never through {@code @Autowired} fields, matching the
- *       constructor-injection rule the rest of the code base follows.
- *   <li>{@code unmappedTargetPolicy = ERROR} — a target property no source feeds <em>fails the
- *       build</em>. A DTO field added later would otherwise ship silently {@code null}; every gap
- *       that is intended is spelled out with {@code @Mapping(target = "...", ignore = true)} on the
- *       method, so a reader sees what is deliberately left unset.
- * </ul>
- *
- * <p>Pointing every mapper at this config replaces the per-mapper boilerplate, which previously
- * spelled the policy three different ways, with a single authoritative declaration.
+ * <p>Mappers are Spring beans with constructor injection, and an unmapped target property fails the
+ * build; intended gaps are declared with {@code @Mapping(target = "...", ignore = true)}.
  */
 @MapperConfig(
     componentModel = "spring",

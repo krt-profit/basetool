@@ -22,15 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code MaterialDemandRowDto}: one aggregated material bucket of
- * the cross-order demand overview (REQ-ORDERS-034) — a material at one quality, summed across every
- * non-terminal order of one responsible org unit. {@code qualityRequirement} is the {@code
- * GOOD}/{@code NONE} name as a string.
+ * Frontend mirror of the backend {@code MaterialDemandRowDto}: one material at one quality, summed
+ * across every non-terminal order of one responsible org unit (REQ-ORDERS-034).
  *
- * <p>The template renders {@code bookedAmount} and {@code claimedAmount} as separate columns
- * because they are different kinds of coverage: booked material is physical stock linked to the
- * orders, a claim is only a promise. {@code outstandingAmount} therefore subtracts the former and
- * not the latter.
+ * <p>{@code outstandingAmount} subtracts booked stock but not claims, which are only promises.
  *
  * @param material the bucket's material (carries {@code quantityType} for unit-aware display)
  * @param qualityRequirement the quality bucket name ({@code GOOD} or {@code NONE})

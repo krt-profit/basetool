@@ -100,18 +100,11 @@ class JobOrderHandoverServiceTest {
     inventoryItem.setId(inventoryId);
     inventoryItem.setMaterial(material);
     inventoryItem.setAmount(10.0);
-    // Variante C (REQ-INV-027): the handover guard reads the job-order allocation, so earmark the
-    // entry's full amount to this order exactly as the real create path does.
     InventoryAllocations.addJobOrder(inventoryItem, order, inventoryItem.getAmount(), false);
   }
 
   @Test
   void createHandover_shouldRejectItemOrder_soProductionRemainsTheSoleMaterialConsumer() {
-    // Given: a material handover posted against an ITEM order (only reachable via a crafted
-    // request;
-    // the UI hides the button on item orders). It must be refused so it cannot draw the linked
-    // stock
-    // down a second time — the Herstellung step already consumes it (REQ-ORDERS-025).
     order.setType(de.greluc.krt.profit.basetool.backend.model.JobOrderType.ITEM);
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
@@ -119,7 +112,6 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-    // When / Then: rejected before any inventory is touched.
     assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertEquals(10.0, inventoryItem.getAmount());
     verify(inventoryItemRepository, never()).save(any());
@@ -128,14 +120,11 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldReduceInventoryAmount_whenAmountIsSmallerThanStock() {
-    // Given
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
-    // findById is called twice: once at the start and once after the loop to re-fetch the managed
-    // entity
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -143,10 +132,8 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then
     assertEquals(6.0, inventoryItem.getAmount());
     assertEquals(6.0, jobOrderMaterial.getAmount());
     verify(inventoryItemRepository).save(inventoryItem);
@@ -155,19 +142,12 @@ class JobOrderHandoverServiceTest {
         .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
-    // findById called twice: initial load + re-fetch after clearAutomatically evicts session cache
     verify(jobOrderRepository, times(2)).findById(orderId);
-    // REQ-MARKET-013: the reduced (non-depleted) handed-over row ratchets any active offer down to
-    // the remaining 6.0 — pins the handover clamp call site.
     verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(inventoryId), eq(6.0));
   }
 
   @Test
   void createHandover_shouldAutoClampMissionEarmark_whenDualTaggedPartialHandover() {
-    // Given: the entry is earmarked at its FULL amount to BOTH the order and a mission (as a
-    // refinery deposit for an order that also belongs to a mission does). A partial handover to the
-    // order must auto-clamp the mission earmark to the remaining stock instead of 422-ing
-    // (REQ-INV-027) — the handed physical SCU leave BOTH earmarks.
     de.greluc.krt.profit.basetool.backend.model.Mission mission =
         new de.greluc.krt.profit.basetool.backend.model.Mission();
     mission.setId(UUID.randomUUID());
@@ -185,12 +165,8 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then: the entry drops to 6, and BOTH the order slice and the auto-clamped mission slice
-    // follow
-    // the physical stock down to 6 (no OverAllocationException).
     assertEquals(6.0, inventoryItem.getAmount());
     assertEquals(6.0, inventoryItem.getJobOrderAllocations().iterator().next().getAmount());
     assertEquals(6.0, inventoryItem.getMissionAllocations().iterator().next().getAmount());
@@ -199,9 +175,6 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldApplyExplicitMissionPlan_whenAmbiguousMultiMission() {
-    // Given: the entry is dual-tagged to the order (full 10) and split across TWO missions (6 + 4,
-    // no mission rest). A partial handover of 4 could shrink either mission, so the modal picker
-    // sends an explicit plan taking all 4 out of mission A; mission B stays untouched.
     de.greluc.krt.profit.basetool.backend.model.Mission missionA =
         new de.greluc.krt.profit.basetool.backend.model.Mission();
     missionA.setId(UUID.randomUUID());
@@ -224,10 +197,8 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then: the entry drops to 6, mission A took the whole 4 (6 -> 2), mission B is untouched (4).
     assertEquals(6.0, inventoryItem.getAmount());
     double missionAAmount =
         inventoryItem.getMissionAllocations().stream()
@@ -247,10 +218,6 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldReject_whenAmountExceedsOwnOrderSlice_withSiblingOrder() {
-    // Given: a 100-SCU entry split across TWO orders on the job-order dimension — 20 to THIS order,
-    // 70 to a sibling order (rest 10). A handover fulfils THIS order only, so it may draw at most
-    // this order's own 20-SCU slice. Handing over 50 would erode the sibling order's coverage
-    // (REQ-INV-027 R5): the guard must reject it (400) rather than silently over-allocate order B.
     JobOrder siblingOrder = new JobOrder();
     siblingOrder.setId(UUID.randomUUID());
     inventoryItem.getJobOrderAllocations().clear();
@@ -267,8 +234,6 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then: rejected with 400, and the entry is left entirely untouched (no R5 violation,
-    // the sibling order's 70-SCU slice is preserved).
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(ex.getMessage().contains("earmarked to this job order"));
@@ -280,15 +245,11 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldDeleteInventoryItem_whenAmountIsFullyHandedOver() {
-    // Given
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
-    // findById is called twice: once at the start and once after the loop to re-fetch the managed
-    // entity
-    // (fix for clearAutomatically=true detaching jobOrder from session)
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -304,27 +265,17 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then
     assertEquals(0.0, jobOrderMaterial.getAmount());
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(any());
-    // REQ-MARKET-013: a depleted row was deleted and its offer cascade-removed (V210), so the
-    // handover must NOT clamp it — pins the depleted-skip branch.
     verify(materialExchangeOfferRepository, never()).clampOfferedAmountToStock(any(), anyDouble());
     verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
-    // completeJobOrderWithinTransaction called with the re-fetched managed entity (same object in
-    // unit test)
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
-    // findById called twice: initial load + re-fetch after clearAutomatically evicts session cache
     verify(jobOrderRepository, times(2)).findById(orderId);
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
-    // The persisted handover item carries the snapshot data (material, quality, amount) only;
-    // there is no longer a reference to the (potentially deleted) inventory item. This is the
-    // structural fix for the JobOrder Übergabe booking bug — see CHANGELOG / V64 migration.
     assertNotNull(persistedHandover[0]);
     assertEquals(1, persistedHandover[0].getItems().size());
     var snapshot = persistedHandover[0].getItems().iterator().next();
@@ -334,7 +285,6 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldThrowException_whenAmountExceedsStock() {
-    // Given
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 11.0, null);
     JobOrderHandoverCreateDto createDto =
@@ -344,7 +294,6 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(ex.getMessage().contains("Cannot hand over more than the available amount"));
@@ -352,9 +301,6 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldThrowException_whenJobOrderIsNullOnInventoryItem() {
-    // Given — the item carries no job-order slice for this order at all. Since Variante C
-    // (REQ-INV-027) the order binding lives in the allocation table, an item with no slice for
-    // this order must be rejected by the pre-write guard exactly like a foreign-order item.
     inventoryItem.getJobOrderAllocations().clear();
 
     JobOrderHandoverItemCreateDto itemDto =
@@ -366,10 +312,6 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then — the cross-staffel pre-write guard (MULTI_SQUADRON_PLAN.md §4.4) now reads the
-    // job-order allocation and raises a BadRequestException (400, localized detail) when the item
-    // has no slice for this order — no longer a raw IllegalStateException, which is a 500 now
-    // (APPSEC-06).
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertEquals(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER, ex.getMessage());
@@ -377,9 +319,6 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldReduceBothJobOrderMaterialAmounts_whenTwoItemsHandedOver() {
-    // Given — reproduces the bug: second JobOrderMaterial.amount was not reduced because
-    // jobOrderMaterialRepository.save(mat) was missing, so the change was lost after
-    // clearAutomatically = true flushed the Hibernate first-level cache.
     UUID inventoryId2 = UUID.randomUUID();
     UUID materialId2 = UUID.randomUUID();
 
@@ -400,7 +339,6 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setAmount(8.0);
     InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
-    // Hand over 5.0 of material1 (partial) and 8.0 of material2 (full)
     JobOrderHandoverItemCreateDto itemDto1 =
         new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null);
     JobOrderHandoverItemCreateDto itemDto2 =
@@ -417,16 +355,8 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     assertDoesNotThrow(() -> service.createHandover(orderId, createDto));
 
-    // Then — both JobOrderMaterial amounts must be correctly reduced via Hibernate dirty
-    // checking. We deliberately do NOT call jobOrderMaterialRepository.save(mat) inside the
-    // loop anymore: a save() on a (potentially) detached entity silently triggers a merge()
-    // and produces a second version bump, which used to cause
-    // ObjectOptimisticLockingFailureException (HTTP 409) when an entire JobOrder was
-    // fulfilled by a single multi-material handover. The dirty changes are flushed by the
-    // post-loop bulk unlink (flushAutomatically=true) and/or at transaction commit.
     assertEquals(
         5.0,
         jobOrderMaterial.getAmount(),
@@ -437,25 +367,16 @@ class JobOrderHandoverServiceTest {
         jobOrderMaterial2.getAmount(),
         0.0001,
         "Second material's open amount must be reduced from 8.0 to 0.0");
-    // No explicit save() on JobOrderMaterial — dirty checking handles it.
     verify(jobOrderMaterialRepository, never()).save(any());
-    // material2 fully handed over → inventory deleted and unlinked
     verify(inventoryItemRepository).delete(inventoryItem2);
     verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId2);
-    // material1 partial → inventory saved, not deleted
     verify(inventoryItemRepository).save(inventoryItem);
-    // Not all fulfilled → order must NOT be completed
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
   }
 
   @Test
   void createHandover_shouldSucceed_whenMultipleItemsHandedOver_andFirstItemFullyConsumed() {
-    // Given — reproduces the bug where deleteJobOrderAllocationsByJobOrderAndMaterial() (a
-    // @Modifying bulk-update)
-    // invalidated the Hibernate first-level cache, causing the second item's jobOrder
-    // association to appear null on the next findByIdForUpdate call → HTTP 400.
-    // Fix: @Modifying(clearAutomatically = true) on deleteJobOrderAllocationsByJobOrderAndMaterial.
     UUID inventoryId2 = UUID.randomUUID();
     UUID materialId2 = UUID.randomUUID();
 
@@ -476,8 +397,6 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setAmount(5.0);
     InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
-    // First item is fully consumed (triggers deleteJobOrderAllocationsByJobOrderAndMaterial),
-    // second is partial
     JobOrderHandoverItemCreateDto itemDto1 =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
     JobOrderHandoverItemCreateDto itemDto2 =
@@ -494,11 +413,8 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When — must not throw (before fix: threw "Inventory item does not belong to this JobOrder"
-    // for the second item because the bulk-update cleared the cache and jobOrder appeared null)
     assertDoesNotThrow(() -> service.createHandover(orderId, createDto));
 
-    // Then
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
@@ -508,14 +424,11 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldNotCompleteOrder_whenMaterialStillOpen() {
-    // Given — only part of the required material is handed over; the order must NOT be completed
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
-    // jobOrderMaterial.amount = 10.0, only 4.0 handed over → 6.0 still open
-    // findById is called twice: once at the start and once for the re-fetch after the loop
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -523,23 +436,19 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then — status must NOT be set to COMPLETED because material is still open
     verify(jobOrderService, never()).updateJobOrderStatus(any(), any());
     assertEquals(6.0, jobOrderMaterial.getAmount(), 0.0001);
   }
 
   @Test
   void createHandover_shouldNotCompleteOrder_whenInventoryItemLinkedToOrder() {
-    // Given — inventory item still belongs to the order (not fully handed over)
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
-    // findById is called twice: once at the start and once for the re-fetch after the loop
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -547,25 +456,19 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then — inventory item must still be linked (saved with reduced amount, not deleted/unlinked)
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(inventoryItemRepository, never())
         .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
-    // Order must remain open
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
   }
 
   @Test
   void createHandover_shouldThrowException_whenItemDoesNotBelongToOrder() {
-    // Given
     JobOrder otherOrder = new JobOrder();
     otherOrder.setId(UUID.randomUUID());
-    // Variante C (REQ-INV-027): the item's only job-order slice points at a different order, so the
-    // guard finds no slice for this order and rejects the handover.
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, otherOrder, inventoryItem.getAmount(), false);
 
@@ -578,8 +481,6 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then — plan §4.4 cross-staffel pre-write guard raises a BadRequestException (HTTP
-    // 400 with the localized detail, APPSEC-06).
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertEquals(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER, ex.getMessage());
@@ -587,7 +488,6 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldThrowException_whenAmountExceedsRemainingAmount() {
-    // Given — inventoryItem.amount = 10.0, but 15.0 is requested (exceeds remaining)
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 15.0, null);
     JobOrderHandoverCreateDto createDto =
@@ -596,32 +496,22 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then — must reject with 400 Bad Request
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(
         ex.getMessage().contains("Cannot hand over more than the available amount"),
         "Exception message must indicate amount exceeds available stock");
-    // Inventory item must NOT be modified
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
   }
 
   @Test
   void createHandover_shouldCallCompleteJobOrderWithinTransaction_whenAllMaterialsHandedOver() {
-    // Given — reproduces the bug: when ALL remaining materials of a JobOrder are handed over in a
-    // single handover, the old code called jobOrderService.updateJobOrderStatus() which executed
-    // its own findById() + save() + flush() inside the same transaction. Since the jobOrder entity
-    // was already modified (via cascade on jobOrderHandoverRepository.save()), this caused a
-    // double-save that triggered ObjectOptimisticLockingFailureException (HTTP 409).
-    // Fix: call completeJobOrderWithinTransaction(managedJobOrder) where managedJobOrder is the
-    // re-fetched entity (after clearAutomatically=true evicts the session cache).
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
-    // findById is called twice: once at the start and once after the loop (re-fetch fix)
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -629,30 +519,18 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When — must succeed without any OptimisticLockingFailureException
     assertDoesNotThrow(() -> service.createHandover(orderId, createDto));
 
-    // Then — completeJobOrderWithinTransaction must be called with the re-fetched managed entity
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
     verify(jobOrderService, never()).updateJobOrderStatus(any(), any());
-    // findById called twice: initial load + re-fetch after clearAutomatically evicts session cache
     verify(jobOrderRepository, times(2)).findById(orderId);
   }
 
   @Test
   void
       createHandover_shouldCompleteOrder_whenLastRemainingMaterialHandedOverAfterPreviousPartialHandover() {
-    // Given — reproduces the bug: after a previous partial handover, jobOrderMaterial.amount was
-    // already reduced (e.g. from 10.0 to 4.0). The final handover hands over the last 4.0 SCU.
-    // deleteJobOrderAllocationsByJobOrderAndMaterial() uses @Modifying(clearAutomatically = true)
-    // which evicts the
-    // Hibernate first-level cache, DETACHING the jobOrder entity from the session. Without the
-    // re-fetch fix, jobOrder.setStatus(COMPLETED) was called on a detached entity and never
-    // flushed to DB → status remained OPEN.
-    // Fix: re-fetch managedJobOrder via jobOrderRepository.findById() after the loop.
-    jobOrderMaterial.setAmount(4.0); // simulates state after a previous partial handover
-    inventoryItem.setAmount(4.0); // only 4.0 SCU left in inventory
-    // keep the order earmark consistent with the reduced stock (Variante C, REQ-INV-027)
+    jobOrderMaterial.setAmount(4.0);
+    inventoryItem.setAmount(4.0);
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, order, 4.0, false);
 
@@ -661,7 +539,6 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
-    // findById is called twice: once at the start and once after the loop (re-fetch fix)
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -669,20 +546,16 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     assertDoesNotThrow(() -> service.createHandover(orderId, createDto));
 
-    // Then — all materials fulfilled → order must be completed
     assertEquals(0.0, jobOrderMaterial.getAmount(), 0.0001);
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
     verify(jobOrderService, never()).updateJobOrderStatus(any(), any());
-    // findById called twice: initial load + re-fetch after clearAutomatically evicts session cache
     verify(jobOrderRepository, times(2)).findById(orderId);
   }
 
   @Test
   void createHandover_shouldThrowException_whenPieceMaterialHasDecimalAmount() {
-    // Given — material is of type PIECE; decimal amounts are not allowed
     material.setQuantityType(QuantityType.PIECE);
     inventoryItem.setAmount(5.0);
     jobOrderMaterial.setAmount(5.0);
@@ -695,25 +568,17 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then — must reject with 400 Bad Request because 2.5 is not a whole number
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(
         ex.getMessage().contains("Amount must be a whole number for PIECE materials"),
         "Exception message must indicate that only integers are allowed for PIECE materials");
-    // Inventory item must NOT be modified
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
   }
 
   @Test
   void createHandover_shouldSucceed_whenInventoryItemBelongsToForeignSquadron() {
-    // The cross-staffel Job-Order workspace is the central reason JobOrder lives
-    // un-filtered: a Logistician from squadron C must be able to fulfil an order
-    // authored by squadron A using an InventoryItem that is owned by squadron B,
-    // as long as the item is linked to the order. The Phase-3 guard at
-    // JobOrderHandoverService:116-119 only checks the linkage, NOT the squadron
-    // identity, and this test pins that contract. Plan §11 "JobOrderHandoverService".
     de.greluc.krt.profit.basetool.backend.model.Squadron squadronA =
         new de.greluc.krt.profit.basetool.backend.model.Squadron();
     squadronA.setId(UUID.randomUUID());
@@ -740,10 +605,8 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When — no exception even though item.owningSquadron != order.requestingSquadron
     service.createHandover(orderId, createDto);
 
-    // Then — handover applied to the foreign-squadron item exactly like a same-squadron one
     assertEquals(7.0, inventoryItem.getAmount());
     assertEquals(7.0, jobOrderMaterial.getAmount());
     verify(inventoryItemRepository).save(inventoryItem);
@@ -752,11 +615,6 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_emitsPerItemHandedOverAudit_andHandoverCreatedWithAutoCompletedFlag() {
-    // Given — two materials, each fully handed over in a single handover, so the whole JobOrder
-    // is fulfilled. Aufträge/Lager are audited areas (REQ-AUDIT-001): the method must emit exactly
-    // one INVENTORY_HANDED_OVER per handed item plus one JOB_ORDER_HANDOVER_CREATED carrying the
-    // item count and the autoCompleted flag. The events are emitted from loop-captured snapshots
-    // AFTER the bulk unlinks, never by re-reading a detached/deleted inventory entity.
     UUID inventoryId2 = UUID.randomUUID();
     UUID materialId2 = UUID.randomUUID();
 
@@ -793,14 +651,10 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then — exactly one INVENTORY_HANDED_OVER per handed item (two here)
     verify(auditService, times(2))
         .record(eq(AuditEventType.INVENTORY_HANDED_OVER), any(), any(), any(), any());
-    // ... plus one JOB_ORDER_HANDOVER_CREATED whose details carry the item count and the
-    // autoCompleted flag (true, because both materials are now fulfilled).
     ArgumentCaptor<CharSequence> detailsCaptor = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(
@@ -819,9 +673,6 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_handoverCreatedAudit_flagsAutoCompletedFalse_whenPartial() {
-    // Given — only 4.0 of the required 10.0 is handed over, so the order stays open. The
-    // JOB_ORDER_HANDOVER_CREATED audit must report items=1 and autoCompleted=false, and there
-    // must be exactly one INVENTORY_HANDED_OVER event for the single handed item.
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
     JobOrderHandoverCreateDto createDto =
@@ -834,13 +685,10 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then — one INVENTORY_HANDED_OVER for the single item
     verify(auditService, times(1))
         .record(eq(AuditEventType.INVENTORY_HANDED_OVER), any(), any(), any(), any());
-    // ... and a JOB_ORDER_HANDOVER_CREATED that flags the order was NOT auto-completed
     ArgumentCaptor<CharSequence> detailsCaptor = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(
@@ -859,14 +707,8 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_subEpsilonResidual_deletesRowAndUnlinksMaterial() {
-    // Given — a floating-point inventory row whose post-decrement residual (10.00003 - 10.0 =
-    // 3e-5) is below QUANTITY_EPSILON (1e-4). The row must be treated as depleted: DELETED (never
-    // saved) and, because the matching JobOrderMaterial also drops sub-epsilon, its material must
-    // be unlinked. A comparison against 0.0 instead of the epsilon would leave a phantom sub-SCU
-    // row and its material link behind, so the order would never auto-complete.
     inventoryItem.setAmount(10.00003);
     jobOrderMaterial.setAmount(10.00003);
-    // keep the order earmark consistent with the edge-case stock (Variante C, REQ-INV-027)
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, order, 10.00003, false);
 
@@ -882,15 +724,12 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then — the sub-epsilon inventory row is deleted, never saved, and its material is unlinked
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
-    // ... and the INVENTORY_HANDED_OVER audit snapshot reflects the depleted state
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_HANDED_OVER),
@@ -906,13 +745,8 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_residualAboveEpsilon_savesRow_withoutDeleteOrUnlink() {
-    // Given — the mirror of the sub-epsilon case: the residual (10.0002 - 10.0 = ~2e-4) is just
-    // ABOVE QUANTITY_EPSILON (1e-4), so the row is a real surplus and must be SAVED with the
-    // reduced amount, never deleted. The JobOrderMaterial requirement is intentionally larger than
-    // the handover so the material never depletes and no unlink fires.
     inventoryItem.setAmount(10.0002);
     jobOrderMaterial.setAmount(50.0);
-    // keep the order earmark consistent with the edge-case stock (Variante C, REQ-INV-027)
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, order, 10.0002, false);
 
@@ -928,10 +762,8 @@ class JobOrderHandoverServiceTest {
     when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
         .thenReturn(mock(JobOrderHandoverDto.class));
 
-    // When
     service.createHandover(orderId, createDto);
 
-    // Then — the above-epsilon row survives: saved with the residual, no delete, no unlink
     assertEquals(0.0002, inventoryItem.getAmount(), 1e-6);
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());

@@ -52,22 +52,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Who may open the Job-Order create form ({@code GET /orders/create}), and what it loads.
- *
- * <p>The form used to be anonymous — the public request form — and this class pinned the guest
- * behaviour: the Staffel/SK-only picker catalogue and the pre-selected intake Spezialkommando. That
- * feature is gone (ADR-0149), so the first thing to pin is the refusal.
- *
- * <p>Two things survive the change and are still worth guarding:
- *
- * <ul>
- *   <li>The job-order materials catalog loads through the <em>public</em> WebClient ({@code
- *       isPublic=true}), not the OAuth2-bearer-relaying authenticated one — otherwise the scmdb
- *       shopping-list import finds zero matches (the regression that first motivated this test).
- *       The endpoint is still {@code permitAll}, so this stays true for a logged-in caller too.
- *   <li>The blanket {@code .form-group input} rule keeps its zero-specificity {@code :where()}
- *       exclusion, which is a CSS invariant and has nothing to do with who is looking.
- * </ul>
+ * Who may open the job-order create form ({@code GET /orders/create}) and what it loads: anonymous
+ * access is refused (ADR-0149), the materials catalog is fetched via the public WebClient, and the
+ * {@code .form-group input} rule keeps its {@code :where()} exclusion.
  */
 @SpringBootTest
 class JobOrderPageControllerCreateFormAuthMvcTest {
@@ -90,13 +77,8 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
   @Test
   @WithAnonymousUser
   void viewCreateForm_AsAnonymousGuest_IsRefused() throws Exception {
-    // The whole point of ADR-0149: an order is raised by somebody, and the form says so before it
-    // renders. A redirect, not a 403 — the frontend sends a browser to the OAuth2 login.
     mockMvc.perform(get("/orders/create")).andExpect(status().is3xxRedirection());
 
-    // Nothing is fetched at all: the redirect happens before the handler runs, so the catalogue
-    // read never starts. This used to assert "never through the public client", which was the
-    // weaker half of the same statement.
     verify(backendApiClient, never()).getCached(any(CachedCatalog.class), anyTypeRef());
   }
 
@@ -111,17 +93,9 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("orders-create"));
 
-    // One client, carrying the member's bearer (REQ-SEC-052). The pair of assertions that stood
-    // here — fetched through the public client, never through the authenticated one — described a
-    // choice that no longer exists.
     verify(backendApiClient).getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
   }
 
-  // The Material <-> Item order-kind radios must keep the global 1.2rem KRT circle styling: the
-  // page's blanket `.form-group input` rule excludes radio/checkbox inputs via a zero-specificity
-  // :where(), so it can neither inflate them with its 0.75rem padding nor outrank the combobox
-  // rule that reserves right padding for the dropdown chevron. Guards the selector text so a
-  // revert to the unfiltered blanket rule fails the build.
   @Test
   @WithMockUser
   void viewCreateForm_blanketInputRuleExcludesRadioAndCheckboxControls() throws Exception {
@@ -155,13 +129,9 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
         .andExpect(view().name("orders-create"))
-        // The customer picker offers every active unit, the non-profit SK included ...
         .andExpect(content().string(Matchers.containsString("Combat SK")))
         .andExpect(content().string(Matchers.containsString("Profit Staffel")));
 
-    // ... and it comes from the all-kinds catalogue, which carries the Bereich/OL tiers (epic
-    // #692). Before ADR-0149 an anonymous caller got the narrower Staffel/SK-only list instead;
-    // there is no anonymous caller left, so there is no second list to fall to except on failure.
     verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
   }

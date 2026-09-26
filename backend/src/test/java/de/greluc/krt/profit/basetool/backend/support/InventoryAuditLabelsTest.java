@@ -29,11 +29,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link InventoryAuditLabels#label(InventoryItem)} — the deletion-proof audit
- * subject snapshot. Since V220 the row is catalog-discriminated (REQ-INV-029), so the label's
- * catalog branch must render the game-item name for an item row; without it every reused audit
- * event on item stock would log the em-dash fallback ({@code — @ <location>}) and the audit trail
- * would lose the affected item's identity.
+ * Unit tests for {@link InventoryAuditLabels#label(InventoryItem)}, the audit subject snapshot,
+ * including the game-item name for an item-catalog row (REQ-INV-029).
  */
 class InventoryAuditLabelsTest {
 
@@ -61,37 +58,28 @@ class InventoryAuditLabelsTest {
     return location;
   }
 
-  // covers REQ-INV-029 / REQ-AUDIT-001 (item rows render the game-item name, not the em dash)
   @Test
   void label_gameItemRow_rendersGameItemNameAtLocation() {
-    // Given a game-item stock row (material == null)
     GameItem drive = new GameItem();
     drive.setId(UUID.randomUUID());
     drive.setName("Quantum Drive");
 
-    // When / Then
     assertEquals(
         "Quantum Drive @ ARC-L1", InventoryAuditLabels.label(row(null, drive, location("ARC-L1"))));
   }
 
-  // covers REQ-AUDIT-001 (material rows keep their historical label byte-identically)
   @Test
   void label_materialRow_rendersMaterialNameAtLocation() {
-    // Given a material stock row
     Material steel = new Material();
     steel.setId(UUID.randomUUID());
     steel.setName("Steel");
 
-    // When / Then
     assertEquals(
         "Steel @ Hurston", InventoryAuditLabels.label(row(steel, null, location("Hurston"))));
   }
 
-  // covers REQ-AUDIT-001 (orphaned rows keep a well-formed label)
   @Test
   void label_missingCatalogReferencesAndLocation_fallsBackToEmDashes() {
-    // Given an orphaned row with neither catalog reference and no location
-    // When / Then — both parts render as em dashes rather than NPE-ing the audit write
     assertEquals("— @ —", InventoryAuditLabels.label(row(null, null, null)));
   }
 }

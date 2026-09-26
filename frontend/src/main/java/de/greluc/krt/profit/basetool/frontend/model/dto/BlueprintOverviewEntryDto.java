@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Frontend mirror of the backend {@code BlueprintOverviewEntryDto} (#364): one row of the org-unit
- * blueprint availability overview — a distinct variant family (base item with its cosmetic variants
- * collapsed) plus how many in-scope members own any member of it.
+ * Frontend mirror of the backend {@code BlueprintOverviewEntryDto}: one variant family of the
+ * org-unit blueprint overview with the number of in-scope members owning any of it.
  *
  * @param productKey variant family key (the drill-down key)
  * @param productName the family's display label (case-preserving base name)

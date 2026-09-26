@@ -23,9 +23,7 @@ import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code CraftabilityGroupDto}: the craftability overlay for one
- * recipe requirement group, emitted in recipe order so the view zips it onto the matching quality
- * block and defaults the slot's slider to the effective quality the caller's stock would deliver
- * (#781).
+ * recipe requirement group, in recipe order.
  *
  * @param materialId the slot's limiting RESOURCE commodity id, or {@code null}
  * @param effectiveQuality the effective quality from inventory alone, or {@code null}

@@ -32,26 +32,9 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins together the three places that must agree on the names of the E2E stack's prebuilt images
- * (audit item CI-06).
- *
- * <p>Since 2026-09-22 {@code .github/workflows/e2e.yml} builds the backend and frontend images once
- * in a {@code build-stack} job and every matrix cell loads them and runs the suite with {@code
- * -Pe2e.prebuilt=true}, which makes {@code E2eStackExtension} boot them with {@code docker compose
- * up --no-build}. That only works while three independent strings name the same images:
- *
- * <ul>
- *   <li>the {@code BACKEND_IMAGE} / {@code FRONTEND_IMAGE} tags the workflow builds,
- *   <li>the {@code image:} template in {@code docker-compose.build.yml}, rendered with the tag the
- *       extension sets ({@code IRI_BASETOOL_VERSION}), which is what compose looks for, and
- *   <li>the extension's own {@code IMAGE_TAG}, which it hands compose and checks the store for.
- * </ul>
- *
- * <p>If any one drifts, compose does not find the loaded image and tries to pull {@code :e2e-local}
- * from GHCR. The extension refuses that case with a clear message at runtime; this test refuses it
- * in the ordinary unit-test run, before a label-gated E2E run is spent finding out. The files are
- * read as text from the repository, the same way {@link E2eAudienceEnforcementParityTest} pins the
- * audience across the realm export and the extension.
+ * Verifies that the E2E workflow's image tags, the {@code image:} template in {@code
+ * docker-compose.build.yml} and {@code E2eStackExtension}'s {@code IMAGE_TAG} name the same
+ * prebuilt images, reading the files as text.
  */
 class E2ePrebuiltImageParityTest {
 

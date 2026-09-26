@@ -1,38 +1,9 @@
 #!/usr/bin/env python3
 """Fail when a shipped Gradle module's SBOM is not generated, committed and published.
 
-An SBOM is what a consumer reads *instead of* unpacking the artifact, so the set
-of published BOMs is read as "these are the components of this release". A module
-missing from that set does not read as missing -- it reads as absent from the
-product. This check makes the set an assertion instead of four hand-maintained
-lists that happen to agree.
-
-It caught the two ways the set had already drifted (v1.7.3):
-
-* ``ingest`` had the plugin and a committed BOM, but no release workflow named
-  it. The file aged in place from 2026-07-11, reaching production naming 126
-  stale component versions, and was never attached to a release at all.
-* ``keycloak-spi`` had no SBOM whatsoever, while ``promote.yml`` pushes its
-  provider-JAR bundle to the production Keycloak alongside the app images.
-
-Every module in ``settings.gradle.kts`` must therefore be either wired for an
-SBOM end to end, listed in ``NOT_SHIPPED`` with the reason it ships nothing, or
-listed in ``SHIPPED_INSIDE`` with the modules whose artifacts -- and BOMs -- carry it.
-A new module is a failure until somebody decides which it is -- that decision
-being the whole point, since both drifts above were silence, not a wrong answer.
-
-The **release notes** were added as a fifth place (v1.8.3) after the same failure
-happened one step further downstream: ``extract_release_notes.py`` announced two
-images while the pipeline built, scanned, signed and pushed three, so ``ingest``
-shipped unmentioned for three releases. What a release says it contains is part
-of what it publishes, so the notes are checked against the build matrix and the
-shipped-module set rather than maintained by hand beside them.
-
-A **sixth** concern arrived on 2026-09-23: a wired module whose regenerated BOM
-is stale. The CycloneDX task's inputs do not see project dependencies, so adding
-``logging-support`` left it ``UP-TO-DATE`` / ``FROM-CACHE`` with the old list.
-Gradle now proves each BOM against the resolved classpath (``verifyCyclonedxBom``);
-this script pins the pieces that keep that proof running (``check_fresh_generation``).
+Every module in ``settings.gradle.kts`` must be wired for an SBOM end to end, listed in
+``NOT_SHIPPED`` with a reason, or listed in ``SHIPPED_INSIDE`` with its carriers. Also
+checks fresh BOM generation and that the release notes name every image and SBOM.
 
 Exit codes:
   0  -> every shipped module is wired end to end.
@@ -57,9 +28,6 @@ PUBLISH = REPO / ".github" / "workflows" / "release-publish.yml"
 IMAGES = REPO / ".github" / "workflows" / "release-images.yml"
 NOTES = REPO / ".github" / "scripts" / "extract_release_notes.py"
 
-# Modules that deliberately publish no SBOM, with the reason. A module lands here
-# only when nothing it produces reaches a consumer; "we forgot" is not a reason,
-# which is why the entry is prose rather than a bare name.
 NOT_SHIPPED = {
     "test-support": (
         "test-only helper library shared by the anonymous-surface sweeps (#1804). Nothing depends "
@@ -68,14 +36,6 @@ NOT_SHIPPED = {
     ),
 }
 
-# Modules that DO ship, but only as a library inside other modules' artifacts, with the
-# modules that carry them. Such a module publishes no SBOM of its own: it appears as a component
-# of each carrier's BOM (the carriers' `runtimeClasspath` is what their BOM enumerates), and a
-# second, stand-alone BOM would describe an artifact nobody can download. The entry is only
-# honest while every carrier really depends on it at runtime, so that is asserted, not trusted.
-# That the carrier's generated BOM then really lists it is asserted by Gradle, not here: each
-# `cyclonedxBom` is finalized by `verifyCyclonedxBom` (root build.gradle.kts), which compares the
-# BOM with the resolved runtimeClasspath, project dependencies included.
 SHIPPED_INSIDE = {
     "logging-support": (
         "LogSafe and the PII maskers every application's logback configuration names (ADR-0205); "
@@ -86,11 +46,7 @@ SHIPPED_INSIDE = {
 
 
 def modules() -> list[str]:
-    """Read the Gradle module names from ``settings.gradle.kts``.
-
-    Parses the ``include("name")`` lines rather than scanning directories, so a
-    stray folder that is not part of the build is not mistaken for a module and
-    a real module cannot hide by lacking one.
+    """Read the Gradle module names from the ``include("name")`` lines of ``settings.gradle.kts``.
 
     :return: the module names in declaration order.
     :raises OSError: if the settings file cannot be read.
@@ -102,10 +58,8 @@ def modules() -> list[str]:
 def check_module(module: str, prepare: str, publish: str) -> list[str]:
     """Assert one shipped module is wired for an SBOM in all four places.
 
-    The four are independent and each fails silently on its own: the Gradle
-    plugin (no BOM is produced), the committed pair (nothing to attach), the
-    regeneration line (the committed pair goes stale), and the publish lists (the
-    fresh pair never leaves the repository).
+    The four are the Gradle plugin, the committed JSON/XML pair, the regeneration in
+    ``release-prepare.yml`` and the publish lists in ``release-publish.yml``.
 
     :param module: the Gradle module name, e.g. ``ingest``.
     :param prepare: full text of ``release-prepare.yml``.
@@ -158,9 +112,6 @@ def check_module(module: str, prepare: str, publish: str) -> list[str]:
 
     for suffix in ("json", "xml"):
         asset = f"{module}/docs/{module}-bom.{suffix}"
-        # Twice: once as an attestation subject, once as a release asset. Attested
-        # but unpublished is useless; published but unattested is what ADR-0145
-        # closed.
         if publish.count(asset) < 2:
             problems.append(
                 f"{module}: release-publish.yml must list {asset} both as an attestation subject "
@@ -173,11 +124,7 @@ def check_module(module: str, prepare: str, publish: str) -> list[str]:
 def check_shipped_inside(module: str, carriers: tuple[str, ...]) -> list[str]:
     """Assert a library-only module is a runtime dependency of every module said to carry it.
 
-    A ``SHIPPED_INSIDE`` entry exempts a module from publishing its own SBOM on the
-    ground that it is listed in its carriers' BOMs. That ground disappears silently if
-    a carrier stops depending on it -- or never did -- so each carrier's build script
-    must declare it as ``implementation(project(":<module>"))``, the configuration
-    its ``runtimeClasspath`` and therefore its BOM are built from.
+    Each carrier's build script must declare ``implementation(project(":<module>"))``.
 
     :param module: the library module, e.g. ``logging-support``.
     :param carriers: the shipped modules whose artifacts contain it.
@@ -199,14 +146,9 @@ def check_shipped_inside(module: str, carriers: tuple[str, ...]) -> list[str]:
 def check_fresh_generation(shipped: list[str], prepare: str, ci: str) -> list[str]:
     """Assert a released SBOM is generated fresh and verified against the resolved classpath.
 
-    cyclonedx-gradle's ``cyclonedxDirectBom`` is cacheable, and the only input it
-    declares for the dependency graph is the set of resolved artifact files. A project
-    dependency has no file there, so adding ``logging-support`` to the three
-    applications left the task ``UP-TO-DATE`` / ``FROM-CACHE`` with the old component
-    list (2026-09-23). The Gradle side of the fix -- both tasks untracked, and a
-    ``verifyCyclonedxBom`` finalizer comparing the BOM with the resolved
-    ``runtimeClasspath`` -- lives in the root build script and is proved by running it;
-    this pins the pieces whose removal would pass every other check in silence.
+    Requires both CycloneDX tasks to be untracked and finalized by ``verifyCyclonedxBom``,
+    the release regeneration to pass ``--no-build-cache``, and ``ci.yml`` to run every
+    shipped module's ``cyclonedxBom``.
 
     :param shipped: the Gradle modules that publish an SBOM, in declaration order.
     :param prepare: full text of ``release-prepare.yml``.
@@ -263,18 +205,8 @@ def check_fresh_generation(shipped: list[str], prepare: str, ci: str) -> list[st
 def check_release_notes(shipped: list[str], images: str) -> list[str]:
     """Assert the release-notes footer announces everything the release ships.
 
-    The fifth place, and the one that drifted after the other four were pinned:
-    ``extract_release_notes.py`` writes the "Docker Images" and "SBOM" sections
-    of the GitHub Release body from two hand-written tuples. Those are the only
-    description of the release most readers ever see, so a module missing there
-    is not a documentation gap -- it is an artifact that, as far as any consumer
-    can tell, was not published. ``ingest`` sat in the build matrix, the scan
-    matrix, the signing matrix and the SBOM asset list while the notes named two
-    images; nothing failed, and three releases went out understating themselves.
-
-    Both directions are checked. A tuple that lists something the release does
-    not build is as wrong as one that omits what it does, and points a reader at
-    a tag that cannot be pulled.
+    Compares ``SERVICE_IMAGES`` and ``SBOM_MODULES`` in ``extract_release_notes.py`` with
+    the build matrix and the shipped modules, in both directions.
 
     :param shipped: the Gradle modules that publish an SBOM, in declaration order.
     :param images: full text of ``release-images.yml``.
@@ -288,9 +220,6 @@ def check_release_notes(shipped: list[str], images: str) -> list[str]:
         match = re.search(rf"^{name}: tuple\[str, \.\.\.\] = \(([^)]*)\)", notes, re.MULTILINE)
         return None if match is None else set(re.findall(r'"([^"]+)"', match.group(1)))
 
-    # The build matrix is the authority on which modules become an image; the
-    # notes must mirror it exactly. Read rather than restated, so this checker
-    # cannot become the fifth list that quietly disagrees with the other four.
     matrix = re.search(r"^\s*module: \[([^\]]+)\]", images, re.MULTILINE)
     declared_images = tuple_entries("SERVICE_IMAGES")
     if matrix is None:
@@ -341,9 +270,6 @@ def check_release_notes(shipped: list[str], images: str) -> list[str]:
 
 def main() -> None:
     """Check every module and exit non-zero with the full list of gaps.
-
-    Reports all problems rather than the first, so one CI run tells the author
-    everything that has to change instead of one round trip per gap.
 
     :raises SystemExit: always -- 0 when sound, 1 when any gap was found.
     """

@@ -50,13 +50,9 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Thin AJAX proxy for the org-unit officer/lead/holder bank actions ({@code
- * /api/proxy/org-units/bank/**}). Browser-side JS posts here with the CSRF header; the proxy
- * forwards the raw JSON to the corresponding {@code /api/v1/org-units/bank/**} backend endpoint
- * with the OAuth2 bearer attached by {@link BackendApiClient}, and streams the redacted Kontoauszug
- * PDF via the {@link WebClient}. Authentication is enforced at this seam; the real authorization
- * (view access, responsible-holder, OL/management for Sonderkonten) lives in the backend seam. Kept
- * separate from the bank-staff {@code BankProxyController} so the two audiences never share a path.
+ * AJAX proxy for the org-unit bank actions ({@code /api/proxy/org-units/bank/**}), forwarding to
+ * the matching {@code /api/v1/org-units/bank/**} backend endpoints and streaming the redacted
+ * statement PDF. It requires authentication; authorization is decided by the backend.
  */
 @RestController
 @RequestMapping("/api/proxy/org-units/bank")
@@ -417,8 +413,6 @@ public class OrgUnitBankProxyController {
       return ResponseEntity.ok().headers(headers).body(pdf);
     } catch (WebClientResponseException e) {
       log.warn("Org-unit statement proxy: backend returned {} for {}", e.getStatusCode(), uri);
-      // Relay the backend status, but a generic reason — the raw WebClient message can leak the
-      // internal backend URI to the browser (the 500 branch already uses a generic message).
       throw new ResponseStatusException(e.getStatusCode(), "Could not generate the statement.");
     } catch (ResponseStatusException e) {
       throw e;

@@ -61,12 +61,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pure-Mockito unit tests for {@link P4kImportService}: no Spring context and no database. The five
- * repositories and {@link SyncReportService} are mocked; a real Jackson 3 {@link JsonMapper} parses
- * the synthetic catalogs. Covers the load-bearing reconciliation paths: a GUID match enriches
- * fill-if-null, the {@code class_name} fallback backfills a null {@code external_uuid}, a non-null
- * differing {@code external_uuid} is kept (conflict reported) while {@code p4k_uuid} is still
- * stamped, and an existing unresolved blueprint ingredient is resolved by its stored Wiki UUID.
+ * Unit tests for {@link P4kImportService} with mocked repositories and {@link SyncReportService}
+ * and a real {@link JsonMapper}: GUID match enrichment, the {@code class_name} fallback, conflict
+ * reporting for a differing {@code external_uuid}, and ingredient resolution by Wiki UUID.
  */
 @ExtendWith(MockitoExtension.class)
 class P4kImportServiceTest {
@@ -99,14 +96,12 @@ class P4kImportServiceTest {
     return json.getBytes(StandardCharsets.UTF_8);
   }
 
-  // ─────────────────────────────────────────────────────── GUID match enrich ──
-
   @Test
   void item_matchedByGuid_enrichesFillIfNullAndStampsP4k() {
     UUID guid = UUID.randomUUID();
     GameItem existing = new GameItem();
     existing.setName("Arclight");
-    existing.setExternalUuid(guid); // already has the same UUID -> no backfill, no conflict
+    existing.setExternalUuid(guid);
     when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.of(existing));
 
     String json =
@@ -123,18 +118,15 @@ class P4kImportServiceTest {
     assertEquals(1, result.items().enriched());
     assertEquals(0, result.items().unmatched());
 
-    // Fill-if-null enrichment applied.
     assertEquals("wpn_arclight", existing.getClassName());
     assertEquals(3.5, existing.getMass());
     assertEquals("A pistol.", existing.getDescriptionEn());
     assertEquals("Eine Pistole.", existing.getDescriptionDe());
 
-    // P4K lane stamped; existing UUID untouched.
     assertEquals(guid, existing.getP4kUuid());
     assertNotNull(existing.getP4kSyncedAt());
     assertEquals(guid, existing.getExternalUuid());
 
-    // Same-UUID match emits neither a backfill nor a conflict event.
     verify(syncReportService, never())
         .logP4kEvent(any(), eq(SyncEventType.LINKED_VIA_NAME), any(), any(), any(), any());
     verify(syncReportService, never())
@@ -159,20 +151,17 @@ class P4kImportServiceTest {
 
     P4kImportResultDto result = service.applyImport(upload(json), false);
 
-    // No fill-if-null write happened because the fields were already populated.
     assertEquals(0, result.items().enriched());
     assertEquals(9.9, existing.getMass());
     assertEquals("Original.", existing.getDescriptionEn());
   }
-
-  // ────────────────────────────────── class_name fallback + external_uuid backfill ──
 
   @Test
   void item_matchedByClassName_backfillsNullExternalUuid() {
     UUID guid = UUID.randomUUID();
     GameItem existing = new GameItem();
     existing.setName("Hornet");
-    existing.setExternalUuid(null); // uuid-less row -> eligible for backfill
+    existing.setExternalUuid(null);
     when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.empty());
     when(gameItemRepository.findByClassNameIgnoreCase("ship_hornet")).thenReturn(List.of(existing));
 
@@ -188,7 +177,6 @@ class P4kImportServiceTest {
     assertEquals(0, result.items().uuidConflicts());
     assertEquals(0, result.items().unmatched());
 
-    // external_uuid backfilled from the P4K GUID; p4k lane stamped.
     assertEquals(guid, existing.getExternalUuid());
     assertEquals(guid, existing.getP4kUuid());
     assertNotNull(existing.getP4kSyncedAt());
@@ -212,7 +200,6 @@ class P4kImportServiceTest {
     b.setName("Dup B");
     when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.empty());
     when(gameItemRepository.findByClassNameIgnoreCase("dup_class")).thenReturn(List.of(a, b));
-    // Name fallback also misses (return empty so the ambiguous class match is the only signal).
     lenient().when(gameItemRepository.findByNameIgnoreCase(any())).thenReturn(List.of());
 
     String json =
@@ -237,7 +224,6 @@ class P4kImportServiceTest {
     GameItem uuidRow = new GameItem();
     uuidRow.setName("Holds The Guid");
     uuidRow.setExternalUuid(guid);
-    // The UUID match wins before the class_name fallback is ever consulted.
     when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.of(uuidRow));
 
     String json =
@@ -247,8 +233,6 @@ class P4kImportServiceTest {
 
     P4kImportResultDto result = service.applyImport(upload(json), false);
 
-    // The UUID-keyed row is the match (already holds the GUID): no backfill, no conflict, p4k lane
-    // stamped on it; the class_name candidate is never touched.
     assertEquals(1, result.items().matched());
     assertEquals(0, result.items().uuidBackfilled());
     assertEquals(0, result.items().uuidConflicts());
@@ -258,16 +242,13 @@ class P4kImportServiceTest {
     verify(gameItemRepository, never()).findByClassNameIgnoreCase(any());
   }
 
-  // ──────────────────────────────── UUID conflict: keep both + report ──
-
   @Test
   void item_conflictingExternalUuid_isKeptAndReportedButP4kUuidStamped() {
     UUID p4kGuid = UUID.randomUUID();
-    UUID existingUuid = UUID.randomUUID(); // different, non-null -> conflict
+    UUID existingUuid = UUID.randomUUID();
     GameItem existing = new GameItem();
     existing.setName("Gladius");
     existing.setExternalUuid(existingUuid);
-    // No row matches the P4K GUID; class_name resolves the (differently-keyed) row.
     when(gameItemRepository.findByExternalUuid(p4kGuid)).thenReturn(Optional.empty());
     when(gameItemRepository.findByClassNameIgnoreCase("ship_gladius"))
         .thenReturn(List.of(existing));
@@ -283,7 +264,6 @@ class P4kImportServiceTest {
     assertEquals(0, result.items().uuidBackfilled());
     assertEquals(1, result.items().uuidConflicts());
 
-    // Existing canonical UUID kept; P4K GUID recorded only in p4k_uuid.
     assertEquals(existingUuid, existing.getExternalUuid());
     assertEquals(p4kGuid, existing.getP4kUuid());
     assertNotNull(existing.getP4kSyncedAt());
@@ -299,8 +279,6 @@ class P4kImportServiceTest {
     verify(syncReportService, never())
         .logP4kEvent(any(), eq(SyncEventType.LINKED_VIA_NAME), any(), any(), any(), any());
   }
-
-  // ──────────────────────────────── manufacturer index feeds item linking ──
 
   @Test
   void item_manufacturerLinkedViaManufacturerGuidIndex() {
@@ -331,11 +309,8 @@ class P4kImportServiceTest {
 
     assertEquals(1, result.manufacturers().matched());
     assertEquals(1, result.items().matched());
-    // The item's null manufacturer was filled from the manufacturer GUID index.
     assertEquals(mfg, item.getManufacturer());
   }
-
-  // ──────────────────────────────── blueprint ingredient resolution ──
 
   @Test
   void blueprint_resolvesUnresolvedResourceIngredientByWikiUuid() {
@@ -348,7 +323,7 @@ class P4kImportServiceTest {
     ingredient.setKind(BlueprintIngredientKind.RESOURCE);
     ingredient.setOrderIndex(0);
     ingredient.setWikiResourceUuid(resourceUuid);
-    ingredient.setMaterial(null); // unresolved
+    ingredient.setMaterial(null);
     blueprint.addIngredient(ingredient);
 
     when(blueprintRepository.findByScwikiUuid(bpGuid)).thenReturn(Optional.of(blueprint));
@@ -367,9 +342,7 @@ class P4kImportServiceTest {
 
     assertEquals(1, result.blueprints().matched());
     assertEquals(1, result.ingredientsResolved());
-    // The previously-unresolved RESOURCE line now points at the material.
     assertEquals(material, blueprint.getIngredients().get(0).getMaterial());
-    // Scalars enriched fill-if-null.
     assertEquals("BP_CRAFT_TEST", blueprint.getScwikiKey());
     assertEquals(120, blueprint.getCraftTimeSeconds());
   }
@@ -385,7 +358,7 @@ class P4kImportServiceTest {
     ingredient.setKind(BlueprintIngredientKind.RESOURCE);
     ingredient.setOrderIndex(0);
     ingredient.setWikiResourceUuid(resourceUuid);
-    ingredient.setMaterial(new Material()); // already resolved
+    ingredient.setMaterial(new Material());
     blueprint.addIngredient(ingredient);
 
     when(blueprintRepository.findByScwikiUuid(bpGuid)).thenReturn(Optional.of(blueprint));
@@ -395,19 +368,15 @@ class P4kImportServiceTest {
     P4kImportResultDto result = service.applyImport(upload(json), false);
 
     assertEquals(0, result.ingredientsResolved());
-    // The resolver never queried the material repo for an already-resolved line.
     verify(materialRepository, never()).findByScwikiUuid(resourceUuid);
   }
 
   @Test
   void blueprint_seedPathAppliesCigMislabelOutputNameOverride() {
-    // Given an unmatched, seedable blueprint whose produced item carries the CIG-mislabeled name
-    // (#327): the seed path writes output_name from the produced item, so it must apply the same
-    // guarded override the SC Wiki sync uses. Covers REQ-INV-047 (P4K consistency wiring).
     UUID bpGuid = UUID.randomUUID();
     UUID producedGuid = UUID.randomUUID();
     GameItem produced = new GameItem();
-    produced.setName("Antium Core Jet"); // the known-wrong name for the helmet blueprint key
+    produced.setName("Antium Core Jet");
     produced.setExternalUuid(producedGuid);
     when(gameItemRepository.findByExternalUuid(producedGuid)).thenReturn(Optional.of(produced));
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -419,18 +388,13 @@ class P4kImportServiceTest {
             + producedGuid
             + "\"}]}";
 
-    // When the catalog is applied with seeding enabled.
     P4kImportResultDto result = service.applyImport(upload(json), true);
 
-    // Then the seeded blueprint stores the in-game-correct name, not the produced item's wrong
-    // name.
     assertEquals(1, result.blueprints().created());
     ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
     verify(blueprintRepository).save(saved.capture());
     assertEquals("Antium Helmet Jet", saved.getValue().getOutputName());
   }
-
-  // ──────────────────────────────── preview makes no writes ──
 
   @Test
   void preview_computesActionsWithoutWritingOrAuditing() {
@@ -448,11 +412,9 @@ class P4kImportServiceTest {
 
     P4kImportResultDto result = service.previewImport(upload(json));
 
-    // Counts are computed as if applying...
     assertEquals(1, result.items().matched());
     assertEquals(1, result.items().uuidBackfilled());
     assertEquals(1, result.items().enriched());
-    // ...but nothing was written and no run was started.
     assertNull(existing.getExternalUuid());
     assertNull(existing.getP4kSyncedAt());
     assertNull(existing.getDescriptionEn());
@@ -460,8 +422,6 @@ class P4kImportServiceTest {
     verify(syncReportService, never()).logP4kEvent(any(), any(), any(), any(), any(), any());
     verify(syncReportService, never()).pruneRuns(any());
   }
-
-  // ──────────────────────────────── seeding new rows (opt-in) ──
 
   @Test
   void item_unmatchedSeedableRow_isCreatedWhenSeedingOn() {
@@ -527,7 +487,6 @@ class P4kImportServiceTest {
     when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.empty());
     when(gameItemRepository.findByClassNameIgnoreCase("dummy_internal")).thenReturn(List.of());
 
-    // No localized name (engine-only record): the export leaves name null -> never seeded.
     String json = "{\"items\":[{\"guid\":\"" + guid + "\",\"className\":\"dummy_internal\"}]}";
 
     P4kImportResultDto result = service.applyImport(upload(json), true);
@@ -544,7 +503,6 @@ class P4kImportServiceTest {
     when(gameItemRepository.findByClassNameIgnoreCase("test_weapon")).thenReturn(List.of());
     when(gameItemRepository.findByNameIgnoreCase("Looks Real")).thenReturn(List.of());
 
-    // Real-looking name but the class_name carries a 'test' dev token -> filtered out.
     String json =
         "{\"items\":[{\"guid\":\""
             + guid
@@ -595,7 +553,7 @@ class P4kImportServiceTest {
     P4kImportResultDto result = service.previewImport(upload(json));
 
     assertTrue(result.seedingEnabled());
-    assertEquals(1, result.items().created()); // would create
+    assertEquals(1, result.items().created());
     assertEquals(0, result.items().unmatched());
     verify(gameItemRepository, never()).save(any());
     verify(syncReportService, never()).beginRun();
@@ -603,21 +561,15 @@ class P4kImportServiceTest {
 
   @Test
   void preview_matchedItemLinkingASeededManufacturer_countsEnrichmentLikeApply() {
-    // Parity guarantee: a preview that would seed a manufacturer indexes it in the dry run too, so
-    // a
-    // matched item linking that manufacturer is counted as enriched exactly as the apply would
-    // report — without writing anything. Regression for the dry-run byGuid registration.
     UUID mfgGuid = UUID.randomUUID();
     UUID itemGuid = UUID.randomUUID();
 
-    // Manufacturer is unmatched on every key -> the run would seed it.
     when(manufacturerRepository.findByScwikiUuid(mfgGuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
         .thenReturn(Optional.empty());
     when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("AEGS"))
         .thenReturn(Optional.empty());
 
-    // Item is an existing GUID match with no manufacturer yet.
     GameItem existing = new GameItem();
     existing.setName("Gladius");
     existing.setExternalUuid(itemGuid);
@@ -637,17 +589,11 @@ class P4kImportServiceTest {
 
     assertEquals(1, result.manufacturers().created());
     assertEquals(1, result.items().matched());
-    // The would-be-seeded manufacturer is indexed in the dry run, so the item's manufacturer fill
-    // is
-    // counted as enrichment — matching what the apply would report.
     assertEquals(1, result.items().enriched());
-    // ...but nothing is written and no run is started.
     assertNull(existing.getManufacturer());
     verify(manufacturerRepository, never()).save(any());
     verify(syncReportService, never()).beginRun();
   }
-
-  // ──────────────────────────────── bad input ──
 
   @Test
   void emptyFile_throwsBadRequest() {
@@ -658,7 +604,6 @@ class P4kImportServiceTest {
 
   @Test
   void malformedJson_throwsBadRequest() {
-    // Truncated / non-JSON body -> the Jackson parse fails -> surfaced as HTTP 400, not a 500.
     org.junit.jupiter.api.Assertions.assertThrows(
         de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
         () -> service.previewImport("{ not json ".getBytes(StandardCharsets.UTF_8)));
@@ -666,25 +611,20 @@ class P4kImportServiceTest {
 
   @Test
   void nonObjectJson_throwsBadRequest() {
-    // Syntactically valid JSON but not a catalog object (an array) -> rejected as 400.
     org.junit.jupiter.api.Assertions.assertThrows(
         de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
         () -> service.previewImport(upload("[1,2,3]")));
   }
-
-  // ──────────────────────────────── UNIQUE-collision guard on backfill ──
 
   @Test
   void item_backfillSkippedWhenAnotherRowAlreadyHoldsTheGuid() {
     UUID guid = UUID.randomUUID();
     GameItem matched = new GameItem();
     matched.setName("Hornet");
-    matched.setExternalUuid(null); // uuid-less -> normally eligible for backfill
+    matched.setExternalUuid(null);
     GameItem otherHolder = new GameItem();
     otherHolder.setName("Already Holds The Guid");
     otherHolder.setExternalUuid(guid);
-    // First lookup (resolution) misses so the class_name fallback matches; the second lookup (the
-    // alreadyClaimed guard inside the backfill) finds the other row that already owns the GUID.
     when(gameItemRepository.findByExternalUuid(guid))
         .thenReturn(Optional.empty())
         .thenReturn(Optional.of(otherHolder));
@@ -698,21 +638,16 @@ class P4kImportServiceTest {
     P4kImportResultDto result = service.applyImport(upload(json), false);
 
     assertEquals(1, result.items().matched());
-    assertEquals(0, result.items().uuidBackfilled()); // guard prevented the UNIQUE collision
+    assertEquals(0, result.items().uuidBackfilled());
     assertEquals(0, result.items().uuidConflicts());
 
-    // The matched row's external_uuid is left null (the GUID belongs to another row); the P4K lane
-    // is still stamped so the observation stays auditable.
     assertNull(matched.getExternalUuid());
     assertEquals(guid, matched.getP4kUuid());
     assertNotNull(matched.getP4kSyncedAt());
 
-    // No name/slug backfill event is logged when the backfill is skipped.
     verify(syncReportService, never())
         .logP4kEvent(any(), eq(SyncEventType.LINKED_VIA_NAME), any(), any(), any(), any());
   }
-
-  // ──────────────────────────────── seeded commodity stays invisible ──
 
   @Test
   void commodity_unmatchedSeedable_isCreatedInvisibleForReview() {
@@ -733,8 +668,6 @@ class P4kImportServiceTest {
     verify(materialRepository).save(captor.capture());
     Material seeded = captor.getValue();
     assertEquals("Quantanium", seeded.getName());
-    // Seeded commodities are inserted invisible so they stay out of trading flows until an admin
-    // reviews them (mirrors the SC-Wiki commodity sync).
     assertEquals(Boolean.FALSE, seeded.getIsVisible());
     assertEquals(MaterialSourceSystem.P4K, seeded.getSourceSystems());
     assertEquals(guid, seeded.getScwikiUuid());
@@ -750,15 +683,8 @@ class P4kImportServiceTest {
             any());
   }
 
-  // ──────────────────────────────── blueprint ITEM-ingredient resolution ──
-
   @Test
   void blueprint_resolvesUnresolvedItemIngredientByWikiItemUuid() {
-    // A matched blueprint carries an ITEM line whose component game item was imported only after
-    // the blueprint: the still-unresolved line (game_item == null, wiki_item_uuid set) must be
-    // re-linked via gameItemRepository.findByExternalUuid and counted in ingredientsResolved. This
-    // is the ITEM twin of the RESOURCE branch and guards against a copy-paste swap to the wrong
-    // repository / UUID field.
     UUID bpGuid = UUID.randomUUID();
     UUID itemUuid = UUID.randomUUID();
 
@@ -768,7 +694,7 @@ class P4kImportServiceTest {
     ingredient.setKind(BlueprintIngredientKind.ITEM);
     ingredient.setOrderIndex(0);
     ingredient.setWikiItemUuid(itemUuid);
-    ingredient.setGameItem(null); // unresolved ITEM line
+    ingredient.setGameItem(null);
     blueprint.addIngredient(ingredient);
 
     when(blueprintRepository.findByScwikiUuid(bpGuid)).thenReturn(Optional.of(blueprint));
@@ -784,14 +710,11 @@ class P4kImportServiceTest {
 
     assertEquals(1, result.blueprints().matched());
     assertEquals(1, result.ingredientsResolved());
-    // The previously-unresolved ITEM line now points at the resolved component game item.
     assertEquals(component, blueprint.getIngredients().get(0).getGameItem());
   }
 
   @Test
   void blueprint_unresolvedItemIngredient_staysNullWhenComponentAbsent() {
-    // Negative twin: the component game item has not been imported yet, so the lookup misses and
-    // the line is neither counted nor linked (game_item stays null) — no over-count, no mislink.
     UUID bpGuid = UUID.randomUUID();
     UUID itemUuid = UUID.randomUUID();
 
@@ -813,17 +736,11 @@ class P4kImportServiceTest {
 
     assertEquals(1, result.blueprints().matched());
     assertEquals(0, result.ingredientsResolved());
-    // No FK link established when the component lookup finds nothing.
     assertNull(blueprint.getIngredients().get(0).getGameItem());
   }
 
-  // ──────────────────────────────── dev-token filter: substring is not a word ──
-
   @Test
   void item_seedableWhenDevTokenIsOnlyASubstring() {
-    // 'latest_rifle' merely embeds the 'test' token as a substring — the delimited-word guard in
-    // containsToken must NOT classify it as a dev asset (unlike a naive String.contains), so
-    // legitimate player content whose engine identifier embeds a token stays seedable.
     UUID guid = UUID.randomUUID();
     when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.empty());
     when(gameItemRepository.findByClassNameIgnoreCase("latest_rifle")).thenReturn(List.of());
@@ -845,14 +762,8 @@ class P4kImportServiceTest {
     assertEquals(guid, captor.getValue().getExternalUuid());
   }
 
-  // ──────────────────────────────── malformed GUID isolates one record ──
-
   @Test
   void item_unparseableGuid_isUnmatchedAndNeverSeeded() {
-    // A present-but-malformed GUID parses to null; every maybeSeed*/resolve* guard requires
-    // guid != null, so the single bad record is isolated as unmatched — never seeded (which would
-    // create a row with no cross-source join key) and never throwing (which would abort the whole
-    // all-or-nothing import as a 500).
     when(gameItemRepository.findByClassNameIgnoreCase("wpn_realgun")).thenReturn(List.of());
     when(gameItemRepository.findByNameIgnoreCase("Real Gun")).thenReturn(List.of());
 

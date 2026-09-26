@@ -25,25 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Thread-safe live count of active Spring Session sessions, maintained from session-lifecycle
- * events rather than by scanning the session store on every Prometheus scrape.
+ * Thread-safe live count of active Spring Session sessions, seeded once from Redis at startup and
+ * kept current by the session created, deleted and expired events.
  *
- * <p><b>Why this exists:</b> the {@code basetool_active_sessions} gauge previously sampled {@code
- * SpringSessionBackedSessionRegistry.getAllPrincipals()}, whose Redis-backed implementation
- * unconditionally throws {@code UnsupportedOperationException}. Micrometer swallowed that throwable
- * during sampling and reported {@code NaN} on every scrape, so the gauge never produced a value and
- * the {@code SsePushChannelDead} alert — which gates on {@code basetool_active_sessions > 3} —
- * could never fire, silently disarming the exact "push dead while users online" detection it was
- * built for (#1158). This tracker instead holds the set of live session ids: it is seeded once at
- * startup from the Redis session namespace and then kept current by {@code SessionCreatedEvent} /
- * {@code SessionDeletedEvent} / {@code SessionExpiredEvent} (all published by {@code
- * RedisIndexedSessionRepository}).
- *
- * <p>Membership is keyed on the session id, so start/end are idempotent: a session end that fires
- * both a delete and an expire event, or a create id that also appears in the seed set, never
- * double-counts, and {@link #count()} can never go negative. The backing set is a {@link
- * ConcurrentHashMap#newKeySet() concurrent set} because the startup seed, the Redis
- * keyspace-notification listener threads, and the scrape all touch it concurrently.
+ * <p>Keyed on the session id, so start and end are idempotent and {@link #count()} never goes
+ * negative.
  */
 public final class ActiveSessionsTracker {
 
@@ -76,11 +62,8 @@ public final class ActiveSessionsTracker {
   }
 
   /**
-   * Seeds the tracker with the ids of sessions that already existed before this instance started
-   * listening — without them a post-restart gauge would read ~0 until existing sessions cycle,
-   * leaving the {@code SsePushChannelDead} alert under-armed for up to the session TTL. Each id is
-   * added through {@link #onSessionStarted(String)}, so seeding is idempotent and
-   * order-independent.
+   * Seeds the tracker with the ids of sessions that existed before it started listening; idempotent
+   * via {@link #onSessionStarted(String)}.
    *
    * @param sessionIds the pre-existing live session ids; an empty collection is a valid no-op.
    */

@@ -54,11 +54,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Unit tests for {@link OrgUnitBankResponsibilityService} (REQ-BANK-034/-026/-047, ADR-0070).
- * Covers the derived responsible-holder reverse-resolution per account type and the
- * leadership-change audit (snapshot + record) split out of {@link OrgUnitBankAccessService} under
- * audit Thema 7 (#14). Lenient strictness mirrors the parent suite's convention across the many
- * independent scenarios.
+ * Unit tests for {@link OrgUnitBankResponsibilityService} (REQ-BANK-034): responsible-holder
+ * resolution per account type and the leadership-change snapshot and audit.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -118,8 +115,6 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void resolveResponsibleHolderUserIds_staffelAccount_returnsStaffelleiter() {
-    // REQ-BANK-034/-026: the reverse resolution for the notification engine — a Staffelkonto's
-    // responsible holders are the STAFFELLEITER of the owning Staffel.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID leiter = UUID.randomUUID();
@@ -134,7 +129,6 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void resolveResponsibleHolderUserIds_skAccount_returnsSkLead() {
-    // REQ-BANK-034: an SK-Konto's responsible holder is the SK_LEAD of the owning Spezialkommando.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID skLead = UUID.randomUUID();
@@ -148,7 +142,6 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void resolveResponsibleHolderUserIds_cartelAccount_returnsAllOlMembers() {
-    // REQ-BANK-034: the CARTEL/KRT account is held collegially by all OL members.
     UUID olId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID ol1 = UUID.randomUUID();
@@ -167,8 +160,6 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void resolveResponsibleHolderUserIds_cartelBank_returnsProfitBereichsleiter() {
-    // REQ-BANK-034: the Kartellbankkonto's responsible holder is the BEREICHSLEITER of every PROFIT
-    // Bereich, unioned.
     UUID profitBereichId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID bl = UUID.randomUUID();
@@ -178,7 +169,6 @@ class OrgUnitBankResponsibilityServiceTest {
     BankAccount cartelBank = typedAccount(accountId, "KB-0004", BankAccountType.CARTEL_BANK, null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartelBank));
     when(bereichRepository.findByDepartment(any())).thenReturn(List.of(profit));
-    // One batched statement for every Profit Bereich (REQ-DATA-003, BE-PERF-15).
     when(orgUnitMembershipRepository.findUserIdsByOrgUnitIdsAndRole(
             List.of(profitBereichId), MembershipRole.BEREICHSLEITER))
         .thenReturn(Set.of(bl));
@@ -188,7 +178,6 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void resolveResponsibleHolderUserIds_specialAccount_returnsEmptyWithoutLookup() {
-    // REQ-BANK-034: a Sonderkonto has no responsible holder — empty, and no membership lookup runs.
     UUID accountId = UUID.randomUUID();
     BankAccount special = specialAccount(accountId, "KB-0009", BankAccountStatus.ACTIVE);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(special));
@@ -207,8 +196,6 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void snapshotResponsibleHolders_capturesOwnedAccountsCurrentHolders() {
-    // ADR-0070: before a leadership change the seam snapshots the current responsible holder(s) of
-    // the account the org unit owns; a non-Profit org unit does not pull in CARTEL/CARTEL_BANK.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID leiter = UUID.randomUUID();
@@ -228,16 +215,11 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void snapshotResponsibleHoldersForUser_coversEveryMembershipOrgUnitsAccount() {
-    // ADR-0070: deleting a user snapshots the responsible holders of every account tied to any org
-    // unit the user belongs to, so a leader-drop by the cascade is audited regardless of org unit.
     UUID userId = UUID.randomUUID();
     UUID staffelId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID leiter = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
-    // The member org units come from the bare-id projection, never from the membership entities:
-    // loading those inside the user-deletion transaction is what caused the production
-    // TransientPropertyValueException (see UserDeletionForeignKeyIntegrityTest).
     when(orgUnitMembershipRepository.findOrgUnitIdsByUserId(userId)).thenReturn(Set.of(staffelId));
     when(bankAccountRepository.findByOrgUnitId(staffelId)).thenReturn(Optional.of(account));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
@@ -254,15 +236,12 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void recordResponsibleHolderChanges_recordsEventWhenHolderSetChanged() {
-    // REQ-BANK-034/ADR-0070: a leadership change that moves the derived responsible-holder set
-    // records one ACCOUNT_RESPONSIBLE_CHANGED event; the sole new holder is the target user.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID oldLeiter = UUID.randomUUID();
     UUID newLeiter = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    // The recompute after the mutation resolves the new Staffelleiter.
     when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
             orgUnitId, MembershipRole.STAFFELLEITER))
         .thenReturn(Set.of(newLeiter));
@@ -280,8 +259,6 @@ class OrgUnitBankResponsibilityServiceTest {
 
   @Test
   void recordResponsibleHolderChanges_noEventWhenHolderSetUnchanged() {
-    // ADR-0070: a leadership change that leaves the derived responsible-holder set unchanged (a
-    // non-leader rank shuffle) records nothing.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID leiter = UUID.randomUUID();

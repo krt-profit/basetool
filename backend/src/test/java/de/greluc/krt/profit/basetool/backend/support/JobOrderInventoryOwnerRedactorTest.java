@@ -48,7 +48,6 @@ class JobOrderInventoryOwnerRedactorTest {
 
   @Test
   void redactItemStockGroups_blanksOwnerAndLocation_keepsAmountsAndContext() {
-    // covers REQ-ORDERS-029
     UUID entryId = UUID.randomUUID();
     JobOrderItemStockEntryDto entry =
         new JobOrderItemStockEntryDto(
@@ -61,18 +60,15 @@ class JobOrderInventoryOwnerRedactorTest {
     List<JobOrderItemStockGroupDto> result = redactor.redactItemStockGroups(List.of(group));
 
     JobOrderItemStockEntryDto redacted = result.get(0).entries().get(0);
-    // Owner/location blanked.
     assertNull(redacted.ownerName(), "ownerName blanked");
     assertNull(redacted.ownerId(), "ownerId blanked");
     assertNull(redacted.location(), "location blanked");
     assertNull(redacted.locationId(), "locationId blanked");
-    // Everything else kept.
     assertEquals(entryId, redacted.inventoryEntryId());
     assertEquals(7L, redacted.version());
     assertEquals(4L, redacted.quantity());
     assertEquals(3L, redacted.allocatedQuantity());
     assertTrue(redacted.delivered());
-    // Group context untouched.
     assertEquals(gameItem, result.get(0).gameItem());
     assertEquals(5, result.get(0).orderedAmount());
     assertEquals(2, result.get(0).manufacturedAmount());
@@ -81,7 +77,6 @@ class JobOrderInventoryOwnerRedactorTest {
 
   @Test
   void redactMaterialCollection_blanksOwnerAndLocation_keepsMaterialAndQuantities() {
-    // covers REQ-ORDERS-029
     UUID entryId = UUID.randomUUID();
     MaterialCollectionEntryDto entry =
         new MaterialCollectionEntryDto(
@@ -115,7 +110,6 @@ class JobOrderInventoryOwnerRedactorTest {
 
   @Test
   void redactInventoryItems_blanksUserLocationAndOwningSquadron_keepsRest() {
-    // covers REQ-ORDERS-029
     UUID id = UUID.randomUUID();
     InventoryGameItemReferenceDto gameItem =
         new InventoryGameItemReferenceDto(UUID.randomUUID(), "Rifle", "Behring", "WEAPON");
@@ -145,7 +139,6 @@ class JobOrderInventoryOwnerRedactorTest {
     assertNull(redacted.user(), "user (owner) blanked");
     assertNull(redacted.location(), "location blanked");
     assertNull(redacted.owningSquadron(), "owningSquadron blanked");
-    // Non-identity fields kept.
     assertEquals(id, redacted.id());
     assertEquals(gameItem, redacted.gameItem());
     assertEquals(4.0, redacted.amount());
@@ -156,7 +149,6 @@ class JobOrderInventoryOwnerRedactorTest {
 
   @Test
   void nullAndEmptyInputs_areHandled() {
-    // covers REQ-ORDERS-029
     assertNull(redactor.redactItemStockGroups(null));
     assertNull(redactor.redactMaterialCollection(null));
     assertNull(redactor.redactInventoryItems(null));

@@ -48,13 +48,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST API for the Materialbörse Gesuche (wanted-listings) — the request-side board of Flotte &amp;
- * Logistik (REQ-MARKET-015…). Mirrors the offer surface ({@link MaterialExchangeController}): the
- * whole board is gated on {@code KRT_MEMBER}; the read endpoints delegate to {@link
- * MaterialRequestBoardService} (board / detail / counts + the supplier-anonymity redaction), the
- * write endpoints to {@link MaterialRequestService} (create / edit / deactivate / fulfilment-signal
- * lifecycle), which enforces per-request ownership. Unlike an offer, a request has no backing Lager
- * row, so there is no release picker / per-item deactivate surface.
+ * REST API for the Materialbörse request board (Gesuche, REQ-MARKET-015), gated on {@code
+ * KRT_MEMBER}.
+ *
+ * <p>Reads delegate to {@link MaterialRequestBoardService}, writes to {@link
+ * MaterialRequestService}, which enforces per-request ownership.
  */
 @RestController
 @RequestMapping("/api/v1/material-requests")

@@ -44,20 +44,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * The session write path and the poison repair, against a real Redis and the real {@link
- * RedisIndexedSessionRepository} — the layer that had no test and where both 2026-09-03 alerts
- * actually lived.
+ * Verifies against a real Redis and {@link RedisIndexedSessionRepository} that session attributes
+ * are written through the configured serializer and that a stored value in the old, unreadable
+ * shape is repaired.
  *
- * <p><strong>Why this exists beside {@code SessionSerializerRoundTripTest}.</strong> That test
- * round-trips values through the serializer <em>in isolation</em>, and it was green throughout the
- * whole incident: it proved the mix-in works, and could not say whether Spring Session's repository
- * writes the attribute through that serializer, nor what happens to a value already sitting in
- * Redis in the pre-fix shape. Both alerts turned on exactly those two questions, and answering them
- * cost a production investigation each time. This test answers them from CI instead.
- *
- * <p>The pre-fix bytes are pinned as a literal rather than produced by a stripped-down mapper: what
- * is in production's Redis is a fixed string written by a release that no longer exists, and a
- * fixture that re-derives it would drift with the code it is supposed to be independent of.
+ * <p>The old-shape bytes are pinned as a literal.
  */
 @Testcontainers
 class SessionAttributeRepairIntegrationTest {
@@ -89,8 +80,6 @@ class SessionAttributeRepairIntegrationTest {
     connectionFactory.afterPropertiesSet();
     connectionFactory.start();
 
-    // Assembled exactly as RedisSessionConfig assembles it in production: the fault-tolerant
-    // wrapper over the configured mapper, string keys, and the diagnostic session mapper.
     RedisSerializer<Object> sessionSerializer =
         new FaultTolerantSessionSerializer(
             new GenericJacksonJsonRedisSerializer(
@@ -155,9 +144,6 @@ class SessionAttributeRepairIntegrationTest {
 
   @Test
   void theRepositoryWritesTheContainerRecordWithItsForcedTypeId() {
-    // The half SessionSerializerRoundTripTest cannot see: not "the serializer can write @class" but
-    // "Spring Session's repository actually writes the attribute through that serializer". If this
-    // ever fails, values are being poisoned again at the source and no amount of repair will help.
     RedisIndexedSessionRepository.RedisSession session = repository.createSession();
     session.setAttribute(ATTRIBUTE, new WsHttpSessionBindingListener("a-session-id"));
     repository.save(session);
@@ -186,14 +172,10 @@ class SessionAttributeRepairIntegrationTest {
 
   @Test
   void theRepairEndsTheDropInsteadOfLettingItRepeatForever() {
-    // The 2026-09-03 defect, pinned. Without the repair this second read drops again, and so does
-    // every read after it for up to the 720-hour authenticated window (REQ-SEC-025) — which is what
-    // kept SessionValueDropsSustained firing for hours after the write path had already been fixed.
     String id = poisonedSession();
     var poisoned = repository.findById(id);
     assertThat(poisoned).isNotNull();
 
-    // Exactly what SessionAttributeRepairFilter does on the way out of the chain.
     for (String attribute : SessionAttributeRepairQueue.drain()) {
       poisoned.removeAttribute(attribute);
     }
@@ -210,9 +192,6 @@ class SessionAttributeRepairIntegrationTest {
 
   @Test
   void theRepairedFieldStillReadsBackAsAbsentRatherThanFailing() {
-    // removeAttribute writes an EMPTY value rather than issuing an HDEL — Spring Session's ordinary
-    // removal shape. Pinned because the repair's whole safety argument rests on that empty value
-    // deserialising to null instead of becoming a second kind of unreadable byte string.
     String id = poisonedSession();
     var poisoned = repository.findById(id);
     assertThat(poisoned).isNotNull();

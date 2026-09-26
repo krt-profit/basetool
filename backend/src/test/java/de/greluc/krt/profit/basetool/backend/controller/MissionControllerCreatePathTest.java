@@ -47,13 +47,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the C-3 mass-assignment fix at the HTTP layer: write endpoints for missions accept the
- * dedicated {@link CreateMissionRequest} record, so dangerous fields a client might smuggle into
- * the JSON ({@code id}, {@code version}, {@code owningSquadron}, {@code parent}, {@code owner},
- * {@code managers}, collections) are physically absent from the binding target and never reach the
- * service. The tests use Jackson's default lenient behaviour (unknown JSON fields are silently
- * dropped) and verify via {@link ArgumentCaptor} that the service was invoked with a request record
- * carrying only the caller-supplied {@code name}/{@code description}/etc.
+ * Verifies that the mission write endpoints bind {@link CreateMissionRequest}, so server-managed
+ * fields smuggled into the JSON never reach the service.
  */
 @SpringBootTest
 class MissionControllerCreatePathTest {
@@ -81,9 +76,6 @@ class MissionControllerCreatePathTest {
 
     UUID attackerTargetId = UUID.randomUUID();
     UUID attackerSquadronId = UUID.randomUUID();
-    // Craft a JSON payload that ATTEMPTS to mass-assign id / version / owningSquadron / parent /
-    // owner / managers. Jackson drops unknown fields silently (we want them dropped — strict mode
-    // would 400 valid frontend payloads that include the read-DTO fields).
     String body =
         "{"
             + "\"id\":\""
@@ -120,15 +112,9 @@ class MissionControllerCreatePathTest {
     Mockito.verify(missionService).createMission(captor.capture());
     CreateMissionRequest forwarded = captor.getValue();
 
-    // Caller-supplied benign fields flow through ...
     org.junit.jupiter.api.Assertions.assertEquals("Attacker Mission", forwarded.name());
     org.junit.jupiter.api.Assertions.assertEquals("benign field", forwarded.description());
     org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, forwarded.isInternal());
-
-    // ... but the CreateMissionRequest record has no slots for id/version/owningSquadron/etc., so
-    // the binding layer cannot smuggle them in. The service receives a record whose only
-    // information about the request is the safe subset. This is the structural fix for C-3.
-    // (No assertions on "absent" fields needed — they don't exist as accessors on the record.)
   }
 
   @Test

@@ -54,28 +54,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Spring MVC controller for the materials browsing pages ({@code /materials}, {@code
- * /materials/overview} matrix, {@code /materials/{id}} detail).
+ * Controller for the materials pages: {@code /materials}, the {@code /materials/overview} matrix
+ * and the {@code /materials/{id}} detail.
  *
- * <p>The overview and detail pages stay simple — list + by-category groups, detail + price list.
- * The matrix is the heaviest read path in the frontend. It is split in two: {@code GET
- * /materials/overview} renders only a lightweight shell (filters + an empty grid container), and
- * {@code GET /materials/overview/data} returns the matrix as one lean {@link MatrixGridDto} JSON
- * document. The browser's virtual-scroll grid ({@code /js/materials-matrix.js}) materializes only
- * the currently visible rows into the DOM, so a multi-thousand-cell universe no longer freezes the
- * page by forcing the browser to build the entire dense table at once.
- *
- * <p><b>Matrix filtering is server-side</b> (ADR-0105, REQ-UI-014). The grid re-fetches {@code
- * /materials/overview/data} with its filter selection as query parameters, which this controller
- * relays to the backend {@code /api/v1/materials/matrix} endpoint, so the browser filters and
- * reshapes only the matching slice instead of the whole universe. Both the unfiltered default and
- * every filtered fetch are assembled <em>complete</em> across all backend pages via {@link
- * CatalogPages} (building on the page-walk of ADR-0102/0103), so no cell is silently dropped past
- * the backend's page-size clamp; the unfiltered default additionally comes from the shared
- * 10-minute catalogue cache ({@link BackendApiClient#getCached} on the {@link
- * CachedCatalog.Fetch#PAGE_WALK} {@code MATERIALS_MATRIX}). The detail page's per-terminal price
- * list is likewise assembled across all pages (REQ-UI-015). The server-side reshaping into
- * columns/rows lives in {@link #buildGrid}.
+ * <p>The matrix page renders a shell; the grid data comes as JSON from {@code
+ * /materials/overview/data}, filtered server-side (REQ-UI-014) and assembled across all backend
+ * pages. The unfiltered matrix is served from the shared catalogue cache.
  */
 @Controller
 @UsesLayoutModel
@@ -86,22 +70,15 @@ import org.springframework.web.bind.annotation.ResponseBody;
 public class MaterialsPageController {
 
   /**
-   * Terminal column for the matrix. Sorts first by star system, then by effective planet system (so
-   * terminals on the same planet/moon/orbit stay visually contiguous), then by location-type group
-   * (city &lt; jump-point space station &lt; loading-dock space station &lt; other station &lt;
-   * outpost &lt; everything else), and finally alphabetically by name. The order is meaningful for
-   * the template — it controls the visual grouping of column headers and ensures planet-tint
-   * stripes form unbroken bands.
+   * Terminal column of the matrix, ordered by star system, planet system, location-type group
+   * (city, jump-point station, loading-dock station, other station, outpost, rest) and name.
    *
    * @param name terminal display name
    * @param nickname terminal short name
-   * @param starSystemName parent star system; {@code null} or blank pushes the column to the back
-   * @param planetName effective planet system this terminal belongs to (direct, via parent moon, or
-   *     via like-named orbit); {@code null} or blank pushes the column to the end of its star
-   *     system
-   * @param planetCssClass CSS class derived from {@code planetName} via {@link
-   *     PlanetColorResolver}; controls the planet-color tint applied to the column header and a
-   *     thin top-border stripe on each body cell
+   * @param starSystemName parent star system; {@code null} or blank sorts last
+   * @param planetName effective planet system (direct, via moon or via orbit); {@code null} or
+   *     blank sorts last within its star system
+   * @param planetCssClass CSS class for the planet tint, from {@link PlanetColorResolver}
    * @param cityName parent city, if any (highest grouping priority)
    * @param spaceStationName parent space station, if any
    * @param outpostName parent outpost, if any
@@ -151,9 +128,6 @@ public class MaterialsPageController {
         return sysCmp;
       }
 
-      // Planet-less terminals (jump points / Lagrange) sink to the end of their star system so
-      // the planet-tinted block stays contiguous. Within the planet-less tail the existing
-      // group/name ordering still applies.
       boolean thisHasPlanet = this.planetName != null && !this.planetName.isBlank();
       boolean otherHasPlanet = o.planetName != null && !o.planetName.isBlank();
       if (thisHasPlanet != otherHasPlanet) {
@@ -181,15 +155,8 @@ public class MaterialsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Bounds how many server-filtered matrix slices may be page-walked (and therefore buffered in
-   * memory) at once. The unfiltered path is protected by the {@code @Cacheable(sync = true)}
-   * single-flight, but a filtered fetch is uncached and can still return a near-full, matrix-sized
-   * payload (up to the WebClient's 64&nbsp;MB codec limit); without a guard a burst of distinct
-   * filter selections would buffer many such payloads concurrently and exhaust the frontend heap.
-   * {@code WebClientConfig} prescribes exactly this small semaphore once a second heavy read path
-   * is added (ADR-0105). Blocking (not rejecting) mirrors the single-flight's wait-for-the-loader
-   * behaviour; each permit is held only for one page-walk, itself bounded by the WebClient's
-   * timeouts.
+   * Limits concurrent page-walks of uncached filtered matrix slices to three, so bursts of distinct
+   * filters cannot exhaust the heap; callers block until a permit is free.
    */
   private final Semaphore filteredMatrixFetchGuard = new Semaphore(3);
 
@@ -206,9 +173,8 @@ public class MaterialsPageController {
       MATERIAL_PRICE_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   /**
-   * Renders the materials overview ({@code /materials}). Fetches the price-overview projection for
-   * all materials in one large page and groups them by category for the template's accordion
-   * layout. Materials without a category land under "Unsortiert" so they remain visible.
+   * Renders the materials overview ({@code /materials}), grouped by category; uncategorised
+   * materials appear under "Unsortiert".
    *
    * @param model Thymeleaf model populated with {@code materials} and {@code materialsByKind}
    * @return the {@code materials} view name
@@ -237,8 +203,6 @@ public class MaterialsPageController {
                 : "Unsortiert";
         materialsByKind.computeIfAbsent(kind, k -> new ArrayList<>()).add(mat);
       }
-      // Sort items within each kind alphabetically by name (already sorted from API, but just to be
-      // sure)
       materialsByKind
           .values()
           .forEach(
@@ -260,16 +224,8 @@ public class MaterialsPageController {
   }
 
   /**
-   * Renders the matrix-overview shell ({@code GET /materials/overview}).
-   *
-   * <p>This endpoint deliberately renders no table body. It fetches the complete (page-walked)
-   * cached matrix only to derive the distinct material-name and star-system lists that populate the
-   * two multi-select filters — spanning the whole universe, so narrowing a filter never removes
-   * options — then returns the page shell. The grid itself is fetched separately as JSON from
-   * {@link #getMatrixData} and drawn by the virtual-scroll script, which keeps a large universe
-   * from freezing the browser by never building the whole dense table in the DOM at once; filter
-   * changes re-fetch that endpoint with the selection as query parameters (server-side filtering,
-   * ADR-0105).
+   * Renders the matrix-overview shell ({@code /materials/overview}) with the full material-name and
+   * star-system filter lists; the grid itself comes from {@link #getMatrixData}.
    *
    * @param model Thymeleaf model populated with the {@code materialNames} and {@code starSystems}
    *     filter source lists
@@ -301,32 +257,15 @@ public class MaterialsPageController {
   }
 
   /**
-   * Returns the trade matrix as one lean {@link MatrixGridDto} JSON document ({@code GET
-   * /materials/overview/data}), consumed by the client-side virtual-scroll grid. The four filter
-   * dimensions are applied <b>server-side</b> (ADR-0105, REQ-UI-014): the grid script passes its
-   * selection as query parameters, this controller relays them to the backend matrix endpoint, and
-   * the response contains only the matching material/terminal slice. A filtered grid therefore
-   * shows only the terminals and materials that have a price row inside the filtered slice.
-   *
-   * <p>The unfiltered default (no parameters) is served from the shared 10-minute {@link
-   * BackendApiClient#getCached} catalogue cache — the matrix is global price/terminal reference
-   * data, not user-scoped, so a shared cache is safe and the heavy page-walk/deserialize runs at
-   * most once per TTL. Filtered requests bypass the cache (their URIs vary by selection and are
-   * deliberately not allowlisted, FE-CACHE-1) and are debounced client-side; because they miss the
-   * cache's single-flight, a small {@link #filteredMatrixFetchGuard} semaphore bounds how many
-   * matrix-sized filtered payloads buffer at once. Both paths assemble <em>every</em> backend page
-   * via {@link CatalogPages} (the page-walk of ADR-0102/0103), so the grid is complete even past
-   * the backend's 100 000-row page-size clamp. The per-request work is the {@link #buildGrid}
-   * reshaping into columns and category-grouped rows. The trade-off is that overview prices can lag
-   * a UEX sync by up to the TTL; the per-material detail page stays uncached for authoritative
-   * prices.
+   * Returns the trade matrix as a {@link MatrixGridDto} for the virtual-scroll grid, with the four
+   * filters applied server-side (REQ-UI-014). The unfiltered matrix is cached; filtered requests
+   * are uncached and throttled by {@link #filteredMatrixFetchGuard}.
    *
    * @param materials material names to keep, or empty/absent for all
    * @param systems star-system names to keep, or empty/absent for all
    * @param loadingDock {@code true} to keep only terminals with a loading dock
    * @param autoLoad {@code true} to keep only terminals with automatic cargo loading
-   * @return the reshaped (possibly filtered) grid, or an empty grid if the backend fetch fails (the
-   *     client then shows its no-results state instead of an error page)
+   * @return the reshaped (possibly filtered) grid, or an empty grid if the backend fetch fails
    */
   @GetMapping("/overview/data")
   @ResponseBody
@@ -350,10 +289,7 @@ public class MaterialsPageController {
   }
 
   /**
-   * Fetches the complete unfiltered matrix projection from the shared page-walked catalogue cache
-   * ({@link CachedCatalog#MATERIALS_MATRIX} is {@link CachedCatalog.Fetch#PAGE_WALK}, so {@link
-   * BackendApiClient#getCached} assembles every page before caching), normalising a {@code null}
-   * page or content to an empty list so callers never see {@code null}.
+   * Fetches the complete unfiltered matrix from the shared catalogue cache.
    *
    * @return the matrix rows, never {@code null}
    */
@@ -368,12 +304,7 @@ public class MaterialsPageController {
   }
 
   /**
-   * Fetches a server-filtered matrix slice (uncached — the URI varies by selection), page-walking
-   * every backend page via {@link CatalogPages#fetchAll} so even a filtered result larger than one
-   * page is complete (ADR-0105, REQ-UI-014). The filter values are passed as URI variables so the
-   * WebClient strictly encodes them (a multi-word material name round-trips for the exact {@code
-   * IN} match — not the {@code URLEncoder} form-encoding trap of #371). Hitting the {@link
-   * CatalogPages#MAX_CATALOG_PAGES} runaway cap is logged.
+   * Fetches a filtered matrix slice across all backend pages, uncached (REQ-UI-014).
    *
    * @param materials material names to keep (non-empty)
    * @param systems star-system names to keep (may be empty)
@@ -385,8 +316,6 @@ public class MaterialsPageController {
   private List<MaterialMatrixItemDto> fetchFilteredMatrixItems(
       List<String> materials, List<String> systems, boolean loadingDock, boolean autoLoad) {
     try {
-      // Uncached, so it misses the single-flight that keeps the unfiltered matrix to one concurrent
-      // buffer; bound how many matrix-sized filtered payloads buffer at once (WebClientConfig).
       filteredMatrixFetchGuard.acquire();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -416,12 +345,8 @@ public class MaterialsPageController {
   }
 
   /**
-   * Builds the backend matrix URI <em>template</em> for a filtered fetch: the allowlisted catalogue
-   * URI (so the base request — including its {@code size} chunking — cannot drift from the cached
-   * unfiltered path) plus one {@code {fN}} placeholder per selected material / star-system value
-   * (REQ-UI-014). The values are appended to {@code uriVariables} in the same order so the
-   * WebClient expands and strictly encodes them. The two boolean dimensions are fixed literals, not
-   * values, so they are inlined.
+   * Builds the backend matrix URI template for a filtered fetch, with one {@code {fN}} placeholder
+   * per material or star-system value, appending the values to {@code uriVariables} in order.
    *
    * @param materials material names to keep, or empty/absent for all
    * @param systems star-system names to keep, or empty/absent for all
@@ -471,10 +396,8 @@ public class MaterialsPageController {
   }
 
   /**
-   * Reshapes the flat material/terminal/price stream into the render-ready {@link MatrixGridDto}:
-   * the deterministically ordered terminal columns (sorted via {@link TerminalCol#compareTo}), the
-   * spanning star-system header counts, and the per-category material rows, each carrying a sparse
-   * terminal-name → price-cell map. No filtering happens here — the browser filters the full grid.
+   * Reshapes the flat matrix rows into a {@link MatrixGridDto}: ordered terminal columns,
+   * star-system header spans and per-category material rows with sparse price cells.
    *
    * @param items the flat matrix rows; must not be {@code null}
    * @return the reshaped grid, never {@code null}
@@ -582,13 +505,8 @@ public class MaterialsPageController {
   }
 
   /**
-   * Renders the per-material detail page ({@code /materials/{id}}) with the material's core record
-   * and its <em>complete</em> price list across every terminal that trades it. The price list is
-   * page-walked across all backend pages via {@link CatalogPages#fetchAll} (ADR-0102/0103,
-   * REQ-UI-015): the template renders the returned list verbatim as the full price table with no
-   * pagination, so a single capped page would silently drop the alphabetically late terminals the
-   * page promises to show. Backend failure leaves the model attributes empty so the template
-   * renders a "not available" placeholder rather than failing.
+   * Renders the material detail page ({@code /materials/{id}}) with the complete price list across
+   * all backend pages (REQ-UI-015). On backend failure the model stays empty.
    *
    * @param id material id
    * @param model Thymeleaf model populated with {@code material} and {@code prices}

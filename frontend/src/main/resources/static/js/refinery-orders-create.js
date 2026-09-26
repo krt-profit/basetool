@@ -17,28 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Refinery-order create page module (/refinery-orders/new), extracted verbatim from the former
- * inline script of refinery-orders-create.html (ADR-0069, follow-up to #924).
- *
- * Owns the create form's dynamic behaviour: per-row SCU calculation, output-material display and
- * yield-badge refresh (via the shared refinery-yield-badge.js module), add/remove/renumber of
- * material rows (including the #435 import-review flags), the refining-method rating readout, the
- * live ends-at and profit previews, the #575 in-place create submit through
- * window.krtFetch.submitForm, the #591 idempotent re-init after a screenshot-import fragment swap,
- * and the #435 screenshot-import submit that swaps a pre-filled create form into place. The classic
- * form-POSTs stay the no-JS fallback.
- *
- * The localized MSG_RFC_* and label strings, the RATING_LEVELS / SPEED_LEVELS dicts, the server-injected
- * MATERIAL_YIELD_BONUSES map and the ROUNDING_MODE value are defined by the inline Thymeleaf
- * bootstrap block of refinery-orders-create.html, which executes immediately before this script.
- */
-
 /* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
-// Initialize the shared yield-badge module. On the create form the map is empty until the
-// user picks a refinery from the location dropdown (then onLocationChange fetches the map
-// via the /refinery-orders/locations/{id}/yields proxy and refreshAll() re-renders every row).
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
 function calcScu(index) {
@@ -64,10 +44,6 @@ function updateOutputMaterial(selectElement) {
     const entryBlock = selectElement.closest('.material-entry');
     const outputDisplay = entryBlock.querySelector('span[id^="outputMaterialDisplay_"]');
 
-    // The input-material picker is a server-side searchable combobox (REQ-FE-016): the selected
-    // option's data-refined-name is mirrored onto the hidden input carrying the control's id. The
-    // raw <select> fallback covers only the not-yet-enhanced pre-enhancement state, whose sole
-    // non-placeholder option is the server-rendered seed (the remote picker preloads no catalog).
     let refinedName = selectElement.dataset.refinedName || '';
     if (!refinedName && selectElement.tagName === 'SELECT') {
         const selectedOption = selectElement.options[selectElement.selectedIndex];
@@ -81,9 +57,6 @@ function updateOutputMaterial(selectElement) {
         outputDisplay.style.opacity = '0.7';
     }
 
-    // Refresh the yield badge against the shared module's map. With no location picked the
-    // map is empty and the badge stays hidden; once the user picks a refinery the map is
-    // populated and the badge appears for the rows whose input material has UEX data.
     window.krtRefineryYield.refreshFor(selectElement);
 }
 
@@ -113,12 +86,6 @@ function addMaterialRow() {
 
     const template = entries[0].cloneNode(true);
 
-    // The input-material picker is an enhanced combobox (REQ-FE-016); its clone is dead
-    // (listeners dropped, duplicated ARIA ids, no native <select> left to re-enhance).
-    // Build a fresh EMPTY select — the remote combobox (remote-materials-raw) searches the
-    // raw catalog on demand, so no options are preloaded — carry over row 0's id/name
-    // (renumbered by the loop below), and let krtEnhanceComboboxes upgrade it once the row
-    // is inserted.
     const clonedPicker = template.querySelector('.krt-combobox');
     if (clonedPicker) {
         const hiddenField = clonedPicker.querySelector('input[type="hidden"]');
@@ -131,10 +98,6 @@ function addMaterialRow() {
         freshSelect.setAttribute('data-trigger', 'rfc-update-output');
         freshSelect.setAttribute('data-krt-combobox', 'remote-materials-raw');
         clonedPicker.parentNode.replaceChild(freshSelect, clonedPicker);
-        // The enhancer re-pointed row 0's label (for="krt-cb-N-input") and minted its id; the
-        // clone carries both, which the /_\d+$/ renumbering below cannot fix — strip the id
-        // (else every added row duplicates it) and re-bind the label to the rebuilt select's
-        // field id so the renumber loop and the fresh enhancement pick it up cleanly.
         const clonedLabel = freshSelect.parentNode.querySelector('label');
         if (clonedLabel) {
             clonedLabel.removeAttribute('id');
@@ -144,16 +107,11 @@ function addMaterialRow() {
         }
     }
 
-    // Renumber the title in the header. Source is row 0 ("Material #1") so without an
-    // update the cloned row would also read "Material #1" until the page is reloaded.
     const title = template.querySelector('.material-entry-title');
     if (title) {
         title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (count + 1);
     }
 
-    // Row 0 has no Remove button (the very first material can't be removed) — inject one
-    // into the cloned row's header. Wired through the delegated 'rfc-remove-material'
-    // krtEvents handler via data-trigger, matching the server-rendered button.
     if (!template.querySelector('.remove-btn')) {
         const header = template.querySelector('.material-entry-header');
         if (header) {
@@ -178,8 +136,6 @@ function addMaterialRow() {
         if (input.name) {
             input.name = input.name.replace(/\[\d+\]/, '[' + count + ']');
         }
-        // The delegated rfc-calc-scu handler reads data-index to know which row's
-        // SCU field to update; without renumbering, calcScu() always targets row 0.
         if (input.hasAttribute('data-index')) {
             input.setAttribute('data-index', count);
         }
@@ -197,17 +153,11 @@ function addMaterialRow() {
         displaySpan.style.opacity = '0.7';
     }
 
-    // A cloned row inherits the source row's yield badge — but the new row's material is
-    // empty so the badge has no meaning. Drop it; the shared module re-creates it as soon as
-    // the user picks a material that has a yield row for the current refinery.
     const yieldBadge = template.querySelector('span[id^="yieldBonus_"]');
     if (yieldBadge) {
         yieldBadge.remove();
     }
 
-    // Same for the import review flags (#435): findings, confidence and suggestion chips
-    // belong to the SOURCE row's draft data — a fresh row has no import finding, and a
-    // cloned chip would still write to the source row's select when clicked.
     template.classList.remove('import-flagged-row');
     const importFlags = template.querySelector('.import-row-flags');
     if (importFlags) {
@@ -223,8 +173,6 @@ function addMaterialRow() {
     });
 
     container.appendChild(template);
-    // Manually built DOM: the global enhancer does not see it, so upgrade the rebuilt
-    // material select in place (REQ-FE-016).
     if (window.krtEnhanceComboboxes) {
         window.krtEnhanceComboboxes(template);
     }
@@ -325,8 +273,8 @@ function updateEndsAt() {
 }
 
 /**
- * Aktualisiert das read-only "Gewinn/Verlust"-Feld live aus oreSales - expenses - otherExpenses.
- * Server bleibt Source of Truth; dies ist lediglich eine UI-Vorschau.
+ * Updates the read-only profit/loss preview as oreSales - expenses - otherExpenses; the server
+ * computes the stored value.
  */
 function updateProfitPreview() {
     const expensesEl = document.getElementById('expenses');
@@ -343,15 +291,8 @@ function updateProfitPreview() {
     preview.classList.toggle('text-muted', profit >= 0);
 }
 
-// CSP-safe delegated bindings (replaces the nine inline on*= handlers above — preserves
-// the input/change semantics so the profit-preview / material-output / scu calculations
-// re-run on the same DOM events as before).
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
-    // Restore "0" if the user clears one of the money fields and tabs away. Uses
-    // `focusout` (which bubbles) instead of `blur` because event delegation listens
-    // on `document` and `blur` does not bubble. The profit-preview re-runs after the
-    // restore so the read-only Gewinn/Verlust field reflects the implicit 0 immediately.
     window.krtEvents.on('focusout', 'rfc-update-profit', function (el) {
         if (el.value.trim() === '') {
             el.value = '0';
@@ -373,7 +314,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('input', 'rfc-calc-scu', function (el) {
         calcScu(el.getAttribute('data-index'));
     });
-    // Screenshot-extract import (#435): hidden file input + styled trigger, submit-on-pick.
     window.krtEvents.on('click', 'rfc-import-pick', function () {
         const fileInput = document.getElementById('refineryImportFile');
         if (fileInput) fileInput.click();
@@ -381,31 +321,15 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'rfc-import-file', function (el) {
         if (el.files && el.files.length > 0) {
             const importForm = document.getElementById('refineryImportForm');
-            // requestSubmit (not submit): only it fires the submit event that clears the
-            // unsaved-changes dirty flag - values typed into the create form before an
-            // import are discarded by design, so no leave-page warning may appear here.
             if (importForm) importForm.requestSubmit();
         }
     });
-    // One-click assignment of a ranked suggestion to the row's material select; the change
-    // event re-derives the output-material display and the yield badge like a manual pick.
-    // The select is resolved RELATIVE to the chip (not via a row index): add/remove
-    // renumber the select ids, so a stored index would silently target the wrong row.
-    // The picker is a REMOTE combobox (remote-materials-raw), so the refined-output metadata
-    // is not resolvable locally: look the suggested material up via the catalog proxy and pass
-    // label + metadata to setValue. A failed/miss lookup degrades to id + name only (the
-    // output display shows '-'), toastless like the rest of the import review flow.
     window.krtEvents.on('click', 'rfc-apply-suggestion', function (el) {
         const materialId = el.getAttribute('data-material-id');
         const materialName = el.getAttribute('data-material-name') || '';
         const entry = el.closest('.material-entry');
-        // Attribute-only selector: after combobox enhancement the control's id lives on a
-        // hidden <input>, not a <select> (REQ-FE-016).
         const select = entry ? entry.querySelector('[id^="inputMaterialId_"]') : null;
         if (!select || !materialId) return;
-        // setValue() syncs the hidden value, the visible label and the mirrored metadata;
-        // the explicit change dispatch re-derives the output display + yield badge like a
-        // manual pick (setValue itself never fires change).
         function applySuggestion(match) {
             if (select.krtCombobox) {
                 if (match) {
@@ -430,8 +354,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             })
             .then(function (list) {
                 const rows = Array.isArray(list) ? list : [];
-                // Exact id match first; fall back to the first exact name match (the id is
-                // authoritative, the name only disambiguates a paged-out id).
                 const match =
                     rows.find(function (m) {
                         return m.id === materialId;
@@ -448,22 +370,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
 }
 
-// In-place create submit (#575): creating a refinery order navigates away on success (to the
-// list), so intercept the form, POST FormData (the browser serializes the dynamic materials
-// editor AND omits the disabled non-logistician owner select, falling back to its hidden twin)
-// with X-Requested-With + krtCsrf, and navigate to the JSON targetUrl. On a validation/backend
-// failure the page STAYS with an inline toast instead of the POST->redirect reflash that loses
-// the entered data. The classic form-POST is the no-JS fallback (krtCsrf absent).
-// Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
-// (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
-// X-Reauthenticate and the double-submit guard (submitter). This helper keeps only its page
-// behaviour: navigate away to the JSON targetUrl on success (toast:false; a create leaves the
-// page) with resetUnsavedChanges, and the 400-invalid vs generic inline error toast. The classic
-// form-POST is the no-JS fallback (krtFetch absent).
 /**
- * Picks the toast for a failed in-place create. A mission the order's owner does not take part in
- * (REQ-SEC-042) is also a 400, so it is told apart by its problem code before the generic 400
- * "add a material" message — otherwise the member would look for the problem in the goods editor.
+ * Picks the toast for a failed in-place create; the mission-participant problem code (REQ-SEC-042)
+ * takes precedence over the generic 400 message.
  *
  * @param {number} status the HTTP status of the failed response
  * @param {any} body the parsed RFC 7807 problem body, if any
@@ -499,11 +408,6 @@ function _submitRefineryCreate(form, submitter) {
         },
     });
 }
-// #591: single idempotent re-init for everything that is NOT document-delegated, run on first
-// load AND after the screenshot-import swaps #refineryImportFormContainer in place. The delegated
-// krtEvents (rfc-*) handlers survive the swap and are deliberately NOT re-bound here (re-binding
-// would double-fire them); the datetime widget re-inits itself via datetime-splitter.js's own
-// krt:swapped listener. Subsumes the former four one-shot DOMContentLoaded init blocks.
 function _reinitRefineryForm(fromSwap) {
     const startedAt = document.getElementById('startedAt');
     const dHours = document.getElementById('durationHours');
@@ -522,17 +426,10 @@ function _reinitRefineryForm(fromSwap) {
     }
     updateMethodRatings();
     document.querySelectorAll('.material-entry').forEach((_, index) => calcScu(index));
-    // Attribute-only selector: matches the raw <select> before enhancement and the hidden
-    // <input> carrying the id after it (REQ-FE-016).
     document.querySelectorAll('[id^="inputMaterialId_"]').forEach((select) => {
         if (select.value) updateOutputMaterial(select);
     });
     if (window.krtRefineryYield) {
-        // On first load the page-level krtRefineryYield.init(...) already holds the server's yield
-        // map, so refreshAll repaints correctly. After an import SWAP that in-memory map is stale
-        // (init ran once at load, location-less), so re-fetch it for the imported location via
-        // onLocationChange (which repaints the badges when it resolves); a location-less import
-        // falls through to refreshAll.
         const locationSelect = document.getElementById('locationId');
         if (
             fromSwap &&
@@ -564,26 +461,17 @@ document.addEventListener('krt:swapped', function (e) {
     if (c && c.id === 'refineryImportFormContainer') _reinitRefineryForm(true);
 });
 
-// Swap a returned refineryImportFormBody fragment into #refineryImportFormContainer and dispatch
-// krt:swapped so the datetime splitter + the create-form re-init pick up the fresh DOM. Shared by
-// the screenshot import and the handoff consume; falls back to a reload only if the stable
-// container is somehow gone.
 function _swapRefineryImportFragment(html) {
     const container = document.getElementById('refineryImportFormContainer');
     if (!container) {
         window.location.reload();
         return;
     }
-    // Same-origin Thymeleaf fragment (refineryImportFormBody), escaped by the template engine.
     window.krtFetch.setTrustedHtml(container, html);
     document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
     if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
 }
 
-// Shared outcome handling for the two import POSTs below: swap the returned fragment in, or show
-// the inline import-failed toast. A non-2xx was already toasted by the call's onError (and a
-// re-auth / consent gate is navigating the page away), so only a 2xx that is not a fragment — a
-// followed redirect, whose body is a whole document — is refused here.
 function _applyRefineryImportResult(result) {
     if (!result.ok) return;
     if (result.redirected || typeof result.body !== 'string') {
@@ -593,20 +481,11 @@ function _applyRefineryImportResult(result) {
     _swapRefineryImportFragment(result.body);
 }
 
-// The error hooks both import POSTs share: every failure shows the inline import-failed toast and
-// leaves the page intact.
 function _refineryImportFailed() {
     if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
     return true;
 }
 
-// #591: in-place screenshot-import. The picker posts the RefineryExtract as multipart; instead of
-// the classic POST->redirect reload, fetch the pre-filled create-form fragment and swap it into
-// #refineryImportFormContainer, then dispatch krt:swapped (the datetime splitter + the create-form
-// re-init pick up the fresh DOM). The upload goes through krtFetch.submitForm (REQ-FE-002: CSRF,
-// the bare-403 refresh-and-retry, the re-auth redirect and the double-submit guard on the submit
-// button); a transport/redirect failure shows an inline toast and leaves the page intact. The
-// classic multipart form-POST is the no-JS fallback (krtFetch absent).
 function _submitRefineryImport(form) {
     if (!window.krtFetch) {
         form.submit();
@@ -616,7 +495,6 @@ function _submitRefineryImport(form) {
         .submitForm({
             form,
             method: 'POST',
-            // The endpoint answers the re-rendered form as an HTML fragment.
             accept: 'text/html',
             toast: false,
             onError: _refineryImportFailed,
@@ -632,21 +510,9 @@ if (_refineryImportForm) {
     });
 }
 
-// One-click ingest (epic #639, REQ-INGEST-004): the extractor opened this page with `?handoff=<id>`.
-// The navigational GET is prefetch-safe -- it does NOT consume the single-use handoff -- so a
-// speculative Firefox/Chrome prefetch or a duplicate top-level load can no longer burn the token
-// (the 2026-07-19 double-GET incident, where a member's Firefox loaded the URL twice ~250ms apart
-// and the first destructive GET consumed it while the second showed the "expired" notice). Once the
-// page's JS runs, POST the id to /refinery-orders/import-handoff -- a request a page prefetch never
-// issues -- to perform the one-time consume and swap the pre-filled fragment into place, exactly the
-// screenshot-import path. The id is stripped from the address bar first so a manual reload does not
-// re-POST a now-consumed handoff. A miss (expired/foreign/unknown) swaps in the fragment carrying
-// the friendly ingest.handoff.notFound notice; a transport failure shows an inline toast and leaves
-// the empty form intact.
 function _loadRefineryHandoff() {
     if (typeof REFINERY_HANDOFF_ID === 'undefined' || !REFINERY_HANDOFF_ID) return;
     const id = REFINERY_HANDOFF_ID;
-    // Drop ?handoff= from the address bar so a manual reload does not re-attempt a consumed id.
     try {
         const params = new URLSearchParams(window.location.search);
         params.delete('handoff');
@@ -655,9 +521,7 @@ function _loadRefineryHandoff() {
         if (window.history && window.history.replaceState) {
             window.history.replaceState(null, '', cleaned);
         }
-    } catch (_e) {
-        /* address-bar cleanup is best-effort; the consume below is what matters */
-    }
+    } catch (_e) {}
     if (!window.krtFetch) return;
     window.krtFetch
         .write({

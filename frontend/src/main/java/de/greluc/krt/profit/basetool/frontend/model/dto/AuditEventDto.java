@@ -24,9 +24,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of one generic activity audit-trail row (REQ-AUDIT-001) for the admin-only
- * unified viewer. Covers the inventory / job-order / refinery / personal-inventory areas; the bank
- * tab uses the separate {@link BankAuditEventDto}. The enums arrive as their string names.
+ * Frontend mirror of one generic audit-trail row (REQ-AUDIT-001) for the admin audit viewer; the
+ * bank tab uses {@link BankAuditEventDto}. Enums arrive as their names.
  *
  * @param id the audit row's id
  * @param occurredAt the mutation instant (UTC)
@@ -37,8 +36,8 @@ import org.jetbrains.annotations.Nullable;
  * @param subjectLabel the affected aggregate's human-readable label snapshot
  * @param targetUserId the affected user for user-centric events
  * @param details compact human-readable details payload
- * @param clientId which client the mutation came through (REQ-AUDIT-005) — a bounded label, {@code
- *     null} only on rows written before the column existed
+ * @param clientId the bounded label of the client the mutation came through (REQ-AUDIT-005), or
+ *     {@code null} when not recorded
  */
 public record AuditEventDto(
     UUID id,

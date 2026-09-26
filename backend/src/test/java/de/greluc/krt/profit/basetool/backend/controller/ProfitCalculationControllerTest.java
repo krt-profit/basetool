@@ -43,7 +43,6 @@ class ProfitCalculationControllerTest {
 
   @Test
   void shouldGetProfitCalculation() {
-    // Given
     UUID shipId = UUID.randomUUID();
     List<String> systems = List.of("Stanton");
     ProfitCalculationDto dto =
@@ -55,11 +54,9 @@ class ProfitCalculationControllerTest {
 
     when(profitCalculationService.calculateProfit(shipId, systems)).thenReturn(List.of(dto));
 
-    // When
     List<ProfitCalculationDto> result =
         profitCalculationController.getProfitCalculation(shipId, systems);
 
-    // Then
     assertNotNull(result);
     assertEquals(1, result.size());
     assertEquals("Laranite", result.get(0).materialName());

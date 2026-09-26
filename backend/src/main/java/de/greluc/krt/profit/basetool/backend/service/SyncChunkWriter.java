@@ -34,35 +34,13 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Writes an external catalogue into the database in short, isolated transactions (BE-PERF-09,
- * REQ-DATA-005).
+ * Writes an external catalogue into the database in short, isolated transactions (REQ-DATA-005).
  *
- * <p>The UEX syncs used to open one transaction per sync step and hold it across the HTTP fetch and
- * every row of the upsert: a pooled connection sat idle while UEX answered, the whole price matrix
- * shared one persistence context (so every lookup query auto-flushed a growing set of dirty rows,
- * quadratic over the run), and a single row the database refused — a unique violation, a too-long
- * value — marked the transaction rollback-only, so the run lost <em>every</em> row, not just that
- * one. This writer is the other half of the fix: the caller fetches with no transaction open, then
- * hands the rows over, and they are written
+ * <p>Rows are written in chunks, each in its own {@code REQUIRES_NEW} transaction; a failed chunk
+ * is replayed row by row, each in its own transaction, so a bad row rolls back alone.
  *
- * <ol>
- *   <li>in chunks of {@code chunkSize}, each chunk in its own {@code REQUIRES_NEW} transaction, so
- *       a normal run costs one commit per chunk and a bounded persistence context; and
- *   <li>when a chunk fails, row by row, each row in its own {@code REQUIRES_NEW} transaction, so
- *       the one bad row rolls back alone and every other row of the chunk still commits.
- * </ol>
- *
- * <p>The chunk callback therefore must <strong>not</strong> swallow a database exception for a row
- * (that would leave the chunk's transaction marked rollback-only and lose its siblings); it lets it
- * propagate and the writer isolates it. A row the callback decides to skip (unknown parent, missing
- * id) simply produces no result. Because a failed chunk is replayed, the callback must derive its
- * counts from the returned results, never from side effects.
- *
- * <p>Callbacks receive ids and DTOs, never entities from another transaction: a managed entity does
- * not survive its transaction's commit, and assigning a detached one to a managed association is
- * how the 2026-09-06 login outage happened (vault: Backend, "An N+1 fix must not hand entities
- * across transactions"). Preloaded lookup maps hold ids; the callback resolves them with {@code
- * getReferenceById} / {@code findAllById} inside its own transaction.
+ * <p>Chunk callbacks must let database exceptions propagate, derive counts only from returned
+ * results, and receive ids and DTOs, never entities from another transaction.
  */
 @Slf4j
 @Component
@@ -85,8 +63,7 @@ public class SyncChunkWriter {
   }
 
   /**
-   * Writes {@code rows} through {@code writer}, chunk by chunk, isolating a failing row as
-   * described in the class Javadoc.
+   * Writes {@code rows} through {@code writer} chunk by chunk, retrying a failed chunk row by row.
    *
    * @param rows the rows to write, in order; never {@code null}
    * @param chunkSize rows per chunk transaction; at least 1
@@ -132,8 +109,6 @@ public class SyncChunkWriter {
         }
       }
     }
-    // Not List.copyOf: a writer may legitimately report a null result for a row (a caller that
-    // counts rows rather than ids), and copyOf rejects null elements.
     return new Outcome<>(Collections.unmodifiableList(results), failedRows);
   }
 

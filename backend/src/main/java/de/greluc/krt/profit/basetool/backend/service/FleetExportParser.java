@@ -39,24 +39,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Parses an uploaded ship-export file into the format-agnostic {@link FleetImportEntry} stream that
- * {@code HangarImportService} then resolves and imports. Extracted verbatim from that service
- * (audit L-tier import-engine split, #16) so it owns the format sniffing and per-format DTO mapping
- * — CCU Game Fleetview, HangarXPLOR Shiplist, Fleetyards and StarJump FleetViewer — while the
- * service keeps the transactional import orchestration.
+ * Parses an uploaded ship-export file (CCU Game Fleetview, HangarXPLOR Shiplist, Fleetyards,
+ * StarJump FleetViewer) into the format-agnostic {@link FleetImportEntry} stream that {@code
+ * HangarImportService} imports.
  *
- * <p>Format detection (see {@link #parse}): an object root with a {@code starjumpFleetviewer} type
- * or a {@code canvasItems} array is StarJump FleetViewer; an array root is probed by field name
- * ({@code pledge_id}/{@code ship_code} → HangarXPLOR, {@code shipname}/{@code type} → Fleetview,
- * {@code shipCode}/{@code manufacturerCode} → Fleetyards). Records with a blank name, a non-ship
- * {@code entity_type} (Shiplist) or a non-{@code SHIP} {@code itemType} (FleetViewer) are dropped
- * before they reach the resolver.
- *
- * <p>Stateless and static-only; it takes the caller's {@link ObjectMapper} as a parameter rather
- * than injecting one, so {@code HangarImportService} passes its own configured mapper. The
- * 8&nbsp;MB pre-{@code readTree} size cap ({@link #MAX_IMPORT_BYTES}) is the security backstop
- * against a multi-MB array expanding into hundreds of MB of transient heap; it lives here with the
- * parse.
+ * <p>Stateless; takes the caller's {@link ObjectMapper}. Uploads above {@link #MAX_IMPORT_BYTES}
+ * are rejected before parsing.
  */
 @Slf4j
 public final class FleetExportParser {
@@ -74,13 +62,7 @@ public final class FleetExportParser {
    */
   public static final String LTI_INSURANCE = "LTI";
 
-  /**
-   * Application-level cap on a hangar/fleet upload, enforced before the body is materialised into a
-   * Jackson tree (security audit gap-fill). A real ship-list export is well under 1 MB; 8 MB leaves
-   * generous headroom for very large fleets while keeping this member-reachable import off the 64
-   * MB global multipart cap (sized for the admin-only P4K catalogue) — a flat multi-MB array would
-   * otherwise expand into hundreds of MB of transient heap per request.
-   */
+  /** Maximum upload size in bytes (8 MB), enforced before the body is read into a Jackson tree. */
   private static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
 
   /**
@@ -94,32 +76,22 @@ public final class FleetExportParser {
   private FleetExportParser() {}
 
   /**
-   * Reads the multipart body, sniffs the format from the payload shape, and converts every record
-   * into the format-agnostic {@link FleetImportEntry}. A JSON <em>object</em> root with a {@code
-   * starjumpFleetviewer} {@code type} or a {@code canvasItems} array is parsed as StarJump
-   * FleetViewer; a JSON <em>array</em> root is probed by field name: a {@code pledge_id} or {@code
-   * ship_code} key flags HangarXPLOR Shiplist; a {@code shipname} or {@code type} key flags CCU
-   * Game Fleetview; a {@code shipCode} or {@code manufacturerCode} key flags Fleetyards (camelCase,
-   * so it never collides with HangarXPLOR's snake_case {@code ship_code}). Records with a blank
-   * {@code name}/{@code defaultText}, a non-{@code "ship"} {@code entity_type} (Shiplist) or a
-   * non-{@code "SHIP"} {@code itemType} (FleetViewer) are silently dropped — they never reach the
-   * resolver.
+   * Reads the upload, detects its format from the payload shape and converts every ship record into
+   * a {@link FleetImportEntry}.
+   *
+   * <p>An object root with a {@code starjumpFleetviewer} type or a {@code canvasItems} array is
+   * StarJump FleetViewer; an array root is probed by field name ({@code pledge_id}/{@code
+   * ship_code} HangarXPLOR, {@code shipname}/{@code type} Fleetview, {@code shipCode}/{@code
+   * manufacturerCode} Fleetyards). Records without a name or that are not ships are dropped.
    *
    * @param objectMapper the caller's configured JSON mapper
    * @param file multipart upload from the controller
    * @return parsed entries (possibly empty); never {@code null}
-   * @throws BadRequestException if the file is too large, the JSON is malformed, the root is
-   *     neither an array nor a recognised FleetViewer object, or no field on the first array
-   *     element matches a known format
+   * @throws BadRequestException if the file is too large, malformed, or of no recognised format
    */
   public static @NotNull List<FleetImportEntry> parse(
       @NotNull ObjectMapper objectMapper, @NotNull MultipartFile file) {
     List<FleetImportEntry> entries = parseEntries(objectMapper, file);
-    // The byte cap bounds the parse; it does not bound the work AFTER it. HangarImportService walks
-    // every entry and inserts one Ship row per counted unit inside a single transaction, so an
-    // 8 MiB upload of minimal records turns into an unbounded insert loop holding one connection
-    // for its whole run - the same shape as the blueprint import's per-entry fuzzy scan. A real
-    // fleet export is in the hundreds.
     if (entries.size() > MAX_IMPORT_ENTRIES) {
       throw new BadRequestException(
           "The uploaded ship list carries "
@@ -140,8 +112,6 @@ public final class FleetExportParser {
    */
   private static @NotNull List<FleetImportEntry> parseEntries(
       @NotNull ObjectMapper objectMapper, @NotNull MultipartFile file) {
-    // Reject an oversized upload BEFORE readTree builds the in-memory tree (security audit
-    // gap-fill). getSize() reflects the buffered multipart length, so this never reads the body.
     if (file.getSize() > MAX_IMPORT_BYTES) {
       throw new BadRequestException(
           "The uploaded ship-list file is too large (limit "
@@ -152,15 +122,11 @@ public final class FleetExportParser {
     try {
       root = objectMapper.readTree(file.getInputStream());
     } catch (IOException | JacksonException e) {
-      // IOException covers the multipart stream; JacksonException (unchecked in Jackson 3) covers a
-      // malformed JSON body — both must surface as a 400, not bubble up as a 500.
       log.debug("Hangar import: failed to parse JSON", e);
       throw new BadRequestException(
           "The uploaded file could not be parsed as a valid ship-list JSON.");
     }
 
-    // StarJump FleetViewer exports use an object root with a canvasItems array, unlike the two
-    // array-based formats — branch on it before the array contract below.
     if (root != null && root.isObject() && isStarjumpFleetviewer(root)) {
       return parseStarjumpEntries(objectMapper, root);
     }
@@ -213,12 +179,8 @@ public final class FleetExportParser {
   }
 
   /**
-   * Recognises a StarJump FleetViewer ("Hangar Link") export from its object root. The
-   * authoritative marker is the {@code "type":"starjumpFleetviewer"} discriminator (matched
-   * case-insensitively); a top-level {@code canvasItems} array is accepted as a secondary signal so
-   * a future export that drops or renames the {@code type} field still resolves. Because the two
-   * array formats can never present as an object, the presence of {@code canvasItems} on an object
-   * root is unambiguous.
+   * Recognises a StarJump FleetViewer export by its case-insensitive {@code "type":
+   * "starjumpFleetviewer"} discriminator or a top-level {@code canvasItems} array.
    *
    * @param root the parsed JSON object root
    * @return {@code true} iff the payload should be parsed as StarJump FleetViewer
@@ -234,11 +196,8 @@ public final class FleetExportParser {
   }
 
   /**
-   * Parses a StarJump FleetViewer object root into the format-agnostic entry stream. Only {@code
-   * SHIP} canvas items survive {@link #mapStarjumpEntry(StarjumpCanvasItemDto)}; decorative {@code
-   * TEXTGROUP} labels and any item without a usable name/slug are dropped. A {@code null} or absent
-   * {@code canvasItems} array yields an empty list rather than an error so an empty FleetViewer
-   * canvas imports as a no-op.
+   * Parses a StarJump FleetViewer object root into entries, keeping only ship canvas items. A
+   * missing {@code canvasItems} array yields an empty list.
    *
    * @param objectMapper the caller's configured JSON mapper
    * @param root the parsed JSON object root (already confirmed as FleetViewer)
@@ -257,13 +216,9 @@ public final class FleetExportParser {
   }
 
   /**
-   * Lifts a StarJump FleetViewer canvas item into the internal representation. Non-{@code "SHIP"}
-   * items (decorative {@code TEXTGROUP} labels, widgets) are dropped. The {@code defaultText}
-   * becomes the resolvable name; if it is blank the kebab-case {@code shipSlug} is used as the name
-   * fallback so a tile with only a slug can still be matched. The trimmed {@code shipSlug} is
-   * always carried separately to drive the slug-fallback match stage. FleetViewer exports no custom
-   * ship name and no insurance, so both are left {@code null} (insurance falls back to {@link
-   * #DEFAULT_INSURANCE}).
+   * Maps a StarJump FleetViewer canvas item to an entry, dropping non-{@code "SHIP"} items. The
+   * {@code defaultText} is the name, falling back to {@code shipSlug}; the slug is always carried
+   * and insurance falls back to {@link #DEFAULT_INSURANCE}.
    *
    * @param item raw FleetViewer canvas item
    * @return internal entry, or {@code null} if the item is not a ship or has neither name nor slug
@@ -302,12 +257,9 @@ public final class FleetExportParser {
   }
 
   /**
-   * Lifts a HangarXPLOR Shiplist record into the internal representation. Non-{@code "ship"} entity
-   * types are dropped. The individual-name heuristic discards a {@code ship_name} that is just an
-   * abbreviation/echo of {@code name} (e.g. {@code ship_name="325a"} for {@code name="325a
-   * Fighter"}), so only truly custom names like {@code "KRT Olymp"} survive. {@code lti=true} maps
-   * to insurance {@code "LTI"}; {@code lti=false} or absent leaves insurance {@code null} so the
-   * caller falls back to {@link #DEFAULT_INSURANCE}.
+   * Maps a HangarXPLOR Shiplist record to an entry, dropping non-{@code "ship"} entity types. A
+   * {@code ship_name} that merely echoes the model name is discarded; {@code lti=true} maps to
+   * insurance {@code "LTI"}, otherwise insurance is {@code null}.
    *
    * @param dto raw HangarXPLOR entry
    * @return internal entry, or {@code null} if the entity type or model name make it ineligible
@@ -325,12 +277,9 @@ public final class FleetExportParser {
   }
 
   /**
-   * Lifts a Fleetyards record into the internal representation. The {@code name} is the resolvable
-   * model name; {@code shipName} becomes the individual name only when it is a genuine custom name
-   * (not an echo/abbreviation of {@code name}), reusing the same heuristic as the Shiplist mapper;
-   * and the manufacturer-prefixed {@code slug} is carried verbatim to drive the slug-fallback match
-   * stage. Fleetyards exports no insurance information, so insurance is left {@code null} and the
-   * caller falls back to {@link #DEFAULT_INSURANCE}.
+   * Maps a Fleetyards record to an entry: {@code name} is the model name, {@code shipName} the
+   * custom name unless it echoes the model, and {@code slug} is carried for slug matching.
+   * Insurance is left {@code null}.
    *
    * @param dto raw Fleetyards entry
    * @return internal entry, or {@code null} if the model name is blank
@@ -345,19 +294,11 @@ public final class FleetExportParser {
   }
 
   /**
-   * Decides whether a source-provided custom name is worth preserving on the imported ship or is
-   * just an abbreviation/echo of the model name. Shared by the Shiplist mapper (HangarXPLOR {@code
-   * ship_name}) and the Fleetyards mapper ({@code shipName}). The check uses the same alphanumeric
-   * normalisation as the matcher ({@link ShipTypeMatcher#normalizeForMatching}): if the normalised
-   * custom name is a substring of the normalised model name, treat it as an echo and return {@code
-   * null}. Empirically (n=64 in the real shiplist) this keeps the three actual custom names ({@code
-   * "KRT Olymp"}, {@code "KRT Falcon"}, {@code "KRT Franklin"}) and discards 12 model-name echoes
-   * like {@code "325a"} → {@code "325a Fighter"} or {@code "Caterpillar"} → {@code "Caterpillar
-   * Pirate Edition"}.
+   * Returns the custom ship name unless it is blank or, after {@link
+   * ShipTypeMatcher#normalizeForMatching} normalisation, a substring of the model name.
    *
    * @param modelName value of the source {@code name} field
-   * @param customName value of the source custom-name field (Shiplist {@code ship_name} /
-   *     Fleetyards {@code shipName}), nullable
+   * @param customName value of the source custom-name field, nullable
    * @return the trimmed custom name, or {@code null} if it is an echo or blank
    */
   private static @Nullable String computeCustomShipName(

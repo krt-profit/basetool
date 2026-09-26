@@ -105,7 +105,6 @@ class MissionUnitShipOptionsTest {
     User nonParticipant = saveUser("ship_opts_c");
 
     participantShipSameOrgUnit = saveShip("A-Ship", participantA, iridium);
-    // Owner is a participant but their ship lives in a different OrgUnit — must still be offered.
     participantShipOtherOrgUnit = saveShip("B-Ship", participantB, otherOrgUnit);
     nonParticipantShip = saveShip("C-Ship", nonParticipant, iridium);
 
@@ -119,7 +118,6 @@ class MissionUnitShipOptionsTest {
         mission.getId(), participantA.getId(), null, null, null, null, null);
     missionService.addParticipant(
         mission.getId(), participantB.getId(), null, null, null, null, null);
-    // nonParticipant is deliberately NOT registered.
   }
 
   @Test
@@ -140,10 +138,6 @@ class MissionUnitShipOptionsTest {
 
   @Test
   void getSelectableUnitShips_includesParticipantShipWithoutAnyOrgUnit() {
-    // A participant who belongs to no org unit at all — their ship is an ownerless personal ship
-    // (owningOrgUnit == null) — must still have their ship offered. Selection is keyed purely on
-    // participation, never on the OrgUnit the participant signed up as (or the lack of one): the
-    // owner-requested "a player's ships are always selectable regardless of org unit" guarantee.
     User orgUnitlessParticipant = saveUser("ship_opts_no_orgunit");
     Ship orgUnitlessShip = saveShip("E-Ship", orgUnitlessParticipant, null);
     missionService.addParticipant(
@@ -159,8 +153,6 @@ class MissionUnitShipOptionsTest {
 
   @Test
   void getSelectableUnitShips_keepsAlreadyAssignedShipOfDepartedOwner() {
-    // A ship owned by a non-participant, persisted onto a unit directly (bypassing the service
-    // guard) to model a unit whose ship owner has since left the roster.
     User departed = saveUser("ship_opts_departed");
     Ship assignedShip = saveShip("D-Ship", departed, mission.getOwningOrgUnit());
 

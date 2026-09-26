@@ -27,25 +27,11 @@ import java.util.function.LongSupplier;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Counts how many <em>distinct</em> subjects were refused within a sliding time window.
+ * Counts how many distinct subjects were refused within a sliding time window (REQ-SEC-028,
+ * REQ-OBS-011).
  *
- * <p>Exists because counting refusal <em>requests</em> cannot distinguish "many people are locked
- * out" from "one client is retrying". That distinction is the whole content of the {@code
- * TermsConsentRolloutStalled} alert: a single looping browser tab, a single member reading the
- * terms slowly, and a single straggler whose desktop extractor keeps retrying all produce an
- * unbounded refusal <em>rate</em> while being, in every case, one person who is not locked out by a
- * broken consent path. On 2026-08-03 exactly that misreading fired the alert twice overnight
- * (REQ-SEC-028, REQ-OBS-011).
- *
- * <p>Bounded by construction, because it is fed by an internet-reachable surface: entries expire
- * with the window, and once {@link #maxTracked} distinct subjects are held a further <em>new</em>
- * subject is dropped rather than admitted. Dropping loses precision in the only direction that is
- * safe — the gauge under-reports, so a cap can never manufacture an alert — and the cap sits far
- * above any real membership, so reaching it already means something other than a rollout.
- *
- * <p>Not persisted and not shared between instances. Each process reports what it saw, which is why
- * the alert reads the series with {@code max()} rather than {@code sum()}: a subject refused on two
- * instances must not count twice.
+ * <p>Bounded: entries expire with the window, and beyond {@link #maxTracked} subjects a new one is
+ * dropped. Per process, not shared between instances.
  */
 public final class RefusedSubjectWindow {
 
@@ -78,11 +64,8 @@ public final class RefusedSubjectWindow {
   }
 
   /**
-   * Records that {@code subject} was refused now, refreshing it if it is already held.
-   *
-   * <p>A subject already in the window is always refreshed even at the cap: the cap exists to bound
-   * growth from <em>new</em> subjects, and refusing to refresh a known one would let it expire
-   * while it is still actively being refused.
+   * Records that {@code subject} was refused now, refreshing it if it is already held; a known
+   * subject is refreshed even at the cap.
    *
    * @param subject the refused caller
    */
@@ -92,8 +75,6 @@ public final class RefusedSubjectWindow {
       lastSeenBySubject.put(subject, now);
       return;
     }
-    // At the cap with a subject we have not seen. Prune first — the cap is usually reached by stale
-    // entries, not by live ones — and admit it only if that freed room.
     prune(now);
     if (lastSeenBySubject.size() < maxTracked) {
       lastSeenBySubject.put(subject, now);
@@ -101,10 +82,8 @@ public final class RefusedSubjectWindow {
   }
 
   /**
-   * Reports how many distinct subjects were refused within the window, dropping expired entries.
-   *
-   * <p>Pruning on read rather than on a timer keeps this allocation-free between scrapes and means
-   * the value is always computed against the instant it is read.
+   * Reports how many distinct subjects were refused within the window, pruning expired entries
+   * first.
    *
    * @return the number of distinct subjects currently inside the window
    */

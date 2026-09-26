@@ -1,30 +1,12 @@
-; systemd timer that fires the nightly backup at 04:15 (host-local time).
-;
-; 04:15 sits inside the 04:00–05:00 maintenance window, which the backup's brief
-; writer-quiesce is allowed to use. The user-facing downtime is only the database
-; dump (seconds) — the slow Nextcloud upload happens after the stack is back up
-; (see scripts/backup.sh, REQ-OPS-009).
-;
-; IMPORTANT: OnCalendar uses the host's local timezone. Make sure the host TZ is
-; what you expect (`timedatectl`).
-
 [Unit]
 Description=Profit Basetool — nightly backup (04:15)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/backup.md
-; No Requires= on the service: a timer only TRIGGERS it, through Unit= below. A Requires= also
-; starts the service whenever the timer itself starts -- at every boot, when timers.target pulls the
-; timer in -- whether or not a run was due (docs/arc42/07-deployment-view.md §7.4b). The catch-up
-; below is the only boot-time run this job is meant to have. Guarded by
-; scripts/container-runtime.test.sh.
 
 [Timer]
 OnCalendar=*-*-* 04:15:00
 
-; Catch up a missed run (host was down at 04:15) on the next boot rather than
-; skipping a whole day.
 Persistent=true
 
-; Keep the start deterministic inside the 04:00–05:00 window.
 RandomizedDelaySec=0
 
 Unit=iri-backup.service

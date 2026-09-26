@@ -1,15 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="de">
 <body>
-<!--/*
-  Single material card, shared by both views of the /materials page: the
-  category-grouped accordion (#materialsGrouped) and the flat, alphabetically
-  sorted grid (#materialsFlat) that the per-user grouping toggle switches between.
-  Extracted so the two views render from one definition. The card-specific CSS
-  classes (.material-card, .material-title, .price-info, ...) are defined in the
-  host page's stylesheet (css/pages/materials.css); #{...} messages and @{...} URLs resolve in the
-  including page's context.
-*/-->
 <a th:fragment="materialCard(mat)" th:href="@{/materials/{id}(id=${mat.id})}" class="hud-box material-card">
     <h3 class="material-title">
         <span th:if="${mat.isIllegal == true}" class="text-danger krtm-margin-right-0-5rem-font-weight-bold-4522" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat.isVolatileQt == true}" class="text-warning krtm-margin-right-0-5rem-font-weight-bold-4522" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat.isVolatileTime == true}" class="text-warning krtm-margin-right-0-5rem-font-weight-bold-4522" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat.name}">Material Name</span>

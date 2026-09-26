@@ -33,14 +33,10 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 /**
- * Resolves a notification rule selector's abstract recipient description into concrete user {@code
- * sub}s.
+ * Resolves a notification rule selector's recipient description into concrete user {@code sub}s.
  *
- * <p>Officer-ness is a global Keycloak role mirrored into {@code user_roles}, so "officers of
- * squadron X" is the role {@code OFFICER} intersected with membership of X; Lead / Logistician /
- * Mission-Manager are per-membership flags read straight off the org unit. Because the role mirror
- * is refreshed by {@code UserSyncTask} (≤5 min), a freshly-promoted officer who has not logged in
- * yet is invisible here until the next sync — accepted eventual consistency (REQ-NOTIF-008).
+ * <p>Officer role membership comes from the periodically synced {@code user_roles} mirror, so a
+ * fresh promotion becomes visible only after the next sync (REQ-NOTIF-008).
  */
 @Service
 @RequiredArgsConstructor
@@ -85,10 +81,8 @@ public class RecipientResolutionService {
   }
 
   /**
-   * Resolves every bank employee holding a {@code bank_account_grant} on the given account — the
-   * {@code ACCOUNT_GRANT} selector's recipients (REQ-BANK-026). Row existence on the account is the
-   * "appropriately authorized for this account" signal (REQ-BANK-009); the per-action capability
-   * flag still gates whether such an employee may later confirm the request.
+   * Resolves every bank employee holding a {@code bank_account_grant} on the given account, the
+   * {@code ACCOUNT_GRANT} selector's recipients (REQ-BANK-026).
    *
    * @param accountId the bank account whose grant holders to notify
    * @return the granted employees' user subs; never {@code null}, possibly empty
@@ -103,11 +97,8 @@ public class RecipientResolutionService {
   }
 
   /**
-   * Resolves the <em>responsible holder(s)</em> (Kontoverantwortliche, REQ-BANK-034) of the given
-   * bank account — the {@code ACCOUNT_RESPONSIBLE} selector's recipients (REQ-BANK-026). The
-   * org-unit-aware derivation (account → owning org unit → role holders) lives in the
-   * OwnerScope-free {@code OrgUnitBankResponsibilityService} seam; this method only forwards to it
-   * so the {@code Bank*} classes stay org-unit-blind (REQ-BANK-008).
+   * Resolves the responsible holders of the given bank account, the {@code ACCOUNT_RESPONSIBLE}
+   * selector's recipients (REQ-BANK-034), via {@code OrgUnitBankResponsibilityService}.
    *
    * @param accountId the bank account whose responsible holder(s) to notify
    * @return the responsible holders' user subs; never {@code null}, empty for a Sonderkonto or an

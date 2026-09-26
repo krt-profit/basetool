@@ -30,28 +30,20 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
 /**
- * Forces Flyway to run before Hibernate validates the schema.
+ * Runs the Flyway migration before the {@code entityManagerFactory} bean initializes, so
+ * Hibernate's schema validation sees the migrated schema.
  *
- * <p>Spring Boot's default auto-configuration order is good enough for most apps, but this project
- * sets {@code spring.jpa.hibernate.ddl-auto=validate} everywhere (see CLAUDE.md) and {@code
- * EntityManagerFactory} bean creation runs validation immediately. Without an explicit ordering, an
- * EMF created before Flyway finishes migrating sees a stale or empty schema and aborts the
- * application. A {@link BeanPostProcessor} hooked to the {@code entityManagerFactory} bean name
- * runs the migration in its {@code postProcessBeforeInitialization} phase, guaranteeing the order.
- * Honoring {@code spring.flyway.enabled=false} keeps the {@code test} profile able to skip
- * migrations when the test harness sets up the schema differently.
+ * <p>Honours {@code spring.flyway.enabled=false}.
  */
 @Configuration
 public class DatabaseMigrationConfig {
 
   /**
    * Registers a {@link BeanPostProcessor} that runs Flyway's {@code migrate()} just before the
-   * {@code entityManagerFactory} bean is initialized so Hibernate's {@code validate} runs against
-   * an up-to-date schema.
+   * {@code entityManagerFactory} bean is initialized.
    *
-   * @param dataSourceProvider lazy provider so we never inject the {@code DataSource} until the
-   *     processor actually fires
-   * @param env environment used to short-circuit when {@code spring.flyway.enabled=false}
+   * @param dataSourceProvider lazy provider, resolved only when the processor fires
+   * @param env environment used to skip migration when {@code spring.flyway.enabled=false}
    * @return the registered post-processor
    */
   @NotNull

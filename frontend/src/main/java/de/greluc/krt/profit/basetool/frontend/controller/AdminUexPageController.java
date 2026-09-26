@@ -66,18 +66,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Consolidated admin page for every UEX-mirrored entity ({@code /admin/uex-data}).
+ * Admin page for every UEX-mirrored entity ({@code /admin/uex-data}): cities, stations, outposts
+ * and POIs grouped by star system, with terminals nested under their city or station.
  *
- * <p>Replaces the previously separate {@code /admin/terminals} and {@code /admin/uex-locations}
- * pages with one hierarchical view: cities, space stations, outposts and POIs are grouped by their
- * star system, and the terminals belonging to a city or station are rendered directly below their
- * parent. The page therefore answers "where can my freighter actually dock?" in a single screen
- * instead of forcing the admin to alt-tab between two flat tables.
- *
- * <p>The backend endpoints used here are the same ones the previous two controllers called; no
- * backend surface change ships with the consolidation. The dispatcher methods carry the same {@code
- * uex}/{@code yes}/{@code no} action semantics as before: {@code uex} clears the admin pin so the
- * next UEX sweep restores the value, {@code yes}/{@code no} pin the flag.
+ * <p>Override actions: {@code uex} clears the admin pin, {@code yes}/{@code no} set it.
  */
 @Controller
 @UsesLayoutModel
@@ -101,19 +93,13 @@ public class AdminUexPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Loads the <em>complete</em> cities, space stations, outposts, POIs and terminals catalogues —
-   * walking every page instead of presenting one capped 10 000-row chunk as the whole list
-   * (REQ-ADMIN-001, ADR-0102) — and groups them by star system. Terminals are bucketed onto their
-   * parent city or station by name within the same star system; any terminal that lacks a
-   * city/station match — typically free-floating orbital terminals — is collected into a per-system
-   * "orphans" list so it stays visible. The summary-chip totals come from the backend-reported
-   * {@code totalElements}, not the fetched list sizes, so they stay truthful even if a page walk
-   * ever hits its safety cap — which additionally raises the {@code catalogTruncated} warning
-   * banner (REQ-ADMIN-002). Backend failures land as an error attribute rather than blanking the
-   * page.
+   * Loads every page of the cities, stations, outposts, POIs and terminals (REQ-ADMIN-001) and
+   * groups them by star system; unmatched terminals go to a per-system orphans list. Totals come
+   * from the backend's {@code totalElements}, and a truncated walk raises the warning banner
+   * (REQ-ADMIN-002).
    *
-   * @param model Thymeleaf model populated with the sorted star-system tree, total counts and the
-   *     most recent UEX sweep timestamp
+   * @param model Thymeleaf model populated with the star-system tree, totals and the last UEX sweep
+   *     time
    * @return the {@code admin/uex} view name
    */
   @NotNull
@@ -171,9 +157,7 @@ public class AdminUexPageController {
   }
 
   /**
-   * Sets or clears the loading-dock override on a city, space station, outpost, POI or terminal.
-   * The {@code kind} path variable maps 1:1 to the backend URL segment so the same dispatcher
-   * serves all five entity types.
+   * Sets or clears the loading-dock override on a city, station, outpost, POI or terminal.
    *
    * @param kind one of {@code cities}, {@code space-stations}, {@code outposts}, {@code pois},
    *     {@code terminals}
@@ -223,14 +207,13 @@ public class AdminUexPageController {
   }
 
   /**
-   * Toggles a single terminal's hidden flag. Pulls the current record so the PUT body contains the
-   * UEX-imported display fields verbatim — the backend's PUT endpoint only updates the hidden flag,
-   * but the body still has to be a full {@link TerminalDto}.
+   * Toggles a terminal's hidden flag, sending the freshly read record as the full {@link
+   * TerminalDto} body.
    *
    * @param id terminal id
-   * @param hidden desired new hidden flag
+   * @param hidden desired hidden flag
    * @param redirectAttributes flash attributes carrier
-   * @return redirect to {@code /admin/uex} (optionally with {@code ?error=...})
+   * @return redirect to {@code /admin/uex}, optionally with {@code ?error=...}
    */
   @NotNull
   @PostMapping("/terminals/{id}/toggle-visibility")
@@ -259,9 +242,6 @@ public class AdminUexPageController {
               current.uexSyncedAt(),
               hidden);
       backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
-      // Flipping a terminal's hidden flag changes the cached terminal catalogue (the
-      // profit-calculator
-      // star-system dropdown reads it), so evict the TERMINAL domain (REQ-DATA-007).
       backendApiClient.evict(CacheDomain.TERMINAL);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -272,17 +252,14 @@ public class AdminUexPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #updateLoadingDockOverride} — routed here ahead of the classic
-   * handler by the {@code X-Requested-With} header so the no-JS form keeps its redirect fallback.
-   * The button active-state is patched deterministically client-side from the action, so this just
-   * relays success/failure.
+   * AJAX twin of {@link #updateLoadingDockOverride}.
    *
    * @param kind one of {@code cities}, {@code space-stations}, {@code outposts}, {@code pois},
    *     {@code terminals}
    * @param id entity id
    * @param action one of {@code uex} (clear pin), {@code yes} or {@code no} (set pin)
-   * @return {@code 200} on success, {@code 400} for an unknown kind/action, the relayed backend
-   *     status on a backend failure
+   * @return {@code 200} on success, {@code 400} for an unknown kind or action, the relayed backend
+   *     status on failure
    */
   @ResponseBody
   @PostMapping(value = "/{kind}/{id}/loading-dock", headers = "X-Requested-With=XMLHttpRequest")
@@ -316,9 +293,7 @@ public class AdminUexPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #toggleTerminalVisibility}. Flips the hidden flag server-side
-   * off a freshly-read record (so the body still carries the UEX-imported display fields verbatim)
-   * and relays success/failure; the button is re-rendered client-side.
+   * AJAX twin of {@link #toggleTerminalVisibility}.
    *
    * @param id terminal id
    * @return {@code 200} on success, the relayed backend status on failure, {@code 500} on an
@@ -359,9 +334,8 @@ public class AdminUexPageController {
   }
 
   /**
-   * AJAX counterpart of {@link #dispatchOverride}: applies the same {@code uex}/{@code yes}/{@code
-   * no} mapping but returns an HTTP status instead of a redirect, relaying any backend problem so
-   * {@code krtFetch} can branch on it.
+   * AJAX counterpart of {@link #dispatchOverride} that returns an HTTP status instead of a
+   * redirect.
    *
    * @param baseUri backend URI up to and including the entity id, with no trailing slash
    * @param action button action ({@code uex}, {@code yes}, or {@code no})
@@ -433,21 +407,15 @@ public class AdminUexPageController {
   }
 
   /**
-   * Groups the five flat entity lists into a per-star-system tree. Terminals are matched to their
-   * parent city or station by the {@code starSystemName + cityName} / {@code starSystemName +
-   * spaceStationName} tuple; any terminal that lacks a usable match goes onto the system's
-   * "orphans" list so it is still surfaced.
-   *
-   * <p>Visible for tests so the bucketing logic — the hard part of this controller — can be
-   * exercised without spinning up a Thymeleaf rendering pass.
+   * Groups the five entity lists into a per-star-system tree, nesting terminals under their city or
+   * station by system and name; unmatched terminals go to the system's orphans list.
    *
    * @param cities sorted city list
    * @param stations sorted space station list
    * @param outposts sorted outpost list
    * @param pois sorted POI list
    * @param terminals sorted terminal list
-   * @return per-star-system groups, sorted case-insensitively by system name (unknown system goes
-   *     last under an empty-string label)
+   * @return groups sorted case-insensitively by system name, the unknown system last
    */
   @NotNull
   @Unmodifiable
@@ -479,9 +447,6 @@ public class AdminUexPageController {
       bySystem.computeIfAbsent(poi.starSystemName(), SystemAccumulator::new).pois.add(poi);
     }
 
-    // Bucket terminals into (system, city) / (system, station); leftovers go on the
-    // system's orphan list. Names are matched case-insensitively to be resilient to
-    // small whitespace/casing drift between the UEX dump and the parent record.
     Map<String, Map<String, List<TerminalDto>>> cityTerminals = new LinkedHashMap<>();
     Map<String, Map<String, List<TerminalDto>>> stationTerminals = new LinkedHashMap<>();
     for (TerminalDto term : terminals) {
@@ -530,12 +495,6 @@ public class AdminUexPageController {
         stationNodes.add(new SpaceStationNode(station, List.copyOf(matched)));
       }
 
-      // Terminals whose claimed cityName/spaceStationName does not match any
-      // record we just fetched would otherwise vanish from the page. Realistic
-      // cause: a UEX sweep populated terminals before the parent city/station
-      // sweep on a fresh install, or a parent record was retired but the
-      // terminal still references it. Either way the admin still needs the
-      // override buttons, so we surface these on the per-system orphan list.
       List<TerminalDto> systemOrphans = new ArrayList<>(acc.orphanTerminals);
       sysCityBuckets.forEach(
           (k, v) -> {
@@ -728,10 +687,7 @@ public class AdminUexPageController {
     final List<TerminalDto> orphanTerminals = new ArrayList<>();
 
     @SuppressWarnings("unused")
-    SystemAccumulator(String unusedSystemName) {
-      // computeIfAbsent supplies the system name; we don't need to store it because
-      // the surrounding TreeMap already keys by it.
-    }
+    SystemAccumulator(String unusedSystemName) {}
   }
 
   /**
@@ -753,16 +709,14 @@ public class AdminUexPageController {
   public record SpaceStationNode(SpaceStationDto station, List<TerminalDto> terminals) {}
 
   /**
-   * All UEX-mirrored entities that share one star system.
+   * All UEX-mirrored entities of one star system.
    *
-   * @param name star system name (may be {@code null} for orphaned entities with no system label)
+   * @param name star system name, or {@code null} for entities without a system
    * @param cities cities in this system, with their terminals nested
    * @param spaceStations space stations in this system, with their terminals nested
-   * @param outposts outposts in this system (no terminals attach to outposts)
-   * @param pois POIs in this system (no terminals attach to POIs)
-   * @param orphanTerminals terminals in this system that could not be matched to any city or
-   *     station — typically free-floating orbital terminals that have neither {@code cityName} nor
-   *     {@code spaceStationName} set
+   * @param outposts outposts in this system
+   * @param pois POIs in this system
+   * @param orphanTerminals terminals matched to no city or station
    */
   public record StarSystemGroup(
       String name,

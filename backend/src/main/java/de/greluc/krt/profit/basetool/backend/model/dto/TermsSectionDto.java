@@ -22,11 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * One numbered section of the Terms of Use (REQ-SEC-028).
- *
- * <p>The heading carries its own number ("4. Pflichten der Nutzer") because the numbering is part
- * of the legal text and is cited as such — a client that renumbered from an ordered list would
- * silently renumber the document whenever a section was added.
+ * One numbered section of the Terms of Use (REQ-SEC-028); the heading carries its own number as
+ * part of the legal text.
  *
  * @param heading the section heading, including its number
  * @param clauses the section's paragraphs, in document order

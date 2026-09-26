@@ -54,21 +54,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Tests for {@link UserService#applyMembershipDelta} — the SPEZIALKOMMANDO_PLAN.md §7.4 single-POST
- * membership-delta orchestrator (multi-Staffel variant, REQ-ORG-017). Verifies:
+ * Tests for {@link UserService#applyMembershipDelta}, the single-request membership-delta
+ * orchestrator (REQ-ORG-017):
  *
  * <ul>
- *   <li>A non-null {@code staffeln} list is forwarded verbatim to {@link
- *       OrgUnitMembershipService#reconcileStaffelMemberships} (which adds / removes / flag-patches
- *       the user's Staffel memberships against that desired set); a {@code null} list leaves the
- *       Staffel side untouched.
- *   <li>An empty {@code staffeln} list still reconciles (it removes every Staffel membership).
- *   <li>SK ADD calls {@link OrgUnitMembershipService#addMember} and adopts initial flags inline via
- *       dirty-checking on the returned row (no second explicit save).
+ *   <li>A non-null {@code staffeln} list, even an empty one, is reconciled via {@link
+ *       OrgUnitMembershipService#reconcileStaffelMemberships}; {@code null} leaves Staffeln
+ *       untouched.
+ *   <li>SK ADD calls {@link OrgUnitMembershipService#addMember} and applies initial flags by
+ *       dirty-checking.
  *   <li>SK REMOVE calls {@link OrgUnitMembershipService#removeMember}.
- *   <li>SK PATCH wraps the change in a {@link MembershipFlagsPatchRequest} that carries the per-row
- *       version and delegates to {@link OrgUnitMembershipService#patchFlags}.
- *   <li>Unknown user surfaces as 404 immediately, before any change is applied.
+ *   <li>SK PATCH delegates a versioned {@link MembershipFlagsPatchRequest} to {@link
+ *       OrgUnitMembershipService#patchFlags}.
+ *   <li>An unknown user yields 404 before any change.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -167,7 +165,6 @@ class UserServiceMembershipDeltaTest {
     userService.applyMembershipDelta(userId, delta);
 
     verify(orgUnitMembershipService).addMember(skId, userId);
-    // Initial flags set inline on the managed entity (no second save call needed).
     assertEquals(true, freshRow.isLogistician());
     assertEquals(true, freshRow.isMissionManager());
   }

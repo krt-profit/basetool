@@ -33,20 +33,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cached index of the active blueprint master grouped into variant families: {@code familyKey ->}
- * the set of concrete normalized product keys that belong to that family. It exists so the
- * family-aware owner drill-down on the org-unit availability overview (#364) can expand a family to
- * its product keys and fetch owners in one bounded {@code IN} query, instead of a per-expand table
- * scan that would violate the drill-down performance contract (REQ-INV-012).
+ * Cached index of the active blueprint master grouped into variant families ({@code familyKey ->}
+ * product keys), backing the family-aware owner drill-down of the org-unit availability overview
+ * (REQ-INV-012).
  *
- * <p>The index is built once from the ~1600-row active blueprint master ({@link
- * BlueprintRepository#findActiveProductRows}) and cached as a single entry under {@link
- * CacheConfig#BLUEPRINT_FAMILY_INDEX_CACHE} (master-data TTL). It carries no per-write evict hook,
- * but the SC Wiki sync sweep evicts it on completion (via {@code MasterDataCacheEvictionService},
- * CACHE-DIST-03), so a blueprint sync is reflected on the next read rather than lagging the TTL;
- * the 12-hour TTL is only the backstop. Even at maximum staleness this is an oversight surface,
- * where the live availability count comes from the (always-fresh) owned-row aggregation and only
- * the lazy owner drill-down consults this index.
+ * <p>Cached under {@link CacheConfig#BLUEPRINT_FAMILY_INDEX_CACHE}; evicted when the SC Wiki sync
+ * completes, with the master-data TTL as backstop.
  */
 @Component
 @RequiredArgsConstructor
@@ -57,11 +49,8 @@ public class BlueprintVariantFamilyCatalog {
   private final BlueprintVariantFamilyResolver familyResolver;
 
   /**
-   * Returns the family index: each variant family key mapped to the deeply-immutable set of
-   * concrete product keys ({@code normalize(output_name)}) that resolve to it across the active
-   * blueprint master. A weapon family holds its base plus every cosmetic variant; a magazine family
-   * holds only its single atomic key. The result is cached as one entry and must be treated as
-   * read-only.
+   * Returns the family index: each variant family key mapped to the immutable set of product keys
+   * that resolve to it. The cached result must be treated as read-only.
    *
    * @return an immutable {@code familyKey -> product keys} map; never {@code null}
    */
@@ -85,8 +74,6 @@ public class BlueprintVariantFamilyCatalog {
       }
       index.computeIfAbsent(familyKey, k -> new HashSet<>()).add(productKey);
     }
-    // Deep-freeze before caching: the cached reference is shared across requests and must not be
-    // mutated by any consumer.
     Map<String, Set<String>> frozen = new HashMap<>(index.size());
     index.forEach((family, keys) -> frozen.put(family, Set.copyOf(keys)));
     return Map.copyOf(frozen);

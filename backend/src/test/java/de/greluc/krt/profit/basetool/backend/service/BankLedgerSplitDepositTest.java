@@ -66,13 +66,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Unit tests for the split deposit engine {@code BankLedgerService#bookSplitDeposit}
- * (REQ-BANK-043): a deposit that distributes a whole-percent of the gross evenly across all active
- * squadron accounts (excluding the named account) while booking a <strong>single</strong> holder
- * leg over the whole gross. Pure Mockito — the squadron-account enumeration, the largest-remainder
- * distribution, the exclude-named rule, the 100 % and rounds-to-zero edges and the no-targets guard
- * are all account/leg arithmetic that needs no database. Account-locking and overdraft concurrency
- * stay covered by the Testcontainers {@code BankLedgerServiceTest}.
+ * Unit tests for {@code BankLedgerService#bookSplitDeposit} (REQ-BANK-043): distribution across
+ * active squadron accounts except the named one, with a single holder leg over the gross.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -94,11 +89,8 @@ class BankLedgerSplitDepositTest {
   private final Map<UUID, BankAccount> accountsById = new HashMap<>();
 
   /**
-   * Assembles the ledger service under test with the real persistence engine {@link
-   * BankPostingWriter} and validation guards {@link BankBookingGuards} (#1253), both driven by the
-   * mocked repositories, so the split-arithmetic assertions on the captured {@code
-   * postingRepository} / {@code holderPostingRepository} legs still exercise the extracted
-   * persistence path end to end.
+   * Assembles the ledger service with the real {@link BankPostingWriter} and {@link
+   * BankBookingGuards} over mocked repositories.
    */
   @BeforeEach
   void setUp() {
@@ -127,9 +119,8 @@ class BankLedgerSplitDepositTest {
   }
 
   /**
-   * Wires the shared, always-needed stubs and registers every supplied account for the
-   * lock-by-id-for-update path and the squadron enumeration. The named account is registered too
-   * but is never part of the squadron set returned by the enumeration query.
+   * Wires the shared stubs and registers every supplied account for lookup; the named account is
+   * not part of the squadron enumeration.
    *
    * @param holder the receiving holder
    * @param named the deposit's named account (the remainder target)
@@ -153,26 +144,22 @@ class BankLedgerSplitDepositTest {
 
   @Test
   void bookSplitDeposit_distributesSliceEvenly_namedKeepsRemainder_oneHolderLeg() {
-    // Given: deposit 1000 onto a CARTEL account, split 30 % across four squadron accounts.
     BankHolder holder = holder();
     BankAccount named = cartelAccount();
     List<BankAccount> squadrons =
         List.of(squadronAccount(), squadronAccount(), squadronAccount(), squadronAccount());
     wire(holder, named, squadrons);
 
-    // When
     bankLedgerService.bookDeposit(
         new BankDepositRequest(
             named.getId(), holder.getId(), new BigDecimal("1000"), "sale", true, bd(30)));
 
-    // Then: slice = 300 -> 75 each squadron; named keeps 1000 - 300 = 700; one holder leg of 1000.
     Map<UUID, BigDecimal> legs = capturedAccountLegs();
     assertEquals(5, legs.size(), "named + four squadron legs");
     assertEquals(0, legs.get(named.getId()).compareTo(new BigDecimal("700")));
     squadrons.forEach(s -> assertEquals(0, legs.get(s.getId()).compareTo(new BigDecimal("75"))));
     assertEquals(0, sum(legs.values()).compareTo(new BigDecimal("1000")), "legs sum to the gross");
 
-    // Exactly ONE holder leg over the whole gross — the money landed once with one custodian.
     ArgumentCaptor<BankHolderPosting> holderCaptor =
         ArgumentCaptor.forClass(BankHolderPosting.class);
     verify(holderPostingRepository, times(1)).save(holderCaptor.capture());
@@ -190,7 +177,6 @@ class BankLedgerSplitDepositTest {
 
   @Test
   void bookSplitDeposit_distributesRemainderAUecLargestRemainder() {
-    // Given: 1000 split 33 % across 7 squadron accounts -> slice 330; base 47, remainder 1.
     BankHolder holder = holder();
     BankAccount named = cartelAccount();
     List<BankAccount> squadrons = new ArrayList<>();
@@ -199,13 +185,10 @@ class BankLedgerSplitDepositTest {
     }
     wire(holder, named, squadrons);
 
-    // When
     bankLedgerService.bookDeposit(
         new BankDepositRequest(
             named.getId(), holder.getId(), new BigDecimal("1000"), null, true, bd(33)));
 
-    // Then: exactly one squadron gets 48, the other six get 47; the squadron shares sum to 330 and
-    // the named account keeps 670.
     Map<UUID, BigDecimal> legs = capturedAccountLegs();
     long got48 =
         squadrons.stream()
@@ -223,18 +206,15 @@ class BankLedgerSplitDepositTest {
 
   @Test
   void bookSplitDeposit_hundredPercent_dropsNamedLeg() {
-    // Given: 1000 split 100 % across two squadron accounts -> named keeps 0, so no named leg.
     BankHolder holder = holder();
     BankAccount named = cartelAccount();
     List<BankAccount> squadrons = List.of(squadronAccount(), squadronAccount());
     wire(holder, named, squadrons);
 
-    // When
     bankLedgerService.bookDeposit(
         new BankDepositRequest(
             named.getId(), holder.getId(), new BigDecimal("1000"), null, true, bd(100)));
 
-    // Then: two squadron legs of 500 each, no leg for the named account (a posting is never zero).
     Map<UUID, BigDecimal> legs = capturedAccountLegs();
     assertEquals(2, legs.size());
     assertFalse(legs.containsKey(named.getId()), "a 100 % split books no named leg");
@@ -243,22 +223,16 @@ class BankLedgerSplitDepositTest {
 
   @Test
   void bookSplitDeposit_excludesNamedAccountEvenWhenItIsASquadron() {
-    // Given: the named account is itself a squadron; the enumeration returns it among the
-    // squadrons,
-    // but the split must exclude it (it only receives the remainder).
     BankHolder holder = holder();
     BankAccount named = squadronAccount();
     BankAccount other1 = squadronAccount();
     BankAccount other2 = squadronAccount();
     wire(holder, named, List.of(named, other1, other2));
 
-    // When: 1000 split 20 % -> slice 200 across the two OTHER squadrons (100 each); named keeps
-    // 800.
     bankLedgerService.bookDeposit(
         new BankDepositRequest(
             named.getId(), holder.getId(), new BigDecimal("1000"), null, true, bd(20)));
 
-    // Then
     Map<UUID, BigDecimal> legs = capturedAccountLegs();
     assertEquals(3, legs.size());
     assertEquals(0, legs.get(named.getId()).compareTo(new BigDecimal("800")));
@@ -268,12 +242,10 @@ class BankLedgerSplitDepositTest {
 
   @Test
   void bookSplitDeposit_noActiveSquadronAccount_throwsNoTargets() {
-    // Given: no squadron accounts exist (the named CARTEL account is not a squadron).
     BankHolder holder = holder();
     BankAccount named = cartelAccount();
     wire(holder, named, List.of());
 
-    // When / Then
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -292,12 +264,10 @@ class BankLedgerSplitDepositTest {
 
   @Test
   void bookSplitDeposit_sliceRoundsBelowOneAUec_throwsTooSmall() {
-    // Given: 1 aUEC at 1 % rounds to 0 -> nothing to distribute.
     BankHolder holder = holder();
     BankAccount named = cartelAccount();
     wire(holder, named, List.of(squadronAccount()));
 
-    // When / Then
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,

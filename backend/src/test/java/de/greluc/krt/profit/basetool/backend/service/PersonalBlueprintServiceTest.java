@@ -375,8 +375,6 @@ class PersonalBlueprintServiceTest {
     assertThrows(NotFoundException.class, () -> service.recipeForOwn(SUB, id));
   }
 
-  // --------------------------------------------------------------- admin variants --
-
   @Test
   void listForUser_delegatesToOwnerLookupWithTargetSub() {
     when(repository.findAllByOwnerUserId(eq(TARGET), any())).thenReturn(new PageImpl<>(List.of()));

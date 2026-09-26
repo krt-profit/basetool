@@ -23,34 +23,13 @@ import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * What happens to each place a person is named when that person's Art. 17 erasure is granted
- * (REQ-SEC-062).
+ * Registers what happens to each place a person is named when that person's Art. 17 erasure is
+ * granted (REQ-SEC-062).
  *
- * <p><b>Why this registry exists.</b> {@code HandleAnonymisationService} documented its set of
- * columns as closed — "erasing some and leaving others would be worse than not erasing at all" —
- * and the set was not closed: five columns survived a granted erasure, including the bank custodian
- * registry, which is the one snapshot that becomes <em>more</em> visible after the account is gone.
- * The person search had {@code PersonSearchCoverageTest} from the start and did not drift; the
- * erasure had a comment and did. This is the equivalent gate.
- *
- * <p>Every column {@link PersonSearchTargets} registers as a place a person is named must appear
- * here with a disposition, and {@code HandleErasureCoverageTest} fails the build otherwise. Adding
- * a search target therefore forces the question "and what does an erasure do about it?" at the
- * moment somebody can still answer it.
- *
- * <p>The {@link Disposition#ANONYMISED} entries are cross-checked against {@code
- * HandleAnonymisationService.ANONYMISED_COLUMNS} rather than against a second literal list. The
- * test used to hold its own copy, and the copy fell one column behind the service: the only
- * configuration in which everything was green was the one that <em>understated</em> what the
- * erasure reached.
- *
- * <p><b>The registry is honest about how much is manual.</b> Rather more than half of these columns
- * are {@link Disposition#REVIEWED_BY_HAND}: prose somebody else typed, where the member's name sits
- * inside a sentence and no mechanical rule can rewrite it without either corrupting the sentence or
- * missing the mention. That is not a gap this registry papers over — it is the reason the admin
- * Personensuche exists, and {@code docs/privacy/data-subject-requests.md} requires the admin to
- * walk its hits. A registry that classified those as "handled" would be the comment this class
- * replaced.
+ * <p>{@code HandleErasureCoverageTest} requires every {@link PersonSearchTargets} column to have a
+ * disposition here, and cross-checks {@link Disposition#ANONYMISED} against {@code
+ * HandleAnonymisationService.ANONYMISED_COLUMNS}. Prose columns are {@link
+ * Disposition#REVIEWED_BY_HAND}.
  */
 public final class HandleErasureCoverage {
 
@@ -100,7 +79,6 @@ public final class HandleErasureCoverage {
   /** Keyed {@code table.column}, exactly as {@link PersonSearchTargets} spells it. */
   public static final Map<String, Coverage> COVERAGE =
       Map.ofEntries(
-          // --- rewritten by the erasure -------------------------------------------------
           anonymised(
               "audit_event.actor_handle",
               "The activity trail's actor snapshot, matched by actor_user_id while the account"
@@ -150,8 +128,6 @@ public final class HandleErasureCoverage {
               "job_order_handover.recipient_handle",
               "A recipient with no user id beside them; matched by text, case-insensitively."),
           anonymised("job_order_item_handover.recipient_handle", "See job_order_handover."),
-
-          // --- the row goes with the account --------------------------------------------
           removed("app_user.username", "The account row itself is deleted."),
           removed("app_user.display_name", "The account row itself is deleted."),
           removed("app_user.email", "The account row itself is deleted."),
@@ -176,8 +152,6 @@ public final class HandleErasureCoverage {
               "inventory_item.note",
               "The departing member's warehouse rows are purged, with the job-order and mission"
                   + " allocations the database cascades off them."),
-
-          // --- names somebody or something else -----------------------------------------
           notTheMember(
               "mission.party_lead_guest_name",
               "A party lead with no account -- a third party, whose own request would be served"
@@ -206,8 +180,6 @@ public final class HandleErasureCoverage {
                   + " the name of a participant."),
           notTheMember("promotion_category.name", "A promotion catalogue entry."),
           notTheMember("promotion_topic.name", "A promotion catalogue entry."),
-
-          // --- prose: found by the search, edited by an admin ---------------------------
           byHand(
               "announcement.content",
               "An administrator's announcement. It can name a member mid-sentence, and rewriting"

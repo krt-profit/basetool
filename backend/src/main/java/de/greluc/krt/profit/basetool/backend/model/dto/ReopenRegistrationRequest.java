@@ -23,11 +23,10 @@ import jakarta.validation.constraints.Size;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Body of a reopen-registration request — the reversal of an erroneous rejection (REQ-SEC-034).
+ * Body of a reopen-registration request, reversing a rejection (REQ-SEC-034).
  *
- * @param reason optional free-text note recorded in the approval audit, typically why the rejection
- *     was wrong; capped at 1000 chars to match {@link RejectRegistrationRequest}
- * @param version the optimistic-lock version the admin last read; {@code null} bypasses the check
+ * @param reason optional note recorded in the approval audit; max 1000 chars
+ * @param version the optimistic-lock version last read; {@code null} bypasses the check
  */
 public record ReopenRegistrationRequest(
     @Nullable @Size(max = 1000) String reason, @Nullable Long version) {}

@@ -55,11 +55,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the booking flows (epic #556, REQ-BANK-004/-011): deposits, withdrawals,
- * account-to-account transfers and reversals (holder→holder Umbuchungen live on {@code
- * BankHolderController}, REQ-BANK-031). The capability gates evaluate the caller's grant flags on
- * the affected account via {@code BankSecurityService} — management and admins pass unrestricted;
- * reversals are management-only (spec open-question 3, v1 decision).
+ * REST surface for deposits, withdrawals, account-to-account transfers and reversals
+ * (REQ-BANK-004/-011). Gates evaluate the caller's grant flags on the affected account; management
+ * and admins pass unrestricted, and reversals are management-only.
  */
 @RestController
 @RequestMapping("/api/v1/bank")
@@ -107,11 +105,9 @@ public class BankBookingController {
   }
 
   /**
-   * Books a withdrawal from an account the caller may withdraw from (REQ-BANK-009), guarded by the
-   * no-overdraft rule (REQ-BANK-006). For the KRT ({@code CARTEL}) account a plain bank employee
-   * may book directly only up to the employee ceiling {@code T1}; above it the attempt is not
-   * rejected but filed as a band-routed approval request (REQ-BANK-047, ADR-0109) and the response
-   * carries a {@code pendingRequest} instead of a {@code transaction} with status {@code 202}.
+   * Books a withdrawal, guarded by the no-overdraft rule (REQ-BANK-006). A KRT ({@code CARTEL})
+   * withdrawal above the employee ceiling {@code T1} is filed as an approval request instead
+   * (REQ-BANK-047).
    *
    * @param request validated withdrawal payload
    * @return {@code 201} with the booked transaction, or {@code 202} with the filed pending request
@@ -131,9 +127,6 @@ public class BankBookingController {
   @Transactional
   public ResponseEntity<BankBookingOutcomeDto> bookWithdrawal(
       @RequestBody @Valid BankWithdrawalRequest request) {
-    // REQ-BANK-047/ADR-0109: a plain bank employee may directly withdraw from the KRT account only
-    // up to the employee ceiling T1; above it the attempt is filed as a band-routed approval
-    // request (Bankleitung / Organisationsleitung) instead of being booked.
     if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
         request.accountId(), request.amount())) {
       BankBookingRequestDto raised =
@@ -175,9 +168,6 @@ public class BankBookingController {
   @Transactional
   public ResponseEntity<BankBookingOutcomeDto> bookTransfer(
       @RequestBody @Valid BankTransferRequest request, Authentication authentication) {
-    // REQ-BANK-047/ADR-0109: a plain bank employee may directly transfer FROM the KRT account only
-    // up to the employee ceiling T1; above it the attempt is filed as a band-routed approval
-    // request (Bankleitung / Organisationsleitung) instead of being booked.
     if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
         request.sourceAccountId(), request.amount())) {
       BankBookingRequestDto raised =

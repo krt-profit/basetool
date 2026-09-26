@@ -24,18 +24,15 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code InventoryItemPersonalRebookDto} (per the {@code
- * feedback_backend_frontend_dto_mirror} memory). Carries the personal-marker rebooking payload
- * (REQ-INV-007) from the Umbuchen modal's PERSONAL mode to the backend through the {@code
- * /inventory/{id}/personal-rebook} proxy.
+ * Frontend mirror of the backend {@code InventoryItemPersonalRebookDto}: the personal-marker
+ * rebooking payload (REQ-INV-007) of the Umbuchen modal's PERSONAL mode.
  *
  * @param amount the quantity to rebook
  * @param version the source row's optimistic-lock version
  * @param targetOwningOrgUnitId the picked org-unit pool for the de-personalize direction, or {@code
  *     null}
- * @param mergeStock the per-action stock-merge opt-in (REQ-INV-026) for the newly inserted row:
- *     honoured only for an {@code SCU} material (a {@code PIECE} rebooking always merges); {@code
- *     null}/{@code false} keeps the new row separate
+ * @param mergeStock stock-merge opt-in for the new row (REQ-INV-026), honoured only for an {@code
+ *     SCU} material; {@code null} or {@code false} keeps it separate
  */
 public record InventoryItemPersonalRebookDto(
     @NotNull @Min(0) Double amount,

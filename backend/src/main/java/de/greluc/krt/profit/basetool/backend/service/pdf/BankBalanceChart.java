@@ -33,15 +33,8 @@ import org.openpdf.text.pdf.PdfTemplate;
 import org.openpdf.text.pdf.PdfWriter;
 
 /**
- * Draws the per-account balance-over-time chart embedded in the management three-month report
- * (REQ-BANK-015, epic #556). The account balance is piecewise constant — it only changes at a
- * booking — so the running balance is rendered as a step line in the DAS KARTELL orange over a dark
- * panel, with the data min/max on the y-axis and the period bounds on the x-axis.
- *
- * <p>Implemented as a {@link PdfTemplate} wrapped in an {@link Image} so the chart flows inline in
- * the document like any other element (OpenPDF has no charting API). All drawing is vector — there
- * is no raster image and the labels use the embedded Lato font, so the report stays crisp at any
- * zoom.
+ * Draws the per-account balance-over-time step chart for the management three-month report
+ * (REQ-BANK-015), as a vector {@link PdfTemplate} wrapped in an {@link Image}.
  */
 public final class BankBalanceChart {
 
@@ -96,7 +89,6 @@ public final class BankBalanceChart {
       double toMs = to.toEpochMilli();
       final double span = Math.max(1d, toMs - fromMs);
 
-      // Build the step-line vertices and track the true data extent (BigDecimal, for the labels).
       List<double[]> vertices = new ArrayList<>();
       vertices.add(new double[] {fromMs, opening.doubleValue()});
       BigDecimal running = opening;
@@ -104,16 +96,14 @@ public final class BankBalanceChart {
       BigDecimal dataMax = opening;
       for (BankBookingRow row : rows) {
         double t = clamp(row.createdAt().toEpochMilli(), fromMs, toMs);
-        vertices.add(new double[] {t, running.doubleValue()}); // hold at the old balance
+        vertices.add(new double[] {t, running.doubleValue()});
         running = running.add(row.amount());
-        vertices.add(new double[] {t, running.doubleValue()}); // jump to the new balance
+        vertices.add(new double[] {t, running.doubleValue()});
         dataMin = dataMin.min(running);
         dataMax = dataMax.max(running);
       }
-      vertices.add(
-          new double[] {toMs, running.doubleValue()}); // hold the closing balance to the end
+      vertices.add(new double[] {toMs, running.doubleValue()});
 
-      // Y range: the data extent plus a little headroom; a flat series gets a synthetic band.
       double lo = dataMin.doubleValue();
       double hi = dataMax.doubleValue();
       if (hi - lo < 1e-6) {
@@ -124,7 +114,6 @@ public final class BankBalanceChart {
       final double axisMin = lo - pad;
       final double axisRange = (hi + pad) - axisMin;
 
-      // Panel + neutral hairline border (orange is reserved for the step line, the one accent).
       cb.setColorFill(KrtPdfSupport.COLOR_DARK_GRAY);
       cb.rectangle(0, 0, WIDTH, HEIGHT);
       cb.fill();
@@ -133,7 +122,6 @@ public final class BankBalanceChart {
       cb.rectangle(0.5f, 0.5f, WIDTH - 1, HEIGHT - 1);
       cb.stroke();
 
-      // Faint gridlines at the data min and max levels.
       final float maxLineY = (float) (y0 + (dataMax.doubleValue() - axisMin) / axisRange * plotH);
       final float minLineY = (float) (y0 + (dataMin.doubleValue() - axisMin) / axisRange * plotH);
       cb.setColorStroke(GRID);
@@ -144,7 +132,6 @@ public final class BankBalanceChart {
       cb.lineTo(x1, minLineY);
       cb.stroke();
 
-      // Axes.
       cb.setColorStroke(AXIS);
       cb.setLineWidth(0.5f);
       cb.moveTo(x0, y0);
@@ -153,7 +140,6 @@ public final class BankBalanceChart {
       cb.lineTo(x1, y0);
       cb.stroke();
 
-      // The running-balance step line.
       cb.setColorStroke(KrtPdfSupport.COLOR_ORANGE);
       cb.setLineWidth(1.2f);
       for (int i = 0; i < vertices.size(); i++) {
@@ -167,7 +153,6 @@ public final class BankBalanceChart {
       }
       cb.stroke();
 
-      // Labels: y-axis data extent (right-aligned to the axis), x-axis period bounds.
       BaseFont font = KrtPdfSupport.regularBaseFont();
       drawText(cb, font, BankPdfFormat.groupedAmount(dataMax), x0 - 3, maxLineY - 2, Align.RIGHT);
       drawText(cb, font, BankPdfFormat.groupedAmount(dataMin), x0 - 3, minLineY - 2, Align.RIGHT);
@@ -176,8 +161,6 @@ public final class BankBalanceChart {
 
       return Image.getInstance(cb);
     } catch (Exception e) {
-      // Bubble up as unchecked; the report service's buildPdf wraps it into a 500
-      // ReportGenerationException with the cause preserved for the log line.
       throw new IllegalStateException("Bank balance chart rendering failed", e);
     }
   }
@@ -189,8 +172,7 @@ public final class BankBalanceChart {
   }
 
   /**
-   * Draws a single Lato label at the given anchor, computing the offset for right alignment from
-   * the font's own metrics (OpenPDF's canvas has no layout engine).
+   * Draws a single Lato label at the given anchor, computing right alignment from the font metrics.
    *
    * @param cb the template canvas
    * @param font the Lato base font

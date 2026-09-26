@@ -35,21 +35,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Serves the Terms-of-Use wording itself (REQ-SEC-028, ADR-0138).
+ * Serves the Terms-of-Use wording to anonymous and authenticated callers alike (REQ-SEC-028,
+ * ADR-0138).
  *
- * <p><strong>Separate from {@link TermsController} because the access rule is the opposite
- * one.</strong> Consent is recorded against an account, so status and acceptance require
- * authentication. The document does not: a text everybody must be able to read <em>before</em>
- * agreeing to anything cannot require having agreed, and the same wording is already served to the
- * world at {@code /terms} on the web frontend. Keeping the anonymous endpoint in its own class
- * makes that rule visible at the top of the file rather than hidden as a method-level override
- * inside a controller annotated {@code isAuthenticated()}.
- *
- * <p>This is the single source both clients render — the web frontend's {@code /terms} page and its
- * consent gate, and the Android app's terms screen. Before it existed the wording lived in the
- * frontend's message bundle and the app had no way to reach it at all; the only alternatives were
- * shipping a copy inside the APK, which drifts from the version being accepted, or sending members
- * out to a browser mid-consent.
+ * <p>Kept apart from {@link TermsController}, whose consent endpoints require authentication. This
+ * is the single source for the web frontend and the Android app.
  */
 @RestController
 @RequestMapping("/api/v1/terms/document")
@@ -60,12 +50,8 @@ public class TermsDocumentController {
   private final TermsDocumentService termsDocumentService;
 
   /**
-   * Returns the wording in force, in the caller's language.
-   *
-   * <p>The language comes from {@code Accept-Language} via Spring's resolved locale, so a client
-   * gets the bundle it asked for and the German default when it asked for something the bundle does
-   * not carry. The response includes the version digest, which lets a client show the document and
-   * accept it in one exchange without risking that the two refer to different wordings.
+   * Returns the wording in force in the caller's {@code Accept-Language}, falling back to German,
+   * together with its version digest.
    *
    * @param locale the caller's resolved language
    * @return the structured document, always {@code 200}
@@ -73,11 +59,6 @@ public class TermsDocumentController {
   @NotNull
   @GetMapping
   @PreAuthorize("permitAll()")
-  // REQ-SEC-052: the ONLY two operations in the document that answer without a token, and the
-  // only two carrying an empty `security` list. The global requirement declared in OpenApiConfig
-  // applies to every other operation; an empty list here overrides it, so a generated client does
-  // not attach a bearer it may not have yet — and OpenApiAnonymousOperationsTest asserts that
-  // exactly these two carry it.
   @SecurityRequirements
   @Operation(
       summary = "The Terms-of-Use wording in force",

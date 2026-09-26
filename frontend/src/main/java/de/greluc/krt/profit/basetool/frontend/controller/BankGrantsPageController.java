@@ -58,23 +58,16 @@ public class BankGrantsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the grants matrix. The {@code view} parameter switches the grouping (G2 toggle): {@code
-   * account} (default) filters by the selected account, {@code employee} filters by the selected
-   * grantee. The grant-creation modal's user picker is a server-side search combobox (#1193) and
-   * its account picker + the per-account filter are server-side account-search comboboxes
-   * (remote-bank-accounts, REQ-FE-017/ADR-0106), so neither a full user roster nor a full account
-   * roster is preloaded here — only the currently-filtered account is resolved for its combobox
-   * seed.
+   * Renders the grants matrix, grouped by account (default) or by employee. User and account
+   * pickers are server-side search comboboxes, so only the filtered account is resolved.
    *
    * @param view grouping mode ({@code account} default, {@code employee})
    * @param accountId selected account in per-account mode; absent = all accounts
    * @param userId selected grantee in per-employee mode; absent = first employee with grants
-   * @param fragment when {@code "grantsMatrix"} only the capability matrix is re-rendered after a
-   *     grant create/revoke (REQ-FE-005), honouring the current {@code view}/{@code
-   *     accountId}/{@code userId} filter so the in-place swap keeps the active grouping; the filter
-   *     selectors and the create modal's lookups (all grants, accounts, users) are then skipped
+   * @param fragment {@code "grantsMatrix"} to re-render only the matrix under the current filter
+   *     (REQ-FE-005)
    * @param model Spring MVC model
-   * @return the grants template, or its {@code grantsMatrix} fragment for an AJAX swap
+   * @return the grants template, or its {@code grantsMatrix} fragment
    */
   @NotNull
   @GetMapping("/bank/grants")
@@ -102,17 +95,11 @@ public class BankGrantsPageController {
     List<BankGrantDto> allGrants =
         backendApiClient.get("/api/v1/bank/grants", BANK_GRANT_LIST_TYPE);
 
-    // The per-employee selector lists every grantee that currently holds at least one grant.
     Map<UUID, String> grantees = new LinkedHashMap<>();
     for (BankGrantDto grant : allGrants == null ? List.<BankGrantDto>of() : allGrants) {
       grantees.putIfAbsent(grant.userId(), grant.userHandle());
     }
 
-    // The per-account filter and the create modal's account picker are server-side account-search
-    // comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0106), so the full account roster is no
-    // longer preloaded. Only the currently-filtered account is resolved for the combobox's
-    // edit-mode seed (so the box shows its name, not a raw id); a lookup failure degrades to no
-    // seed (the filter then shows its "all accounts" placeholder).
     BankAccountDto selectedAccount = null;
     if (!byEmployee && accountId != null) {
       try {

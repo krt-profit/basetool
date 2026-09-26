@@ -36,55 +36,18 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Keeps {@link FrontendPageRoutes} honest: <b>every route the dispatcher answers is accounted for,
- * or this fails and names it.</b>
+ * Verifies that every variable-free {@code GET} route the dispatcher answers is listed in {@link
+ * FrontendPageRoutes}, naming any that is missing.
  *
- * <p><b>The drift this replaces was real and measured.</b> Until 2026-09-13 three E2E classes each
- * hand-maintained their own list of the frontend's page routes, and the largest of them was short
- * by seventeen while its Javadoc and {@code REQ-UI-009}'s "Enforced by" clause both said every
- * route was covered. Adding the seventeen found a genuine defect on the first run ({@code
- * /admin/notification-rules} scrolls the page sideways at every device class) and showed a phone
- * fix that had shipped unmeasured because the page carrying it was never loaded. Folding the three
- * lists into one removes two of the three ways they could disagree; this class removes the third,
- * which is the only one that was ever going to matter — a page route that exists and is in no list
- * at all.
- *
- * <p><b>Why a gate and not a convention.</b> "Add the route to the list" is a step somebody has to
- * remember, and the evidence is that it was missed seventeen times without anyone noticing. Asking
- * the dispatcher turns it into a step nobody can skip: the build goes red on the pull request that
- * adds the controller, naming the route and the two lists it could go in. That is the same
- * substitution {@code AnonymousSurfaceSweepMvcTest} makes for REQ-SEC-052, and it runs on the same
- * engine — {@link EndpointEnumeration}.
- *
- * <p><b>Why it does not decide which list a route belongs in.</b> A page is recognised by its app
- * shell at runtime, not by a return type: {@code /inventory/my/stack/entries} is an HTML fragment
- * and {@code /inventory/my} is a page, and both are a {@code @GetMapping} returning a view name
- * from a {@code @Controller}. Any predicate that sorted them would also, silently, reclassify a
- * page on the day its handler changed shape — and the touch sweep's whole method is to keep
- * non-pages listed and let the run classify them, because that is how a page that quietly
- * <i>stops</i> rendering its shell surfaces. So the gate asks only the question it can answer
- * without judgement: is this route written down somewhere? Which of the two lists it goes in stays
- * a decision a person makes, in a diff a reviewer reads.
- *
- * <p><b>Scope.</b> Variable-free {@code GET} patterns only. A route needing a {@code /{id}} is
- * reached from a seeded entity by the sweeps that care, never from a list of paths, and a wildcard
- * pattern has no single spelling to load.
+ * <p>Uses {@link EndpointEnumeration}. It checks only that a route is listed, not which list it
+ * belongs in.
  */
 @SpringBootTest
 class PageRouteCatalogueTest {
 
   /**
-   * How many routes the enumeration must find before this class's verdict counts for anything.
-   *
-   * <p>A floor, not a target. {@link EndpointEnumeration}'s own Javadoc records the failure mode it
-   * exists for: <i>a sweep that enumerates nothing passes every assertion it makes</i>. Every check
-   * below is a set difference, and two empty sets differ by nothing — so a dispatcher bean that
-   * came back empty, or a filter that over-reached, would report this catalogue perfectly in step
-   * with an application it never looked at.
-   *
-   * <p>Set well under the ~95 routed today, because its job is to catch a collapse rather than to
-   * count: a deliberate removal of a third of the frontend's pages should not be made to fail here,
-   * in a test whose subject is drift.
+   * The minimum number of routes the enumeration must find for the test's verdict to count,
+   * guarding against an enumeration that silently finds nothing.
    */
   private static final int MIN_ROUTED_CANDIDATES = 50;
 
@@ -105,11 +68,9 @@ class PageRouteCatalogueTest {
       clientRegistrationRepository;
 
   /**
-   * Every variable-free {@code GET} route the frontend owns, as the dispatcher reports it.
-   *
-   * <p>Minus {@link FrontendPageRoutes#NOT_SWEPT_ROOTS} — the proxies, the machine descriptors and
-   * the routes Spring contributes — matched segment-wise with {@link EndpointEnumeration#isUnder}
-   * rather than by prefix, so an exclusion cannot swallow a neighbour it was never meant to cover.
+   * Every variable-free {@code GET} route the frontend owns, as the dispatcher reports it, minus
+   * {@link FrontendPageRoutes#NOT_SWEPT_ROOTS} matched segment-wise via {@link
+   * EndpointEnumeration#isUnder}.
    *
    * @return the routed paths, in lexicographic order
    */
@@ -218,14 +179,7 @@ class PageRouteCatalogueTest {
         .isEmpty();
   }
 
-  /**
-   * The two smoke slices name pages that exist.
-   *
-   * <p>Neither slice is derived — which pages an ordinary staging member can load, and which admin
-   * pages a dedicated flow already drives, are judgements about test value rather than facts about
-   * a mapping. What is checkable is that each entry is a real page route, so a typo or a rename
-   * cannot leave a smoke suite quietly loading nothing.
-   */
+  /** Verifies that every entry of the two smoke slices is a real page route. */
   @Test
   @DisplayName("the smoke slices and the detail-list set are subsets of PAGES")
   void theSlicesAreSubsetsOfThePages() {
@@ -246,13 +200,8 @@ class PageRouteCatalogueTest {
   }
 
   /**
-   * Every detail-prefix override points from a real list page to a real detail route.
-   *
-   * <p>The touch sweep follows a list's first {@code <prefix>/<id>} link to measure its detail
-   * view, and {@link FrontendPageRoutes#DETAIL_PREFIX_OVERRIDES} names the lists whose detail links
-   * leave their own path. An override whose key is no page is never consulted, and one whose value
-   * no longer owns a {@code /{id}} route matches no link — either way the detail view drops out of
-   * the sweep while every assertion still passes. This pins both ends to the dispatcher.
+   * Verifies that every {@link FrontendPageRoutes#DETAIL_PREFIX_OVERRIDES} entry maps a real list
+   * page to a routed {@code /{id}} detail view.
    */
   @Test
   @DisplayName("every detail-prefix override maps a list page to a routed /{id} detail view")
@@ -268,13 +217,7 @@ class PageRouteCatalogueTest {
         .allSatisfy(prefix -> assertThat(routed).contains(prefix + "/{id}"));
   }
 
-  /**
-   * No list repeats itself.
-   *
-   * <p>{@code List.of} rejects a null but not a duplicate, and a route listed twice is swept twice
-   * — which costs a touch-sweep screenshot pass per device class and reads in the log as if the
-   * coverage were wider than it is.
-   */
+  /** Verifies that no catalogue list contains a duplicate route. */
   @Test
   @DisplayName("no catalogue list contains a duplicate")
   void noListRepeatsARoute() {

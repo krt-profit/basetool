@@ -84,18 +84,15 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void createMission_WithEmptyDescription_ShouldSucceed() throws Exception {
-    // Prepare Mocks — the create endpoint now reads the persisted MissionDto to redirect to the new
-    // mission's Verwaltung tab (REQ-MISSION-015).
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.post(any(String.class), any(), Mockito.eq(MissionDto.class)))
         .thenReturn(minimalMission(missionId));
 
-    // Perform Request
     mockMvc
         .perform(
             post("/missions")
                 .param("name", "Test Mission")
-                .param("description", "") // Empty description triggers StringTrimmerEditor -> null
+                .param("description", "")
                 .param("status", "PLANNED")
                 .param("plannedStartTime", "2026-02-10T10:00")
                 .param("plannedEndTime", "2026-02-10T12:00")
@@ -143,10 +140,6 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void createMission_aCarrierWithAnUnknownKeyFailsInsteadOfDroppingTheValue() throws Exception {
-    // The carrier parser moved from Jackson 2 to Jackson 3 (FE-MOD-04). Jackson 3 ignores an
-    // unknown
-    // property by default; Jackson 2 refused it, and the create must keep refusing a misspelt key
-    // rather than create a goal with its title silently missing.
     mockMvc
         .perform(
             post("/missions")
@@ -165,43 +158,28 @@ class MissionPageControllerMvcTest {
   void missionDetail_ShouldRenderWithoutErrors() throws Exception {
     UUID missionId = UUID.randomUUID();
 
-    // The MissionDto below intentionally carries empty sub-collections (units, participants,
-    // job orders, finance entries, ...). The test focuses on the mission-detail TEMPLATE
-    // contract — panel structure, accessible toggles, no horizontal-scroll markers — not on
-    // sub-aggregate rendering, so a minimal mission is sufficient. Earlier revisions built
-    // up nested Map fixtures here (shipType / unit / order / inventory item / material)
-    // that were never actually attached to the mission; they have been removed because
-    // unused container literals tripped CodeQL's "Container contents are never accessed"
-    // rule and added confusion to anyone reading this test.
     MissionDto mission = minimalMission(missionId);
 
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // OFFICER is a member, so the member-only finance ledger fetch now runs (REQ-SEC-013); stub it
-    // empty so the page renders without exercising the entry-row template here.
     stubEmptyFinance(missionId);
 
-    // This will fail with TemplateProcessingException if the template syntax is invalid
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail"))
-        // Tab layout (Variante B): sticky head + facts bar + accessible tab nav
         .andExpect(content().string(containsString("mission-head-sticky")))
         .andExpect(content().string(containsString("facts-bar")))
         .andExpect(content().string(containsString("role=\"tablist\"")))
         .andExpect(content().string(containsString("id=\"pane-ueb\"")))
         .andExpect(content().string(containsString("id=\"pane-crew\"")))
         .andExpect(content().string(containsString("id=\"pane-fin\"")))
-        // Verwaltung tab renders for an editor (canEdit=true in this fixture)
         .andExpect(content().string(containsString("id=\"pane-verw\"")))
         .andExpect(content().string(containsString("role=\"tabpanel\"")))
-        // Crew board skeleton: pool drop zone + the legacy participants table is gone
         .andExpect(content().string(containsString("id=\"board-pool\"")))
         .andExpect(content().string(not(containsString("mission-columns-container"))))
-        // Legacy horizontal-scroll markers must be gone
         .andExpect(content().string(not(containsString("vertical-title"))));
   }
 
@@ -217,28 +195,15 @@ class MissionPageControllerMvcTest {
 
     mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
 
-    // REQ-SEC-013 regression: a member must trigger the member-only finance ledger fetch. Before
-    // the
-    // fix isMemberOrAbove read the OidcUser principal authorities (which lack the Keycloak-mapped
-    // ROLE_*), so this fetch was silently skipped and the "Finanzen" panel rendered empty.
     verify(backendApiClient)
         .get(
             eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
             eq(MissionFinanceTotalsDto.class));
   }
 
-  // "An anonymous visitor does not trigger the member-only finance fetch" stood here. Its caller
-  // is gone (ADR-0159) and its assertion inverts for the caller that replaced them: a member DOES
-  // trigger the fetch, which the case directly above already pins. Keeping it with a principal
-  // would have asserted the opposite of the truth.
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_rendersAblaufChecklistAndEditor_whenStepsPresent() throws Exception {
-    // The other render tests use empty step lists, so the per-step Thymeleaf path (the th:each over
-    // mission.steps, the derived step--now via mission.steps.^[!done], the data-step-id toggle and
-    // the editor rows) is only exercised here, with one done + one open step. Guards
-    // REQ-MISSION-009.
     UUID missionId = UUID.randomUUID();
     var step1 =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionStepDto(
@@ -256,20 +221,15 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
-        // Overview read-only checklist: titles, done + derived current-phase classes, toggle
-        // control.
         .andExpect(content().string(containsString("class=\"ablauf\"")))
         .andExpect(content().string(containsString("Briefing")))
         .andExpect(content().string(containsString("Mining")))
         .andExpect(content().string(containsString("step--done")))
         .andExpect(content().string(containsString("step--now")))
         .andExpect(content().string(containsString("data-trigger=\"mission-toggle-step\"")))
-        // Re-split overview + the new Ziele box (structured goals replace the single objective
-        // row).
         .andExpect(content().string(containsString("Mission auf einen Blick")))
         .andExpect(content().string(containsString("class=\"ziele\"")))
         .andExpect(content().string(containsString("Janalite sammeln")))
-        // Verwaltung drag-editors (canEdit fixture) + the meeting-point form field.
         .andExpect(content().string(containsString("id=\"mission-step-list\"")))
         .andExpect(content().string(containsString("id=\"mission-objective-list\"")))
         .andExpect(content().string(containsString("name=\"meetingPoint\"")));
@@ -278,12 +238,6 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_omitsEmptyGoalAndProcedureTiles_andOpensDescription() throws Exception {
-    // Owner request 2026-07-01 (REQ-MISSION-004/-009/-019): when no goals + no Ablauf steps are
-    // authored, the read-only Übersicht Ziele and Ablauf tiles are omitted entirely — no "Noch
-    // keine …" placeholder — and the detailed-description <details> opens by default.
-    // minimalMission
-    // carries empty objectives + empty steps; here it also gets a description so the collapsible
-    // renders. The Verwaltung drag-editors (canEdit fixture) stay regardless of emptiness.
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(minimalMission(missionId, "**Briefing** folgt."));
@@ -294,27 +248,22 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
-        // Empty goals/steps: the read-only overview tiles and their placeholders are gone.
         .andExpect(content().string(not(containsString("class=\"ablauf\""))))
         .andExpect(content().string(not(containsString("class=\"ziele\""))))
         .andExpect(content().string(not(containsString("Noch keine Ziele"))))
         .andExpect(content().string(not(containsString("Noch keine Schritte"))))
-        // The Verwaltung editors remain reachable even with nothing authored yet.
         .andExpect(content().string(containsString("id=\"mission-step-list\"")))
         .andExpect(content().string(containsString("id=\"mission-objective-list\"")))
-        // The detailed-description card renders expanded by default.
         .andExpect(content().string(containsString("<details class=\"more\" open")));
   }
 
   /**
-   * Builds a renderable {@link MissionDto} carrying the given Ablauf steps plus one goal (Ziel) and
-   * a meeting point (Treffpunkt), so the per-step checklist/editor, the Ziele box/editor and the
-   * new at-a-glance rows actually render (REQ-MISSION-009/-019). Editable (canEdit), so the editors
-   * + done-toggle show.
+   * Builds an editable {@link MissionDto} with the given Ablauf steps, one goal and a meeting
+   * point, so the step, goal and at-a-glance sections render (REQ-MISSION-009/-019).
    *
    * @param missionId the id to stamp on the mission
    * @param steps the Ablauf steps to render
-   * @return a mission fixture with steps + one goal + meeting point
+   * @return a mission fixture with steps, one goal and a meeting point
    */
   private MissionDto missionWithSteps(
       UUID missionId,
@@ -367,9 +316,8 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Builds a minimal renderable {@link MissionDto} (empty sub-collections, one manager, editable,
-   * no description) for the mission-detail template tests, so the 38-argument constructor lives in
-   * one place.
+   * Builds a minimal editable {@link MissionDto} with empty collections, one manager and no
+   * description.
    *
    * @param missionId the id to stamp on the mission
    * @return a minimal mission fixture with no description
@@ -379,12 +327,11 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Builds a minimal renderable {@link MissionDto} carrying the given (possibly {@code null})
-   * Markdown description, so a test can exercise the collapsible detailed-description card while
-   * still leaving the goals + Ablauf collections empty.
+   * Builds a minimal {@link MissionDto} with the given Markdown description and empty goals and
+   * steps.
    *
    * @param missionId the id to stamp on the mission
-   * @param description the Markdown description to render, or {@code null} for none
+   * @param description the Markdown description, or {@code null} for none
    * @return a minimal mission fixture with the given description
    */
   private MissionDto minimalMission(UUID missionId, String description) {
@@ -438,8 +385,6 @@ class MissionPageControllerMvcTest {
    * @param missionId the mission whose finance-entries fetch is stubbed
    */
   private void stubEmptyFinance(UUID missionId) {
-    // ADR-0078: the finance strip reads a single aggregate (/finance-entries/summary) and the table
-    // a bounded page (size=200) instead of the previous size=1000 load-all.
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
             eq(MissionFinanceTotalsDto.class)))
@@ -452,14 +397,13 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Builds a renderable {@link MissionDto} carrying the given participants and assigned units, so
-   * the crew board (unit drop zones + per-crew person rows) actually renders. Editable (canEdit) so
-   * the board shows for the OFFICER fixture. All other collections are empty.
+   * Builds an editable {@link MissionDto} with the given participants and assigned units so the
+   * crew board renders; all other collections are empty.
    *
    * @param missionId the id to stamp on the mission
    * @param participants the mission participants (source of {@code participantsById})
    * @param units the assigned units whose crew rows the board renders
-   * @return a mission fixture with the given participants + units
+   * @return a mission fixture with the given participants and units
    */
   private MissionDto missionWithUnitsAndParticipants(
       UUID missionId,
@@ -511,16 +455,6 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_crewWithUnresolvableParticipant_SuppressesGhostRow() throws Exception {
-    // A unit's crew entry carries a participantId; the crew board resolves the full participant via
-    // participantsById (built only from mission.participants). The backend keeps crew and
-    // participants in sync, so cp is non-null in practice — but the mission-detail template guards
-    // the per-crew personRow with th:if=${cp != null} as defence-in-depth. This test pins that
-    // guard: a crew entry whose participant is absent from participantsById must render NO row.
-    //
-    // Regression guard for the Thymeleaf precedence trap — th:replace (precedence 1) runs before
-    // th:if (3), so a same-element guard is dead and the null-safe personRow fragment rendered a
-    // ghost row (empty name, empty data-participant-id). The fix gates an outer th:block; this test
-    // fails on the pre-fix markup (ghost row present) and passes after it.
     UUID missionId = UUID.randomUUID();
     UUID realParticipantId = UUID.randomUUID();
     UUID missingParticipantId = UUID.randomUUID();
@@ -543,8 +477,6 @@ class MissionPageControllerMvcTest {
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto realCrew =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
             realCrewId, realParticipantId, "Real Crew", null, null);
-    // Crew entry whose participant is NOT in the participants set -> participantsById lookup is
-    // null.
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto ghostCrew =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
             ghostCrewId, missingParticipantId, "Ghost", null, null);
@@ -577,27 +509,18 @@ class MissionPageControllerMvcTest {
             .getResponse()
             .getContentAsString();
 
-    // The unit board rendered...
     assertThat(html).as("crew board unit rendered").contains("Alpha Unit");
-    // ...the resolvable crew member renders its person-row (personRow stamps the crew id)...
     assertThat(html)
         .as("resolvable crew member renders a person-row")
         .contains("data-crew-id=\"" + realCrewId + "\"");
-    // ...but the crew entry with an unresolvable participant renders NO ghost person-row.
     assertThat(html)
         .as("crew entry with an unresolvable participant renders no ghost person-row")
         .doesNotContain("data-crew-id=\"" + ghostCrewId + "\"");
   }
 
   /**
-   * The crew board's drop zones must advertise the click path, not only the drag one (#1936).
-   * Native HTML5 drag never fires from touch input, so hints reading "Teilnehmer hierher ziehen"
-   * told a phone user to perform the one gesture that cannot work and said nothing about the click
-   * fallback that has always worked. Each zone now renders a two-state hint — the idle instruction
-   * plus the armed call to action that CSS reveals while a participant is selected — and a zone's
-   * {@code aria-label} carries the same sentence as its visible idle text. Asserted in both bundles
-   * (German is the {@code CookieLocaleResolver} default, English via {@code ?lang=en}) so a
-   * half-translated rewording fails here rather than in production.
+   * Verifies that each crew-board drop zone renders an idle hint and an armed hint describing the
+   * click path, with its {@code aria-label} matching the idle text, in German and English.
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -620,7 +543,6 @@ class MissionPageControllerMvcTest {
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
             1L);
-    // No crew: the participant sits in the pool and the unit zone is empty, so both hints render.
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto unit =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto(
             UUID.randomUUID(),
@@ -650,11 +572,8 @@ class MissionPageControllerMvcTest {
             .getResponse()
             .getContentAsString();
 
-    // Both hint states are wired per zone; .hint-armed is what the :has(.is-selected) rule
-    // reveals, so it must be in the markup even though it starts hidden.
     assertThat(de).as("idle hint rendered").contains("class=\"hint-idle\"");
     assertThat(de).as("armed hint rendered").contains("class=\"hint-armed\"");
-    // The instruction names tapping, and each zone's armed text says what the tap will do.
     assertThat(de)
         .as("idle hint names the click path")
         .contains("Teilnehmer antippen, dann hierher tippen");
@@ -662,12 +581,9 @@ class MissionPageControllerMvcTest {
     assertThat(de)
         .as("pool zone armed call to action")
         .contains("Hier tippen, um die Zuweisung zu entfernen");
-    // aria-label overrides the zone's visible content for a screen reader, so it has to carry the
-    // same instruction rather than the old drag-only sentence.
     assertThat(de)
         .as("zone aria-label carries the click path too")
         .contains("aria-label=\"Teilnehmer antippen, dann hierher tippen");
-    // A key missing from a bundle renders as ??key_locale?? and would otherwise ship unnoticed.
     assertThat(de).as("no unresolved crew-board message key").doesNotContain("??mission.crew.");
 
     String en =
@@ -826,30 +742,20 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
-        // Raw UTC timestamps must be present on the edit button
         .andExpect(content().string(containsString("data-start-time=\"2026-02-10T09:30:00Z\"")))
         .andExpect(content().string(containsString("data-end-time=\"2026-02-10T11:45:00Z\"")))
-        // Formatted (local-zone) timestamps must also be present and non-empty so the
-        // participant edit modal can pre-populate datetime-local inputs.
         .andExpect(content().string(not(containsString("data-start-time-formatted=\"\""))))
         .andExpect(content().string(not(containsString("data-end-time-formatted=\"\""))))
-        // Regression guard: the edit modal must re-sync the datetime-split widget
-        // after programmatically setting the hidden value (otherwise the visible
-        // date/time inputs stay empty even though startTime/endTime are present).
-        // Since #924 the sync call lives in the static page module, so the page must
-        // load it and the module must still carry the call.
         .andExpect(content().string(containsString("src=\"/js/mission-detail.js\"")));
     assertThat(missionDetailModuleSource()).contains("krtSyncDatetimeSplitGroup");
   }
 
   /**
-   * Reads the mission-detail page module ({@code static/js/mission-detail.js}) from the classpath.
-   * The #924 extraction moved the page's inline JavaScript there, so script-content regression
-   * guards now assert against the module source while the MockMvc render is only expected to carry
-   * the module's loader tag.
+   * Reads the mission-detail page module ({@code static/js/mission-detail.js}) from the classpath,
+   * for script-content assertions.
    *
-   * @return the full UTF-8 source of the mission-detail page module
-   * @throws IOException if the classpath resource cannot be read (build misconfiguration)
+   * @return the full UTF-8 source of the module
+   * @throws IOException if the classpath resource cannot be read
    */
   private static String missionDetailModuleSource() throws IOException {
     try (var in =
@@ -863,17 +769,8 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_LinkedRefineryOrder_RendersEndTimeForClientSideLocalZoneConversion()
       throws Exception {
-    // Regression guard: a refinery order linked to a mission used to render its end time with a raw
-    // #temporals.format() that fell back to the server's default zone (UTC in the container), so
-    // the
-    // user saw UTC instead of their local time. The fix renders the end timestamp into a data-utc
-    // epoch-millis attribute plus an explicitly UTC-labelled fallback, and a small page script
-    // (formatRefineryEndLocalTimes) rewrites it to the browser's local zone on load.
     UUID missionId = UUID.randomUUID();
 
-    // #1138: the Wirtschaft refinery <details> now renders the finance section's fetched
-    // ${refineryOrders} (RefineryOrderListDto) instead of the removed MissionDto.refineryOrders
-    // field, so the order is stubbed on the /refinery-orders/mission/{id} read below.
     de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto order =
         new de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto(
             UUID.randomUUID(),
@@ -935,9 +832,6 @@ class MissionPageControllerMvcTest {
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // #1138: the Wirtschaft block sources ${refineryOrders} from the finance section's dedicated
-    // read, so the finance fetches must succeed (else the panel collapses) and the refinery read
-    // must carry the order under test.
     stubEmptyFinance(missionId);
     when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef()))
         .thenReturn(List.of(order));
@@ -945,15 +839,9 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
-        // End timestamp carried as epoch millis for the client-side local-zone converter.
         .andExpect(content().string(containsString("data-utc=\"" + expectedEndsAtMillis + "\"")))
         .andExpect(content().string(containsString("class=\"refinery-endsat-local\"")))
-        // Pre-JS fallback is explicitly UTC-labelled (never an unlabelled, misleading local-looking
-        // string).
         .andExpect(content().string(containsString("10.02.2026 11:00 UTC")))
-        // The conversion script must ship so the value becomes browser-local on load. Since #924
-        // it lives in the static page module, so the page must load the module and the module
-        // must still carry the converter.
         .andExpect(content().string(containsString("src=\"/js/mission-detail.js\"")));
     assertThat(missionDetailModuleSource()).contains("krtFormatLocalDateTime");
   }
@@ -1006,7 +894,6 @@ class MissionPageControllerMvcTest {
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
             1L);
 
-    // 2 checked-in out of 3 registered
     MissionDto mission =
         new MissionDto(
             missionId,
@@ -1056,10 +943,6 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("2/3")));
   }
 
-  // "A guest does not see the Teilnahme (%) column" stood here. The column is a member-facing
-  // read-out and the guest it was hidden from no longer exists (ADR-0159); with a member principal
-  // the column renders, which is correct and is not what this case was written to check.
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void setMissionOwner_forwardsTheUserAndTheOwnershipVersionToTheVersionedEndpoint()
@@ -1078,8 +961,6 @@ class MissionPageControllerMvcTest {
                 .content("{\"userId\":\"" + userId + "\",\"version\":4}"))
         .andExpect(status().isOk());
 
-    // The versioned PUT /owner, body {userId, version} — never the deprecated PUT /owner/{userId}
-    // that carried no version and let the later of two concurrent changes win silently.
     @SuppressWarnings("unchecked")
     org.mockito.ArgumentCaptor<Map<String, Object>> sent =
         org.mockito.ArgumentCaptor.forClass(Map.class);
@@ -1107,8 +988,6 @@ class MissionPageControllerMvcTest {
                 java.util.List.of(),
                 "Somebody changed it first"));
 
-    // The status AND the code survive the proxy: OPTIMISTIC_LOCK is what makes krtFetch offer the
-    // reload dialog rather than a generic error toast.
     mockMvc
         .perform(
             put("/missions/" + missionId + "/owner/ajax")
@@ -1177,10 +1056,6 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_AssetShapedPath_ShouldReturn404NotWarn400() throws Exception {
-    // A crawler resolving head.html's script filenames relative to /missions/... hits the /{id}
-    // route and fails UUID conversion. REQ-OBS-001 asset-shaped carve-out: such a path names no
-    // resource, so the full MVC pipeline must ship the 404 error page (the ModelAndView status
-    // wins over the handler's @ResponseStatus(BAD_REQUEST) at render time), not a 400.
     mockMvc
         .perform(get("/missions/common-handlers.js"))
         .andExpect(status().isNotFound())
@@ -1190,7 +1065,6 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_UndottedMalformedId_ShouldKeep400() throws Exception {
-    // A truncated pasted link has no filename extension — the honest 400 for a malformed id stays.
     mockMvc.perform(get("/missions/8bd4a2de")).andExpect(status().isBadRequest());
   }
 
@@ -1277,8 +1151,6 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current)
         .thenReturn(refreshed);
-    // The actual-time endpoint now dispatches a section-scoped PATCH on /schedule, not the
-    // legacy full-PUT — concurrent edits on other sections must not 409 the actual-time flow.
     when(backendApiClient.patch(
             eq("/api/v1/missions/" + missionId + "/schedule"), any(), eq(Void.class)))
         .thenReturn(null);
@@ -1338,9 +1210,6 @@ class MissionPageControllerMvcTest {
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current);
-    // The actual-time endpoint dispatches a section-scoped PATCH on /schedule. A stale
-    // scheduleVersion now surfaces as a 409 here — and only on the schedule patch, so
-    // concurrent edits on core or flags are unaffected.
     when(backendApiClient.patch(
             eq("/api/v1/missions/" + missionId + "/schedule"), any(), eq(Void.class)))
         .thenThrow(
@@ -1389,8 +1258,6 @@ class MissionPageControllerMvcTest {
         .perform(post("/missions/" + missionId + "/managers/" + userId).with(csrf()))
         .andExpect(status().isBadRequest());
   }
-
-  // --- Paket 3B: Frequencies AJAX endpoints -----------------------------
 
   @Test
   @WithMockUser(roles = "OFFICER")
@@ -1458,8 +1325,6 @@ class MissionPageControllerMvcTest {
         .perform(delete("/missions/" + missionId + "/frequencies/" + freqId + "/ajax").with(csrf()))
         .andExpect(status().isOk());
   }
-
-  // --- Custom (mission-specific) frequencies AJAX endpoints (REQ-MISSION-014) -----
 
   @Test
   @WithMockUser(roles = "OFFICER")
@@ -1544,8 +1409,6 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isConflict());
   }
 
-  // --- Paket 3C: Units AJAX endpoints -----------------------------------
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void addUnitAjax_WithValidBody_ShouldReturn200() throws Exception {
@@ -1610,8 +1473,6 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isNoContent());
   }
 
-  // --- Paket 3C (Option b): Participants AJAX endpoints ------------------
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void addParticipantAjax_WithValidBody_ShouldReturn200() throws Exception {
@@ -1623,14 +1484,6 @@ class MissionPageControllerMvcTest {
     p.put("version", 0);
     slimResponse.add(p);
 
-    // Note: since the bugfix for anonymous mission signups, this controller method
-    // routes via `isPublic = (principal == null)` — `@WithMockUser` does not produce
-    // an `OidcUser` principal, so `isPublic` evaluates to `true` here. The dedicated
-    // happy-path test for an authenticated OIDC user lives in
-    // `addParticipantAjax_AsAnonymousGuest_ShouldRouteThroughPublicWebClientAndReturn200`
-    // (anonymous) and is implicitly covered by the production wiring; for this MVC
-    // smoke-test we therefore accept any boolean for the isPublic flag and only
-    // assert that the controller forwards to the correct backend slim endpoint.
     when(backendApiClient.post(
             eq("/api/v1/missions/" + missionId + "/participants/slim"), any(), eq(Object.class)))
         .thenReturn(slimResponse);
@@ -1646,22 +1499,11 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("Guest-X")));
   }
 
-  // Three cases stood here: an anonymous guest adding, updating and deleting their own
-  // participant row, each asserting that the write was relayed through the public WebClient.
-  // Both halves of that are gone (ADR-0159): there is no anonymous caller and no public
-  // client. The row itself survives as an EXTERNAL participant, which the mission
-  // leadership records and maintains — covered by MissionSecurityServiceTest on the backend
-  // and by the D4 gating in mission-detail.html.
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void updateParticipantAjax_WithBackendConflict_ShouldReturn409() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
-    // Note: since the bugfix for anonymous mission participant edits, this controller
-    // method routes via `isPublic = (principal == null)`. `@WithMockUser` does not
-    // produce an `OidcUser` principal, so isPublic evaluates to true here. Accept any
-    // boolean for the isPublic flag in this MVC smoke-test.
     when(backendApiClient.put(
             eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
             any(),
@@ -1749,8 +1591,6 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isConflict());
   }
 
-  // --- Paket 3C (Option c): Crew AJAX endpoints --------------------------
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void addCrewAjax_WithValidBody_ShouldReturn200() throws Exception {
@@ -1822,13 +1662,10 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isNoContent());
   }
 
-  // --- Bugfix: MEMBER sieht Bearbeiten-Button für eigenen Teilnehmereintrag ---
-
   @Test
   void missionDetail_AsMember_ShouldShowEditButtonForOwnParticipantEntry() throws Exception {
-    // Given
     UUID missionId = UUID.randomUUID();
-    UUID memberUserId = UUID.randomUUID(); // Keycloak sub der eingeloggten Person
+    UUID memberUserId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
     de.greluc.krt.profit.basetool.frontend.model.dto.UserDto memberUser =
@@ -1885,7 +1722,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             Collections.emptySet(),
-            false, // canEdit = false (kein Manager/Admin)
+            false,
             false,
             1L,
             1L,
@@ -1917,7 +1754,6 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
 
-    // When / Then: MEMBER sieht den Bearbeiten-Button für seinen eigenen Eintrag
     mockMvc
         .perform(
             get("/missions/" + missionId)
@@ -1931,20 +1767,15 @@ class MissionPageControllerMvcTest {
                                     .claim("preferred_username", "member1"))))
         .andExpect(status().isOk())
         .andExpect(
-            // The participant edit action is now an icon button (gained `btn-icon`). Assert the
-            // full class attribute of the rendered button — the bare `edit-participant-btn` marker
-            // also appears in the page's inline JS (querySelectorAll), so it cannot tell
-            // "button rendered" apart from "script present".
             content()
                 .string(containsString("class=\"btn btn-ghost btn-icon edit-participant-btn\"")));
   }
 
   @Test
   void missionDetail_AsMember_ShouldNotShowEditButtonForForeignParticipantEntry() throws Exception {
-    // Given
     UUID missionId = UUID.randomUUID();
-    UUID loggedInUserId = UUID.randomUUID(); // eingeloggter MEMBER
-    UUID otherUserId = UUID.randomUUID(); // anderer Nutzer
+    UUID loggedInUserId = UUID.randomUUID();
+    UUID otherUserId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
     de.greluc.krt.profit.basetool.frontend.model.dto.UserDto otherUser =
@@ -2001,7 +1832,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             Collections.emptySet(),
-            false, // canEdit = false (kein Manager/Admin)
+            false,
             false,
             1L,
             1L,
@@ -2033,7 +1864,6 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
 
-    // When / Then: MEMBER sieht den Bearbeiten-Button NICHT für fremde Einträge
     mockMvc
         .perform(
             get("/missions/" + missionId)
@@ -2047,20 +1877,14 @@ class MissionPageControllerMvcTest {
                                     .claim("preferred_username", "member2"))))
         .andExpect(status().isOk())
         .andExpect(
-            // The participant edit action gained `btn-icon`; assert the full rendered class
-            // attribute. The bare `edit-participant-btn` marker also appears in the page's inline
-            // JS, so `not(contains(marker))` would false-fail even when the button is absent.
             content()
                 .string(
                     not(containsString("class=\"btn btn-ghost btn-icon edit-participant-btn\""))));
   }
 
-  // --- Unassigned participants AJAX endpoint ------------------------------
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void getUnassignedParticipantsAjax_ShouldReturn200WithList() throws Exception {
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Map<String, Object> participant = new java.util.HashMap<>();
@@ -2072,7 +1896,6 @@ class MissionPageControllerMvcTest {
             eq("/api/v1/missions/" + missionId + "/participants/unassigned"), anyTypeRef()))
         .thenReturn(response);
 
-    // When / Then
     mockMvc
         .perform(get("/missions/" + missionId + "/participants/unassigned/ajax"))
         .andExpect(status().isOk())
@@ -2082,7 +1905,6 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void getUnassignedParticipantsAjax_WithBackendError_ShouldPropagateStatus() throws Exception {
-    // Given
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId + "/participants/unassigned"), anyTypeRef()))
@@ -2090,18 +1912,13 @@ class MissionPageControllerMvcTest {
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Not Found", null, 404));
 
-    // When / Then
     mockMvc
         .perform(get("/missions/" + missionId + "/participants/unassigned/ajax"))
         .andExpect(status().isNotFound());
   }
 
-  // --- Unit ship picker is restricted to ships of registered participants ----
-
   @Test
   void missionDetail_UnitShipPicker_OnlyOffersShipsOfRegisteredParticipants() throws Exception {
-    // Given: one registered (account-backed) participant who owns a ship, plus an outsider who
-    // owns another ship. Both ships are in `allShips`, but only the participant's may be offered.
     UUID missionId = UUID.randomUUID();
     UUID participantUserId = UUID.randomUUID();
     UUID outsiderUserId = UUID.randomUUID();
@@ -2193,7 +2010,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             Collections.emptySet(),
-            true, // canEdit -> unit add/edit modals (and their ship pickers) render
+            true,
             true,
             1L,
             1L,
@@ -2222,13 +2039,10 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
-    // Unit ship pickers are populated from the mission-scoped endpoint; specific stub AFTER the
-    // generic get(...) so it wins for this URL.
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef()))
         .thenReturn(List.of(participantShip, outsiderShip));
 
-    // When / Then: the rendered ship pickers offer the participant's ship but not the outsider's.
     mockMvc
         .perform(
             get("/missions/" + missionId)
@@ -2248,9 +2062,6 @@ class MissionPageControllerMvcTest {
   @Test
   void missionDetail_UnitShipPicker_KeepsAlreadyAssignedShipEvenIfOwnerNotParticipant()
       throws Exception {
-    // Given: a unit already holds a ship whose owner is NOT (or no longer) a participant. The edit
-    // picker must keep offering that ship so editing the unit doesn't silently drop it. A stray
-    // non-participant ship that is not assigned anywhere must still be excluded.
     UUID missionId = UUID.randomUUID();
     UUID participantUserId = UUID.randomUUID();
     UUID outsiderUserId = UUID.randomUUID();
@@ -2388,14 +2199,10 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
-    // The endpoint returns participant ships plus already-assigned ships; the stray ship is neither
-    // and must be filtered out by the template. Specific stub AFTER the generic get(...).
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef()))
         .thenReturn(List.of(participantShip, assignedShip, strayShip));
 
-    // When / Then: the assigned ship is still selectable as an <option value="..."> (so the
-    // client-side edit picker can pre-select it), while the unassigned stray ship is excluded.
     mockMvc
         .perform(
             get("/missions/" + missionId)
@@ -2414,14 +2221,8 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * #816: the Übersicht "Funk" panel must list both the central, unit-less frequencies that carry a
-   * value and the per-unit frequencies of units that have one, while omitting empty entries.
-   *
-   * <p>Given a mission with one central frequency type that has a value ("Befehl"), one that has
-   * none ("Notfall"), one unit with a frequency ("Alpha") and one without ("Bravo"), the overview
-   * fragment must render the two entries that carry a value and neither empty one. The overview
-   * fragment is requested directly (`?fragment=overview`) so the assertions are scoped to the
-   * overview pane and never pick up the unit names from the crew board.
+   * Verifies that the overview "Funk" panel lists central and per-unit frequencies that carry a
+   * value and omits empty ones; the {@code overview} fragment is requested directly.
    */
   @Test
   void missionOverviewFragment_ListsFrequenciesWithValue_OmitsEmptyOnes() throws Exception {
@@ -2429,7 +2230,6 @@ class MissionPageControllerMvcTest {
     UUID befehlTypeId = UUID.randomUUID();
     UUID notfallTypeId = UUID.randomUUID();
 
-    // Central frequency: only "Befehl" carries a value; "Notfall" is an active type with none.
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto befehlFrequency =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto(
             UUID.randomUUID(),
@@ -2439,7 +2239,6 @@ class MissionPageControllerMvcTest {
             new java.math.BigDecimal("121.50"),
             1L);
 
-    // "Alpha" carries a frequency, "Bravo" does not -> only Alpha appears in the Funk panel.
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto alphaUnit =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto(
             UUID.randomUUID(),
@@ -2523,14 +2322,10 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
-    // The active frequency types feed the central rows; specific stub AFTER the generic getCached.
     when(backendApiClient.getCached(eq(CachedCatalog.FREQUENCY_TYPES_ACTIVE), anyTypeRef()))
         .thenReturn(freqTypesPage);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
-    // canEdit=true -> the unit ship-option picker is fetched; return a List (not the PageResponse
-    // the
-    // generic stub yields) so the controller's List<ShipDto> assignment does not ClassCast.
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2548,25 +2343,17 @@ class MissionPageControllerMvcTest {
                                     .subject(UUID.randomUUID().toString())
                                     .claim("preferred_username", "viewer1"))))
         .andExpect(status().isOk())
-        // Central frequency with a value is shown; the value-less central type is omitted.
         .andExpect(content().string(containsString("Befehl")))
         .andExpect(content().string(containsString("121.50")))
         .andExpect(content().string(not(containsString("Notfall"))))
-        // The unit that carries a frequency is shown; the one without is omitted.
         .andExpect(content().string(containsString("Alpha")))
         .andExpect(content().string(containsString("243.75")))
         .andExpect(content().string(not(containsString("Bravo"))));
   }
 
   /**
-   * #816 follow-up (review finding): the "Funk" panel must collapse — not paint a bare heading over
-   * an empty list — when the frequency-types lookup fails (a Resilience4j-wrapped fetch whose
-   * failure the controller swallows, leaving the {@code frequencyTypes} attribute null) while the
-   * mission still carries a stored central frequency value and no unit has a frequency.
-   *
-   * <p>The central rows iterate {@code frequencyTypes}; the panel gate therefore AND-s the
-   * central-value flag with {@code hasCentralTypes} so it stays hidden when the type list is
-   * absent.
+   * Verifies that the "Funk" panel is hidden when the frequency-types lookup fails, even though the
+   * mission stores a central frequency value.
    */
   @Test
   void missionOverviewFragment_FreqTypesFetchFailed_CollapsesFunkPanel() throws Exception {
@@ -2628,7 +2415,6 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
-    // The frequency-types fetch fails -> the controller swallows it and never sets frequencyTypes.
     when(backendApiClient.getCached(eq(CachedCatalog.FREQUENCY_TYPES_ACTIVE), anyTypeRef()))
         .thenThrow(new RuntimeException("frequency types unavailable"));
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
@@ -2650,28 +2436,16 @@ class MissionPageControllerMvcTest {
                                     .subject(UUID.randomUUID().toString())
                                     .claim("preferred_username", "viewer1"))))
         .andExpect(status().isOk())
-        // The panel collapses entirely: no "Funk" heading and no orphaned central value.
         .andExpect(content().string(not(containsString(">Funk<"))))
         .andExpect(content().string(not(containsString("121.50"))));
   }
 
   /**
-   * Reproducer for the "creating a finance entry 500s the mission detail page" bug (live log:
-   * {@code TemplateProcessingException ... mission-detail line 856} right after a finance entry is
-   * persisted).
+   * Verifies that the mission detail page renders without a template error when the mission has a
+   * finance entry, including its edit button's rounded amount.
    *
-   * <p>The {@code th:each="entry : ${financeEntries}"} loop renders an edit button whose rounded
-   * amount used to be produced by {@code th:data-amount="${@moneyFormat.round(entry.amount)}"}.
-   * Thymeleaf 3.1 evaluates default/unknown attributes (such as {@code th:data-*}) in a restricted
-   * expression context where {@code @bean} references are forbidden, so the call threw and every
-   * render of a mission that owned at least one finance entry returned HTTP 500. The fix binds the
-   * rounded value via {@code th:with} (an unrestricted context) and only reads the resulting local
-   * variable in {@code th:data-amount}.
-   *
-   * <p>The earlier render tests all pass an empty finance list, so the loop body never executed and
-   * the bug slipped through; this test populates exactly one entry. {@code ROLE_OFFICER} is granted
-   * via {@code oidcLogin()} because the finance ledger is only fetched for member-or-above OIDC
-   * principals.
+   * <p>{@code ROLE_OFFICER} is granted via {@code oidcLogin()}, as finance data is only fetched for
+   * OIDC members.
    */
   @Test
   void missionDetail_WithFinanceEntry_ShouldRenderEditButtonWithoutTemplateError()
@@ -2679,13 +2453,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
 
-    // 1234.5 exercises the HALF_UP rounding the bean applies (-> 1235), and the raw integer (no
-    // thousands separator) is what the edit modal expects in the number input.
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto entry =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto(
             entryId,
             missionId,
-            null, // no participant -> the "Nutzer" cell renders "-"
+            null,
             "Salvage income",
             de.greluc.krt.profit.basetool.frontend.model.dto.FinanceType.INCOME,
             new java.math.BigDecimal("1234.5"),
@@ -2738,12 +2510,10 @@ class MissionPageControllerMvcTest {
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
-    // Broad stubs first so unrelated detail-page fetches never NPE; specific overrides win below.
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
-    // An authenticated OIDC principal fetches the mission with the public flag = false.
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
     when(backendApiClient.get(
@@ -2754,12 +2524,8 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"), anyTypeRef()))
         .thenReturn(financesPage);
-    // Return a real (empty) List for the refinery-orders fetch so it is not assigned the broad
-    // PageResponse stub (which would ClassCastException inside the finance try-block).
     when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // #1138: same for the new mission-inventory read (else the broad emptyPage stub breaks
-    // #lists.isEmpty in the Wirtschaft block).
     when(backendApiClient.get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -2777,22 +2543,17 @@ class MissionPageControllerMvcTest {
                                 token
                                     .subject(UUID.randomUUID().toString())
                                     .claim("preferred_username", "officer1"))))
-        // Before the fix this threw TemplateProcessingException -> HTTP 500 here.
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail"))
-        // The rounded amount is rendered as a raw integer data attribute (HALF_UP: 1234.5 -> 1235).
         .andExpect(content().string(containsString("data-amount=\"1235\"")));
   }
 
   /**
-   * Renders the crew board with a unit that actually has crew: the earlier render fixtures all use
-   * empty crew lists, so the person-row fragment's crew branch (chip-select with the assigned job
-   * preselected, the multi-edit entry, and the unit drop-zone wiring) never executed. This test
-   * populates one unit with one crew member holding one function and asserts the board markup.
+   * Verifies the crew-board markup for a unit with one crew member holding one function: the job
+   * chip-select, the multi-edit entry and the drop-zone wiring.
    */
   @Test
   @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
-  // REQ-SEC-052: the detail page needs a login to render.
   void missionDetail_UnitWithCrew_RendersBoardRowWithChipSelect() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -2867,8 +2628,6 @@ class MissionPageControllerMvcTest {
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // The chip-select options are rendered from the CREW job-type lookup; without this stub the
-    // generic emptyList answer above throws on .content() and the options list stays empty.
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<java.util.Map<String, Object>>
         crewJobTypesPage =
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
@@ -2885,18 +2644,13 @@ class MissionPageControllerMvcTest {
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail"))
-        // The unit renders as a drop zone carrying its id; the crew member renders as a
-        // person row carrying participant + crew ids for the board move handlers.
         .andExpect(content().string(containsString("data-unit-id=\"" + unitId + "\"")))
         .andExpect(
             content().string(containsString("data-participant-id=\"" + participantId + "\"")))
         .andExpect(content().string(containsString("data-crew-id=\"" + crewId + "\"")))
-        // On-board function chip-select with the single assigned job preselected and the
-        // multi-function edit entry present (canEdit=true in this fixture).
         .andExpect(content().string(containsString("crew-role-select")))
         .andExpect(content().string(containsString("value=\"" + jobTypeId + "\" selected")))
         .andExpect(content().string(containsString("value=\"__edit\"")))
-        // HVU marking surfaces as the warning chip on the unit head.
         .andExpect(content().string(containsString("chip--warning")));
   }
 
@@ -2961,8 +2715,6 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(not(containsString("<script>alert"))));
   }
 
-  // --- #574: in-place section fragment branches --------------------------
-
   /** Minimal editable mission (canEdit + canManageManagers) for the fragment-render assertions. */
   private static MissionDto editableMission(UUID id) {
     return new MissionDto(
@@ -3018,7 +2770,6 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail :: crewBoard"))
         .andExpect(content().string(containsString("id=\"board-pool\"")))
-        // The fragment must NOT carry the page chrome (sticky head / tab nav / sibling panes).
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
   }
@@ -3059,16 +2810,6 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"board-pool\""))));
   }
 
-  // --- REQ-FE-010: steps / objectives / frequencies live-sync section fragments ---
-  // These three section keys (fragmentValues in static/js/mission-detail.js MISSION_SECTIONS;
-  // switch cases at MissionPageController#missionDetail) are the exact class that already shipped
-  // the objectives/frequencies stale-peer defect. A peer's live-sync re-fetch of one of them must
-  // resolve to its OWN section fragment, not fall through the switch `default -> "mission-detail"`.
-  // If a case is renamed/dropped or its Thymeleaf fragment id drifts, the default arm silently
-  // (HTTP 200) swaps the ENTIRE mission page into the small section container (nested-page
-  // breakage). Each test pins the exact `mission-detail :: <fragment>` view name and a marker that
-  // proves the section body — not the page chrome — was rendered.
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_StepsEditorFragment_RendersStepsEditorOnly() throws Exception {
@@ -3083,7 +2824,6 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail :: stepsEditor"))
         .andExpect(content().string(containsString("id=\"mission-step-list\"")))
-        // Section-sized: no page chrome, no sibling panes.
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
   }
@@ -3128,10 +2868,6 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_OrganisationFragment_RendersPartyLeadAndTypedFrequenciesOnly()
       throws Exception {
-    // #1120: the Verwaltung "Organisation" panel is its own broadcastable fragment so a peer's
-    // party-lead / typed-frequency change re-renders it in place (REQ-FE-015). The fragment carries
-    // the party-lead display + typed-frequency editor, but NOT the page chrome and NOT the sibling
-    // "Weitere Frequenzen" swap container (which is its own `frequencies` section, never nested).
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(editableMission(missionId));
@@ -3150,8 +2886,6 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_OrganisationFragment_ErrorPathRendersSectionSizedAlert() throws Exception {
-    // A backend failure on the fragment refetch must answer a section-sized inline error, never a
-    // redirect a live-sync swap would paint whole into the container.
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenThrow(new RuntimeException("boom"));
@@ -3167,10 +2901,6 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FragmentBackendError_RendersInlineErrorFragmentNotRedirect() throws Exception {
     UUID missionId = UUID.randomUUID();
-    // The backend read fails mid-swap (circuit-breaker open / timeout / 5xx). The fragment path
-    // must answer with a section-sized inline error fragment (HTTP 200), never the classic
-    // redirect:/missions — krtFetch.swap would otherwise follow the 302 and paint the whole
-    // missions page into the small #crew-board-results container (#574 review must-fix).
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenThrow(new RuntimeException("backend unavailable"));
 
@@ -3179,23 +2909,12 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail :: fragmentError"))
         .andExpect(content().string(containsString("role=\"alert\"")))
-        // Section-sized: no page chrome, no full board markup.
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"board-pool\""))));
   }
 
-  // --- ADR-0078: fragment-gated backend reads (fan-out regression fence) ---
-  // Before ADR-0078 missionDetail() rebuilt the FULL model (~6-9 uncached backend GETs) for every
-  // fragment value, so one peer's crew-board live-update refetch still pulled the size=1000 finance
-  // ledger + the manager/owner pickers. Across 200 concurrent viewers that O(peers x sections x
-  // reads) fan-out starved the backend DB pool and tripped the shared circuit breaker into a
-  // fleet-wide outage. These tests fence the gate: a fragment refetch must issue ONLY the reads its
-  // own section renders. Assertions are Mockito verify() against the mocked BackendApiClient (this
-  // suite has no WireMock server).
-
   /**
-   * Asserts the member-only finance reads (summary aggregate + entries page + refinery) were NOT
-   * issued.
+   * Asserts that the member-only finance reads (summary, entries page, refinery) were not issued.
    */
   private void verifyNoFinanceReads(UUID missionId) {
     verify(backendApiClient, never())
@@ -3204,21 +2923,13 @@ class MissionPageControllerMvcTest {
         .get(eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"), anyTypeRef());
     verify(backendApiClient, never())
         .get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef());
-    // #1138: the mission inventory list moved onto its own read, fetched only for the finance
-    // fragment — a non-finance fragment must not issue it.
     verify(backendApiClient, never())
         .get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef());
   }
 
   /**
-   * Asserts the all-users roster read ({@code /users/lookup}) was NOT issued. Since #1193 the owner
-   * / manager pickers are server-side searchable comboboxes that fetch matches from {@code
-   * /users/search} on demand, so this preload no longer happens on <em>any</em> render path — full
-   * page or fragment. (The owner-picker's org-unit read {@code /users/me/pickable-org-units} still
-   * lives in the {@code !anonymous && needMgmt} block but is principal-guarded: {@code
-   * fetchCallerMembershipOptions} short-circuits to an empty list when the {@code OidcUser}
-   * principal is null, and {@code @WithMockUser} injects a plain user, so it is never reached
-   * here.)
+   * Asserts that the all-users roster read ({@code /users/lookup}) was not issued; the owner and
+   * manager pickers search {@code /users/search} on demand.
    */
   private void verifyNoUserLookupRead() {
     verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
@@ -3238,7 +2949,6 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail :: crewBoard"));
 
-    // A crew-board refetch renders neither finance data nor the manager/owner pickers.
     verifyNoFinanceReads(missionId);
     verifyNoUserLookupRead();
   }
@@ -3257,7 +2967,6 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail :: overviewSection"));
 
-    // The overview fragment needs none of finance / manager pickers / unit-ship options.
     verifyNoFinanceReads(missionId);
     verifyNoUserLookupRead();
     verify(backendApiClient, never())
@@ -3279,8 +2988,6 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail :: financeSection"));
 
-    // The finance fragment IS the one that renders the ledger: it fetches the summary aggregate, a
-    // bounded entries page, and the refinery list (ADR-0078 — no more size=1000 load-all).
     verify(backendApiClient)
         .get(
             eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
@@ -3288,8 +2995,6 @@ class MissionPageControllerMvcTest {
     verify(backendApiClient)
         .get(eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"), anyTypeRef());
     verify(backendApiClient).get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef());
-    // #1138: the finance fragment also fetches the mission inventory list for the Wirtschaft table
-    // (formerly embedded in the MissionDto payload).
     verify(backendApiClient).get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef());
   }
 
@@ -3307,11 +3012,7 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail :: mgmtPanels"));
 
-    // #1193: the Verwaltung owner/manager pickers are now server-side searchable comboboxes, so the
-    // mgmt fragment no longer preloads the all-users roster. (The owner-picker's org-unit read is
-    // principal-guarded and not observable under @WithMockUser — see verifyNoUserLookupRead.)
     verifyNoUserLookupRead();
-    // ... and it still does not touch the finance trio.
     verifyNoFinanceReads(missionId);
   }
 
@@ -3325,21 +3026,16 @@ class MissionPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
-    // No fragment param -> full page render must keep issuing every read (unchanged behaviour).
     mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
 
     verify(backendApiClient)
         .get(
             eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
             eq(MissionFinanceTotalsDto.class));
-    // #1193: even a full-page render no longer preloads the all-users roster — the owner/manager
-    // pickers search it server-side on demand.
     verifyNoUserLookupRead();
     verify(backendApiClient)
         .get(eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef());
   }
-
-  // --- #574: party-lead AJAX endpoint ------------------------------------
 
   @Test
   @WithMockUser(roles = "OFFICER")

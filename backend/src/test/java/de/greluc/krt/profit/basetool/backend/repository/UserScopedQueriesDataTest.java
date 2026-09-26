@@ -41,29 +41,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for the Staffel-scoped {@link UserRepository} listing / search / reference
- * queries — {@code findAllScoped}, {@code findAllScopedList}, {@code findAllReferenceScoped},
- * {@code searchScoped}, {@code searchScopedList} — run against the real Postgres test schema
- * (Testcontainers + Flyway via the {@code test} profile).
+ * Integration tests for the Staffel-scoped {@link UserRepository} listing, search and reference
+ * queries against real Postgres (REQ-ORG-017).
  *
- * <p>REQ-ORG-017 widened the scope parameter from a scalar {@code UUID} to a {@code
- * Collection<UUID>} (a non-admin's unpinned scope is the union of their up-to-two Staffeln) while
- * keeping the bare {@code :scopeSquadronIds IS NULL OR ... IN :scopeSquadronIds} shape. Two
- * binding-level concerns that only the real dialect proves — and a Mockito stub of the repository
- * cannot catch — are pinned here:
- *
- * <ul>
- *   <li>the {@code null} collection path (an admin with no active pin, or any caller with no
- *       Staffel) binds cleanly to the {@code IN} clause instead of throwing a {@code
- *       QueryException} / bind failure;
- *   <li>the two-element collection path (a dual-Staffel member's union) expands correctly and
- *       returns the members of <em>both</em> Staffeln.
- * </ul>
- *
- * <p>{@link Transactional} so each method rolls back: the seeded users, memberships and the second
- * Staffel never commit to the shared Testcontainers database. The queries still observe them
- * because they are flushed within the test transaction before the read, and every assertion is
- * scoped to the freshly created ids so rows other suites committed cannot perturb it.
+ * <p>Covers a {@code null} scope collection binding cleanly to the {@code IN} clause and a
+ * two-element scope returning the members of both Staffeln. Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -179,9 +161,8 @@ class UserScopedQueriesDataTest {
   }
 
   /**
-   * Persists a fresh {@link Squadron} (single-table inheritance on {@code org_unit}, kind {@code
-   * SQUADRON}) with a unique name/shorthand so the test owns a second Staffel to union against. The
-   * legacy {@code squadron} table is kept in lockstep by the V97 sync trigger on the flush.
+   * Persists a fresh {@link Squadron} with a unique name and shorthand, as a second Staffel to
+   * union against.
    *
    * @return the generated id of the persisted second Staffel.
    */

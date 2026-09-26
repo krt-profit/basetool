@@ -37,16 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * The Lager multi-select filters summarise their selection the same way on both pages (owner
- * decision 2026-09-23, REQ-INV-037): nothing or every option ticked reads the "all" label, one
- * ticked option reads its own name, anything in between reads "N ausgewählt". Before, "Mein Lager"
- * said "N ausgewählt" with every option ticked while "Globales Lager" said "Alle".
- *
- * <p>The helper now lives once in {@code inventory-common.js}. There is no JavaScript unit harness
- * in this repository, so the behaviour is guarded here, in a browser, on both pages — a page that
- * stopped delegating to the shared helper would keep its markup intact and only fail here. The
- * labels are read from the header's own {@code data-all} / {@code data-selected} attributes so the
- * assertions hold in either locale.
+ * Verifies that the Lager multi-select filters on both pages label their selection alike
+ * (REQ-INV-037): none or all ticked reads "all", one reads its name, otherwise "N ausgewählt".
+ * Labels are read from the header's {@code data-all} / {@code data-selected} attributes, so the
+ * test is locale-independent.
  */
 @Tag("e2e")
 class InventoryMultiSelectLabelE2eTest {
@@ -139,30 +133,24 @@ class InventoryMultiSelectLabelE2eTest {
         header.click();
         assertThat(page.locator("#materialOptions")).hasClass(Pattern.compile("open"));
 
-        // Select-all ticks every option: that is "no filter", so it reads "all".
         page.locator("#matAll").check();
         assertThat(text).hasText(all);
 
-        // One option short of all: a count.
         options.nth(0).uncheck();
         assertThat(text).hasText((total - 1) + " " + selected);
         assertThat(page.locator("#matAll")).not().isChecked();
 
-        // Every option ticked one by one reads "all" again, and re-ticks the select-all box.
         options.nth(0).check();
         assertThat(text).hasText(all);
         assertThat(page.locator("#matAll")).isChecked();
 
-        // Nothing ticked is "no filter" too.
         page.locator("#matAll").uncheck();
         assertThat(text).hasText(all);
 
-        // Exactly one reads that option's own name.
         options.nth(1).check();
         String name = options.nth(1).locator("xpath=preceding-sibling::span[1]").innerText();
         assertThat(text).hasText(name);
 
-        // Two: a count.
         options.nth(2).check();
         assertThat(text).hasText("2 " + selected);
       } catch (RuntimeException | AssertionError failure) {

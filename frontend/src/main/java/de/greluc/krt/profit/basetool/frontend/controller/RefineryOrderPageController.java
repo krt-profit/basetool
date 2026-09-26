@@ -78,12 +78,8 @@ import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.JsonNode;
 
 /**
- * REST controller for RefineryOrderPageController endpoints.
- *
- * <p>Since the #924 L5 read/write split, this class only renders the refinery-order pages and
- * read-only AJAX lookups (plus the non-mutating import relay); the write half — the classic create
- * / update / delete / store handlers and their AJAX twins — lives in {@link
- * RefineryOrderWriteController}.
+ * Controller rendering the refinery-order pages, their read-only AJAX lookups and the
+ * non-persisting import relays; writes live in {@link RefineryOrderWriteController}.
  */
 @Controller
 @UsesLayoutModel
@@ -150,25 +146,18 @@ public class RefineryOrderPageController {
   private final ParallelPageLoader parallelPageLoader;
 
   /**
-   * Renders one server-side page of the refinery-order list ({@code /refinery-orders}). Default
-   * filter is {@code OPEN}+{@code IN_PROGRESS} so the operational view is uncluttered by
-   * completed/canceled orders. The {@code onlyMine} toggle switches between the all-orders endpoint
-   * and the per-user endpoint; both are fetched one {@link #PAGE_SIZES}-bounded page at a time
-   * (sorted by {@code startedAt} desc) instead of the former unbounded {@code size=1000} pull, so a
-   * large order history no longer loads in a single response (REQ-REFINERY-019). {@code size} is
-   * restricted to {@link #PAGE_SIZES} so a crafted query string cannot reinstate the unbounded
-   * fetch.
+   * Renders one page of the refinery-order list ({@code /refinery-orders}), filtered to {@code
+   * OPEN} and {@code IN_PROGRESS} by default and sorted by {@code startedAt} descending
+   * (REQ-REFINERY-019).
    *
    * @param status optional list of statuses to include
-   * @param onlyMine if true, restrict to the caller's own orders
-   * @param page zero-based page index, defaulted/clamped to 0
+   * @param onlyMine whether to restrict to the caller's own orders
+   * @param page zero-based page index, clamped to 0
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else the default
-   * @param fragment when {@code "results"}, only the results-table fragment is rendered for an
-   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with {@code orders}, the page envelope ({@code
-   *     ordersPage}), the {@code pageSizes} and the filter-preserving {@code paginationBaseUrl},
-   *     plus the selected statuses and the full status list for the filter UI
-   * @param principal authenticated OIDC user (used to derive the logistician hint)
+   * @param fragment {@code "results"} renders only the results-table fragment (REQ-FE-005)
+   * @param model model populated with the orders, the page envelope, page sizes, pagination base
+   *     URL and filter state
+   * @param principal authenticated OIDC user, used for the logistician hint
    * @return the {@code refinery-orders-index} view name, or its {@code refineryOrdersResults}
    *     fragment selector
    */
@@ -195,8 +184,6 @@ public class RefineryOrderPageController {
     PageResponse<RefineryOrderListDto> p = null;
     try {
       String statusParam = String.join(",", status);
-      // Everyone sees all orders (read-only for normal members); the per-user endpoint backs the
-      // "Meine Auftraege" toggle. Both are paginated server-side now (REQ-REFINERY-019).
       String endpoint =
           Boolean.TRUE.equals(onlyMine)
               ? "/api/v1/refinery-orders/my-orders"
@@ -231,12 +218,9 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Builds the {@code baseUrl} the pagination fragment threads {@code page}/{@code size} onto so
-   * page and size links preserve the active filter. The repeatable {@code status} params and the
-   * {@code onlyMine} flag are reproduced exactly as the filter form submits them; the status tokens
-   * are fixed enum names, so no extra escaping is required.
+   * Builds the pagination base URL that preserves the active status and own-orders filter.
    *
-   * @param status the resolved (never empty) status filter
+   * @param status the resolved, non-empty status filter
    * @param onlyMine the resolved own-orders toggle
    * @return {@code /refinery-orders?status=...&onlyMine=true} carrying the current filter
    */
@@ -253,13 +237,12 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Renders the create-order form ({@code /refinery-orders/create}). Seeds an empty form with the
-   * current user as the default owner; loads the materials, methods, locations, missions, user list
-   * and the refinery rounding mode for the form's dropdowns and computations.
+   * Renders the create-order form ({@code /refinery-orders/create}) with the current user as
+   * default owner and the reference catalogs for its dropdowns.
    *
-   * @param source optional origin marker for the return-to-page link after save
-   * @param model Thymeleaf model populated with the form and reference catalogs
-   * @param principal authenticated OIDC user (used to derive the default owner)
+   * @param source optional origin marker for the return link after save
+   * @param model model populated with the form and reference catalogs
+   * @param principal authenticated OIDC user, the default owner
    * @return the {@code refinery-orders-create} view name
    */
   @NotNull
@@ -272,7 +255,6 @@ public class RefineryOrderPageController {
       @AuthenticationPrincipal OidcUser principal) {
     RefineryOrderForm form;
     if (model.containsAttribute("refineryOrderForm")) {
-      // A flashed form (the classic upload redirect) wins over a fresh / handoff form.
       form = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
       if (form != null && form.getSource() == null) {
         form.setSource(source);
@@ -284,15 +266,6 @@ public class RefineryOrderPageController {
       if (currentUserId != null) {
         form.setOwnerId(currentUserId);
       }
-      // One-click ingest (epic #639, REQ-INGEST-004): a `?handoff=<id>` from the desktop extractor.
-      // This navigational GET is a SAFE request and must NOT consume the single-use handoff: a
-      // speculative browser prefetch or a duplicate top-level load of this URL would otherwise burn
-      // the token on the first (often invisible) request and leave the real navigation showing the
-      // ingest.handoff.notFound notice on every send (the 2026-07-19 Firefox double-GET incident).
-      // Instead of consuming here, expose the id so the create page's JS can POST it to
-      // importHandoff below -- a script-initiated request a page prefetch never issues -- which
-      // performs the one-time consume and swaps the pre-filled fragment in place, exactly like the
-      // manual upload. Consuming stays off every navigational GET.
       if (handoff != null && !handoff.isBlank()) {
         model.addAttribute("pendingHandoffId", handoff);
       }
@@ -302,15 +275,13 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Consumes a one-click ingest handoff and maps its staged refinery draft into a pre-filled form,
-   * adding the same review attributes (issues + counters) the manual import renders. Returns {@code
-   * null} when the handoff is unknown / expired / foreign / wrong-kind or carries no order, so the
-   * caller falls back to the fresh form plus an inline notice.
+   * Consumes an ingest handoff and maps its staged refinery draft into a pre-filled form, adding
+   * the import review attributes to the model.
    *
    * @param handoff the {@code ?handoff=} id from the extractor
-   * @param principal the authenticated user (its Keycloak subject scopes the staged lookup)
-   * @param model the model to enrich with the import review attributes on success
-   * @return the pre-filled form, or {@code null} when there is nothing to hand off
+   * @param principal the authenticated user, whose subject scopes the staged lookup
+   * @param model the model enriched with the review attributes on success
+   * @return the pre-filled form, or {@code null} when the handoff is unusable or carries no order
    */
   @Nullable
   private RefineryOrderForm applyRefineryHandoff(String handoff, OidcUser principal, Model model) {
@@ -334,23 +305,14 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Populates {@code model} with everything the refinery create form needs to render: the bound
-   * {@code refineryOrderForm}, the logistician flag, the catalog dropdowns (materials, methods,
-   * locations, missions, users), the rounding mode, the UEX yield map for the form's
-   * currently-selected location and the owner-picker options. Shared by {@link #viewCreateForm}
-   * (full page) and {@link #importExtractAjax} (in-place import fragment) so both render an
-   * identical form.
+   * Populates the model with everything the refinery create form renders, shared by {@link
+   * #viewCreateForm} and {@link #importExtractAjax}.
    *
-   * <p>The yield map is preloaded for any location already on the form (validation re-render or
-   * screenshot import) so the bonus badges paint without an extra round-trip; a fresh form has no
-   * location, falls through to an empty map, and the client-side {@code onLocationChange} handler
-   * fetches it when the user picks a refinery.
+   * <p>The yield map is preloaded when the form already has a location.
    *
-   * @param model the Thymeleaf model to populate
-   * @param form the create form to bind (fresh, validation-failed or import-prefilled); a {@code
-   *     null} form (defensive flash path) is replaced by a fresh owner-prefilled one so the
-   *     template never iterates a null {@code *{goods}}
-   * @param principal the authenticated user (drives the logistician flag and the owner options)
+   * @param model the model to populate
+   * @param form the form to bind; {@code null} is replaced by a fresh owner-prefilled form
+   * @param principal the authenticated user, for the logistician flag and owner options
    */
   private void populateCreateFormModel(Model model, RefineryOrderForm form, OidcUser principal) {
     if (form == null) {
@@ -360,10 +322,6 @@ public class RefineryOrderPageController {
         form.setOwnerId(currentUserId);
       }
     }
-    // isLogistician reads the SecurityContext on the request thread; do it here, then fetch the
-    // catalog lookups concurrently (missions, users, rounding mode, yields and the owner picker are
-    // uncached round-trips). Each helper swallows its own failure and returns an empty list/map, so
-    // join() never throws and the form degrades exactly as the serial version did.
     model.addAttribute("isLogistician", isLogistician(principal));
     model.addAttribute("refineryOrderForm", form);
     final RefineryOrderForm boundForm = form;
@@ -372,9 +330,6 @@ public class RefineryOrderPageController {
     var methodsFuture = parallelPageLoader.loadAsync(this::fetchMethods);
     var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
     var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
-    // Owner picker is a server-side searchable combobox (remote-users, #1193): seed only the
-    // current
-    // owner's display name (the caller by default), not the whole roster.
     var seedNamesFuture =
         parallelPageLoader.loadAsync(
             () ->
@@ -406,28 +361,16 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * AJAX twin of {@link RefineryImportProxyController#importExtract} (#591): relays the uploaded
-   * {@code RefineryExtract} JSON to the backend matcher and returns the pre-filled create-form
-   * fragment ({@code refinery-orders-create :: refineryImportFormBody}) so the create page swaps it
-   * in place instead of doing a full {@code POST → redirect} reload. Routed by the {@code
-   * X-Requested-With} header (more specific than the classic multipart handler in {@link
-   * RefineryImportProxyController}); the classic handler stays the no-JS fallback. Persists
-   * nothing.
+   * AJAX twin of {@link RefineryImportProxyController#importExtract}: relays the uploaded extract
+   * and returns the pre-filled {@code refinery-orders-create :: refineryImportFormBody} fragment;
+   * persists nothing.
    *
-   * <p>Every branch — success and each failure (invalid/oversized file, unparseable JSON, backend
-   * reject) — returns the same fragment with the appropriate {@code importErrorKey} / {@code
-   * importErrorText} so the error surfaces inline in the swapped region, never as a redirect the
-   * client would have to follow. On any failure the form falls back to a fresh owner-prefilled
-   * form, matching the classic flow's fresh-{@code GET} render.
-   *
-   * <p>Deliberately kept on this read controller in the #924 L5 read/write split: it is
-   * non-mutating (relays the extract to the backend matcher, persists nothing) and it is the only
-   * POST that needs the whole create-page render machinery ({@link #populateCreateFormModel}, the
-   * fetch* family, the parallel page loader and the logistician check).
+   * <p>Every failure returns the same fragment with a fresh form and {@code importErrorKey} or
+   * {@code importErrorText}.
    *
    * @param file the uploaded {@code RefineryExtract} JSON
-   * @param model the model populated with the pre-filled form + review flags (or an error key)
-   * @param principal the authenticated user (drives the create-form catalogs + owner options)
+   * @param model the model populated with the pre-filled form and review flags, or an error key
+   * @param principal the authenticated user, for the form catalogs and owner options
    * @return the create-form fragment view name
    */
   @NotNull
@@ -468,8 +411,6 @@ public class RefineryOrderPageController {
         model.addAttribute("importRowsSkipped", draft.rowsSkipped());
       }
     } catch (BackendServiceException e) {
-      // Envelope-level reject (e.g. unsupported schemaVersion): the backend's problem detail is
-      // already localized — show it verbatim; otherwise a generic failure message.
       String detail = e.getProblemDetail();
       if (detail != null && !detail.isBlank()) {
         model.addAttribute("importErrorText", detail);
@@ -485,24 +426,16 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Consumes a one-click ingest handoff and returns the pre-filled create-form fragment for an
-   * in-place swap (epic #639, REQ-INGEST-004). This is the script-initiated counterpart to {@link
-   * #viewCreateForm}'s handoff branch: the navigational {@code GET …/create?handoff=<id>} renders
-   * the empty owner-prefilled form and never consumes, so a speculative browser prefetch or a
-   * duplicate top-level load cannot burn the single-use token (the 2026-07-19 Firefox double-GET
-   * incident); the create page's JS then POSTs the id here exactly once and swaps the returned
-   * {@code refineryImportFormBody} fragment into place.
+   * Consumes a single-use ingest handoff and returns the pre-filled create-form fragment
+   * (REQ-INGEST-004).
    *
-   * <p>Mirrors {@link #importExtractAjax}: on a hit the pre-filled form + the same review flags
-   * (issues, counters) render; on a miss — unknown, expired, already-consumed, wrong-kind or
-   * foreign-{@code sub} — the fresh owner-prefilled form renders with the {@code
-   * ingest.handoff.notFound} inline notice. Kept on this read controller for the same reason as
-   * {@link #importExtractAjax}: it is non-mutating (the single-use consume deletes a transient
-   * Redis pickup, it persists no squadron data) and needs the whole create-page render machinery.
+   * <p>The create page's script posts the id here once, so the navigational {@code GET} never
+   * consumes it. A miss renders the fresh form with the {@code ingest.handoff.notFound} notice.
    *
-   * @param handoff the handoff id the extractor put on the {@code ?handoff=} parameter
-   * @param model the model populated with the pre-filled form + review flags, or the not-found key
-   * @param principal the authenticated user (its Keycloak subject scopes the single-use consume)
+   * @param handoff the handoff id from the {@code ?handoff=} parameter
+   * @param model the model populated with the pre-filled form and review flags, or the not-found
+   *     key
+   * @param principal the authenticated user, whose subject scopes the consume
    * @return the {@code refinery-orders-create :: refineryImportFormBody} fragment view name
    */
   @NotNull
@@ -529,31 +462,18 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Renders the detail view of a single refinery order ({@code /refinery-orders/{id}}), either as
-   * the full page or — when {@code fragment} names a section — as that section's fragment for an
-   * in-place AJAX swap (REQ-FE-001 / REQ-FE-015).
+   * Renders a refinery order's detail page, or only its {@code order} or {@code store} section for
+   * an in-place swap (REQ-FE-015).
    *
-   * <p>The {@code canEdit} flag is resolved here (not in the template): logisticians can edit every
-   * order; the order's owner can edit their own. Backend's PUT enforces the same rule so this is
-   * purely a UX gate.
-   *
-   * <p>The two fragments are the seams the page's own save/store and its {@code
-   * refinery-order:{id}} live-sync receiver re-render: {@code order} (the edit form, the goods
-   * editor and the status-gated action row) and {@code store} (the Einlagern dialog's rows, derived
-   * from the order's output goods). Each skips the catalog lookups the other one needs
-   * (ADR-0078/ADR-0081 fragment-gating) — a {@code store} refresh never pays for the missions
-   * catalog, an {@code order} refresh never pays for the active-job-order lookup. An unknown
-   * fragment name, or a backend failure while rendering one, degrades to a section-sized inline
-   * error rather than a redirect, so a flaky peer-refresh never dumps a whole page into a small
-   * swap container.
+   * <p>{@code canEdit} holds for logisticians and the owner. An unknown fragment or a failed
+   * fragment load renders an inline section error.
    *
    * @param id refinery order id
-   * @param fragment when {@code "order"} or {@code "store"}, only that section's fragment is
-   *     rendered; otherwise the full page
-   * @param model Thymeleaf model populated with order, edit/role flags and the dropdown catalogs
-   * @param principal authenticated OIDC user (used to derive owner and logistician flags)
-   * @return the {@code refinery-orders-details} view name, one of its section fragment selectors,
-   *     or {@code :: fragmentError} on an unknown fragment / failed fragment load
+   * @param fragment {@code "order"} or {@code "store"} renders only that section
+   * @param model model populated with the order, flags and dropdown catalogs
+   * @param principal authenticated OIDC user, for the owner and logistician flags
+   * @return the {@code refinery-orders-details} view name, a section fragment selector, or the
+   *     {@code :: fragmentError} selector
    */
   @NotNull
   @GetMapping("/{id}")
@@ -568,11 +488,6 @@ public class RefineryOrderPageController {
       return "refinery-orders-details :: fragmentError";
     }
     boolean isLogistician = isLogistician(principal);
-    // Set unconditionally, not only on the fresh-load branch below: the store dialog's receiver
-    // picker is gated on this flag (REQ-SEC-039), and on the flash-attribute re-render after a
-    // validation error the branch is skipped — which would silently demote a logistician to the
-    // read-only receiver field. A missing flag renders as "not a logistician", so the failure mode
-    // is safe but wrong, and only visible after a failed submit.
     model.addAttribute("isLogistician", isLogistician);
 
     if (!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm")) {
@@ -591,11 +506,6 @@ public class RefineryOrderPageController {
         model.addAttribute("canEdit", canEdit);
         model.addAttribute("order", orderDto);
 
-        // Store-dialog owning-org-unit picker (#596): options for the default receiver (the caller)
-        // are server-rendered; the JS rebuilds them per row when the receiver dropdown changes. The
-        // inherited default pre-selects the order's own owning OrgUnit so a same-OrgUnit self-store
-        // needs no manual choice. A receiver who is not a member of that OrgUnit simply gets no
-        // pre-selection and must pick — the §5.5.1 "force choice" fallback.
         model.addAttribute("storeOrgUnitOptions", fetchUserOrgUnitOptions(currentUserId));
         model.addAttribute("orderOwningOrgUnitId", orderDto.owningOrgUnitId());
 
@@ -660,15 +570,6 @@ public class RefineryOrderPageController {
                 storeItem.setMaterialId(good.outputMaterial().id());
                 storeItem.setMaterialName(good.outputMaterial().name());
 
-                // The output quantity from the refinery good is stored as units (centi-SCU)
-                // when the material is SCU-measured: 100 units == 1 SCU. We divide by 100 to
-                // get the SCU value the user will enter in the store dialog. Default to the
-                // SCU branch whenever the material's quantityType is anything other than the
-                // explicit string "PIECE": UEX-imported materials historically have a NULL
-                // quantity_type (the UEX sync never set the field — see issue #230), and a
-                // refinery never produces piece-counted goods anyway, so treating "unknown"
-                // as SCU here is both safer (avoids 100x over-booking) and matches the
-                // domain. Backed by the V95 migration that backfills NULL -> 'SCU'.
                 double amount = 0.0;
                 String materialQuantityType = good.outputMaterial().quantityType();
                 if (good.outputQuantity() != null) {
@@ -691,8 +592,6 @@ public class RefineryOrderPageController {
                   storeItem.setAmountFixed(false);
                 }
                 storeItem.setAmount(amount);
-                // Normalize the per-row quantityType the template sees so the unit label
-                // ("(SCU)" / "(Stück)") matches the converted amount above.
                 storeItem.setQuantityType("PIECE".equals(materialQuantityType) ? "PIECE" : "SCU");
 
                 storeItem.setQuality(good.quality() != null ? good.quality() : 0);
@@ -702,10 +601,6 @@ public class RefineryOrderPageController {
                 if (currentUserId != null) {
                   storeItem.setUserId(currentUserId);
                 }
-                // Inherit the order's own owning OrgUnit as the picker's default selection (#596).
-                // Valid only when the default receiver (the caller) is a member of it; if not, the
-                // option is absent from storeOrgUnitOptions and the picker renders unselected,
-                // forcing an explicit choice per the §5.5.1 matrix.
                 storeItem.setOwningOrgUnitId(orderDto.owningOrgUnitId());
                 storeForm.getItems().add(storeItem);
               }
@@ -715,9 +610,6 @@ public class RefineryOrderPageController {
         }
       } catch (Exception e) {
         log.error("Failed to fetch refinery order details", e);
-        // A fragment request must never answer with a redirect: krtFetch.swap would bail silently
-        // and leave the section stale. Answer section-sized instead (the full page still
-        // redirects).
         if (section != null) {
           return "refinery-orders-details :: fragmentError";
         }
@@ -728,10 +620,6 @@ public class RefineryOrderPageController {
     model.addAttribute("orderId", id);
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("methods", fetchMethods());
-    // Keep this order's own refinery in the dropdown even after an admin hides that location:
-    // the picker source excludes hidden entries, and the location <select> is `required`, so a
-    // dropped option would leave the field on "-- please choose --" and block every subsequent
-    // save of an order that was perfectly valid when it was created.
     LocationDto preserveLocation =
         model.getAttribute("order") instanceof RefineryOrderDto orderForPicker
             ? orderForPicker.location()
@@ -739,17 +627,10 @@ public class RefineryOrderPageController {
     model.addAttribute("locations", fetchLocations(preserveLocation));
     model.addAttribute("allLocations", fetchAllLocations());
     RefineryOrderForm formInModel = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
-    // The missions catalog is a size=1000 uncached read and is referenced only by the `order`
-    // section's "Einsatz" picker, so a `store` fragment refresh skips it entirely.
     if (!FRAGMENT_STORE.equals(section)) {
       UUID preserveMissionId = formInModel != null ? formInModel.getMissionId() : null;
       model.addAttribute("missions", fetchMissions(preserveMissionId));
     }
-    // The owner + per-item receiver pickers are now server-side searchable comboboxes
-    // (remote-users,
-    // #1193): instead of preloading the whole roster, seed only the display names of the users the
-    // form actually references (the owner and each store item's receiver — all default to the
-    // caller). Bounded by the distinct referenced ids, not the roster size.
     Set<UUID> seedIds = new LinkedHashSet<>();
     if (formInModel != null && formInModel.getOwnerId() != null) {
       seedIds.add(formInModel.getOwnerId());
@@ -762,17 +643,11 @@ public class RefineryOrderPageController {
       }
     }
     model.addAttribute("seedUserNames", resolveSeedUserNames(seedIds));
-    // The active-job-order lookup backs only the store dialog's per-row "Auftrag" picker, so an
-    // `order` fragment refresh skips it.
     if (!FRAGMENT_ORDER.equals(section)) {
       model.addAttribute("jobOrders", fetchActiveJobOrders());
     }
     model.addAttribute("roundingMode", fetchRoundingMode());
 
-    // Pre-load the UEX yield map for the order's current location so the detail page can render
-    // the bonus badge for every input material in the dropdown on first paint, without an extra
-    // network round-trip. The same map is then refreshed client-side via the AJAX endpoint below
-    // whenever the user picks a different refinery from the location dropdown.
     UUID currentLocationId = null;
     Object orderAttr = model.getAttribute("order");
     if (orderAttr instanceof RefineryOrderDto orderForLookup && orderForLookup.location() != null) {
@@ -789,16 +664,10 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * AJAX endpoint that proxies the backend's {@code GET
-   * /api/v1/refinery-orders/locations/{locationId}/yields} so the detail page's bonus badges can
-   * refresh client-side when the user picks a different refinery without a full page reload.
-   * Returns the UEX {@code materialId -> percent} map as JSON (positive = bonus, negative = malus,
-   * 0 = explicit baseline, absent key = no UEX row known for the (location, material) pair). Errors
-   * land as an empty map rather than a 5xx so a transient backend hiccup just falls back to an
-   * empty badge instead of breaking the form.
+   * Proxies the backend's UEX yield map of a refinery location for the bonus badges.
    *
    * @param locationId target refinery location
-   * @return per-material yield map keyed by material UUID
+   * @return percent per material UUID; empty on a backend error
    */
   @GetMapping("/locations/{locationId}/yields")
   @PreAuthorize("isAuthenticated()")
@@ -808,14 +677,11 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * AJAX endpoint (#596) that proxies the backend's {@code GET /api/v1/users/{userId}/memberships}
-   * so the store dialog's per-item owning-org-unit picker can refresh its options client-side when
-   * the receiving-member dropdown changes — without a full page reload. Returns the receiver's
-   * OrgUnit memberships as the picker-friendly option rows; an empty list on a backend hiccup keeps
-   * the picker from breaking the dialog.
+   * Proxies the backend's membership lookup so the store dialog's org-unit picker follows the
+   * chosen receiver.
    *
-   * @param userId the receiving member whose OrgUnit memberships back the picker
-   * @return the member's OrgUnit options as JSON; never {@code null}
+   * @param userId the receiving member
+   * @return the member's org-unit options; empty on a backend error, never {@code null}
    */
   @GetMapping("/users/{userId}/org-units")
   @PreAuthorize("isAuthenticated()")
@@ -825,11 +691,8 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Pulls the per-material UEX bonus/malus map from the backend for {@code locationId}. Wraps every
-   * failure mode in an empty map: a {@code null} id (the order has no location picked yet), an
-   * unknown id (the backend returns an empty map by design), or a transient network/backend error
-   * (logged at WARN). The shared yield-badge JS module treats "empty map" identically to "no UEX
-   * data" so all three branches fall through cleanly on both the create and the detail page.
+   * Fetches the per-material UEX yield map of a location; a {@code null} id or any failure yields
+   * an empty map.
    */
   private Map<String, Integer> fetchYieldsForLocation(UUID locationId) {
     if (locationId == null) {
@@ -893,19 +756,11 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Fetches the refinery-location catalog backing the "Raffinerie" dropdown. The backend source
-   * ({@code GET /api/v1/locations/refineries}) lists only locations that host a live refinery
-   * terminal <em>and</em> are not hidden, so an admin who hides a location removes it from this
-   * picker as well as from the storage pickers.
+   * Fetches the refinery locations of the "Raffinerie" dropdown: live refinery terminals that are
+   * not hidden.
    *
-   * <p>Pass {@code preserveLocation} to retain one specific location regardless of that filter —
-   * used on the detail page so an existing order's own refinery survives in the dropdown after its
-   * location was hidden. Without it the {@code required} select would render unselected and no
-   * further edit of that order could be saved.
-   *
-   * @param preserveLocation location to keep in the result even when the backend omits it, or
-   *     {@code null} to take the backend list as-is.
-   * @return mutable list of selectable refinery locations; empty on backend failure.
+   * @param preserveLocation a location to keep even when the backend omits it, or {@code null}
+   * @return mutable list of selectable locations; empty on backend failure
    */
   private List<LocationDto> fetchLocations(LocationDto preserveLocation) {
     List<LocationDto> locs = new ArrayList<>();
@@ -922,15 +777,11 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Appends {@code preserveLocation} to {@code locations} when it carries an id that the list does
-   * not already contain, so a filtered-out but still-referenced location stays selectable.
+   * Appends {@code preserveLocation} to {@code locations} when its id is missing from the list.
    *
-   * <p>Package-private for direct unit testing — the surrounding {@link
-   * #fetchLocations(LocationDto)} would otherwise hide this behind the API client mock.
-   *
-   * @param locations the backend's picker list; mutated and returned.
-   * @param preserveLocation the location to retain, or {@code null} for no preservation.
-   * @return {@code locations}, with the preserved entry appended when it was missing.
+   * @param locations the picker list; mutated and returned
+   * @param preserveLocation the location to retain, or {@code null}
+   * @return {@code locations}, with the preserved entry appended when it was missing
    */
   static List<LocationDto> withPreservedLocation(
       List<LocationDto> locations, LocationDto preserveLocation) {
@@ -949,24 +800,15 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Fetches the missions catalog for the refinery-order dropdowns, restricted to the last three
-   * months of {@code plannedStartTime} (future-scheduled missions are included) and sorted
-   * newest-first. Older missions are dropped so the dropdown does not balloon with historical
-   * operations the user is unlikely to pick. Pass {@code preserveMissionId} to retain a specific
-   * mission regardless of its plannedStartTime — used on the detail page so an existing order's
-   * linked mission stays visible even when it falls outside the three-month window.
+   * Fetches the missions of the last three months (future ones included) for the dropdowns, newest
+   * first.
    *
-   * @param preserveMissionId mission id to keep in the result regardless of its plannedStartTime,
-   *     or {@code null} to apply the cut-off without preservation.
-   * @return mutable list of missions in newest-first order; empty on backend failure.
+   * @param preserveMissionId a mission to keep regardless of its start, or {@code null}
+   * @return mutable list of missions, newest first; empty on backend failure
    */
   @NotNull
   private List<MissionListDto> fetchMissions(UUID preserveMissionId) {
     try {
-      // The explicit newest-first sort is load-bearing: without it the backend's default is
-      // plannedStartTime ASCENDING, so once more than 1000 missions exist the single fetched page
-      // holds the 1000 OLDEST rows and the three-month window below silently empties — the recent
-      // missions the dropdown is for would sit beyond the page boundary.
       PageResponse<MissionListDto> p =
           backendApiClient.get(
               "/api/v1/missions?size=1000&sort=plannedStartTime,desc", MISSION_LIST_PAGE);
@@ -983,19 +825,13 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Filters the given missions to those whose {@code plannedStartTime} is on or after {@code
-   * cutoff} (missions without a planned start are dropped) and sorts the result newest-first. If
-   * {@code preserveMissionId} is non-null and the matching mission is in {@code all} but missing
-   * from the filtered slice, it is appended to the end so the caller can keep it as a selected
-   * option without losing it from the dropdown.
+   * Keeps missions with {@code plannedStartTime} on or after {@code cutoff}, sorts them newest
+   * first, and appends {@code preserveMissionId}'s mission when it was filtered out.
    *
-   * <p>Package-private for direct unit testing — the date arithmetic in the surrounding {@link
-   * #fetchMissions(UUID)} would otherwise be hidden behind the API client mock.
-   *
-   * @param all unfiltered mission list from the backend (may be {@code null} or empty).
-   * @param cutoff inclusive lower bound for {@code plannedStartTime}.
-   * @param preserveMissionId mission id to retain regardless of the cut-off, or {@code null}.
-   * @return mutable list of missions in newest-first order.
+   * @param all unfiltered mission list; may be {@code null} or empty
+   * @param cutoff inclusive lower bound for {@code plannedStartTime}
+   * @param preserveMissionId mission id to retain regardless of the cutoff, or {@code null}
+   * @return mutable list of missions, newest first
    */
   @NotNull
   static List<MissionListDto> filterAndSortMissionsForDropdown(
@@ -1020,43 +856,29 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Resolves the {@link OrgUnitMembershipOptionDto} list that drives the R5.d owner-picker fragment
-   * on the refinery-order create form. The target user is the form's {@code ownerId} when a
-   * logistician has explicitly picked another user; otherwise the calling user (a self-entry).
+   * Resolves the owner-picker options of the create form for the form's chosen owner, else the
+   * caller.
    *
-   * <p>Falls back to an empty list when the lookup fails — the fragment collapses to a hidden state
-   * for an empty option list, so a transient backend hiccup does not break the form render.
-   *
-   * @param form the inbound refinery-order form (may be {@code null} on the very first GET before
-   *     binding).
-   * @param principal the OIDC principal of the calling user; used to derive the fallback target
-   *     user when the form does not carry an explicit owner.
-   * @return picker options or empty list; never {@code null}.
+   * @param form the refinery-order form; may be {@code null}
+   * @param principal the caller, used when the form names no owner
+   * @return picker options; empty on failure, never {@code null}
    */
   private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(
       RefineryOrderForm form, OidcUser principal) {
     UUID explicitOwnerId = form != null ? form.getOwnerId() : null;
     if (explicitOwnerId == null) {
-      // Self-entry → the caller's pickable org units: direct memberships plus their cascading
-      // leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs), epic #692 Phase 5.
-      // Unchanged for an ordinary member. Resolved server-side for the caller.
       if (principal == null) {
         return List.of();
       }
       return fetchMyPickableOrgUnits();
     }
-    // A logistician explicitly picking another owner → that user's DIRECT memberships (their own
-    // stock); the create-on-behalf cascade applies to the caller, not to a third-party owner.
     return fetchUserOrgUnitOptions(explicitOwnerId);
   }
 
   /**
-   * Fetches the calling user's pickable owning-org-unit options (direct memberships ∪ cascading
-   * leadership reach) from {@code /api/v1/users/me/pickable-org-units} (epic #692 Phase 5). Wraps
-   * failures in an empty list so a transient backend hiccup leaves the picker empty rather than
-   * breaking the form.
+   * Fetches the caller's pickable owning org units, direct memberships plus leadership reach.
    *
-   * @return the caller's pickable options, sorted by the backend; never {@code null}.
+   * @return the caller's pickable options; empty on failure, never {@code null}
    */
   private List<OrgUnitMembershipOptionDto> fetchMyPickableOrgUnits() {
     try {
@@ -1071,14 +893,10 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Fetches a user's OrgUnit memberships as picker-friendly option rows, backing both the
-   * create-form owner picker (via {@link #fetchOwnerPickerOptions}) and the store dialog's per-item
-   * owning-org-unit picker (#596). Wraps every failure in an empty list — a {@code null} id or a
-   * transient backend hiccup leaves the picker empty rather than breaking the page.
+   * Fetches a user's org-unit memberships as picker options.
    *
-   * @param userId the user whose memberships to list; {@code null} yields an empty list.
-   * @return the picker options, sorted Staffel-first then SK alphabetical by the backend; never
-   *     {@code null}.
+   * @param userId the user; {@code null} yields an empty list
+   * @return the options, Staffel first then SK alphabetically; empty on failure, never {@code null}
    */
   private List<OrgUnitMembershipOptionDto> fetchUserOrgUnitOptions(UUID userId) {
     if (userId == null) {
@@ -1096,15 +914,11 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Resolves the display names of exactly the users the owner + per-item receiver pickers
-   * reference, so those server-side searchable comboboxes (remote-users, #1193) can seed their
-   * preselected option without preloading the whole roster. Bounded by the distinct referenced ids
-   * (owner + store receivers — all default to the caller, so usually one), never the roster size. A
-   * failed or unknown id is simply absent from the map (the picker then shows its placeholder
-   * rather than a raw id); {@code effectiveName} falls back to the username.
+   * Resolves display names of the users the owner and receiver pickers reference, to seed their
+   * preselected options.
    *
-   * @param ids the distinct user ids the form references; never {@code null}, possibly empty.
-   * @return a map from user id to display name for the referenced users; never {@code null}.
+   * @param ids the distinct referenced user ids; possibly empty
+   * @return user id to display name; unknown or failed ids are absent
    */
   @NotNull
   private Map<UUID, String> resolveSeedUserNames(Collection<UUID> ids) {
@@ -1119,7 +933,6 @@ public class RefineryOrderPageController {
           names.put(id, user.effectiveName() != null ? user.effectiveName() : user.username());
         }
       } catch (Exception e) {
-        // REQ-OBS-004: log the id only, never the resolved name.
         log.warn("Failed to resolve seed user name for refinery picker (id {})", id, e);
       }
     }
@@ -1127,17 +940,11 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Loads the active (OPEN / IN_PROGRESS) job orders that back the store dialog's per-item
-   * "Auftrag" dropdown. Uses the lightweight {@code /api/v1/orders/lookup} reference projection
-   * rather than the full {@code /api/v1/orders} list because the projection's {@code
-   * requiredMaterialIds} is the authoritative, kind-agnostic required-material set: it is populated
-   * for ITEM orders too (whose {@code materials} line list is always empty), so the template can
-   * hide an order that does not require the stored output material across <em>both</em> order kinds
-   * (REQ-ORDERS-018). The old {@code materials}-based filter silently dropped every ITEM order,
-   * leaving the dropdown empty.
+   * Loads the active job orders for the store dialog's order dropdown from {@code
+   * /api/v1/orders/lookup}, whose {@code requiredMaterialIds} covers both order kinds
+   * (REQ-ORDERS-018).
    *
-   * @return the active job orders visible to the caller as reference projections; never {@code
-   *     null}
+   * @return the active job orders visible to the caller; never {@code null}
    */
   @NotNull
   private List<JobOrderReferenceDto> fetchActiveJobOrders() {
@@ -1171,10 +978,8 @@ public class RefineryOrderPageController {
       return null;
     }
     try {
-      // Try the subject directly (fastest path)
       return CurrentUser.userId(principal);
     } catch (Exception e) {
-      // Fallback: ask the backend for our id
       try {
         UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
         return me != null ? me.id() : null;
@@ -1196,9 +1001,6 @@ public class RefineryOrderPageController {
     Collection<? extends GrantedAuthority> authorities =
         (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
 
-    // REQ-OBS-004: never log principal.getName() (the Keycloak preferred_username handle — PII the
-    // appender PiiMasker does not scrub). Log the same stable short pseudonym used for the
-    // backend-flag grant below (BackendRoleSyncFilter.maskPrincipal shape).
     log.debug(
         "Checking logistician status for user u-{}, authorities: {}",
         Integer.toHexString(java.util.Objects.hashCode(principal.getName())),
@@ -1215,15 +1017,10 @@ public class RefineryOrderPageController {
                         || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (!result) {
       try {
-        // Fallback: check the DB flag from the backend
         de.greluc.krt.profit.basetool.frontend.model.dto.UserDto me =
             backendApiClient.get(
                 "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
         if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
-          // M-16: do NOT log {@code principal.getName()} (the Keycloak username — PII). Log only
-          // a stable short pseudonym derived from the principal name's hashCode, in the same
-          // shape as {@code BackendRoleSyncFilter.maskPrincipal}. The narrower {@code log.debug}
-          // a few lines down does not carry the principal at all.
           log.info(
               "Granting logistician by backend flag for user: u-{}",
               Integer.toHexString(java.util.Objects.hashCode(principal.getName())));

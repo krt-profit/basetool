@@ -32,23 +32,13 @@ import org.mapstruct.Mapping;
 public interface OperationMapper {
 
   /**
-   * Maps an {@link Operation} entity to its outbound DTO.
+   * Maps an {@link Operation} to its DTO, publishing the owning org unit as {@code owningSquadron}.
    *
-   * <p>After R9 Step 2 the operation entity exposes {@code owningOrgUnit} (typed {@code OrgUnit});
-   * the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API
-   * stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
-   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned operations now
-   * surface their SK badge instead of a blank cell.
-   *
-   * @param entity the operation entity to project; {@code null} returns {@code null}.
-   * @return the populated operation DTO.
+   * @param entity the entity to project; {@code null} returns {@code null}
+   * @return the operation DTO
    */
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
-  // Stamped by the read path through OperationDto#withPayoutPreliminary, not an entity column.
   @Mapping(target = "payoutPreliminary", ignore = true)
-  // MapStruct reads a record's wither as a fluent setter of a property named after it; there
-  // is no such property, so it is ignored.
   @Mapping(target = "withPayoutPreliminary", ignore = true)
   OperationDto toDto(Operation entity);
 
@@ -61,7 +51,6 @@ public interface OperationMapper {
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "missions", ignore = true)
-  // A new row starts unversioned; the owning org unit is stamped by the service at create.
   @Mapping(target = "version", ignore = true)
   @Mapping(target = "owningOrgUnit", ignore = true)
   Operation toEntity(OperationCreateDto dto);

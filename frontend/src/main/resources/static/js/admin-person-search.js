@@ -19,26 +19,11 @@
 
 // @ts-check
 
-/*
- * Admin Personensuche (REQ-SEC-060, ADR-0184). One IIFE, classic non-module script — ADR-0069.
- *
- * The search submit swaps the results block in place (REQ-FE-002) instead of reloading; the GET
- * form is the no-JS fallback and needs no JavaScript to work at all, which matters because this
- * page is used while serving a legal request.
- *
- * `history: true` keeps the address bar in step, so a search can be re-run by refreshing and the
- * URL can be pasted into a case note. That does put the searched name in the browser history —
- * which is the same exposure as any search box, and the alternative (a POST) would make the page
- * un-refreshable in the middle of handling a request.
- */
-
 (function () {
     'use strict';
 
     const RESULTS_ID = 'person-search-results';
 
-    // Delegated on document so the binding survives the results block being swapped, and so the
-    // form keeps working if it is ever moved inside the fragment.
     document.addEventListener('submit', function (event) {
         const form = event.target;
         if (!(form instanceof HTMLFormElement) || form.id !== 'person-search-form') {

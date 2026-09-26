@@ -39,24 +39,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the price-calculation results table after the CSP hardening of ADR-0093
- * ("eliminate inline {@code style=""} attributes so the CSP can pin {@code style-src-attr
- * 'none'}"). {@code materials-profit-calculation.js} builds its placeholder / loading / no-data /
- * error rows via {@code innerHTML}, and those {@code <td>}s carried inline {@code
- * style="text-align:center; padding:..;color:.."} attributes. An inline style inside a JS {@code
- * innerHTML} string is blocked by {@code style-src-attr 'none'} exactly like a template one, so the
- * browser would report a CSP violation for every rendered status row. The fix moves the styling to
- * the {@code profit-msg} / {@code profit-msg-loading} / {@code profit-msg-error} classes.
+ * Verifies that the {@code /materials/profit-calculation} results table renders a status row
+ * without a {@code style-src-attr} CSP violation (ADR-0093).
  *
- * <p>This test loads {@code /materials/profit-calculation}, picks a ship to drive the client render
- * (which materializes a loading row and then a data or no-data row through the migrated code path),
- * asserts the results body renders a row, and asserts no {@code style-src-attr} CSP violation was
- * logged — the pre-fix frontend logs one per status row it injects.
- *
- * <p>Read-only and target-agnostic: it navigates and reads, mutating nothing, so it is safe against
- * a shared deployment. The actor is {@code test-admin}, who may open the trade pages. When the
- * stack has no seeded ships the driving step is skipped and the console guard still runs against
- * the base page.
+ * <p>Read-only; runs as {@code test-admin}. Without seeded ships only the console guard runs.
  */
 @Tag("e2e")
 class MaterialsProfitCalculationRendersE2eTest {
@@ -109,9 +95,6 @@ class MaterialsProfitCalculationRendersE2eTest {
         E2eSupport.navigate(page, baseUrl + "/materials/profit-calculation");
         assertThat(page.locator("#resultsTable")).isVisible();
 
-        // Index 0 is the placeholder option; anything after is a seeded ship. Picking one fires
-        // the profit-update handler, which renders the migrated loading row and then a data or
-        // no-data row into #profitBody — the former-inline-style status <td>s under test.
         if (page.locator("#shipSelect option").count() > 1) {
           page.locator("#shipSelect").selectOption(new SelectOption().setIndex(1));
           assertThat(page.locator("#profitBody tr").first())

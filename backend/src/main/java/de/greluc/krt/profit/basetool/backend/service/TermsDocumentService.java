@@ -32,25 +32,11 @@ import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
 /**
- * Assembles the Terms-of-Use document from the message bundle (REQ-SEC-028).
+ * Assembles the Terms-of-Use document from the {@code terms.*} keys of the message bundle
+ * (REQ-SEC-028).
  *
- * <p><strong>The key convention is the structure.</strong> There is no separate schema listing the
- * sections; {@code terms.h1_4} <em>is</em> the declaration that a fourth section exists, and {@code
- * terms.p_4_1} that it opens with a paragraph. Walking the keys means a clause added to the bundle
- * appears in both clients with no code change — which is the property that makes a single source
- * worth having. The convention is documented at the top of the {@code terms.*} block in {@code
- * messages_de.properties}.
- *
- * <p><strong>Walked until a gap, not counted.</strong> Numbering is dense by construction (a
- * document has no section 5 without a section 4), so the walk stops at the first missing key rather
- * than reading a count from somewhere that could disagree with the bundle. A gap therefore
- * truncates the document silently — which is why {@code TermsDocumentStructureTest} asserts that
- * every {@code terms.*} key in the bundle is reachable by this walk, so a mis-numbered key fails
- * the build instead of quietly dropping a clause from a legal text.
- *
- * <p>Nothing is cached. The bundle is already an in-memory resource, Spring's {@code MessageSource}
- * does its own caching, and the document is served rarely — a cache here would only add a way for
- * the served text to lag the deployed text.
+ * <p>The key numbering is the structure: sections, paragraphs and bullets are walked until the
+ * first missing key, so a numbering gap truncates the document. Nothing is cached.
  */
 @Service
 @RequiredArgsConstructor
@@ -136,9 +122,7 @@ public class TermsDocumentService {
    * @param key the message key
    * @param locale the language to render
    * @return the resolved text
-   * @throws IllegalStateException if the key is absent — a Terms page with no title or no "Stand"
-   *     line is not a document worth serving, and failing loudly beats emitting a hole in a legal
-   *     text
+   * @throws IllegalStateException if the key is absent
    */
   private @NotNull String required(@NotNull String key, @NotNull Locale locale) {
     String value = optional(key, locale);

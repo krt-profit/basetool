@@ -25,9 +25,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend's bank booking-request payload (epic #666 F2, REQ-BANK-022/-023).
- * Serves both the requester's "my requests" list and the bank-staff confirmation queue; type/status
- * arrive as enum names rendered through i18n keys.
+ * Frontend mirror of the backend's bank booking-request payload (REQ-BANK-022), used by the
+ * requester's list and the staff confirmation queue; type and status arrive as enum names.
  *
  * @param id the request id
  * @param accountId the target org-unit account id
@@ -41,14 +40,13 @@ import org.jetbrains.annotations.Nullable;
  * @param note the requester's optional note, or {@code null}
  * @param justification the requester's optional justification (Begr&uuml;ndung) for a {@code
  *     WITHDRAWAL} / {@code TRANSFER} (REQ-BANK-045), or {@code null}
- * @param staffNote the confirming bank employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054),
- *     snapshotted on the request at confirmation; {@code null} while the request is pending, on a
- *     rejected/cancelled one and when the employee recorded none
+ * @param staffNote the confirming bank employee's note (REQ-BANK-054), or {@code null} unless
+ *     confirmed with one
  * @param status lifecycle enum name (PENDING / CONFIRMED / REJECTED / CANCELLED)
  * @param requesterHandle the requesting officer/lead's effective-name snapshot
  * @param holderId the holder recorded at confirmation, or {@code null} while not confirmed
- * @param holderHandle the recorded holder's display name (live effective name, snapshot fallback
- *     when the user is gone, REQ-BANK-003), or {@code null} while not confirmed
+ * @param holderHandle the recorded holder's display name (REQ-BANK-003), or {@code null} while not
+ *     confirmed
  * @param resultingTransactionId the booked ledger transaction id, or {@code null} while not
  *     confirmed
  * @param deciderHandle the deciding bank employee's handle, or {@code null} while pending/cancelled
@@ -60,20 +58,19 @@ import org.jetbrains.annotations.Nullable;
  * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
  *     (REQ-BANK-041)
  * @param applicableLimit the requester's resolved approval limit, or {@code null} = unlimited
- * @param requiredApprover which approver class a flagged request needs (REQ-BANK-041/-046) — {@code
- *     RESPONSIBLE_HOLDER} / {@code BANK_MANAGEMENT} / {@code ORGANISATIONSLEITUNG}, or {@code null}
- *     when no approval is needed
+ * @param requiredApprover the approver class a flagged request needs ({@code RESPONSIBLE_HOLDER} /
+ *     {@code BANK_MANAGEMENT} / {@code ORGANISATIONSLEITUNG}), or {@code null} when none is needed
  * @param ownerApprovalGranted whether the responsible holder has granted in-app approval
  * @param ownerApprovalGrantedByHandle the responsible holder's handle who granted approval, or
  *     {@code null}
- * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
+ * @param splitEnabled whether a deposit is split by percentage across the squadron accounts on
  *     confirmation (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
  *     null} when not a split
  * @param counterpartyUserId the Empf&auml;nger named on a {@code WITHDRAWAL} request
  *     (REQ-BANK-055), or {@code null} when confirmation should derive the requester
- * @param counterpartyHandle name snapshot of that Empf&auml;nger, the value the request lists
- *     display; {@code null} exactly when none is named
+ * @param counterpartyHandle name snapshot of that Empf&auml;nger; {@code null} exactly when none is
+ *     named
  * @param counterpartyOrgUnitId the Empf&auml;nger's chosen org unit, or {@code null}
  * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
  * @param version the optimistic-locking version echoed on cancel/confirm/reject

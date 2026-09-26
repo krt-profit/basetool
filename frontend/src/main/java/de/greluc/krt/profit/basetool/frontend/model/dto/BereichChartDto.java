@@ -23,20 +23,14 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of one Bereich tier of the multi-Bereich org chart (epic #692, REQ-ORG-026),
- * decoded from {@code GET /api/v1/org-chart}: the Bereich's Bereichsleitung sub-tree plus the
- * Staffeln/SKs reporting into it, tinted by the Bereich's department.
- *
- * <p>{@code department} is the department's enum name (e.g. {@code "PROFIT"}) or {@code null} when
- * unassigned; the template maps it to the {@code --color-dept-*} CSS token. The leadership reuses
- * {@link AreaLeadershipDto} (lead = Bereichsleiter, coordinators = Bereichskoordinatoren, operators
- * = Bereichsoperatoren; commanders always empty).
+ * Frontend mirror of one Bereich of the org chart (REQ-ORG-026): its Bereichsleitung and the
+ * Staffeln and Spezialkommandos reporting into it.
  *
  * @param orgUnitId the Bereich's org-unit id.
  * @param name the Bereich's display name.
  * @param shorthand the Bereich's short tag.
  * @param department the department / Bereichsfarbe enum name, or {@code null} when unassigned.
- * @param leadership the Bereichsleitung sub-tree.
+ * @param leadership the Bereichsleitung sub-tree; its commanders list is always empty.
  * @param squadrons the Bereich's Staffeln, ordered by name.
  * @param specialCommands the Bereich's Spezialkommandos, ordered by name.
  */

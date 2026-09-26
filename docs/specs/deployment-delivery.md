@@ -768,8 +768,8 @@ PostgreSQL's clean shutdown.
   booted under its unit's hardening once (clean start + healthcheck).
 
 **Enforced by:** `docker-compose.yml` (all `prod` services) · `scripts/generate-quadlet.py` and the
-generated `quadlet/systemd/*.container` · `scripts/check-conformance.py` · verification recipe in the
-service comments · **Decisions:** ADR-0189, ADR-0190
+generated `quadlet/systemd/*.container` · `scripts/check-conformance.py` · **Decisions:** ADR-0189,
+ADR-0190
 
 ### REQ-OPS-015 — Host-side signature verification before apply
 
@@ -1094,16 +1094,18 @@ time; (3) `ContainerPidsHigh` as the runtime backstop for a task leak from any *
 true`) · `docker-compose.monitoring.yml` (`x-mon-base` anchor, `init: true`) ·
 `.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` check of
 [`repo-lint.yml`](../../.github/workflows/repo-lint.yml), with a self-test that keeps it from
-passing vacuously) · verification recipe in the `x-backend` service comment
+passing vacuously) · the spot-checks in the acceptance list above
 
 ### REQ-OPS-020 — Container resource limits are derived from measurement, never from a ratio
 
 Every `memory:` and `cpus:` limit in `docker-compose.yml` and `docker-compose.monitoring.yml`, and
 every runtime sizing knob derived from one (`MaxRAMPercentage`, `GOMEMLIMIT`, Postgres
 `shared_buffers` / `effective_cache_size` / `work_mem`, Redis `maxmemory`, HikariCP
-`maximum-pool-size`), is **derived from a production measurement and carries that measurement in a
-comment next to the value**. Changing any of them without a measurement to point at is a defect,
-even when the direction is "safer".
+`maximum-pool-size`), is **derived from a production measurement, and that measurement is recorded
+in the [sizing ledger](#sizing-ledger) below**. Changing any of them without a measurement to point
+at is a defect, even when the direction is "safer".
+
+Amended 2026-09-25 (ADR-0214): the measurements moved from compose comments into this ledger.
 
 This requirement exists because the same error class has shipped four separate times, always by
 applying a **percentage or a ratio** where a **budget** was needed:
@@ -1149,19 +1151,86 @@ applying a **percentage or a ratio** where a **budget** was needed:
    forbidden but requires an explicit owner decision recorded in ADR-0085, because the sum bounds
    the pathological simultaneous-spike case the limits exist to survive.
 
-**Enforced by:** the sizing comments in `docker-compose.yml` (the `POSTGRES SIZING`, `STACK
-RESOURCE BUDGET` and `JVM CONTAINER SIZING` blocks) and `docker-compose.monitoring.yml` (the `GO
-SERVICE MEMORY SIZING` block and the CPU-limit rationale) · the measurement runbook in
+#### Sizing ledger
+
+Host: Hetzner CPX42, 8 vCPU / 16 GB (15.24 GiB MemTotal). Unless a row says otherwise, figures are
+the 7-day production peaks ending 2026-08-03 (#937); "2026-09-13" rows are the CPU re-measurement
+under real use, whose stall is `throttled seconds / throttled periods`. A CPU quota is a burst
+ceiling (rule 5), so its headroom is the stall it removes, not a multiple.
+
+**Sum of memory limits** (recomputed 2026-09-25 from the declared values): app 9792 MiB +
+monitoring 4208 MiB = **14 000 MiB (13.67 GiB)**, under ADR-0085's ~14 GB trigger. The 2026-09-13
+figure of 4368 MiB monitoring still counted `cadvisor` (128M) and the docker-socket proxy (32M),
+both removed 2026-09-22. CPU quotas total 17.0 vCPU on 8 physical (overcommit is intended).
+
+`docker-compose.yml`
+
+| Service     | Knob                                        | Value                | Measured figure                                                                                                   | Headroom                                                                                   |
+|-------------|---------------------------------------------|----------------------|-------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
+| db-backend  | `memory`                                    | 1536M                | working-set peak 295 MB; database 107.7 MB                                                                        | 5.2× peak; not cut further (a DB OOM costs a recovery cycle)                               |
+| db-backend  | `cpus`                                      | 4.0                  | 2026-09-13: 161.1 s throttled over 703 events in 29 h (229 ms stall) at 0.024 cores average                       | burst room for one backend process per Hikari connection                                   |
+| db-backend  | `shared_buffers`                            | 384MB                | database 107.7 MB, cache hit 99.990 %                                                                             | 3.6× the database; re-review when the DB quadruples                                        |
+| db-backend  | `effective_cache_size`                      | 1024MB               | host MemAvailable ≥ 9.84 GiB throughout                                                                           | 9.5× the database (planner estimate, not an allocation)                                    |
+| db-backend  | `work_mem` / `maintenance_work_mem`         | 8MB / 64MB           | 0 temp files                                                                                                      | proven sufficient; unchanged                                                               |
+| db-backend  | `max_connections`                           | 150                  | peak 31 / average 4.7                                                                                             | covers the 100-slot Hikari pool + exporter, Flyway, admin                                  |
+| db-keycloak | `memory`                                    | 512M                 | working-set peak 87 MB; database 39.4 MB                                                                          | 5.9× peak                                                                                  |
+| db-keycloak | `cpus`                                      | 1.0                  | 23 s throttled in 7 days, peak ratio 1.5 %, average 0.132 %                                                       | unchanged                                                                                  |
+| db-keycloak | `shared_buffers` / `effective_cache_size`   | 128MB / 384MB        | database 39.4 MB, cache hit 99.998 %                                                                              | 3.3× / ~10× the database                                                                   |
+| db-keycloak | `work_mem` / `maintenance_work_mem`         | 4MB / 32MB           | 0 temp files                                                                                                      | proven sufficient; unchanged                                                               |
+| db-keycloak | `max_connections`                           | 120                  | peak 20 / average 3.0                                                                                             | covers Keycloak's ~100 pool + exporter, admin                                              |
+| keycloak    | `memory` (the image's heap is ~70 % of it)  | 2560M                | working-set peak 922 MB (36 %), `rss` 32.7 %; heap 729 committed / 400 used of ~1792 MB; GC ≤ 0.07 %              | 2.8× working set; kept for the 5000-account token/refresh burst                            |
+| keycloak    | `cpus`                                      | 3.0                  | 2026-09-13: 34.3 s over 216 events in 13 h (159 ms stall)                                                         | burst ceiling; each stall is login latency                                                 |
+| backend     | `memory`                                    | 2048M                | working set 1108 MB (2026-07-25); `rss` 55.6 %                                                                    | 1.8× working set; the 2048M → 1792M lever (ADR-0085) stays un-taken                        |
+| backend     | `MaxRAMPercentage` / `InitialRAMPercentage` | 57 / 35              | heap 684 committed / 647 used; overhead 438 MB (nonheap 230 + other native 208, 2026-07-25)                       | ceiling 1167 MB = 1.7× committed; 1167 + 438 = 1605 MB = 78 % of limit; initial 717 MB     |
+| backend     | `cpus`                                      | 3.0                  | 2026-09-13: 19.2 s over 418 events in 13 h (46 ms stall)                                                          | burst ceiling                                                                              |
+| backend     | Hikari `maximum-pool-size` (application-prod.yml) | 100            | active peak 10, total 30, pending 0, timeouts 0, acquire max 0.444 s                                              | ~10× demand; kept for the ADR-0078 live-update burst; re-open only if pending stays 0 through one |
+| redis       | `memory`                                    | 512M                 | `rss` peak 28.5 MB (5.6 %)                                                                                        | above `maxmemory` for the RDB/AOF-rewrite fork's copy-on-write pages                       |
+| redis       | `maxmemory` (`noeviction`)                  | 384mb                | used peak 7.07 MB (1.8 %), 8191 keys, 0 evictions; linear projection to 5000 accounts ≈ 43 MB                      | ~9× the projection; at the ceiling writes are refused (ADR-0079)                           |
+| redis       | `cpus`                                      | 1.0                  | 545 s throttled in 7 days (0.661 % average); use 0.015 cores at peak                                              | burst room for the single-threaded loop plus AOF/RDB threads                               |
+| frontend    | `memory`                                    | 1792M                | heap 529 committed (2026-07-25), 493 committed / 472 used (#937); overhead ~406–420 MB                            | at HotSpot's 1792 MB server-class line (ADR-0175); G1 is also set explicitly               |
+| frontend    | `MaxRAMPercentage` / `InitialRAMPercentage` | 50 / 35              | as above                                                                                                          | ceiling 896 MB = 1.7× committed; 896 + ~420 = 73 % of limit; initial 627 MB                |
+| frontend    | `cpus`                                      | 2.0                  | 1506 s throttled in 7 days (0.725 % average, 66.7 % peak ratio); 5-minute peak 0.18 cores                         | burst ceiling for render + JIT bursts                                                      |
+| ingest      | `memory`                                    | 512M                 | working set 337 MB (66 %, 2026-07-25); `rss` 69.9 %                                                               | 77 % worst case (below)                                                                    |
+| ingest      | `MaxRAMPercentage` / `InitialRAMPercentage` | 60 / 50              | heap 248 committed / 118 used; overhead 89 MB                                                                     | ceiling 307 MB = 1.2× committed; 307 + 89 = 396 MB = 77 % of limit; Serial GC by choice    |
+| ingest      | `cpus`                                      | 1.5                  | 452 s throttled in 7 days (0.245 % average, 76.7 % peak ratio); 5-minute peak 0.10 cores                          | burst room for handshake + JWT + relay                                                     |
+| edge        | `memory` / `cpus`                           | 192M / 1.0           | none recorded                                                                                                     | measure before the next change                                                             |
+| acme        | `memory` / `cpus`                           | 128M / 0.5           | none recorded                                                                                                     | measure before the next change                                                             |
+
+JVM overhead is `nonheap + other native` and is budgeted absolutely: `ceiling + overhead ≤ ~80 %` of
+the limit (rule 3). Every JVM figure above was measured with 96-bit object headers and on the
+collector of its time; REQ-OPS-030's pending re-measurement replaces them.
+
+`docker-compose.monitoring.yml` — every service is Go; `GOMEMLIMIT` is 75 % of the limit unless the
+row says otherwise, checked against the live heap (`go_memstats_heap_alloc_bytes`). No service here
+has a `cpus:` quota, deliberately: all containers together averaged 0.256 cores (3.2 % of the host)
+with this stack under half of it, and a throttled exporter or Prometheus gaps the very series an
+incident needs. The memory limit plus `oom_score_adj` is the runaway guard.
+
+| Service                    | `memory` | `GOMEMLIMIT`       | Measured figure                                                                                                              | Headroom                                                               |
+|----------------------------|----------|--------------------|------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| prometheus                 | 1024M    | 900MiB (88 %)      | live heap 225.1 MiB, resident 336.0 MiB, `rss` 32.8 %                                                                        | 4.0× heap; the 88 % is a recorded exception for 180-day WAL replay     |
+| grafana                    | 1024M    | 768MiB             | working-set peak 528.7 MiB (51.6 %); not scraped, so no `go_*`; 192M and 512M both OOM-cycled                                | 1.9× working set                                                       |
+| loki                       | 384M     | 288MiB             | live heap 76.7 MiB; anon 261.3 MiB (68.0 %)                                                                                  | 3.8× heap                                                              |
+| tempo                      | 1G       | 768MiB             | 7 days to 2026-08-29 (#1705): `rss` peak 665.3 MiB (65.0 %), working set 819.5 MiB; heap sawtooth peak 641.6 MiB             | 1.5× `rss`; re-measure first at an image or trace-volume change        |
+| alloy (local stacks only)  | 512M     | 360MiB (budget)    | 21 days to 2026-08-02: `rss` flat 190–217 MB, heap 154 MiB, non-Go overhead ~47 MiB, anon 40.5 %                              | 360 + 47 = 407 MiB ≈ 80 %; on production a host service, same budget   |
+| alertmanager               | 48M      | 36MiB              | live heap 7.7 MiB; anon 23.2 MiB (48.3 %)                                                                                    | 4.7× heap                                                              |
+| node-exporter              | 32M      | 24MiB              | live heap 2.6 MiB; anon 10.7 MiB (33.4 %)                                                                                    | 9.2× heap; on production a host service with its own drop-in           |
+| postgres-exporter-backend  | 32M      | 24MiB              | live heap 3.6 MiB; anon 13.6 MiB (42.4 %)                                                                                    | 6.7× heap                                                              |
+| postgres-exporter-keycloak | 32M      | 24MiB              | live heap 3.4 MiB; anon 42.3 %                                                                                               | 7.1× heap                                                              |
+| redis-exporter             | 32M      | 24MiB              | no `go_*` (Go collector disabled); anon 12.8 MiB (40.0 %)                                                                    | 2.5× anon                                                              |
+| blackbox-exporter          | 64M      | 44MiB              | live heap 9.8 MiB; anon 47.6 % (was 30.5 MiB = 95.3 % of the former 32M, 2026-08-02)                                         | 4.5× heap                                                              |
+
+**Enforced by:** the [sizing ledger](#sizing-ledger) above · the measurement runbook in
 [`monitoring/README.md`](../../monitoring/README.md) → "Container memory sizing" · the capacity rule
 and its measured revisions in [ADR-0085](../adr/0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md).
 
 **Acceptance**
 
-- Every `memory:` / `cpus:` value in either compose file has an adjacent comment naming the measured
-  figure it was derived from and the multiple of headroom it retains.
+- Every limit and derived knob has a row in the sizing ledger naming the measured figure and the
+  headroom it retains; a changed limit changes its row in the same PR.
 - No sizing change is merged whose justification is a percentage of the container limit, a
   round-number bump, or "to be safe", without a measurement.
-- The sum of limits is recomputed and recorded whenever any limit changes.
+- The sum of limits is recomputed and recorded in the ledger whenever any limit changes.
 
 ### REQ-OPS-021 — Each image is built once per change of its inputs; the release tag and main pushes re-tag the rest
 
@@ -1869,7 +1938,7 @@ defect whether or not ergonomics currently picks the intended one:
 | `backend`  | 2048M | `-XX:+UseG1GC`                                                                                                                         |
 | `ingest`   | 512M  | `-XX:+UseSerialGC` — deliberate; a relay that is idle between bursts does not benefit from G1, and Serial's native overhead is smaller |
 
-The sizing rule in `docker-compose.yml` gains a clause with this: **a memory-limit change that
+The REQ-OPS-020 sizing rule gains a clause with this: **a memory-limit change that
 crosses 1792 MB changes the collector**, with a different heap layout, different native overhead and
 different pause behaviour. It must be made deliberately, not discovered afterwards — which is the
 whole reason the flag is mandatory rather than advisory.
@@ -1890,8 +1959,8 @@ whole reason the flag is mandatory rather than advisory.
 - [x] The running collector is verifiable without reading a flag: `jvm_gc_pause_seconds_count`
   carries `gc="G1 Young Generation"` for G1 and `gc="Copy"` + `gc="MarkSweepCompact"` for Serial.
 
-**Code:** `docker-compose.yml` (the `JVM CONTAINER SIZING` block and each service's
-`JAVA_TOOL_OPTIONS`) · **Decision:**
+**Code:** `docker-compose.yml` (each service's `JAVA_TOOL_OPTIONS`) · the REQ-OPS-020
+[sizing ledger](#sizing-ledger) · **Decision:**
 [ADR-0175](../adr/0175-jvm-garbage-collectors-are-set-explicitly.md)
 
 ### REQ-OPS-029 — A release announces every artifact it publishes
@@ -1973,9 +2042,9 @@ in ADR-0209 — with nothing failing. The check rules in both directions.
   `<svc>-stdout` stream, and the Loki rule **`JvmStartupCacheRejected`** (warning) fires on them.
   `scripts/check-loki-rule-signatures.py` holds the rule to the verbatim lines.
 
-**The heap saving does not license a smaller budget until it is measured.** Every figure in the
-`JVM CONTAINER SIZING` block of `docker-compose.yml` was measured with 96-bit headers and is the
-*before* side of this change. Limits and `MaxRAMPercentage` values stay exactly as REQ-OPS-020 and
+**The heap saving does not license a smaller budget until it is measured.** Every JVM figure in the
+REQ-OPS-020 [sizing ledger](#sizing-ledger) was measured with 96-bit headers and is the *before*
+side of this change. Limits and `MaxRAMPercentage` values stay exactly as REQ-OPS-020 and
 ADR-0175 left them until a post-deploy re-measurement replaces the table — the same one-variable-at-
 a-time rule the collector change had to learn (ADR-0175: the previous table compared figures taken
 on two different collectors).
@@ -1984,8 +2053,8 @@ on two different collectors).
 
 - [x] `backend`, `frontend` and `ingest` each pass `-XX:+UseCompactObjectHeaders` in
   `JAVA_TOOL_OPTIONS`.
-- [x] The image's training run passes the same flag, and both sides carry a comment naming the
-  other.
+- [x] The image's training run passes the same flag; the table above names both places.
+  Amended 2026-09-25 (ADR-0214): this item used to require a comment on each side naming the other.
 - [x] The image build fails when the training run does not complete the context refresh, when no
   cache is written, or when a start under `-XX:AOTMode=on` with the image's layout refuses the cache
   (verified 2026-09-23 with two deliberately broken ingest builds — a verifying start under the
@@ -2007,7 +2076,7 @@ on two different collectors).
   alert are the measurement instrument, and the 90 % `ContainerMemoryHigh` line can only move
   further away.
 - [ ] Re-measured on production after a full week under the new layout, with the snapshot queries in
-  `monitoring/README.md`, and the new table written into the `JVM CONTAINER SIZING` block. Freed
+  `monitoring/README.md`, and the new figures written into the REQ-OPS-020 sizing ledger. Freed
   headroom may be spent only after that.
 
 **Code:** `docker-compose.yml` and `quadlet/env.d/*.env.tmpl` (each service's `JAVA_TOOL_OPTIONS`) ·

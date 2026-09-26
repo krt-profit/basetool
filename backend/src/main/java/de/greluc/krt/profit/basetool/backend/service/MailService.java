@@ -24,12 +24,8 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Channel-agnostic seam for sending a transactional e-mail (REQ-NOTIF-013).
  *
- * <p>Sending is <b>best-effort</b>: an implementation MUST NOT throw on a delivery failure, a
- * disabled channel or an unconfigured transport — it logs and returns, so a caller (typically an
- * after-commit event listener) never has its already-committed business outcome affected by mail.
- * Reusable by any producer; the first user is the account approval/rejection mail ({@code
- * UserApprovalMailService}), and the in-app notification system can adopt it later as a second
- * channel.
+ * <p>Sending is best-effort: an implementation must not throw on a delivery failure, a disabled
+ * channel or an unconfigured transport; it logs and returns.
  */
 public interface MailService {
 

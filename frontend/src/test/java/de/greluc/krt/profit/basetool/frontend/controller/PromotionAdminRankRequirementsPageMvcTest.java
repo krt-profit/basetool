@@ -51,22 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders {@code /promotion/admin/rank-requirements} as an OFFICER and asserts the toolbar create
- * button AND the inline event-handler registration survive end-to-end.
- *
- * <p>Regression guard for the silent template truncation that turned the "NEUE ANFORDERUNG" button
- * into a no-op. The page inlines a {@code Map<UUID, List<PromotionCategoryDto>>} into the bottom
- * {@code <script>} block via {@code [[${categoriesByTopic}]]}. The custom {@code
- * JavaTimeAwareJavaScriptSerializer} called {@code ObjectMapper.writeValue(writer, ...)} on
- * Thymeleaf's shared template writer; with Jackson's {@code AUTO_CLOSE_TARGET} default the writer
- * was closed immediately after the JSON was emitted, so every byte that followed (the message
- * bundle inlines, the {@code openCreateModal} helper, and the {@code window.krtEvents.on('click',
- * 'ar-open-create', ...)} wiring) was dropped. The page still rendered 200 OK but with an
- * unterminated {@code <script>} block, leaving the create button orphaned. Post-ADR-0069 the map
- * lives in the inline bootstrap with the page module loaded via {@code th:src} right after it; the
- * assertions below pin the map's JSON and that following {@code th:src}, so a re-introduced writer-
- * closing serializer (truncating the bootstrap and dropping the module tag) is still caught at the
- * test layer instead of in production.
+ * Renders {@code /promotion/admin/rank-requirements} as an OFFICER and verifies that the inline
+ * {@code categoriesByTopic} JSON bootstrap is complete and followed by the page module's {@code
+ * th:src} tag, so the create button stays wired.
  */
 @SpringBootTest
 class PromotionAdminRankRequirementsPageMvcTest {
@@ -112,7 +99,6 @@ class PromotionAdminRankRequirementsPageMvcTest {
             null,
             null);
 
-    // OrgUnitContextAdvice fan-out: squadrons list + non-admin /me/active-org-unit lookup.
     PageResponse<SquadronDto> squadronPage =
         new PageResponse<>(
             List.of(new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, true, false, 0L)),
@@ -123,8 +109,6 @@ class PromotionAdminRankRequirementsPageMvcTest {
             List.of());
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(squadronPage);
-    // availableSquadrons() reads the catalogue through the SQUADRON cache (getCached) now
-    // (REQ-DATA-007); stub that path too or the officer's promotion-feature flag resolves empty.
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(squadronPage);
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
@@ -143,15 +127,9 @@ class PromotionAdminRankRequirementsPageMvcTest {
     mockMvc
         .perform(get("/promotion/admin/rank-requirements"))
         .andExpect(status().isOk())
-        // The create button must be present with its data-trigger so the inline JS wiring
-        // can find it.
         .andExpect(content().string(containsString("data-trigger=\"ar-open-create\"")))
-        // The page loads the extracted rank-requirements module (ADR-0069, rendered with a real
-        // nonce) whose tail wires the ar-* click handlers.
         .andExpect(
             content().string(containsString("src=\"/js/promotion-admin-rank-requirements.js\"")))
-        // The Thymeleaf-inlined categories map (now in the bootstrap) must be valid JSON, not the
-        // literal placeholder.
         .andExpect(
             content()
                 .string(containsString("var AR_CATEGORIES_BY_TOPIC = {\"" + topicId + "\":[")));

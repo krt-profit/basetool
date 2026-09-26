@@ -1,18 +1,4 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Self-test for scripts/lib/container-runtime.sh — the seam Phase 3 puts between
-# the operational scripts and the container runtime.
-#
-# No daemon, no containers, no network: `podman`, `skopeo` and `systemctl` are
-# stubbed on PATH and record what they were called with, which is the same
-# harness deploy.test.sh already uses.
-#
-# Rootless Podman only, since 2026-09-22 (OPS-SIMP-01): the Docker half of the
-# seam, and with it every assertion this file made twice, was removed with the
-# retired Docker host.
-#
-#   bash scripts/container-runtime.test.sh
-# =============================================================================
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,13 +17,8 @@ BIN="${WORK}/bin"
 LOG="${WORK}/calls.log"
 mkdir -p "$BIN"
 
-# A stub that records its argv and can be told to fail. `STUB_FAIL` holds a
-# space-separated list of substrings; an invocation matching one exits 1.
 make_stub() {
   local name="$1" extra="${2:-}"
-  # An ABSOLUTE interpreter: `#!/usr/bin/env bash` makes env search PATH for
-  # bash, and the detection scenarios deliberately run under a PATH that may not
-  # contain it.
   local bash_path; bash_path="$(command -v bash)"
   cat > "${BIN}/${name}" <<STUB
 #!${bash_path}
@@ -62,15 +43,10 @@ make_stub skopeo 'echo "{\"Digest\":\"sha256:22222222222222222222222222222222222
 make_stub systemctl
 export PATH="${BIN}:${PATH}"
 
-# Runs a snippet with the library loaded and a clean call log.
-# $1 backend, $2 shell snippet. Prints the snippet's stdout; the log is in $LOG.
 run_rt() {
   local backend="$1" snippet="$2"
   : > "$LOG"
   # shellcheck disable=SC2030,SC2031
-  # The subshell IS the isolation: every case must start from an unset RT_*, or
-  # one test's detection result leaks into the next and the suite passes by
-  # accident. shellcheck warns that the change is local, which is the intent.
   (
     set +e
     export RT_BACKEND="$backend"
@@ -82,7 +58,6 @@ run_rt() {
   )
 }
 
-# $1 label, $2 backend, $3 snippet, $4 substring the call log must contain
 expect_call() {
   local label="$1" backend="$2" snippet="$3" want="$4"
   run_rt "$backend" "$snippet" >/dev/null 2>&1
@@ -93,7 +68,6 @@ expect_call() {
   fi
 }
 
-# $1 label, $2 backend, $3 snippet, $4 substring the call log must NOT contain
 expect_no_call() {
   local label="$1" backend="$2" snippet="$3" unwanted="$4"
   run_rt "$backend" "$snippet" >/dev/null 2>&1
@@ -102,7 +76,6 @@ expect_no_call() {
   else ok "$label"; fi
 }
 
-# $1 label, $2 backend, $3 snippet, $4 expected stdout substring
 expect_out() {
   local label="$1" backend="$2" snippet="$3" want="$4" got
   got="$(run_rt "$backend" "$snippet" 2>/dev/null)"
@@ -112,32 +85,12 @@ expect_out() {
 }
 
 say "== detecting the runtime, which is where this class of bug lives =="
-# The equivalent code in check-conformance.py INFERRED the rootless user from a
-# glob over a 0750 directory it could not read, silently fell back to the wrong
-# user, and reported `no such object` for eight healthy containers. So detection
-# is asserted here rather than assumed: it must pick what actually answers.
-# The scenarios below must see ONLY the CLIs each one names, so the PATH they run
-# under carries the scenario directory plus a hand-built set of coreutils -- and
-# nothing else.
-#
-# `PATH="$1:/usr/bin:/bin"` was the first attempt and it is not isolation: a
-# GitHub runner has a real, working /usr/bin/podman as well as a docker, so "a
-# host with neither" detected one and the suite went red there while passing on a
-# workstation. Green for the wrong reason, in the file whose whole subject is
-# detection.
 MINIMAL="${WORK}/coreutils"
 mkdir -p "$MINIMAL"
 for util in bash sh env id basename getent cut ls sudo sleep stat; do
   util_path="$(command -v "$util" 2>/dev/null)" || continue
   ln -sf "$util_path" "${MINIMAL}/${util}" 2>/dev/null     || cp "$util_path" "${MINIMAL}/${util}" 2>/dev/null || true
 done
-# STAGED IS NOT THE SAME AS RUNNABLE, and the difference is not cosmetic. Where
-# `ln -sf` copies instead of linking -- MSYS/Git Bash on Windows -- a copied
-# binary cannot find its runtime library and exits 127 with "error while loading
-# shared libraries". Detection calls `id -un`, so a broken `id` there made
-# rt_detect take a branch on an EMPTY username, which is the exact condition the
-# library now guards against. The stage is patched only when a utility genuinely
-# fails to run, so on Linux nothing below happens at all.
 if ! PATH="${MINIMAL}" id -un >/dev/null 2>&1; then
   minimal_srcdir="$(dirname "$(command -v id)")"
   for runtime_lib in "${minimal_srcdir}"/msys-*.dll "${minimal_srcdir}"/cyg*.dll; do
@@ -148,30 +101,23 @@ fi
 if [[ ! -x "${MINIMAL}/bash" ]]; then
   say "  FATAL: could not stage a minimal PATH (no bash found)"; exit 2
 fi
-# Asserted, not hoped for: every case below reads a username out of the staged
-# PATH, and one that cannot produce one tests nothing.
 if PATH="${MINIMAL}" id -un >/dev/null 2>&1; then
   ok "the staged PATH can actually run its utilities"
 else
   bad "the staged PATH cannot run \`id\` — every detection case below is meaningless"
 fi
 
-# A linger directory that does NOT name the current user, which is the state the
-# deploy account is in: it can run podman, and it owns nothing.
 NO_LINGER="${WORK}/linger-none"; mkdir -p "$NO_LINGER"
-# ...and one that does.
 SELF_LINGER="${WORK}/linger-self"; mkdir -p "$SELF_LINGER"
 : > "${SELF_LINGER}/$(id -un)"
 
-detect_in() { # $1 = directory holding the CLIs that exist; prints the backend
+detect_in() {
   # shellcheck disable=SC2030,SC2031
-  # Same reason as run_rt: a leaked RT_BACKEND would make detection untestable.
   (
     set +e
     PATH="$1:${MINIMAL}"
     unset RT_BACKEND RT_CLI RT_SYSTEMCTL
     # shellcheck disable=SC2034
-    # Read by the library sourced on the next line, which shellcheck does not follow.
     RT_LINGER_DIR="${2:-${SELF_LINGER}}"
     # shellcheck disable=SC1090
     . "$LIB"
@@ -179,13 +125,8 @@ detect_in() { # $1 = directory holding the CLIs that exist; prints the backend
   )
 }
 
-# Prints "<backend>|<cli>|<unit dir>" so a case can assert WHICH podman was
-# chosen, not merely that podman was.
 detect_detail() {
   # shellcheck disable=SC2030,SC2031,SC2034
-  # The subshell IS the isolation, as in run_rt. RT_LINGER_DIR reads as unused because its only
-  # consumer is the library sourced two lines below, which shellcheck does not follow; the three
-  # RT_* names are read back out of that same subshell on purpose.
   (
     set +e
     PATH="$1:${MINIMAL}"
@@ -198,10 +139,6 @@ detect_detail() {
     printf '%s|%s|%s' "${RT_BACKEND}" "${RT_CLI}" "${RT_UNIT_DIR}"
   )
 }
-# The isolation is itself asserted, because it is what silently failed: on a
-# runner with /usr/bin/podman the scenarios below are meaningless unless the PATH
-# they run under really cannot reach it. Checking the scenarios without checking
-# this is how the suite went green on a workstation and red in CI.
 if PATH="$MINIMAL" command -v podman >/dev/null 2>&1; then
   bad "the minimal PATH can still reach a podman -- the detection cases prove nothing"
 else
@@ -210,7 +147,6 @@ fi
 
 ONLY_PODMAN="${WORK}/only-podman"; mkdir -p "$ONLY_PODMAN"; cp "${BIN}/podman" "$ONLY_PODMAN/"
 NEITHER="${WORK}/neither"; mkdir -p "$NEITHER"
-# A docker binary on its own is no runtime any more (OPS-SIMP-01): it must be refused, not used.
 ONLY_DOCKER="${WORK}/only-docker"; mkdir -p "$ONLY_DOCKER"
 printf '#!/usr/bin/env bash\nexit 0\n' > "${ONLY_DOCKER}/docker"; chmod +x "${ONLY_DOCKER}/docker"
 
@@ -223,13 +159,6 @@ if [[ -z "$got" ]]; then ok "a working docker alone is refused -- the Docker run
 got="$(RT_BACKEND=docker bash -c '. "$1"; rt_detect' _ "$LIB" 2>&1 || true)"
 if [[ "$got" == *"retired"* ]]; then ok "a preset RT_BACKEND=docker is refused and says why"; else bad "RT_BACKEND=docker was not refused: '${got}'"; fi
 
-# The case that shipped broken. `podman ps` succeeds for EVERY account with a
-# podman binary, against that account's own empty store -- so "can I run podman"
-# answered yes for the deploy account, which owns nothing, and detection stopped
-# there with a bare `podman` and a unit directory under deploy's HOME. Measured on
-# the testing host 2026-09-18: the deployer aborted with "no Quadlet unit
-# directory (/var/lib/iri/.config/containers/systemd)". Lingering is the signal
-# that distinguishes them, and it is the one the sudo bridge already used.
 got="$(detect_detail "$ONLY_PODMAN" "$NO_LINGER")"
 if [[ "${got}" == "podman|podman|"* ]]; then
   bad "a user that merely HAS podman was taken for the owner (got '${got}')"
@@ -245,43 +174,14 @@ fi
 
 say ""
 say "== the boot race: a lingering user whose runtime is not up YET =="
-# Measured on the production host 2026-09-22, the first reboot after the cutover: the backup,
-# cleanup and drill timers carry Persistent=true, their catch-up runs fired at 16:26:02, eleven
-# seconds after boot, and all three died in detection -- user@994.service became active at 16:26:03.
-# They lost by one second, stayed `failed` and paged SystemdUnitFailed critical.
-#
-# And again on 2026-09-25, with the wait for the directory in place: all four jobs started in the
-# same second as user@994.service and died at once, because the directory was there and podman
-# still refused. Reproduced the same day in a systemd container (Rocky 10.2, systemd 257, podman
-# 5.8.2), which is where the two shapes below come from:
-#
-#   * a sandboxed job started BEFORE the runtime tmpfs was mounted never sees the mount -- the
-#     directory it finds is the bare, root-owned mount point, for the job's whole life;
-#   * a job that does see the runtime (read-only, ProtectHome) cannot set up podman's user
-#     namespace itself and can only JOIN the pause process the manager's first container creates:
-#     until then "set sticky bit on: chmod /run/user/<uid>/libpod: read-only file system".
-#
-# These cases run detection through the SUDO BRIDGE, which is the path production takes: the jobs
-# run as the deploy account, which does not linger, and reach the service user through sudo.
 BRIDGE="${WORK}/bridge"; mkdir -p "$BRIDGE"
 cp "${BIN}/podman" "$BRIDGE/"
 REAL_ID="$(command -v id)"
 ABS_BASH="$(command -v bash)"
-# The service user's uid is the CURRENT user's by default, so a fixture directory this test creates
-# is owned by "the service user" -- which is what a mounted runtime looks like from the job
-# (rt_runtime_visible). STUB_SVC_UID set to anything else makes the same directory the bare mount
-# point of a runtime this job cannot see. Every other form of id is the real one, because
-# detection also asks `id -un` for the current user and that answer has to be true.
 MY_UID="$("$REAL_ID" -u)"
-# shellcheck disable=SC2016  # "$1", "$2", "$@" and the variables belong to the stub being written
+# shellcheck disable=SC2016
 printf '#!%s\nif [ "$1" = "-u" ] && [ "$2" = "svcuser" ]; then echo "${STUB_SVC_UID:-%s}"; exit 0; fi\nexec "%s" "$@"\n' \
   "$ABS_BASH" "$MY_UID" "$REAL_ID" > "${BRIDGE}/id"
-# The sudo bridge. Every call is logged, so a case can prove podman was NOT run.
-#   `podman ps`             succeeds once STUB_READY_DIR exists -- on a host, once the manager's
-#                           first container has created the pause process podman joins; otherwise
-#                           it fails the way the sandbox makes it fail, on stderr
-#   `is-system-running`     answers STUB_MANAGER_STATE (default running); "-" is no answer at all
-# Any other sudo call succeeds.
 cat > "${BRIDGE}/sudo" <<STUB
 #!${ABS_BASH}
 printf '%s\n' "\$*" >> "${WORK}/sudo.log"
@@ -303,10 +203,8 @@ LINGER_SVC="${WORK}/linger-svc"; mkdir -p "$LINGER_SVC"; : > "${LINGER_SVC}/svcu
 RUNBASE="${WORK}/run-user"; mkdir -p "$RUNBASE"
 RUNDIR="${RUNBASE}/${MY_UID}"
 
-# Prints "<backend>|<cli>", or nothing when detection refused. $1 = RT_RUNTIME_WAIT.
 detect_bridge() {
   # shellcheck disable=SC2030,SC2031,SC2034
-  # The subshell IS the isolation, as in detect_detail; the RT_* names are read by the library.
   (
     set +e
     : > "${WORK}/sudo.log"
@@ -338,8 +236,6 @@ else
   bad "the boot race is not waited out: got '${got}' after ${elapsed}s -- $(detect_err)"
 fi
 
-# The bound matters as much as the wait. A runtime that never appears must still end in the
-# refusal detection always gave -- later, and saying that it waited.
 rm -rf "${RUNDIR:?}"
 started=$SECONDS
 got="$(detect_bridge 3)"
@@ -351,13 +247,7 @@ else
   bad "a runtime that never comes up was not refused within the bound: got '${got}' after ${elapsed}s -- $(detect_err)"
 fi
 
-# THE 2026-09-25 SHAPE, first half: the directory EXISTS but is not the service user's -- the bare
-# mount point a job sees when its sandbox was built before the runtime was mounted. The old wait
-# looked only for the directory, found it, and let podman refuse at once. Now it is not taken for a
-# runtime: podman is never run against it (with no runtime to find, podman sets up a namespace of
-# its own inside the sandbox, which once left a pause process that broke the stack), and the
-# refusal names the missing ordering.
-mkdir -p "${RUNBASE}/4242"       # exists, and is not owned by the (stubbed) service uid 4242
+mkdir -p "${RUNBASE}/4242"
 export STUB_READY_DIR="${RUNBASE}/4242"
 started=$SECONDS
 got="$(STUB_SVC_UID=4242 detect_bridge 3)"
@@ -370,10 +260,7 @@ else
   bad "the bare mount point was taken for a runtime: got '${got}' after ${elapsed}s, sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log") -- $(detect_err)"
 fi
 
-# Second half, and the case that FAILED on the code before this: the runtime is visible and podman
-# refuses because the manager has not run its first container yet. The manager says `starting`, so
-# that refusal is waited out -- and ends the moment podman can join.
-mkdir -p "${RUNDIR}"                # the runtime is up and visible from here on
+mkdir -p "${RUNDIR}"
 export STUB_READY_DIR="${WORK}/first-container"
 rm -rf "${STUB_READY_DIR:?}"
 ( sleep 3; mkdir -p "${WORK}/first-container" ) &
@@ -388,8 +275,6 @@ else
 fi
 rm -rf "${WORK}/first-container"
 
-# ...bounded as well, and this time the refusal carries podman's own words: the 2026-09-25 line
-# named no cause, because podman's stderr was thrown away.
 export STUB_READY_DIR="${WORK}/never-ready"
 started=$SECONDS
 got="$(STUB_MANAGER_STATE=- detect_bridge 3)"
@@ -401,9 +286,6 @@ else
   bad "a manager that never finishes coming up was not refused within the bound: got '${got}' after ${elapsed}s -- $(detect_err)"
 fi
 
-# The opposite case must NOT wait. A runtime whose manager says it is RUNNING (or degraded) is up,
-# so a podman that refuses is a real answer -- waiting there would only make every genuine refusal
-# two minutes slower.
 for state in running degraded; do
   started=$SECONDS
   got="$(STUB_MANAGER_STATE=${state} detect_bridge 15)"
@@ -415,8 +297,6 @@ for state in running degraded; do
   fi
 done
 
-# And the steady state -- every tick but the first after a boot -- costs nothing new: podman answers
-# first time, so the manager is never asked and nothing waits.
 export STUB_READY_DIR="${RUNDIR}"
 got="$(detect_bridge 15)"
 if [[ "$got" == "podman|sudo -n -u svcuser podman" ]] && ! grep -q "is-system-running" "${WORK}/sudo.log"; then
@@ -428,13 +308,7 @@ unset STUB_READY_DIR
 
 say ""
 say "== waiting for the service user's manager to FINISH starting =="
-# The second half of the same boot. user@994.service was active at 16:26:03 -- it reports ready as
-# soon as the manager runs -- and the manager logged "Startup finished in 1min 30.765s" at 16:27:33.
-# A job that only waited for the runtime would have quiesced the backend while it was still coming
-# up. rt_wait_for_startup waits on the manager's own state instead.
 STARTUP="${WORK}/startup"; mkdir -p "$STARTUP"
-# Answers the next state from STUB_STATES on every call; the last one repeats. "-" stands for a
-# manager that does not answer at all, which prints nothing.
 printf '#!%s\n' "$ABS_BASH" > "${STARTUP}/systemctl"
 cat >> "${STARTUP}/systemctl" <<'STUB'
 read -r -a states <<< "${STUB_STATES}"
@@ -448,7 +322,6 @@ printf '%s\n' "${state}"
 STUB
 chmod +x "${STARTUP}/systemctl"
 
-# Prints "rc=<n> calls=<n>". $1 backend (podman), $2 the states, $3 RT_STARTUP_WAIT.
 startup_case() {
   # shellcheck disable=SC2030,SC2031,SC2034
   (
@@ -466,7 +339,7 @@ startup_case() {
     printf 'rc=%s calls=%s' "$rc" "$(cat "${STUB_COUNTER}" 2>/dev/null || echo 0)"
   )
 }
-expect_startup() { # label backend states wait want
+expect_startup() {
   local got; got="$(startup_case "$2" "$3" "$4")"
   if [[ "$got" == "$5" ]]; then ok "$1"; else
     bad "$1 -- wanted '$5', got '${got}' ($(tr '\n' ' ' < "${WORK}/startup.err"))"
@@ -486,10 +359,6 @@ else
   bad "a stuck startup was not refused within the bound: got '${got}' ($(tr '\n' ' ' < "${WORK}/startup.err"))"
 fi
 
-# The function is only half of it; the other half is WHO calls it. Nothing else exercises the three
-# maintenance scripts end to end, so a refactor that dropped one call would be invisible until the
-# next reboot paged again. And deploy.sh must NOT call it: a stack stuck in `starting` may be exactly
-# what the next release exists to fix, and a deployer that waits for startup could never deliver it.
 for job in backup restore-drill container-cleanup; do
   if awk '/^rt_detect$/ { d = 1; next } d && /^rt_wait_for_startup$/ { found = 1 } END { exit !found }' \
        "${HERE}/${job}.sh"; then
@@ -506,12 +375,6 @@ fi
 
 say ""
 say "== what starts the jobs at boot, and what they are ordered after =="
-# Every iri-*.timer carried `Requires=<its service>` until 2026-09-25. That makes starting the TIMER
-# start the service -- at every boot, when timers.target pulls the timers in -- without the timer
-# elapsing and without LastTrigger moving. It is why all four deploy-account jobs ran one second
-# into the 2026-09-25 reboot although none was due, and why iri-deploy's OnBootSec=5min never held.
-# Reproduced in a systemd container the same day: the service started 3 ms after its timer.
-# A directive in a comment does not count, so only lines that start with the key are read.
 timers=0
 for timer in "${HERE}"/iri-*.timer; do
   [[ -e "${timer}" ]] || continue
@@ -530,10 +393,6 @@ for timer in "${HERE}"/iri-*.timer; do
 done
 (( timers >= 6 )) || bad "expected the six iri-*.timer files beside this suite, found ${timers}"
 
-# The ordering drop-in: the four deploy-account units wait for the service user's manager, so their
-# sandbox is built after the runtime is mounted -- a sandbox built before it never sees it. After=
-# only: a Wants= would make a tick start a manager an operator had stopped, and every container
-# with it. The uid is the role's to fill in, so the template and the task are what is checked.
 ROLE="${HERE}/../ansible/roles/basetool_host"
 ORDER_TMPL="${ROLE}/templates/iri-deploy-account-order.conf.j2"
 if grep -Eq '^After=.*systemd-logind\.service' "${ORDER_TMPL}" 2>/dev/null \
@@ -578,11 +437,6 @@ expect_out  "...and success when it does" podman \
 
 say ""
 say "== pre-pulling the release, where a service name and a reference are NOT the same thing =="
-# The regression this section exists for. rt_pull once took SERVICE NAMES, which
-# `docker compose pull` could resolve through the compose file and podman cannot:
-# `podman pull backend` is a bare name resolved against the host's
-# unqualified-search registries, which fails and, at a call site running under
-# `set -e`, aborted every Podman deploy at "pulling images". It takes the pair.
 PULL_PAIRS="'backend=ghcr.io/krt-profit/basetool-backend@sha256:3333333333333333333333333333333333333333333333333333333333333333' 'ingest=ghcr.io/krt-profit/basetool-ingest@sha256:4444444444444444444444444444444444444444444444444444444444444444'"
 expect_call "podman pulls the REFERENCE, the only form it can resolve" podman \
   "rt_pull ${PULL_PAIRS}" \
@@ -628,10 +482,6 @@ if [[ ! -f "$PIN" ]]; then ok "clearing the pin removes the file"; else bad "the
 
 say ""
 say "== the pin's TWO halves, and the rollback that has to restore both =="
-# The trap this section exists for: under Quadlet the running stack is bound by
-# the DROP-INS, not by the record. Restoring only the record on rollback leaves
-# the new digests bound, so the "rollback" silently rolls FORWARD into the very
-# release whose health check just failed.
 PINDIR="${WORK}/pinstate"; mkdir -p "$PINDIR"
 pin_env() {
   printf 'export RT_PIN_FILE=%q RT_PIN_FILE_PREVIOUS=%q;' \
@@ -648,14 +498,11 @@ if grep -q '^Image=img@sha256:OLD$' "$DROPIN" 2>/dev/null; then
   ok "...and the drop-in binds it"
 else bad "the drop-in does not bind it"; fi
 
-# Round-trip: the record must read back into exactly what was written, because
-# that is the only place the previous digests survive an overwrite.
 got="$(run_rt podman "$(pin_env) rt_pin_record_pairs \"${PINDIR}/current.yml\"" 2>/dev/null | tr '\n' ' ')"
 if [[ "$got" == *"backend=img@sha256:OLD"* && "$got" == *"ingest=img2@sha256:OLDI"* ]]; then
   ok "the record round-trips into service=reference pairs"
 else bad "the record did not round-trip: '${got}'"; fi
 
-# Now the sequence a real deploy runs: save, apply a NEW pin, then roll back.
 run_rt podman "$(pin_env) rt_pin_save; rt_pin_apply backend=img@sha256:NEW" >/dev/null 2>&1
 if grep -q '^Image=img@sha256:NEW$' "$DROPIN" 2>/dev/null; then
   ok "applying a new pin rebinds the drop-in"
@@ -669,25 +516,14 @@ if grep -q '^Image=img@sha256:OLD$' "$DROPIN" 2>/dev/null; then
 else
   bad "rollback left the drop-in on the failed release: $(grep '^Image=' "$DROPIN" 2>/dev/null)"
 fi
-# And a rollback with no anchor must refuse rather than pretend.
 if run_rt podman "$(pin_env) rm -f \"${PINDIR}/previous.yml\"; rt_pin_rollback" >/dev/null 2>&1; then
   bad "rollback reported success with no previous pin to roll back to"
 else ok "rollback with no anchor fails instead of silently doing nothing"; fi
 
 say ""
 say "== lifting a file out of an image without running it =="
-# A TAR STREAM under podman, because RT_CLI is `sudo -u <svc> podman` there and a direct copy
-# would have the service user write into the deploy account's directory ("mkdir /docker:
-# permission denied"). The pipe is what crosses the account boundary.
 expect_call "podman creates, streams a tar out, and removes" podman \
   'rt_extract_from_image img:tag /a /b' 'cp created-cid:/a -'
-# The bundle images declare no CMD and no ENTRYPOINT, so `create` refuses them
-# without an argument -- one that is never executed, but has to be there.
-# The two shapes the one helper serves, and the reason it has to tell them apart. The config
-# bundle extracts a TREE into a directory; the Keycloak provider JAR is ONE FILE at a path. The
-# first version unpacked both with `tar -x -C`, which for the second means "extract into a
-# directory named keycloak-spi-stage.jar" -- and tar said so:
-#   tar: /var/lib/iri/keycloak-spi-stage.jar: Cannot open: No such file or directory
 expect_call "a trailing slash means a tree, unpacked in place" podman   'rt_extract_from_image img:tag /config/. /tmp/rt-extract-dir/' 'cp created-cid:/config/. -'
 expect_no_call "...and a tree is never streamed to a single file" podman   'rt_extract_from_image img:tag /config/. /tmp/rt-extract-dir/' 'xOf'
 
@@ -703,9 +539,6 @@ say "== pruning must never reach a volume, because they hold the databases =="
 expect_no_call "no system prune" podman 'rt_prune' 'system prune'
 expect_no_call "no volume prune" podman 'rt_prune' 'volume prune'
 expect_call    "images and networks only" podman 'rt_prune' 'image prune --force'
-# `until=` is what keeps the images this deploy just pulled -- the ones a rollback
-# still needs. Pruning those would make the rollback re-pull from a registry that
-# may be exactly what is broken.
 expect_call    "the age filter that protects the rollback images" podman \
   'rt_prune_images 720h' 'image prune --force --filter until=720h'
 
@@ -714,36 +547,21 @@ say "== the monitoring plane, a set of units told apart from the stack by name =
 mon() { printf 'export RT_MONITORING_SERVICES=%q;' "prometheus loki grafana"; }
 
 # shellcheck disable=SC2016
-# The snippets below are passed to `eval` inside run_rt, so `${WORK}` is expanded THERE, in the
-# subshell that has the library loaded. Expanding it here would be the bug, not the fix.
-#
-# The defect that would have shipped. `systemctl start` on an ALREADY ACTIVE unit returns 0 and
-# re-reads nothing, so a changed digest pin never reaches the running container: measured on the
-# testing host, the drop-in named a new image, `start` returned 0, and the container went on
-# running the old one while the deploy reported success.
-# Since 2026-09-25 (ADR-0213) the recreate is a STOP followed by the start pass, never a restart:
-# a restart travels along Requires= and a second restart of a dependent re-runs it.
-# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+# shellcheck disable=SC2016
 expect_call "a service this run re-pinned is STOPPED, so the start that follows creates it anew" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:aaaa"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'systemctl --user stop backend.service'
-# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+# shellcheck disable=SC2016
 expect_call "...and then started" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:abab"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'systemctl --user start backend.service'
-# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+# shellcheck disable=SC2016
 expect_call "...and one it did not is merely started, so the databases stay up" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:bbbb"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'start db-backend.service'
-# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+# shellcheck disable=SC2016
 expect_out "...and the database is never stopped for somebody else's change" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cccc"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack; echo "stops-naming-db=$(grep " stop " "${LOG}" | grep -c db-backend);"'   'stops-naming-db=0;'
-# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+# shellcheck disable=SC2016
 expect_no_call "...nor restarted" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cdcd"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'restart'
-# Idempotence: rewriting the identical pin must NOT count as a change, or every tick becomes a
-# rolling restart of the whole stack.
-# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+# shellcheck disable=SC2016
 expect_no_call "an unchanged pin does not stop anything" podman   'RT_PIN_FILE="${WORK}/pin2.yml" RT_UNIT_DIR="${WORK}/units2" rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_CHANGED_SERVICES=""; rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_STACK_SERVICES="backend" rt_apply_stack'   ' stop '
 
 say ""
 say "== one restart window: every re-defined unit goes down in ONE stop, then the stack starts in order =="
-# 2026-09-25 (#2072's open finding, ADR-0213): the apply restarted re-defined units one by one. A
-# restart of backend restarts ingest and frontend with it (Requires=), and the restarts of ingest and
-# frontend that followed ran them again. keycloak's provider JAR rides the same apply now, so the
-# same pass covers it.
 stack5='RT_STACK_SERVICES="db-backend keycloak backend ingest frontend"'
 expect_call "all re-defined units are named in one stop call" podman \
   "RT_CHANGED_SERVICES='keycloak backend frontend'; ${stack5} rt_apply_stack" \
@@ -768,9 +586,6 @@ expect_out "...and cleared by the next wait" podman \
 
 say ""
 say "== the runtime-health heal is the same window: one stop of the sick units, then the stack in order =="
-# 2026-09-25 (ADR-0083 amended): the heal was `restart` per unhealthy service, which re-ran what
-# Requires= it and returned before that was back. rt_heal_stack is rt_apply_stack with the sick units
-# marked as re-defined.
 expect_call "the sick units go down in one stop" podman \
   "${stack5} rt_heal_stack backend frontend" 'systemctl --user stop backend.service frontend.service'
 expect_out "...first, then every stack unit is started in stack order" podman \
@@ -788,16 +603,10 @@ expect_out "a unit that does not come back fails the heal, and is named" podman 
 
 say ""
 say "== waiting out a restart that travelled along Requires= =="
-# After `restart keycloak.service` returns, systemd is still restarting what Requires= keycloak.
-# rt_await_stack is the wait: START each stack unit, so a queued start job is joined rather than
-# stopped and begun again. 2026-09-25: without it the provider-JAR step reported success while
-# frontend and ingest had no container.
 expect_call "every stack unit is started, the last one included" podman \
   'RT_STACK_SERVICES="keycloak backend ingest frontend" rt_await_stack' 'systemctl --user start frontend.service'
 expect_no_call "...never restarted, even one this run re-defined" podman \
   'RT_CHANGED_SERVICES="backend frontend"; RT_STACK_SERVICES="keycloak backend ingest frontend" rt_await_stack' 'restart'
-# `rc=1;` and not `rc=1`: the latter is a substring of `rc=127`, which is what a missing function
-# returns -- this assertion passed against a library that had no rt_await_stack at all.
 expect_out "a unit that does not come back fails the wait" podman \
   'STUB_FAIL="start_frontend.service" RT_STACK_SERVICES="keycloak backend ingest frontend" rt_await_stack; echo "rc=$?;"' 'rc=1;'
 expect_call "...after the others were still waited for" podman \
@@ -811,19 +620,12 @@ expect_call "podman starts each named unit" podman \
   "$(mon) rt_monitoring_up" 'systemctl --user start prometheus.service'
 expect_call "...all of them, not just the first" podman \
   "$(mon) rt_monitoring_up" 'systemctl --user start grafana.service'
-# The same trap as the digest pin above, on the monitoring half, and it shipped: until 2026-09-22
-# this arm only ever said `start`, so a release that changed prometheus.container installed the unit
-# and left the old container running.
 expect_call "podman RESTARTS a monitoring unit this run re-defined" podman \
   "$(mon) RT_CHANGED_SERVICES='prometheus'; rt_monitoring_up" 'systemctl --user restart prometheus.service'
 expect_no_call "...and leaves the others alone" podman \
   "$(mon) RT_CHANGED_SERVICES='prometheus'; rt_monitoring_up" 'restart loki.service'
-# It runs twice on a deploy's success path. The second call must not recreate prometheus again.
 expect_out "...once: a second apply in the same run only starts it" podman \
   "$(mon) RT_CHANGED_SERVICES='prometheus'; rt_monitoring_up; : > \"\${LOG}\"; rt_monitoring_up; grep -c 'restart prometheus' \"\${LOG}\" || true" '0'
-# A restart that failed is kept, so the second call is its retry rather than a silent give-up. The
-# stub fails `restart` ONLY: a plain `false` would fail the daemon-reload first, return before the
-# loop, and leave the list untouched for the wrong reason -- a case that passes whatever the code does.
 expect_out "...but a FAILED restart stays pending for the retry" podman \
   "$(mon) RT_CHANGED_SERVICES='prometheus'; norestart() { [[ \"\$1\" != restart ]]; }; RT_SYSTEMCTL=norestart; rt_monitoring_up; printf '[%s]' \"\${RT_CHANGED_SERVICES}\"" '[prometheus]'
 expect_out "...and a successful one is not" podman \
@@ -833,24 +635,13 @@ expect_call "a monitoring recreate touches one service only" podman \
 expect_no_call "...and never the whole plane" podman \
   "$(mon) rt_monitoring_recreate loki" 'start prometheus.service'
 
-# alloy is a HOST service under Podman -- generate-quadlet.py translates it to one, because it
-# carries group_add 4/473 to read root:adm files and a rootless container's namespace groups are
-# not host groups. Its CONFIGURATION still rides the config bundle, so a release can change it and
-# the reconcile has to restart something. Asking the SERVICE user's systemd about it fails with
-# "Unit alloy.service not found", which deploy.sh reported as "monitoring stack down?" about a unit
-# that was up -- on every tick, non-gating, while the new configuration never arrived.
 expect_call "a host service is restarted through the SYSTEM manager" podman \
   "$(mon) RT_HOST_SYSTEMCTL=systemctl rt_monitoring_recreate alloy" 'systemctl restart alloy.service'
 expect_no_call "...and never through the service user's, which has no such unit" podman \
   "$(mon) RT_HOST_SYSTEMCTL=systemctl rt_monitoring_recreate alloy" 'systemctl --user restart alloy.service'
-# The routing must stay narrow: everything that IS a container still goes the ordinary way, or one
-# host service turns the whole monitoring plane into system units nobody granted access to.
 expect_call "a containerised one still goes to the service user" podman \
   "$(mon) RT_HOST_SYSTEMCTL=systemctl rt_monitoring_recreate prometheus" 'systemctl --user restart prometheus.service'
 
-# The monitoring set is DERIVED from the unit directory (OPS-SIMP-04): every `.container` that is not
-# an application service. deploy.sh and backup.sh each carried the nine names as a literal, and a
-# list kept in step with compose by hand is how acme went missing from every list until 2026-09-22.
 MONDIR="${WORK}/mon-units"; mkdir -p "$MONDIR"
 for u in backend db-backend prometheus loki acme; do printf '[Container]\n' > "${MONDIR}/${u}.container"; done
 got="$(run_rt podman "RT_MONITORING_SERVICES=''; RT_UNIT_DIR='${MONDIR}'; RT_STACK_SERVICES='db-backend backend acme'; rt_monitoring_services" 2>/dev/null | sort | tr '\n' ' ')"
@@ -870,9 +661,6 @@ expect_out "an empty unit directory is 'not configured', not an error" podman \
 
 say ""
 say "== reading state out for the backup =="
-# One primitive serves a host path and a named volume, because podman accepts
-# either in the same position. That is what let the edge's TLS material -- which
-# lives in volumes -- be captured by the same code that reads the keystore.
 expect_call "a named volume is read through the helper" podman \
   'rt_read_mount edge-certs postgres:18-alpine tar -C /src -cz .' \
   'run --rm -v edge-certs:/src:ro postgres:18-alpine tar -C /src -cz .'
@@ -887,8 +675,6 @@ expect_out "...and one that does" podman 'rt_volume_exists edge-certs; echo "rc=
 
 say ""
 say "== the helper and drill image is db-backend's own digest pin (OPS-SEC-03) =="
-# backup.sh and restore-drill.sh named `docker.io/library/postgres:18-alpine` by TAG: resolved at
-# pull time, and a second pin Dependabot never touches. The unit already carries the digest.
 mkdir -p "${WORK}/units" "${WORK}/bundle"
 printf '[Container]\nImage=docker.io/postgres:18-alpine@sha256:%s\nContainerName=db-backend\n' \
   "$(printf 'd%.0s' $(seq 1 64))" > "${WORK}/units/db-backend.container"
@@ -903,16 +689,12 @@ expect_out "the bundle copy is the fallback when the installed unit is not there
 expect_out "no unit anywhere is a non-zero answer, not an empty image name" podman \
   'RT_UNIT_DIR='"${WORK}"'/nowhere rt_unit_image db-backend '"${WORK}"'/nowhere; echo "rc=$?"' \
   'rc=1'
-# The real unit, so the helper keeps working the day the generator changes the line's shape.
 expect_out "the generated db-backend unit carries a digest the backup can use" podman \
   'RT_UNIT_DIR='"${HERE}"'/../quadlet/systemd rt_unit_image db-backend' \
   '@sha256:'
 
 say ""
 say "== the weekly TSDB snapshot is asked from inside prometheus (OPS-SEC-02) =="
-# It used to be `podman run curlimages/curl:8.11.1 -u grafana:<password> ...`: a short image name
-# rootless podman refuses without a TTY, and the password in the argv of a process every account on
-# the host can read through /proc.
 expect_call "the snapshot is requested through exec into prometheus" podman \
   'rt_prometheus_snapshot' 'exec prometheus sh -c'
 expect_call "...reading the password from the container's own mounted secret" podman \
@@ -937,8 +719,6 @@ expect_call "podman stops each writer unit" podman \
   'rt_service_stop frontend backend' 'systemctl --user stop frontend.service'
 expect_call "and starts them again" podman \
   'rt_service_start frontend' 'systemctl --user start frontend.service'
-# The quiesce must NOT apply the pin or wait for health -- that is a release
-# operation, and the backup is meant to put the stack back exactly as it was.
 expect_no_call "the quiesce does not re-apply the digest pin" podman \
   'RT_PIN_FILE=/tmp/pin.yml rt_service_start frontend' '/tmp/pin.yml'
 
@@ -947,19 +727,8 @@ say "== the throwaway container the restore drill proves recoverability in =="
 expect_call "it is started detached, by name" podman \
   'rt_run_detached iri-restore-drill postgres:18-alpine -e POSTGRES_USER=drill' \
   'run -d --name iri-restore-drill -e POSTGRES_USER=drill postgres:18-alpine'
-# A drill container on the deployment's networks is a drill container that can be
-# mistaken for the real thing.
 expect_no_call "it joins none of the deployment's networks" podman \
   'rt_run_detached iri-restore-drill img -e A=b' '--network'
-# STREAMED in under podman: RT_CLI is `sudo -u <svc> podman`, so a plain `cp` would have the
-# service user read a file in the deploy account's 0700 working tree. `exec -i` has the CALLER do
-# the reading, and the bytes cross the boundary on stdin.
-#
-# NOT `podman cp -`, which is what this used to be: it stops reading once it has extracted the
-# entry, so tar's trailing blocks land in a closed pipe and it exits 125 -- with the file complete
-# in the container. Measured on the production host 2026-09-22, ten rounds each: `cp -` failed
-# 10/10 while delivering correctly 10/10, `exec -i` passed 10/10. The restore drill aborted on its
-# second copy and reported four artifacts unrestorable that it had never got as far as testing.
 printf 'a dump\n' > "${WORK}/krt_basetool.dump"
 expect_call "a dump is streamed in on stdin, not read by the service user" podman \
   'rt_cp_to '"${WORK}"'/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
@@ -986,7 +755,7 @@ say "== lib/common.sh: the helpers the four operational scripts share (OPS-SIMP-
 COMMON="${HERE}/lib/common.sh"
 CENV="${WORK}/common-env"; mkdir -p "${CENV}/textfile"
 printf 'A=1\nIRI_MONITORING_ENABLED = "true"\nKEY=first\nKEY=last\nQ=\x27single\x27\n' > "${CENV}/.env"
-common() { # $1 snippet -- runs it with lib/common.sh loaded against the fixture
+common() {
   ( set +e; export COMPOSE_DIR="${CENV}" TEXTFILE_DIR="${CENV}/textfile"
     # shellcheck disable=SC1090
     . "$COMMON"; eval "$1" )
@@ -1012,7 +781,7 @@ if [[ "$got" == *"WARN"*"rc=1" ]]; then ok "an unwritable directory is a WARN an
 got="$(common 'fail "boom"; echo survived' 2>&1)"
 if [[ "$got" == *"FATAL: boom"* && "$got" != *survived* ]]; then ok "fail logs FATAL and exits"; else bad "fail gave '${got}'"; fi
 for job in deploy backup restore-drill container-cleanup; do
-  # shellcheck disable=SC2016 # a literal `${...SCRIPT_DIR}` is what the pattern looks for
+  # shellcheck disable=SC2016
   if grep -q '^\. "\${[A-Z_]*SCRIPT_DIR}/lib/common.sh"' "${HERE}/${job}.sh" \
      && ! grep -qE '^(log|fail|read_env)\(\)' "${HERE}/${job}.sh"; then
     ok "${job}.sh uses lib/common.sh and keeps no copy of its helpers"

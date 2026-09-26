@@ -22,28 +22,17 @@ package de.greluc.krt.profit.basetool.frontend.logging;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Thread-local holder for the current request's correlation id, so that non-servlet components
- * (e.g. the {@code WebClientLoggingFilter}) can propagate the id towards the backend without
- * re-reading the original {@code HttpServletRequest}. Populated by {@link CorrelationIdFilter} at
- * the beginning of every request and cleared in the matching {@code finally} block.
+ * Thread-local holder for the current request's correlation id, set and cleared by {@link
+ * CorrelationIdFilter}.
  *
- * <p>Reactor pipelines do <strong>not</strong> copy classic {@code ThreadLocal} values onto their
- * worker threads automatically — the holder only lives on the thread that called {@link #set}. The
- * {@link de.greluc.krt.profit.basetool.frontend.config.ReactorContextPropagationConfig} hooks
- * Reactor's automatic context propagation to a registered {@code ThreadLocalAccessor} so this
- * holder is restored on whichever Reactor worker thread runs the downstream operator. See the
- * {@code CORRELATION_CONTEXT_KEY} constant on that config class for the registry key. Without that
- * wiring the value would be invisible inside {@code WebClient} exchange filters and outbound
- * backend calls would log a different correlation id than the inbound frontend request, breaking
- * the audit-trail join.
+ * <p>Restored on Reactor worker threads through the {@code ThreadLocalAccessor} registered in
+ * {@link de.greluc.krt.profit.basetool.frontend.config.ReactorContextPropagationConfig}.
  */
 public final class CorrelationContext {
 
   private static final ThreadLocal<String> HOLDER = new ThreadLocal<>();
 
-  private CorrelationContext() {
-    // utility
-  }
+  private CorrelationContext() {}
 
   /** Stores the given correlation id in the calling thread; a blank value clears the slot. */
   public static void set(@Nullable String correlationId) {

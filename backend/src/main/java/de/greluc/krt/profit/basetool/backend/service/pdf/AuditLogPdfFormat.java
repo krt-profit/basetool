@@ -33,15 +33,9 @@ import org.jetbrains.annotations.Nullable;
 import org.openpdf.text.pdf.PdfPTable;
 
 /**
- * Shared renderer for the activity audit-log PDFs (REQ-AUDIT-001) and the bank audit-log export.
- * Given a title, a period and a chronological list of generic {@link Row}s, it produces a KRT
- * corporate-design document (dark background, orange accents, embedded Lato, A4) through the shared
- * {@link KrtPdfSupport}. Both the generic {@code AuditReportService} and {@code
- * BankAuditReportService} compose their rows and call {@link #render} so the four area logs and the
- * bank log look identical.
- *
- * <p>Callers localize the event label (the bundles differ between the generic and bank trails)
- * before building the {@link Row}, so this renderer only ever prints ready strings.
+ * Shared renderer for the activity audit-log PDFs (REQ-AUDIT-001) and the bank audit-log export,
+ * printing a title, a period and pre-localized {@link Row}s in the KRT design via {@link
+ * KrtPdfSupport}.
  */
 public final class AuditLogPdfFormat {
 

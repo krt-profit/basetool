@@ -1,17 +1,3 @@
-# promtool unit test for IngestAudienceGateOff (ING-SEC-03, REQ-INGEST-011).
-#
-# Pins the three things the rule has to get right:
-#   - it fires when the gateway reports its audience gate at 0 for longer than the `for:` window,
-#   - it stays silent once the audience is configured (1), and
-#   - it is blind to the OTHER gates: an allowlist left in audit-only reports azp/scope/tool at 0,
-#     which is a legitimate rollout stage, and must not be read as the audience being off.
-# It also pins that an absent gauge (a restart, or a gateway not yet on this build) is silence, not
-# an alert: absence is TargetDown's question, not this rule's.
-#
-# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
-#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/ingest_audience_gate_off_test.yml'
-
 rule_files:
   - ../alerts/business.yml
 

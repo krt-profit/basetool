@@ -1,26 +1,5 @@
 @layer base, components, page, migration, utilities;
 
-/* Cascade layers (FE-MOD-02, ADR-0212): the order above decides between files, before any
-   specificity - base < components < page < migration < utilities. See ui-design-system.md
-   REQ-UI-024 for what goes where. */
-
-/* Fonts */
-
-/*
- * WOFF2-only. The previously declared TTF/OTF fallbacks targeted browsers that predate WOFF2
- * (Chrome <36, Firefox <39, Safari <12, Edge <14) — all released before 2018 and below the
- * supported baseline. Dropping the fallbacks saves ~225 KB of font payload on first contact
- * without changing the rendered output on any supported browser. `font-display: swap` keeps
- * the system fallback visible until the brand font arrives, eliminating the FOIT blank period.
- */
-/*
- * Lato is the single typeface for the whole app — body, UI AND headlines.
- * Headlines are distinguished by weight (700) + UPPERCASE + tracking, not by a
- * separate display face. History: Ethnocentric -> Audiowide -> Lato-only
- * (2026-06); the Audiowide @font-face + Audiowide-Regular.woff2 were removed and
- * --font-headline is kept as an alias of Lato so existing var(--font-headline)
- * references still resolve.
- */
 @layer base {
     @font-face {
         font-family: Lato;
@@ -48,7 +27,6 @@
 
     :root {
         color-scheme: dark;
-        /* Colors */
         --color-primary: #e77e23;
         --color-white: #fff;
         --color-bg-black: #000;
@@ -57,48 +35,30 @@
         --color-accent-light: #eeb64b;
         --color-accent-dark: #c45c00;
 
-        --color-gray-1: #d2d2d2; /* primary body text on dark */
-        --color-gray-2: #646464; /* muted text, placeholders, disabled */
-        --color-gray-3: #282828; /* hairline borders, hover-row fill */
-        --color-gray-4: #141414; /* darkest standard surface (alias: --color-bg-dark-gray) */
+        --color-gray-1: #d2d2d2;
+        --color-gray-2: #646464;
+        --color-gray-3: #282828;
+        --color-gray-4: #141414;
 
-        /* Half-step between Grau 4 (#141414) and Grau 3 (#282828); NOT part of the
-       official 4-step manual grayscale. Used for input + table-head fills so
-       controls read slightly above the surface. */
         --color-surface-input: #1c1c1c;
 
-        /* Departments - Bereichsfarben (Corporate Design Manual V2, p.14).
-       Names and hex are authoritative per the manual; the values must
-       never be altered and never used for the logo. Prefer the semantic
-       aliases below in generic UI - department hues are functional, not
-       decorative. */
-        --color-dept-raumueberlegenheit: #37bbc0; /* Raumueberlegenheit / Space Superiority (teal) */
-        --color-dept-forschung: #355ddc; /* Forschung / Research (blue) */
-        --color-dept-sub-radar: #a3000a; /* Sub-Radar / covert (red) */
-        --color-dept-marinekorps: #7a5e96; /* Marinekorps / Marine Corps (purple) */
-        --color-dept-profit: #239e33; /* Profit (green) */
-        --color-dept-search-rescue: #ffd23f; /* Search and Rescue (yellow) */
+        --color-dept-raumueberlegenheit: #37bbc0;
+        --color-dept-forschung: #355ddc;
+        --color-dept-sub-radar: #a3000a;
+        --color-dept-marinekorps: #7a5e96;
+        --color-dept-profit: #239e33;
+        --color-dept-search-rescue: #ffd23f;
 
-        /* Legacy aliases - previously shipped (mis-)names, kept so existing
-       code and templates still resolve. Prefer the official names above. */
         --color-dept-combat: var(--color-dept-raumueberlegenheit);
         --color-dept-research: var(--color-dept-forschung);
         --color-dept-marine: var(--color-dept-marinekorps);
 
-        /* Semantic Colors - status meaning, decoupled from the department
-       tokens so renaming a Bereichsfarbe can never shift a status colour.
-       Values reuse Bereichsfarben hues by appearance. */
-        --color-danger: #a3000a; /* same value as Sub-Radar */
-        --color-success: #239e33; /* same value as Profit */
-        --color-warning: #ffd23f; /* same value as Search and Rescue */
-        --color-info: #355ddc; /* same value as Forschung */
-        --color-secondary: #ffd23f; /* cross-squadron / foreign-link highlight */
+        --color-danger: #a3000a;
+        --color-success: #239e33;
+        --color-warning: #ffd23f;
+        --color-info: #355ddc;
+        --color-secondary: #ffd23f;
 
-        /* Planet-system tints (price matrix, materials-overview.css). A terminal column is tinted by
-       its effective UEX planet: --krt-planet-<p> fills the column header, --krt-planet-<p>-stripe
-       is the 2px left stripe of its body cells. Canonical planets are hand-picked; hash-0..11 are
-       the twelve buckets PlanetColorResolver assigns an unknown planet. A categorical palette,
-       not brand colour: use it only for planet identity. */
         --krt-planet-hurston: #3a2519;
         --krt-planet-hurston-stripe: #7a4a2e;
         --krt-planet-crusader: #3a2c26;
@@ -150,46 +110,21 @@
         --color-danger-hover: #d41a25;
         --color-success-hover: #2ebc3d;
 
-        /* Accessible text tints - the canonical danger/info hues are too dark to
-       read as small text on black (Sub-Radar #A3000A ~ 2.3:1, Forschung
-       #355DDC ~ 3.6:1). Use these lightened variants whenever the colour IS the
-       text itself (.field-error, .text-danger, .status-*, price up/down); keep
-       the canonical hues for fills, borders and the brand Bereichsfarben tags. */
-        --color-danger-text: #f2564b; /* ~ 5.3:1 on black */
-        --color-info-text: #6c93ef; /* ~ 6.1:1 on black */
-        --color-success-text: #2ebc3d; /* ~ 5.6:1 on black */
+        --color-danger-text: #f2564b;
+        --color-info-text: #6c93ef;
+        --color-success-text: #2ebc3d;
 
-        /* Accessible muted-text tint - Grau 2 (#646464) reads at only ~3.5:1 on the
-       flat-black page and fails WCAG AA as small text (the former honeycomb wash
-       used to keep the automated a11y gate from measuring it; the flat-black
-       surface of REQ-UI-003 exposed the shortfall). Use this lightened variant
-       whenever muted grey IS the text itself (.text-muted, secondary labels,
-       placeholders, hints); keep the canonical --color-gray-2 for hairline
-       borders, scrollbar thumbs, disabled fills and decorative glyphs. ~ 6.1:1
-       on black and >= 4.9:1 on the #141414 / #1c1c1c surfaces. */
         --color-gray-2-text: #8a8a8a;
 
-        /* Action hierarchy - how the orange accent is allocated. The filled
-       orange CTA marks the ONE primary action per context; orange is for
-       action + identity (logo, badges, headings), never plain data values.
-       See .btn--cta / .btn-outline / .btn-ghost / .btn-quiet-danger /
-       .data-value in the components section, and README "Action hierarchy". */
-        --action-primary: var(--color-primary); /* filled CTA */
-        --action-emphasis: var(--color-primary); /* outline secondary */
-        --action-neutral: var(--color-gray-3); /* ghost border */
-        --data-fg: var(--color-white); /* bright neutral readouts */
+        --action-primary: var(--color-primary);
+        --action-emphasis: var(--color-primary);
+        --action-neutral: var(--color-gray-3);
+        --data-fg: var(--color-white);
 
-        /* Typography — Lato only. Headlines are distinguished by weight (700) +
-       UPPERCASE + tracking, not by a separate face; --font-headline is kept as a
-       Lato alias so existing var(--font-headline) references keep resolving. */
         --font-headline: 'Lato', sans-serif;
         --font-body: 'Lato', sans-serif;
-        /* The brand ships no monospace face, so "mono" contexts (version strings,
-       IDs, hex codes, code) use the house font Lato with tabular figures for
-       column alignment. No system/substitute font is referenced. */
         --font-mono: 'Lato', sans-serif;
 
-        /* Type scale (rem). Body base = 1rem/16px. Headings are uppercase. */
         --fs-h1: 2rem;
         --fs-h2: 1.5rem;
         --fs-h3: 1.17rem;
@@ -198,17 +133,15 @@
         --fs-xs: 0.8rem;
         --fs-2xs: 0.7rem;
 
-        --fw-thin: 300; /* body default */
+        --fw-thin: 300;
         --fw-regular: 400;
-        --fw-bold: 700; /* labels, nav, btn, strong */
+        --fw-bold: 700;
         --fw-black: 900;
 
-        --tracking-display: 0.05em; /* headline tracking (Lato, uppercase) */
-        --tracking-overline: 0.15em; /* admin chip, overlines */
+        --tracking-display: 0.05em;
+        --tracking-overline: 0.15em;
         --lh-body: 1.5;
 
-        /* Shape / elevation - square-first. Corners are SHARP; only pills
-       (chips/badges) and the circular radio control round. */
         --radius-none: 0;
         --radius-pill: 999px;
 
@@ -216,14 +149,12 @@
         --border-accent: 1px solid var(--color-primary);
         --border-heading: 2px solid var(--color-primary);
 
-        /* Glows / shadows - the orange bloom is the brand's only "shadow" idiom. */
-        --glow-primary: 0 0 5px rgb(231 126 35 / 30%); /* input focus */
-        --glow-primary-lg: 0 0 20px rgb(231 126 35 / 20%); /* toasts, modals */
+        --glow-primary: 0 0 5px rgb(231 126 35 / 30%);
+        --glow-primary-lg: 0 0 20px rgb(231 126 35 / 20%);
         --glow-danger-lg: 0 0 20px rgb(163 0 10 / 20%);
         --shadow-drawer: 5px 0 15px rgb(0 0 0 / 50%);
         --shadow-dropdown: 0 8px 16px rgb(0 0 0 / 80%);
 
-        /* Spacing rhythm (rem multiples of 0.5). */
         --space-1: 0.25rem;
         --space-2: 0.5rem;
         --space-3: 0.75rem;
@@ -231,47 +162,12 @@
         --space-6: 1.5rem;
         --space-8: 2rem;
 
-        --touch-target: 44px; /* min hit area for every interactive control */
+        --touch-target: 44px;
 
-        /* REQ-UI-009's documented exception: a REPEATED DENSE ROW control (`.btn-xs`,
-       `.btn-icon`, `.master-row`, an in-row checkbox or chevron) may stop at 32px, because
-       raising every one of them to 44px would turn a scannable table into a list of cards.
-       It is never the floor for a form control or a standalone button. A token rather than a
-       literal so the stylesheet and TouchClassLayoutE2eTest's DENSE_ACTION_FLOOR name the
-       same number. */
-        /* Named by `.btn.btn-xs`, `.btn-icon`, `.bank-chart-range-btn`,
-       `.krt-bp-imp-suggestion` and the touch-block rules — a second spelling of the same
-       number is how the two drift. The other `32px` values in these files (the scrollbar
-       thumb, the header mark's height) are NOT touch floors and deliberately keep the
-       literal: the token is what says "this number is the dense hit area". */
         --touch-target-dense: 32px;
-        --content-max: 1200px; /* main column cap */
-        --measure: 80ch; /* paragraph max line length */
+        --content-max: 1200px;
+        --measure: 80ch;
 
-        /*
-     * The viewport height a page-level scroll container may occupy, stated ONCE.
-     *
-     * Four panels cap themselves to "the screen, minus whatever the footer covers": the
-     * Materialbörse material list, the Materialien-Übersicht and Gewinnberechnung table
-     * wrappers, and the Beförderung matrix. Each subtracts its own reserve for the chrome
-     * above it (the sticky header, the greeting, the filter row), which is why the reserve
-     * stays at the call site and only the viewport term lives here.
-     *
-     * `--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
-     * the footer is" (REQ-UI-009): `sidebar.js` publishes 0 whenever the footer is not
-     * `fixed`, which on the phone class it is not (ADR-0172). The 5rem fallback is what the
-     * value is before that JS has run.
-     *
-     * `dvh`, not `vh`: `vh` is the LARGE viewport (address bar hidden), so on a phone a `vh`
-     * calc over-estimates by the bar's height and the panel's bottom sits under it. The `vh`
-     * definition below is the fallback for an engine that does not know `dvh` — and it is an
-     * @supports test rather than the two-declaration trick the four call sites used to carry,
-     * because that trick CANNOT survive being moved into a custom property: with
-     * `max-height: var(--x)` twice, both declarations parse, the cascade keeps only the last,
-     * and if its substituted value is invalid the property falls back to `unset` — `none` for
-     * `max-height` — so the panel would get no cap at all, the exact failure the trick existed
-     * to prevent. Stated here once, the fallback cannot be forgotten at a call site either.
-     */
         --krt-panel-viewport-rest: calc(100vh - var(--krt-footer-height, 5rem));
     }
 
@@ -284,11 +180,6 @@
 
 @layer components {
     body {
-        /*
-     * Flat black page background per the design-system UI kit and REQ-UI-003. The
-     * former faint ambient honeycomb (Wabenmuster) texture layer has been removed —
-     * the page is now plain black with no background image.
-     */
         background-color: var(--color-bg-black);
         color: var(--color-gray-1);
         font-family: var(--font-body);
@@ -297,37 +188,7 @@
         line-height: var(--lh-body);
         margin: 0;
         padding: 0;
-        /*
-     * `min-height: 100vh` keeps the dark page background painted across the
-     * full viewport even when the content is short. The previous `display:
-     * flex; flex-direction: column` was only there to power a sticky-footer
-     * pattern (`<main flex: 1 0 auto>` grew to push the footer down). The
-     * footer is `position: fixed; bottom: 0` (see `.krt-footer`) on every class
-     * ABOVE the phone one, so it stays anchored to the viewport bottom at every
-     * scroll position regardless of content length — the flex column trick is no
-     * longer needed and is dropped to keep <main>'s normal block-layout width
-     * calculation simple. On the phone class the footer is `static` again (owner
-     * decision 2026-09-13) and simply follows the content as the last block, so
-     * the sticky-footer pattern is not needed there either.
-     */
         min-height: 100vh;
-        /*
-     * `dvh` as well, for the same reason `.sidebar` and `.krt-modal-overlay` carry the pair: on a
-     * phone browser `100vh` is the LARGE viewport, the one with the address bar hidden.
-     *
-     * It was harmless while the footer was `position: fixed` at every width. The phone class made it
-     * load-bearing: `body` is a flex column there and `main` / `.page-wrapper` take `flex: 1 0 auto`,
-     * so whatever slack `min-height` invents is absorbed by the content box and pushes the now
-     * in-flow footer down with it. In Safari's TAB mode on a short page — `/notifications` with no
-     * rows, `/impressum`, `/privacy`, `/terms`, `/profile` — that is 60-100px, and the member has to
-     * scroll a page with nothing to scroll in order to reach the legal links.
-     *
-     * Invisible to TouchClassLayoutE2eTest and to the installed app alike, because neither has
-     * dynamic browser chrome and `vh == dvh` there. It bites only in the browser tab.
-     *
-     * The `vh` line stays first: an engine that does not know `dvh` discards that declaration alone
-     * and keeps this one.
-     */
         min-height: 100dvh;
     }
 
@@ -340,8 +201,7 @@
         font-family: var(--font-headline);
         color: var(--color-primary);
         text-transform: uppercase;
-        letter-spacing: var(--tracking-display); /* Optical kerning fix */
-        /* Lato needs weight to read as a heading (Audiowide carried it intrinsically). */
+        letter-spacing: var(--tracking-display);
         font-weight: var(--fw-bold);
     }
 
@@ -355,8 +215,6 @@
         color: var(--color-accent-light);
     }
 
-    /* "Mono" data contexts use Lato with tabular figures (the brand has no monospace
-   face) — see --font-mono. Aligned with the design-system update (#274). */
     code,
     kbd,
     samp {
@@ -370,8 +228,6 @@
         font-weight: var(--fw-bold);
     }
 
-    /* Brand text selection — orange highlight with black text, matching the
-   single-accent HUD palette instead of the browser default blue. */
     ::selection {
         background: var(--color-primary);
         color: var(--color-bg-black);
@@ -386,14 +242,6 @@
         z-index: 1000;
     }
 
-    /*
- * Admin-mode header tint. Applied by sidebar.html JS when the URL path
- * starts with `/admin/`, so admins can tell at a glance that they are
- * looking at a privileged view (otherwise the in-page chrome is
- * identical to the regular user UI). The chip uses the same brand
- * orange as the rest of the HUD; the darker bottom border (accent-dark
- * instead of primary) signals "elevated context" without screaming.
- */
     body.admin-mode header {
         border-bottom-color: var(--color-accent-dark);
     }
@@ -485,23 +333,6 @@
 
     main {
         padding: var(--space-8);
-        /*
-     * Reserve viewport-bottom space for the fixed footer (see `.krt-footer`).
-     * Without this, the last line of long pages would scroll under the
-     * always-pinned footer and be permanently hidden. The `--krt-footer-height`
-     * custom property is set by sidebar.html JS after measuring the actual
-     * rendered footer (with ResizeObserver + resize listener), so the
-     * reservation tracks the real height across breakpoints, link wrap and
-     * font load. What it publishes is the height the footer COVERS, so on the
-     * phone class — where the footer is `position: static` and scrolls with the
-     * page — it is 0 and this reserve collapses to its separator gap, which the
-     * `width <= 768px` block then replaces outright. The fallback `5rem` covers the brief window before
-     * DOMContentLoaded fires and the JS publishes the measured value; the
-     * extra `5rem` is the visible gap between the last content line and the
-     * top edge of the footer — `1rem` and `2rem` both read as flush against
-     * the footer at maximum scroll, so the buffer is widened to a clearly
-     * comfortable separation.
-     */
         padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
         width: 100%;
         max-width: var(--content-max);
@@ -529,11 +360,6 @@
         margin-top: var(--space-2);
     }
 
-    /* Landing page — the only surface a visitor without a session sees (REQ-SEC-052).
-   The four classes below were written with the page and had no rules at all, so the
-   two call-to-action buttons stacked as plain inline anchors and the notice, hint and
-   legal row rendered at body colour and size. */
-
     .krt-landing-actions {
         display: flex;
         flex-wrap: wrap;
@@ -547,8 +373,6 @@
         font-size: var(--fs-sm);
     }
 
-    /* The lead paragraph above is 1.1rem via `.greeting p`; these three are secondary text
-   and must not inherit it. */
     .greeting p.krt-landing-notice,
     .greeting p.krt-landing-hint {
         font-size: var(--fs-sm);
@@ -570,10 +394,6 @@
         color: var(--color-primary);
     }
 
-    /* Table Styles — one canonical treatment for every data table. The bare
-   `table` element selector, `.krt-table` and `.data-table` are interchangeable
-   aliases (templates use all three historically); keeping them on a single rule
-   guarantees identical rendering regardless of which class a page picked. */
     table,
     .krt-table,
     .data-table {
@@ -593,8 +413,6 @@
 
     th {
         background-color: var(--color-surface-input);
-        /* Header text is neutral light-gray; the orange is kept as the 2px
-       under-rule only (action-hierarchy work) so columns read as data. */
         color: var(--color-gray-1);
         font-family: var(--font-body);
         font-size: var(--fs-sm);
@@ -613,17 +431,6 @@
             color 0.2s ease;
     }
 
-    /*
- * Subtle zebra striping for long data tables. The 0.02 alpha is intentionally
- * minimal — strong enough to break the eye line on dense rows, weak enough
- * not to compete with hover or with department-tinted rows (e.g. the
- * `.unit-color-*` palette on mission-detail).
- *
- * Hover must out-rank the stripe on BOTH odd and even rows. A bare `tr:hover`
- * (specificity 0,1,1) lost to `tbody tr:nth-child(even)` (0,1,2), so the
- * lighter striped rows showed no hover feedback while the dark rows did — the
- * explicit even-row hover (0,2,2) restores a uniform hover across every row.
- */
     tbody tr:nth-child(even) {
         background-color: rgb(255 255 255 / 2%);
     }
@@ -633,36 +440,6 @@
         background-color: var(--color-gray-3);
     }
 
-    /* ------------------------------------------------------------------ TREE TABLE
- * Dense, hierarchical tree table for nested data (inventory:
- * Material -> Nutzer/Stack -> Eintrag). Replaces deeply-nested <table>s that
- * each repeat their own <thead>: ONE sticky header (.tree-head) for the whole
- * tree, depth shown by INDENTATION + left rails (never repeated column heads).
- * Every row is a CSS-grid .tree-row sharing one column template (--tree-cols)
- * so values stay aligned across depths. Ported from the design system
- * (das-kartell-design/krt-components.css -> .tree-table); see its README
- * "Tree table (nested data)" + proposals/inventory-table-readability.html.
- */
-    /* Sized to the WIDEST row, never narrower than the scroll container.
- *
- * Without this the element is an ordinary block and takes the scroller's
- * content width — the viewport on a phone. The head/group/mid rows are grids
- * whose --tree-cols minimums add up to ~844px, so they overflow it and are what
- * produces the horizontal scrollbar; but the leaf rows collapse to `1fr auto`
- * below 1024px (see the media query further down) and therefore have no minimum
- * at all. They stayed at the viewport width, pinned to the left of an 844px
- * scroll area: scrolling right to read Menge/Aktion moved every expanded entry
- * out of the frame and left dead space beside it. Reported from a phone on
- * 2026-09-14.
- *
- * `max-content` makes the table as wide as its widest row, so a collapsed leaf's
- * `1fr` resolves against that same width and its amount and actions land under
- * the columns they belong to; `min-width: 100%` keeps it filling the container
- * when the rows happen to be narrower. This restores the invariant this block
- * comment already claims — "every row ... sharing one column template so values
- * stay aligned across depths" — which the mobile leaf collapse had quietly
- * broken for the one row type that carries the actions.
- */
     .tree-table {
         width: max-content;
         min-width: 100%;
@@ -695,9 +472,6 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* Left gutter keeps the amount column and the action buttons from colliding;
-   flex-wrap is a safety net so an unexpectedly wide action set wraps onto a
-   second line instead of overflowing left across the right-aligned amount. */
     .tree-cell--actions {
         display: flex;
         flex-wrap: wrap;
@@ -706,7 +480,6 @@
         padding-left: 1.5rem;
     }
 
-    /* Sticky single header for the whole tree. */
     .tree-head {
         position: sticky;
         top: 0;
@@ -723,7 +496,6 @@
         letter-spacing: 0.07em;
     }
 
-    /* Name cell + disclosure chevron. */
     .tree-name {
         display: flex;
         align-items: center;
@@ -750,7 +522,6 @@
         transform: rotate(90deg);
     }
 
-    /* Depth levels - indentation + rails. The orange bar marks the top group only. */
     .tree-row--group {
         background-color: var(--color-surface-input);
         border-left: 4px solid var(--color-primary);
@@ -790,9 +561,6 @@
         padding-left: 3rem;
     }
 
-    /* Leaf main area spans the freed-up name+context+quality columns so inline
-   controls (Auftrag/Einsatz selects) get real width for long labels, while the
-   amount + actions stay column-aligned. */
     .tree-leaf-main {
         display: flex;
         grid-column: 1 / 4;
@@ -833,15 +601,6 @@
         text-overflow: ellipsis;
     }
 
-    /* Entry associations - split with amounts (Lager entry). Mirrors the design-system
-   "Entry associations - split with amounts" block (krt-components.css, DS commit
-   39b3d2a): per .tree-field the single Auftrag/Einsatz select is replaced by an
-   .assoc-split group of clickable .assoc-chip tokens (label + .assoc-chip__amt;
-   --order = orange, --mission = blue), a dashed .assoc-add in .assoc-add-wrap that
-   opens an .assoc-pop popover (combobox to add, or amount editor on chip click),
-   and a trailing rest .chip per group (Rest 0 = --success, Rest > 0 = --muted
-   "frei", over-allocation = --danger). rgba() values converted to the modern
-   rgb(r g b / a%) form required by the project Stylelint (equivalent). */
     .assoc-split {
         display: flex;
         flex-wrap: wrap;
@@ -915,12 +674,6 @@
         outline: none;
     }
 
-    /* Fixed — not absolute — so the two horizontally-scrolling ancestors
-   (#tableContainer.overflow-x-auto + .table-responsive, whose overflow-x:auto forces
-   overflow-y to auto) cannot crop the popover at their bottom edge; Firefox and Chrome
-   alike clip an absolute descendant there. Fixed positioning needs explicit coordinates,
-   so inventory-admin.js / inventory-my.js anchor top/left to the trigger's rect on open
-   and keep it glued on scroll/resize (assocPositionPop). */
     .assoc-pop {
         position: fixed;
         z-index: 60;
@@ -944,15 +697,6 @@
         font-weight: var(--fw-bold);
     }
 
-    /* The amount editor never fits its three controls on one line inside the 260px
-   popover: "Speichern" + "Entfernen" alone claim ~225px, and the input is the only
-   shrinkable item because `.tree-field input` (above) hands every input inside the
-   Lager tree `width: 100%; min-width: 0` — the popover is a DOM descendant of
-   .tree-field even though it is position: fixed. Result before the fix: the input
-   collapsed to a 26px sliver and "Entfernen" overflowed the popover's right border.
-   So the input takes a full-width line of its own, the buttons share the next one,
-   and `flex-wrap` guarantees a longer translation drops a button to a third line
-   instead of escaping the box. */
     .assoc-pop__menge .assoc-menge-row {
         display: flex;
         flex-wrap: wrap;
@@ -968,12 +712,6 @@
         flex: 1 1 auto;
     }
 
-    /* Variante C "Herkunft" (deduct-from) picker (REQ-INV-027): inside the Ausbuchen /
-   Umbuchen modals, one amount input per earmark tag per dimension lets the user choose how
-   much of the booked-out quantity comes from each Auftrag / Einsatz slice; whatever is left
-   comes from the not-yet-assigned rest. The rest chip reuses the shared .chip tones, a danger
-   warning states the minimum that must go to tags when the rest cannot cover the deduction,
-   and (SELL only) a coupled-proceeds hint estimates each mission's credit. */
     .herkunft-help {
         margin: 0 0 0.5rem;
         font-size: var(--fs-2xs);
@@ -1024,8 +762,6 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* A dimension with exactly one tag and no free rest has only one applyable plan, so the picker
-   fills the field from the deducted amount and locks it; .herkunft-auto states why. */
     .herkunft-input--auto {
         cursor: not-allowed;
         opacity: 0.75;
@@ -1082,7 +818,6 @@
         color: var(--color-gray-2-text);
     }
 
-    /* Quality gauge (0-1000): number above a thin orange bar. */
     .tree-gauge {
         display: inline-flex;
         flex-direction: column;
@@ -1115,7 +850,6 @@
         background-color: var(--color-primary);
     }
 
-    /* Amount: bright value + dimmed unit. */
     .tree-amount {
         color: var(--color-white);
         font-variant-numeric: tabular-nums;
@@ -1126,8 +860,6 @@
         font-size: 0.74rem;
     }
 
-    /* Note: rendered ONLY when a note exists. Indented annotation block with room
-   for the full text (~80ch), orange label + surface box. */
     .tree-note {
         background-color: rgb(0 0 0 / 35%);
         border-bottom: var(--border-hairline);
@@ -1161,31 +893,12 @@
         overflow-wrap: anywhere;
     }
 
-    /* Compact action button for dense tree-table rows — the 32px dense-row exception to
-   REQ-UI-009's 44px floor, which covers these two compact classes and nothing else.
-
-   The `.btn` qualifier is load-bearing, not decoration. `.btn` is declared LATER in this
-   file and declared a second time inside the `width <= 1024px` touch block, so a bare
-   `.btn-xs` (0,1,0) loses every property it shares with `.btn` on source order and renders
-   full-size: before this qualifier a `.btn.btn-primary.btn-xs` measured 105x44 — pixel-identical
-   to a plain `.btn`, i.e. the class had been inert since it was introduced. `.btn.btn-xs`
-   (0,2,0) wins wherever `.btn` appears, in any file and inside any media query. Never drop
-   the qualifier, and never rely on moving these blocks around instead. */
     .btn.btn-xs {
         min-height: var(--touch-target-dense);
         padding: 0.25rem 0.55rem;
         font-size: 0.68rem;
     }
 
-    /* Icon-only square action button: keeps a dense action column from crowding the
-   value beside it (e.g. the per-entry "Notiz" button in the Lager tree table).
-   The accessible name comes from aria-label/title; the glyph is decorative
-   (aria-hidden). Pair with .btn-xs for the 32px dense-row size.
-
-   Same specificity trap as .btn-xs above: `gap` and `padding` collide with `.btn` and need
-   the qualifier, `min-width` is unique to this rule and applies on its own. Declared after
-   `.btn.btn-xs` on purpose — equal specificity, so this padding wins when a button carries
-   both classes, which is what squares off an icon-only dense action (32x32). */
     .btn-icon {
         min-width: var(--touch-target-dense);
     }
@@ -1200,20 +913,10 @@
         height: 1.05rem;
     }
 
-    /* Decorative button glyphs must never intercept clicks: a click on the icon has
-   to land on the host <button>/<a>, not the inner <svg>/<use>. Without this, an
-   icon-only action whose JS matches on event.target (rather than closest()) would
-   silently do nothing when the user hits the glyph. */
     .btn .krt-icon {
         pointer-events: none;
     }
 
-    /* Tablet and below (REQ-UI-009 device classes): collapse the leaf row's
-   multi-column grid so the amount and per-entry actions reflow onto their own
-   line beneath the wide Auftrag/Einsatz controls, instead of competing with
-   them for a sliver of width and overlapping the value column. The
-   group/mid/head rows keep the shared --tree-cols template (wide tables scroll
-   horizontally per the design system). */
     @media (width <= 1024px) {
         .tree-row--leaf {
             grid-template-columns: 1fr auto;
@@ -1235,19 +938,6 @@
         }
     }
 
-    /*
- * SK-order claim tables (orders-detail): the cell content and its "Eintragen"
- * action share one flex row so every button's left edge lines up down the
- * column no matter how wide the content is (SCU decimals vs. piece counts
- * differ in width). The content grows to fill, pushing each button to the same
- * offset; the gap replaces the button's former left margin.
- *
- * Two fillers exist because the two order kinds put the action in different
- * columns: the MATERIAL table keeps its "Offen" open-amount
- * (.claim-open-amount), while the aggregated ITEM table dropped that column and
- * hosts the action next to the claim chips (.claim-chips) instead - there,
- * "Offen" contradicted the manufacturing-reduced "Gesamtmenge" (REQ-ORDERS-026).
- */
     .claim-open-cell {
         display: flex;
         align-items: center;
@@ -1259,19 +949,6 @@
         flex: 1 1 auto;
     }
 
-    /*
- * Global page footer (injected by sidebar.html JS). Legal links also live in
- * the sidebar, but a visible footer matches standard web convention so users
- * looking for Impressum / Datenschutz / Nutzungsbedingungen can find them
- * without opening the navigation drawer.
- *
- * The footer is `position: fixed; bottom: 0` so it stays anchored to the
- * viewport bottom on every scroll position, overlaying the content. The
- * z-index sits below the sticky header (1000), the sidebar drawer (2000),
- * modals (3000) and toasts (9999) so those always paint above the footer.
- * `<main>` reserves vertical space via `padding-bottom: 5rem` (7rem on
- * mobile) so the last line of long pages is not permanently obscured.
- */
     .krt-footer {
         position: fixed;
         bottom: 0;
@@ -1306,24 +983,12 @@
     .krt-footer-meta a:hover {
         color: var(--color-primary);
     }
-    /*
- * Right-hand footer group: Handbuch link, GitHub repo icon and the build
- * version, kept on one baseline. `space-between` on `.krt-footer` pushes this
- * block to the right edge; the inner flex row keeps the three items aligned and
- * lets them wrap together when the footer stacks on mobile.
- */
     .krt-footer-meta {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: var(--space-4);
     }
-    /*
- * Slightly enlarge the GitHub mark and pad its anchor so the icon-only link is
- * a comfortable touch target without disturbing the baseline of its neighbours.
- * The glyph inherits `fill: currentColor`, so the shared link hover above turns
- * it brand-orange.
- */
     .krt-footer-github {
         display: inline-flex;
         align-items: center;
@@ -1336,13 +1001,6 @@
     }
 
     .krt-footer-version {
-        /*
-     * gray-1, not the "muted" gray-2: #646464 on the #141414 footer is only
-     * ~3.1:1, below the WCAG AA 4.5:1 floor for this small body-size text
-     * (#441). gray-1 (#D2D2D2 ~12:1) is the lowest official grayscale token
-     * that clears AA; the version still reads as secondary via its small
-     * monospaced size next to the brighter links.
-     */
         color: var(--color-gray-1);
         font-family: var(--font-mono);
         font-variant-numeric: tabular-nums;
@@ -1350,54 +1008,10 @@
     }
 
     @media (width <= 768px) {
-        /*
-     * Rows of controls wrap on a phone instead of widening the page (REQ-UI-009, ADR-0176).
-     *
-     * `space-between` with no `flex-wrap` means a row cannot break, and the German compounds
-     * this UI is built from ("AUFTRAGSVERWALTUNG") already fill a 375px screen on their own.
-     * Measured on the phone class: /orders overflowed by 159px, /notifications by 52px,
-     * /missions and /materials/overview by 26px, /bank by 10px. Nothing was clipped — the page
-     * simply became 534px wide and every screen had to be panned sideways. REQ-UI-009 lets a
-     * wide TABLE scroll; it does not let the page do it.
-     *
-     * This was three overlapping lists of class names until 2026-09-13, and the lists could
-     * never have been complete. Ten action rows were named here by hand, and each measuring
-     * round found more; worse, the row that overflowed /orders by 403px was a `.flex-gap-sm`,
-     * and a good number of the app's rows carry a GENERATED class from inline-migration.css
-     * whose name is content-hashed (`krtm-display-flex-gap-1rem-...-6529`). A hashed name
-     * cannot be enumerated in advance by anyone, so a list-shaped fix could only ever chase
-     * this defect, never close it.
-     *
-     * So the rule below asks what an element IS, not what it is called: a row that directly
-     * contains a control or a link is an action row, whatever its class. `:has()` reads the
-     * structure the templates already have, which is the one thing the generator cannot
-     * rename. `flex-wrap` is inert on anything that is not a flex container, so matching a
-     * `<td>` or a `<form>` that happens to hold a button costs nothing — and `.btn` itself is
-     * never matched, because a button holding an icon and a label has no control CHILD, which
-     * is what would otherwise stack the glyph above its text.
-     *
-     * `:where()` keeps it at zero specificity, so any row that must not break says so with
-     * `flex-wrap: nowrap` and wins outright.
-     */
         :where(:has(> :where(button, [role='button'], summary, a, input, select, textarea))) {
             flex-wrap: wrap;
         }
 
-        /*
-     * The generic row utilities wrap here too, and are listed by name rather than left to the
-     * structural rule above on purpose: these are the design system's own vocabulary for "put
-     * these things in a row", so the list is closed and stable in a way a set of page-specific
-     * class names is not. They also cover the rows the structural rule cannot see — a
-     * `.flex-gap-sm` holding only `<span>`s contains no control to match on.
-     *
-     * Wrapping is right for every use of these utilities on a phone, including the `<label>`
-     * rows they also serve: a checkbox that drops under its own caption is still a usable
-     * checkbox, a caption sliced at the screen edge is not.
-     *
-     * `.flex-between` and `.flex-between-mb` are NOT here — they carry their wrap on their base
-     * rules instead, because this block only ever reaches ≤768px and the band that defect was
-     * measured in is 769-1023px.
-     */
         .flex-gap-xs,
         .flex-gap-sm,
         .flex-gap-md,
@@ -1405,38 +1019,10 @@
             flex-wrap: wrap;
         }
 
-        /*
-     * `.kpi-card-foot` is the one row from the old hand-written list that neither mechanism
-     * above reaches, and it is worth saying why rather than quietly leaving it out: it holds a
-     * delta figure and an inline sparkline — a `<span>` and an `<svg>` — so it is a row of
-     * CONTENT, not of controls, and it carries no row utility either. It still has to break on
-     * a phone for the same reason the others do.
-     *
-     * The other nine names that stood here are all covered now: eight hold a `.btn`, a
-     * `<button>` or an `<a>` as a direct child and are matched structurally, and
-     * `.notification-dropdown-footer` holds a bare `<a>`.
-     */
         .kpi-card-foot {
             flex-wrap: wrap;
         }
 
-        /*
-     * German headings break inside the word on a phone, because they have to.
-     *
-     * This UI's headings are compounds — NUTZUNGSBEDINGUNGEN, AUFTRAGSVERWALTUNG,
-     * MATERIALBEDARFSÜBERSICHT — set uppercase at --fs-h1 with letter-spacing, and
-     * a single one of them is wider than a 375px screen with no space to wrap at.
-     * Measured: the admin Nutzungsbedingungen page ran 88px past the viewport on
-     * the word alone, the two audit pages 151px. Scoping this to `.greeting h1`
-     * (where it started) covered a fraction — 76 templates carry an <h1> and most
-     * are not in a `.greeting`.
-     *
-     * `hyphens: auto` first, so the break lands on a syllable boundary and gets a
-     * hyphen; the documents carry `lang` from the request locale, which is what
-     * makes that work at all. `overflow-wrap: anywhere` is the fallback for the
-     * words hyphenation declines — and it also lowers the element's min-content
-     * width, which is what lets a flex row shrink instead of overflowing.
-     */
         h1,
         h2,
         h3 {
@@ -1444,225 +1030,58 @@
             overflow-wrap: anywhere;
         }
 
-        /*
-     * The custom multi-select is not a `<select>`, so the form-control cap in the
-     * <=1024px block does not reach it — it is a div widget carrying a hard
-     * `min-width: 200px`. Two of them in the price-overview filter row make
-     * 400px plus a 24px gap on a 375px screen: the row does wrap and the flex
-     * items do shrink, but that 200px floor inside them does not, so the content
-     * spills out of its own box and the page ends up 401px wide. Dropping the
-     * floor and giving each filter a row of its own is the phone layout for it.
-     */
         .filters-container .multi-select-container {
             min-width: 0;
         }
 
-        /*
-     * `div.filters-container`, not `.filters-container` — the same out-specifying this block does
-     * for `.btn.btn-xs2` and `input.item-checkbox`, and for the same reason. The bare form is
-     * (0,2,0), exactly what `materials-overview.css`'s `.materials-overview-main .form-group
-     * { flex: 1; min-width: 150px }` scores; a media query adds no specificity, and that file loads
-     * after this one through the head fragment's extraLinks. So source order decided and the stack
-     * never happened on the one page that has this filter row — the two groups stayed side by side
-     * at ~160px on a 375px screen. The sibling `.multi-select-container` rule wins only because it
-     * happens to out-specify a (0,1,0) base rule, so half the fix landed and half did not.
-     */
-        /* `div.filters-container > .form-group` lives in the page layer (FE-MOD-02). */
-
-        /*
-     * The bank / audit filter bar: the same defect one level up.
-     *
-     * `.bank-filterbar` is a wrapping flex ROW, so its children are flex items and each carries
-     * `min-width: auto` — the content's min-content size. A `<select>` does not shrink below its
-     * longest option, so `#audit-event` („Alle Ereignisse / Konto angelegt / Konto umbenannt / …")
-     * measured 427px inside a 375px screen and dragged its row and label out to 443px. That is why
-     * neither `max-width: 100%` nor the bar's own `flex-wrap` helped: wrapping cannot rescue a
-     * single item that is itself too wide, and a percentage max-width resolves against a containing
-     * block the select is busy widening.
-     *
-     * `min-width: 0` on the items is the half that lets the chain shrink; `width: 100%` on the
-     * controls is the half that makes them fill the shrunken row instead of their own content.
-     */
         .bank-filterbar > * {
             min-width: 0;
         }
 
-        /* `.bank-filter-group` is gone: zero hits across templates/ and static/js/, and the only other
-       reference (bank.css) is itself dead. The rule's own justification names `#audit-event`, which
-       lives in a `.bank-form-row` and is covered by the half that does match — so the fix worked
-       while two of its four selectors could never fire, and a reader would have kept them in step
-       with markup that does not exist. */
         .bank-form-row select,
         .bank-form-row input {
             width: 100%;
         }
 
-        /*
-     * On a phone the footer SCROLLS WITH THE PAGE instead of being pinned to
-     * the viewport bottom (owner decision 2026-09-13, REQ-UI-009).
-     *
-     * Pinned, it cost the phone class twice over: the column-stacked footer is
-     * two rows tall (~75px of an 812px viewport), and `main` reserved that
-     * height AGAIN as padding-bottom so the last content line could clear it.
-     * Together that is roughly a fifth of the screen permanently spent on three
-     * legal links — on the one device class where vertical space is scarcest,
-     * and where the app is now the mobile client (REQ-UI-020). Scrolling it
-     * away gives the whole viewport to content and still leaves the links
-     * exactly where web convention puts them: at the end of the page.
-     *
-     * `position: static` is the whole mechanism, and it is load-bearing in one
-     * non-obvious way: `--krt-footer-height` feeds EIGHT consumers (this file's
-     * `main` reserve, the materialboerse / materials-overview / promotion
-     * max-height calcs, the org-chart proxy scrollbar's `bottom`, and the
-     * mission- and operation-detail padding), all of which mean "how much of
-     * the viewport bottom is covered". sidebar.js therefore publishes 0 as soon
-     * as the footer is not `fixed`, so every one of them stops reserving in the
-     * same breath rather than each needing its own media query.
-     */
         .krt-footer {
             flex-direction: column;
             align-items: flex-start;
             position: static;
-            /*
-         * `order` is what keeps the footer last, and on this class it is not decoration.
-         *
-         * The footer fragment is included from `fragments/sidebar.html`, which every template puts
-         * as the FIRST element of <body> — before <header>. While the footer was unconditionally
-         * `position: fixed` that did not matter, and `sidebar.js` moved it to the end of <body>
-         * only so screen readers read it after the content. Take `fixed` away and DOM order becomes
-         * visual order: the legal links and the version string paint ABOVE the header until the
-         * `DOMContentLoaded` handler gets ~105 lines in to the `appendChild`, and stay there for
-         * good if anything earlier in that handler throws. The layout guard cannot see it, because
-         * it waits for `readyState === 'complete'` — always after the relocation.
-         *
-         * This restores the mechanism `fragments/footer.html`'s comment has described all along.
-         * The JS move stays: it costs nothing, keeps the DOM tidy, and is what the wider classes
-         * have always used.
-         */
             order: 999;
         }
 
-        /*
-     * …and `order` needs a flex container to act on, which is why the column comes back HERE and
-     * only here. It was dropped from the base `body` rule when the footer became unconditionally
-     * fixed; scoping it to the one class where the footer is in flow keeps every wider class on the
-     * block layout it has today. `.krt-footer` is the only child that asks for a non-default order,
-     * and the sidebar and its overlay are `position: fixed`, so they are out of flow and not flex
-     * items at all.
-     */
         body {
             display: flex;
             flex-direction: column;
         }
 
-        /*
-     * …and something has to GROW, or the column does nothing on a short page.
-     *
-     * `body` keeps `min-height: 100vh` from the base rule, so on a page shorter than the viewport
-     * (an empty /notifications, /pending-approval, /terms/accept) the flex column lays header, main
-     * and footer out at their natural heights and leaves the remainder as bare page background —
-     * with the footer floating in the middle of the screen instead of at the end of the page.
-     * `flex: 1 0 auto` on `main` is the missing half of the sticky-footer pattern, and the base
-     * `body` comment names it as the mechanism that was dropped when the footer became
-     * unconditionally fixed.
-     */
         main,
-    /*
-     * `.page-wrapper` too, because on the two pages this pattern was written for `main` is not the
-     * body's flex child. `operation-detail.html` has NO `<main>` at all, and
-     * `mission-detail.html`'s is nested inside `.page-wrapper` and gated on `th:if="${isNew}"` — so
-     * an existing mission has none either, and the body-level child is `.page-wrapper` in both
-     * cases. Nothing in the column could absorb the slack, and the footer landed mid-screen with
-     * bare page background beneath it, which is precisely the failure the comment above describes.
-     * Before this class the footer was `position: fixed` everywhere and the case could not arise.
-     *
-     * Harmless where `.page-wrapper` sits INSIDE `main`, which is the usual shape: `flex` on a
-     * non-flex-child is inert.
-     */
-    .page-wrapper {
+        .page-wrapper {
             flex: 1 0 auto;
         }
-
-        /*
-     * The two page-local footer reserves, here rather than in two inline <style> blocks.
-     *
-     * mission-detail.html and operation-detail.html put the reserve on `.page-wrapper` instead of
-     * `main`, so the shared override above does not reach them: `--krt-footer-height` publishes 0
-     * on this class, their `calc(... + 5rem)` resolves to a bare 80px, and the three densest pages
-     * in the app kept 80px of dead scroll where every other page has 16px. Both carried an
-     * identical copy of this rule, and the comment on those copies said outright that duplicating
-     * the reserve is how it came to be missed — so it is stated once, here, with every other page's.
-     *
-     * `div.page-wrapper`, not `.page-wrapper`. head.html links this file at :85 and renders the
-     * per-page `additionalLinks` at :348, so both pages' inline `.page-wrapper` is LATER at equal
-     * specificity and won the tie — this rule was written, its comment was accurate, and the two
-     * densest pages in the app kept the exact 80px it describes. The element prefix is the same
-     * technique this block already uses for `.btn.btn-xs2`, `input.item-checkbox` and
-     * `div.filters-container`, and for the same reason.
-     */
-        /* `div.page-wrapper` lives in the page layer (FE-MOD-02). */
     }
 
-    /*
- * Star Citizen Fan Kit compliance band (`fragments/fankit.html`). Rendered at
- * the end of the home page's <main> since REQ-UI-018 moved it off the fixed
- * footer, where it cost every page a full 3.25rem row. A hairline rule sets it
- * apart from the page content without making it look like a second footer; it
- * scrolls with the page, so it never eats viewport height.
- */
     .krt-fankit-band {
         display: flex;
         align-items: center;
-        /*
-     * Wraps so the Fankit Agreement clause 2(g) notice can take a row of its own
-     * (see .krt-fankit-disclaimer). Without the wrap that 370-character paragraph
-     * becomes a third column and squashes the other two into slivers.
-     */
         flex-wrap: wrap;
         gap: var(--space-3);
         margin-top: var(--space-8);
         padding-top: var(--space-4);
         border-top: var(--border-hairline);
     }
-    /*
- * White-artwork logo variant, rendered unmodified (no recolour, outline,
- * distortion or effect — Fan Kit Guidelines section 3). Fixed square size keeps
- * it crisp and recognisable; `flex-shrink: 0` stops the long trademark sentence
- * from squashing it when the row is tight.
- */
     .krt-fankit-logo {
         width: 2.25rem;
         height: 2.25rem;
         flex-shrink: 0;
     }
-    /*
- * Required trademark notice at --fs-sm (~10.8pt) on the gray-1 ink, clearing
- * the Fan Kit's "legible font size and color, no less than 10 point font" rule
- * (section 2b) — the --fs-xs used elsewhere for fine print is only ~9.6pt.
- */
     .krt-fankit-trademark {
-        /*
-     * Shares the first row with the logo and wraps inside its own box. Without the
-     * flex growth the wrapped band drops the logo onto a row of its own at narrow
-     * widths, which visually separates it from the notice section 2 couples it to.
-     * `min-width: 0` is what lets a flex item wrap instead of forcing the row wider.
-     */
         flex: 1 1 0;
         min-width: 0;
         font-size: var(--fs-sm);
         color: var(--color-gray-1);
         line-height: 1.4;
     }
-    /*
- * The Fankit Agreement clause 2(g) notice. A SECOND, longer notice, required by a
- * different CIG document than the trademark line above it — the Guidelines and the
- * Agreement bind this project cumulatively, so neither notice substitutes for the
- * other. Same size and ink as the line above, because 2(g) states no size of its own
- * and section 2b's ">=10pt, legible colour" floor is the one to clear either way.
- *
- * `flex-basis: 100%` puts it on its own row under the logo and the trademark line
- * rather than beside them.
- */
     .krt-fankit-disclaimer {
         flex-basis: 100%;
         margin: 0;
@@ -1677,14 +1096,6 @@
         width: 100%;
     }
 
-    /*
- * Date- und Time-Inputs haben unterschiedlich breiten Inhalt
- * (z. B. "23.04.2026" vs. "19:00"). Mit reinem `flex:1` wurden sie
- * gleich breit, wodurch das Datumsfeld den vollstaendigen Inhalt
- * inkl. Kalender-Icon nicht mehr anzeigen konnte. Wir geben dem
- * Date-Part daher eine ausreichende Mindestbreite und lassen nur
- * das Time-Feld auf seine kompakte Minimalbreite schrumpfen.
- */
     .datetime-split-inputs input[type='date'] {
         flex: 0 0 auto;
         width: 10.5rem;
@@ -1699,46 +1110,12 @@
         max-width: 7rem;
     }
 
-    /*
- * Both parts above are fixed-width and non-shrinkable, so a .datetime-split-group
- * cannot render narrower than 10.5rem + --space-2 + 7rem = 18rem. A multi-column
- * `.form-row` hands out a smaller per-column floor (`.form-row > .form-group` on
- * mission-detail declares 250px), and wherever a column actually lands below 18rem
- * the parts simply spill out of it -- swallowing the row's column gap and overrunning
- * the container's padding. Measured case: the two groups in the 600px .krt-modal--wide
- * participant modal get ~275px each, so the time part overflows by ~13px and "Endzeit"
- * ends up 3px from the modal border, at every desktop width.
- *
- * Declaring the real floor makes the row WRAP instead of overflow: where there is
- * room the groups stay side by side, otherwise they fall onto their own full-width
- * line. min() caps the floor at the line width so a narrow (mobile) container still
- * shrinks rather than overflowing. The `.form-group` qualifier is what outranks the
- * page-level `.form-row > .form-group` floor, which is declared later in the cascade.
- *
- * The rule is deliberately NOT scoped to .krt-modal: it states the widget's real
- * minimum, so any multi-column row gets it. On the mission Verwaltung form -- the
- * other multi-column user of this widget -- it is a no-op today: that row already
- * keeps two groups per line at >= 18rem each across 1280-1800px, measured, and it
- * did so before this rule too. It is guarding against a future narrower row there,
- * not fixing a present defect.
- */
-    /* `.form-row > .form-group.datetime-split-group` lives in the page layer (FE-MOD-02). */
-
-    /*
- * A wrapped datetime line must keep the standard field rhythm: .form-group already
- * carries margin-bottom: 1.25rem, so the row's own gap would stack on top of it and
- * open a 36px hole between "Startzeit" and "Endzeit". Zero the ROW gap only -- the
- * column gap that separates two side-by-side groups stays untouched.
- */
-    /* `.form-row:has(> .form-group.datetime-split-group)` lives in the page layer (FE-MOD-02). */
-
     @media (width <= 768px) {
         .datetime-split-inputs {
             flex-direction: column;
         }
     }
 
-    /* Forms & Inputs */
     input[type='text'],
     input[type='search'],
     input[type='password'],
@@ -1762,16 +1139,6 @@
         color-scheme: dark;
     }
 
-    /*
- * Unified height for single-line form inputs so their bottom edges align
- * consistently when placed side-by-side in filter bars (e.g. the
- * "Einsatzuebersicht" filter row with a text search plus date/time inputs)
- * and in multi-column form rows where selects, inputs and the .btn
- * (min-height: 44px) sit next to each other. 2.75rem == 44px matches the
- * Styleguide touch-target rule and aligns with .btn — so the labels above
- * the inputs land at the same Y position regardless of control type.
- * textarea is intentionally excluded so it can grow vertically.
- */
     input[type='text'],
     input[type='search'],
     input[type='password'],
@@ -1784,25 +1151,6 @@
         height: 2.75rem;
     }
 
-    /*
- * <select> styling, merged into a single rule (stylelint no-duplicate-selectors).
- *
- * Height: <select> must NOT use a fixed height. Chrome calculates the inner
- * content box differently from Firefox when box-sizing: border-box is active,
- * which causes descenders and umlauts to be clipped at the bottom. Using only
- * min-height lets Chrome size the element naturally around its content while
- * still aligning with the 44px input/.btn baseline.
- *
- * Appearance: Chrome does not automatically centre the option text within the
- * content box, which clips descenders (g, p, q, y, …) and umlauts when a fixed
- * height meets insufficient padding. Fixes applied:
- *   - -webkit-appearance / appearance: none  removes the native widget so our
- *     padding/line-height rules are fully respected.
- *   - line-height: 1.5  gives enough vertical space for the font at 1rem.
- *   - padding reserves space on the right for the custom arrow indicator.
- *   - box-sizing: border-box (set on the shared input rule) ensures the
- *     min-height of 2.75rem is measured from border to border.
- */
     select {
         min-height: 2.75rem;
         -webkit-appearance: none;
@@ -1815,12 +1163,6 @@
         background-size: 12px 8px;
     }
 
-    /*
- * Association-Select: Dropdowns für Auftrags- und Einsatzzuordnung in
- * Lagereinträgen (inventory-my.html, inventory-admin.html).
- * Das padding-right muss groß genug sein, damit der orangene SVG-Pfeil
- * (aus der globalen select-Regel oben) den Text nicht überlagert.
- */
     select.association-select {
         width: 100%;
         min-width: 190px;
@@ -1832,43 +1174,6 @@
         box-sizing: border-box;
     }
 
-    /*
- * Per-template \3c style> blocks on the form pages (refinery-orders-*,
- * orders-create, inventory-input, ship-data, hangar, materials,
- * material-detail, admin/*) ship a single combined rule of the form
- *   .form-group input, .form-group select, .form-group textarea {
- *       width: 100%;
- *       padding: 0.75rem;
- *       ...
- *   }
- * The 0.75-rem padding makes <input> look fine (input height is pinned
- * to 2.75rem by the global rule above) but inflates <select>: with the
- * 1.5-line-height text plus 12-px padding all sides plus border, the
- * select's intrinsic height grows to ~50 px, well past the 2.75rem
- * min-height — so inside a `.material-row` the select sits ~6 px
- * taller than the input next to it and the labels above end up on
- * different Y positions.
- *
- * Revert the padding for `.form-group select` to the descender-safe
- * value the stand-alone `select` rule above uses. The 0.375-rem top/
- * bottom padding keeps the natural height at ~38 px so the min-height
- * (2.75rem == 44 px) cleanly pads the box up to match the input.
- *
- * Specificity bump (main .form-group select == 0/1/2) deliberately
- * exceeds the per-template `.form-group select` (0/1/1) and is dwarfed
- * by `.krt-personal-inventory .form-group select` /
- * `.materials-overview-main .form-group select` (both 0/2/1) — those
- * pages already have correct select padding scoped to their own
- * containers and stay untouched.
- */
-    /* `main .form-group select` itself lives in the page layer at the end of this file
-   (FE-MOD-02): it must keep beating the page stylesheets' `.form-group select` rules. */
-
-    /*
- * Wrapper für die innere Detailtabelle in Lagereinträgen.
- * Ermöglicht horizontales Scrollen auf kleinen Bildschirmen,
- * damit die Select-Felder nicht abgeschnitten werden.
- */
     .inventory-items-table-wrapper {
         overflow-x: auto;
         width: 100%;
@@ -1878,28 +1183,6 @@
         min-width: 700px;
     }
 
-    /*
- * Touch target optimisation for Smartphone & Tablet is now baked into the
- * desktop rules above (input height + select min-height bumped to 2.75rem
- * == 44px), so no separate mobile override is needed for the basic
- * single-line controls. The per-component overrides further down still
- * apply where they need to (search-form date/time, etc.).
- */
-
-    /*
- * Alignment for .search-form filter bars (Einsatzuebersicht,
- * Mitgliederuebersicht). The form itself flex-rows the columns and
- * uses `align-items: flex-end` so every filter column (direct child
- * div) lines up on its bottom edge. We ensure identical column
- * heights via:
- *   - forcing a single label row height (min-height: 1.25rem, single
- *     line via white-space: nowrap) so labels contribute exactly the
- *     same vertical space regardless of text length
- *   - fixing the input/wrapper height to 2.5rem (see generic input rule
- *     above)
- *   - forcing .datetime-split-inputs wrapper height to 2.5rem so a
- *     date/time column is visually identical to a plain-input column
- */
     .search-form {
         display: flex;
         align-items: flex-end;
@@ -1912,31 +1195,17 @@
         gap: 0.2rem;
     }
 
-    /*
- * Action column at the right end of the search bar: holds the Reset /
- * Create-New buttons. Always rendered as a flex row so the buttons sit
- * next to each other regardless of label-column ordering.
- */
     .search-form-actions {
         align-self: flex-end;
         display: flex;
         gap: var(--space-2);
     }
 
-    /*
- * Single-line text-search column that should grow with the available
- * space so the search input always dominates the filter bar visually.
- */
     .search-form-flex-1 {
         flex: 1;
         min-width: 150px;
     }
 
-    /*
- * Checkbox-only column. Holds a single checkbox + label pair. The
- * empty spacer keeps the checkbox aligned with the bottom edge of
- * other inputs (same height as a label row would contribute).
- */
     .search-form-checkbox-col {
         display: flex;
         flex-direction: column;
@@ -1956,24 +1225,16 @@
         border: 1px solid transparent;
     }
 
-    /*
- * Only columns that actually contain a label + input stack need a
- * deterministic total height so their bottom edges line up. Button-only
- * columns (e.g. Filter, "Neuer Einsatz") must NOT get a min-height here,
- * otherwise they stretch the column and — because they are not flex
- * containers — push the button to the top of that stretched box.
- * We therefore target only label-bearing columns via :has().
- */
     .search-form > div:has(> label) {
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
-        min-height: 3.95rem; /* label (1.25rem) + gap (0.2rem) + input (2.5rem) */
+        min-height: 3.95rem;
     }
 
     @media (width <= 1024px) {
         .search-form > div:has(> label) {
-            min-height: 4.2rem; /* label (1.25rem) + gap (0.2rem) + input (2.75rem) */
+            min-height: 4.2rem;
         }
 
         .search-form > div.datetime-split-group {
@@ -2003,21 +1264,12 @@
         display: none;
     }
 
-    /*
- * .datetime-split-group inside a .search-form filter bar must have the
- * same total height as a plain label+input column so that align-items:flex-end
- * on the form aligns all bottom edges on the same horizontal line.
- * We cannot rely solely on :has(> label) because the datetime column has
- * additional nested structure (hidden input + .datetime-split-inputs wrapper)
- * that may cause the browser to compute a different intrinsic height.
- * Setting min-height and justify-content explicitly here guarantees alignment.
- */
     .search-form > div.datetime-split-group {
         display: flex;
         flex-direction: column;
         gap: 0.2rem;
         justify-content: flex-end;
-        min-height: 4.2rem; /* label (1.25rem) + gap (0.2rem) + input (2.75rem) */
+        min-height: 4.2rem;
     }
 
     .search-form > div > .datetime-split-inputs {
@@ -2029,25 +1281,12 @@
         flex: 0 0 2.75rem;
     }
 
-    /* Inner date/time inputs inside the split wrapper keep the same height
-   so the wrapper and a standalone input are visually identical. The
-   explicit min-height: 0 prevents the native date/time picker UI (which
-   has an intrinsic min-content size larger than 2.75rem in Chromium) from
-   forcing the column taller than a plain text input column. */
     .search-form .datetime-split-inputs input[type='date'],
     .search-form .datetime-split-inputs input[type='time'] {
         height: 2.75rem;
         min-height: 0;
         max-height: 2.75rem;
         box-sizing: border-box;
-        /*
-     * Chromium's native date/time picker has an intrinsic content size
-     * (spinner + picker icon) that can exceed the declared height, which
-     * in turn stretches the .datetime-split-inputs flex wrapper and the
-     * surrounding filter column. Neutralising the native appearance makes
-     * these inputs render as a plain text box, so the declared height is
-     * authoritative and the column matches the plain-text search column.
-     */
         -webkit-appearance: none;
         -moz-appearance: none;
         appearance: none;
@@ -2057,13 +1296,6 @@
         overflow: hidden;
     }
 
-    /*
- * Firefox renders input[type="date"] / input[type="time"] with internal
- * pseudo-elements (reset/clear buttons, picker indicator) whose intrinsic
- * size can push the input's content box beyond the declared height even
- * with box-sizing: border-box. Neutralise them explicitly so the inputs
- * behave like a plain text input and match the search field height.
- */
     .search-form .datetime-split-inputs input[type='date']::-moz-focus-inner,
     .search-form .datetime-split-inputs input[type='time']::-moz-focus-inner {
         border: 0;
@@ -2076,31 +1308,18 @@
         margin: 0;
     }
 
-    /*
- * Mobile date/time height override is no longer needed: the desktop rules
- * above already pin everything to 2.75rem (44px touch-target).
- */
-
-    /* On Smartphone the .datetime-split-inputs wrapper switches to
-   flex-direction: column (date over time), so a fixed wrapper height
-   would clip the second input. Release the fixed height and let the
-   column grow naturally. */
     @media (width <= 768px) {
         .search-form > div > .datetime-split-inputs {
             height: auto;
         }
     }
 
-    /* Mark mandatory fields with an asterisk */
     .form-group:has([required]) > label::after,
     label:has(+ [required])::after {
         content: ' *';
         color: var(--color-primary);
     }
 
-    /* Form Labels — neutral light-gray, not orange: the accent is reserved for
-   actions and identity, so the input VALUES stay the brightest thing in a form
-   (action-hierarchy work). */
     .form-label {
         display: block;
         color: var(--color-gray-1);
@@ -2118,8 +1337,6 @@
         font-size: var(--fs-sm);
     }
 
-    /* Extra-small label variant — inline (no display:block, unlike .form-label),
-   used for compact filter captions above multi-select controls. */
     .form-label-xs {
         color: var(--color-gray-1);
         font-family: var(--font-body);
@@ -2127,11 +1344,6 @@
         font-size: var(--fs-xs);
     }
 
-    /* Inline field-validation message rendered under an input (Thymeleaf
-   th:errors). Uses the accessible danger TEXT tint (not the dark canonical red,
-   which fails WCAG as small text on black) with a leading warning-glyph slot;
-   pair with the field getting a red border. Replaces the repeated
-   `color: var(--color-danger); font-size: 0.8rem` inline style. */
     .field-error {
         color: var(--color-danger-text);
         font-size: var(--fs-xs);
@@ -2141,17 +1353,10 @@
         align-items: flex-start;
     }
 
-    /* #589: the mission core-edit form keeps its per-field .field-error divs always present (with a
-   data-error-for hook) so the in-place AJAX save can fill them client-side; an empty one must take
-   no space, matching the old th:if-removed-the-div behaviour. Harmless for the th:if-gated error
-   divs elsewhere (they only render when they already carry a message). */
     .field-error:empty {
         display: none;
     }
 
-    /* Input/select/textarea flagged invalid - red hairline at rest, swapping the
-   orange focus bloom for a danger one, so the offending field is obvious next to
-   its .field-error message. */
     .input-error {
         border-color: var(--color-danger);
     }
@@ -2161,8 +1366,6 @@
         box-shadow: 0 0 5px rgb(163 0 10 / 40%);
     }
 
-    /* Small muted help text under a form control (replaces ad-hoc inline
-   `font-size: 0.8rem; color: var(--color-gray-2-text)` styles). */
     .form-hint {
         color: var(--color-gray-2-text);
         font-size: var(--fs-xs);
@@ -2170,9 +1373,6 @@
         max-width: var(--measure);
     }
 
-    /* Checkbox opt-in row — checkbox left, label + .form-hint help stacked right.
-   Shared by the profile blueprint-sharing toggle and the REQ-INV-026 stock-merge
-   opt-ins (Einbuchen form + the Umbuchen modals of both Lager views). */
     .check-row {
         display: flex;
         gap: var(--space-3);
@@ -2192,15 +1392,10 @@
         cursor: pointer;
     }
 
-    /* A per-page `.form-group label` rule (block display + bottom margin, e.g. the
-   inventory-input field labels) ties the (0,1,1) label rule above and loads after
-   this sheet — re-pin the tight label/hint stack at (0,2,1) for the
-   form-group-hosted rows. */
     .form-group.check-row label {
         margin: 0;
     }
 
-    /* Layout Utility Classes */
     .mt-1 {
         margin-top: var(--space-4);
     }
@@ -2240,7 +1435,6 @@
     .w-1 {
         width: 1%;
     }
-    /* Flex-item grow shorthands (distinct from the container .flex-* helpers above). */
     .flex-1 {
         flex: 1;
     }
@@ -2271,8 +1465,6 @@
         cursor: pointer;
     }
 
-    /* Small muted "inactive" tag appended after a name in the admin master-data
-   tables (Staffeln / Aufgaben / SKs). Square by design. */
     .badge-inactive {
         font-size: var(--fs-2xs);
         background-color: var(--color-surface-input);
@@ -2281,9 +1473,6 @@
         color: var(--color-gray-2-text);
     }
 
-    /* Stacked label/value pair (e.g. the refinery method-rating readout): a neutral
-   uppercase caption above a bright value. The accent is not spent on the caption
-   so the VALUE is what stands out (action-hierarchy work). */
     .stat-label {
         display: flex;
         flex-direction: column;
@@ -2328,17 +1517,6 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        /*
-     * Wrap and gap belong on the BASE rule, not only in the phone block.
-     *
-     * Three templates used to carry a generated `flex-wrap: wrap; gap: 1rem` utility on this exact
-     * element at every width. Removing it in favour of the shared media-query fix left 769-1024px
-     * uncovered, where a long German compound heading (MATERIALSAMMELÜBERSICHT) beside its button
-     * can still not break. `space-between` already pushes the items apart, so the gap only shows
-     * once a row is full — which is precisely when it is wanted — and wrapping is inert until the
-     * content stops fitting. Both are therefore no-ops on a wide screen and the fix that was
-     * missing on a medium one.
-     */
         flex-wrap: wrap;
         gap: var(--space-3);
     }
@@ -2347,12 +1525,6 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: var(--space-4);
-        /*
-     * Same wrap and gap as `.flex-between` above, for the same reason and on the same rule. It had
-     * the phone-block half only, so the 769-1023px band that fix was written to close stayed open
-     * for the seven templates using this variant — and the phone-block copy was itself dead, since
-     * this base rule is later in the file at equal specificity.
-     */
         flex-wrap: wrap;
         gap: var(--space-3);
     }
@@ -2372,7 +1544,6 @@
         gap: var(--space-4);
     }
 
-    /* Custom styling for number input spin buttons to match the dark/orange KRT design */
     input[type='number'] {
         -moz-appearance: textfield;
     }
@@ -2474,23 +1645,10 @@
         border-color: var(--color-primary);
     }
 
-    /*
- * Form-group spacing — central definition so every page that uses .form-group
- * gets the same vertical rhythm without having to redeclare margin-bottom in
- * its own inline \3c style> block. Pages that need a different cadence (e.g. the
- * materials-overview filter row sitting at 0, or a row that participates in a
- * grid layout) can still override the value with a more specific selector.
- */
     .form-group {
         margin-bottom: 1.25rem;
     }
 
-    /*
- * Icon sprite — the <svg> sprite from fragments/icons.html must not take up
- * any layout space. Individual icons reference it via `<svg class="krt-icon">
- * <use href="#krt-icon-NAME"/></svg>` and inherit text colour through the
- * symbol's `currentColor` strokes/fills.
- */
     .krt-icon-sprite {
         width: 0;
         height: 0;
@@ -2515,19 +1673,6 @@
         height: 2em;
     }
 
-    /* Buttons (if any) */
-    /*
- * min-height enforces the Styleguide 44px touch-target rule on every device class,
- * not just mobile. Touch-laptops and hybrid devices report as desktop but still
- * need the larger hit area, so we apply it unconditionally rather than only inside
- * the mobile media query.
- *
- * The single exception is the dense-row pair `.btn-xs` / `.btn-icon` (declared earlier,
- * with a `.btn` qualifier so they out-specify this rule): repeated per-row actions in a
- * dense table or tree drop to a 32px hit area on every class. That carve-out is approved
- * and written down in REQ-UI-009 — do not widen it to further variants without amending
- * the requirement first.
- */
     .btn {
         display: inline-flex;
         align-items: center;
@@ -2572,12 +1717,10 @@
     }
 
     .btn-danger:hover {
-        background-color: var(--color-danger-hover); /* Consistent with error pages hover */
+        background-color: var(--color-danger-hover);
         color: #fff;
     }
 
-    /* The label is text, so it takes the accessible tint (the canonical danger hue read 2.36:1
-   on this fill); the border keeps the canonical hue (DS "Accessible text tints"). */
     .btn-outline-danger {
         background-color: rgb(163 0 10 / 10%);
         border: 1px solid var(--color-danger);
@@ -2600,23 +1743,6 @@
         color: #fff;
     }
 
-    /* ----------------------------------------------------------------------------
-   Action-hierarchy button ladder (added 2026-06) — fixes "everything is
-   orange" on dense pages like /missions/{id}. Reserve the filled orange accent
-   for the ONE primary action per context; demote routine and destructive
-   actions. See the design-system skill (krt-components.css) + README.
-
-   Strongest -> quietest:
-     .btn.btn--cta      primary, filled orange + bloom   (max 1 per panel)
-     .btn-success       status / state change (green)    (Check-In)
-     .btn-outline       emphasized secondary (orange outline, not filled)
-     .btn-ghost         routine secondary (neutral hairline -> orange on hover)
-     .btn-quiet-danger  destructive (transparent -> red on hover)
-   ---------------------------------------------------------------------------- */
-
-    /* Primary call-to-action: the existing filled .btn plus a restrained orange
-   bloom (the brand's own elevation idiom) so the single hero action is
-   unmistakable. .btn-primary is kept as a backwards-compatible alias. */
     .btn--cta,
     .btn-primary {
         box-shadow: var(--glow-primary);
@@ -2628,8 +1754,6 @@
         box-shadow: var(--glow-primary-lg);
     }
 
-    /* Emphasized secondary — orange outline, no fill. For the second-most-important
-   action in a context (e.g. "Crew zuweisen" inside a unit box). */
     .btn-outline {
         background-color: transparent;
         color: var(--color-primary);
@@ -2642,8 +1766,6 @@
         border-color: var(--color-accent-light);
     }
 
-    /* Routine secondary — neutral hairline that lights up orange on hover. Use for
-   repeated row actions (Edit, Check-Out, Details) so tables stay calm. */
     .btn-ghost {
         background-color: transparent;
         color: var(--color-gray-1);
@@ -2656,7 +1778,6 @@
         border-color: var(--color-primary);
     }
 
-    /* Destructive, quiet — transparent until hover, then commits to red. */
     .btn-quiet-danger {
         background-color: transparent;
         color: var(--color-gray-2-text);
@@ -2669,18 +1790,12 @@
         border-color: var(--color-danger);
     }
 
-    /* Disabled state for every button variant — dimmed and non-interactive.
-   Covers both the `disabled` attribute on <button> and the attribute set
-   reflectively on <a>/<input> elements that carry the .btn class. */
     .btn:disabled,
     .btn[disabled] {
         opacity: 0.45;
         cursor: not-allowed;
     }
 
-    /* Accessibility utility — visually hide an element while keeping it available to
-   assistive tech (e.g. a <label> for an input that otherwise shows only a
-   placeholder). Global so every page can give controls an accessible name. */
     .visually-hidden {
         position: absolute !important;
         width: 1px;
@@ -2693,12 +1808,6 @@
         border: 0;
     }
 
-    /* ----------------------------------------------------------------------------
-   Panel header — calmer alternative to a full-orange bordered section header.
-   Surface fill + a single orange left-accent bar + a light heading; orange is
-   kept for the chevron and the active/hover state only, so the accent isn't
-   spent on every collapsible panel frame (action-hierarchy work).
-   ---------------------------------------------------------------------------- */
     .panel-header {
         all: unset;
         box-sizing: border-box;
@@ -2753,11 +1862,6 @@
         color: var(--color-primary);
     }
 
-    /* ----------------------------------------------------------------------------
-   Data value — mission-critical readouts (names, frequencies, IDs) read as
-   bright neutral DATA on a surface chip, not as an action. Orange stays
-   reserved for action + identity, never for plain values.
-   ---------------------------------------------------------------------------- */
     .data-value {
         color: var(--color-white);
         font-weight: var(--fw-bold);
@@ -2771,7 +1875,6 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* Alerts */
     .alert {
         padding: var(--space-4);
         margin-bottom: var(--space-6);
@@ -2800,11 +1903,6 @@
         border-left: 4px solid var(--color-warning);
     }
 
-    /* Pagination - square page-nav. Prev/next use chevron icons (not « ‹ › »
-   glyphs). Disabled pages must be visually AND functionally disabled - an <a>
-   cannot carry `disabled`, so `.disabled` removes pointer-events + dims it. The
-   current-page readout uses tabular figures; mark the active page with
-   aria-current="page" in markup. */
     .pagination {
         display: flex;
         gap: 0.4rem;
@@ -2835,7 +1933,6 @@
         height: 1.1em;
     }
 
-    /* First/last page buttons stack two chevrons; pull the second tight to the first. */
     .pagination .page-btn .krt-icon + .krt-icon {
         margin-left: -0.4em;
     }
@@ -2871,9 +1968,6 @@
         font-weight: var(--fw-bold);
     }
 
-    /* Active page-size choice - same highlight as the aria-current page button,
-   but rendered as an inert <span class="page-btn active"> (a non-page use of
-   aria-current="true", so the [aria-current='page'] selector does not catch it). */
     .pagination .page-btn.active {
         background-color: var(--color-primary);
         color: var(--color-bg-black);
@@ -2882,9 +1976,6 @@
         cursor: default;
     }
 
-    /* Combined footer bar under paginated tables: page-size picker left, page-nav
-   right; wraps into stacked rows on narrow (smartphone) widths. The children
-   keep their own component styles - only their top margin moves to the bar. */
     .pagination-controls {
         display: flex;
         flex-wrap: wrap;
@@ -2906,10 +1997,6 @@
         margin-right: var(--space-2);
     }
 
-    /* Key-value detail list - read-only "label : value" rows (profile, detail
-   panels, org/finance summaries). Label is neutral uppercase; the VALUE is the
-   bright thing (data, not action). Built on a 2-col grid so colons/values
-   align - use instead of ad-hoc flex rows with a fixed-width label. */
     .kv-list {
         display: grid;
         grid-template-columns: minmax(140px, max-content) 1fr;
@@ -2936,9 +2023,6 @@
         overflow-wrap: anywhere;
     }
 
-    /* Subordinate qualifier inside a .kv-list term (e.g. the "Einheit" tag that marks a
-   per-unit frequency row in the mission overview Funk panel). Reads as secondary to the
-   term it follows: lighter weight, no uppercase/tracking, smaller and dimmed. */
     .kv-list dt .kv-sub {
         font-weight: var(--fw-regular);
         text-transform: none;
@@ -2947,18 +2031,14 @@
         opacity: 0.7;
     }
 
-    /* Full-width row (e.g. a description spanning both columns). */
     .kv-list .kv-row-wide {
         grid-column: 1 / -1;
     }
 
-    /* A label whose value is a tall block (a form / textarea) aligns to the top
-   instead of the shared baseline. */
     .kv-list .kv-row-self-start {
         align-self: start;
     }
 
-    /* Hairline separators between rows. */
     .kv-list.kv-ruled dt,
     .kv-list.kv-ruled .kv-key,
     .kv-list.kv-ruled dd,
@@ -2967,8 +2047,6 @@
         border-bottom: var(--border-hairline);
     }
 
-    /* Text Colors - semantic colour used AS text uses the accessible tints (the
-   canonical danger/success hues are reserved for fills/borders). */
     .text-danger {
         color: var(--color-danger-text) !important;
     }
@@ -2982,7 +2060,6 @@
         color: var(--color-gray-2-text) !important;
     }
 
-    /* Utilities */
     .text-primary {
         color: var(--color-primary);
     }
@@ -2990,7 +2067,6 @@
         background-color: var(--color-bg-dark-gray);
     }
 
-    /* Sci-Fi Elements */
     .hud-box-error {
         background-color: rgb(163 0 10 / 20%);
         border-color: var(--color-danger);
@@ -3042,11 +2118,6 @@
         border-right: 2px solid var(--color-primary);
     }
 
-    /* ----------------------------------------------------------------------------
-   Plain card - a simple square surface (border + dark fill), no HUD brackets.
-   Use for list items, sub-panels and summary tiles where the bracketed .hud-box
-   is too heavy. Compose with .section-title, .kv-list and .chip.
-   ---------------------------------------------------------------------------- */
     .card {
         background-color: var(--color-bg-dark-gray);
         border: var(--border-hairline);
@@ -3054,15 +2125,15 @@
     }
 
     .card--inset {
-        background-color: var(--color-surface-input); /* nested / quieter */
+        background-color: var(--color-surface-input);
     }
 
     .card--accent {
-        border-top: 3px solid var(--color-primary); /* top accent bar */
+        border-top: 3px solid var(--color-primary);
     }
 
     .card--flush {
-        padding: 0; /* card wrapping a table/list */
+        padding: 0;
     }
 
     .card-head {
@@ -3088,12 +2159,6 @@
         margin-top: 1rem;
     }
 
-    /* ----------------------------------------------------------------------------
-   Chip - small SQUARE inline label for data tags (order kind, quality, claims,
-   counts). Pills (border-radius) are reserved for .squadron-badge; chips are the
-   squared counterpart. currentColor-driven, so a tone modifier is all that is
-   needed on top of the neutral base.
-   ---------------------------------------------------------------------------- */
     .chip {
         display: inline-flex;
         align-items: center;
@@ -3116,7 +2181,6 @@
         height: 0.9em;
     }
 
-    /* Tone variants - border + text take the hue, the fill stays a faint tint. */
     .chip--primary {
         color: var(--color-primary);
         background-color: rgb(231 126 35 / 10%);
@@ -3153,7 +2217,6 @@
         border-color: var(--color-gray-3);
     }
 
-    /* A chip carrying "key: value" data, e.g. a claim "IRI: 1,200 SCU". */
     .chip--data {
         font-weight: var(--fw-regular);
         text-transform: none;
@@ -3165,11 +2228,6 @@
         font-weight: var(--fw-bold);
     }
 
-    /* ----------------------------------------------------------------------------
-   Section title - standard sub-section heading inside a page/panel. Replaces the
-   ad-hoc inline `style="font-family:'Lato'; font-weight:700; …"` repeated on the
-   detail-page <h3>s. Lato bold, neutral light, hairline rule beneath.
-   ---------------------------------------------------------------------------- */
     .section-title {
         margin: 2rem 0 1rem;
         padding-bottom: 0.5rem;
@@ -3186,7 +2244,6 @@
         margin-top: 0;
     }
 
-    /* Notification Toast */
     .notification-toast {
         position: fixed;
         bottom: 30px;
@@ -3202,7 +2259,7 @@
         transition:
             opacity 0.5s ease,
             transform 0.5s ease;
-        pointer-events: none; /* Prevent clicks when hidden */
+        pointer-events: none;
     }
 
     .notification-toast.visible {
@@ -3267,7 +2324,6 @@
         color: var(--color-danger-text);
     }
 
-    /* Language Switcher Dropdown */
     .dropdown {
         position: relative;
         display: inline-block;
@@ -3307,7 +2363,6 @@
         margin-top: var(--space-2);
     }
 
-    /* Invisible bridge to keep hover active across the gap */
     .dropdown-content::before {
         content: '';
         position: absolute;
@@ -3318,7 +2373,6 @@
         background: transparent;
     }
 
-    /* Override nav .links a styles for dropdown items */
     .dropdown-content a {
         color: var(--color-gray-1);
         padding: 12px 16px;
@@ -3326,7 +2380,7 @@
         display: flex;
         align-items: center;
         gap: 0.8rem;
-        margin-left: 0 !important; /* Force override */
+        margin-left: 0 !important;
         font-weight: normal;
         transition:
             background-color 0.2s ease,
@@ -3349,38 +2403,22 @@
         border: var(--border-hairline);
     }
 
-    /* Arrow indicator */
     .dropbtn::after {
         content: '▼';
         font-size: 0.6rem;
         margin-left: 0.2rem;
     }
 
-    /* Sidebar Drawer */
     .sidebar {
         position: fixed;
         top: 0;
         left: 0;
         width: 380px;
         max-width: 85vw;
-        /*
-     * `dvh`, with `vh` kept above it as the fallback for engines that do not
-     * know the unit. This drawer is a scroll container (`overflow: hidden auto`
-     * below) and its height is what decides where its scrollable area ends. On a
-     * phone browser `100vh` is the LARGE viewport — the one with the address bar
-     * hidden — so with the bar showing, the bottom of the drawer sits behind it:
-     * the container believes it fits, produces no overflow to scroll, and the
-     * last nav entries (Abmelden among them) simply cannot be reached. `dvh`
-     * tracks the viewport that is actually visible. Inside the installed PWA
-     * (REQ-UI-020) there is no browser chrome and the two are identical, which is
-     * why this only ever bit in Safari's tab mode.
-     */
         height: 100vh;
         height: 100dvh;
         z-index: 2000;
 
-        /* Animate transform (compositor-only) instead of `left` to avoid a
-       full reflow + repaint of the drawer on every frame while opening. */
         transform: translateX(calc(-100% - 20px));
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
@@ -3406,14 +2444,6 @@
         position: fixed;
         top: 0;
         left: 0;
-        /*
-     * `100%` rather than `100vw`: on a viewport with a classic (space-taking)
-     * scrollbar, `100vw` counts the scrollbar's width too, so a full-width fixed
-     * layer overflows the page by exactly that much and hands the document a
-     * horizontal scrollbar of its own. `inset: 0` semantics via width/height
-     * percentages of the initial containing block avoid it. `dvh` for the height,
-     * for the same reason as the drawer above.
-     */
         width: 100%;
         height: 100vh;
         height: 100dvh;
@@ -3473,18 +2503,10 @@
         padding-left: 10px;
     }
 
-    /* Discord brand mark trailing the anonymous-sidebar "Sign in with Discord" entry.
-   The label is wrapped in a <span> that is display:contents (.sidebar-links span),
-   so the inter-element gap sits on the icon itself. The glyph inherits the link
-   colour (currentColor) like the footer GitHub mark and turns brand-orange with the
-   label on hover. */
     .sidebar-links a.sidebar-discord-login .krt-icon {
         margin-left: var(--space-2);
     }
 
-    /* Logout is a CSRF-safe POST <button> (see fragments/sidebar.html), not an <a>. Strip the
-   user-agent button chrome so it renders identically to the surrounding nav anchors — the
-   typography/colour above is shared with the anchors via the grouped selectors. */
     .sidebar-logout-form {
         margin: 0;
     }
@@ -3498,7 +2520,6 @@
         width: 100%;
     }
 
-    /* Sidebar Group (Collapsible) */
     .sidebar-group {
         width: 100%;
     }
@@ -3553,10 +2574,6 @@
             color 0.2s ease;
     }
 
-    /* Sub-section label inside a sidebar group, used to cluster the long admin list
-   ("Stammdaten" / "System & Daten" ...). A quiet, non-interactive header — never a link.
-   The top margin sits on top of the flex gap to set each cluster apart; the first
-   label in a group drops it so the cluster aligns with the summary. */
     .sidebar-subheading {
         font-family: var(--font-headline);
         font-size: 0.7rem;
@@ -3571,9 +2588,6 @@
         margin-top: 0;
     }
 
-    /* Active-page markers: the current page's link and its containing section turn
-   brand-orange so the open drawer shows "you are here" at a glance. The link
-   mirrors the hover indent (padding-left) so the active affordance reads the same. */
     .sidebar-links a.sidebar-link-active {
         color: var(--color-primary);
         padding-left: 10px;
@@ -3583,7 +2597,6 @@
         color: var(--color-primary);
     }
 
-    /* Move Locale Dropdown in sidebar */
     .sidebar .dropdown {
         margin-left: 0;
         margin-top: var(--space-8);
@@ -3602,12 +2615,11 @@
         top: -0.6rem !important;
     }
 
-    /* ===== Notification bell + dropdown + list (epic #622, REQ-NOTIF-006) ===== */
     .notification-bell {
         position: fixed;
         top: 1rem;
         right: 1rem;
-        z-index: 1300; /* above the header, below the sidebar overlay */
+        z-index: 1300;
     }
 
     .notification-bell-btn {
@@ -3754,7 +2766,6 @@
         margin-bottom: var(--space-3);
     }
 
-    /* REQ-NOTIF-019: "showing X of Y" hint + load-more under the capped inbox list. */
     .notification-page-more {
         display: flex;
         align-items: center;
@@ -3792,7 +2803,7 @@
         padding: var(--space-2) 0.6rem;
         font-family: Lato, sans-serif;
         font-size: var(--fs-sm);
-        min-height: var(--touch-target); /* fat-finger target per the corporate design rule */
+        min-height: var(--touch-target);
         cursor: pointer;
     }
 
@@ -3811,9 +2822,6 @@
         cursor: pointer;
     }
 
-    /* Owning-squadron badge that the staffel-scoped list templates render
-   on every row. Subtle outline + brand-orange shorthand so the column
-   reads as metadata, not as primary content. */
     .squadron-badge {
         display: inline-flex;
         align-items: center;
@@ -3828,10 +2836,6 @@
         white-space: nowrap;
     }
 
-    /* Job-order rows render two badges side by side (Auftraggeber +
-   Erstellt durch). When both squadrons match, the dot pattern collapses
-   into a single chip; when they differ the second badge takes a muted
-   variant so the difference reads at a glance. */
     .squadron-badge-group {
         display: inline-flex;
         flex-wrap: wrap;
@@ -3849,30 +2853,16 @@
         border-color: var(--color-secondary);
     }
 
-    /* Spezialkommando badge variant — neutral grey style so SK pins are visually
-   distinguishable from Staffel badges without competing with the brand-orange
-   primary colour. Used in members.html (per-user SK list column), in the
-   member-edit memberships panel, and anywhere else an SK shorthand appears. */
     .squadron-badge-sk {
         color: var(--color-gray-1);
         border-color: var(--color-gray-2);
         background-color: rgb(255 255 255 / 4%);
     }
 
-    /* Inventory rows linked to a job-order from a foreign squadron get an
-   orange-yellow left border so the cross-squadron link is visible at a
-   glance during handover preparation. */
     .inventory-row-foreign-jobOrder {
         border-left: 4px solid var(--color-secondary);
     }
 
-    /* Order-kind chip — distinguishes the two job-order kinds (Material procurement
-   vs finished-Item manufacture) in the list and on the detail header. Reuses the
-   squadron-badge pill chrome with currentColor borders: Material orders take the
-   brand orange, Item orders the Forschung blue (manufacturing/derivation semantic).
-   The Item label is small text, so it takes the accessible tint and keeps the
-   canonical blue on its border only: #355DDC as text read 3.29:1 on the table
-   surface, below AA's 4.5:1 (AccessibilitySmokeE2eTest, 2026-09-25). */
     .order-kind-badge {
         display: inline-flex;
         align-items: center;
@@ -3897,10 +2887,6 @@
         border-color: var(--color-info);
     }
 
-    /* Caption for the processing unit (Bearbeitende Einheit) shown under the ID +
-   type badge in the order-overview first column (#1188). Small, muted, bold so
-   it reads as a sub-label for the squadron badge beneath it without competing
-   with the order id. On its own line via display:block. */
     .order-responsible-label {
         display: block;
         margin-top: var(--space-1);
@@ -3909,9 +2895,6 @@
         font-weight: var(--fw-bold);
     }
 
-    /* Cross-order material-demand overview (REQ-ORDERS-034). One section per
-   responsible org unit, each a HUD box whose heading pairs the unit badge with
-   its full name. The lead + basis lines are muted so the tables stay the focus. */
     .demand-lead {
         margin-top: var(--space-1);
         font-family: Lato, sans-serif;
@@ -3928,9 +2911,6 @@
         text-transform: uppercase;
     }
 
-    /* The material cell doubles as the drill-down toggle, so it must read as a row
-   label rather than a button: no chrome, left-aligned, full-width hit area (the
-   44px min-height keeps it tappable on the mobile device class). */
     .demand-orders-toggle {
         display: flex;
         gap: var(--space-2);
@@ -3946,8 +2926,6 @@
         font-size: 0.7rem;
     }
 
-    /* Nested contributing-order table: visually subordinate to the bucket row it
-   expands from, hence the transparent ground and the primary-tinted inset rule. */
     .demand-orders-table {
         margin: 0;
         background: transparent;
@@ -3955,8 +2933,6 @@
         border-left: 2px solid var(--color-primary);
     }
 
-    /* The gathering gap is the number the page exists for, so it carries weight;
-   a fully covered bucket drops to the success colour instead. */
     .demand-outstanding {
         font-weight: var(--fw-bold);
     }
@@ -3966,11 +2942,6 @@
         font-weight: var(--fw-regular);
     }
 
-    /* Filter surface of the Materialbedarf page (REQ-ORDERS-034). Mirrors the Lager's
-   collapsible filter row (REQ-INV-037): a toggle in an action bar, the panel a
-   sibling below it, collapsed via the `hidden` attribute so a JS-less client keeps
-   its filters. The toggle itself is the shared .filter-* component (REQ-FE-021); only the
-   bar that hosts it stays page-scoped. */
     .demand-actions-bar {
         display: flex;
         justify-content: flex-end;
@@ -3997,7 +2968,6 @@
         gap: var(--space-1);
     }
 
-    /* The quality group is a fieldset for the grouping semantics only, not the chrome. */
     .demand-filter-qualities {
         margin: 0;
         padding: 0;
@@ -4022,7 +2992,6 @@
         cursor: pointer;
     }
 
-    /* Search box pinned inside the scrolling option list so it stays reachable. */
     .demand-material-search {
         position: sticky;
         top: 0;
@@ -4044,7 +3013,6 @@
         display: none;
     }
 
-    /* Sortable headers: the whole cell is the hit area, so the button is bare. */
     .demand-sort-btn {
         display: inline-flex;
         gap: var(--space-2);
@@ -4066,8 +3034,6 @@
         font-size: 0.7rem;
     }
 
-    /* Decorative (aria-hidden; the header's aria-sort carries the state), so it keeps the
-   canonical Grau 2 per REQ-UI-006 — AccessibleTextTintTest exempts exactly this selector. */
     .demand-sortable[aria-sort='none'] .demand-sort-indicator {
         color: var(--color-gray-2);
     }
@@ -4092,9 +3058,6 @@
         }
     }
 
-    /* Quality chip for an item order's aggregated-materials panel — one row per
-   (material, quality). GOOD (700+) reads as the Profit green; NONE ("Keine")
-   takes the muted grey so "no quality floor" never competes for attention. */
     .quality-badge {
         display: inline-flex;
         align-items: center;
@@ -4117,9 +3080,6 @@
         border-color: var(--color-gray-2);
     }
 
-    /* Sub-assembly provenance marker on an ordered item line that was adopted from a
-   parent item's blueprint ITEM ingredient. Square, muted, low-key — it annotates
-   provenance without pulling focus from the item name. */
     .subassembly-tag {
         display: inline-flex;
         align-items: center;
@@ -4135,20 +3095,10 @@
         white-space: nowrap;
     }
 
-    /* ── Item-order blueprint coverage (Blaupausen-Verfuegbarkeit) ───────────────
-   Members-only panel in the item-order detail, after the Bearbeiter section:
-   which members of the responsible squadron/SK own the blueprints for the
-   ordered items, plus per-item coverage. Square-first, built on the shared
-   tokens; the coverage grid reuses the .data-table component. */
     .bp-coverage {
         margin-top: var(--space-8);
     }
 
-    /* Collapsible wrapper for the blueprint-availability panel. Keeps .bp-coverage's
-   quiet gray heading register (no orange HUD restyle of .hud-details) and only
-   adds a fold affordance: the section's <h3> rides inside the <summary>, with a
-   +/- marker pinned to the right edge mirroring the .hud-details convention.
-   Renders open by default (the template sets the `open` attribute). */
     .bp-coverage__details {
         margin: 0;
     }
@@ -4180,7 +3130,7 @@
     }
 
     .bp-coverage__details[open] > .bp-coverage__summary::after {
-        content: '\2212'; /* minus sign */
+        content: '\2212';
     }
 
     .bp-coverage__summary:focus-visible {
@@ -4210,9 +3160,6 @@
         font-size: var(--fs-sm);
     }
 
-    /* Variant-counting toggle (#822): a logistician-only switch above the coverage lists that flips
-   whether cosmetic variants are counted. Deliberately a divider-separated control row, NOT a filled
-   card, so it never reads as one of the .bp-owner data cards below it. */
     .bp-coverage__mode {
         display: flex;
         flex-wrap: wrap;
@@ -4227,7 +3174,7 @@
         display: inline-flex;
         align-items: center;
         gap: var(--space-2);
-        min-height: 2.75rem; /* 44px comfortable tap target on touch device classes */
+        min-height: 2.75rem;
         cursor: pointer;
         font-weight: var(--fw-bold);
     }
@@ -4236,12 +3183,10 @@
         width: 1.1rem;
         height: 1.1rem;
         cursor: pointer;
-        accent-color: var(--color-accent-light); /* brand gold on the checked state */
+        accent-color: var(--color-accent-light);
     }
 
     .bp-coverage__mode-hint {
-        /* gray-1 (not the muted/disabled gray-2): on the page surface the muted gray fails WCAG AA at
-       this size — readability comes from the smaller font size, not a low-contrast colour. */
         color: var(--color-gray-1);
         font-size: var(--fs-sm);
     }
@@ -4281,9 +3226,6 @@
         font-weight: var(--fw-bold);
     }
 
-    /* Discreet "not a member of the responsible unit" hint — shown next to an owner who
-   appears only because they opted into global blueprint sharing (REQ-INV-018). Muted and
-   small so it reads as a footnote, never competing with the member's name. */
     .bp-owner__external {
         color: var(--color-gray-2-text);
         font-size: var(--fs-xs);
@@ -4304,8 +3246,6 @@
         list-style: none;
     }
 
-    /* Owned-blueprint chip — square HUD tag (cf. .subassembly-tag) kept in the
-   product's natural case + size so long item names stay legible. */
     .bp-tag {
         display: inline-flex;
         align-items: center;
@@ -4322,17 +3262,11 @@
         color: var(--color-gray-2-text);
     }
 
-    /* Coverage gap — nobody in the unit owns this item's blueprint. Uses the
-   accessible danger text tint (REQ-UI-006) plus a text label, so the state
-   never relies on colour alone. */
     .bp-gap {
         color: var(--color-danger-text);
         font-weight: var(--fw-bold);
     }
 
-    /* Coverage row hint — notes that the owner count folds in cosmetic variants of
-   the ordered item (every non-magazine row). Muted, small, on its own line under
-   the item name. */
     .bp-coverage__hint {
         display: block;
         margin-top: var(--space-1);
@@ -4340,10 +3274,6 @@
         font-size: var(--fs-xs);
     }
 
-    /* Department tag — small square chip tinted by the owning Bereichsfarbe.
-   The border inherits `currentColor`, so setting the text colour to a
-   department token (e.g. `color: var(--color-dept-forschung)`) tints both
-   the label and its outline in one declaration. Square by design. */
     .dept-tag {
         display: inline-flex;
         align-items: center;
@@ -4355,11 +3285,6 @@
         border: 1px solid currentcolor;
     }
 
-    /* Status pill — the canonical row-status indicator: an 8px square dot in the
-   status colour followed by the uppercased enum label (PLANNED / ACTIVE /
-   COMPLETED / CANCELLED). The dot uses `currentColor`, so each `.status-*`
-   modifier only needs to set `color`. Not a rounded pill despite the name —
-   the system's only rounded chips are the squadron badges. */
     .status-pill {
         display: inline-flex;
         align-items: center;
@@ -4376,8 +3301,6 @@
         height: 8px;
         background: currentcolor;
     }
-    /* Status colours used AS text use the accessible tints so the small uppercase
-   labels stay legible on the dark canvas (the canonical hues fail WCAG here). */
     .status-planned {
         color: var(--color-info-text);
     }
@@ -4387,16 +3310,10 @@
     .status-completed {
         color: var(--color-gray-1);
     }
-    /* Two spellings exist in the domain enums: missions use CANCELLED, operations
-   use CANCELED. Both map to the danger tint so a generated `status-<enum>`
-   class resolves regardless of which aggregate produced the value. */
     .status-cancelled,
     .status-canceled {
         color: var(--color-danger-text);
     }
-    /* JobOrder statuses (orders-detail header pill). COMPLETED reuses the shared
-   neutral .status-completed above. OPEN = info, IN_PROGRESS = warning (the
-   warning hue clears WCAG as text), REJECTED = danger. */
     .status-open {
         color: var(--color-info-text);
     }
@@ -4407,7 +3324,6 @@
         color: var(--color-danger-text);
     }
 
-    /* Collapsible Details in Forms */
     details.hud-details {
         margin-bottom: var(--space-8);
     }
@@ -4448,7 +3364,6 @@
         content: '-';
     }
 
-    /* Autocomplete Dropdown */
     .autocomplete-items {
         position: absolute;
         border: var(--border-accent);
@@ -4475,7 +3390,6 @@
         color: var(--color-primary);
     }
 
-    /* Non-selectable "keep typing" row under a capped user list (REQ-FE-016). */
     .autocomplete-items div.autocomplete-notice,
     .autocomplete-items div.autocomplete-notice:hover {
         cursor: default;
@@ -4489,23 +3403,13 @@
         color: var(--color-bg-black) !important;
     }
 
-    /* ---------------------------------------------------------------------------
-   Searchable select (combobox) — krtSearchableSelect() upgrades a native
-   <select> into a type-to-filter dropdown. Keeps the KRT HUD look: square
-   corners, #1C1C1C field with the orange chevron + focus bloom, and an
-   orange-on-dark option list that mirrors .autocomplete-items above.
-   --------------------------------------------------------------------------- */
     .krt-combobox {
         position: relative;
         width: 100%;
     }
 
-    /* The textbox inherits the shared field look from `.form-group input`; we only
-   add the dropdown chevron (same SVG as the native <select>) and reserve room
-   for it. Higher specificity than the per-page `.form-group input` padding. */
     .krt-combobox .krt-combobox__input {
         width: 100%;
-        /* padding: in the page layer at the end of this file (FE-MOD-02) */
         cursor: text;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23E77E23' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
@@ -4534,10 +3438,6 @@
         display: none;
     }
 
-    /* Flip-up variant: when the popup opens above the field (more room there than
-   below — set by krt-searchable-select.js, which also switches to fixed
-   positioning so a scrolling modal body cannot clip it), restore the top border
-   and drop the bottom one so the open edge meets the textbox. */
     .krt-combobox__listbox--above {
         border-top: var(--border-accent);
         border-bottom: none;
@@ -4563,13 +3463,11 @@
         background-color: var(--color-gray-3);
     }
 
-    /* Keyboard / pointer cursor — the focused row. */
     .krt-combobox__option--active {
         color: var(--color-bg-black);
         background-color: var(--color-primary);
     }
 
-    /* The committed value, marked while the cursor is on a different row. */
     .krt-combobox__option[aria-selected='true']:not(.krt-combobox__option--active) {
         color: var(--color-primary);
         box-shadow: inset 3px 0 0 var(--color-primary);
@@ -4585,15 +3483,11 @@
         min-width: 0;
     }
 
-    /* The optional "clear selection" row — the empty/placeholder option made selectable so a committed
-   value can be reset to none (REQ-FE-011). Muted + italic to read as "no selection"; hover / active
-   still highlight it like any option. */
     .krt-combobox__option--clear {
         color: var(--color-gray-2-text);
         font-style: italic;
     }
 
-    /* Non-selectable status rows (no matches / "keep typing"). */
     .krt-combobox__notice {
         padding: 0.75rem;
         color: var(--color-gray-2-text);
@@ -4601,22 +3495,6 @@
         font-style: italic;
     }
 
-    /* Mission Info Grid */
-    /*
- * `minmax(0, 1fr)` for the value column, not a bare `1fr` (REQ-UI-009, measured
- * 2026-09-13). `1fr` is shorthand for `minmax(auto, 1fr)`, and that `auto`
- * minimum is the track's min-content width — so a long value does not wrap, it
- * widens the track. Nested in `.grid-auto-cards` below that made the tile wider
- * than its own grid cell and pushed the whole document out: the tablet-landscape
- * class measured 1042px of scrollWidth on a 1024px screen, with the mission
- * name, the unit name, the status pill and both timestamps sliced at the right
- * edge. The phone class never showed it because its override further down
- * collapses this grid to a single column.
- *
- * The label column keeps `max-content` on purpose — the German labels
- * ("Verantwortliche Einheit:", "Treffen Teamspeak:") must stay on one line, and
- * as a track minimum `max-content` is only ever as wide as the longest label.
- */
     .mission-info-grid {
         display: grid;
         grid-template-columns: max-content minmax(0, 1fr);
@@ -4624,44 +3502,17 @@
         align-items: baseline;
     }
 
-    /*
- * The other half of the same fix, and neither half works alone: `minmax(0, 1fr)`
- * above lets the TRACK shrink, this lets the CONTENT break. Without it the track
- * duly narrows to 87px and the value simply paints 149px wide straight out of it
- * — a mission name is one unbreakable token often enough ("E2EListFilterBravoZ9",
- * and in production any name without a space in it) and a timestamp always is.
- * Measured: the overflow moved from the grid to the span and the document stayed
- * 22px too wide.
- *
- * `anywhere` rather than `break-word` because it is the one that also lowers the
- * element's min-content width, which is what stops the track from being pushed
- * back out. No `hyphens: auto` here, unlike the headings: these are names,
- * identifiers and timestamps, and a soft hyphen inside one reads as part of it.
- * The `max-content` label column is unaffected — `overflow-wrap` changes
- * min-content, never max-content — so the German labels stay on one line.
- */
     .mission-info-grid > * {
         min-width: 0;
         overflow-wrap: anywhere;
     }
 
-    /*
- * Auto-fit Grid Cards.
- *
- * `min(300px, 100%)` rather than a bare `300px` as the track minimum: a fixed
- * minimum is a floor the grid cannot go under, so on any container narrower than
- * 300px (a phone in portrait once the page padding is taken off, or this grid
- * nested one level deeper) the track overflows instead of shrinking. The `min()`
- * lets the single remaining column fall back to the container width.
- */
     .grid-auto-cards {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
         gap: var(--space-4);
     }
 
-    /* Upcoming-mission tiles (home page) — equal-height cards whose CTA sticks to the bottom so the
-   "Einsatz öffnen" buttons align across a row regardless of description length. */
     .mission-tile {
         display: flex;
         flex-direction: column;
@@ -4676,22 +3527,15 @@
         gap: var(--space-3);
     }
 
-    /* Own-unit chip sits at the bottom-right of the tile (pushed past the CTA with margin-left:auto)
-   rather than at the top, so it never adds a row above the body — every tile's body text starts at
-   the same height whether or not it carries the chip. */
     .mission-tile__badge {
         margin-left: auto;
     }
 
-    /* The description label and its clamped body span the full tile width (not the narrow value
-   column), so the three-line preview stays readable in a tile. */
     .mission-tile__desc-label,
     .mission-tile__desc {
         grid-column: 1 / -1;
     }
 
-    /* Clamp the rendered markdown preview to three lines; the full text lives on the mission detail
-   page. Zero the first/last child margins so the clamp height is predictable. */
     .mission-tile__desc {
         display: -webkit-box;
         overflow: hidden;
@@ -4708,18 +3552,11 @@
         margin-bottom: 0;
     }
 
-    /* Constrain text width for better readability on ultra-wide screens */
     main p {
         max-width: var(--measure);
         text-wrap: pretty;
     }
 
-    /* Custom Scrollbars — HUD style per the design-system spec
-   (.claude/skills/das-kartell-design/krt-components.css): square, hairline
-   track, a thumb that sits in a 2px channel, accent-light on hover and brand
-   orange while dragging. The cross-axis corner is filled so two-axis scrollers
-   never fall back to the bright OS default, and the default arrow buttons are
-   removed for a cleaner HUD look. */
     ::-webkit-scrollbar {
         width: 12px;
         height: 12px;
@@ -4733,7 +3570,7 @@
 
     ::-webkit-scrollbar-thumb {
         background-color: var(--color-gray-2);
-        border: 2px solid var(--color-bg-dark-gray); /* inset → thumb reads as a bar in a channel */
+        border: 2px solid var(--color-bg-dark-gray);
         background-clip: padding-box;
         min-height: 32px;
         min-width: 32px;
@@ -4767,10 +3604,9 @@
         width: 100%;
         overflow-x: auto;
         display: block;
-        -webkit-overflow-scrolling: touch; /* for smooth scrolling on iOS */
+        -webkit-overflow-scrolling: touch;
     }
 
-    /* Accessibility: Focus Visible */
     a:focus-visible,
     .btn:focus-visible,
     input:focus-visible,
@@ -4788,8 +3624,6 @@
         outline: none;
     }
 
-    /* Reduced motion - neutralise transitions/animations for users who request it
-   (vestibular safety). The app uses slide-in drawers + toast translate/fade. */
     @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
@@ -4801,74 +3635,20 @@
         }
     }
 
-    /* --- Tablet & Mobile Breakpoints --- */
     @media (width <= 1024px) {
         header {
             padding: var(--space-3) var(--space-6);
         }
 
-        /*
-     * Set top + inline padding via LONGHAND — never the `padding` shorthand.
-     * The shorthand would reset `padding-bottom` and wipe the fixed-footer
-     * reservation from the base `main` rule, dropping the last lines of a page
-     * behind the footer on tablet/mobile (where the column-stacked footer is
-     * tallest). padding-bottom intentionally stays inherited from the base
-     * rule's calc(var(--krt-footer-height) + 5rem), which grows with the
-     * measured footer height.
-     */
         main {
             padding-top: var(--space-6);
             padding-inline: var(--space-6);
         }
 
-        /*
-     * REQ-UI-009's 44px floor, as a DEFAULT rather than as a list of names (ADR-0176).
-     *
-     * Every interactive control is born at the floor, and a control opts OUT by declaring a
-     * `min-height` of its own. Until 2026-09-13 this was the other way round: the floor
-     * enumerated `input, select, textarea, .btn, .hamburger-btn` plus eight hand-added
-     * exceptions, and every round of review found more that the list had missed — the
-     * language switcher at 17px, the sidebar close button at 34px, the bell at 40px; then
-     * four in-row controls; then `.krt-modal-close`, which carried no size rule in any
-     * stylesheet; then `.close-modal` and `.btn-close`; then `.pa-sort-btn` at 29x18px, which
-     * the guard could not even see, because its template hides the control behind a
-     * "more than one topic" condition and an under-seeded stack renders no sort column.
-     * A list of names cannot close that class of defect: absence from it is indistinguishable
-     * from not existing yet, so every control written after the list starts out
-     * non-compliant, and silently so.
-     *
-     * `:where()` is the whole mechanism, and it is load-bearing rather than decoration: it
-     * contributes ZERO specificity, so this selector is (0,0,0) and ANY authored rule beats
-     * it — in this file, in a per-page <style> block read after it, at any specificity. That
-     * is the property which makes a default safe to apply to every control at once, and it is
-     * why this rule cannot resurrect the specificity traps the exceptions below were written
-     * to dodge (`.btn.btn-xs2`, `input.item-checkbox`): it never competes with them.
-     *
-     * The sanctioned opt-out is `min-height: var(--touch-target-dense)`, the token REQ-UI-009
-     * names for a repeated dense in-row control. That is a DECLARED marker rather than an
-     * absence, and it is the same marker `TouchClassLayoutE2eTest` already reads out of the
-     * CSSOM to build its dense set — so the stylesheet still declares the exemption, the
-     * guard still follows it, and neither side keeps a list. A control that declares some
-     * other sub-floor height is NOT silently exempt: the guard measures it against the full
-     * 44px and fails.
-     *
-     * `min-height` only, deliberately. The floor that kept being missed is the vertical one
-     * and it is the one the guard asserts; it is also monotonic, so a default can only ever
-     * raise a control. A universal `min-width` would not be: `.pa-sort-btn` declares
-     * `width: 1.8rem` and `.matrix-flag` a 32px square, neither declares `min-width`, and a
-     * default min-width would therefore widen the very columns those two exist to keep
-     * narrow. The icon-only controls that need a square keep their own `min-width` below.
-     */
         :where(button, [role='button'], summary, a.btn, input, select, textarea) {
             min-height: var(--touch-target);
         }
 
-        /*
-     * Comfort padding for form controls and buttons — separate from the floor above, and that
-     * separation is the point. Padding is a styling decision belonging to these specific
-     * controls; carrying it on the `:where()` default would have given every bare `button` in
-     * the app a 0.75rem/1rem box, which is how an icon-only control gets torn off its glyph.
-     */
         input,
         select,
         textarea,
@@ -4877,21 +3657,6 @@
             padding: var(--space-3) var(--space-4);
         }
 
-        /*
-     * A form control may never be wider than the space it is given.
-     *
-     * A bare `<select>` sizes itself to its LONGEST OPTION, and nothing caps it:
-     * the audit log's event-type list pushed the page to 443px on a 375px
-     * screen, and the price overview's two filter selects to 401px. On a phone
-     * that does not produce a scrollbar — the layout viewport simply widens and
-     * the whole page is scaled down, so every other element gets smaller too.
-     *
-     * `min-width: 0` is the half that is easy to miss: a flex item's automatic
-     * minimum size is its content size, so a select in a filter row refuses to
-     * shrink below its longest option no matter what `max-width` says. The pair
-     * is what makes it fit; the same trap the header wordmark and the page-title
-     * row above each needed their own `min-width: 0` for.
-     */
         input,
         select,
         textarea {
@@ -4899,29 +3664,11 @@
             min-width: 0;
         }
 
-        /*
-     * The bell is a SQUARE hit area, not merely a tall one. The default above gives it the
-     * height; this gives it the matching width.
-     */
         .notification-bell-btn {
             width: var(--touch-target);
             height: var(--touch-target);
         }
 
-        /*
-     * The dismiss button of the sidebar and of the dialog shell is one control under two
-     * names, and neither declares a size of its own.
-     *
-     * It used to be one control under FOUR names: `.close-modal` (16 templates) and
-     * `.btn-close` (6) were the legacy shapes' spellings of the same ✕. Both are gone with
-     * those shapes (#1891), and so is the reason `min-height` was spelled out here rather
-     * than left to the zero-specificity default above — `.close-modal` was a `<span>` in
-     * admin/mission-data.html, and a `<span>` is reached by no element selector. That comment
-     * called the markup "the real defect there … but that is a separate change"; the port was
-     * that change, so every dismiss control in the app is now a `<button>` and keyboard-
-     * operable. The line is kept anyway: it costs nothing and it does not depend on the
-     * element being a button. The square and the centring are needed regardless.
-     */
         .close-sidebar-btn,
         .krt-modal-close {
             display: flex;
@@ -4931,33 +3678,6 @@
             min-height: var(--touch-target);
         }
 
-        /*
-     * `.btn-xs2` is a page-local dense variant declared inline in mission-detail.html and
-     * operation-detail.html (`min-height: 32px`, 21 uses). Two of its instances are FORM
-     * actions — "Ziel hinzufügen" and "Schritt hinzufügen" on the mission create form — and
-     * REQ-UI-009 is explicit that a form button keeps the 44px floor; only repeated dense ROW
-     * actions (`.btn-xs`, `.btn-icon`) are exempt. Owner decision 2026-09-13: raise the whole
-     * variant on the touch classes and leave desktop density untouched.
-     *
-     * This is one of the two rules the inverted default deliberately does NOT replace. The
-     * page's own rule lives in an inline <style> the browser reads AFTER this file, so it
-     * beats the (0,0,0) default outright; out-specifying it is the same technique REQ-UI-009
-     * already prescribes for `.btn.btn-xs` over `.btn`. Written `.btn.btn-xs2`, never
-     * `.btn-xs2`.
-     */
-        /* `.btn.btn-xs2` lives in the page layer (FE-MOD-02). */
-
-        /* `input.item-checkbox` lives in the page layer (FE-MOD-02). */
-
-        /*
-     * On touch devices the generic rule sets padding: 0.75rem 1rem which,
-     * combined with the fixed height of 2.75rem, leaves too little room
-     * for a 1rem font at line-height 1.5 and clips descenders/umlauts in
-     * Chrome. We override with symmetric vertical padding that keeps the
-     * touch target >= 44px via min-height while giving the text enough
-     * breathing room. The right padding is kept wide enough for the
-     * custom SVG arrow added by the desktop rule above.
-     */
         select {
             padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
             line-height: 1.5;
@@ -4975,82 +3695,16 @@
         }
     }
 
-    /* --- Mobile Breakpoints --- */
     @media (width <= 768px) {
         header {
             padding: var(--space-2) var(--space-4);
-            /*
-         * Reserve the notification bell's footprint. The bell is
-         * `position: fixed; top: 1rem; right: 1rem` with a 44px button, so it
-         * floats ABOVE the header and outside its flex flow — the header has no
-         * idea it is there. On a 375px screen the wordmark therefore truncates at
-         * the header's own padding edge and the last characters, ellipsis
-         * included, are drawn underneath the bell: seen on the Lager booking page
-         * as "Profit Basetool – Alle Staf" with no ellipsis and no gap.
-         * 16px offset + 44px button + 8px breathing room.
-         */
             padding-right: calc(1rem + var(--touch-target) + var(--space-2));
         }
 
-        /*
-     * Compact header on the phone class (owner decision 2026-09-13, REQ-UI-009).
-     *
-     * Measured before changing anything: the header was 76px tall on a 375px
-     * screen — 16px padding plus 60px of content — and the 60px did NOT come
-     * from the 50px mark. It came from the wordmark wrapping to two lines,
-     * because it carries the active OrgUnit context ("Profit Basetool – Alle
-     * Staffeln", REQ-ORG-024) and that is simply longer than a phone is wide.
-     *
-     * So the fix is one line of text, not a smaller font alone: `nowrap` +
-     * ellipsis caps the row at a single line, and `min-width: 0` on both flex
-     * levels is what actually lets it shrink — a flex item's automatic minimum
-     * size is its CONTENT size, so without this the text refuses to shrink,
-     * pushes the row wider than the viewport and the ellipsis never appears.
-     * That is the same trap the page-title row above fell into.
-     *
-     * The mark goes to 32px. REQ-UI-019 fixes the asset's presentation — its
-     * 240×240 viewBox carries ~30% breathing room that must not be cropped —
-     * and scaling the whole box keeps those proportions exactly; nothing is
-     * forked or tightened. Result: ~48px instead of 76px, and the menu, mark
-     * and bell all stay reachable without scrolling, which is why this was
-     * chosen over letting the header scroll away like the footer.
-     */
         nav {
-            /*
-         * A GRID, not a flex row, and that is the whole fix.
-         *
-         * The structural wrap rule further down matches any flex row whose direct children include
-         * a button or a link — "the structure counts, not the name" — and this nav has both: the
-         * hamburger and the brand. It therefore wrapped the brand onto a second line and took the
-         * header to 110px, undoing the compact header above. Both shipped in the SAME release
-         * (v1.8.0) and neither was measured against the other.
-         *
-         * `flex-wrap: nowrap` was the obvious answer and it is the wrong one: a nowrap flex row
-         * still OVERFLOWS when its content does not fit, and on the Bank pages it did — the layout
-         * viewport widened from 375px to 412px and the whole page scaled down. It reproduced in CI
-         * on all three browsers and not locally, because the seeded data there is wider; a control
-         * run without the change was green, which is what settled it.
-         *
-         * `minmax(0, 1fr)` cannot do that. The second track is bounded by the container, so the
-         * brand is forced to shrink and its wordmark to ellipsise rather than push the page wider.
-         * `flex-wrap` from the structural rule is inert on a grid, so the opt-out is structural too
-         * rather than a declaration that has to win a specificity argument.
-         */
             display: grid;
             grid-template-columns: auto minmax(0, 1fr);
 
-            /*
-         * Column flow, so a THIRD child opens an implicit COLUMN instead of a second row.
-         * `sidebar.js` appends the "ADMIN" chip into this nav on every /admin/* page. Under the
-         * default row flow that chip was placed at (row 2, column 1) and took the header to 108px
-         * on all 23 admin routes - the very cost this block exists to remove, reintroduced on the
-         * pages an operator uses most. Measured, not reasoned: 107px before, 62px after, at 375px
-         * against this stylesheet.
-         *
-         * An implicit track is only created when an item needs one, so a page without the chip
-         * keeps exactly two tracks and the brand keeps every pixel of the 1fr. A third explicit
-         * `auto` column would instead spend a `gap` on an empty track on every non-admin page.
-         */
             grid-auto-flow: column;
             gap: var(--space-4);
             align-items: center;
@@ -5074,15 +3728,6 @@
             min-width: 0;
         }
 
-        /* Still longhand — see the <=1024px note above — but padding-bottom is now
-       set DELIBERATELY rather than inherited from the base rule's footer
-       reservation. On this class the footer is `position: static` and scrolls
-       with the page, so there is nothing to reserve: --krt-footer-height is 0
-       here (sidebar.js publishes the covered height, not the rendered one) and
-       the base calc would still leave its 5rem separator gap, which on a phone
-       is 80px of empty page between the last row and a footer that is simply
-       the next block. --space-4 plus the footer's own border-top is the whole
-       separation this needs. */
         main {
             padding-top: var(--space-4);
             padding-inline: var(--space-4);
@@ -5109,18 +3754,12 @@
         }
     }
 
-    /* --- Ultra-Wide Breakpoints --- */
     @media (width >= 1600px) {
         main {
-            max-width: 1600px; /* Expand the main container to utilize space */
+            max-width: 1600px;
         }
     }
 
-    /* ==========================================================================
-   KRT Loading Indicator (used by live-filter overlays, e.g. mission list).
-   Respects corporate design: dark background, orange accent, uppercase
-   Lato headline label and no native browser UI.
-   ========================================================================== */
     .krt-loading-indicator {
         display: flex;
         align-items: center;
@@ -5160,12 +3799,6 @@
         }
     }
 
-    /* ==========================================================================
-   Mission Detail Presence Indicator (Stufe 3 / Awareness)
-   Pulsing orange dot + count chip rendered on each .col-header[data-panel-key]
-   when other users are currently editing that section. KRT brand orange.
-   Awareness only — does not block any input.
-   ========================================================================== */
     @keyframes krt-presence-pulse {
         0% {
             box-shadow: 0 0 0 0 rgb(231 126 35 / 55%);
@@ -5209,20 +3842,6 @@
         letter-spacing: 0.02em;
     }
 
-    /* Live multi-user sync (REQ-FE-010): the deferred-refresh pill, shown bottom-right when a peer's
-   change arrives while the local user is mid-edit. Clicking it applies the held-back refresh.
-
-   `.krt-livesync-pill` is the ONLY class krt-live-sync.js gives the pill, and that is now fixed in
-   the helper rather than configurable — it used to be a `pillCfg.className` default that only the
-   mission pages overrode, and only the mission variant was styled, so on every other consumer — /bank, /bank/requests, /bank/manage —
-   the pill rendered as a bare browser-default button, 21px tall, unbranded, with no fixed position
-   and no pulse: not a small deviation from the design system but no styling at all. Found by the
-   touch-class sweep (2026-09-13), which flagged it for height; the missing branding was the larger
-   half of the bug. Both selectors share one rule so the next consumer that omits a class name is
-   styled by default instead of silently unstyled.
-
-   `min-height` is the 44px floor rather than the dense exception: this is a standalone floating
-   control, not a repeated row action. */
     .krt-livesync-pill {
         position: fixed;
         right: var(--space-4);
@@ -5256,11 +3875,6 @@
         transition: opacity 120ms ease-in-out;
     }
 
-    /* ==========================================================================
-   KRT Confirm Modal (showKrtConfirm) — corporate-design-konformes
-   Bestätigungsdialog-Modal. Kein nativer browser confirm().
-   Ersetzt den nativen Browser-Dialog vollständig.
-   ========================================================================== */
     .krt-confirm-overlay {
         position: fixed;
         inset: 0;
@@ -5356,11 +3970,6 @@
         }
     }
 
-    /* ============================================================
-   Multi-Select Dropdown (KRT Custom Component)
-   Verwendet in: inventory-my, inventory-admin,
-                 materials-overview, materials-profit-calculation
-   ============================================================ */
     .multi-select-container {
         position: relative;
         min-width: 200px;
@@ -5404,10 +4013,6 @@
         border-top: none;
         max-height: 300px;
         overflow-y: auto;
-        /* Must clear the fixed footer (z-index 999) so the lower options never hide
-       behind it when the filter sits low in the viewport. Same popover tier as
-       .krt-pi-typeahead-results. Opens downward (top: 100%), so painting above
-       the sticky header (1000) never overlaps it in practice. */
         z-index: 1100;
         display: none;
         box-shadow: 0 4px 6px rgb(0 0 0 / 50%);
@@ -5448,11 +4053,6 @@
         max-width: 150px;
     }
 
-    /* ============================================================
-   Mission Unit Box – Color Palette (KRT Dark Mode)
-   Dezente, dunkle Hintergrundfärbungen für Einheitsboxen.
-   Nur für .mission-unit-box – keine anderen .hud-box betroffen.
-   ============================================================ */
     .mission-unit-box.unit-color-0 {
         background-color: rgb(231 126 35 / 8%);
     }
@@ -5526,15 +4126,6 @@
         background-color: rgb(200 100 40 / 8%);
     }
 
-    /* ==========================================================================
-   SCU Input Hint - an inline "?" disc shown next to every material-quantity
-   input whose unit is SCU. Hover or keyboard-focus reveals a HUD tooltip
-   explaining the decimal scale (cSCU = 0.01 SCU, microSCU = 0.001 SCU) so
-   operators know fractional SCU values are accepted. Pure-CSS show/hide; the
-   `scu-hint` Thymeleaf fragment renders the markup. Conditional SCU/PIECE
-   fields render the marker hidden and their page JS reveals it only when the
-   selected material is SCU-typed.
-   ========================================================================== */
     .scu-hint {
         position: relative;
         display: inline-flex;
@@ -5570,9 +4161,6 @@
         outline-offset: 2px;
     }
 
-    /* The tooltip body floats above the disc, centred on it, and never intercepts
-   the pointer so it cannot block the input beneath. z-index sits above the
-   modal layer (3000) so hints inside book-out / claim / handover modals win. */
     .scu-hint__bubble {
         position: absolute;
         bottom: calc(100% + 0.5rem);
@@ -5581,9 +4169,6 @@
         width: max-content;
         max-width: min(17rem, 78vw);
         padding: var(--space-2) 0.6rem;
-        /* --hint-shift is set by common-handlers.js when the centred bubble would overflow its
-       clipping container (e.g. a scrolling .krt-modal-body, whose overflow-y:auto also clips
-       horizontally): it slides the bubble back inside so the text is never cut off. Default 0. */
         transform: translateX(calc(-50% + var(--hint-shift, 0px)));
         background: rgb(0 0 0 / 95%);
         border: 1px solid var(--color-primary);
@@ -5612,8 +4197,6 @@
         visibility: visible;
     }
 
-    /* Down-pointing arrow that ties the bubble to its disc. It counter-shifts by --hint-shift so it
-   keeps pointing at the "?" disc even when the bubble was slid sideways to avoid clipping. */
     .scu-hint__bubble::after {
         content: '';
         position: absolute;
@@ -5624,14 +4207,10 @@
         transform: translateX(-50%);
     }
 
-    /* ------------------ Refinery screenshot import (#435): create-page review flags */
-
     .import-extract-bar {
         margin-bottom: 1rem;
     }
 
-    /* The bar's only child is the upload form — the flex row has to live there,
-   or the gap between button and help text never applies. */
     .import-extract-bar form {
         display: flex;
         align-items: center;
@@ -5652,7 +4231,6 @@
         margin-bottom: 0.25rem;
     }
 
-    /* Accessible text tints (REQ-UI-006): canonical hues stay on fills/dots only. */
     .import-flag-danger {
         color: var(--color-danger-text);
     }
@@ -5665,14 +4243,10 @@
         color: var(--color-info-text);
     }
 
-    /* De-emphasised via the neutral body tone — an opacity fade would drop the
-   severity tints below the AA contrast headroom REQ-UI-006 chose them for. */
     .import-flag-raw {
         color: var(--color-gray-1);
     }
 
-    /* 3px left status bar on flagged goods rows; inset shadow so the inline border of
-   .material-entry keeps working without specificity fights. */
     .import-flagged-row {
         box-shadow: inset 3px 0 0 var(--color-warning);
     }
@@ -5698,8 +4272,6 @@
         gap: 0.35rem;
     }
 
-    /* Square dot per the KRT square-first language; dot keeps the canonical hue,
-   the percent text uses the accessible tint. */
     .import-confidence-dot {
         display: inline-block;
         width: 10px;
@@ -5740,32 +4312,13 @@
         min-height: var(--touch-target);
     }
 
-    /* ==========================================================================
-   Mission page patterns (ported from design-system krt-components.css,
-   commit ea56d7c): tab nav, facts bar, KRT modal, assign board, chip select.
-   ========================================================================== */
-
-    /* ------------------------------------------------------ FILTER PANEL ----- */
-    /* Collapsible filter block, shared by every list page (REQ-FE-021).
- *
- * Ported from the three near-identical page-local copies that preceded it (Mein Lager,
- * Lager-Verwaltung, Materialbedarf); the eight other list pages had no collapse at all and their
- * filter blocks filled a phone viewport before a single row was visible.
- *
- * Collapsing uses `hidden`, which takes the panel out of the flow entirely rather than merely
- * hiding it — a `visibility` or opacity collapse would keep its height and defeat the purpose.
- */
     .filter-toggle {
-        /* Sits at the END of the actions bar it shares with the page's primary actions, so the
-       collapse control never competes with "Neuer Auftrag" for the first position. */
         display: inline-flex;
         gap: 0.5rem;
         align-items: center;
         margin-left: auto;
     }
 
-    /* Chevron points right when collapsed and rotates down when open — the same idiom as the bank
-   panels and the tree table, so the affordance reads identically across the app. */
     .filter-chevron {
         transition: transform 0.15s ease;
     }
@@ -5774,42 +4327,24 @@
         transform: rotate(90deg);
     }
 
-    /* The active-filter count is what keeps a collapsed panel honest: it says how many dimensions are
-   narrowing the list, so a short list is never left unexplained. The explicit [hidden] rule is
-   REQUIRED — .chip sets display:inline-flex, which would otherwise beat the user-agent
-   `[hidden] { display: none }`. */
     .filter-count[hidden] {
         display: none;
     }
 
     .filter-panel {
-        /* Space on BOTH sides. The top gap separates the panel from the toggle above it; the bottom one
-       keeps the last filter row off whatever follows — on the Lager that is the table head, which
-       the expanded filters otherwise sit directly on top of. The material-demand panel this
-       component replaced carried `margin-bottom: var(--space-3)`; consolidating the three page-local
-       copies kept the top margin and dropped that one, which is how the gap went missing. */
         margin-top: var(--space-3);
         margin-bottom: var(--space-3);
     }
 
     @media (width <= 768px) {
-        /* Full width rather than an inline chip: stacked, the toggle would otherwise sit on a line of
-       its own at whatever width its label happens to need. 44px is the touch floor
-       (REQ-FE-013). */
         .filter-toggle {
             justify-content: center;
             width: 100%;
             min-height: 44px;
-            /* Stacked, the auto-margin would strand the toggle on a line of its own. */
             margin-left: 0;
         }
     }
 
-    /* -------------------------------------------------------------- TAB NAV -- */
-    /* Page-level tab navigation (e.g. mission detail). Surface row; active tab =
-   white text + 3px orange underline; counts orange. Use role="tablist"/"tab"
-   + aria-selected, arrow-key navigation, and sync the active tab with a
-   ?tab=/#tab= deeplink. Specimen: preview/components-tabs.html */
     .tab-nav {
         display: flex;
         border-bottom: var(--border-hairline);
@@ -5848,9 +4383,6 @@
         margin-left: 4px;
     }
 
-    /* ------------------------------------------------------------ FACTS BAR -- */
-    /* Compact key-fact strip under a sticky page head — answers the most common
-   questions without scrolling. Values use tabular figures. */
     .facts-bar {
         display: flex;
         gap: 16px;
@@ -5874,12 +4406,6 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* ------------------------------------------------------- META GROUP GRID -- */
-    /* Detail-page header that would otherwise be a tall single-column kv-list.
-   Group related fields into 2–3 labelled columns so the header collapses to
-   ~half height and the page's primary content rises above the fold. Pair with
-   a .facts-bar (high-signal values) + a status pill in the title row.
-   Comment/description goes in .annotation, not as another kv row. */
     .meta-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -5908,7 +4434,6 @@
         color: var(--color-gray-2-text);
         margin-bottom: 8px;
     }
-    /* Compact two-column key/value used inside a meta-group (denser than .kv-list). */
     .kv-compact {
         display: grid;
         grid-template-columns: max-content 1fr;
@@ -5930,11 +4455,6 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* Annotation block — a labelled note/comment with an orange left rule. For
-   free-text that shouldn't compete with structured kv data. The label and text
-   share one baseline-aligned row so a short comment stays a single tight line;
-   a long/multi-line comment wraps in the text column while the label keeps its
-   place. The box hugs its content instead of reserving a tall full-width panel. */
     .annotation {
         display: flex;
         align-items: baseline;
@@ -5952,17 +4472,11 @@
         font-weight: var(--fw-bold);
         color: var(--color-gray-2-text);
     }
-    /* pre-wrap lives on the text only: it preserves the user's own line breaks
-   without rendering the template's inter-element indentation whitespace (which
-   on the container would surface as blank lines and inflate the box). */
     .annotation .annotation-text {
         white-space: pre-wrap;
         overflow-wrap: anywhere;
     }
 
-    /* ------------------------------------------------- ORDER-DETAIL HEADER --- */
-    /* The orders-detail header (Variante A): a title row above the facts-bar +
-   meta-grid, plus the logistician-only status-select row under the card. */
     .od-titlebar {
         display: flex;
         align-items: center;
@@ -5994,41 +4508,17 @@
         font-weight: var(--fw-bold);
     }
 
-    /* ---------------------------------------------------------------- MODAL -- */
-    /* KRT modal: surface + orange top edge + HUD corner brackets on a blurred
-   scrim. Rules: exactly ONE filled CTA per modal (right), Cancel = .btn-ghost,
-   close-X = icon button with aria-label; danger variant for destructive
-   confirms (consequence named in the body). Focus-trap + Esc required. */
     .krt-modal-overlay {
         position: fixed;
         inset: 0;
         background: rgb(0 0 0 / 80%);
         backdrop-filter: blur(2px);
-        /* Hidden by default. A modal is opened by adding the `krtm-modal-open` class
-       (`display: flex`, inline-migration.css), which common-handlers.js
-       `open-modal-display` does via classList — no inline style, per the CSP
-       migration; the `align-items`/`justify-content` below only take effect once
-       that class activates flex layout. This GLOBAL default must stay `none`: styles.css
-       is loaded on every page, so making the hidden default live here (not only in
-       the page-scoped bank.css, which duplicates it) means a `.krt-modal-overlay`
-       modal stays closed even if a page-specific stylesheet fails to load. It was
-       `display: flex` here, relying on bank.css to override it to `none` — so a
-       dropped bank.css (e.g. a WebKit HTTP/2 stream reset under CI load) left every
-       no-inline-style modal rendered open on load. */
         display: none;
         align-items: center;
         justify-content: center;
         padding: 20px;
         z-index: 3000;
     }
-    /* Every overlay is a native <dialog> (FE-SIMP-04b, ADR-0177). `window.krtModal.open` shows it with
-   showModal(): top layer, the rest of the page inert, Escape raised as `cancel`. The user-agent
-   dialog box is undone here so the element is the same full-viewport scrim the <div> was — in the
-   top layer and equally when it is shown by the `krtm-modal-open` class alone (a server-rendered
-   open dialog before the script upgrades it, the layout guard revealing every dialog). The UA
-   `::backdrop` is made transparent because the overlay IS the scrim; keeping both would darken
-   the page twice. The overlay keeps its class: live sync, the layout guard and the tests key on
-   `.krt-modal-overlay` and its computed display. */
     dialog.krt-modal-overlay {
         width: auto;
         height: auto;
@@ -6042,10 +4532,6 @@
     dialog.krt-modal-overlay::backdrop {
         background: transparent;
     }
-    /* The frame itself must NOT scroll: its ::before/::after corner brackets sit
-   2px outside the box and would register as permanent overflow, forcing
-   scrollbars even when the content fits. Scrolling happens in .krt-modal-body
-   only (head/foot stay pinned), so bars appear solely when space runs out. */
     .krt-modal {
         width: 100%;
         max-width: 440px;
@@ -6056,37 +4542,13 @@
         border-top: 3px solid var(--color-primary);
         position: relative;
         box-shadow: var(--glow-primary-lg);
-        /*
-     * A dialog SCROLLS when it runs out of room; it never becomes two columns.
-     *
-     * This is the escape hatch the phone-class wrap rule is designed around (ADR-0176): that rule
-     * is zero-specificity, so saying `nowrap` here wins outright. It is needed because these two
-     * are the only `flex-direction: column` containers in the app whose height is genuinely CAPPED
-     * — `max-height: 90vh` here, and the form below inherits the cap through the flex layout with
-     * its `min-height: 0`. Every other column container in these stylesheets constrains itself with
-     * `min-height`, which is a floor and can never make a flex line run out of space.
-     *
-     * A column flex container that wraps lays its overflow into a SECOND COLUMN, so without these
-     * two lines a long dialog on a phone would put the rest of its fields beside the first ones
-     * inside a 440px box, rather than scrolling as `.krt-modal-body` intends.
-     *
-     * Spelled as the `flex-flow` shorthand because stylelint requires it once both halves are set.
-     */
         flex-flow: column nowrap;
     }
     .krt-modal > form {
         display: flex;
-        /* Same reason as `.krt-modal` above: capped through the flex layout by its `min-height: 0`. */
         flex-flow: column nowrap;
         min-height: 0;
     }
-    /* Pass-through wrapper. The frame caps itself at 90vh and lets only
-   `.krt-modal-body` scroll, which works as long as the head/body/foot are flex
-   ITEMS of the frame. A modal whose body+foot live inside a live-sync swap
-   container (refinery-orders-details' `#refinery-store-results`, the
-   `?fragment=store` seam) has one plain <div> in between, and that div would
-   otherwise absorb the column layout and leave the body unscrollable. Put this
-   class on such a wrapper so the frame's column passes through it. */
     .krt-modal > .krt-modal-flow {
         display: flex;
         flex-direction: column;
@@ -6117,15 +4579,9 @@
         border-left: none;
         border-top: none;
     }
-    /* Width variant for form-heavy modals (3+ stacked fields): confirms and
-   single-field prompts stay at the compact 440px default. */
     .krt-modal--wide {
         max-width: 600px;
     }
-    /* Third and last sanctioned width, for the dialogs that carry a TABLE rather
-   than a form (the Auftrag material/item pickers, the refinery store sheet).
-   Squeezing those into --wide's 600px reflows their columns; anything that is
-   merely form-heavy stays at --wide. */
     .krt-modal--xwide {
         max-width: 800px;
     }
@@ -6146,9 +4602,6 @@
         border-bottom: var(--border-hairline);
         flex-shrink: 0;
     }
-    /* The shell's title. Every dialog is rendered by `modal-wrapper :: modal`, whose title is
-   an <h2> (REQ-UI-013); the <h3> variant this rule used to carry went with the last
-   <h3> title on 2026-09-23. */
     .krt-modal-head h2 {
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);
@@ -6166,19 +4619,6 @@
         min-height: 0;
         overflow-y: auto;
     }
-    /*
- * The modal's close control (20 modals use it) had NO rule in any stylesheet —
- * verified across styles.css, bank.css, personal-inventory.css and the rest on
- * 2026-09-13, including descendant forms like `.krt-modal-head button`. It was
- * therefore rendering as a browser-default button: a light chrome box with a
- * system-font ✕ inside a dark HUD panel, and on a touch class it also missed the
- * 44px floor, because the `<=1024px` touch rule enumerates classes (`.btn`,
- * `.hamburger-btn`, …) and this is a bare `button` that is none of them.
- *
- * Styled to match `.close-sidebar-btn`, its already-approved sibling — same job
- * (an ✕ that dismisses a surface), same treatment — rather than inventing a
- * variant. The touch floor is applied in the `<=1024px` block with the others.
- */
     .krt-modal-close {
         background: none;
         border: none;
@@ -6188,10 +4628,6 @@
         font-size: var(--fs-h3);
         line-height: 1;
         cursor: pointer;
-        /*
-     * The head is a flex row and the title is the growing item, so a long German
-     * title would otherwise squeeze the ✕ narrower than its own glyph.
-     */
         flex-shrink: 0;
     }
 
@@ -6199,11 +4635,6 @@
         color: var(--color-accent-light);
     }
 
-    /*
- * Keyboard affordance. The control is reachable by Tab (it is the first focusable
- * element in the dialog, which the org-chart focus-trap test asserts), and the
- * colour change alone does not say so on a dark HUD.
- */
     .krt-modal-close:focus-visible {
         outline: 2px solid var(--color-primary);
         outline-offset: -2px;
@@ -6213,12 +4644,6 @@
     .krt-modal-foot {
         display: flex;
         justify-content: flex-end;
-        /*
-     * Wraps, because it cannot not: three German labels ("Abbrechen",
-     * "Endgültig löschen", …) in a 335px modal on a 375px phone do not fit on
-     * one line, and `justify-content` alone would push the last button out of
-     * the frame. Same trap as the page-title row and `.flex-between`.
-     */
         flex-wrap: wrap;
         gap: 8px;
         padding: 12px 16px;
@@ -6226,11 +4651,6 @@
         flex-shrink: 0;
     }
 
-    /* --------------------------------------------------------- ASSIGN BOARD -- */
-    /* Drag-&-drop planning board (mission crew): a pool of unassigned people and
-   open-ended unit drop zones — units have NO fixed size; per-person on-board
-   function is a flexible .chip-select. Always provide a click fallback
-   (select person → click target zone) and keyboard operability. */
     .person-row {
         display: flex;
         align-items: center;
@@ -6239,13 +4659,6 @@
         background: var(--color-surface-input);
         border: var(--border-hairline);
         cursor: grab;
-        /* #1936: on touch the browser's own long-press behaviour WAS the bug — it raised the
-       selection menu instead of starting a drag. `user-select` removes the selection UI the
-       Android menu hangs off, `-webkit-touch-callout` removes iOS's callout, and `touch-action`
-       concedes vertical panning and pinch-zoom to the browser so a swipe still scrolls the board
-       and pinch still zooms; the JS hold is what claims the gesture, not this declaration. The
-       cost is that a participant's name is no longer selectable text — the row is a drag handle
-       first, and the same name is selectable wherever it is rendered as prose. */
         touch-action: pan-y pinch-zoom;
         user-select: none;
         -webkit-user-select: none;
@@ -6255,8 +4668,6 @@
         border-color: var(--color-primary);
         box-shadow: var(--glow-primary);
     }
-    /* Lifted while a touch drag carries it: the finger covers the row, so the dimming is mostly
-   read at its edges and in the gap it leaves behind in the list. */
     .person-row.is-touch-dragging {
         opacity: 0.55;
         border-color: var(--color-primary);
@@ -6310,8 +4721,6 @@
         outline-offset: -4px;
         background: rgb(231 126 35 / 6%);
     }
-    /* gray-1 + regular weight: gray-2 at thin weight was unreadable over the
-   dark page background showing through the semi-transparent zones. */
     .drop-hint {
         border: 1px dashed var(--color-gray-3);
         color: var(--color-gray-1);
@@ -6325,17 +4734,6 @@
         border-color: var(--color-primary);
         color: var(--color-primary);
     }
-    /* Idle / armed hint text (#1936). The zones must advertise the click path, not only the
-   drag one: a mobile browser never turns touch input into HTML5 drag events, so a hint
-   reading "drag participants here" left a phone user with no visible way in at all. While
-   a participant is selected every OTHER zone trades its instruction for the short call to
-   action, in the same accent the drag-over state uses. The zone that HOLDS the selection
-   keeps its idle text — dropping a person where they already are is the one move
-   moveParticipant refuses, so offering it would be a lie.
-
-   Selector, not a JS state class, on purpose: the board replaces its own innerHTML on
-   every crew mutation, and a class parked on the wrapper is one more thing that can
-   survive a swap it no longer describes. :has() cannot desync. */
     .drop-hint .hint-armed {
         display: none;
     }
@@ -6358,8 +4756,6 @@
         display: block;
     }
 
-    /* Chip-styled inline select — uppercase label + orange chevron; reads like a
-   .chip but is editable (e.g. on-board function in a dense row). */
     .chip-select {
         -webkit-appearance: none;
         appearance: none;
@@ -6388,20 +4784,11 @@
         box-shadow: var(--glow-primary);
     }
 
-    /* The closed control is transparent on the dark row, but the OPTION popup must
-   not inherit that: Firefox paints the list with the select's background, which
-   computes to white — light-gray text on it is unreadable. Pin the popup to the
-   dark surface explicitly. */
     .chip-select option {
         background-color: var(--color-bg-dark-gray);
         color: var(--color-gray-1);
     }
 
-    /* ==========================================================================
-   Rendered user Markdown (mission description). Source HTML is generated by
-   the server-side @markdown bean (raw HTML escaped, unsafe URLs stripped) —
-   these rules only give the generated tags the KRT look.
-   ========================================================================== */
     .markdown-content {
         font-size: 0.85rem;
         font-weight: 300;
@@ -6512,15 +4899,6 @@
         padding: 0.25em 0.6em;
     }
 
-    /* ==========================================================================
-   Master-detail, ingredient-quality, and empty-state patterns (ported from
-   design-system krt-components.css, commit dab7640).
-   ========================================================================== */
-
-    /* ----------------------------------------------------------- EMPTY STATE -- */
-    /* Centered placeholder for empty lists/collections: short reason + ONE next
-   action (ghost or cta). Never leave a bare "Keine Einträge." table cell. */
-    /* The hidden attribute must win over the flex display (UA [hidden] rule loses to a class). */
     .empty-state[hidden] {
         display: none;
     }
@@ -6550,10 +4928,6 @@
         max-width: 48ch;
     }
 
-    /* ---------------------------------------------------------- MASTER-DETAIL -- */
-    /* Collection browser (e.g. blueprints): dense filterable list left, permanent
-   detail pane right. On small screens collapse to list → detail navigation
-   (back button in the pane). Keyboard: ↑/↓ move the active row. */
     .master-detail {
         display: grid;
         grid-template-columns: 300px 1fr;
@@ -6584,7 +4958,6 @@
         background: rgb(255 255 255 / 3%);
     }
     .master-row.is-active {
-        /* border-left and background: in the page layer (FE-MOD-02) */
         color: var(--color-white);
         font-weight: var(--fw-bold);
     }
@@ -6592,9 +4965,6 @@
         outline: 2px solid var(--color-primary);
         outline-offset: -2px;
     }
-    /* The instant client-side filter hides non-matching rows via the `hidden` attribute. The
-   author-level `display: flex` above outranks the UA stylesheet's `[hidden] { display: none }`,
-   so without this explicit override the attribute is ignored and the filter shows nothing. */
     .master-row[hidden] {
         display: none;
     }
@@ -6604,10 +4974,6 @@
         padding: 14px 16px;
     }
 
-    /* ------------------------------------------------- INGREDIENT QUALITY ----- */
-    /* "Stat-Beitrag nach Zutat-Qualität": every ingredient carries its OWN quality
-   slider which scales only its mapped stats. Show the live factor on the
-   affected stat chips; keep "min. Qualität" and "höher ist besser" hints. */
     input[type='range'] {
         accent-color: var(--color-primary);
     }
@@ -6665,13 +5031,6 @@
         flex-wrap: wrap;
     }
 
-    /* ============================================================ PROFILE PAGE ==
-   /profile (Variante A redesign). A capped reading column with a read-only
-   identity band + fact grid on top, then one settings card per editable section
-   below — each carrying exactly one filled CTA. Built on the existing
-   .card / .chip / .squadron-badge / .btn--* primitives; the rules below are the
-   page-specific layout glue (identity tile, fact grid, card foot, security note).
-   ---------------------------------------------------------------------------- */
     .profile-page {
         max-width: 760px;
         margin: 0 auto;
@@ -6694,7 +5053,6 @@
         font-size: var(--fs-sm);
     }
 
-    /* Identity band — square initials tile beside name / handle / chips. */
     .profile-page .id-band {
         display: flex;
         gap: var(--space-4);
@@ -6746,7 +5104,6 @@
         margin-top: var(--space-3);
     }
 
-    /* Read-only fact grid — hairline-separated cells, neutral labels, bright values. */
     .profile-page .facts {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -6783,7 +5140,6 @@
         font-size: var(--fs-xs);
     }
 
-    /* Settings card stack. */
     .profile-page .stack {
         display: flex;
         flex-direction: column;
@@ -6816,7 +5172,6 @@
         font-weight: var(--fw-bold);
     }
 
-    /* One filled CTA per card, separated from the fields by a hairline. */
     .profile-page .card-foot {
         display: flex;
         align-items: center;
@@ -6827,10 +5182,6 @@
         border-top: var(--border-hairline);
     }
 
-    /* The blueprint-sharing checkbox row uses the shared .check-row component (forms
-   section above). */
-
-    /* Access & security note. */
     .profile-page .acct-note {
         display: flex;
         gap: var(--space-3);
@@ -6866,13 +5217,6 @@
         }
     }
 
-    /*
- * Open-source licence notice (/licenses, REQ-UI-021). One folding .hud-details section per
- * licence; the summary carries the licence name on the left and "N components - SPDX: id" on the
- * right, like the Android screen's group header. A row is the coordinate (linked to the project's
- * source), the version as a data value, and one muted chip per shipped module. Coordinates are
- * long unbroken strings, so the name may break anywhere rather than push the row off a phone.
- */
     .oss-meta,
     .oss-end {
         color: var(--color-gray-2-text);
@@ -6890,8 +5234,6 @@
         font-size: 1rem;
     }
 
-    /* Name and count share one wrapping row, so on a phone the count drops under the name instead of
-   squeezing it to one word per line; the +/- marker stays a separate item at the right edge. */
     .oss-group-head {
         display: flex;
         flex: 1 1 auto;
@@ -6952,32 +5294,15 @@
     }
 }
 
-/*
- * Design-system declarations that must keep beating the page stylesheets (FE-MOD-02, REQ-UI-024).
- *
- * Before the layers these won against a page's own rule by specificity alone: `main .form-group
- * select` (0,1,2) over a page's `.form-group select` (0,1,1), and so on. In the components layer
- * they would lose to every page rule, whatever its specificity, so exactly these declarations —
- * and nothing else of their rules — sit in the page layer, where specificity and source order
- * decide against the page stylesheets exactly as they did before. This file loads first, so a page
- * rule of equal specificity still wins the tie, as it always did. Measured: a computed-style diff
- * of every page route at 375 and 1280 px shows no page-versus-component change after the move.
- */
 @layer page {
-    /* The chevron room of a native select inside a form group; a page's own `.form-group select`
-       padding would otherwise squeeze the text under the arrow. (0,1,2), deliberately above the
-       per-page (0,1,1) and below `.krt-personal-inventory .form-group select` (0,2,1). */
     main .form-group select {
         padding: 0.375rem var(--space-8) 0.375rem var(--space-3);
     }
 
-    /* The same for the combobox textbox: its right padding reserves the dropdown chevron. */
     .krt-combobox .krt-combobox__input {
         padding: 0.75rem var(--space-8) 0.75rem 0.75rem;
     }
 
-    /* A datetime group keeps its minimum width and its row no extra gap (the form-group margin
-       is the rhythm), against the mission pages' generic `.form-row` rules. */
     .form-row > .form-group.datetime-split-group {
         min-width: min(18rem, 100%);
     }
@@ -6986,37 +5311,26 @@
         row-gap: 0;
     }
 
-    /* The selected master row keeps its fill and its orange edge against a page's reset of
-       `.master-row`. */
     .master-row.is-active {
         border-left: 3px solid var(--color-primary);
         background: var(--color-surface-input);
     }
 
     @media (width <= 768px) {
-        /* Phone: each filter group takes the full row. */
         div.filters-container > .form-group {
             flex: 1 1 100%;
         }
 
-        /* Phone: the footer scrolls, so no page reserves room for it (REQ-UI-009). */
         div.page-wrapper {
             padding-bottom: var(--space-4);
         }
     }
 
     @media (width <= 1024px) {
-        /* Touch classes: the page-local 32px `.btn-xs2` keeps the 44px floor (REQ-UI-009). */
         .btn.btn-xs2 {
             min-height: var(--touch-target);
         }
 
-        /* Touch classes: the inventory row selector at the dense floor (REQ-UI-009). One per
-           inventory row, so 32px rather than 44px, like `.btn-xs`, `.matrix-flag` and
-           `.bank-row-toggle`. Here and not in `components`, because inventory-my.css declares the
-           20px square in the page layer, which beats every components rule whatever its
-           specificity; left in `components` it measured 26px (2026-09-23). `#personalOnly` shares
-           the class inside a `<label>` that is already over the floor, so raising it does no harm. */
         input.item-checkbox {
             width: var(--touch-target-dense);
             height: var(--touch-target-dense);

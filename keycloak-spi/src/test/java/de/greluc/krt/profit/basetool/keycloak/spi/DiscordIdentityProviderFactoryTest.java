@@ -33,7 +33,6 @@ class DiscordIdentityProviderFactoryTest {
 
   @Test
   void exposesStableDiscordIdentity() {
-    // Given / When / Then
     assertEquals("discord", factory.getId(), "kc_idp_hint alias must stay 'discord'");
     assertEquals("Discord", factory.getName());
     assertNotNull(factory.createConfig());
@@ -41,15 +40,12 @@ class DiscordIdentityProviderFactoryTest {
 
   @Test
   void createsProviderWithDiscordEndpoints() {
-    // Given
     IdentityProviderModel model = new IdentityProviderModel();
     model.setProviderId(DiscordIdentityProviderFactory.PROVIDER_ID);
     model.setAlias("discord");
 
-    // When — a null session is fine: the constructor only sets URLs on the config.
     DiscordIdentityProvider provider = factory.create(null, model);
 
-    // Then
     OAuth2IdentityProviderConfig config = provider.getConfig();
     assertEquals(DiscordIdentityProvider.AUTH_URL, config.getAuthorizationUrl());
     assertEquals(DiscordIdentityProvider.TOKEN_URL, config.getTokenUrl());

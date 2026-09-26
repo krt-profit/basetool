@@ -35,11 +35,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Unit tests for {@link BackendErrorResponses}, pinning both the {@code problem+json} relay shape
- * shared by the AJAX page controllers whose private {@code propagateBackendError} copies it
- * replaced and the {@link BackendErrorResponses#relay(Logger, String,
- * BackendErrorResponses.BackendCall)} try/catch wrapper's success / {@code BackendServiceException}
- * / generic-exception branches (including their DEBUG-vs-ERROR log level contract).
+ * Unit tests for {@link BackendErrorResponses}: the shared {@code problem+json} relay shape and the
+ * {@link BackendErrorResponses#relay(Logger, String, BackendErrorResponses.BackendCall)} wrapper's
+ * success, {@code BackendServiceException} and generic-exception branches with their DEBUG vs ERROR
+ * log levels.
  */
 class BackendErrorResponsesTest {
 

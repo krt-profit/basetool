@@ -41,15 +41,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pins the correction step that fixes the reported "MIC-L5 / ARC-L4 missing from the refinery
- * picker" bug (REQ-REFINERY-020): after each terminal sweep, {@code
- * UexUniverseSyncService.reconcileRefineryTerminalFlags()} recomputes {@code has_refinery_terminal}
- * on cities and space stations from the live {@code type = 'refinery'} terminals, overriding UEX's
- * unreliable parent-level {@code has_refinery} claim in <em>both</em> directions.
- *
- * <p>The fixture mirrors the real upstream data measured on 2026-07-28: MIC-L5 carries {@code
- * has_refinery = 0} yet hosts terminal 244, while People's Service Station Alpha carries {@code
- * has_refinery = 1} and hosts no refinery terminal at all.
+ * Verifies that {@code UexUniverseSyncService.reconcileRefineryTerminalFlags()} recomputes {@code
+ * has_refinery_terminal} on cities and space stations from the live {@code type = 'refinery'}
+ * terminals, overriding UEX's {@code has_refinery} claim in both directions (REQ-REFINERY-020).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -105,10 +99,6 @@ class UexUniverseSyncRefineryFlagTest {
     spaceStationRepository.save(station);
   }
 
-  // covers REQ-REFINERY-020 — the sweep derives the flag from refinery terminals, correcting both
-  // the false negatives (MIC-L5, ARC-L4, Patch City) and the false positives (People's Service).
-  // The two calls mirror the sweep: syncTerminals() leads it, reconcileRefineryTerminalFlags() runs
-  // from UexScheduler's finally once every step has had its turn.
   @Test
   void sweepDerivesRefineryFlagFromTerminalsNotFromTheUexClaim() {
     saveStation("MIC-L5 Modern Icarus Station", false, false);
@@ -145,41 +135,34 @@ class UexUniverseSyncRefineryFlagTest {
     service.syncTerminals();
     service.reconcileRefineryTerminalFlags();
 
-    // False negative corrected: UEX said no, the terminal says yes.
     assertTrue(
         spaceStationRepository
             .findByName("MIC-L5 Modern Icarus Station")
             .orElseThrow()
             .getHasRefineryTerminal());
-    // False positive corrected: UEX said yes, no refinery terminal exists.
     assertFalse(
         spaceStationRepository
             .findByName("People's Service Station Alpha")
             .orElseThrow()
             .getHasRefineryTerminal());
-    // A non-refinery terminal must not promote its station.
     assertFalse(
         spaceStationRepository
             .findByName("MIC-L3 Endless Odyssey Station")
             .orElseThrow()
             .getHasRefineryTerminal());
-    // City-level refinery (Levski) is picked up too.
     assertTrue(cityRepository.findByName("Levski").orElseThrow().getHasRefineryTerminal());
 
-    // The raw UEX claim is preserved untouched alongside the derived flag.
     assertFalse(
         spaceStationRepository
             .findByName("MIC-L5 Modern Icarus Station")
             .orElseThrow()
             .getHasRefinery());
 
-    // The terminal kind itself is mirrored so the derivation is reproducible.
     assertTrue(
         Terminal.TYPE_REFINERY.equals(
             terminalRepository.findByIdTerminal(244).orElseThrow().getType()));
   }
 
-  // covers REQ-REFINERY-020 — a decommissioned refinery drops out on the next sweep.
   @Test
   void nonLiveRefineryTerminalDoesNotFlagItsStation() {
     saveStation("Retired Station", true, true);

@@ -20,16 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Tracks which external catalogues have written to a {@link GameItem} or {@link ShipType} row.
- *
- * <p>R2 only emits {@link #UEX_ONLY} (the UEX item sync is the first writer). R3+ flips {@code
- * UEX_ONLY → BOTH} when the Wiki commodity / item sync finds a match by {@code external_uuid}; the
- * Wiki sync also creates fresh {@link #WIKI_ONLY} rows for items UEX does not carry (variant skins,
- * paints UEX skipped). See SC_WIKI_SYNC_PLAN.md §6.3.1 / §6.5 for the full transition table.
- *
- * <p>Distinct from {@link MaterialSourceSystem}: that enum carries an additional {@link
- * MaterialSourceSystem#MANUAL} value for admin-created commodity rows, which has no analogue in the
- * item / vehicle domain (those rows are external-catalogue-only).
+ * Which external catalogues have written to a {@link GameItem} or {@link ShipType} row. Unlike
+ * {@link MaterialSourceSystem} there is no manual value; these rows come only from external
+ * catalogues.
  */
 public enum GameItemSourceSystem {
 
@@ -43,11 +36,9 @@ public enum GameItemSourceSystem {
   BOTH,
 
   /**
-   * The KRT P4K Reader catalog import has touched this row. Unlike {@link #UEX_ONLY} / {@link
-   * #WIKI_ONLY} / {@link #BOTH}, P4K participation is normally signalled by a non-null {@code
-   * p4k_synced_at} rather than by flipping {@code source_systems} — the importer enriches existing
-   * rows in place and does not rewrite their owning source. This value exists so the CHECK
-   * constraint accepts it and a future flow may set it explicitly if the policy changes.
+   * The P4K Reader catalog import has touched this row. Normally that is signalled by a non-null
+   * {@code p4k_synced_at} instead; this value is accepted by the CHECK constraint but not set by
+   * the importer.
    */
   P4K
 }

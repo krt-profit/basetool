@@ -66,7 +66,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("materialboard"))).isFalse();
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("inventory"))).isFalse();
-    // The member gate short-circuits, so no resource question is even asked.
     verify(ownerScopeService, never()).canViewJobOrders();
   }
 
@@ -105,7 +104,6 @@ class LiveSyncSubscriptionAuthorizerTest {
   @DisplayName("the Auftrags-queue room needs the queue capability, not just membership")
   void theQueueRoomNeedsTheQueueCapability() {
     when(ownerScopeService.canViewJobOrders()).thenReturn(false);
-    // A requester who only ever sees their own Aufträge is refused the page and the room alike.
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("orders"))).isFalse();
 
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
@@ -127,11 +125,7 @@ class LiveSyncSubscriptionAuthorizerTest {
     when(orgUnitBankAccessService.getViewableAccountDetail(RESOURCE))
         .thenThrow(new IllegalStateException("account not visible"));
 
-    // Fail-closed: a stream open is user-initiated and retried, so refusing during a transient
-    // fault costs one refresh, while admitting would make an exception handler the access decision.
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("bank:" + RESOURCE))).isFalse();
-    // Told apart from an ordinary refusal on the metric: a database wobble and members hitting
-    // permission boundaries are indistinguishable once they share a series.
     assertThat(
             meterRegistry
                 .counter(

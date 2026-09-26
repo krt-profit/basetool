@@ -37,19 +37,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Refinery-order lifecycle beyond create + store (UC-20): editing and cancelling through the UI,
- * the status filter on the list, and the create/update validation + optimistic-locking edges.
- * Together with {@code RefineryOrderCreateE2eTest} (create) and {@code RefineryOrderStoreE2eTest}
- * (store) this rounds out the full set of refinery functions.
+ * Refinery-order lifecycle beyond create and store (UC-20): edit and cancel through the UI, the
+ * list's status filter, and the validation and optimistic-locking edges.
  *
- * <p><b>Drive via UI, verify via API.</b> The edit and cancel flows are exercised in the real
- * browser (the order-detail form and the list filter); the persisted effect (the new money value,
- * the {@code CANCELED} status) is asserted through {@link BackendSeeder}. The validation and 409
- * edges run purely through the API because they assert HTTP status codes the UI deliberately hides
- * behind a generic toast.
- *
- * <p>{@code test-admin} (ADMIN, IRIDIUM member) owns every order. Each test seeds its own order so
- * the mutations stay isolated.
+ * <p>UI flows are verified through the API via {@link BackendSeeder}; the validation and 409 edges
+ * run purely through the API. Each test seeds its own order owned by {@code test-admin}.
  */
 @Tag("e2e")
 class RefineryOrderLifecycleE2eTest {
@@ -116,23 +108,9 @@ class RefineryOrderLifecycleE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/" + orderId);
         page.waitForLoadState();
-        // The input-material picker (a searchable combobox — its id stays on the enhancer's hidden
-        // input) is required, but its options come from the long-cached /api/v1/materials,
-        // which need not contain this test's freshly-seeded material — so the order's pre-selected
-        // option can be absent, leaving the picker empty and blocking the submit with a validation
-        // bubble. Pick whatever RAW material the combobox offers (it renders no placeholder option)
-        // so the form validates. The form carries no output-material field, so the backend
-        // re-infers the output from the new input; the test asserts the edited Ore-Sales, not the
-        // material.
         E2eSupport.selectComboboxFirstOption(
             page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"));
         page.locator("#oreSales").fill("12345");
-        // Drop the fixed footer so the bottom Save button is clickable, then submit and wait for
-        // the
-        // update POST's own response (the backend commit) before the API read-back. Targeting that
-        // POST — rather than the settled post-redirect navigation (awaitFormPost) — avoids a WebKit
-        // flake where the redirect does not settle within the timeout under CI load (the #505
-        // pattern); the read-back needs only the commit, not the re-rendered list page.
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
@@ -166,17 +144,9 @@ class RefineryOrderLifecycleE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/" + orderId);
         page.waitForLoadState();
-        // The cancel control is a submit inside a small <form action=".../{id}/delete">. Drop the
-        // fixed footer so it is clickable, then wait for the delete POST's own response — tying the
-        // wait to that exact request means a mis-targeted click (e.g. the adjacent back link, which
-        // also lands on the list) fails loudly instead of passing on the wrong navigation.
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
-        // Cancel now shows a KRT confirm dialog before posting (#575). Click the cancel button to
-        // open the overlay, then accept it inside waitForResponse so the wait is registered before
-        // the confirm fires the delete POST. Selector matches the green
-        // OrgChartPositionCrudE2eTest.
         page.locator("form[action$='/" + orderId + "/delete'] button[type='submit']").click();
         page.waitForResponse(
             response ->
@@ -192,13 +162,10 @@ class RefineryOrderLifecycleE2eTest {
   }
 
   /**
-   * The list's status filter hides a {@code CANCELED} order under the default {@code OPEN}+{@code
-   * IN_PROGRESS} view and shows it under an explicit {@code CANCELED} filter.
+   * Verifies that the status filter hides a {@code CANCELED} order under the default {@code
+   * OPEN}+{@code IN_PROGRESS} view and shows it under an explicit {@code CANCELED} filter.
    *
-   * <p>The filter is driven through its {@code ?status=…} URL contract — the form the visible
-   * status checkboxes belong to is GET-submitted to exactly that query, and its manual "Filtern"
-   * button is JS-hidden (progressive enhancement) so it cannot be clicked in the harness.
-   * Navigating the URL exercises the same backend filter the UI invokes.
+   * <p>Driven through the {@code ?status=…} URL, since the filter button is hidden by JS.
    */
   @Test
   void statusFilterRevealsCanceledOrders() {
@@ -216,12 +183,10 @@ class RefineryOrderLifecycleE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Default filter is OPEN+IN_PROGRESS, so the cancelled order's detail link is absent.
         E2eSupport.navigate(page, baseUrl + "/refinery-orders");
         page.waitForLoadState();
         assertThat(page.locator(rowLink)).hasCount(0);
 
-        // The CANCELED status filter reveals it.
         E2eSupport.navigate(page, baseUrl + "/refinery-orders?status=CANCELED");
         page.waitForLoadState();
         assertThat(page.locator(rowLink).first())
@@ -270,10 +235,6 @@ class RefineryOrderLifecycleE2eTest {
             USERNAME, PASSWORD, orderId, hubLocationId, materialId, version),
         "re-using the now-stale version must conflict with 409");
   }
-
-  // --------------------------------------------------------------------------------------------
-  // Helpers
-  // --------------------------------------------------------------------------------------------
 
   /**
    * Reads the current status of a refinery order via {@code GET /api/v1/refinery-orders/{id}}.

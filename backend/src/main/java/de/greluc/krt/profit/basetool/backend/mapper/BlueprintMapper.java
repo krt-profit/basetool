@@ -66,9 +66,7 @@ public interface BlueprintMapper {
   BlueprintRequirementGroupDto toGroupDto(BlueprintRequirementGroup group);
 
   /**
-   * Maps a list of requirement groups element-wise via {@link
-   * #toGroupDto(BlueprintRequirementGroup)}, so a recipe's build slots can be exposed without
-   * mapping the rest of the blueprint aggregate (used by the Personal Inventory recipe view, #327).
+   * Maps requirement groups element-wise via {@link #toGroupDto(BlueprintRequirementGroup)}.
    *
    * @param groups the requirement-group entities (may be {@code null})
    * @return the requirement-group DTOs, or {@code null} when {@code groups} is {@code null}
@@ -76,9 +74,7 @@ public interface BlueprintMapper {
   List<BlueprintRequirementGroupDto> toGroupDtos(List<BlueprintRequirementGroup> groups);
 
   /**
-   * Maps a list of ingredient lines element-wise via {@link #toIngredientDto(BlueprintIngredient)},
-   * used to expose a recipe's flat ingredient list as the legacy fallback for the Personal
-   * Inventory recipe view (#327).
+   * Maps ingredient lines element-wise via {@link #toIngredientDto(BlueprintIngredient)}.
    *
    * @param ingredients the ingredient entities (may be {@code null})
    * @return the ingredient DTOs, or {@code null} when {@code ingredients} is {@code null}
@@ -86,9 +82,8 @@ public interface BlueprintMapper {
   List<BlueprintRequirementIngredientDto> toIngredientDtos(List<BlueprintIngredient> ingredients);
 
   /**
-   * Maps a requirement modifier (stat contribution) to its DTO, deriving the effective quality band
-   * from the segments so the slider spans the full covered range (see {@link
-   * #effectiveQualityMin(BlueprintRequirementModifier)}).
+   * Maps a requirement modifier to its DTO, with the effective quality band derived from its
+   * segments.
    *
    * @param modifier the modifier entity
    * @return the modifier DTO
@@ -120,11 +115,8 @@ public interface BlueprintMapper {
   }
 
   /**
-   * Computes the highest ingredient quality the modifier actually covers — the largest segment
-   * {@code qualityMax} when stepped, else the raw {@code qualityMax}. Mirror of {@link
-   * #effectiveQualityMin(BlueprintRequirementModifier)} for the upper bound; together they let the
-   * UI span the full {@code 0..1000} band a multi-segment curve covers even though the raw pair
-   * only reflects the first segment.
+   * Computes the highest ingredient quality the modifier covers: the largest segment {@code
+   * qualityMax} when stepped, else the raw {@code qualityMax}.
    *
    * @param modifier the modifier entity
    * @return the effective upper quality bound, or {@code null} when neither segments nor the raw
@@ -151,12 +143,9 @@ public interface BlueprintMapper {
   BlueprintRequirementModifierSegmentDto toSegmentDto(BlueprintModifierSegment segment);
 
   /**
-   * Maps an ingredient line to its DTO, taking the display name from the Wiki snapshot and the kind
-   * from the enum name. For a RESOURCE line it also surfaces the resolved material's {@code
-   * quantityType} so the UI can label the {@code quantityScu} amount in the right unit (SCU vs
-   * Stück) — a deliberate, bounded touch of the lazy {@code material} association (one recipe's
-   * ingredients, inside the read transaction); ITEM lines and unresolved RESOURCE lines carry a
-   * {@code null} quantity type.
+   * Maps an ingredient line to its DTO, taking the name from the Wiki snapshot and, for a resolved
+   * RESOURCE line, the material's {@code quantityType}; other lines carry a {@code null} quantity
+   * type.
    *
    * @param ingredient the ingredient entity
    * @return the ingredient DTO

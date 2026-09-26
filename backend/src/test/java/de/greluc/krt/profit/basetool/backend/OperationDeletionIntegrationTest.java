@@ -120,7 +120,6 @@ class OperationDeletionIntegrationTest {
 
   @Test
   void testDeleteOperationKeepsMissionAndAllItsReferences() throws Exception {
-    // Given: InventoryItem linked to Mission
     Material material = new Material();
     material.setName("Test Ore");
     material.setType(MaterialType.RAW);
@@ -136,11 +135,9 @@ class OperationDeletionIntegrationTest {
     item.setLocation(location);
     item.setQuality(100);
     item.setAmount(10.0);
-    // Variante C: the mission earmark is a cascade-persisted allocation slice, not a scalar column.
     InventoryAllocations.addMission(item, mission, item.getAmount());
     item = inventoryItemRepository.save(item);
 
-    // Given: RefineryOrder linked to Mission
     RefineryOrder order = new RefineryOrder();
     order.setOwner(adminUser);
     order.setLocation(location);
@@ -149,7 +146,6 @@ class OperationDeletionIntegrationTest {
     order.setExpenses(100.0);
     order = refineryOrderRepository.save(order);
 
-    // Given: MissionParticipant + MissionFinanceEntry linked to Mission
     MissionParticipant participant = new MissionParticipant();
     participant.setMission(mission);
     participant.setUser(adminUser);
@@ -168,7 +164,6 @@ class OperationDeletionIntegrationTest {
     UUID financeEntryId = financeEntry.getId();
     UUID participantId = participant.getId();
 
-    // When: Deleting the operation as admin
     mockMvc
         .perform(
             delete("/api/v1/operations/" + operation.getId())
@@ -178,16 +173,12 @@ class OperationDeletionIntegrationTest {
                         .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isNoContent());
 
-    // Then: Operation is gone
     assertTrue(operationRepository.findById(operation.getId()).isEmpty());
 
-    // Then: Mission survives, only its back-reference to the operation is cleared
     Mission survivedMission = missionRepository.findById(missionId).orElseThrow();
     assertNull(
         survivedMission.getOperation(), "mission must no longer reference the deleted operation");
 
-    // Then: InventoryItem is still linked to the (now operation-less) mission via its
-    // mission allocation slice (Variante C)
     InventoryItem survivedItem = inventoryItemRepository.findById(itemId).orElseThrow();
     InventoryMissionAllocation survivedAllocation =
         survivedItem.getMissionAllocations().stream()
@@ -198,19 +189,16 @@ class OperationDeletionIntegrationTest {
                         "inventory item must keep its mission link when the operation is deleted"));
     assertEquals(missionId, survivedAllocation.getMission().getId());
 
-    // Then: RefineryOrder is still linked to the mission
     RefineryOrder survivedOrder = refineryOrderRepository.findById(orderId).orElseThrow();
     assertNotNull(
         survivedOrder.getMission(),
         "refinery order must keep its mission link when the operation is deleted");
     assertEquals(missionId, survivedOrder.getMission().getId());
 
-    // Then: MissionFinanceEntry survives and stays linked to the mission
     MissionFinanceEntry survivedFinance =
         missionFinanceEntryRepository.findById(financeEntryId).orElseThrow();
     assertEquals(missionId, survivedFinance.getMission().getId());
 
-    // Then: MissionParticipant survives
     assertTrue(
         missionParticipantRepository.findById(participantId).isPresent(),
         "mission participant must survive the operation delete");

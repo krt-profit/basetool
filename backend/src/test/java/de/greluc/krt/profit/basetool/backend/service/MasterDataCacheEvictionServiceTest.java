@@ -84,7 +84,6 @@ class MasterDataCacheEvictionServiceTest {
 
   @Test
   void evict_toleratesAnUnregisteredCacheWithoutThrowing() {
-    // A name that resolves to null (not registered) must not abort the sweep-completion eviction.
     when(cacheManager.getCache(anyString())).thenReturn(null);
 
     assertDoesNotThrow(service::evictUexSyncedMasterData);

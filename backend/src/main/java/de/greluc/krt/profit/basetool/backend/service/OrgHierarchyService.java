@@ -42,17 +42,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Admin-only lifecycle service for the upper org-hierarchy tiers (epic #692, REQ-ORG-014): creating
- * {@link Bereich} and {@link Organisationsleitung} rows and wiring the {@code parent_org_unit_id}
- * edges (Staffel/SK → Bereich, Bereich → OL). It deliberately does <strong>not</strong> inject
- * {@code OwnerScopeService}: like {@link SquadronService} / {@link SpecialCommandService} it is
- * pure org-unit lifecycle administration gated to ADMIN at the controller, with no per-caller
- * scope. The cascading <em>reach</em> that the hierarchy unlocks is computed elsewhere
- * (REQ-ORG-015, a later phase).
+ * Admin-only lifecycle service for the upper org-hierarchy tiers (REQ-ORG-014): creates {@link
+ * Bereich} and {@link Organisationsleitung} rows and sets parent edges.
  *
- * <p>The parent-kind pairing is validated here for a clean 400, and additionally pinned by the V164
- * {@code validate_org_unit_parent} trigger and the {@code chk_org_unit_ol_has_no_parent} CHECK as
- * the DB backstop. The OL is treated as a singleton: a second active one is rejected with 409.
+ * <p>Parent-kind pairing is validated for a clean 400; the Organisationsleitung is a singleton.
  */
 @Service
 @RequiredArgsConstructor
@@ -97,21 +90,17 @@ public class OrgHierarchyService {
   }
 
   /**
-   * Creates a Bereich, optionally already wired under the Organisationsleitung. The same-kind
-   * case-insensitive name check surfaces a clean 409 before the global {@code org_unit.name} UNIQUE
-   * constraint trips (a cross-kind collision is caught at flush time as a 409 like the SK path).
+   * Creates a Bereich, optionally already parented to the Organisationsleitung.
    *
-   * @param name display name; required.
-   * @param shorthand short tag; required.
-   * @param description free-form text; nullable.
-   * @param parentOrgUnitId the owning OL's id, or {@code null} to leave the Bereich unparented for
-   *     now; when non-null it must reference an {@code ORGANISATIONSLEITUNG}.
-   * @param department the Kartell department / Bereichsfarbe (epic #692, REQ-ORG-026), or {@code
-   *     null} to leave the Bereich untinted in the org chart for now.
-   * @return the persisted Bereich.
-   * @throws DuplicateEntityException if a Bereich with that name already exists.
-   * @throws BadRequestException if {@code parentOrgUnitId} is not an Organisationsleitung.
-   * @throws NotFoundException if {@code parentOrgUnitId} references no org unit.
+   * @param name display name; required
+   * @param shorthand short tag; required
+   * @param description free-form text; nullable
+   * @param parentOrgUnitId the OL's id, or {@code null} to leave the Bereich unparented
+   * @param department the Bereich's department (REQ-ORG-026), or {@code null}
+   * @return the persisted Bereich
+   * @throws DuplicateEntityException if a Bereich with that name already exists
+   * @throws BadRequestException if {@code parentOrgUnitId} is not an Organisationsleitung
+   * @throws NotFoundException if {@code parentOrgUnitId} references no org unit
    */
   @Transactional
   public Bereich createBereich(
@@ -135,14 +124,13 @@ public class OrgHierarchyService {
   }
 
   /**
-   * Creates the Organisationsleitung. There is exactly one OL, so a second active one is rejected.
+   * Creates the single Organisationsleitung.
    *
-   * @param name display name; required.
-   * @param shorthand short tag; required.
-   * @param description free-form text; nullable.
-   * @return the persisted OL.
-   * @throws DuplicateEntityException if an active Organisationsleitung already exists, or a Bereich
-   *     /SK with the same name does.
+   * @param name display name; required
+   * @param shorthand short tag; required
+   * @param description free-form text; nullable
+   * @return the persisted OL
+   * @throws DuplicateEntityException if an active OL already exists or the name is taken
    */
   @Transactional
   public Organisationsleitung createOrganisationsleitung(
@@ -159,18 +147,18 @@ public class OrgHierarchyService {
   }
 
   /**
-   * Sets (or clears) an org unit's parent in the hierarchy, validating the kind pairing: a Staffel
-   * or SK must be parented to a Bereich, a Bereich to the Organisationsleitung, and the OL has no
-   * parent. A {@code null} parent detaches the unit. The child's optimistic-lock version is
-   * checked.
+   * Sets or clears an org unit's parent after checking the kind pairing and the child's version.
    *
-   * @param orgUnitId the child org unit to (re)parent; never {@code null}.
-   * @param parentOrgUnitId the new parent's id, or {@code null} to detach.
-   * @param version the child's optimistic-lock version.
-   * @return the persisted child org unit.
-   * @throws NotFoundException if the child or the parent id references no org unit.
-   * @throws BadRequestException if the parent kind does not match the child's level.
-   * @throws ObjectOptimisticLockingFailureException if the supplied version is stale.
+   * <p>A Staffel or SK takes a Bereich, a Bereich takes the Organisationsleitung, the OL takes
+   * none.
+   *
+   * @param orgUnitId the child org unit
+   * @param parentOrgUnitId the new parent's id, or {@code null} to detach
+   * @param version the child's optimistic-lock version
+   * @return the persisted child org unit
+   * @throws NotFoundException if the child or parent id references no org unit
+   * @throws BadRequestException if the parent kind does not match the child's level
+   * @throws ObjectOptimisticLockingFailureException if the version is stale
    */
   @Transactional
   public OrgUnit setParent(
@@ -179,9 +167,6 @@ public class OrgHierarchyService {
     OptimisticLock.check(child.getVersion(), version, OrgUnit.class, orgUnitId);
     if (parentOrgUnitId == null) {
       child.setParent(null);
-      // saveAndFlush (not save): the controller is class-@Transactional, so without an explicit
-      // flush the @Version increment would be deferred past the toDto mapping and the response
-      // would carry the stale pre-update version, 409-ing the caller's next chained edit.
       return orgUnitRepository.saveAndFlush(child);
     }
     OrgUnit parent =

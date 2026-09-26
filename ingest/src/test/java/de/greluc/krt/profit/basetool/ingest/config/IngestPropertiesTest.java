@@ -27,19 +27,13 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the defaults of the gateway's four configuration records, bound through the real
- * {@code Binder} so the {@code @DefaultValue} annotations — not a hand-kept copy — are what is
- * asserted. Guards the handoff TTL default so a future edit cannot silently revert it below the
- * value the one-click ingest flow needs (REQ-INGEST-003), and the property names, which the records
- * migration (ING-MOD-02) had to keep byte-identical for every existing environment.
+ * {@code Binder}, including the handoff TTL (REQ-INGEST-003) and the property names.
  */
 class IngestPropertiesTest {
 
   /**
-   * The handoff TTL default is 30 minutes, not the original 5. Staging happens when the user clicks
-   * Send in the extractor, but opening the pre-filled page is a separate manual click afterwards,
-   * so a 5-minute window expired before pickup for slower users and surfaced as "Import-Link
-   * abgelaufen oder ungültig" on every send (REQ-INGEST-003). This locks the widened default in
-   * place.
+   * The handoff TTL defaults to 30 minutes, leaving time between the extractor's Send and opening
+   * the pre-filled page (REQ-INGEST-003).
    */
   @Test
   void handoffTtlDefaultsToThirtyMinutes() {

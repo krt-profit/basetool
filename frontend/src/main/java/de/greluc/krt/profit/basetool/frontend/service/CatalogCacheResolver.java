@@ -31,12 +31,9 @@ import org.springframework.cache.interceptor.CacheResolver;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves the per-domain Caffeine cache for a {@link BackendApiClient#getCached} invocation from
- * its {@link CachedCatalog} first argument (FE-CACHE-2). {@code @Cacheable} cannot compute {@code
- * cacheNames} dynamically, so a {@link CacheResolver} is the declarative seam that lets one
- * cached-read method target a different named cache per catalogue while keeping Caffeine's
- * proxy-based, concurrent- load-coalescing semantics — no programmatic {@code cacheManager.get/put}
- * in the hot path.
+ * Resolves the per-domain Caffeine cache for a {@link BackendApiClient#getCached} call from its
+ * {@link CachedCatalog} first argument, since {@code @Cacheable} cannot compute cache names
+ * dynamically.
  */
 @Component("catalogCacheResolver")
 @RequiredArgsConstructor

@@ -59,16 +59,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Renders the management three-month report PDF (REQ-BANK-015, epic #556 Phase 3): every bank
- * account over the rolling three-month window ending now, each with a summary block (opening
- * balance, inflow, outflow, closing balance) and the itemized bookings of the window, followed by a
- * single <strong>global holder-balance section</strong> (ADR-0039 — holders are decoupled from
- * accounts, so the report ends with each holder's bank-wide custody, not a per-account
- * distribution). Management-only at the endpoint gate; each export writes one {@code
- * MANAGEMENT_REPORT_EXPORTED} audit event (REQ-BANK-012).
+ * Renders the management three-month report PDF (REQ-BANK-015): per account a summary block and the
+ * itemized bookings of the rolling window, followed by one global holder-balance section.
  *
- * <p>Labels are German from the backend message bundle; the visual layer is the shared {@link
- * KrtPdfSupport}.
+ * <p>Each export writes a {@code MANAGEMENT_REPORT_EXPORTED} audit event (REQ-BANK-012).
  */
 @Service
 @RequiredArgsConstructor
@@ -142,8 +136,6 @@ public class BankManagementReportService {
         krt.document().add(empty);
       }
 
-      // Each account starts on its own page so a section never shares a page with the previous
-      // account's tail (REQ-BANK-015 readability); the first follows the title/period meta.
       boolean firstAccount = true;
       for (BankAccount account : accounts) {
         if (!firstAccount) {
@@ -165,16 +157,14 @@ public class BankManagementReportService {
 
   /**
    * Adds one account's report section: header, summary block, balance chart and the itemized
-   * bookings of the window (with the per-booking holder derived from the holder ledger). The
-   * closing holder distribution is gone (ADR-0039) — the report's single global holder section
-   * replaces it.
+   * bookings of the window with the per-booking holder.
    *
    * @param krt the open document handle
    * @param account the account to render
    * @param from window start (inclusive)
    * @param to window end (inclusive)
    * @param stamp the zone-bound timestamp formatter
-   * @param dateOnly the zone-bound date-only formatter for the chart's x-axis labels
+   * @param dateOnly the zone-bound date-only formatter for the chart's x-axis
    */
   private void addAccountSection(
       @NotNull KrtPdfSupport.KrtDocument krt,
@@ -192,7 +182,6 @@ public class BankManagementReportService {
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-044).
     final Map<UUID, List<BankCounterLeg>> accountLegsByTx =
         txIds.isEmpty()
             ? Map.of()
@@ -229,7 +218,6 @@ public class BankManagementReportService {
         summary, label("pdf.bank.report.closing"), BankPdfFormat.amount(closing));
     krt.document().add(summary);
 
-    // Balance-over-time chart: the running balance across the three-month window as a step line.
     KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.report.chart"));
     krt.document()
         .add(
@@ -237,9 +225,6 @@ public class BankManagementReportService {
                 krt.writer(), opening, rows, from, to, dateOnly.format(from), dateOnly.format(to)));
     krt.document().add(new Paragraph(" "));
 
-    // The Begründung + Notiz of each booking move into an indented sub-row beneath it
-    // (REQ-BANK-045,
-    // reason first) so the five main columns stay wide enough to never wrap.
     PdfPTable table = new PdfPTable(5);
     table.setWidthPercentage(100);
     table.setWidths(new float[] {1.5f, 1.2f, 1.5f, 1.9f, 1.2f});
@@ -263,10 +248,6 @@ public class BankManagementReportService {
                   row.amount().signum());
       KrtPdfSupport.addTableCell(table, stamp.format(row.createdAt()), bg, false);
       KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
-      // Humanised like the Gegenpartei column below, and for the same reason: bank_holder.user_id
-      // is ON DELETE SET NULL, so after a deletion the display name falls back to the handle
-      // snapshot -- which a granted erasure has rewritten. Raw, that printed #ANONYMISED# in the
-      // Halter column while the next column on the same row read "Anonymisiert" (REQ-SEC-062).
       KrtPdfSupport.addTableCell(
           table,
           HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
@@ -280,7 +261,6 @@ public class BankManagementReportService {
       KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
       String reason = row.justification() != null ? row.justification() : "";
       String note = row.note() != null ? row.note() : "";
-      // The management report is a Bankleitung-only artifact, so the internal staff note is kept.
       String staffNote = row.staffNote() != null ? row.staffNote() : "";
       if (!reason.isEmpty() || !note.isEmpty() || !staffNote.isEmpty()) {
         KrtPdfSupport.addDetailSubRow(
@@ -295,15 +275,12 @@ public class BankManagementReportService {
   }
 
   /**
-   * Renders the "Quell-/Zielkonto" cell for a report row (REQ-BANK-044) — the far side of the
-   * booking: for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler /
-   * Empf&auml;nger) with their org unit in parentheses; for a {@code TRANSFER} the counter
-   * account's number; empty otherwise. The type column and amount sign convey the direction, so no
-   * arrow glyph is rendered.
+   * Renders the "Quell-/Zielkonto" cell of a report row (REQ-BANK-044): the counterparty with org
+   * unit for a {@code DEPOSIT}/{@code WITHDRAWAL}, the counter account's number for a {@code
+   * TRANSFER}, empty otherwise.
    *
    * @param row the report row
-   * @param accountLegsByTx the section's account legs grouped by transaction (transfer counter
-   *     accounts)
+   * @param accountLegsByTx the section's account legs grouped by transaction
    * @return the cell text, never {@code null}
    */
   private static @NotNull String counterpartyCell(
@@ -315,9 +292,6 @@ public class BankManagementReportService {
         if (row.counterpartyHandle() == null) {
           yield "";
         }
-        // A counterparty whose handle an Art. 17 request erased renders as the placeholder rather
-        // than as the raw sentinel (REQ-SEC-062). The booking itself is untouched -- amount, date
-        // and account all stand; only the name is gone.
         String handle = HandleAnonymisation.humanise(row.counterpartyHandle(), anonymisedLabel);
         yield row.counterpartyOrgUnitName() == null
             ? handle
@@ -334,12 +308,12 @@ public class BankManagementReportService {
   }
 
   /**
-   * Adds the report's single global holder-balance section (ADR-0039): each holder's bank-wide
-   * custody total, largest first, on its own page. Replaces the old per-account distribution.
+   * Adds the global holder-balance section (ADR-0039): each holder's bank-wide custody total,
+   * largest first.
    *
    * @param krt the open document handle
-   * @param noAccounts whether the report had no accounts (then the section is appended inline
-   *     rather than on a fresh page)
+   * @param noAccounts whether the report had no accounts, in which case the section is appended
+   *     inline rather than on a fresh page
    */
   private void addGlobalHolderSection(@NotNull KrtPdfSupport.KrtDocument krt, boolean noAccounts) {
     if (!noAccounts) {

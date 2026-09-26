@@ -40,29 +40,12 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Redis pub/sub {@link LiveSyncFanout} that makes the {@code changed} relay correct across frontend
- * replicas (ADR-0094) and the editor-presence dots consistent across them (ADR-0126).
+ * Redis pub/sub {@link LiveSyncFanout} that relays {@code changed} signals (ADR-0094) and
+ * editor-presence snapshots (ADR-0126) across frontend replicas, each on its own channel.
  *
- * <p>The handler always relays a {@code changed} frame to <em>this</em> instance's local rooms
- * first, then calls {@link #publish(String, List)}, which serialises {@code {v, topic, sections,
- * origin}} and publishes it on the configured channel. Every replica (including this one) receives
- * it via {@link #onMessage(Message, byte[])}; a message whose {@code origin} is this instance is
- * skipped (the local relay already delivered it), and any other is relayed to this instance's local
- * rooms through {@link LiveSyncWebSocketHandler#deliverFromFanout(String, List)}. Because local
- * relay happens before publish, a Redis outage degrades to exactly the single-instance behaviour —
- * publish simply fails, is counted, and the local viewers are already up to date.
- *
- * <p><b>Two channels, one listener.</b> {@link #publishPresence(String, Map)} follows the identical
- * local-first + own-origin-skip shape on a second channel carrying {@code {v, topic, origin,
- * sections:{key:[{userId,displayName}]}}} — this instance's <em>complete</em> presence state for
- * the topic, not a delta. {@link #onMessage(Message, byte[])} dispatches on the channel the message
- * arrived on. The streams are separated because presence is periodic and cosmetic while the changed
- * relay is event-driven and load-bearing; mixing them would make one indistinguishable from the
- * other on the fan-out dashboard and let gossip volume mask a changed-relay outage.
- *
- * <p>The handler reference is injected lazily through an {@link ObjectProvider} to break the
- * construction cycle (the handler depends on the fan-out to publish; the fan-out depends on the
- * handler to deliver on consume).
+ * <p>The handler relays locally first and then publishes; {@link #onMessage(Message, byte[])} skips
+ * this instance's own messages and delivers the rest to the local rooms. A Redis outage therefore
+ * degrades to single-instance behaviour.
  */
 @Slf4j
 public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
@@ -86,8 +69,7 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
    * @param meterRegistry registry the publish/consume/error counters bind to
    * @param channel the Redis channel {@code changed} signals cross
    * @param presenceChannel the Redis channel editor-presence snapshots cross (ADR-0126); must
-   *     differ from {@code channel}, since {@link #onMessage(Message, byte[])} tells the two
-   *     payload formats apart by the channel a message arrived on
+   *     differ from {@code channel}
    * @param instanceId this JVM's stable instance id, used to skip own-origin messages and to key
    *     the presence partition peers hold for this replica
    */
@@ -149,8 +131,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
               metricLabel(canonicalTopic))
           .increment();
     } catch (RuntimeException e) {
-      // Local relay already delivered to this instance's viewers; a failed cross-replica publish
-      // only degrades peer delivery, so swallow-and-count rather than propagate to the caller.
       meterRegistry
           .counter(MetricNames.LIVESYNC_REDIS_ERRORS, MetricNames.TAG_OP, MetricNames.OP_PUBLISH)
           .increment();
@@ -186,9 +166,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
               metricLabel(canonicalTopic))
           .increment();
     } catch (RuntimeException e) {
-      // Same swallow-and-count contract as the changed relay: the local dots were already
-      // broadcast, so a failed gossip costs peers a cosmetic dot until the next tick, never a
-      // stale view of the data itself.
       meterRegistry
           .counter(
               MetricNames.LIVESYNC_REDIS_ERRORS,
@@ -218,7 +195,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
       JsonNode root = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
       String origin = textOrNull(root, "origin");
       if (instanceId.equals(origin)) {
-        // Our own publication looped back — the local relay already delivered it. Skip.
         return;
       }
       String topic = textOrNull(root, "topic");
@@ -251,13 +227,9 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   }
 
   /**
-   * Consume half of the presence gossip (ADR-0126): parses a peer's complete presence snapshot for
-   * one topic and hands it to the handler, which sanitises it, replaces that origin's partition and
-   * re-broadcasts the merged dots to the local room.
-   *
-   * <p>Unlike the {@code changed} path, an <b>empty</b> {@code sections} object is not discarded —
-   * it is the peer saying "no editors here any more", which drops its partition immediately rather
-   * than waiting out the partition TTL.
+   * Consumes a peer's complete presence snapshot for one topic and hands it to the handler, which
+   * replaces that origin's partition (ADR-0126). An empty {@code sections} object drops the
+   * partition immediately.
    *
    * @param message the raw Redis message from the presence channel
    */
@@ -266,8 +238,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
       JsonNode root = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
       String origin = textOrNull(root, "origin");
       if (origin == null || origin.isBlank() || instanceId.equals(origin)) {
-        // Our own gossip looped back (or a payload with no usable origin, which cannot key a
-        // partition) — the local broadcast already carried our own state. Skip.
         return;
       }
       String topic = textOrNull(root, "topic");
@@ -304,10 +274,8 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   }
 
   /**
-   * Reads one section's editor array from a gossiped presence snapshot, skipping any element that
-   * is not an object with a non-empty {@code userId}. A missing {@code displayName} degrades to the
-   * empty string rather than dropping the editor: the dot still belongs on the panel even if its
-   * label is unusable.
+   * Reads one section's editor array from a presence snapshot, skipping elements without a
+   * non-empty {@code userId}; a missing {@code displayName} becomes the empty string.
    *
    * @param editorsNode the raw array node (may be {@code null} or not an array)
    * @return the parsed editors, possibly empty

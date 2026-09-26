@@ -81,38 +81,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Backend security configuration: JWT resource-server, role hierarchy, CSRF policy and the request
+ * Backend security configuration: JWT resource server, role hierarchy, CSRF policy and the request
  * authorization matrix.
  *
- * <p>The backend is a pure resource server — incoming JWTs are validated against the Keycloak
- * issuer, the {@code CustomJwtGrantedAuthoritiesConverter} maps both Keycloak realm roles AND the
- * project-specific {@code is_logistician} / {@code is_mission_manager} flags on the caller's {@code
- * org_unit_membership} rows into Spring authorities. The role hierarchy mirrors the CLAUDE.md
- * matrix (admin/officer imply logistician/mission-manager).
- *
- * <p>The {@code authorizeHttpRequests} matrix in {@link #filterChain} is the single, exhaustive
- * source for which endpoints are public, which require authentication, and which require a specific
- * role/authority. The order matters — Spring evaluates the matchers top-down. Method-level
- * {@code @PreAuthorize} on services adds fine-grained checks but never weakens the chain matcher.
- *
- * <p><strong>Four paths answer without a token, and that list is the requirement</strong>
- * (REQ-SEC-052, ADR-0159): {@code /error}, {@code /actuator/health(/**)}, {@code /internal/**} —
- * machine-to-machine behind a constant-time shared-secret header, not an anonymous data path — and
- * the two {@code GET}-scoped reads {@code /api/v1/terms/document} and {@code
- * /api/v1/app/version-policy}. Everything else requires authentication at this layer <em>and</em> a
- * method gate; a {@code HEAD} on either read falls to the catch-all and answers {@code 401},
- * because the rules name the verb.
- *
- * <p>An authenticated caller is still not admitted by default. A token whose realm roles map to no
- * application role is refused with {@code 403 NO_ROLE} (REQ-SEC-053) before it reaches a handler,
- * on the JWT path and on the ingest gateway's acting-member path alike. There is no role below
- * member: the {@code GUEST} role was removed with {@code V239}.
- *
- * <p>CSRF is enabled with the cookie token repository except in the {@code test} profile, where it
- * is disabled so MockMvc tests do not need to plumb the token through every call. API endpoints
- * that are exclusively JSON and bearer-token authenticated ({@code /api/v1/missions/**}, {@code
- * /api/v1/operations/**}, {@code /api/v1/orders}, {@code /api/v1/finance-entries}) are explicitly
- * ignored because they can never be triggered from a CSRF-vulnerable browser flow.
+ * <p>The matrix in {@link #filterChain} is the exhaustive source of which endpoints are public or
+ * require a role; method-level {@code @PreAuthorize} only narrows it. Only {@code /error}, {@code
+ * /actuator/health(/**)}, {@code /internal/**} and the {@code GET} reads {@code
+ * /api/v1/terms/document} and {@code /api/v1/app/version-policy} answer without a token
+ * (REQ-SEC-052), and a token mapping to no application role is refused with {@code 403 NO_ROLE}
+ * (REQ-SEC-053).
  */
 @Configuration
 @EnableWebSecurity
@@ -128,81 +105,36 @@ public class SecurityConfig {
   static final String TERMS_GATE_ARMED_IN_TEST = "app.security.terms.armed-in-test";
 
   /**
-   * Paths exempt from cookie-based CSRF, because on them there is no ambient credential for a
-   * cross-site request to ride.
-   *
-   * <p>This chain is {@link
-   * org.springframework.security.config.http.SessionCreationPolicy#STATELESS} and authenticates
-   * with nothing but a bearer JWT — no form login, no basic auth, no session cookie. CSRF defends
-   * against a browser attaching a credential by itself; a bearer token is never attached by itself,
-   * so on {@code /api/v1/**} the check can only ever refuse a legitimate client.
-   *
-   * <p><strong>It did.</strong> The list used to name five paths, and every path outside it
-   * answered {@code 403 MissingCsrfToken} to any caller without a CSRF cookie — which is every
-   * bearer client, i.e. the whole native app. In production that broke booking stock out of the
-   * Lager ({@code POST /api/v1/inventory/{id}/book-out}), taking and progressing an Auftrag ({@code
-   * /api/v1/orders/{id}/assignees/{userId}}, {@code /status}) and a bank account's balance target —
-   * while {@code /api/v1/missions/**} and {@code /api/v1/operations/**}, which were on the list,
-   * worked. The nightly {@code edge-deny-probe} named all four: it asserts {@code 401} for an
-   * anonymous write and got {@code 403}, because the CSRF filter runs ahead of authorization and
-   * answered first.
-   *
-   * <p>Growing the list per broken endpoint is what produced that shape. The pattern now matches
-   * the reason: the whole bearer-only API. {@code /internal/**} keeps its entry —
-   * machine-to-machine with its own shared-secret header, also cookie-less (REQ-SEC-022).
-   *
-   * <p>Package-private so {@code SecurityConfigCsrfExemptionTest} can pin it. The {@code test}
-   * profile disables CSRF outright so MockMvc can post, which means no {@code @SpringBootTest} in
-   * this repo exercises the production branch at all — that blind spot is why the gap shipped, and
-   * a test over this constant is the part of it that can be closed cheaply.
+   * Paths exempt from cookie-based CSRF, because this stateless chain authenticates only with a
+   * bearer JWT, which a browser never attaches by itself.
    */
   static final String[] CSRF_EXEMPT_PATHS = {"/api/v1/**", "/internal/**"};
 
   /**
-   * Cross-origin allowlist for the backend API. Empty by default: the backend is only addressed
-   * server-side from the Spring-Boot frontend (Thymeleaf SSR), so no direct browser-to-backend
-   * cross-origin traffic is expected, and any such call is rejected with HTTP 403. Override in
-   * environment-specific YAML when a real browser client on a different origin is introduced (e.g.
-   * a future mobile web app on https://mobile.profit-base.online).
+   * Cross-origin allowlist for the backend API; empty by default, so every cross-origin browser
+   * call is rejected with {@code 403}.
    */
   @Value("${app.cors.allowed-origin-patterns:}")
   private List<String> allowedOriginPatterns;
 
   /**
-   * Expected JWT {@code aud} (audience) values for the opt-in audience check (audit L-1). Empty by
-   * default → no audience enforcement: the resource server already validates signature, issuer and
-   * expiry, and the effective authority comes from realm roles, so requiring {@code aud} is a
-   * defense-in-depth knob an operator enables once they know the value their realm issues (a wrong
-   * value would reject every token). Set {@code app.security.jwt.expected-audiences} (comma-list)
-   * to the backend client / resource id to turn it on. Under the {@code prod} profile it is not
-   * optional: {@link JwtAudienceStartupCheck} refuses to start the context while it is blank
-   * (APPSEC-08), so "empty = off" holds only for dev, test and e2e.
+   * Expected JWT {@code aud} values for the opt-in audience check; empty disables it. Under the
+   * {@code prod} profile {@link JwtAudienceStartupCheck} refuses to start while it is blank.
    */
   @Value("${app.security.jwt.expected-audiences:}")
   private List<String> expectedAudiences;
 
   /**
-   * Custom resource-server {@link JwtDecoder}, created ONLY when at least one hardening knob is
-   * set: {@code app.security.jwt.expected-audiences} (opt-in {@code aud} enforcement, audit L-1)
-   * and/or {@code app.security.jwt.jwk-set-uri} (opt-in: fetch the JWKS from the INTERNAL Keycloak
-   * so token validation no longer hairpins through the public edge — REQ-SEC-024). When neither is
-   * set the bean is absent and Spring Boot's auto-configured, lazily-fetching decoder is used
-   * unchanged, so the default behaviour — including the {@code test} profile's unreachable
-   * placeholder issuer — is untouched (this is what keeps every {@code @SpringBootTest} that does
-   * not mock {@code JwtDecoder} green).
+   * Creates the resource-server {@link JwtDecoder} when an expected audience or an internal JWKS
+   * URL is configured (REQ-SEC-024); otherwise Spring Boot's auto-configured decoder is used.
    *
-   * <p>The validator chain is identical to the auto-config default plus the optional audience
-   * check: signature + issuer + timestamp via {@link JwtValidators#createDefaultWithIssuer(String)}
-   * — the {@code iss} claim is still validated against the PUBLIC issuer Keycloak stamps into
-   * tokens, so split-horizon JWKS (public {@code iss}, internal key fetch) is transparent — and the
-   * {@code aud} validator only when non-blank audiences are configured.
+   * <p>Validates signature, issuer and timestamps, plus {@code aud} when audiences are configured;
+   * {@code iss} is always checked against the public issuer.
    *
-   * @param issuerUri the configured Keycloak issuer location (used for {@code iss} validation)
-   * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer location as
-   *     before
-   * @param sslBundles the registered SSL bundles, consulted for the {@code keycloak-trust} pin when
-   *     an internal {@code jwkSetUri} is used
-   * @return a Nimbus decoder wired for the configured hardening knobs
+   * @param issuerUri the Keycloak issuer location used for {@code iss} validation
+   * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer
+   * @param sslBundles the SSL bundles holding the {@code keycloak-trust} pin
+   * @return a Nimbus decoder wired for the configured checks
    */
   @Bean
   @ConditionalOnExpression(
@@ -224,34 +156,22 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the underlying {@link NimbusJwtDecoder} for {@link #resourceServerJwtDecoder}. With a
-   * blank {@code jwkSetUri} it reproduces the auto-config exactly ({@link
-   * NimbusJwtDecoder#withIssuerLocation(String)}, an eager discovery fetch). With an internal
-   * {@code jwkSetUri} it fetches keys lazily from that URL over a {@link
-   * KeycloakTrustSupport}-pinned client so the self-signed internal Keycloak certificate is
-   * trusted; when no {@code keycloak-trust} bundle is registered (dev/test) it falls back to the
-   * default client, matching {@code KeycloakService}'s behaviour.
+   * Builds the {@link NimbusJwtDecoder} for {@link #resourceServerJwtDecoder}: issuer-location
+   * discovery for a blank {@code jwkSetUri}, otherwise a lazy key fetch from that URL over a {@link
+   * KeycloakTrustSupport}-pinned client, falling back to the default client without a {@code
+   * keycloak-trust} bundle.
    *
    * @param issuerUri the Keycloak issuer location
    * @param jwkSetUri the internal JWKS URL, or blank for issuer-location discovery
    * @param sslBundles the registered SSL bundles
-   * @return the Nimbus decoder (validators are attached by the caller)
+   * @return the Nimbus decoder, without validators
    */
-  // Package-private (not private) so SecurityConfigInternalJwksDecoderTest can assert the
-  // internal-JWKS path accepts a non-RS256 (ES256) token — the REQ-SEC-024 algorithm-set fix.
   static NimbusJwtDecoder buildDecoder(String issuerUri, String jwkSetUri, SslBundles sslBundles) {
     if (!StringUtils.hasText(jwkSetUri)) {
       return NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
     }
     NimbusJwtDecoder.JwkSetUriJwtDecoderBuilder builder =
         NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
-            // withJwkSetUri defaults to RS256-ONLY, whereas withIssuerLocation derives the accepted
-            // algorithm set from the live JWKS. Restore the full asymmetric set so enabling
-            // internal
-            // JWKS cannot 401 every token the moment the realm signs with PS*/ES* (REQ-SEC-024).
-            // SignatureAlgorithm carries only asymmetric algorithms (no HMAC), so widening it
-            // cannot
-            // open an algorithm-confusion attack — the signature is still verified against the JWK.
             .jwsAlgorithms(
                 algorithms -> algorithms.addAll(EnumSet.allOf(SignatureAlgorithm.class)));
     ClientHttpRequestFactory trusted =
@@ -264,14 +184,11 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the {@code aud}-claim validator (audit L-1): a token passes only when its {@code aud}
-   * list intersects {@code expectedAudiences}. Package-private + static so it is unit-testable
-   * without a Spring context.
+   * Builds the {@code aud}-claim validator: a token passes only when its {@code aud} list
+   * intersects {@code expectedAudiences}.
    *
-   * @param expectedAudiences the accepted audience values; never {@code null} (an empty set matches
-   *     no token).
-   * @return an {@link OAuth2TokenValidator} that errors unless the JWT's {@code aud} intersects the
-   *     expected set.
+   * @param expectedAudiences the accepted audience values; an empty list matches no token
+   * @return a validator that fails unless the JWT's {@code aud} intersects the expected set
    */
   @NotNull
   static OAuth2TokenValidator<Jwt> audienceValidator(List<String> expectedAudiences) {
@@ -301,16 +218,11 @@ public class SecurityConfig {
   }
 
   /**
-   * Wires the project's {@code CustomJwtGrantedAuthoritiesConverter} into Spring Security's
-   * standard {@link JwtAuthenticationConverter}, so every authenticated request sees the merged
-   * authority set (Keycloak realm roles + DB-flag-derived roles). The parameter is typed as the
-   * Spring {@link Converter} interface rather than the concrete {@code service}-package bean, so
-   * this {@code config} class does not depend on the {@code service} layer (which would close a
-   * {@code config} &harr; {@code service} package cycle); Spring still injects the single matching
-   * bean by type.
+   * Wires the project's authorities converter into a {@link JwtAuthenticationConverter}, so every
+   * authenticated request carries Keycloak realm roles plus the DB-flag-derived roles.
    *
    * @param customConverter the project-specific authorities converter bean
-   * @return wired {@code JwtAuthenticationConverter}
+   * @return the wired {@code JwtAuthenticationConverter}
    */
   @NotNull
   @Bean
@@ -322,13 +234,9 @@ public class SecurityConfig {
   }
 
   /**
-   * The window the {@code NO_ROLE} refusals are counted into, published as {@link
-   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}.
-   *
-   * <p>Same shape and same 15-minute window as {@link #refusedSubjectWindow(MeterRegistry)}, and a
-   * separate instance on purpose: the two answer different questions and one member can be in both
-   * (a role-less account that has also not accepted the terms), so sharing a window would report
-   * them as one population.
+   * The 15-minute window of distinct subjects refused with {@code NO_ROLE}, published as {@link
+   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}; separate from the consent window because one member can
+   * be in both populations.
    *
    * @param meterRegistry the registry the gauge is published to
    * @return the window the role gate records refusals into
@@ -344,14 +252,8 @@ public class SecurityConfig {
   }
 
   /**
-   * The sliding window of distinct subjects the consent gate refused, published as the {@code
-   * basetool_terms_refused_subjects} gauge (REQ-SEC-028, REQ-OBS-011).
-   *
-   * <p>15 minutes is chosen against the alert that reads it: long enough that a member who is
-   * refused, reads the terms and takes a while to decide stays counted throughout, short enough
-   * that the series falls back to zero within one scrape window of a rollout completing. The 5 000
-   * cap is roughly two orders of magnitude above the membership — it exists so an
-   * internet-reachable refusal path cannot grow the map without bound, not as a functional limit.
+   * The 15-minute sliding window of distinct subjects the consent gate refused, published as the
+   * {@code basetool_terms_refused_subjects} gauge (REQ-SEC-028) and capped at 5 000 entries.
    *
    * @param meterRegistry the registry the gauge is published to
    * @return the window the consent filter records refusals into
@@ -367,34 +269,20 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the main {@link SecurityFilterChain}: CSRF policy (profile-dependent), CORS source,
-   * security response headers (CSP, X-Frame-Options, Referrer-Policy, Permissions-Policy,
-   * X-Content-Type-Options), the request-authorization matrix and JWT resource-server activation.
+   * Builds the main {@link SecurityFilterChain}: CSRF policy, CORS, security response headers, the
+   * profile-independent request-authorization matrix and the JWT resource server.
    *
-   * <p>The matrix is profile-independent — same rules for {@code dev} and {@code prod}. Public
-   * endpoints (master data, mission-search, guest mission editing) are listed explicitly; every
-   * unlisted request falls through to {@code anyRequest().authenticated()}.
-   *
-   * @param http Spring Security builder
-   * @param jwtAuthenticationConverter wired by {@link #jwtAuthenticationConverter}
-   * @param env active environment, used to detect the {@code test} profile — which disables CSRF
-   *     for MockMvc tests and stands the consent gate down unless {@link #TERMS_GATE_ARMED_IN_TEST}
-   *     re-arms it
-   * @param securityProblemResponseHandler renders filter-level 401/403 as RFC&nbsp;7807
-   *     problem+json (wired as both the entry point and the access-denied handler)
-   * @param messageSource localizes the 403 problem bodies of the three refusing filters ({@code
-   *     PendingApprovalAccessFilter}, {@code TermsAcceptanceAccessFilter}, {@code
-   *     ActingMemberFilter})
-   * @param problemResponseFactory assembles the RFC&nbsp;7807 problem body for those filters
-   * @param objectMapper serializes those filters' {@code ProblemDetail}s to JSON
-   * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
-   *     basetool_http_error_total} (REQ-OBS-011)
-   * @param noRoleRefusedSubjectWindow the distinct-subject window {@code
-   *     PendingApprovalAccessFilter} records its {@code NO_ROLE} refusals into; a separate instance
-   *     from the consent one, because a member can be in both populations at once
-   * @param clientAttribution bounds the {@code client_id} label of {@code
-   *     basetool_api_client_requests_total} (A8, REQ-OBS-018) — the same mapping the audit trail's
-   *     client column records (REQ-AUDIT-005)
+   * @param http the Spring Security builder
+   * @param jwtAuthenticationConverter the converter from {@link #jwtAuthenticationConverter}
+   * @param env the environment; the {@code test} profile disables CSRF and stands the consent gate
+   *     down unless {@link #TERMS_GATE_ARMED_IN_TEST} re-arms it
+   * @param securityProblemResponseHandler renders filter-level 401/403 as problem+json
+   * @param messageSource localizes the 403 bodies of the refusing filters
+   * @param problemResponseFactory assembles the RFC&nbsp;7807 body for those filters
+   * @param objectMapper serializes those filters' {@code ProblemDetail}s
+   * @param meterRegistry counts the identity-provider-unavailable 503
+   * @param noRoleRefusedSubjectWindow the window the {@code NO_ROLE} refusals are recorded into
+   * @param clientAttribution bounds the {@code client_id} label of the API client request counter
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -419,50 +307,21 @@ public class SecurityConfig {
 
     boolean isTest = env.matchesProfiles("test");
 
-    // REQ-SEC-028: the consent boundary is ARMED BY DEFAULT and stood down only under the `test`
-    // profile, mirroring the CSRF carve-out below. The alternative — a property that must be set to
-    // switch it on — was rejected: it ships a gate that looks armed and is not, which is the exact
-    // failure TermsVersionProvider refuses to start for. MockMvc callers authenticate as synthetic
-    // subjects that have no acceptance row and could not create one, so leaving it armed would
-    // 403 roughly 120 pre-existing tests without testing anything about consent;
-    // TermsAcceptanceAccessFilterTest drives the real filter directly instead.
-    // NOTE: this carve-out is `test`-only. The E2E profile is NOT `test`, so the gate is live
-    // there and E2E users must actually accept.
-    // ...with one opt-in escape hatch, because the stand-down had a cost that only showed up
-    // later: no test could observe the gate at all, so when the acting-member identity swap
-    // (ADR-0129) made TermsAcceptanceAccessFilter fail OPEN on the ingest path, the whole suite
-    // stayed green. A test class that is specifically about the consent boundary re-arms it for
-    // itself. This cannot weaken production: outside the `test` profile the gate is armed
-    // unconditionally, and the property is read only when `isTest` already holds.
     boolean armed =
         !isTest || env.getProperty(TERMS_GATE_ARMED_IN_TEST, Boolean.class, Boolean.FALSE);
     TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : userId -> true;
 
     if (isTest) {
-      // CSRF is intentionally disabled in the `test` Spring profile so MockMvc
-      // tests can POST without first acquiring a CSRF cookie. The production
-      // path (the `else` branch below) keeps cookie-based CSRF enabled with
-      // explicit `ignoringRequestMatchers(...)` only for the JWT-bearer-token
-      // API endpoints under `/api/v1/**`, which are protected by JWT auth
-      // and have no session cookie to attack. The test profile is gated by
-      // Spring profile activation and is never enabled in deployed environments.
-      // lgtm[java/spring-disabled-csrf-protection]
       http.csrf(
           org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer
               ::disable);
     } else {
-      // L-2: pin the CSRF cookie's Secure + SameSite attributes explicitly. Spring's default
-      // CookieCsrfTokenRepository does not set SameSite, leaving the browser to fall back to
-      // {@code Lax}; pinning {@code Strict} aligns the XSRF cookie with the session cookie
-      // (see frontend application*.yml `server.servlet.session.cookie.same-site: strict`).
       CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
       csrfRepo.setCookieCustomizer(c -> c.sameSite("Strict").secure(true));
       http.csrf(
           csrf ->
               csrf.csrfTokenRepository(csrfRepo)
                   .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                  // The reason each pattern is here, and what a per-endpoint list cost,
-                  // are on CSRF_EXEMPT_PATHS. Do not narrow it back to individual paths.
                   .ignoringRequestMatchers(CSRF_EXEMPT_PATHS));
     }
 
@@ -470,18 +329,6 @@ public class SecurityConfig {
         .headers(
             headers -> {
               headers.contentSecurityPolicy(
-                  // The backend is a pure JSON resource server — it serves no HTML, scripts,
-                  // styles, images or fonts of its own (enforced by the ArchUnit "no HTML" rules
-                  // and the removal of Swagger UI). The earlier policy relaxed {@code style-src}
-                  // with {@code 'unsafe-inline'} and allowed {@code data:} img/font sources purely
-                  // so the bundled Swagger UI rendered; with that gone the policy locks down to
-                  // {@code default-src 'none'}, which makes every fetch directive
-                  // (script/style/img/font/connect/object) inherit {@code 'none'} — nothing can be
-                  // loaded into a (would-be) document context. {@code frame-ancestors 'none'}
-                  // mirrors X-Frame-Options DENY; {@code base-uri 'none'} and {@code form-action
-                  // 'none'} are defence-in-depth against an injected {@code <base>}/{@code <form>}.
-                  // {@code upgrade-insecure-requests} is dropped: there are no sub-resources left
-                  // to upgrade.
                   csp ->
                       csp.policyDirectives(
                           "default-src 'none'; frame-ancestors 'none'; base-uri 'none';"
@@ -489,10 +336,6 @@ public class SecurityConfig {
               headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
               headers.referrerPolicy(
                   ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
-              // M-12: Cross-Origin-Opener-Policy + Cross-Origin-Resource-Policy. COOP isolates
-              // the browsing-context group so a popup cannot reach back via {@code window.opener}
-              // (OAuth-redirect timing attacks etc.); CORP prevents cross-origin embedding via
-              // {@code <img src=…>} / {@code <script src=…>}.
               headers.crossOriginOpenerPolicy(
                   coop ->
                       coop.policy(
@@ -505,17 +348,11 @@ public class SecurityConfig {
                           org.springframework.security.web.header.writers
                               .CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy
                               .SAME_ORIGIN));
-              // Audit finding H-9: explicit HSTS. Spring Security's default writer only emits the
-              // header when {@code request.isSecure()} is true; behind a reverse proxy without
-              // forward-headers configuration that check silently disables HSTS. Setting it here
-              // makes the policy explicit and independent of the request-scoped scheme detection.
               headers.httpStrictTransportSecurity(
                   hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
               headers.addHeaderWriter(
                   new StaticHeadersWriter(
                       "Permissions-Policy",
-                      // L-3: explicit deny for every browser feature the app does not use, so
-                      // an injected iframe / shared context cannot opt-in.
                       "geolocation=(), camera=(), microphone=(), fullscreen=(),"
                           + " payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(),"
                           + " gyroscope=(), magnetometer=(), display-capture=(),"
@@ -524,118 +361,22 @@ public class SecurityConfig {
             })
         .authorizeHttpRequests(
             auth ->
-                // Spring's error dispatch. It carries no data of its own and must stay
-                // reachable, or a refusal cannot render its own problem body.
                 auth.requestMatchers("/error")
                     .permitAll()
-                    // Swagger UI has been removed from the project (springdoc -api starter, no
-                    // -ui). Only the raw OpenAPI document is served at /v3/api-docs, and only in
-                    // non-prod profiles: the prod profile sets springdoc.api-docs.enabled=false so
-                    // this matcher resolves to a 404 there. The committed openapi.json remains the
-                    // single source of API documentation.
-                    //
-                    // REQ-SEC-052: it is no longer permitAll. The document enumerates every path,
-                    // parameter and DTO field of the whole API — the most efficient description of
-                    // the attack surface the project can produce — and it was readable without a
-                    // token on any profile that serves it. Being a 404 in prod is a deployment
-                    // property, not an access rule, and this file is where the access rule belongs.
-                    //
-                    // Both spellings, because springdoc registers two handlers for one document:
-                    // /v3/api-docs and /v3/api-docs.yaml. `**` spans whole segments, so the pattern
-                    // that has stood here since the permitAll days never matched the YAML variant —
-                    // it fell through to the catch-all and was merely authenticated, which is not
-                    // what the line next to it claims. `*` matches within the segment and closes
-                    // it.
                     .requestMatchers("/v3/api-docs*", "/v3/api-docs/**")
                     .hasRole(Roles.ADMIN)
-                    // Spring Boot Actuator health endpoint, used by Docker HEALTHCHECK and by
-                    // docker-compose `depends_on: condition: service_healthy`. Other actuator
-                    // endpoints stay behind authentication (the `anyRequest().authenticated()`
-                    // catch-all below, tightened to ROLE_ADMIN for the mutating loggers POST — see
-                    // the next matcher). `management.endpoint.health.show-details=never` keeps the
-                    // response to `{"status":"UP"}` so no internal details leak.
                     .requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
-                    // REQ-OBS-016: `loggers` is exposed so a log level can be raised at RUNTIME
-                    // during an incident, and its POST variant MUTATES that level. Where Actuator
-                    // lives depends on the profile. In prod it is on a dedicated, internal-only
-                    // management port, 11271 (`management.server.port`, application-prod.yml,
-                    // ADR-0134), and a 404 on the 11261 application connector. On that port
-                    // ManagementPortSecurityConfig's @Order(0) chain permits ONLY an enumerated
-                    // read list (health, health/**, prometheus, info) without credentials; every
-                    // other management path, `loggers` included, falls through to THIS chain. In
-                    // dev/test/e2e there is no management port and Actuator rides the application
-                    // connector. Either way, without this rule the write would reach
-                    // `anyRequest().authenticated()` below and ANY valid realm JWT could set the
-                    // ROOT logger to TRACE, which makes Spring Security / the HTTP clients write
-                    // bearer tokens and request bodies into a log stream retained for 744 h. Only
-                    // the mutator is gated; the read (GET /actuator/loggers) stays on the
-                    // authenticated catch-all. Frontend and ingest permit all of /actuator/** on
-                    // their UNAUTHENTICATED management port, where no identity exists to gate on,
-                    // so there the write is removed instead
-                    // (`management.endpoint.loggers.access: read-only`, prod profile only).
                     .requestMatchers(HttpMethod.POST, "/actuator/loggers/**")
                     .hasRole(Roles.ADMIN)
-                    // Internal machine-to-machine endpoints (REQ-SEC-022): the Keycloak Discord SPI
-                    // calls /internal/discord/account-existence during first-broker-login. It bears
-                    // no JWT (Keycloak is outside the resource-server trust boundary), so it must
-                    // be
-                    // permitAll here and bypass the /api/** rate-limiter +
-                    // PendingApprovalAccessFilter;
-                    // the controller enforces its own constant-time shared-secret header instead.
                     .requestMatchers("/internal/**")
                     .permitAll()
-                    // ADR-0138 / REQ-SEC-028: the Terms-of-Use WORDING is anonymous, while
-                    // /api/v1/terms/status and /acceptance below it stay authenticated. A document
-                    // everyone must be able to read before agreeing to anything cannot require
-                    // having agreed, and the identical text is already world-readable at /terms on
-                    // the web frontend, so this publishes nothing new -- it stops the app from
-                    // needing its own drifting copy. Ordering matters: Spring Security takes the
-                    // FIRST matching rule, so this exact path must stay above any broader
-                    // /api/v1/terms rule and above the authenticated catch-all.
                     .requestMatchers(HttpMethod.GET, "/api/v1/terms/document")
                     .permitAll()
-                    // REQ-API-010 / REQ-SEC-037: the served-version floor for the Android
-                    // app, anonymous by owner decision (2026-08-24) and the single exception to
-                    // the vhost's no-anonymous-paths stance (plan Q8). A version gate that only
-                    // answers after a successful login is silent in exactly the case it exists
-                    // for: when the break is in the auth flow, the old build cannot log in and
-                    // would show an authentication error instead of "Update erforderlich".
-                    // It carries three integers and a public release URL -- no caller identity
-                    // goes in and none comes out. Same ordering rule as the line above: it must
-                    // stay ahead of any broader /api/v1/app rule and the authenticated catch-all.
                     .requestMatchers(HttpMethod.GET, "/api/v1/app/version-policy")
                     .permitAll()
-                    // Everything from here down is a TIGHTENING of the authenticated catch-all,
-                    // never a widening. REQ-SEC-052 / ADR-0159: the five matcher families that used
-                    // to sit here — the ten-family catalogue block on all verbs, the five mission
-                    // GET rules, the mission POST, the twelve participant write patterns and
-                    // `GET /api/v1/org-units/active` — are gone, and with them the anonymous API
-                    // surface. What replaced them is nothing: they fall through to
-                    // `anyRequest().authenticated()` at the bottom of this matrix.
-                    //
-                    // Several `authenticated()` entries went with them. They existed to carve a
-                    // path back OUT of a permitAll block sitting below them — the two REQ-SEC-032
-                    // material price paths and the three ADR-0149 order/finance writes — and with
-                    // the block gone they restated the catch-all. A matrix in which most entries
-                    // say what the catch-all already says cannot be read against REQ-SEC-052's
-                    // table, which is the whole point of writing that requirement down. Their
-                    // history is in ADR-0149 and ADR-0159; their behaviour is pinned by
-                    // `AnonymousSurfaceSweepTest`, which asserts the status of EVERY mapping rather
-                    // than trusting this file to be complete.
-                    // The slim picker search (BE-PERF-06) is the same query with a reference
-                    // projection, so it carries exactly its full-DTO twin's gate; likewise the
-                    // bank twin below.
                     .requestMatchers("/api/v1/users/search", "/api/v1/users/search/references")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    // Bank-audience search twin (ADR-0089, the #1193 remoteSource switch): the bank
-                    // pickers (register holder, grant Bank-Employee role, approval limits) resolve
-                    // candidates across the whole user base and must stay reachable for a bank
-                    // employee/manager who holds no org-role (REQ-BANK-008/009/044) — same widening
-                    // as /lookup, and the same squadron scope. Kept off /search so the ordinary
-                    // picker's gate is unchanged. BANK_EMPLOYEE covers BANK_MANAGEMENT via the role
-                    // hierarchy; both are listed so the URL gate does not depend on hierarchy
-                    // evaluation at the filter layer.
                     .requestMatchers(
                         "/api/v1/users/search-bank", "/api/v1/users/search-bank/references")
                     .hasAnyRole(
@@ -644,14 +385,6 @@ public class SecurityConfig {
                         Roles.KRT_MEMBER,
                         Roles.BANK_MANAGEMENT,
                         Roles.BANK_EMPLOYEE)
-                    // Bank widening (REQ-BANK-009 grants, REQ-BANK-044 deposit/withdrawal
-                    // counterparty): bank staff resolve grantees and the Einzahler/Empfänger via
-                    // the
-                    // user lookup and need not hold any org-role (REQ-BANK-008). BANK_EMPLOYEE
-                    // covers
-                    // BANK_MANAGEMENT via the role hierarchy; both are listed so the URL gate does
-                    // not
-                    // depend on hierarchy evaluation at the filter layer.
                     .requestMatchers("/api/v1/users/lookup")
                     .hasAnyRole(
                         Roles.ADMIN,
@@ -665,34 +398,8 @@ public class SecurityConfig {
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    // Attribute edits are admin-only since the Phase-4 lockdown
-                    // (docs/archive/MULTI_SQUADRON_PLAN.md section 2), matching the
-                    // method-level @PreAuthorize on UserController#updateUserAttributes. Two
-                    // sibling matchers for PATCH .../logistician and .../mission-manager stood here
-                    // until 2026-09-22; those endpoints were removed when the flags moved
-                    // onto the per-Staffel membership row
-                    // (PATCH /api/v1/squadrons/{id}/members/{userId}), so the matchers
-                    // guarded URLs nothing serves. The catch-all /api/v1/users/** below
-                    // still answers them ADMIN-only, which
-                    // SecurityConfigLegacyUserFlagRoutesTest pins.
                     .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
                     .hasRole(Roles.ADMIN)
-                    // GET .../memberships is the picker read variant
-                    // (docs/archive/SPEZIALKOMMANDO_PLAN.md section 7.4) — it returns only OrgUnit
-                    // names + shorthands, no PII. The frontend's OrgUnitContextAdvice (sidebar
-                    // switcher + area-context chip) and the R5.d owner-picker fragments read it
-                    // for every authenticated caller. Without this explicit rule the URL falls
-                    // into the catch-all `/api/v1/users/**` below — which is `hasRole("ADMIN")`
-                    // and caused a 403 for non-admins on their own memberships lookup (the
-                    // sidebar chip then showed "Kein Bereichskontext"). The method-level
-                    // @PreAuthorize on UserController#getUserMemberships is the second line of
-                    // defence (defence in depth) and stays the source of truth for the allowed
-                    // roles — the URL rule only opens the gate.
-                    // BANK_EMPLOYEE widening (REQ-BANK-044): the deposit/withdrawal counterparty
-                    // org-unit picker resolves the chosen user's memberships here; a bank employee
-                    // need not hold any org-role (REQ-BANK-008). BANK_EMPLOYEE covers
-                    // BANK_MANAGEMENT
-                    // via the role hierarchy.
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*/memberships")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE)
                     .requestMatchers("/api/v1/users/**")
@@ -725,23 +432,12 @@ public class SecurityConfig {
                     .authenticated()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole(Roles.ADMIN)
-                    // Bank admin carve-out (REQ-BANK-010/-012): wipe reset and the audit log are
-                    // URL-gated to ADMIN on top of the method-level @PreAuthorize — bank
-                    // management explicitly does NOT pass. The rest of /api/v1/bank/** rides the
-                    // authenticated() catch-all plus the BankSecurityService method gates.
                     .requestMatchers("/api/v1/bank/admin/**")
                     .hasRole(Roles.ADMIN)
-                    // Activity audit logs (REQ-AUDIT-001, ADR-0037): the per-area viewer and PDF
-                    // export are URL-gated to ADMIN on top of the method-level @PreAuthorize.
                     .requestMatchers("/api/v1/audit/**")
                     .hasRole(Roles.ADMIN)
                     .anyRequest()
                     .authenticated())
-        // RFC-7807 hardening (REQ-API-004 / REQ-SEC): route filter-level 401/403 through the same
-        // problem+json handler the rest of the API uses. The global exceptionHandling entry point
-        // covers the no-token / anonymous case; the resource-server overrides cover the
-        // bearer-token-rejected case (Spring installs its own bare-401 entry point there
-        // otherwise).
         .exceptionHandling(
             ex ->
                 ex.authenticationEntryPoint(securityProblemResponseHandler)
@@ -752,38 +448,6 @@ public class SecurityConfig {
                     .authenticationEntryPoint(securityProblemResponseHandler)
                     .accessDeniedHandler(securityProblemResponseHandler)
                     .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
-        // REQ-SEC-017 (PR review #1): a PENDING/REJECTED registration is authenticated but carries
-        // only ROLE_PENDING_APPROVAL; this filter 403s it on every /api/** endpoint (except the
-        // registration-status read) so the "no access until approved" guarantee holds at the
-        // backend
-        // boundary, not just via the frontend redirect. Placed after the bearer-token filter so the
-        // authorities are already assembled. Emits an RFC-7807 problem+json body with a minted
-        // correlationId (it runs before CorrelationIdFilter) — RFC-7807 hardening.
-        // ADR-0129: replace the security identity with the member an ingest gateway is acting for,
-        // BEFORE the two person-gates below. They must judge the person who is sending, exactly as
-        // they did while the gateway still relayed that person's token — otherwise consent
-        // (REQ-SEC-028) and approval (REQ-SEC-017) would be evaluated against a service account and
-        // the ingest path would silently stop enforcing either. Runs immediately after the
-        // bearer-token filter, which is the first point at which there IS a caller to check.
-        // A8 / REQ-OBS-018: attribute every authenticated API request to its client software.
-        // The window is narrow and both edges matter. AFTER BearerTokenAuthenticationFilter,
-        // because before it there is no SecurityContext and the filter would see every request as
-        // anonymous — and it skips those silently, so the metric would simply stay empty
-        // (measured: no series at all in production between 2026-08-18 and this fix). BEFORE
-        // ActingMemberFilter, because that filter swaps an on-behalf-of call's authentication for
-        // an ActingMemberAuthentication which carries no claims, so a gateway request observed
-        // after it would count as anonymous too. Ahead of the refusing gates for a third reason: a
-        // client must not be able to hide from the counter behind its own 403s and 429s.
-        //
-        // Expressed as addFilterAfter on the bearer filter — the SAME anchor ActingMemberFilter
-        // uses — and registered FIRST, which is what puts it between the two. Measured, not
-        // reasoned: with two addFilterAfter calls naming one anchor, the earlier registration ends
-        // up earlier (registering this one second placed it at 10, behind ActingMemberFilter at 9).
-        // Do not "simplify" this to addFilterBefore(…, ActingMemberFilter.class): that spelling
-        // reads as if it did the same and instead lands the filter at the bearer filter's own slot
-        // — position 8 ahead of the bearer filter at 9, i.e. before there is any SecurityContext,
-        // which is exactly how the counter shipped dead. ApiClientMetricsChainTest pins both edges
-        // now; each wrong variant above fails it.
         .addFilterAfter(
             new ApiClientMetricsFilter(clientAttribution, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
@@ -806,13 +470,6 @@ public class SecurityConfig {
                 meterRegistry,
                 noRoleRefusedSubjectWindow),
             ActingMemberFilter.class)
-        // REQ-SEC-028: refuse the API until the Terms of Use are accepted. Enforced HERE rather
-        // than only in the frontend because the backend is the one place every caller passes
-        // through — the web UI and, since ActingMemberFilter above makes the gateway's call carry
-        // the sending member's identity (ADR-0129), the desktop extractor. Placed AFTER the
-        // pending-approval filter so a
-        // user who is both pending and unconsented gets the approval message, which is the one
-        // they can actually act on.
         .addFilterAfter(
             new TermsAcceptanceAccessFilter(
                 effectiveConsentCheck,
@@ -822,21 +479,6 @@ public class SecurityConfig {
                 meterRegistry,
                 refusedSubjectWindow),
             PendingApprovalAccessFilter.class)
-        // A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API. The per-IP
-        // limiter ahead of the chain bounds a network position, which is the wrong unit in both
-        // directions — CGNAT puts many members behind one address, and an address pool escapes it
-        // entirely. Placed after the gates above so a pending or unconsented caller is refused on
-        // its own terms rather than spending a token first.
-        //
-        // Re-anchored on TermsAcceptanceAccessFilter by ADR-0159. It used to hang off
-        // AnonymousPageSizeFilter, which bounded the page size an unauthenticated caller could ask
-        // for (REQ-SEC-032) and is gone with the anonymous surface itself — there is no
-        // unauthenticated caller left on any paginated path to bound. The anchor was doing real
-        // work beyond ordering: two addFilterAfter calls naming ONE anchor end up reversed, so
-        // naming the page-size filter is what stated this filter's position instead of leaving it
-        // to registration order. TermsAcceptanceAccessFilter now has exactly one filter after it,
-        // so the hazard is not live — SecurityFilterChainOrderTest pins the order regardless,
-        // because "not live" is a property of today's registrations and not of this line.
         .addFilterAfter(
             new SubjectRateLimitingFilter(
                 rateLimitProperties,
@@ -845,36 +487,21 @@ public class SecurityConfig {
                 objectMapper,
                 meterRegistry),
             TermsAcceptanceAccessFilter.class)
-        // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /
-        // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
-        // AuthenticationServiceException and re-map it to a retryable 503 instead of the opaque 500
-        // it produces by default. Installed BEFORE the bearer-token filter so its try/catch wraps
-        // that filter's execution; a genuine 401/403 never reaches it. WARN-logged and counted so a
-        // Keycloak blip does not masquerade as an application error (LogbackErrorSpike).
         .addFilterBefore(
             new IdentityProviderUnavailableFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
-        // L-11: backend is a pure JWT-bearer resource server — no HTTP session needed for any
-        // endpoint. Pinning STATELESS makes the contract explicit: a future bug that introduces
-        // {@code @SessionAttributes} or {@code request.getSession(true)} on a permitAll POST is
-        // caught at startup rather than silently creating a session per anonymous caller.
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
     return http.build();
   }
 
   /**
-   * Per-environment CORS configuration.
+   * Builds the CORS source from {@code app.cors.allowed-origin-patterns}, with credentials never
+   * allowed.
    *
-   * <p>The allowed origin patterns come from {@code app.cors.allowed-origin-patterns} — empty by
-   * default because the only legitimate caller is the Spring-Boot frontend running server-side, NOT
-   * a browser. {@code allowCredentials=false} is intentional and load-bearing: combined with a
-   * future misconfigured wildcard origin list it would be the difference between a 403 and a CSRF
-   * exposure across the entire API.
-   *
-   * @return CORS source applied to all paths
+   * @return the CORS source applied to all paths
    */
   @NotNull
   @Bean
@@ -891,10 +518,6 @@ public class SecurityConfig {
             "X-Correlation-Id",
             "X-Requested-With",
             "X-XSRF-TOKEN"));
-    // Credentials are intentionally disabled. The backend does not authenticate
-    // browsers directly; the frontend exchanges tokens server-side and proxies
-    // every request. Allowing credentials here would magnify the impact of any
-    // future origin-list misconfiguration (open-CORS-with-credentials).
     configuration.setAllowCredentials(false);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

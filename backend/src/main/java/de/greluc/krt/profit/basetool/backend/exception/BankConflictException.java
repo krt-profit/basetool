@@ -30,24 +30,12 @@ import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.HttpStatus;
 
 /**
- * Bank-domain state conflict carrying its own <em>stable problem code</em> (epic #556). Unlike the
- * generic {@link BusinessConflictException} (always {@code BUSINESS_CONFLICT}), the bank spec
- * mandates distinguishable 409 codes — {@code BANK_OVERDRAFT}, {@code BANK_ACCOUNT_NOT_EMPTY},
- * {@code BANK_ACCOUNT_CLOSED}, {@code BANK_GRANTEE_MISSING_ROLE}, … — so the frontend can render a
- * specific inline field error (e.g. the overdraft hint at the amount input, K1 mockup) instead of a
- * generic toast.
+ * Bank-domain state conflict carrying its own stable problem code, one of the {@code CODE_BANK_*}
+ * constants, so the frontend can render a specific inline error.
  *
- * <p>Mapped to HTTP {@code 409 Conflict} by {@link GlobalExceptionHandler}'s generic {@code
- * AppException} dispatch handler; the {@link #code} is surfaced as the RFC 7807 {@code code}
- * extension property and the optional {@link #properties} are copied onto the problem response so
- * clients can localize parameterized messages (available balance, account number, holder handle)
- * without parsing the human-readable {@code detail}.
- *
- * <p>Unlike its seven {@link AppException} siblings, this exception's {@link #code()}, {@link
- * #titleKey()}, {@link #detailKey()} and {@link #typeSuffix()} are <b>not</b> a fixed per-type
- * {@link AppExceptionKind} constant — each instance picks its own {@link #code} from one of the
- * {@code CODE_BANK_*} constants below, so the abstract accessors are computed from that field
- * instead of delegated to an enum.
+ * <p>Mapped to HTTP {@code 409}; the {@link #code} becomes the RFC 7807 {@code code} and the
+ * optional {@link #properties} are copied onto the problem response. The accessors are computed
+ * from the per-instance code rather than delegated to an {@link AppExceptionKind}.
  */
 @Getter
 public final class BankConflictException extends AppException {
@@ -56,9 +44,8 @@ public final class BankConflictException extends AppException {
   public static final String CODE_BANK_OVERDRAFT = "BANK_OVERDRAFT";
 
   /**
-   * Retired since ADR-0039: holder balances are now a global dimension allowed to go negative
-   * (REQ-BANK-006), so no booking path checks holder coverage. The constant is kept for backward
-   * reference; it is no longer thrown.
+   * Holder overdraft; never thrown, because holder balances may go negative (REQ-BANK-006,
+   * ADR-0039).
    */
   public static final String CODE_BANK_HOLDER_OVERDRAFT = "BANK_HOLDER_OVERDRAFT";
 
@@ -98,11 +85,8 @@ public final class BankConflictException extends AppException {
   public static final String CODE_BANK_REQUEST_NOT_PENDING = "BANK_REQUEST_NOT_PENDING";
 
   /**
-   * Edit attempt by the requester on a booking request whose responsible holder has already granted
-   * the over-limit approval (REQ-BANK-056). The approval was given for the amount and reason <em>as
-   * they stood</em>, so letting the requester change them afterwards would turn a small approved
-   * request into an arbitrarily large pre-approved one — an approval-gate bypass, not a correction.
-   * The requester's route is to cancel and re-raise.
+   * Edit attempt by the requester on a booking request whose over-limit approval was already
+   * granted (REQ-BANK-056); the requester must cancel and re-raise instead.
    */
   public static final String CODE_BANK_REQUEST_ALREADY_APPROVED = "BANK_REQUEST_ALREADY_APPROVED";
 
@@ -121,14 +105,9 @@ public final class BankConflictException extends AppException {
   public static final String CODE_BANK_OWNER_APPROVAL_REQUIRED = "BANK_OWNER_APPROVAL_REQUIRED";
 
   /**
-   * Direct withdrawal/transfer leaving the KRT ({@code CARTEL}) account by a plain bank employee
-   * for an amount above the bank-employee approval ceiling T1 — the money must instead go through
-   * the booking-request → external-approval flow (Bankleitung / Organisationsleitung). Retained in
-   * the error vocabulary, but since ADR-0109 the direct-booking controller no longer
-   * <em>throws</em> this: it silently files the over-ceiling attempt as a {@code PENDING} approval
-   * request and answers {@code 202} instead (see {@code
-   * BankBookingGuards#exceedsCartelDirectBookingCeiling}). Management and admins are unrestricted
-   * (REQ-BANK-047).
+   * Direct booking out of the KRT ({@code CARTEL}) account by a plain bank employee above the
+   * ceiling T1 (REQ-BANK-047). Not thrown: the direct-booking controller files such an attempt as a
+   * {@code PENDING} approval request and answers {@code 202} (ADR-0109).
    */
   public static final String CODE_BANK_CARTEL_APPROVAL_REQUIRED = "BANK_CARTEL_APPROVAL_REQUIRED";
 
@@ -155,9 +134,9 @@ public final class BankConflictException extends AppException {
   public static final String CODE_BANK_JUSTIFICATION_REQUIRED = "BANK_JUSTIFICATION_REQUIRED";
 
   /**
-   * Fee-inclusive withdrawal/transfer (REQ-BANK-033, #999) whose entered amount does not exceed the
-   * in-game fee, so nothing would arrive at the recipient/destination ({@code amount - fee <= 0}).
-   * Raise the amount. Never thrown in the default on-top fee mode.
+   * Fee-inclusive withdrawal/transfer (REQ-BANK-033) whose amount does not exceed the in-game fee,
+   * so nothing would arrive ({@code amount - fee <= 0}). Never thrown in the default on-top fee
+   * mode.
    */
   public static final String CODE_BANK_FEE_EXCEEDS_AMOUNT = "BANK_FEE_EXCEEDS_AMOUNT";
 

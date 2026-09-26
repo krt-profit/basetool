@@ -39,16 +39,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages a job order's assignees — the members who have signed up to work the order — and their
- * per-assignee free-text notes. Extracted from {@code JobOrderService} (L2, #921) so the assignee
- * concern lives on its own, behind the same logic verbatim.
+ * Manages a job order's assignees and their per-assignee notes.
  *
- * <p>Each write flushes explicitly so the returned DTO carries fresh versions; the note edit is
- * optimistic-locked on the assignee edge's own {@code @Version} (via {@link OptimisticLock}), so a
- * stale note edit surfaces as HTTP 409 without ever bumping the parent order's version. The order
- * is projected back to a DTO through the shared {@link JobOrderStockProjectionService}. {@code
- * JobOrderService} keeps its public assignee methods as thin delegations, so the controller and
- * transaction boundaries are unchanged.
+ * <p>Writes flush so returned DTOs carry fresh versions; note edits are locked on the assignee
+ * edge's own {@code @Version} via {@link OptimisticLock}, never bumping the order's version.
  */
 @Service
 @RequiredArgsConstructor
@@ -67,12 +61,11 @@ public class JobOrderAssigneeService {
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
 
   /**
-   * Adds a user as an assignee of a job order (idempotent: a repeated add returns the current
-   * state).
+   * Adds a user as an assignee of a job order; idempotent.
    *
-   * @param jobOrderId job order primary key
+   * @param jobOrderId job order id
    * @param userId user to add
-   * @return the persisted order with refreshed assignee list
+   * @return the order with its refreshed assignee list
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when either id is
    *     unknown
    */
@@ -129,16 +122,13 @@ public class JobOrderAssigneeService {
   }
 
   /**
-   * Sets (creates or replaces) the note on a user's assignee entry. The note is the assignee's own
-   * free-text context — when they work on the order, which part they take. Optimistic-locked on the
-   * assignee edge's own version, so a stale client edit surfaces as HTTP 409 without ever bumping
-   * the parent order's version.
+   * Sets the note on a user's assignee entry, locked on the assignee edge's own version.
    *
-   * @param jobOrderId job order primary key
+   * @param jobOrderId job order id
    * @param userId the assignee whose note is changed
-   * @param note the new note text (already length-validated at the controller boundary)
-   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
-   * @return the persisted order with the refreshed assignee list
+   * @param note the new note text, already length-validated
+   * @param version the edge version the client last saw, or {@code null} to skip the check
+   * @return the order with its refreshed assignee list
    * @throws NotFoundException when the order or the assignee entry is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code version} is
    *     stale
@@ -149,13 +139,12 @@ public class JobOrderAssigneeService {
   }
 
   /**
-   * Clears the note on a user's assignee entry. Same optimistic-locking semantics as {@link
-   * #updateAssigneeNote}.
+   * Clears the note on a user's assignee entry, locked like {@link #updateAssigneeNote}.
    *
-   * @param jobOrderId job order primary key
+   * @param jobOrderId job order id
    * @param userId the assignee whose note is cleared
-   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
-   * @return the persisted order with the refreshed assignee list
+   * @param version the edge version the client last saw, or {@code null} to skip the check
+   * @return the order with its refreshed assignee list
    * @throws NotFoundException when the order or the assignee entry is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code version} is
    *     stale
@@ -166,15 +155,14 @@ public class JobOrderAssigneeService {
   }
 
   /**
-   * Shared implementation for the note set/clear endpoints: locates the assignee edge, enforces the
-   * supplied version against the edge's own {@code @Version}, mutates the note via dirty-checking
-   * and flushes so the returned DTO carries the freshly incremented edge version.
+   * Sets or clears an assignee note after checking the edge's version, then flushes so the returned
+   * DTO carries the new edge version.
    *
-   * @param jobOrderId job order primary key
+   * @param jobOrderId job order id
    * @param userId the assignee whose note is changed
-   * @param note the new note value, or {@code null} to clear it
-   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
-   * @return the persisted order with the refreshed assignee list
+   * @param note the new note, or {@code null} to clear it
+   * @param version the edge version the client last saw, or {@code null} to skip the check
+   * @return the order with its refreshed assignee list
    */
   private JobOrderDto setAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
     JobOrder jobOrder =
@@ -193,7 +181,6 @@ public class JobOrderAssigneeService {
     String trimmed = StringNormalization.trimToNull(note);
     assignee.setNote(trimmed);
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    // PII: the note body is user free text — record only its presence/length, never the content.
     if (trimmed != null) {
       auditService.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_SET,
@@ -213,19 +200,11 @@ public class JobOrderAssigneeService {
   }
 
   /**
-   * Composes the audit subject label for a job order — {@code #<displayId> '<handle>'}, the
-   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001).
+   * Composes the audit subject label {@code #<displayId> '<handle>'} for a job order
+   * (REQ-AUDIT-001).
    *
-   * <p><b>The handle names a person.</b> It is the order's contact — {@code orders.create.handle}
-   * renders it as "Handle des Ansprechpartners" — and is frequently somebody outside the
-   * organisation with no account at all. The snapshot itself stays, because the trail has to remain
-   * readable once the order is gone; but it is why {@code audit_event.subject_label} is registered
-   * as a person-name surface in {@code PersonSearchTargets} and why the Art. 15 export does not
-   * select it (REQ-SEC-058).
-   *
-   * <p>Corrected 2026-09-16: this said the handle was "a non-personal order title and is safe to
-   * snapshot". It is neither non-personal nor safe to disclose, and that claim is why the export
-   * shipped without a guard on the column.
+   * <p>The handle names a person (the order's contact), so the label is treated as personal data
+   * and excluded from the data-subject export (REQ-SEC-058).
    *
    * @param jobOrder the order
    * @return the {@code #<displayId> '<handle>'} label

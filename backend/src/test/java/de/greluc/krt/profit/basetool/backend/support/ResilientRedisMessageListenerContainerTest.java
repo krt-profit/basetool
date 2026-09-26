@@ -33,13 +33,8 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.ChannelTopic;
 
 /**
- * Pins the behaviour that keeps an unreachable Redis from deciding whether the backend exists.
- *
- * <p>The production line these tests answer to is {@code ApplicationContextException: Failed to
- * start bean 'liveSyncRedisMessageListenerContainer'} (2026-09-02, 07:07:09Z): a plain {@code
- * RedisMessageListenerContainer} whose first subscription fails throws out of {@code
- * SmartLifecycle#start()}, and Spring cancels the context refresh. Every assertion below is red
- * against the plain superclass.
+ * Pins that an unreachable Redis does not stop the backend from starting: a failing first
+ * subscription is retried instead of failing {@code SmartLifecycle#start()}.
  */
 class ResilientRedisMessageListenerContainerTest {
 
@@ -67,7 +62,6 @@ class ResilientRedisMessageListenerContainerTest {
         new ResilientRedisMessageListenerContainer(retryIntervalMillis);
     container.setBeanName("testFanoutContainer");
     container.setConnectionFactory(factory);
-    // Keep the failure fast: the default registration wait is two seconds per attempt.
     container.setMaxSubscriptionRegistrationWaitingTime(200L);
     container.addMessageListener((message, pattern) -> {}, new ChannelTopic("basetool:test"));
     container.afterPropertiesSet();
@@ -102,7 +96,6 @@ class ResilientRedisMessageListenerContainerTest {
         refusingContainer(
             attempts, ResilientRedisMessageListenerContainer.DEFAULT_RETRY_INTERVAL_MILLIS);
     try {
-      // The whole point: the superclass throws here, and Spring turns that into a failed refresh.
       assertThatNoException().isThrownBy(container::start);
       assertThat(container.isListening())
           .as("nothing is subscribed, and the container must not pretend otherwise")
@@ -122,11 +115,6 @@ class ResilientRedisMessageListenerContainerTest {
     try {
       container.start();
 
-      // Upstream start() is `if (started.compareAndSet(false, true)) { lazyListen(); }`, so the
-      // flag
-      // is already true when lazyListen throws. Without the super.stop() in the catch, isRunning()
-      // would report true for a container subscribed to nothing AND every later start() would be
-      // skipped outright — the retry would run forever without ever attempting anything.
       assertThat(container.isRunning()).isFalse();
     } finally {
       container.stop();

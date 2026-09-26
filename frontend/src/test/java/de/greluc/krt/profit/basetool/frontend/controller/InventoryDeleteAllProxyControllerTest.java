@@ -37,21 +37,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Unit tests for {@link InventoryDeleteAllProxyController}. Drives the real {@link WebClient}
- * against {@link MockWebServer} so every exception-handling branch is exercised end-to-end without
- * a Spring context.
- *
- * <p>Coverage points:
- *
- * <ul>
- *   <li>Happy path: backend returns 204 → controller returns 204 and targets the canonical backend
- *       path {@code /api/v1/inventory/all}.
- *   <li>Backend client error (4xx) → controller re-throws as {@link ResponseStatusException} with
- *       the same status (e.g. 403 from a non-admin caller).
- *   <li>Backend server error (5xx) → same passthrough behaviour.
- *   <li>Network failure (server shutdown mid-request) → controller wraps in a 500 {@code
- *       ResponseStatusException} (no upstream stack trace leaked).
- * </ul>
+ * Unit tests for {@link InventoryDeleteAllProxyController} against a {@link MockWebServer}: a
+ * {@code 204} passes through, backend 4xx and 5xx statuses are rethrown as {@link
+ * ResponseStatusException} with the same status, and a network failure becomes a 500.
  */
 class InventoryDeleteAllProxyControllerTest {
 
@@ -106,8 +94,6 @@ class InventoryDeleteAllProxyControllerTest {
 
   @Test
   void deleteAllGlobalInventory_onConnectionFailure_wrapsAs500() throws Exception {
-    // Shutdown the server before the call so the WebClient gets a
-    // connect/read failure (NOT a WebClientResponseException).
     server.shutdown();
 
     ResponseStatusException ex =
@@ -119,8 +105,6 @@ class InventoryDeleteAllProxyControllerTest {
         "Non-HTTP failures must be re-thrown as a 500 (sanitised — no upstream stack trace)");
     assertTrue(ex.getReason() != null && ex.getReason().toLowerCase().contains("unexpected"));
 
-    // Tear down was a no-op; bring the field back to a clean state so AfterEach's
-    // shutdown is a no-op too.
     server = new MockWebServer();
     server.start();
   }

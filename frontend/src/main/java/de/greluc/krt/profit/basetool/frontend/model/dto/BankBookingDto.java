@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of one booking-history row (K1 page): this account's ledger leg with its
- * transaction context and — for transfers — the resolved counter side.
+ * transaction context and, for transfers, the counter side.
  *
  * @param postingId the leg's id
  * @param transactionId the owning transaction's id (the reversal target)
@@ -35,11 +35,10 @@ import org.jetbrains.annotations.Nullable;
  * @param amount the signed amount of this account's leg
  * @param holderHandle the holder whose stash this leg changed
  * @param note the transaction's free-text note, may be {@code null}
- * @param justification the transaction's free-text justification (Begr&uuml;ndung) for a {@code
- *     WITHDRAWAL} / {@code TRANSFER} (REQ-BANK-045), may be {@code null}
- * @param staffNote the booking bank employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054);
- *     always {@code null} on an org-unit member-facing row, where the backend redacts it as an
- *     internal remark (REQ-BANK-038)
+ * @param justification the justification (Begr&uuml;ndung) of a {@code WITHDRAWAL} / {@code
+ *     TRANSFER} (REQ-BANK-045), may be {@code null}
+ * @param staffNote the booking bank employee's note (REQ-BANK-054); always {@code null} on an
+ *     org-unit member-facing row (REQ-BANK-038)
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for reversal rows the corrected transaction's id, else {@code null}
  * @param counterAccountNo for transfer legs the other account's number, {@code null} otherwise
@@ -47,13 +46,10 @@ import org.jetbrains.annotations.Nullable;
  * @param counterHolderHandle for transfer legs the holder on the other leg
  * @param intraAccount {@code true} for intra-account holder rebookings (custody moved, the balance
  *     did not)
- * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
- *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee rows. On an
- *     outgoing leg the leg is the gross debited, so the recipient received {@code |amount| −
- *     transferFee}
+ * @param transferFee the in-game transfer fee borne by the debited source (REQ-BANK-033); {@code 0}
+ *     for non-fee rows; an outgoing leg is the gross debited
  * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty's
- *     handle — the Einzahler / Empf&auml;nger on the far side (REQ-BANK-044), {@code null}
- *     otherwise
+ *     handle (REQ-BANK-044), {@code null} otherwise
  * @param counterpartyOrgUnitName the counterparty's org-unit name, or {@code null} when none was
  *     recorded
  */

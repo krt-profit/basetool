@@ -23,9 +23,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code JobOrderMaterialDto}. {@code claims}/{@code openAmount} are
- * populated only for public SK orders (Phase 5, #345); {@code openAmount} is {@code null} for
- * private orders, which is how the detail template decides whether to render the claim columns.
+ * Frontend mirror of the backend {@code JobOrderMaterialDto}. {@code claims} and {@code openAmount}
+ * are filled only for public SK orders; a {@code null} {@code openAmount} hides the claim columns.
  *
  * @param id material-line primary key
  * @param material the required material (carries {@code quantityType} for unit-aware display)

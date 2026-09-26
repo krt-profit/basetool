@@ -106,7 +106,6 @@ class MissionUnitManagementTest {
                 null,
                 null));
 
-    // The ship owner must be a registered participant before the ship can be pinned to a unit.
     missionService.addParticipant(
         mission.getId(), officerUser.getId(), null, null, null, null, null);
 
@@ -171,10 +170,8 @@ class MissionUnitManagementTest {
 
   @Test
   void testAddUnit_ShipOwnerNotParticipant_Rejected() {
-    // Given: a ship owned by a user who is NOT registered for the mission.
     Ship outsiderShip = shipOwnedByNonParticipant();
 
-    // When / Then: pinning that ship to a new unit is rejected.
     assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -191,8 +188,6 @@ class MissionUnitManagementTest {
 
   @Test
   void testAddUnit_ShipOwnerIsParticipant_Allowed() {
-    // officerUser is a registered participant (see setUp) and owns `ship`, so the assignment
-    // passes.
     Mission updated =
         missionService.addUnitToMission(
             mission.getId(),
@@ -215,7 +210,6 @@ class MissionUnitManagementTest {
 
   @Test
   void testUpdateUnit_ChangeToShipOfNonParticipant_Rejected() {
-    // Switching an existing unit to a ship owned by a non-participant is rejected.
     Ship outsiderShip = shipOwnedByNonParticipant();
 
     assertThrows(
@@ -236,9 +230,6 @@ class MissionUnitManagementTest {
 
   @Test
   void testUpdateUnit_KeepsExistingShipAfterOwnerLeftMission_Allowed() {
-    // The unit holds officerUser's ship, assigned while officerUser was a participant. Remove
-    // officerUser from the roster so the ship owner is no longer registered, then edit the unit
-    // keeping the same ship: the already-assigned ship is grandfathered and the edit still passes.
     UUID participantId =
         missionRepository.findById(mission.getId()).orElseThrow().getParticipants().stream()
             .filter(p -> p.getUser() != null && p.getUser().getId().equals(officerUser.getId()))

@@ -32,17 +32,10 @@ import org.springframework.stereotype.Repository;
 public interface JobOrderItemRepository extends JpaRepository<JobOrderItem, UUID> {
 
   /**
-   * Finds every ordered-item line whose chosen blueprint no longer produces the line's game item
-   * (REQ-ORDERS-033). The pairing is validated when the line is written, but {@code
-   * ScWikiBlueprintSyncService} re-resolves a blueprint's output item from the Wiki feed on every
-   * run, so an upstream re-point silently leaves existing lines snapshotting a foreign recipe. This
-   * is the detection query behind the scheduled integrity sweep.
+   * Finds every ordered-item line whose chosen blueprint no longer produces the line's game item,
+   * including blueprints whose output no longer resolves to any game item (REQ-ORDERS-033).
    *
-   * <p>The {@code LEFT JOIN} on the output item is deliberate: a blueprint whose output UUID
-   * stopped resolving to any known game item is drift too, not a row to skip.
-   *
-   * @return one row per drifted line (empty when every line is consistent), ordered oldest-order
-   *     first so the operator log reads chronologically
+   * @return one row per drifted line (empty when every line is consistent), oldest order first
    */
   @Query(
       """

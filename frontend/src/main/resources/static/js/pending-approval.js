@@ -18,25 +18,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Self-healing waiting page (REQ-SEC-017). Polls the caller's own approval status and reacts to
- * whichever verdict lands, so a decision propagates live instead of only on the next login — the
- * frontend half of the same fix that stopped BackendRoleSyncFilter from pinning a PENDING verdict
- * for the session's whole 720h lifetime.
- *
- * ACTIVE forwards into the tool. REJECTED is terminal (the backend refuses to decide anything but a
- * still-PENDING registration), so the poll stops AND swaps the waiting copy for the rejection copy
- * in place: stopping alone would leave a rejected member reading "waiting for an administrator"
- * indefinitely, which is exactly the bug this page had. The server renders the same swap directly
- * for a caller who is already REJECTED when the page loads, and then omits this script entirely.
- *
- * The poll deliberately outlives the filter's approval re-check interval, so every tick is a genuine
- * backend read. It pauses while the tab is hidden (a waiting page sits in a background tab for
- * hours).
- *
- * URLs and user-facing text come from the template via data-* attributes / rendered markup, so this
- * file carries neither a hardcoded path nor a hardcoded string.
- */
 (function () {
     const POLL_INTERVAL_MS = 20000;
     const STATE_ACTIVE = 'ACTIVE';
@@ -46,11 +27,6 @@
     if (!root) {
         return;
     }
-    // Default to '' rather than leaving these `string | undefined`: the guard
-    // below rejects the empty string exactly as it rejects a missing attribute,
-    // so the behaviour is unchanged and the polling closures below (hoisted
-    // function declarations, which do not inherit the guard's narrowing) see a
-    // plain string.
     const statusUrl = root.dataset.statusUrl || '';
     const homeUrl = root.dataset.homeUrl || '';
     if (!statusUrl || !homeUrl) {
@@ -84,8 +60,6 @@
     function onRejected() {
         stopped = true;
         window.clearTimeout(timer ?? undefined);
-        // Both blocks are in the DOM already (the template renders the pair and hides one), so this
-        // is a pure visibility swap — no fetch, no reload, and no user-facing string in this file.
         if (waitingBlock) {
             waitingBlock.hidden = true;
         }
@@ -100,8 +74,6 @@
             headers: { Accept: 'application/json' },
         })
             .then(function (response) {
-                // A 401 carries the X-Reauthenticate contract and the browser is being sent to the
-                // login flow anyway; anything else non-OK is a transient hiccup worth retrying.
                 return response.ok ? response.json() : null;
             })
             .then(function (data) {
@@ -128,7 +100,6 @@
         if (document.hidden) {
             window.clearTimeout(timer ?? undefined);
         } else {
-            // Back in the foreground: check immediately rather than waiting out a full interval.
             poll();
         }
     });

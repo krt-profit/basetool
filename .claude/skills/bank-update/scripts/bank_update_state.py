@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 """Remember which month the last bank update covered, so the next run needs no argument.
 
-The marker lives in the **shared git directory** (``git rev-parse --git-common-dir``),
-which is the same location from the main checkout and from every ``git worktree`` and
-sits outside every working tree. That matters here for the same reason it does for the
-release notes: each session runs in a throwaway worktree, and git-ignored files do not
-travel between worktrees — a marker in the working tree would be invisible to the next
-run and the resume would fail silently.
+The marker lives in the shared git directory, so every worktree sees the same one.
 
 Usage:
     python .claude/skills/bank-update/scripts/bank_update_state.py --show
@@ -16,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import subprocess
 import sys
@@ -27,15 +23,13 @@ FILENAME = ".bank-update-state.json"
 
 def marker_path() -> Path:
     """Return the marker's location, preferring the shared git directory."""
-    try:
+    with contextlib.suppress(Exception):
         common = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
         if common:
             return (Path(common).resolve() / FILENAME)
-    except Exception:  # noqa: BLE001 - outside a repo the fallback below is correct
-        pass
     return Path.cwd() / FILENAME
 
 
@@ -65,7 +59,7 @@ def main() -> None:
     if path.exists():
         try:
             stored = json.loads(path.read_text(encoding="utf-8")).get("last_month")
-        except Exception:  # noqa: BLE001 - a corrupt marker is treated as absent
+        except Exception:  # noqa: BLE001
             stored = None
 
     if args.show:

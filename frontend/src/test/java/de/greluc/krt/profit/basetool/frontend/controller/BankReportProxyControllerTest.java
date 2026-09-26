@@ -59,7 +59,6 @@ class BankReportProxyControllerTest {
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void downloadStatement_shouldReturnPdfBytes_andForwardPeriodToBackendUri() {
-    // Given
     UUID id = UUID.randomUUID();
     byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
@@ -70,7 +69,6 @@ class BankReportProxyControllerTest {
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
     doReturn(Mono.just(fakePdf)).when(responseSpec).bodyToMono(byte[].class);
 
-    // When
     ResponseEntity<byte[]> response =
         controller.downloadStatement(
             id,
@@ -78,7 +76,6 @@ class BankReportProxyControllerTest {
             Instant.parse("2026-02-01T00:00:00Z"),
             "Europe/Berlin");
 
-    // Then
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertArrayEquals(fakePdf, response.getBody());
     assertEquals(MediaType.APPLICATION_PDF, response.getHeaders().getContentType());
@@ -95,7 +92,6 @@ class BankReportProxyControllerTest {
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void downloadStatement_shouldPropagateBackendStatus() {
-    // Given
     UUID id = UUID.randomUUID();
     doReturn(requestHeadersUriSpec).when(webClient).get();
     doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
@@ -105,7 +101,6 @@ class BankReportProxyControllerTest {
         .when(responseSpec)
         .bodyToMono(byte[].class);
 
-    // When & Then
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,
@@ -121,7 +116,6 @@ class BankReportProxyControllerTest {
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void downloadThreeMonthReport_shouldReturnPdfBytes() {
-    // Given
     byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
     doReturn(requestHeadersUriSpec).when(webClient).get();
     doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
@@ -129,10 +123,8 @@ class BankReportProxyControllerTest {
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
     doReturn(Mono.just(fakePdf)).when(responseSpec).bodyToMono(byte[].class);
 
-    // When
     ResponseEntity<byte[]> response = controller.downloadThreeMonthReport(null);
 
-    // Then
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertArrayEquals(fakePdf, response.getBody());
     String disposition = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);

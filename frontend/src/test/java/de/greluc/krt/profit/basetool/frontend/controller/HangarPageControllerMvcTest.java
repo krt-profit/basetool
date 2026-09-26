@@ -72,7 +72,6 @@ class HangarPageControllerMvcTest {
   @Test
   @WithMockUser
   void viewHangar_ShouldRenderHangarView() throws Exception {
-    // Given
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
     ShipTypeDto shipType =
@@ -91,15 +90,9 @@ class HangarPageControllerMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS), anyTypeRef()))
         .thenReturn(locations);
 
-    // When & Then
     mockMvc.perform(get("/hangar")).andExpect(status().isOk()).andExpect(view().name("hangar"));
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, would deform the ship modal's "Fitted" checkbox into a padded surface box. Pins
-  // the :not() exclusion and the removal of the old width:auto override, which only restored the
-  // width and, with the exclusion in place, would instead shrink the global 1.2rem square.
   @Test
   @WithMockUser
   void viewHangar_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -122,8 +115,6 @@ class HangarPageControllerMvcTest {
   @Test
   @WithMockUser
   void viewHangar_ShouldRenderServerSideSearchFormWhenHangarHasShips() throws Exception {
-    // The personal hangar's text filter is now a server-side GET form (REQ-HANGAR-002): the search
-    // input carries name="search" so it round-trips to /hangar, and the rendered ship type appears.
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
     ShipTypeDto shipType =
@@ -135,7 +126,6 @@ class HangarPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(ships);
 
-    // When & Then
     mockMvc
         .perform(get("/hangar"))
         .andExpect(status().isOk())
@@ -149,8 +139,6 @@ class HangarPageControllerMvcTest {
   @Test
   @WithMockUser
   void viewHangar_ShouldRenderHomeLocationButtonAndCuratedOptions() throws Exception {
-    // Given a hangar with at least one ship (button is hidden when empty) and one curated home
-    // location returned by the dedicated endpoint.
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
     ShipTypeDto shipType =
@@ -166,7 +154,6 @@ class HangarPageControllerMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_HOME), anyTypeRef()))
         .thenReturn(List.of(homeLoc));
 
-    // When & Then
     mockMvc
         .perform(get("/hangar"))
         .andExpect(status().isOk())
@@ -179,10 +166,6 @@ class HangarPageControllerMvcTest {
   @Test
   @WithMockUser
   void viewHangar_FragmentResults_RendersOnlyTheShipTableFragment() throws Exception {
-    // The in-place swap target: GET /hangar?fragment=results returns just the hangarResults
-    // fragment (the add button + search form + table + pagination) and NOT the surrounding page
-    // chrome (the modals, the import section), so a write/filter/page handler can re-render the
-    // table without reloading (REQ-FE-005 / REQ-HANGAR-002).
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
     ShipTypeDto shipType =
@@ -200,7 +183,6 @@ class HangarPageControllerMvcTest {
         .andExpect(view().name("hangar :: hangarResults"))
         .andExpect(content().string(containsString("data-testid=\"hangar-add-ship\"")))
         .andExpect(content().string(containsString("id=\"hangar-ship-filter\"")))
-        // the modals + import section live outside the fragment and must not be in the swap body
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString("id=\"ship-modal\""))))
         .andExpect(
             content()
@@ -210,8 +192,6 @@ class HangarPageControllerMvcTest {
   @Test
   @WithMockUser
   void viewSquadron_ShouldRenderSearchFormAndPageSizePicker() throws Exception {
-    // Given a first page at the default size 50 with enough total entries (>10) for the
-    // page-size picker to render at all.
     ManufacturerDto manufacturer =
         new ManufacturerDto(
             UUID.randomUUID(), "Drake Interplanetary", "DRAK", null, null, null, false);
@@ -224,8 +204,6 @@ class HangarPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/hangar/squadron-overview?page=0&size=50"), anyTypeRef()))
         .thenReturn(page);
 
-    // When & Then: the server-side search form and the 10/50/100 page-size picker render;
-    // the active size (50) is an inert span, the other sizes are links.
     mockMvc
         .perform(get("/hangar/squadron"))
         .andExpect(status().isOk())
@@ -241,8 +219,6 @@ class HangarPageControllerMvcTest {
   @Test
   @WithMockUser
   void viewSquadron_ShouldSnapUnsupportedPageSizeToDefault() throws Exception {
-    // covers REQ-HANGAR-001 — a crafted ?size= outside 10/50/100 must not reach the backend;
-    // it snaps to the default page size (50) instead.
     PageResponse<SquadronShipOverviewDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, List.of());
     when(backendApiClient.get(eq("/api/v1/hangar/squadron-overview?page=0&size=50"), anyTypeRef()))
@@ -257,8 +233,6 @@ class HangarPageControllerMvcTest {
   @Test
   @WithMockUser
   void viewSquadron_ShouldForwardSearchAndKeepItInPaginationLinks() throws Exception {
-    // covers REQ-HANGAR-001 — the search term reaches the backend, and the page-size links
-    // carry it so switching the size never silently drops the active filter.
     PageResponse<SquadronShipOverviewDto> page =
         new PageResponse<>(List.of(), 0, 50, 12, 1, List.of());
     when(backendApiClient.get(
@@ -274,13 +248,9 @@ class HangarPageControllerMvcTest {
         .andExpect(
             content()
                 .string(containsString("/hangar/squadron?search=Cutlass&amp;page=0&amp;size=10")))
-        // the clear-filter link drops the search but keeps the page size
         .andExpect(content().string(containsString("href=\"/hangar/squadron?size=50\"")));
   }
 
-  // #1344 regression: a multi-word ship search must reach the backend single-encoded (the real
-  // spaces), not double-encoded (%2520). The term rides as a URI variable ({search}) and is
-  // verified to be forwarded verbatim, so "Cutlass Black" filters the squadron overview again.
   @Test
   @WithMockUser
   void viewSquadron_passesMultiWordSearchAsUriVariable() throws Exception {

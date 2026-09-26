@@ -85,13 +85,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit coverage for the material-exchange domain's security-critical behaviour across the
- * read/write split (#14): the interessenten anonymity redaction (names only for the owner) lives in
- * {@link MaterialExchangeBoardService} and is exercised via that co-wired subject, while the
- * owner-only write gates, the item-ownership check on release, the self-interest block and the
- * optimistic-lock guard on a remark edit live in {@link MaterialExchangeService}. The write service
- * is co-wired to the real board service so a mutation's redacted response goes through the
- * identical projection.
+ * Unit tests for the material exchange: interessent redaction in {@link
+ * MaterialExchangeBoardService}, and owner-only writes, release ownership, the self-interest block
+ * and optimistic locking in {@link MaterialExchangeService}.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExchangeServiceTest {
@@ -110,14 +106,8 @@ class MaterialExchangeServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialExchangeService> selfProvider;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL board service is one of
-  // its arguments
   private MaterialExchangeService service;
 
-  // Read/write split (#14): the board/detail/counts/picker reads plus the interessenten-anonymity
-  // redaction moved to MaterialExchangeBoardService, built from the same mocks and co-wired into
-  // the write service below so both the moved read paths and the write→read projection keep
-  // exercising the real logic from this fixture.
   @InjectMocks private MaterialExchangeBoardService boardService;
 
   private final UUID ownerId = UUID.randomUUID();
@@ -129,12 +119,6 @@ class MaterialExchangeServiceTest {
   /** Builds a fresh owner + active offer fixture before each test. */
   @BeforeEach
   void setUp() {
-    // The REAL co-built board service goes in through the constructor so the write->read
-    // projection runs the real redaction/DTO mapping.
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
     service =
         new MaterialExchangeService(
             offerRepository,
@@ -209,7 +193,6 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
     when(interestRepository.countByOfferId(offerId)).thenReturn(0L);
-    // Rows returned in a deliberately unsorted order to prove the service imposes the ordering.
     when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
         .thenReturn(
             List.of(
@@ -276,7 +259,7 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_partialAmount_storesOfferedAmountAndExposesAvailableToOwner() {
-    UUID itemId = offer.getInventoryItem().getId(); // item stock = 340 SCU
+    UUID itemId = offer.getInventoryItem().getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(inventoryItemRepository.findById(itemId))
         .thenReturn(Optional.of(offer.getInventoryItem()));
@@ -298,7 +281,7 @@ class MaterialExchangeServiceTest {
   /** Offering more than the item's current stock is rejected (400) and persists nothing. */
   @Test
   void release_amountExceedsStock_badRequest() {
-    UUID itemId = offer.getInventoryItem().getId(); // item stock = 340 SCU
+    UUID itemId = offer.getInventoryItem().getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(inventoryItemRepository.findById(itemId))
         .thenReturn(Optional.of(offer.getInventoryItem()));
@@ -324,9 +307,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * A genuinely new interest registration publishes a {@link
-   * MaterialExchangeInterestRegisteredEvent} directed at the offer owner, carrying the interessent
-   * and material render params (#1187, REQ-MARKET-011).
+   * A new interest registration publishes a {@link MaterialExchangeInterestRegisteredEvent} to the
+   * offer owner (REQ-MARKET-011).
    */
   @Test
   void registerInterest_newRegistration_publishesOwnerNotification() {
@@ -439,7 +421,7 @@ class MaterialExchangeServiceTest {
   @Test
   void detail_offeredAmountClampedToCurrentStock() {
     offer.setOfferedAmount(340.0);
-    offer.getInventoryItem().setAmount(60.0); // booked out since release
+    offer.getInventoryItem().setAmount(60.0);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
 
@@ -458,9 +440,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * The "Material anbieten" picker carries each item's material quantity type, so the release
-   * dialog renders the amount in the material's own unit (Stück for PIECE) instead of always SCU
-   * (#1182).
+   * The release picker carries each item's material quantity type, so amounts render in the
+   * material's own unit.
    */
   @Test
   void myReleasableItems_carriesMaterialQuantityType() {
@@ -480,11 +461,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * The release picker's Material/Item radio narrows the query by kind (REQ-MARKET-002): {@code
-   * MATERIAL} asks the repository for material rows only ({@code includeMaterial=true,
-   * includeItem=false}), {@code ITEM} for game-item rows only, and {@code null} for both. The gate
-   * is pushed into the repository call — before its row cap — so a row of the wanted kind past the
-   * cap is never hidden by a post-query filter.
+   * The release picker's kind filter maps to the repository's include flags before the row cap
+   * (REQ-MARKET-002).
    */
   @Test
   void myReleasableItems_kindFilterMapsToRepositoryFlags() {
@@ -492,8 +470,6 @@ class MaterialExchangeServiceTest {
     when(inventoryItemRepository.findReleasableForUser(
             any(), any(), anyBoolean(), anyBoolean(), any()))
         .thenReturn(List.of());
-    // No offerRepository stub: an empty picker result short-circuits releasedInventoryItemIds
-    // before it queries the offer repo, so stubbing it would be flagged as unnecessary.
 
     boardService.myReleasableItems(null, MaterialExchangeOfferKind.MATERIAL);
     boardService.myReleasableItems(null, MaterialExchangeOfferKind.ITEM);
@@ -505,9 +481,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * Listing a craftable item (#1185, REQ-MARKET-012) persists an ITEM offer carrying the resolved
-   * product key/name and the user-stated quantity, with no Lager row and no quality — and the
-   * returned DTO reflects the same (null material/quality/amount).
+   * Listing a craftable item persists an ITEM offer with product key, name and quantity but no
+   * Lager row and no quality (REQ-MARKET-012).
    */
   @Test
   void releaseItem_validProduct_persistsItemOfferWithQuantityAndNullQuality() {
@@ -599,7 +574,7 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_existingActiveOffer_updatesInPlaceAndFlagsReRelease() {
-    InventoryItem item = offer.getInventoryItem(); // stock = 340 SCU, owned by ownerId
+    InventoryItem item = offer.getInventoryItem();
     UUID itemId = item.getId();
     Instant past = Instant.now().minusSeconds(3600);
     offer.setReleasedAt(past);
@@ -634,11 +609,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * A concurrent duplicate interest registration is swallowed as an idempotent success (Gap 2):
-   * when the {@code REQUIRES_NEW} inner insert throws a {@link DataIntegrityViolationException}
-   * (the unique {@code (offer, user)} constraint losing a race), the orchestrator catches it and
-   * still returns the re-read offer detail instead of propagating a 500 (CLAUDE.md find-or-create
-   * rule).
+   * A concurrent duplicate interest registration losing the unique constraint is treated as an
+   * idempotent success.
    */
   @Test
   void registerInterest_concurrentDuplicate_isIdempotent() {
@@ -657,8 +629,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * A real withdrawal (a registration was removed) records exactly one {@code
-   * MARKET_INTEREST_WITHDRAWN} audit event (Gap 3).
+   * Withdrawing an existing registration records exactly one {@code MARKET_INTEREST_WITHDRAWN}
+   * audit event.
    */
   @Test
   void withdrawInterest_removed_recordsAudit() {
@@ -733,18 +705,12 @@ class MaterialExchangeServiceTest {
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
-  // ---- stock-backed item offers (design §8, REQ-MARKET-014, ADR-0108) ----
-
   /**
-   * Releasing a game-item Lager row creates a <b>stock-backed</b> ITEM offer (REQ-MARKET-014): the
-   * offer carries the Lager row (bound to physical stock), stores the whole-unit quantity, derives
-   * its product key / display name from the row's game item via {@code resolveByGameItem}, and
-   * carries no {@code offeredAmount} — while the owner still sees the row's stock as {@code
-   * availableAmount}.
+   * Releasing a game-item Lager row creates a stock-backed ITEM offer with whole-unit quantity and
+   * no {@code offeredAmount} (REQ-MARKET-014).
    */
   @Test
   void release_gameItemRow_createsStockBackedItemOffer() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Quantum Drive");
     InventoryItem row = itemStockRow(owner, gameItem, 8.0);
     UUID itemId = row.getId();
@@ -781,7 +747,6 @@ class MaterialExchangeServiceTest {
   /** Offering more whole units than a game-item row holds is rejected (400) — nothing persisted. */
   @Test
   void release_gameItemRow_quantityExceedsStock_badRequest() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Cooler");
     InventoryItem row = itemStockRow(owner, gameItem, 3.0);
     UUID itemId = row.getId();
@@ -798,7 +763,6 @@ class MaterialExchangeServiceTest {
   /** A non-whole item quantity is rejected (400) — item stock is integral. */
   @Test
   void release_gameItemRow_fractionalQuantity_badRequest() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Shield");
     InventoryItem row = itemStockRow(owner, gameItem, 6.0);
     UUID itemId = row.getId();
@@ -814,7 +778,6 @@ class MaterialExchangeServiceTest {
   /** A game-item row not produced by any active blueprint cannot be offered (400). */
   @Test
   void release_gameItemRow_noBlueprintProduct_badRequest() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Loot Only");
     InventoryItem row = itemStockRow(owner, gameItem, 4.0);
     UUID itemId = row.getId();
@@ -834,7 +797,6 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_gameItemRow_existingActiveOffer_reReleasesInPlace() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Power Plant");
     InventoryItem row = itemStockRow(owner, gameItem, 10.0);
     UUID itemId = row.getId();
@@ -861,7 +823,6 @@ class MaterialExchangeServiceTest {
   /** The release picker returns a game-item row as an ITEM entry (PIECE unit, no quality). */
   @Test
   void myReleasableItems_returnsGameItemRowAsItemKind() {
-    // covers REQ-MARKET-014
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     GameItem gameItem = gameItem("Power Plant");
     InventoryItem row = itemStockRow(owner, gameItem, 4.0);
@@ -882,14 +843,11 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * Editing a <b>stock-backed</b> item offer changes its whole-unit quantity — this was impossible
-   * before REQ-MARKET-014: the pre-fix {@code updateOffer} unconditionally validated {@code
-   * offeredAmount} against {@code offer.getInventoryItem()}, but read the wrong field on an item
-   * offer. The new quantity is re-validated against the backing row's current stock.
+   * Editing a stock-backed item offer changes its quantity, validated against the backing row's
+   * stock (REQ-MARKET-014).
    */
   @Test
   void updateOffer_stockBackedItemOffer_editsQuantity() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Cooler");
     InventoryItem row = itemStockRow(owner, gameItem, 10.0);
     MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 6);
@@ -911,7 +869,6 @@ class MaterialExchangeServiceTest {
   /** Editing a stock-backed item offer above the backing row's current stock is rejected (400). */
   @Test
   void updateOffer_stockBackedItemOffer_quantityExceedsStock_badRequest() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Cooler");
     InventoryItem row = itemStockRow(owner, gameItem, 3.0);
     MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 3);
@@ -927,13 +884,11 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * Editing a <b>free-stated</b> item offer (no backing Lager row) changes its quantity with no
-   * stock cap — and, crucially, no longer NPEs on the null {@code inventoryItem} (the kind-aware
-   * {@code updateOffer} fix, REQ-MARKET-014).
+   * Editing a free-stated item offer changes its quantity without a stock cap and without a null
+   * {@code inventoryItem} failure (REQ-MARKET-014).
    */
   @Test
   void updateOffer_freeStatedItemOffer_editsQuantityWithoutNpe() {
-    // covers REQ-MARKET-014
     MaterialExchangeOffer freeItem = new MaterialExchangeOffer();
     freeItem.setId(offerId);
     freeItem.setKind(MaterialExchangeOfferKind.ITEM);
@@ -964,9 +919,8 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void detail_stockBackedItemOffer_clampsQuantityToCurrentStock() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Shield");
-    InventoryItem row = itemStockRow(owner, gameItem, 2.0); // booked down since release
+    InventoryItem row = itemStockRow(owner, gameItem, 2.0);
     MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 6);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(itemOffer));

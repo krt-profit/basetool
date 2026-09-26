@@ -37,23 +37,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end coverage for the default-blueprint feature (REQ-INV-016/017) against the live stack.
- *
- * <p>The default blueprints are seeded into {@code default_blueprint} at backend startup (the
- * provisioning bootstrap; enabled in the {@code dev} profile the e2e stack runs) and granted to a
- * user the first time their {@code app_user} row is created — which {@link BackendSeeder#getUserId}
- * forces in {@link #setUp()}. Two flows are asserted:
- *
- * <ul>
- *   <li><b>user-facing non-removability:</b> a granted default appears in the owner's blueprint
- *       list and its detail pane offers the edit control but <em>no</em> delete control (the {@code
- *       removable=false} flag hides it), which is the exact UX the owner chose over a 409.
- *   <li><b>admin curation:</b> the admin default-blueprints page lists the seeded set, and removing
- *       one entry through the confirm modal drops it from the set in place, without a reload.
- * </ul>
- *
- * <p>Removing an entry in the admin flow does not revoke rows users already hold, so the two tests
- * are order-independent on the shared ephemeral stack.
+ * End-to-end tests of default blueprints (REQ-INV-016, REQ-INV-017): a granted default shows no
+ * delete control to its owner, and an admin can remove a default from the set in place.
  */
 @Tag("e2e")
 class DefaultBlueprintsE2eTest {
@@ -76,8 +61,6 @@ class DefaultBlueprintsE2eTest {
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     if (STACK.managesStack()) {
-      // Materialises the user row on first login, which grants the default blueprints synchronously
-      // in UserService.syncUser before the call returns.
       new BackendSeeder().getUserId(USERNAME, PASSWORD);
     }
   }
@@ -111,8 +94,6 @@ class DefaultBlueprintsE2eTest {
         E2eSupport.navigate(page, baseUrl + "/personal-inventory/blueprints");
         page.waitForLoadState();
 
-        // Target an auto-granted default explicitly (data-removable="false") rather than assuming
-        // row order, so the test stays valid even if the user later owns non-default blueprints.
         Locator defaultRow =
             page.locator("#krt-bp-master-rows .master-row[data-removable='false']").first();
         assertThat(defaultRow)
@@ -120,7 +101,6 @@ class DefaultBlueprintsE2eTest {
 
         defaultRow.click();
 
-        // The detail pane renders with the edit control but the delete control stays hidden.
         assertThat(page.locator("#krt-bp-detail-edit")).isVisible();
         assertThat(page.locator("#krt-bp-detail-delete")).isHidden();
       } catch (RuntimeException | AssertionError failure) {
@@ -152,19 +132,12 @@ class DefaultBlueprintsE2eTest {
         Locator removeButtons = page.locator("[data-trigger='dbp-open-delete']");
         assertThat(removeButtons.first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
-        // The set is fully server-rendered on load, so this count is stable here.
         int before = removeButtons.count();
 
-        // A marker on the window survives only if the document is never reloaded (REQ-FE-001).
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // Open the confirm modal for the first default, then confirm it (the confirm button sends
-        // the row's server-rendered action through krtFetch and re-swaps the list).
         removeButtons.first().click();
         assertThat(page.locator("#krt-dbp-delete-modal")).isVisible();
-        // Not clickSubmitClearingFooter: that helper waits for a post-submit NAVIGATION, which an
-        // in-place write never starts. Wait for the XHR remove itself instead, with the fixed
-        // footer moved out of the click's way as the helper would.
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
@@ -176,8 +149,6 @@ class DefaultBlueprintsE2eTest {
                 () -> page.locator("#krt-dbp-delete-confirm").click());
         assertEquals(200, removed.status(), "the in-place remove must succeed");
 
-        // Web-first count assertion: auto-retries until the swapped list shows one fewer entry, so
-        // it never races the in-place re-render (a one-shot count() flakes on WebKit / Firefox).
         assertThat(page.locator("[data-trigger='dbp-open-delete']")).hasCount(before - 1);
         assertThat(page.locator("#krt-dbp-delete-modal")).isHidden();
         assertEquals(

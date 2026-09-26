@@ -57,10 +57,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST endpoints for {@code MemberEvaluation}.
  *
- * <p>Personal view ({@code /my}) is filtered by JWT sub (data isolation). Admin view ({@code /all}
- * and upsert) requires ADMIN or OFFICER. Officer access is squadron-scoped — an Officer of squadron
- * X may only manage evaluations whose category belongs to a topic owned by squadron X (gate
- * enforced by {@code MemberEvaluationService}).
+ * <p>{@code /my} is filtered by the caller's JWT sub; {@code /all} and upsert require ADMIN or
+ * OFFICER, with officers limited to their own squadron by {@code MemberEvaluationService}.
  */
 @RestController
 @RequestMapping("/api/v1/promotion/evaluations")
@@ -93,9 +91,8 @@ public class MemberEvaluationController {
   }
 
   /**
-   * Returns a paginated slice of the caller's own {@link MemberEvaluationResponse} entries with
-   * sort fields restricted to {@link MemberEvaluationService#SORTABLE_FIELDS} to prevent
-   * information disclosure via unstable user-supplied sorts.
+   * Pages the caller's own evaluations, with sort fields restricted to {@link
+   * MemberEvaluationService#SORTABLE_FIELDS}.
    *
    * @param page zero-based page index, or {@code null} for the default
    * @param size page size, or {@code null} for the default
@@ -123,8 +120,8 @@ public class MemberEvaluationController {
   }
 
   /**
-   * Returns a paginated slice of every {@link MemberEvaluationResponse} in the system for promotion
-   * reviewers. Authorization is enforced in the service layer and limited to ADMIN callers.
+   * Pages every member evaluation for promotion reviewers; authorization is enforced in the service
+   * layer.
    *
    * @param page zero-based page index, or {@code null} for the default
    * @param size page size, or {@code null} for the default
@@ -153,12 +150,10 @@ public class MemberEvaluationController {
   }
 
   /**
-   * Returns the paged list of squadron members that the caller may evaluate — the simple members of
-   * the squadron, with both admins and officers excluded (issue #817). Squadron-scoped for Officer
-   * (own squadron only) and for Admin with the sidebar switcher focused on a squadron; Admin in
-   * "all squadrons" mode sees every squadron's ordinary members. Admins and officers themselves
-   * never appear — admins are squadron-less by design, and officers run the Bewertungsverwaltung
-   * rather than being its subject.
+   * Pages the ordinary squadron members the caller may evaluate, excluding admins and officers.
+   *
+   * <p>Scoped to the officer's own squadron, or to the admin's focused squadron; an admin in "all
+   * squadrons" mode sees every squadron.
    *
    * @param page zero-based page index, or {@code null} for the default
    * @param size page size, or {@code null} for the default
@@ -190,15 +185,14 @@ public class MemberEvaluationController {
   }
 
   /**
-   * Creates or updates the evaluation record for the given user and promotion category. The request
-   * body carries the new score and notes; the optimistic-locking {@code version} echoed back by the
-   * client guards against concurrent edits and surfaces as HTTP 409 on conflict.
+   * Creates or updates the evaluation for the given user and promotion category; a stale {@code
+   * version} yields HTTP 409.
    *
    * @param userId {@code app_user.id} of the member being evaluated
    * @param categoryId identifier of the {@link
    *     de.greluc.krt.profit.basetool.backend.model.PromotionCategory}
-   * @param request validated payload carrying the new score, notes, and {@code version}
-   * @return the persisted evaluation in its response form
+   * @param request payload carrying score, notes and {@code version}
+   * @return the persisted evaluation
    */
   @PutMapping("/user/{userId}/category/{categoryId}")
   @Operation(
@@ -220,9 +214,7 @@ public class MemberEvaluationController {
   }
 
   /**
-   * Permanently removes the evaluation identified by {@code id}, dropping the row used to track a
-   * member's standing in one promotion category. ADMIN or OFFICER of the category's owning
-   * squadron.
+   * Permanently deletes an evaluation; ADMIN or OFFICER of the category's owning squadron.
    *
    * @param id identifier of the {@link
    *     de.greluc.krt.profit.basetool.backend.model.MemberEvaluation} to delete

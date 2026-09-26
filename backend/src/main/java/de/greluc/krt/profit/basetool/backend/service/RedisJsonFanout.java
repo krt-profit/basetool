@@ -32,15 +32,11 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The Redis pub/sub transport the two cross-replica fan-outs share (ADR-0094, ADR-0143): a JSON
- * object published on one channel, the {@code origin} echo filter, and the error counter.
+ * The Redis pub/sub transport shared by {@link RedisNotificationFanout} and {@link
+ * RedisLiveSyncFanout}: publishes a JSON object on one channel, skips messages of its own origin
+ * and counts failures (ADR-0094, ADR-0143).
  *
- * <p>Composition, not a base class: {@link RedisNotificationFanout} and {@link RedisLiveSyncFanout}
- * each own one of these and keep everything that is theirs — the payload fields and their order on
- * the wire, what a consumed message is delivered to, and their own published / consumed counters.
- * What lives here is exactly what the two had copied from each other: build and send the JSON,
- * swallow and count a failure in either direction (a Redis outage must cost peer delivery and
- * nothing else), and skip a message this instance published itself.
+ * <p>Failures in either direction are swallowed, so a Redis outage only costs peer delivery.
  */
 @Slf4j
 final class RedisJsonFanout {
@@ -54,7 +50,7 @@ final class RedisJsonFanout {
   private final String logLabel;
 
   /**
-   * Builds the transport.
+   * Creates the transport.
    *
    * @param redisTemplate the string Redis template used to publish
    * @param meterRegistry registry the error counter binds to
@@ -100,13 +96,11 @@ final class RedisJsonFanout {
   }
 
   /**
-   * Publishes one JSON object. {@code fill} writes every field, in the order the wire format
-   * defines, including {@code origin} ({@link #instanceId()}); {@code onSent} runs only after the
-   * send succeeded. Any failure — while building, serialising or sending — is swallowed, counted as
-   * {@code op=publish} and logged at DEBUG, because the local delivery has already happened.
+   * Publishes one JSON object; any failure is swallowed, counted as {@code op=publish} and logged
+   * at DEBUG.
    *
-   * @param fill writes the payload fields onto the empty root object
-   * @param onSent bumps the owner's published counter
+   * @param fill writes the payload fields, including {@code origin}, onto the empty root object
+   * @param onSent runs only after a successful send
    */
   void publish(@NotNull Consumer<ObjectNode> fill, @NotNull Runnable onSent) {
     try {
@@ -121,11 +115,8 @@ final class RedisJsonFanout {
   }
 
   /**
-   * Consumes one message: parses it, skips it when its {@code origin} is this instance (the local
-   * delivery already happened), and hands anything else to {@code handler}. Any failure — a frame
-   * that is not JSON, or one the handler cannot use — is swallowed, counted as {@code op=consume}
-   * and logged at DEBUG: the sender is another process on a shared channel, possibly a different
-   * build.
+   * Parses one message and hands it to {@code handler} unless its {@code origin} is this instance;
+   * any failure is swallowed, counted as {@code op=consume} and logged at DEBUG.
    *
    * @param message the raw Redis message
    * @param handler delivers a peer's parsed payload to the local streams
@@ -135,7 +126,6 @@ final class RedisJsonFanout {
       JsonNode root = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
       JsonNode origin = root.get("origin");
       if (origin != null && origin.isString() && instanceId.equals(origin.asString())) {
-        // Our own publication looped back — the local delivery already happened. Skip.
         return;
       }
       handler.accept(root);

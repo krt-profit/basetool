@@ -44,44 +44,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the status an anonymous caller gets from the paths the API vhost allow-lists (REQ-SEC-037).
+ * Pins the status an anonymous caller gets from each path the API vhost allow-lists (REQ-SEC-037).
  *
- * <p><strong>Why a test and not a table in a document.</strong> The operator verifies the vhost by
- * curling those paths from outside and comparing the status against the table in {@code
- * API_VHOST_ROLLOUT_RUNBOOK.md} § D.3a. A number that is wrong there is not a documentation defect
- * — it is a false alarm during a production rollout, or worse, a real finding read as noise. The
- * table said {@code 401} for the Finanzen paths on reasoning from their {@code @PreAuthorize}
- * alone; production answers {@code 403}. These assertions are the reason it cannot say the wrong
- * thing again.
- *
- * <p><strong>Why the two differ.</strong> The me-scoped paths are {@code authenticated()} in {@link
- * SecurityConfig}'s matcher list, so Spring Security refuses them before the dispatch and the entry
- * point writes {@code 401}. The Finanzen paths sit under {@code GET /api/v1/missions/**}, which is
- * {@code permitAll} in that same list — the request is dispatched, {@code @PreAuthorize} refuses it
- * at the method seam, and the {@code @RestControllerAdvice} renders that refusal as {@code 403}.
- * Nothing upgrades it: {@code ExceptionTranslationFilter}, which would substitute the entry point
- * for an anonymous caller, never sees an exception the MVC advice already handled. Both paths are
- * closed to the internet either way — this test is about the number, because the number is what the
- * rollout check reads.
- *
- * <p><strong>Re-pinned 2026-09-06 (ADR-0159).</strong> Almost every row here changed number, and
- * none of them changed because the vhost did: the allow-list is untouched, and the backend now
- * refuses the caller behind each admitted path (REQ-SEC-052).
- *
- * <p>The {@code 403} rows are the ones worth understanding rather than replacing. They said {@code
- * 403} because their path sat under a {@code permitAll} stem — the request was dispatched, refused
- * at the method seam, and the {@code @RestControllerAdvice} rendered that. With the stem gone they
- * are turned away at the entry point, which writes {@code 401}. Same closure, different number, and
- * the number is what the rollout check reads.
- *
- * <p>Two paths still answer {@code 200}: {@code /api/v1/terms/document} and {@code
- * /api/v1/app/version-policy}. Both are {@code GET}-scoped, so their {@code HEAD} answers {@code
- * 401} — asserted here and by the nightly probe, because a method-scoped rule above an all-verb one
- * is how REQ-SEC-032 leaked a price query to a {@code HEAD} once.
- *
- * <p>The mission id is a constant that matches nothing. Method security runs before the controller
- * body, so the refusal never depends on the row existing — and a test that needed a seeded Einsatz
- * would assert the seed as much as the rule.
+ * <p>A path refused by the filter chain answers {@code 401}; one dispatched under a {@code
+ * permitAll} stem and refused at the method seam answers {@code 403}. The two {@code GET}-scoped
+ * anonymous reads answer {@code 200}, their {@code HEAD} {@code 401}.
  */
 @SpringBootTest
 class ApiVhostAnonymousSurfaceTest {
@@ -154,12 +121,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The last of phase 2: the Lager tree, the Auftrag queue and the org bank.
-   *
-   * <p>The bank rows are the ones that would matter most — balances and a transaction ledger with
-   * member handles on it — and `/api/v1/orders` is the subtle one: the **same path** answers a
-   * `POST` that is `permitAll` by design, so only the verb separates a public request form from a
-   * queue read. The vhost's read-only guard is the second half of that, and this asserts the first.
+   * The Lager tree, the Auftrag queue and the org bank reads are refused without a token.
    *
    * @param path the allow-listed read
    * @throws Exception if the request could not be performed
@@ -181,9 +143,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The two hangar reads are me-scoped and org-scoped respectively. The first is the one that would
-   * hurt: it answers with the caller's own ships **and** their user record, so an anonymous 200
-   * would hand out an email address along with a fleet list.
+   * The me-scoped and org-scoped hangar reads are refused without a token.
    *
    * @param path the allow-listed hangar read
    * @throws Exception if the request could not be performed
@@ -196,10 +156,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The announcement is not anonymous either, despite having no {@code @PreAuthorize} of its own:
-   * nothing in the matcher list names it, so it falls through to {@code
-   * anyRequest().authenticated()}. Worth pinning precisely because the absence of an annotation
-   * reads like "public" to anyone auditing the controller alone.
+   * The announcement read is refused without a token through the {@code
+   * anyRequest().authenticated()} catch-all, although it has no {@code @PreAuthorize}.
    *
    * @throws Exception if the request could not be performed
    */
@@ -210,9 +168,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The inbox, its badge count and its push stream are me-scoped, and the stream is the one worth
-   * asserting: an SSE endpoint that answered an anonymous caller would hold a connection open and
-   * feed it another member's events for as long as it lived.
+   * The notification inbox, badge count and push stream are refused without a token.
    *
    * @param path the allow-listed notification read
    * @throws Exception if the request could not be performed
@@ -232,10 +188,6 @@ class ApiVhostAnonymousSurfaceTest {
   /**
    * The app's live-sync bridge is refused without a token in both directions (ADR-0143,
    * REQ-SEC-037).
-   *
-   * <p>The stream is the second long-lived SSE endpoint on this vhost and carries the notification
-   * stream's hazard in a wider shape: an untokened stream would hold a connection open and feed it
-   * <em>other members' rooms</em> for as long as it lived.
    *
    * @throws Exception if the request could not be performed
    */
@@ -267,12 +219,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The two Beförderung reads are refused without a token (REQ-SEC-037).
-   *
-   * <p>Me-scoped by construction — both paths end in {@code /my} and the member is resolved from
-   * the token — so there is no id an anonymous caller could substitute. Asserted anyway, because
-   * the rule is that every allow-listed path has its status pinned, not that obvious ones may be
-   * assumed.
+   * The two me-scoped Beförderung reads are refused without a token (REQ-SEC-037).
    *
    * @param path the allow-listed promotion read
    * @throws Exception if the request could not be performed
@@ -285,11 +232,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * Phase 4's Raffinerie reads and its booking are refused without a token (REQ-SEC-037).
-   *
-   * <p>All three are {@code hasRole(KRT_MEMBER)}, and the booking is the one that would matter most
-   * if it were not: it creates Lager entries and marks an order stored, and the endpoint does so
-   * whatever its item list contains.
+   * The Raffinerie reads and booking are refused without a token (REQ-SEC-037).
    *
    * @param path the allow-listed refinery path
    * @throws Exception if the request could not be performed
@@ -324,12 +267,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * Phase M's create write, refused before it can raise anything.
-   *
-   * <p>The vhost admits the bare {@code /api/v1/refinery-orders} stem for every verb it serves, so
-   * the chain rule is the only thing between an anonymous caller and a booked refinery run. That
-   * rule is the {@code authenticated()} catch-all, which refuses before the dispatch — the body is
-   * never parsed, which is why an empty one still answers {@code 401} rather than {@code 400}.
+   * Creating a refinery order is refused without a token with {@code 401}, before the body is
+   * parsed.
    *
    * @throws Exception if the request could not be performed
    */
@@ -346,11 +285,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The Materialbörse's four reads are refused without a token (REQ-SEC-037).
-   *
-   * <p>{@code releasable-items} is the sharpest of them: it answers with the <em>caller's own</em>
-   * Lager stacks, so an anonymous {@code 200} would be a different order of leak from an empty
-   * board.
+   * The four Materialbörse reads are refused without a token (REQ-SEC-037).
    *
    * @param path the allow-listed board path
    * @throws Exception if the request could not be performed
@@ -384,13 +319,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The served-version floor answers {@code 200} <em>without</em> a token, and that is the point.
-   *
-   * <p>It is the one anonymous path the API vhost admits (owner decision, 2026-08-24), against a
-   * stance that opens none (plan Q8), so it gets its own assertion rather than riding along with
-   * the refusals above. A {@code 401} here is not a hardening win but a broken gate: an app too old
-   * to authenticate would then learn nothing and show an authentication error where the design
-   * calls for „Update erforderlich".
+   * The served-version floor answers {@code 200} without a token, so an outdated app can still
+   * learn that it must update.
    *
    * @throws Exception if the request could not be performed
    */
@@ -406,12 +336,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The same path asked for with {@code HEAD}, which is refused.
-   *
-   * <p>The rule is {@code GET}-scoped and Spring Security compares the verb with {@code
-   * String.equals}, so a {@code HEAD} falls to the authenticated catch-all. That is deliberate
-   * rather than incidental: a method-scoped rule sitting above an all-verb one is how REQ-SEC-032
-   * once served a material price query to a {@code HEAD} and returned its {@code Content-Length}.
+   * A {@code HEAD} on the version floor is refused, because the anonymous rule is {@code
+   * GET}-scoped (REQ-SEC-032).
    *
    * @throws Exception if the request could not be performed
    */
@@ -438,10 +364,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The four Operationen reads answer {@code 401}, not the {@code 403} their Einsatz neighbours
-   * give: no chain matcher names {@code /api/v1/operations/**}, so they fall through to {@code
-   * anyRequest().authenticated()} and are refused before the dispatch. Same family, same phase,
-   * different number — which is exactly why the runbook's table is per path.
+   * The four Operationen reads answer {@code 401}: no chain matcher names them, so the
+   * authenticated catch-all refuses them before dispatch.
    *
    * @param path the allow-listed Operationen read
    * @throws Exception if the request could not be performed
@@ -482,15 +406,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The catalogues phase 3 admits, and what an anonymous caller gets from each.
-   *
-   * <p>Not an oversight and not a leak: all three are {@code permitAll} game data the public web
-   * frontend already renders without a session — hull names, material names with their units, place
-   * names — and the editors behind them need the lists before a member has picked anything.
-   *
-   * <p>Recorded per path rather than as a family, because REQ-SEC-037 asks for the anonymous
-   * surface to be enumerated and a family is not an enumeration. The failure that rule exists to
-   * prevent is a path that turns out anonymous when nobody intended it.
+   * The anonymous status of each game-data catalogue the vhost admits; these are {@code permitAll}
+   * master data.
    *
    * @param path the allow-listed catalogue read
    * @throws Exception if the request could not be performed
@@ -504,16 +421,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * Phase M's Methoden-Picker is a catalogue of the same kind, and <strong>anonymous</strong>.
-   *
-   * <p>`/api/v1/refining-methods/**` is `permitAll` in the chain and the list read carries no
-   * method gate, so an anonymous caller gets `200`: refining-method names with their UEX yield/cost
-   * ratings, master data with no member, org unit or order in it. The admin CRUD on the same stem
-   * stays `hasRole(ADMIN)` and is unaffected.
-   *
-   * <p>Recorded separately from the phase-3 family above because it was admitted to the vhost as
-   * `401`, which it has never answered. It is the entry REQ-SEC-037's enumeration rule exists for:
-   * a path anonymous on the internet that its own rollout note described as gated.
+   * The refining-method list answers {@code 200} anonymously: {@code permitAll} master data without
+   * member or org-unit content.
    *
    * @throws Exception if the request could not be performed
    */
@@ -564,10 +473,6 @@ class ApiVhostAnonymousSurfaceTest {
   /**
    * Joining an Einsatz is refused without a token.
    *
-   * <p>Worth pinning because the Einsatz list and the Einsatz itself ARE anonymous on this vhost —
-   * the public home page renders from them — so this is a write one path segment away from a read
-   * that answers everybody.
-   *
    * @throws Exception if the request could not be performed
    */
   @Test
@@ -579,17 +484,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The four participant writes answer {@code 401} — and this is the entry on the allow-list that
-   * changed most with ADR-0159.
-   *
-   * <p>They used to resolve the row <strong>before</strong> judging the caller, so an anonymous
-   * request against a row that did not exist answered {@code 404}: {@code canAccessParticipant}
-   * looked the participant up first, because a guest sign-up was editable by the anonymous creator
-   * presenting the per-row capability token minted at sign-up (REQ-SEC-018). Both halves of that
-   * are gone — {@code V239} dropped {@code guest_edit_token_hash} and REQ-SEC-052 dropped the
-   * anonymous caller — so the request never reaches the lookup and is turned away at the entry
-   * point. This was the one entry on the list that was not authenticated-only; there is no longer
-   * one.
+   * The four participant writes are refused without a token with {@code 401} at the entry point.
    *
    * @throws Exception if the request could not be performed
    */
@@ -617,11 +512,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * Booking money against an Einsatz, and confirming a payout — both refused without a token.
-   *
-   * <p>The finance writes are the first paths on this allow-list that live outside every prefix the
-   * read-only guard names, so the vhost admits every verb on them and the chain is the only thing
-   * standing between an anonymous caller and a booked expense.
+   * Booking an Einsatz expense and confirming a payout are refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -660,11 +551,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The account-settings reads and writes, refused without a token.
-   *
-   * <p>What a caller may change on an account is stated in the settings answer rather than in the
-   * chain — `canSetTarget`, `canConfigureVisibility` — so the chain's only job here is to refuse an
-   * anonymous one, and that is what this pins.
+   * The account-settings reads and writes are refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -692,12 +579,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The order's assignee edge and its status change, refused without a token.
-   *
-   * <p>The status one is the entry worth having: it is the first path on this allow-list whose
-   * chain rule is a role rather than a session, so an authenticated member without LOGISTICIAN gets
-   * {@code 403} here where every other write on the list gets {@code 401}. The app gates the
-   * control on {@code isLogistician} for exactly that reason.
+   * The job order's assignee and status changes are refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -725,50 +607,21 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The four pickers phase S opens, refused without a token.
-   *
-   * <p>The class the audit called unreportable: each of these is swallowed on failure by design — a
-   * picker is one field on a form about something else — so a refused read renders as an
-   * <em>empty</em> list, and an empty picker reads as an answer rather than as a fault. {@code
-   * /job-types} is the worst of them: the tab does not merely show nothing, it states that the
-   * organisation has defined no CREW functions.
+   * The four form pickers are refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousPickerReadsWithUnauthorized() throws Exception {
-    // Pinned one at a time, because the four do NOT answer alike and grouping them hid that.
-    // `/api/v1/orders/**` and `/api/v1/operations/**` are authenticated in the filter chain, so the
-    // entry point turns them away before dispatch and writes 401.
     mockMvc.perform(get("/api/v1/orders/lookup")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/operations/lookup")).andExpect(status().isUnauthorized());
-    // `GET /api/v1/missions/**` is permitAll — the whole Einsatz read surface is, so a guest can
-    // see the board — so this one is dispatched and refused at the method seam: 403.
-    // 403, not 401, and the difference is structural: `/api/v1/job-types` is `permitAll` in the
-    // filter chain (it sits in the catalogue block beside /locations and /refining-methods), so
-    // the request is DISPATCHED and the method-level guard refuses it — which
-    // GlobalExceptionHandler
-    // renders as 403, with nothing upgrading it to 401 because the MVC advice has already handled
-    // it. Identical in shape to /locations/home-locations, which phase M spent three red probe
-    // nights learning.
     mockMvc.perform(get("/api/v1/missions/lookup")).andExpect(status().isUnauthorized());
-    // 200, and DELIBERATELY so (REQ-SEC-037). `JobTypeController`'s own Javadoc states the rule —
-    // "Read is public; mutations are OFFICER/ADMIN" — and the list carries role names and nothing
-    // else: no member, no org unit, no Einsatz is reachable through it. It sits in the same
-    // permitAll catalogue block as /ship-types, /materials/search and /refining-methods, all of
-    // which this class already records as anonymous. Admitting it at the edge therefore publishes
-    // a catalogue that was already public, and this assertion is what keeps that a decision.
     mockMvc.perform(get("/api/v1/job-types")).andExpect(status().isUnauthorized());
   }
 
   /**
-   * The two edits phase R opens, refused without a token.
-   *
-   * <p>These are the only two of the audit's 75 that answered {@code 405} rather than {@code 404}:
-   * the path was reachable and the verb was not. What this class can pin is the backend's own
-   * answer; that the exception stayed <em>method-scoped</em> — {@code DELETE} on both paths still
-   * refused by the edge — is a vhost behaviour and is asserted by the nightly probe instead.
+   * The two edit paths are refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -792,15 +645,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The last seven paths phase X opens, and the one that is anonymous by design.
-   *
-   * <p>Blaupausen, the Fleetview import and the two thresholds that colour an Auftrag by age. The
-   * settings pair is the interesting one: {@code /api/v1/settings} sits in the {@code permitAll}
-   * catalogue block beside {@code /locations} and {@code /job-types}, so these reads are dispatched
-   * and answer with a value. They carry two integers — how many days before an Auftrag turns
-   * yellow, and before it turns red — and nothing else. What must NOT be open is the {@code PUT} on
-   * the same path, which is the admin write that changes them for the whole organisation; that is
-   * held shut by the read-only family rather than by a carve-out.
+   * The blueprint, Fleetview-import and settings paths: the settings read answers anonymously with
+   * the two job-order age thresholds, everything else is refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -846,8 +692,6 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isUnauthorized());
-    // Anonymous BY DESIGN, and pinned so it stays a decision: two integers in the same permitAll
-    // catalogue block as /locations and /job-types.
     mockMvc
         .perform(get("/api/v1/settings/job_order.age_yellow_days"))
         .andExpect(status().isUnauthorized());
@@ -857,26 +701,15 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The Handel family phase W opens, and the two ways it answers.
-   *
-   * <p>The price screens sit under {@code /api/v1/materials}, which is a {@code permitAll}
-   * catalogue prefix — {@code /materials/search} has been recorded as anonymous since phase 2 — so
-   * these reads are dispatched and refused at the method seam rather than turned away at the entry
-   * point. The Materialbörse and the terminal catalogue are ordinary authenticated surfaces.
-   *
-   * <p>Pinned one at a time rather than in a loop, because that is exactly what phase S's four
-   * pickers proved: a group assertion hides a seam.
+   * The Handel paths without a token: the price screens under the {@code permitAll} materials
+   * prefix are refused at the method seam, the Materialbörse and terminal catalogue at the entry
+   * point.
    *
    * @throws Exception if the request could not be performed
    */
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousTradeFamily() throws Exception {
-    // The four price reads are authenticated, and three of them only became so with this phase:
-    // measured anonymously first, `prices-overview` answered 200, `*/prices` answered 200 and
-    // `profit-calculation` answered 500 — dispatched and crashing, which is not a gate. They carry
-    // the UEX trade data REQ-SEC-032 exists to keep off the public vhost, so they joined the
-    // `matrix` carve-out rather than being admitted as they stood.
     mockMvc.perform(get("/api/v1/materials/prices-overview")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/materials/matrix")).andExpect(status().isUnauthorized());
     mockMvc
@@ -885,11 +718,6 @@ class ApiVhostAnonymousSurfaceTest {
     mockMvc
         .perform(get("/api/v1/materials/" + ABSENT_MISSION + "/prices"))
         .andExpect(status().isUnauthorized());
-    // `GET /materials/{id}` was the last anonymous read on this family, kept because MaterialDto
-    // is catalogue only — name, quantity type, category, flags, no price — and `/materials/search`
-    // had published those same fields anonymously since phase 2. REQ-SEC-052 closed both: the
-    // public surface is an enumerated list of four backend paths and no catalogue is on it. A 401
-    // here where a 404 used to stand is the whole change in one line.
     mockMvc
         .perform(get("/api/v1/materials/" + ABSENT_MISSION))
         .andExpect(status().isUnauthorized());
@@ -928,14 +756,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The Einsatz planning set phase V opens, refused without a token.
-   *
-   * <p>The audit's largest block: everything a Kommandoleiter builds an Einsatz out of. The writes
-   * are the interesting half here, because {@code GET /api/v1/missions/**} is {@code permitAll} —
-   * the whole Einsatz read surface is, so a guest can see the board — and that seam is what phase S
-   * met with {@code /missions/lookup} answering {@code 403} where its three neighbours answered
-   * {@code 401}. A write is not covered by that {@code permitAll}, so the entry point turns it away
-   * before dispatch and writes {@code 401}; the one read in this phase is the one to watch.
+   * The Einsatz planning writes are refused without a token with {@code 401} at the entry point.
    *
    * @throws Exception if the request could not be performed
    */
@@ -943,8 +764,6 @@ class ApiVhostAnonymousSurfaceTest {
   @WithAnonymousUser
   void shouldRefuseAnonymousMissionPlanningWrites() throws Exception {
     String mission = "/api/v1/missions/" + ABSENT_MISSION;
-    // The three section patches and the party lead. Each carries its own section counter, which is
-    // the reason they are separate endpoints at all.
     for (String leaf : new String[] {"/core", "/schedule", "/flags"}) {
       mockMvc
           .perform(
@@ -961,8 +780,6 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":0}"))
         .andExpect(status().isUnauthorized());
-    // The manager-only add-by-id (REQ-MISSION-020, ADR-0170 amendment) that replaced the deleted
-    // `POST …/participants` on 2026-09-22.
     mockMvc
         .perform(
             post(mission + "/participants/by-id/slim")
@@ -970,8 +787,6 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + ABSENT_OPERATION + "\"}"))
         .andExpect(status().isUnauthorized());
-    // Einheiten, crew, Frequenzen and Verwalter — slim only: the full-DTO twins were deleted on
-    // 2026-09-22 (BE-SIMP-02) after their deprecation, and the app had been moved off them.
     for (String leaf :
         new String[] {
           "/units/slim",
@@ -1026,12 +841,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The one read in phase V, pinned on its own because it sits behind the {@code permitAll} seam.
-   *
-   * <p>{@code GET /api/v1/missions/**} is {@code permitAll}, so this request is dispatched rather
-   * than turned away at the entry point, and whatever the method guard then decides is what the
-   * runbook's table and the nightly probe have to say. Phase M's lesson, and phase S's: the number
-   * is measured here first and written down afterwards.
+   * The one Einsatz planning read, dispatched under the {@code permitAll} missions prefix, is
+   * refused by its method guard.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1044,12 +855,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The three Lager writes phase U opens, refused without a token.
-   *
-   * <p>Sammel-Ausbuchen, Sammel-Umbuchen, and the earmark a Logistiker sets on a stock row. The
-   * allocation is three verbs on one path and all three were refused, which is what made it the
-   * worst of them: the save loop is sequential and version-chained, so the first row fails, {@code
-   * partial} stays at zero and <em>nothing</em> is ever written.
+   * The bulk book-out, bulk transfer and stock earmark writes are refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1094,26 +900,14 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The Auftrags-Familie phase T opens, refused without a token.
-   *
-   * <p>Nine paths, and the audit's own block: four reads that made a working screen look empty or
-   * absent, and five writes that discarded what a Logistiker had typed. They are pinned together
-   * because they were admitted together — the Zusagen list carries its own upsert and withdrawal on
-   * the same path, and the Bestandszeilen read is what makes a Material-Übergabe submittable at
-   * all, an Übergabe being what closes an Auftrag.
-   *
-   * <p>All nine answer {@code 401}: nothing under {@code /api/v1/orders} is {@code permitAll}
-   * except the item catalogue and the two creates, and those are {@code authenticated} explicitly.
-   * Unlike phase S's pickers there is no seam to fall through — the entry point turns every one of
-   * these away before dispatch. Asserted rather than assumed, in the order this runbook fixed after
-   * phase M.
+   * The nine job-order paths (claims, stock lines and handover-related reads and writes) are
+   * refused without a token with {@code 401}.
    *
    * @throws Exception if the request could not be performed
    */
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousJobOrderFamilyWithUnauthorized() throws Exception {
-    // The four reads.
     mockMvc.perform(get("/api/v1/orders/material-demand")).andExpect(status().isUnauthorized());
     mockMvc
         .perform(get("/api/v1/orders/" + ABSENT_OPERATION + "/item-stock"))
@@ -1130,8 +924,6 @@ class ApiVhostAnonymousSurfaceTest {
                     + ABSENT_MISSION
                     + "/inventory"))
         .andExpect(status().isUnauthorized());
-    // The five writes. Bodies are shaped enough to reach the security gate and no further — an
-    // anonymous request never gets as far as validation.
     mockMvc
         .perform(
             post("/api/v1/orders/" + ABSENT_OPERATION + "/claims")
@@ -1174,24 +966,14 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"items\":[]}"))
         .andExpect(status().isUnauthorized());
-    // A query parameter, not a body, and no version: the service reorders the whole queue under a
-    // pessimistic write lock, so there is nothing for an optimistic version to guard.
     mockMvc
         .perform(put("/api/v1/orders/" + ABSENT_OPERATION + "/priority?priority=1").with(csrf()))
         .andExpect(status().isUnauthorized());
   }
 
   /**
-   * The member's own two settings and the Aushang's read marker, refused without a token.
-   *
-   * <p>Phase Q, and the quietest gap this allow-list has produced. Both settings rows are drawn
-   * {@code enabled} only once their value has arrived, and the {@code GET} that would deliver it
-   * was admitted by no rule — so it answered {@code 404}, the app logged it, and the rows sat in
-   * exactly the state a never-set value produces. Nobody could report it as a failure.
-   *
-   * <p>Read and write are pinned together for both, because they were admitted together: the two
-   * rows share one optimistic-lock version, and a client that could write but not read would echo
-   * {@code 0}.
+   * The member's own two settings and the Aushang read marker are refused without a token, for both
+   * read and write.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1220,15 +1002,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The Freigabe-Limits, refused without a token.
-   *
-   * <p>Four leaves under one allow-list rule (phase P), and the gap they close is the quietest one
-   * this vhost has had: the account's {@code /settings} GET that carries their current values was
-   * admitted in phase 3, so the section drew correctly and only the writes answered 404. Nothing in
-   * the runbook named {@code approval-limit} at all — neither admitting it nor excluding it.
-   *
-   * <p>Both verbs on each leaf, because the carve-out opens both and a test that checked only the
-   * PUT would say nothing about the DELETE that clears a ceiling.
+   * The approval-limit paths are refused without a token, for both {@code PUT} and {@code DELETE}.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1252,17 +1026,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The Verwaltung's direct booking, refused without a token.
-   *
-   * <p>Four paths phase O admits, and the phase is a correction rather than an addition: they were
-   * excluded because the runbook said no artboard drew them, and design chapter 12 artboard 9 draws
-   * exactly the sheet the app shipped. So the interesting thing to pin is not that they are refused
-   * — it is that they are refused with <b>401</b> and not 404, which is what says the allow-list
-   * actually admits them now.
-   *
-   * <p>All four gate on {@code hasRole('BANK_EMPLOYEE')}; the three bookings add a per-account
-   * grant that anonymous never reaches. The bank-admin paths beside them stay 404 and are asserted
-   * elsewhere — that exclusion is a real owner decision and this phase does not touch it.
+   * The bank's direct booking paths are refused without a token with {@code 401}, which shows the
+   * vhost admits them.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1313,14 +1078,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The Materialsammelübersicht and the crew removal, refused without a token.
-   *
-   * <p>Five paths phase N admits: the collection read, its two unlinks, the delivered PATCH that
-   * belongs to the same screen but lives on {@code /inventory}, and the {@code /slim} crew removal.
-   * REQ-SEC-037 wants every admitted path pinned here, and phase M is the reason it is not optional
-   * — that phase wrote its expected-status table by reasoning about the form around the field
-   * instead of the rule that judges the caller, the nightly probe was generated from the table, and
-   * both carried the same wrong number for three nights.
+   * The material-collection overview, its unlinks, the delivered patch and the crew removal are
+   * refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1357,13 +1116,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The home-location list is refused with {@code 403}, not {@code 401}.
-   *
-   * <p>Same shape as the Finanzen paths: `/api/v1/locations/**` is `permitAll` in the filter chain,
-   * so the request is dispatched and the method-level guard refuses it — which
-   * `GlobalExceptionHandler` renders as `403`, and nothing upgrades to `401` because the MVC advice
-   * has already handled it. The number is what the runbook's table has to say, or the paste
-   * verification reports a difference that is not one.
+   * The home-location list is refused with {@code 403}: dispatched under the {@code permitAll}
+   * locations prefix and refused by its method guard.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1374,15 +1128,8 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The refinery-location list is refused with {@code 403} for the same structural reason as the
-   * home-location list above it — two subreads of one prefix, identical in shape.
-   *
-   * <p>Phase M admits it as the create form's Raffinerie-Picker and recorded it as {@code 401}. It
-   * has never answered that: `/api/v1/locations/**` is `permitAll` in the chain, so the request is
-   * dispatched, the method-level `isAuthenticated()` refuses it at the method seam, and
-   * `GlobalExceptionHandler` renders that as `403`. The number was reasoned from the gated form the
-   * picker belongs to rather than read off the rule that judges the caller, and the nightly probe
-   * inherited it — three red runs against a vhost that was configured correctly.
+   * The refinery-location list is refused with {@code 403}, for the same reason as the
+   * home-location list.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1393,11 +1140,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The Hangar's own-ship writes, which phase 3 opens on the vhost.
-   *
-   * <p>The reads beside them were already covered; what is new is that the vhost now lets these
-   * verbs through, so the method gate is the only thing between an anonymous caller and somebody
-   * else's hangar.
+   * The hangar's own-ship writes are refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -1425,12 +1168,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The first <em>writes</em> the vhost admits, refused the same way when nobody is signed in.
-   *
-   * <p>Worth its own case rather than folding into the read above: the allow-list opens these two
-   * paths for every verb the backend serves, so the question "what does an anonymous POST get" is
-   * now a real one. It must be the same {@code 401} — a write that answered anything softer would
-   * mean the vhost had opened a path whose method-level guard does not hold.
+   * The first writes the vhost admits answer {@code 401} without a token, like the reads.
    *
    * @throws Exception if the request could not be performed
    */

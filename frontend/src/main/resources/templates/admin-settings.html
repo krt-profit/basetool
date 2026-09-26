@@ -80,13 +80,6 @@
             </form>
         </div>
 
-        <!--/*
-            Per-squadron promotion-feature toggle. Each row PATCHes the backend on click via
-            /api/proxy/squadrons/{id}/promotion-enabled — no full form submit so the admin can
-            flip several squadrons without a page reload. Flipping the flag does NOT delete any
-            promotion data; the menu just becomes hidden for the squadron's non-admin members
-            until the flag goes back to ON.
-        */-->
         <div class="data-section mt-2">
             <h2 th:text="#{admin.settings.squadron.promotion}">Beförderungssystem pro Staffel</h2>
             <p class="mb-1 text-muted"
@@ -123,12 +116,6 @@
             </div>
         </div>
 
-        <!--/*
-            Per-squadron profit-eligibility toggle. Each row PATCHes the backend on click via
-            /api/proxy/squadrons/{id}/profit-eligible — no full form submit. Marking a squadron
-            eligible opts it into the Job-Order responsible (processing) picker; un-marking removes
-            it again. Spezialkommandos have their own per-SK toggle in the section below.
-        */-->
         <div class="data-section mt-2">
             <h2 th:text="#{admin.settings.squadron.profit}">Auftragsbearbeitung pro Staffel</h2>
             <p class="mb-1 text-muted"
@@ -165,11 +152,6 @@
             </div>
         </div>
 
-        <!--/*
-            Per-SK profit-eligibility toggle. Same pattern as the squadron table, but PATCHes
-            /api/proxy/special-commands/{id}/profit-eligible. SKs of non-Profit Kartell departments
-            stay unchecked: they may place orders but not process them.
-        */-->
         <div class="data-section mt-2">
             <h2 th:text="#{admin.settings.sk.profit}">Auftragsbearbeitung pro Spezialkommando</h2>
             <p class="mb-1 text-muted"
@@ -211,7 +193,6 @@
 <th:block th:replace="~{fragments/toast :: toast}" />
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    /*<![CDATA[*/
     var MSG_ENABLED  = /*[[#{admin.settings.squadron.promotion.enabled}]]*/ 'aktiv';
     var MSG_DISABLED = /*[[#{admin.settings.squadron.promotion.disabled}]]*/ 'inaktiv';
     var MSG_ERROR    = /*[[#{admin.settings.squadron.promotion.error}]]*/ 'Speichern fehlgeschlagen';
@@ -229,7 +210,6 @@
         dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
-    /*]]>*/
 </script>
 <script th:src="@{/js/admin-settings.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

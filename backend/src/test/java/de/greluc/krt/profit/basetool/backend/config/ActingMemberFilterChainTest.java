@@ -41,22 +41,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * The acting-member trust boundary, exercised through the <strong>real filter chain</strong>
- * (ADR-0129).
+ * Tests the refusals of the acting-member trust boundary through the real filter chain, with the
+ * approval gate live (ADR-0129).
  *
- * <p>Deliberately not a unit test of the filter. Every failure this boundary has actually had was
- * an ordering or wiring failure that a filter tested in isolation cannot see: filters running
- * before authentication against an empty context, a gate evaluating the wrong subject, a caller
- * reaching an endpoint the header was never meant for. So these drive {@link FilterChainProxy} as
- * configured, with the approval gate live.
- *
- * <p>The consent gate is NOT live here: the {@code test} profile stands it down for the whole
- * suite, which is exactly how a fail-open on that gate stayed green. {@link
- * ActingMemberIdentityChainTest} re-arms it for itself and owns that case; this class owns the
- * refusals.
- *
- * <p>The allowlist is set to a test client id, which is the only thing that distinguishes a gateway
- * from any other caller — matching production, where an empty allowlist admits nobody.
+ * <p>The consent gate is stood down here; {@link ActingMemberIdentityChainTest} covers it.
  */
 @SpringBootTest
 @TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
@@ -73,11 +61,8 @@ class ActingMemberFilterChainTest {
   private MockMvc mockMvc;
 
   /**
-   * How often this filter has refused for one reason so far.
-   *
-   * <p>Read as a delta around each request rather than as an absolute: the meter registry is a
-   * context-scoped singleton, so counters carry over from every test that ran before this one in
-   * the same context.
+   * Returns how often the filter has refused for one reason so far; tests read it as a delta
+   * because the registry is shared across the context.
    *
    * @param reason the bounded {@code MetricNames.ON_BEHALF_OF_*} reason
    * @return the current count, or {@code 0} when nothing has been counted under it yet
@@ -119,17 +104,11 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    // Asserted on the code AND the reason, not on the status alone. Three filters in this chain
-    // answer 403 and the request would have been refused downstream anyway (this caller has no
-    // consent row either), so a bare status assertion passes even when THIS guard never ran.
     assertThat(refusals(MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY)).isEqualTo(before + 1);
   }
 
   /**
-   * The gateway may not use the header on an endpoint outside the two it is bounded to.
-   *
-   * <p>ADR-0129 bounds the header to the two import endpoints. Before this the bound existed only
-   * in prose, so a future endpoint would have inherited impersonation by accident.
+   * The gateway may not use the header on an endpoint outside the two it is bound to (ADR-0129).
    */
   @Test
   void refusesTheHeaderOnAnEndpointItIsNotBoundTo() throws Exception {
@@ -149,19 +128,7 @@ class ActingMemberFilterChainTest {
     assertThat(refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(before + 1);
   }
 
-  // The percent-encoded-path case is NOT here on purpose: MockMvc normalises the path before any
-  // filter sees it, so this level cannot reproduce it — the same limitation TermsAcceptanceAccess-
-  // FilterTest documents for the identical guard. It is covered directly in
-  // ActingMemberFilterPathMatchingTest instead, which drives the filter with a raw request URI.
-
-  /**
-   * A member with no local account is refused, not created.
-   *
-   * <p>The login path creates a row for a first-seen subject, which is right when a person
-   * authenticated. Here nobody did — inventing a member from a header would make the header a
-   * registration primitive, and would also defeat the liveness check by re-creating exactly the row
-   * that was meant to be missing.
-   */
+  /** A member with no local account is refused, not created. */
   @Test
   void refusesAMemberWithNoLocalAccount() throws Exception {
     double before = refusals(MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE);
@@ -177,20 +144,12 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    // Counted as "not live" rather than as its own reason: the answer must not distinguish an
-    // unknown subject from an offboarded one, or the endpoint becomes an enumeration oracle.
     assertThat(refusals(MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE)).isEqualTo(before + 1);
   }
 
   /**
    * An unauthenticated caller sending the header at an unbound endpoint is counted as
-   * <em>endpoint_not_bound</em>, not as <em>no_authenticated_caller</em>.
-   *
-   * <p>This pins the guard ORDER, which is load-bearing. This filter sits on the unmatched chain,
-   * so it sees every path; while the caller check came first, any anonymous internet request that
-   * carried this header — a header shipped in the extractor and documented publicly — was counted
-   * under a reason documented as structurally impossible and alerted on as evidence of a
-   * filter-ordering bug. One probe produced an hour-long page pointing at the wrong thing.
+   * <em>endpoint_not_bound</em>, not as <em>no_authenticated_caller</em>, pinning the guard order.
    */
   @Test
   void countsAnAnonymousProbeOnAnUnboundPathAsOutOfBoundsNotAsAMissingCaller() throws Exception {
@@ -210,13 +169,7 @@ class ActingMemberFilterChainTest {
     assertThat(refusals(MetricNames.ON_BEHALF_OF_NO_CALLER)).isEqualTo(caller);
   }
 
-  /**
-   * On a bound endpoint, a header with no authenticated caller is still refused and still counted.
-   *
-   * <p>The reason survives the reorder — it is now confined to the two endpoints that accept the
-   * header at all, which is what makes a sustained rate on it meaningful rather than ambient
-   * internet noise.
-   */
+  /** On a bound endpoint, a header with no authenticated caller is still refused and counted. */
   @Test
   void stillRefusesAHeaderWithNoAuthenticatedCallerOnABoundPath() throws Exception {
     double before = refusals(MetricNames.ON_BEHALF_OF_NO_CALLER);

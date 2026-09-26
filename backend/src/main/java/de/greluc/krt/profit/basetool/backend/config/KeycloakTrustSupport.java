@@ -33,46 +33,32 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 
 /**
- * Shared factory for a {@link ClientHttpRequestFactory} whose JDK {@link HttpClient} pins its trust
- * set to a named Spring SSL bundle's truststore — the single source of the self-signed-Keycloak
- * trust wiring so the two backend callers that reach the internal {@code https://keycloak:18443}
- * connector ({@code KeycloakService}'s admin client and the resource server's JWKS decoder) build
- * it identically instead of hand-rolling the same {@code TrustManagerFactory} / {@code SSLContext}
- * dance twice (REQ-SEC-014, REQ-SEC-024).
+ * Builds a {@link ClientHttpRequestFactory} whose JDK {@link HttpClient} trusts only a named Spring
+ * SSL bundle's truststore, for the backend's calls to the internal Keycloak connector
+ * (REQ-SEC-014).
  *
- * <p>Hostname verification is intentionally left at the JDK default ({@code HTTPS}) — the
- * synchronous JDK {@link HttpClient} cannot disable it reliably per-client, so the pinned
- * certificate MUST carry {@code dns:keycloak} in its SAN. Returning {@code null} when the bundle is
- * absent lets each caller fall back to its default client (the JVM {@code cacerts} + plain-HTTP
- * dev/test admin URL), which is exactly what the non-prod profiles need.
+ * <p>Hostname verification stays on, so the pinned certificate must carry {@code dns:keycloak} in
+ * its SAN.
  */
 public final class KeycloakTrustSupport {
 
   /**
-   * Canonical name of the Spring SSL bundle whose truststore pins the self-signed certificate the
-   * production Keycloak presents on its internal {@code https://keycloak:18443} connector. Defined
-   * in {@code application-prod.yml}; absent in dev/test, where Keycloak is reached over plain HTTP.
-   * Shared so {@code KeycloakService} (admin client) and the resource-server JWKS decoder name the
-   * exact same bundle.
+   * Name of the SSL bundle pinning the certificate of the internal Keycloak connector; defined only
+   * in the {@code prod} profile.
    */
   public static final String KEYCLOAK_TRUST_BUNDLE = "keycloak-trust";
 
-  private KeycloakTrustSupport() {
-    // Utility holder — not instantiable.
-  }
+  private KeycloakTrustSupport() {}
 
   /**
-   * Builds a truststore-pinned {@link ClientHttpRequestFactory} from the named SSL bundle, or
-   * returns {@code null} when no such bundle is registered for the active profile (the caller then
-   * falls back to its default, JVM-trust-store-backed client). The truststore is read once here;
-   * callers are expected to cache the returned factory rather than rebuild it per request.
+   * Builds a truststore-pinned request factory from the named SSL bundle.
+   *
+   * <p>Callers should cache the returned factory rather than rebuild it per request.
    *
    * @param sslBundles the registered Spring SSL bundles
    * @param bundleName the name of the bundle whose truststore pins the accepted certificate
-   * @return a truststore-pinned request factory, or {@code null} to signal "bundle absent, use the
-   *     default client"
-   * @throws IllegalStateException if the bundle exists but a TLS context cannot be built from it (a
-   *     genuine misconfiguration that must fail fast rather than silently trust nothing)
+   * @return the pinned request factory, or {@code null} when the bundle is absent
+   * @throws IllegalStateException if the bundle exists but no TLS context can be built from it
    */
   @Nullable
   public static ClientHttpRequestFactory trustedRequestFactory(

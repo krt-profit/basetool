@@ -34,14 +34,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Asserts that a {@link java.math.BigDecimal} form amount is a whole number (no fractional part).
- *
- * <p>Value-based, not scale-based: {@code 500}, {@code 500.00} and {@code 500.0000} are accepted
- * and only genuinely fractional values such as {@code 500.50} are rejected — unlike
- * {@code @Digits(fraction = 0)}, which would reject the whole-valued {@code 500.00}. Mirrors the
- * backend {@code WholeNumber} constraint so the mission-finance form rejects fractional input
- * inline (REQ-MISSION-001) before the controller calls the backend. {@code null} is valid; presence
- * is the concern of {@code @NotNull} and the lower bound that of {@code @DecimalMin}.
+ * Asserts that a {@link java.math.BigDecimal} form amount has no fractional part, by value rather
+ * than scale ({@code 500.00} passes, {@code 500.50} fails); mirrors the backend {@code WholeNumber}
+ * (REQ-MISSION-001). {@code null} is valid.
  */
 @Documented
 @Constraint(validatedBy = WholeNumberValidator.class)

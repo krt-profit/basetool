@@ -24,22 +24,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Carries the consent gate's verdict across a WebSocket handshake, from the servlet filter that
- * decided it to the handshake interceptor that acts on it (REQ-SEC-028, REQ-FE-015).
+ * Carries the consent gate's verdict across a WebSocket handshake from the servlet filter to the
+ * handshake interceptor (REQ-SEC-028, REQ-FE-015).
  *
- * <p><strong>Why a handoff rather than a refusal.</strong> A WebSocket upgrade answered with
- * anything but {@code 101} — a {@code 302} to the consent page included — reaches the browser as
- * {@code close} with code {@code 1006} and no reason, indistinguishable from a dropped connection.
- * The client therefore reconnects, and consent can never be given from a background socket, so the
- * loop has no exit. The gate consequently lets the upgrade through and marks it; the socket is
- * refused with a terminal close code once one exists.
- *
- * <p><strong>Why it lives in {@code support}.</strong> {@code config} already depends on {@code
- * websocket} (the endpoint registration), so letting {@code websocket} read the attribute name off
- * the filter would close a package cycle. A leaf both may depend on is the same shape ADR-0047
- * forced on the backend's {@code support.TermsConsentCheck}, and it keeps a single owner for the
- * attribute name — a literal duplicated on the two sides would drift into a socket that is never
- * refused and a loop nobody notices.
+ * <p>The gate lets the upgrade through and marks it, because a refused upgrade looks like a dropped
+ * connection and causes endless reconnects; the socket is then closed with a terminal code.
  */
 public final class TermsGateHandoff {
 
@@ -49,9 +38,7 @@ public final class TermsGateHandoff {
    */
   private static final String REQUEST_ATTRIBUTE = "krt.terms.gate.websocket";
 
-  private TermsGateHandoff() {
-    // utility holder
-  }
+  private TermsGateHandoff() {}
 
   /**
    * Marks a WebSocket handshake as belonging to a user without valid consent, recording where that

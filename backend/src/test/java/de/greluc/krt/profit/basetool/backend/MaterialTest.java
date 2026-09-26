@@ -91,7 +91,6 @@ class MaterialTest {
 
   @Test
   void testCreateMaterial_Admin_Allowed() throws Exception {
-    // Mirrors the new MaterialCreateDto contract: name + type + quantityType are required.
     Material material = new Material();
     material.setName("New Material");
     material.setDescription("Valuable");

@@ -35,17 +35,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Browser coverage for the cross-order material-demand page ({@code /orders/material-demand},
- * REQ-ORDERS-034). The MockMvc render test pins the server-rendered markup; everything this page
- * does <em>after</em> the HTML arrives is client-side and only reachable here: the per-bucket
- * drill-down toggle and its per-browser {@code localStorage} persistence across a reload.
+ * E2E coverage for the client-side behaviour of the cross-order material-demand page ({@code
+ * /orders/material-demand}, REQ-ORDERS-034): the per-bucket drill-down toggle and its {@code
+ * localStorage} persistence across a reload.
  *
- * <p>Seeds two orders of the same profit-eligible unit requesting the <em>same</em> material at the
- * same quality, so the page must fold them into a <b>single</b> row whose demand is the sum — the
- * defining behaviour of the feature — with both orders listed in that row's drill-down.
- *
- * <p>The seeded material name is unique to this class, so the assertions stay stable even when a
- * shared stack carries other suites' orders.
+ * <p>Seeds two orders requesting the same material at the same quality and asserts they fold into
+ * one summed row listing both orders.
  */
 @Tag("e2e")
 class JobOrderMaterialDemandE2eTest {
@@ -86,8 +81,6 @@ class JobOrderMaterialDemandE2eTest {
       seeder.createJobOrder(USERNAME, PASSWORD, IRIDIUM_ID, "E2E demand A", materialId, 650, 40);
       seeder.createJobOrder(USERNAME, PASSWORD, IRIDIUM_ID, "E2E demand B", materialId, 650, 60);
 
-      // A second, fully covered bucket: 25 required with 25 linked in stock, so its outstanding
-      // amount is 0 and the hide-covered filter has something to remove.
       String coveredMaterialId =
           seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, COVERED_MATERIAL_NAME);
       String locationId = seeder.createLocation(USERNAME, PASSWORD, "E2E Demand Location");
@@ -151,9 +144,7 @@ class JobOrderMaterialDemandE2eTest {
         assertThat(page.locator("section[data-testid='demand-group']").first()).isVisible();
         Locator row = demandRow(page);
         assertThat(row).hasCount(1);
-        // 40 + 60, summed across the two orders and formatted as an SCU amount.
         assertThat(row.locator("[data-testid='demand-required']")).containsText("100,000");
-        // Nothing is booked against them, so the whole demand is still outstanding.
         assertThat(row.locator("[data-testid='demand-outstanding']")).containsText("100,000");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "material-demand-aggregation");
@@ -185,7 +176,6 @@ class JobOrderMaterialDemandE2eTest {
         toggle.click();
         assertThat(drillDown).isVisible();
         assertThat(toggle).hasAttribute("aria-expanded", "true");
-        // Both seeded orders are listed as contributors of this one bucket.
         assertThat(drillDown.locator("tr[data-testid='demand-order-share']")).hasCount(2);
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
@@ -194,7 +184,6 @@ class JobOrderMaterialDemandE2eTest {
         assertThat(demandRow(page).locator("[data-trigger='demand-toggle-orders']"))
             .hasAttribute("aria-expanded", "true");
 
-        // Collapsing again must persist too, otherwise the state would be write-once.
         demandRow(page).locator("[data-trigger='demand-toggle-orders']").click();
         E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
         assertThat(page.locator("tr[data-bucket-orders='" + bucketKey + "']")).isHidden();
@@ -241,8 +230,6 @@ class JobOrderMaterialDemandE2eTest {
         Locator panel = page.locator("#demandFilterPanel");
         Locator count = page.locator(".filter-toggle [data-filter-count]");
 
-        // Every filter panel starts collapsed (REQ-FE-021); nothing is filtered yet, so the chip
-        // is off as well.
         assertThat(panel).isHidden();
         assertThat(toggle).hasAttribute("aria-expanded", "false");
         assertThat(count).isHidden();
@@ -253,7 +240,6 @@ class JobOrderMaterialDemandE2eTest {
         assertThat(count).isVisible();
         assertThat(count).containsText("1");
 
-        // The explicit open choice AND the active filter both survive a reload.
         E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
         assertThat(page.locator("#demandFilterPanel")).isVisible();
         assertThat(page.locator("[data-testid='demand-hide-covered']")).isChecked();
@@ -316,7 +302,6 @@ class JobOrderMaterialDemandE2eTest {
                 .filter(new Locator.FilterOptions().setHasText(MATERIAL_NAME))
                 .first();
 
-        // The search is presentation only: it hides options, never rows.
         page.locator("[data-testid='demand-material-search']").fill(COVERED_MATERIAL_NAME);
         assertThat(coveredOption).isVisible();
         assertThat(oreOption).isHidden();
@@ -348,7 +333,6 @@ class JobOrderMaterialDemandE2eTest {
         sortOutstanding.click();
         assertThat(page.locator("th[data-sort-col='outstanding']").first())
             .hasAttribute("aria-sort", "ascending");
-        // Ascending: the covered bucket (0) comes before the outstanding one (100).
         assertTrue(
             rowIndexOf(page, COVERED_MATERIAL_NAME) < rowIndexOf(page, MATERIAL_NAME),
             "covered row sorts before the outstanding row ascending");
@@ -360,7 +344,6 @@ class JobOrderMaterialDemandE2eTest {
             rowIndexOf(page, MATERIAL_NAME) < rowIndexOf(page, COVERED_MATERIAL_NAME),
             "outstanding row sorts first descending");
 
-        // A third click returns to the server's own order.
         sortOutstanding.click();
         assertThat(page.locator("th[data-sort-col='outstanding']").first())
             .hasAttribute("aria-sort", "none");

@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code ClaimBucketDto}: the claim view of one aggregated material
- * bucket on a public SK order (required vs. claimed vs. open-remaining plus the individual claims).
- * {@code qualityRequirement} is the {@code GOOD}/{@code NONE} name as a string, matching {@link
- * AggregatedMaterialDto}. No interactive UI consumes this yet (Phase 6).
+ * Frontend mirror of the backend {@code ClaimBucketDto}: required, claimed and open amounts plus
+ * the individual claims of one material bucket on a public SK order.
  *
  * @param material the bucket's material (carries {@code quantityType} for unit-aware display)
  * @param qualityRequirement the quality bucket name ({@code GOOD} or {@code NONE})

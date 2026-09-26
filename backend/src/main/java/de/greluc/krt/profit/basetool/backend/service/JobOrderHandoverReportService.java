@@ -45,10 +45,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service responsible for generating handover report PDFs in KRT Corporate Design. Supports both
- * persisted handovers (by ID) and preview generation from raw DTO data. The page background, the
- * embedded Lato fonts and every cell helper come from the shared {@link KrtPdfSupport} layer (epic
- * #556 Phase 3) — the rendered content is unchanged.
+ * Generates handover report PDFs in KRT corporate design, for persisted handovers or as a preview
+ * from raw DTO data, using the shared {@link KrtPdfSupport} layer.
  */
 @Service
 @RequiredArgsConstructor
@@ -56,9 +54,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderHandoverReportService {
 
-  // Patterns are intentionally NOT bound to a fixed zone here. The persisted-handover path
-  // binds the zone per request (from the X-User-Time-Zone header), and the preview path
-  // formats LocalDateTime directly without any zone conversion.
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -66,16 +61,12 @@ public class JobOrderHandoverReportService {
   private final MessageSource messageSource;
 
   /**
-   * Generates a handover report PDF for a persisted handover.
-   *
-   * <p>The persisted {@code handoverTime} is a UTC {@link java.time.Instant}; for display in the
-   * PDF it must be rendered in the user's actual time zone (passed in via {@code userZone}, e.g.
-   * from the {@code X-User-Time-Zone} request header). If {@code userZone} is {@code null}, UTC is
-   * used as a safe fallback.
+   * Generates the report PDF for a persisted handover, rendering the handover time in {@code
+   * userZone}.
    *
    * @param jobOrderId the job order ID
    * @param handoverId the handover ID
-   * @param userZone the time zone to render the handover time in; may be {@code null}
+   * @param userZone the display time zone; {@code null} means UTC
    * @return PDF as byte array
    */
   public byte @NotNull [] generateHandoverReport(
@@ -130,8 +121,6 @@ public class JobOrderHandoverReportService {
       @NotNull HandoverReportPreviewRequestDto dto) {
     log.debug("Generating handover report preview for jobOrderNumber={}", dto.jobOrderNumber());
 
-    // dto.handoverTime() is a LocalDateTime — exactly what the user typed in the modal.
-    // No zone conversion is applied so the PDF shows the same date/time the user entered.
     String handoverDate = DATE_PATTERN.format(dto.handoverTime());
     String handoverTime = TIME_PATTERN.format(dto.handoverTime());
 
@@ -171,9 +160,6 @@ public class JobOrderHandoverReportService {
       KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
       KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
       KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
-      // A recipient whose handle an Art. 17 request erased renders as the
-      // placeholder rather than as the raw sentinel (REQ-SEC-062). The handover
-      // itself is untouched; only the name is gone.
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",
@@ -213,11 +199,6 @@ public class JobOrderHandoverReportService {
       krt.document().close();
       return baos.toByteArray();
     } catch (Exception e) {
-      // Caught by GlobalExceptionHandler.handleReportGeneration which produces a 500
-      // RFC 7807 response with the stable code REPORT_GENERATION_FAILED and a localised
-      // generic detail. The cause is preserved on the exception so the ERROR log line
-      // emitted by the handler carries the full PDF-library stacktrace; the exception
-      // message itself is server-internal and never leaks to the API client.
       throw new ReportGenerationException("PDF generation failed", e);
     }
   }
@@ -234,12 +215,8 @@ public class JobOrderHandoverReportService {
       String materialName, String locationName, double amount, int quality, String quantityType) {}
 
   /**
-   * Resolves one German PDF label from the backend message bundle.
-   *
-   * <p>This document is German by construction (its headers are literals), so the locale is fixed.
-   * The one label that is resolved rather than written inline is the erased-handle placeholder: it
-   * is shared with every other surface that renders a handle snapshot, and a second spelling of it
-   * here would be a second thing to keep in step (REQ-SEC-062).
+   * Resolves a German PDF label from the backend message bundle, used for the shared erased-handle
+   * placeholder (REQ-SEC-062).
    *
    * @param key the message key
    * @return the resolved label

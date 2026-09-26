@@ -34,15 +34,11 @@ public interface MissionFrequencyRepository extends JpaRepository<MissionFrequen
   List<MissionFrequency> findByMissionId(UUID missionId);
 
   /**
-   * Atomically upserts a <em>typed</em> mission frequency in a single race-free statement: inserts
-   * the {@code (mission_id, frequency_type_id)} row, or updates its value in place when it already
-   * exists, resolving a concurrent first-time-set on the same channel through the {@code
-   * UNIQUE(mission_id, frequency_type_id)} constraint instead of the old find-then-insert TOCTOU
-   * that 409'd the loser with an unresolvable phantom conflict (#1148). Last-writer-wins by design
-   * (the typed upsert carries no client version); the {@code @Version} column is bumped manually on
-   * update so a later JPA load stays consistent, and {@code updated_at} is refreshed. {@code
-   * clearAutomatically} because this bypasses the persistence context — the caller re-fetches the
-   * mission so its {@code frequencies} collection reflects the upserted row.
+   * Atomically inserts or updates a typed mission frequency for {@code (mission_id,
+   * frequency_type_id)}.
+   *
+   * <p>Last writer wins; {@code version} and {@code updated_at} are bumped on update. Clears the
+   * persistence context, so the caller must re-fetch the mission.
    *
    * @param missionId the owning mission.
    * @param frequencyTypeId the typed channel to set.

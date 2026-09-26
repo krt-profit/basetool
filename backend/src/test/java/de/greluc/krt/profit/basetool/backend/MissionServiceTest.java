@@ -97,8 +97,6 @@ class MissionServiceTest {
   @Mock private ParticipantTargetResolver participantTargetResolver;
 
   @InjectMocks private MissionParticipantService missionParticipantService;
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL participant sub-service
-  // is one of its arguments
   private MissionService missionService;
 
   @BeforeEach
@@ -109,47 +107,31 @@ class MissionServiceTest {
             inv ->
                 new ParticipantTargetResolver.ParticipantTarget(
                     inv.getArgument(0), inv.getArgument(1)));
-    // MissionService delegates the participant methods to the extracted MissionParticipantService
-    // (L1 step 2, #920). Wire a real instance (built from this class's mocks) into the CUT via
-    // reflection, since Mockito does not inject one @InjectMocks target into another.
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     missionService =
         new MissionService(
             missionRepository,
             missionParticipantRepository,
             userRepository,
-            null, // frequencyTypeRepository
-            null, // missionFrequencyRepository
-            null, // missionOwnershipRepository
-            null, // operationRepository
+            null,
+            null,
+            null,
+            null,
             userService,
             ownerScopeService,
             authHelperService,
             auditService,
-            null, // missionTimelineService
+            null,
             missionParticipantService,
-            null // missionStructureService
-            );
+            null);
   }
 
-  // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions
-  // covers REQ-MISSION-008 — admin all-scope falls back to the organisation-wide next mission
   @Test
   void getNextMission_refetchesByIdThroughGraph() {
-    // The limit-1 lookup is intentionally not graphed (a collection fetch + limit forces in-memory
-    // pagination, HHH90003004); the service re-fetches the hit by id via the graphed findById so
-    // the collections are eagerly loaded for the mapper.
     UUID id = UUID.randomUUID();
     Mission head = new Mission();
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
-    // Admin all-scope → no org-unit narrowing → the unscoped, all-status finder.
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
@@ -180,7 +162,6 @@ class MissionServiceTest {
     verify(missionRepository, never()).findById(any());
   }
 
-  // covers REQ-MISSION-008 — a member's banner is scoped to their own org units' next mission
   @Test
   void getNextMission_scopedMember_usesScopedQueryThenRefetches() {
     UUID orgA = UUID.randomUUID();
@@ -203,12 +184,10 @@ class MissionServiceTest {
         .findNextScopedMission(
             any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any());
     verify(missionRepository).findById(id);
-    // The unscoped finders must NOT run for a scoped caller.
     verify(missionRepository, never())
         .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(any(), any());
   }
 
-  // covers REQ-MISSION-008 — a pinned active org unit narrows the scoped lookup to that unit
   @Test
   void getNextMission_scopedPinned_passesActiveOrgUnitId() {
     UUID pin = UUID.randomUUID();
@@ -232,7 +211,6 @@ class MissionServiceTest {
             any(), eq(List.of("PLANNED", "ACTIVE")), eq(pin), eq(Set.of()), any());
   }
 
-  // covers REQ-MISSION-008 — a scoped caller with no upcoming own-unit mission gets nothing
   @Test
   void getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch() {
     UUID orgA = UUID.randomUUID();
@@ -263,8 +241,6 @@ class MissionServiceTest {
     when(participantTargetResolver.resolve(null, "TestUser", "Participant name is ambiguous."))
         .thenReturn(new ParticipantTargetResolver.ParticipantTarget(userId, null));
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(existingUser));
-    // The resolved user has no memberships, so the participant gets no org-unit affiliation —
-    // there is deliberately no IRIDIUM fallback anymore.
     when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, null, "TestUser", null, "No comment");
@@ -279,7 +255,6 @@ class MissionServiceTest {
         "a user with no membership must get no org-unit affiliation (no IRIDIUM fallback)");
   }
 
-  // covers REQ-MISSION-002 — sign-up seeds the participant payout preference from the user default
   @Test
   void addParticipant_ShouldPreFillPayoutPreferenceFromUserDefault() {
     UUID missionId = UUID.randomUUID();
@@ -305,7 +280,6 @@ class MissionServiceTest {
         "participant payout preference must be seeded from the signing-up user's profile default");
   }
 
-  // covers REQ-MISSION-002 — a user with no chosen default keeps the PAYOUT entity default
   @Test
   void addParticipant_ShouldKeepPayoutDefault_WhenUserHasNoDefault() {
     UUID missionId = UUID.randomUUID();
@@ -316,7 +290,6 @@ class MissionServiceTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("nopref");
-    // defaultPayoutPreference deliberately left null — the user never opted in.
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
@@ -331,7 +304,6 @@ class MissionServiceTest {
         "a user with no profile default keeps the PAYOUT entity default");
   }
 
-  // The sign-up modal's explicit Auszahlungsart choice wins over the user's profile default.
   @Test
   void addParticipant_ExplicitPayoutChoice_WinsOverProfileDefault() {
     UUID missionId = UUID.randomUUID();
@@ -364,14 +336,8 @@ class MissionServiceTest {
     String query = "Test";
     Instant start = Instant.now();
     Instant end = Instant.now().plus(1, ChronoUnit.DAYS);
-    List<String> status =
-        List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"); // Default expected when null passed
+    List<String> status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
 
-    // The M-1 override is gone with ADR-0159: searchMissions used to rewrite a null isInternal to
-    // FALSE for an unauthenticated caller, as defence-in-depth against a controller forgetting to
-    // pass it. There is no unauthenticated caller on this path any more, and
-    // currentScopePredicate() throws for one rather than building an empty predicate — so the
-    // filter is passed through untouched and the scope decides.
     Pageable pageable = PageRequest.of(0, 10);
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
@@ -537,13 +503,6 @@ class MissionServiceTest {
     assertThrows(IllegalArgumentException.class, () -> missionService.createMission(request));
   }
 
-  // ── Audit finding C-4: server-side stamping of owningSquadron ────────
-  // Pins the create-mission stamping pipeline so a future refactor that re-introduces a
-  // client-supplied owningSquadron path (e.g. by adding a `UUID owningSquadronId` field to
-  // CreateMissionRequest and threading it into MissionService) breaks here. The ArchUnit rule
-  // {@code missionWriteRequestDtosMustNotCarryServerManagedFields} blocks the DTO-shape side; the
-  // tests below pin the service-side stamping behaviour itself.
-
   @Test
   void createMission_stampsOwningSquadronFromOwnerSquadron() {
     Squadron home = new Squadron();
@@ -567,9 +526,6 @@ class MissionServiceTest {
 
   @Test
   void createMission_membershiplessLeadershipOwner_stampsNullOwningOrgUnit() {
-    // A "Bereichsleitung" user belongs to no Staffel/SK but may plan org-wide missions. The
-    // nullable picker resolver returns null for such a membershipless owner (instead of 400ing), so
-    // the mission persists ownerless — attributable through its owner and public unless internal.
     User caller = new User();
     caller.setId(UUID.randomUUID());
 
@@ -603,10 +559,6 @@ class MissionServiceTest {
     Squadron scopeSquadron = new Squadron();
     scopeSquadron.setId(UUID.randomUUID());
 
-    // R5.d.d branch flip: the fallback fires when getCurrentUser() returns empty, not when the
-    // owner has no home Staffel. An authenticated owner without any membership now flows through
-    // OwnerScopeService.resolveOrgUnitForPickerOutputNullable and resolves to a null (ownerless)
-    // owner — see createMission_membershiplessLeadershipOwner_stampsNullOwningOrgUnit.
     when(userService.getCurrentUser()).thenReturn(Optional.empty());
     when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.of(scopeSquadron));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);

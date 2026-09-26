@@ -60,21 +60,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.DeferredResult;
 
 /**
- * A log line written during a servlet <b>async dispatch</b> carries the same {@code correlationId},
- * {@code userId} and {@code orgUnitId} as the request's initial dispatch (REQ-OBS-001/-002).
+ * A log line written during a servlet async dispatch carries the same {@code correlationId}, {@code
+ * userId} and {@code orgUnitId} as the initial dispatch (REQ-OBS-001, REQ-OBS-002).
  *
- * <p>Pins the fix for the 2026-09-25 misattribution: the notification relay's async result was
- * dispatched back into MVC, {@code GlobalExceptionHandler} logged an {@code ERROR} there, and the
- * line carried no correlation id and the logback fallback {@code userId=anonymous} — for a
- * logged-in member — because both MDC filters are {@code OncePerRequestFilter}s and skipped the
- * async pass.
- *
- * <p>The request runs through both real filters in their production order, and the async pass is
- * driven the way the container drives it: the same request object, re-entered with {@code
- * DispatcherType.ASYNC} once the {@link DeferredResult} completes. Between the two dispatches the
- * test deliberately removes everything the async pass could re-derive a value from — the security
- * context, the session pin, the inbound header — so a value that survives can only have come from
- * what the initial dispatch stashed.
+ * <p>Runs both real MDC filters in production order and re-enters the same request with {@code
+ * DispatcherType.ASYNC}, after removing every other source of those values, so a surviving value
+ * can only come from what the initial dispatch stored.
  */
 class AsyncDispatchMdcTest {
 
@@ -118,8 +109,8 @@ class AsyncDispatchMdcTest {
     }
 
     /**
-     * Resolves the async failure on the async dispatch, logging it the way the global handler's
-     * catch-all did in the incident.
+     * Handles the async failure on the async dispatch by logging it at ERROR, like the global
+     * catch-all handler.
      *
      * @param ex the failure the async result carried
      */
@@ -143,7 +134,6 @@ class AsyncDispatchMdcTest {
   @BeforeEach
   void setUp() {
     probeLogger = (Logger) LoggerFactory.getLogger(StreamController.class);
-    // Whatever a Spring context earlier in this JVM configured, the probe's INFO line is captured.
     probeLogger.setLevel(Level.INFO);
     appender = new ListAppender<>();
     appender.start();
@@ -177,7 +167,6 @@ class AsyncDispatchMdcTest {
             .andExpect(request().asyncStarted())
             .andReturn();
 
-    // Everything the async pass could re-derive a value from is taken away or changed.
     SecurityContextHolder.clearContext();
     session.setAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY, UUID.randomUUID());
     controller.pending().setErrorResult(new IllegalStateException("upstream stream closed"));
@@ -201,7 +190,6 @@ class AsyncDispatchMdcTest {
     String minted = initial.getResponse().getHeader(HEADER);
     assertThat(minted).as("the initial dispatch minted an id").matches("[0-9a-f-]{36}");
 
-    // A header on the async pass is still the client's; it must not replace the stashed id.
     MockHttpServletRequest sameRequest = (MockHttpServletRequest) initial.getRequest();
     sameRequest.removeHeader(HEADER);
     sameRequest.addHeader(HEADER, "forged-on-the-async-pass");

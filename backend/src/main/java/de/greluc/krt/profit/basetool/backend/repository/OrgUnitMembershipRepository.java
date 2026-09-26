@@ -32,31 +32,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Spring Data repository for {@link OrgUnitMembership}. Provides the few derived finders that the
- * R2.b service layer will need to answer the two recurring questions: "which org units does user X
- * belong to?" (membership listing for the active-context switcher and the owner picker) and "who
- * are the members of org unit Y?" (admin roster pages).
- *
- * <p>Uses the {@link OrgUnitMembershipId} composite key — Spring Data resolves the embeddable on
- * its own as long as the type parameter matches. The {@code findById(OrgUnitMembershipId)} method
- * inherited from {@link JpaRepository} is the canonical lookup for "does user X currently belong to
- * org unit Y?".
- */
+/** Spring Data repository for {@link OrgUnitMembership}, keyed by {@link OrgUnitMembershipId}. */
 @Repository
 public interface OrgUnitMembershipRepository
     extends JpaRepository<OrgUnitMembership, OrgUnitMembershipId> {
 
   /**
-   * Returns every membership row belonging to the given user. Used by the active-context switcher
-   * (to populate the dropdown of org units the user may pin) and by the owner-picker fragment on
-   * create forms (to enumerate the legal {@code owningOrgUnitId} values). Result order is insertion
-   * order — callers that need a stable display order (Staffel first, SKs alphabetical, etc.) sort
-   * in the service layer.
+   * Returns every membership of the given user, in insertion order; callers sort for display.
    *
    * @param userId the user whose memberships to list; never {@code null}.
-   * @return every membership of this user; never {@code null}, possibly empty when the user has no
-   *     org-unit membership at all (admin or guest).
+   * @return every membership of this user; never {@code null}, empty when the user has none.
    */
   List<OrgUnitMembership> findAllByIdUserId(UUID userId);
 
@@ -73,12 +58,10 @@ public interface OrgUnitMembershipRepository
   long countByIdUserId(UUID userId);
 
   /**
-   * Returns every membership row of the given user filtered by kind. Handy for "what Staffeln does
-   * this user belong to" (REQ-ORG-017: up to two SQUADRON rows since the V98 {@code
-   * uq_org_unit_membership_one_squadron} index was relaxed to {@code <=2} in V164) and for "what
-   * Spezialkommandos has this user joined" — without forcing the caller to filter the full result
-   * client-side. Always use this for {@code kind=SQUADRON}; a single-row accessor would throw for a
-   * legitimate two-Staffel user.
+   * Returns the given user's memberships of one kind.
+   *
+   * <p>A user may hold up to two {@code SQUADRON} memberships (REQ-ORG-017), so always use this for
+   * that kind.
    *
    * @param userId the user whose memberships to list; never {@code null}.
    * @param kind the discriminator value to match; never {@code null}.
@@ -87,19 +70,14 @@ public interface OrgUnitMembershipRepository
   List<OrgUnitMembership> findAllByIdUserIdAndKind(UUID userId, OrgUnitKind kind);
 
   /**
-   * Batch variant of {@link #findAllByIdUserIdAndKind(UUID, OrgUnitKind)} for a set of users and a
-   * set of kinds in a single query — the N+1-free way to resolve "which Staffeln, Spezialkommandos
-   * and Bereiche does each of these users belong to?". Backs the Materialbörse board's anbieter
-   * affiliation badges (REQ-MARKET-001), which render every offering member's {@code SQUADRON} /
-   * {@code SPECIAL_COMMAND} / {@code BEREICH} memberships after the username without a per-offer
-   * membership lookup.
+   * Batch variant of {@link #findAllByIdUserIdAndKind(UUID, OrgUnitKind)} for several users and
+   * kinds in one query; backs the Materialbörse affiliation badges (REQ-MARKET-001).
    *
-   * @param userIds the users whose memberships to list; never {@code null}. An empty collection
-   *     yields an empty result.
-   * @param kinds the discriminator values to match; never {@code null}. An empty collection yields
-   *     an empty result.
-   * @return the matching membership rows across all requested users and kinds; never {@code null},
-   *     possibly empty.
+   * @param userIds the users whose memberships to list; never {@code null}; empty yields an empty
+   *     result
+   * @param kinds the discriminator values to match; never {@code null}; empty yields an empty
+   *     result
+   * @return the matching membership rows; never {@code null}, possibly empty.
    */
   List<OrgUnitMembership> findAllByIdUserIdInAndKindIn(
       Collection<UUID> userIds, Collection<OrgUnitKind> kinds);
@@ -127,11 +105,8 @@ public interface OrgUnitMembershipRepository
   boolean existsByIdUserIdAndIdOrgUnitId(UUID userId, UUID orgUnitId);
 
   /**
-   * {@code true} iff any membership row currently references the given Kommandogruppe (epic #800,
-   * REQ-ROLE-003). Backs the Kommandogruppe-delete guard: a group still bound to a Kommandoleiter /
-   * stellv. Kommandoleiter / Ensign must not be deleted (the V185 group-link CHECK would otherwise
-   * be violated, or the members silently orphaned), so the service rejects the delete with a clean
-   * 400 until the members are reassigned.
+   * Whether any membership references the given Kommandogruppe; backs the Kommandogruppe-delete
+   * guard, which rejects the delete until its members are reassigned (REQ-ROLE-003).
    *
    * @param kommandoGroupId the Kommandogruppe to check; never {@code null}.
    * @return {@code true} iff at least one membership is assigned to that group.
@@ -139,32 +114,22 @@ public interface OrgUnitMembershipRepository
   boolean existsByKommandoGroupId(UUID kommandoGroupId);
 
   /**
-   * Returns the distinct ids of every user who is a member of any of the given org units. Backs the
-   * scoped branches of the blueprint availability overview (#364) — the pinned single org unit and
-   * the non-admin oversight union — by resolving the in-scope org units to their member users.
+   * Returns the distinct ids of every user who is a member of any of the given org units; backs the
+   * scoped blueprint availability overview.
    *
-   * @param orgUnitIds the org units whose members to collect; never {@code null}. An empty
-   *     collection yields an empty result.
+   * @param orgUnitIds the org units whose members to collect; never {@code null}; empty yields an
+   *     empty result
    * @return the distinct member user ids across the given org units; never {@code null}.
    */
   @Query("SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId IN :orgUnitIds")
   Set<UUID> findDistinctUserIdsByOrgUnitIdIn(@Param("orgUnitIds") Collection<UUID> orgUnitIds);
 
   /**
-   * Returns the ids of the org units the given user belongs to, as a bare id projection rather than
-   * as {@link OrgUnitMembership} entities.
+   * Returns the ids of the org units the given user belongs to, without loading membership
+   * entities.
    *
-   * <p>The projection is load-bearing, not a micro-optimisation: {@code
-   * OrgUnitBankResponsibilityService.snapshotResponsibleHoldersForUser} runs <em>inside</em> the
-   * {@code UserDeletionService.deleteUser} transaction, immediately before {@code
-   * userRepository.delete(user)}. Resolving the same org units through {@link
-   * #findAllByIdUserId(UUID)} would attach the user's membership rows to the persistence context;
-   * because {@code org_unit_membership.user_id} is cleared by the database {@code ON DELETE
-   * CASCADE} and never by Hibernate, those managed entities survive the {@code delete} call still
-   * pointing at the removed {@code User}, and the following flush aborts with {@code
-   * TransientPropertyValueException} ({@code OrgUnitMembership.user -> User}) — the production
-   * user-deletion regression. Selecting only {@code id.orgUnitId} leaves the persistence context
-   * empty, so the flush sees nothing to validate.
+   * <p>Safe inside the user-deletion transaction, where managed membership entities would make the
+   * flush after the user delete fail.
    *
    * @param userId the user whose org units to collect; never {@code null}.
    * @return the ids of the org units this user is a member of; never {@code null}, possibly empty.
@@ -236,12 +201,9 @@ public interface OrgUnitMembershipRepository
 
   /**
    * Batch variant of {@link #findUserIdsByOrgUnitAndRole(UUID, MembershipRole)}: the users holding
-   * {@code role} on <em>any</em> of the given org units, in one statement. Backs the {@code
-   * CARTEL_BANK} responsible-holder resolution, which unions the Bereichsleiter of every Profit
-   * Bereich and used to ask once per Bereich (REQ-DATA-003, BE-PERF-15).
+   * {@code role} on any of the given org units, in one statement (REQ-DATA-003).
    *
    * @param orgUnitIds the org units to collect role holders of; never {@code null}, never empty
-   *     (JPQL rejects an empty {@code IN} list, so the caller short-circuits)
    * @param role the membership role to match; never {@code null}
    * @return the matching user ids, each once; never {@code null}, possibly empty
    */

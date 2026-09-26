@@ -37,20 +37,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 /**
- * Centralised access point for the Spring Security {@link SecurityContextHolder}.
- *
- * <p>This service is the single seam through which controllers, mappers and non-{@code UserService}
- * business code may consult the currently authenticated principal. Touching {@link
- * SecurityContextHolder} directly from anywhere else is forbidden by an ArchUnit rule (see {@code
- * ArchitectureTest}) — the rationale is laid out in CLAUDE.md: the same business method must not
- * behave differently depending on which thread invokes it (scheduling, async, message listeners),
- * and concentrating the read here makes the contract testable without a full Spring security
- * context.
- *
- * <p>The helper deliberately exposes a narrow surface — just enough to cover the role-hierarchy
- * checks the controllers used to inline ({@link #isLogisticianOrAbove()} etc.) plus a small set of
- * generic primitives ({@link #currentAuthentication()}, {@link #isAuthenticated()}, {@link
- * #hasReachableRole(String)}).
+ * The single access point to the {@link SecurityContextHolder} for the current principal and its
+ * role checks; direct access elsewhere is forbidden by {@code ArchitectureTest}.
  */
 @Service
 @RequiredArgsConstructor
@@ -60,12 +48,9 @@ public class AuthHelperService {
   private final ApplicationContext applicationContext;
 
   /**
-   * The authorities that mark a caller as a registered organisation member (or a role above it). A
-   * caller that reaches none of these — i.e. an anonymous request OR an authenticated but role-less
-   * {@code GUEST} account — is treated as a mission "outsider" by {@link #isMemberOrAbove()}. The
-   * elevated roles are listed explicitly (not only {@code ROLE_KRT_MEMBER}) because the role
-   * hierarchy promotes {@code ADMIN}/{@code OFFICER} to {@code LOGISTICIAN}/{@code MISSION_MANAGER}
-   * but never down to {@code KRT_MEMBER}.
+   * The authorities that mark a caller as an organisation member or above, used by {@link
+   * #isMemberOrAbove()}; elevated roles are listed because the hierarchy never implies {@code
+   * KRT_MEMBER}.
    */
   private static final Set<String> MEMBER_OR_ABOVE_ROLES =
       Set.of(
@@ -108,12 +93,8 @@ public class AuthHelperService {
   }
 
   /**
-   * {@code true} if the current authentication can reach {@code role} via the configured {@link
-   * RoleHierarchy}. Pass the role with the {@code ROLE_} prefix (e.g. {@code "ROLE_LOGISTICIAN"}).
-   *
-   * <p>"Reachable" means: either the principal has the role directly, or the role is implied by a
-   * higher role in the hierarchy (e.g. {@code ROLE_ADMIN} reaches {@code ROLE_LOGISTICIAN} because
-   * {@code SecurityConfig} declares {@code ROLE_ADMIN > ROLE_LOGISTICIAN}).
+   * Returns whether the current authentication holds {@code role} directly or through the {@link
+   * RoleHierarchy}; pass the role with the {@code ROLE_} prefix (e.g. {@code "ROLE_LOGISTICIAN"}).
    */
   public boolean hasReachableRole(@NotNull String role) {
     Authentication auth = rawAuthentication();
@@ -144,33 +125,22 @@ public class AuthHelperService {
   }
 
   /**
-   * The programmatic twin of {@link Roles#ADMIN_OR_OFFICER}: {@code true} when the caller reaches
-   * {@code ROLE_ADMIN} or {@code ROLE_OFFICER} through the configured {@link RoleHierarchy}.
-   * Neither role is implied by any other, so today this equals "holds one of the two directly";
-   * asking the hierarchy keeps the answer right if that ever changes.
+   * Programmatic twin of {@link Roles#ADMIN_OR_OFFICER}, evaluated through the {@link
+   * RoleHierarchy}.
    *
-   * @return {@code true} for an admin or an officer, {@code false} for every other caller,
-   *     including an anonymous one and a request with no authentication at all
+   * @return {@code true} for an admin or an officer, {@code false} otherwise, including anonymous
+   *     and unauthenticated callers
    */
   public boolean isAdminOrOfficer() {
     return isAdmin() || hasReachableRole(Roles.authority(Roles.OFFICER));
   }
 
   /**
-   * {@code true} when the current caller is a registered organisation member or holds an elevated
-   * role ({@code KRT_MEMBER}/{@code MEMBER}/{@code LOGISTICIAN}/{@code MISSION_MANAGER}/{@code
-   * OFFICER}/{@code ADMIN}), evaluated through the configured {@link RoleHierarchy}.
+   * Returns whether the caller is an organisation member or holds an elevated role, evaluated
+   * through the {@link RoleHierarchy}.
    *
-   * <p>Kept as a distinct question from {@code isAuthenticated()} even though the two now agree on
-   * nearly every caller. Since ADR-0159 an account that maps to no application role is refused with
-   * {@code 403 NO_ROLE} before a handler runs, so the gap between "authenticated" and "member" has
-   * shrunk to two cohorts — neither of them hypothetical. One is the PENDING/REJECTED registration.
-   * The other is the ingest gateway (ADR-0129): {@code CustomJwtGrantedAuthoritiesConverter}
-   * short-circuits it to {@code ROLE_INGEST_GATEWAY} alone, ahead of {@code assembleFor}, so it
-   * arrives authenticated, with a non-empty authority set, and this method answers {@code false}
-   * for it. Membership is the honest predicate for the questions that ask it — the mission
-   * description (REQ-SEC-041), the live-sync rooms — and collapsing it into authentication would
-   * make each of those depend on a refusal happening earlier in the chain.
+   * <p>Distinct from authentication: pending or rejected registrations and the ingest gateway are
+   * authenticated but not members.
    *
    * @return {@code true} iff the caller reaches one of {@link #MEMBER_OR_ABOVE_ROLES}
    */
@@ -191,26 +161,16 @@ public class AuthHelperService {
    */
   @NotNull
   public Optional<UUID> currentUserId() {
-    // Through the seam, not through getName(). This method predates the ingest gateway's identity
-    // swap and happened to keep working for it only because the acting member's name equals its
-    // sub — an accident, not a contract. Reading getName() is the idiom that split every consumer
-    // into fail-open and fail-closed when a second authentication type appeared (ADR-0129), and it
-    // is the one that would put a callsign here for a username/password caller (REQ-OBS-004).
     return AuthenticatedSubject.idOf(currentAuthentication().orElse(null));
   }
 
   /**
-   * Plan-compliant convenience accessor for the caller's squadron context — delegates to {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#currentSquadronId()}
-   * (MULTI_SQUADRON_PLAN.md section 4.1 expects this on {@code AuthHelperService}). The injection
-   * is lazy via the {@link org.springframework.context.ApplicationContext} so that the bean wiring
-   * does not introduce a circular {@code AuthHelperService -> OwnerScopeService -> ... ->
-   * AuthHelperService} dependency at startup. Callers in hot paths should resolve the context once
-   * per request rather than per filtered row.
+   * Returns the caller's squadron context, delegating lazily to {@link
+   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#currentSquadronId()} to avoid a
+   * bean cycle.
    *
-   * @return active squadron id for non-admins (their persistent home squadron) or for admins with
-   *     an active switcher selection; {@code Optional.empty()} for admins in "all squadrons" mode
-   *     and for unauthenticated callers.
+   * @return the home squadron for non-admins or the switcher selection for admins; empty for admins
+   *     in "all squadrons" mode and for unauthenticated callers
    */
   @NotNull
   public Optional<UUID> currentSquadronId() {
@@ -236,14 +196,11 @@ public class AuthHelperService {
   }
 
   /**
-   * Plan-compliant convenience accessor for the org-unit write-side check — delegates to {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#canEditOrgUnit(UUID)}. Unlike
-   * {@link #canEditSquadron(UUID)}, the id may reference either a Staffel or a Spezialkommando;
-   * used by the guest org-unit-labeling gate when a participant is tagged with org units of either
-   * kind.
+   * Returns whether the caller may edit the given Staffel or Spezialkommando, delegating to {@link
+   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#canEditOrgUnit(UUID)}.
    *
-   * @param orgUnitId the org-unit id (Staffel or Spezialkommando) to check write access for.
-   * @return {@code true} iff the current caller may edit/label the given org unit.
+   * @param orgUnitId the org-unit id (Staffel or Spezialkommando)
+   * @return {@code true} iff the caller may edit or label the org unit
    */
   public boolean canEditOrgUnit(@NotNull UUID orgUnitId) {
     return scope().canEditOrgUnit(orgUnitId);

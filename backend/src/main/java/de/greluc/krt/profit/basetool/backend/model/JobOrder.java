@@ -51,10 +51,6 @@ import org.hibernate.annotations.Generated;
 @AllArgsConstructor
 @Builder
 @Table(name = "job_order")
-// Batch-fetch lazy proxies of this entity so a page of InventoryJobOrderAllocation /
-// InventoryMissionAllocation rows initialises its to-one references in bounded batches
-// instead of one-by-one (the allocation N+1, REQ-DATA-003). @BatchSize is invalid on a
-// @ManyToOne field in Hibernate 6, so it goes on the target entity class.
 @BatchSize(size = 100)
 public class JobOrder extends AbstractEntity<UUID> {
 
@@ -75,28 +71,18 @@ public class JobOrder extends AbstractEntity<UUID> {
   private Integer displayId;
 
   /**
-   * Org unit responsible for <em>processing</em> this order — a profit-eligible squadron or
-   * Spezialkommando (eligibility enforced at the service layer via {@code
-   * OrgUnit#isProfitEligible}). Stamped at create time and editable afterwards only through the
-   * dedicated reassignment endpoint ({@code PATCH /api/v1/orders/{id}/responsible-org-unit}). This
-   * field governs visibility (Phase 3, #343): a squadron-responsible order is private to that
-   * squadron + admins, an SK-responsible order is public to all squadrons. The requester does NOT
-   * grant visibility. {@code nullable = false} reflects V130's NOT NULL tightening after the Phase
-   * 3 backfill copied each legacy order's retired {@code creating_org_unit_id} onto this column.
-   * The retired {@code creating_org_unit_id} column lives on (nullable, unmapped) until the
-   * destructive cleanup release per V129.
+   * The profit-eligible squadron or Spezialkommando that processes this order. It governs
+   * visibility: a squadron-responsible order is private to that squadron and admins, an
+   * SK-responsible order is public. Changed only via {@code PATCH
+   * /api/v1/orders/{id}/responsible-org-unit}.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "responsible_org_unit_id", nullable = false)
   private OrgUnit responsibleOrgUnit;
 
   /**
-   * Org unit that placed the order and ultimately receives the material/item — the customer. Any
-   * squadron or Spezialkommando (no profit-eligibility restriction; other Kartell departments may
-   * place orders). Mandatory at create time, editable by any Logistician+ through the regular
-   * update path. Informational only; it does NOT grant visibility (a private order is visible to
-   * its responsible org unit + admins only, not to the requester — see Phase 3 / #343). {@code
-   * nullable = false} reflects V99's NOT NULL tightening, still in force.
+   * The org unit that placed the order and receives the goods; any squadron or Spezialkommando.
+   * Mandatory and editable by Logistician+, but it grants no visibility.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requesting_org_unit_id", nullable = false)
@@ -107,12 +93,9 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Column private Integer priority;
 
   /**
-   * Optional free-text comment captured from the order creator at creation time (context, delivery
-   * notes, …). Stored as plain text and always rendered HTML-escaped in the UI — never interpreted
-   * as markup. Because anonymous users may create job orders this value is fully untrusted: its
-   * length is bounded to {@value #COMMENT_MAX_LENGTH} characters at the DTO boundary and by the
-   * column definition, and it is never written to application logs. {@code null} when the creator
-   * left the field empty.
+   * Optional, untrusted free-text comment from the order creator, at most {@value
+   * #COMMENT_MAX_LENGTH} characters. Always rendered HTML-escaped and never logged; {@code null}
+   * when left empty.
    */
   @Column(name = "comment", length = COMMENT_MAX_LENGTH)
   private String comment;
@@ -134,16 +117,9 @@ public class JobOrder extends AbstractEntity<UUID> {
   private JobOrderType type = JobOrderType.MATERIAL;
 
   /**
-   * Whether the item-order blueprint-coverage view ({@code GET /orders/{id}/item-blueprint-owners})
-   * counts cosmetic <em>variants</em> of the ordered items toward availability. {@code true} (the
-   * default, and the value backfilled onto every pre-existing row by migration V191) keeps the
-   * historic behaviour: a member owning any variant of the family — {@code Fresnel "Molten" Energy
-   * LMG} for an ordered {@code Fresnel Energy LMG} — is counted, via {@code
-   * BlueprintVariantFamilyResolver} family-key matching. {@code false} switches the coverage to
-   * exact-name matching, so when a specific variant is requested only owners of that exact
-   * blueprint count and other variants of the same family are excluded. Relevant only to {@link
-   * JobOrderType#ITEM} orders; ignored for {@link JobOrderType#MATERIAL} orders. {@code nullable =
-   * false}: V191 adds the column {@code NOT NULL DEFAULT true}.
+   * Whether the blueprint-coverage view of an {@link JobOrderType#ITEM} order counts cosmetic
+   * variants of the ordered items. {@code true} (default) matches by variant family; {@code false}
+   * requires the exact blueprint.
    */
   @Column(name = "count_blueprints_with_variants", nullable = false)
   @Builder.Default

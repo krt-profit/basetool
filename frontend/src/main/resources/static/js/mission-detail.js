@@ -17,51 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Mission detail page module (#924 Part 2) — the former inline script blocks of
- * templates/mission-detail.html moved verbatim into one classic script, loaded synchronously at
- * the same end-of-body position right after the page's inline i18n/constants bootstrap.
- *
- * Contents, in original document order: the krtMissionWrite / krtRefreshMissionSection /
- * krtNotifyMissionChanged section-write seam (built via the shared krtFetch.sectionWrite factory,
- * #574 / REQ-FE-010), the out-of-fragment header patch listeners (crew counts, finance tab badge,
- * sticky-header title/status/facts), the live multi-user sync receiver (REQ-FE-010 / ADR-0031),
- * the Ablauf steps and Ziele objectives drag editors, the KRT modal helpers and finance type
- * segments, the participant/frequency/custom-frequency/unit/crew/finance modal wiring with their
- * AJAX interceptors (including the shared #delete-confirm-form unit/participant/crew/finance
- * submit chain), the Verwaltung owner/manager/owning-org-unit/payout handlers and their krtEvents
- * registrations, the tab navigation with the unsaved-changes guard, the in-place core-edit save
- * (#589), the crew board drag & drop + keyboard operation, and the UTC-to-local datetime
- * localiser.
- *
- * The Thymeleaf-interpolated constants (the MSG_* consts, the window.MISSION_*_I18N dictionaries,
- * missionId, window.missionCanEdit) stay in the template's inline th:inline="javascript"
- * bootstrap, which executes before this file; classic scripts share the global lexical
- * environment, so the bare reads below resolve against those bootstrap const bindings.
- * openEditFinanceModal (the template's conditional finance block, th:if="${!isNew}") and the
- * presence bootstrap stay inline in the template and are only referenced late-bound from event
- * callbacks here; showFrontendErrorToast is the window-property function from fragments/toast.html
- * that block 5 historically calls without the window. prefix.
- */
 /* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId, openEditFinanceModal, showFrontendErrorToast */
 
-// ---- #574 in-place AJAX seam (retires window.MissionSubresource) -----------------
-// krtMissionWrite wraps window.krtFetch.write and sources the already-localized section/conflict
-// strings from MISSION_SUBRES_I18N exactly as the retired MissionSubresource alias did, so every
-// call site stays a one-liner while the shared krt-fetch.js carries no mission-specific code.
-// Since #924 the trio is produced by the mission-agnostic window.krtFetch.sectionWrite factory;
-// only the mission-specific pieces live here: the dictionary keys with their fallbacks, the
-// sectionKey -> {container, fragmentValue} map, the page URL and the presence broadcast.
-// Everything is handed over LATE-BOUND (dict getter, pageUrl getter, broadcast closure, each
-// evaluated per call): the dictionary is assigned by the inline bootstrap and
-// window.missionPresence only exists after the conditional presence bootstrap's
-// DOMContentLoaded (and only on !isNew pages with an authUserId).
-// Single source of truth for the mission's refreshable sections (sectionKey ->
-// {container, fragmentValue}). Shared by the write seam below AND the live-sync receiver
-// further down, which derives its container map from it — keeping them one object means a
-// section added here is automatically picked up by peers' receivers (REQ-FE-010); the two
-// maps drifted apart once (objectives/frequencies missing on the receive side) and must not
-// diverge again.
 const MISSION_SECTIONS = {
     crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
     finance: { container: '#finance-results', fragmentValue: 'finance' },
@@ -76,25 +33,12 @@ const MISSION_SECTIONS = {
         container: '#mission-frequencies-results',
         fragmentValue: 'frequencies-editor',
     },
-    // #1120: the Verwaltung "Organisation" panel (party lead + typed-frequency overview) used to
-    // sit outside every broadcastable fragment, so a peer's change left their view — and their
-    // #party-lead-version — stale (a needless 409 on their next edit). It is now its own section;
-    // custom "Weitere Frequenzen" stays the sibling `frequencies` section (not nested).
     organisation: {
         container: '#mission-organisation-results',
         fragmentValue: 'organisation',
     },
 };
 
-// #1241: a mission's core (name/status) and its finance also render on the PARENT OPERATION's
-// detail page — in the embedded missions table and the finance roll-up — which live on the
-// operation:{id} live-sync room, a different topic this page never subscribes to. When such a
-// section changes here, cross-publish the affected operation sections to that room (publishing
-// needs no subscription) so a peer viewing the operation refreshes them in place without a reload.
-// Mapping: mission 'overview' (the core: name/status) -> operation 'missions'; mission 'finance' ->
-// operation 'finance'. Only fires for a mission that belongs to an operation (missionOperationId
-// set); other mission sections (crew/steps/objectives/organisation/…) do not surface on the
-// operation and are not forwarded. Wiring tracked in #1241 (REQ-FE-015).
 function crossPublishToParentOperation(keys) {
     const operationId = window.missionOperationId;
     if (
@@ -138,10 +82,6 @@ const missionSeam = window.krtFetch.sectionWrite({
     pageUrl() {
         return window.missionId ? '/missions/' + window.missionId : null;
     },
-    // Live multi-user sync (REQ-FE-010): tell other users viewing this mission that these
-    // sections just changed, so their views re-fetch the same fragments in place. Suppressed
-    // when this refresh is itself the application of a peer's signal (opts.broadcast === false),
-    // otherwise the inbound change would echo straight back into a loop.
     broadcast(keys) {
         if (window.missionPresence && typeof window.missionPresence.sendChanged === 'function') {
             window.missionPresence.sendChanged(keys);
@@ -151,27 +91,10 @@ const missionSeam = window.krtFetch.sectionWrite({
 });
 window.krtMissionWrite = missionSeam.write;
 
-// krtRefreshMissionSection re-renders one or more mission sections in place via server-rendered
-// fragment swaps, replacing the former window.location.reload() after a successful sub-mutation
-// (#571/#574): 'crew' -> crew board (#crew-board-results), 'finance' -> finance & payout pane
-// (#finance-results), 'mgmt' -> owner/manager panel (#mission-mgmt-results). Participant writes
-// pass ['crew','finance'] because a participant also renders in the payout table (list, share and
-// participation %). Accepts a single key or an array; returns a Promise resolving when all swaps
-// complete so callers can close a modal afterwards.
 window.krtRefreshMissionSection = missionSeam.refresh;
 
-// Broadcast-only sibling of krtRefreshMissionSection (REQ-FE-010): signal peers that these
-// sections changed WITHOUT re-fetching locally — for handlers that already patched their own DOM
-// surgically (payout preference, party-lead, frequency) and so do not need a self re-render.
 window.krtNotifyMissionChanged = missionSeam.notify;
 
-// Patch the participant counts that live in the page header — the facts bar (#facts-registered,
-// #facts-checked-in) and the crew tab badge (#tab-crew .tab-count) — after every in-place crew
-// swap. They sit OUTSIDE the #crew-board-results fragment, so a participant add / edit / delete
-// or check-in / out would otherwise leave them stale until a full reload (#571/#574). The
-// crewBoard fragment exposes the fresh counts via #crew-count-meta; this generalises the finance
-// #finance-count-meta / refreshFinanceAndBadge precedent as a krt:swapped listener so it covers
-// every crew-board swap without touching each write call site.
 document.addEventListener('krt:swapped', function (ev) {
     const container = ev && ev.detail && ev.detail.container;
     if (!container || container.id !== 'crew-board-results') {
@@ -197,12 +120,6 @@ document.addEventListener('krt:swapped', function (ev) {
     }
 });
 
-// After ANY in-place finance swap — local OR peer-driven (live sync, REQ-FE-010) — patch the
-// Finanzen tab badge (#finance-tab-count) from the fresh count the fragment exposes in
-// #finance-count-meta. It lives in the tab nav OUTSIDE #finance-results, so a peer-driven swap
-// (which does not run the local add/edit/delete handlers) would otherwise leave it stale until a
-// reload. Mirrors the crew listener above; makes the count the single source of truth so the
-// local handlers no longer need to patch the badge themselves.
 document.addEventListener('krt:swapped', function (ev) {
     const container = ev && ev.detail && ev.detail.container;
     if (!container || container.id !== 'finance-results') {
@@ -215,11 +132,6 @@ document.addEventListener('krt:swapped', function (ev) {
     }
 });
 
-// After an in-place OVERVIEW swap, patch the parts of the sticky header that live OUTSIDE the
-// #overview-results fragment — the mission title (h1), the status pill (text + colour class) and
-// the Server-Join / TS facts — from the fresh values the fragment exposes in #overview-head-meta.
-// Generalises the crew #crew-count-meta precedent so a peer's core / schedule / status change is
-// reflected in the header without a full reload.
 document.addEventListener('krt:swapped', function (ev) {
     const container = ev && ev.detail && ev.detail.container;
     if (!container || container.id !== 'overview-results') {
@@ -257,18 +169,11 @@ document.addEventListener('krt:swapped', function (ev) {
     patchFact('facts-planned-start', 'data-planned-start-utc');
     patchFact('facts-planned-end', 'data-planned-end-utc');
     patchFact('facts-ts', 'data-meeting-utc');
-    // The "Leiter" fact shows the Einsatzleiter (the participant designated as mission lead),
-    // else the mission owner — computed server-side and exposed on the fragment as data-leader, so
-    // a peer's participant / planned-job-type change updates the header too (it lives outside the
-    // overview fragment).
     const lead = meta.getAttribute('data-leader');
     const leadEl = document.getElementById('facts-leader');
     if (leadEl && lead != null) {
         leadEl.textContent = lead;
     }
-    // The owning-org-unit badge in the sticky header (outside this fragment) mirrors the owning
-    // squadron — patch it from the fresh shorthand/name the fragment exposes so a peer's
-    // reassignment (REQ-ORG-018) shows in the header too. Empty shorthand = ownerless → cleared.
     const ouSlot = document.getElementById('mission-head-org-badge-slot');
     if (ouSlot) {
         const ouShorthand = meta.getAttribute('data-owning-org-unit-shorthand');
@@ -284,19 +189,6 @@ document.addEventListener('krt:swapped', function (ev) {
     }
 });
 
-// ---- Live multi-user sync receiver (REQ-FE-010 / ADR-0031) ----------------------------------
-// mission-presence.js dispatches 'krt:mission-changed' {sections:[...]} when ANOTHER user mutates
-// this mission, and 'krt:mission-resync' after a dropped socket reconnects (signals may have been
-// missed while offline). We re-fetch the affected section fragments via
-// krtRefreshMissionSection(..., {broadcast:false}) — broadcast:false stops the applied change
-// from echoing back into a loop. The data never travels over the socket: every peer re-pulls
-// through its own authenticated, authorization-checked fragment endpoint, so peer redaction and
-// the member-only finance gate still apply per viewer.
-// The coalescing / busy-guard / deferred-pill receiver now lives in the shared krt-live-sync.js
-// module (REQ-FE-015); mission uses events-source mode because mission-presence.js owns the socket
-// and re-dispatches 'krt:mission-changed' / 'krt:mission-resync'. The section map, the pill id /
-// class / i18n key and the {broadcast:false} refresh are all kept identical so the behaviour — and
-// the two-context e2e that pins it — is unchanged.
 window.krtLiveSync.createReceiver({
     sections: MISSION_SECTIONS,
     events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
@@ -317,24 +209,10 @@ window.krtLiveSync.createReceiver({
     },
 });
 
-// ---- Ablauf (procedure timeline): overview done-toggle + Verwaltung drag-editor -------------
-// Every mutation goes through krtMissionWrite (CSRF + retry-once-on-403 + the shared 409
-// reload-confirm) against the /steps/* AJAX proxies, then re-renders the editor + overview
-// checklist fragments in place via krtRefreshMissionSection (which also broadcasts to peers,
-// REQ-FE-010). The dedicated mission.stepsVersion section counter is read from the nearest
-// [data-steps-version] holder and echoed on every write so the next click never 409s; after each
-// swap the fresh fragment carries the bumped version. Handlers are delegated on document so they
-// survive the innerHTML swaps. No window.location.reload() on success.
 (function () {
     function mid() {
         return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
     }
-    // The live steps-section version, read from the [data-steps-version] holder in the DOM at the
-    // moment of the call. The write helpers below read it LAZILY (inside the payload/url thunk that
-    // krtFetch resolves at send time) rather than baking it into the payload when the handler fires.
-    // Combined with the per-section serialization the seam applies (serialize: 'section:steps'), a
-    // user's own back-to-back edits queue and each picks up the version the previous write bumped —
-    // so typing a title and immediately clicking +/▲▼/delete no longer self-collides into a 409.
     function stepsVersion() {
         const holder = document.querySelector('[data-steps-version]');
         const v = holder ? Number(holder.getAttribute('data-steps-version')) : null;
@@ -378,8 +256,10 @@ window.krtLiveSync.createReceiver({
         if (stepsVersion() === null) {
             return;
         }
-        const title =
-            (window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.default_title) || 'New step';
+        const title = window.krtI18nText(
+            window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.default_title,
+            'MISSION_STEP_I18N.default_title',
+        );
         writeStep({
             method: 'POST',
             url: '/missions/' + mid() + '/steps/ajax',
@@ -397,8 +277,6 @@ window.krtLiveSync.createReceiver({
         const title = titleInput.value.trim();
         const metaInput = row.querySelector('.ae-meta');
         const meta = metaInput ? metaInput.value : null;
-        // The backend requires a non-blank title; an emptied title is a no-op (restored on the
-        // next swap) rather than a rejected write.
         if (!title) {
             return;
         }
@@ -522,8 +400,6 @@ window.krtLiveSync.createReceiver({
         }
     });
 
-    // Drag reorder — scoped to #mission-step-list so the crew board's own drag is untouched
-    // (we only preventDefault once a drag that started in the step list is in flight).
     let dragRow = null;
     document.addEventListener('dragstart', function (e) {
         const row = e.target.closest('#mission-step-list .ae-row');
@@ -579,25 +455,10 @@ window.krtLiveSync.createReceiver({
     });
 })();
 
-// ---- Ziele (mission goals): Verwaltung drag-editor (classified, sortable) ---------------------
-// Mirrors the Ablauf editor: every mutation goes through krtMissionWrite (CSRF + retry-once-on-403
-// + the shared 409 reload-confirm) against the /objectives/* AJAX proxies, then re-renders the
-// editor + overview Ziele fragments in place via krtRefreshMissionSection (which also broadcasts to
-// peers, REQ-FE-010). The dedicated mission.objectivesVersion section counter is read from the
-// nearest [data-objectives-version] holder and echoed on every write. Handlers are delegated on
-// document so they survive the innerHTML swaps. No window.location.reload() on success. Goals carry
-// no done-toggle (a goal is a scope statement, not a progress item).
 (function () {
     function mid() {
         return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
     }
-    // The live goals-section version, read from the [data-objectives-version] holder in the DOM at
-    // the moment of the call. The write helpers below read it LAZILY (inside the payload/url thunk
-    // krtFetch resolves at send time) rather than baking it in when the handler fires. Combined with
-    // the per-section serialization the seam applies (serialize: 'section:objectives'), a user's own
-    // back-to-back edits queue and each picks up the version the previous write bumped — so typing a
-    // goal and immediately clicking +/the Klassifizierung dropdown/▲▼/delete no longer self-collides
-    // into a 409 (the reported bug).
     function objectivesVersion() {
         const holder = document.querySelector('[data-objectives-version]');
         const v = holder ? Number(holder.getAttribute('data-objectives-version')) : null;
@@ -648,8 +509,6 @@ window.krtLiveSync.createReceiver({
         }
         const title = titleInput.value.trim();
         const kind = kindSelect.value;
-        // The backend requires a non-blank title; an emptied title is a no-op (restored on the
-        // next swap) rather than a rejected write.
         if (!title) {
             return;
         }
@@ -767,8 +626,6 @@ window.krtLiveSync.createReceiver({
         }
     });
 
-    // Drag reorder — scoped to #mission-objective-list so the crew board's / Ablauf's own drag is
-    // untouched (we only preventDefault once a drag that started in the goal list is in flight).
     let dragRow = null;
     document.addEventListener('dragstart', function (e) {
         const row = e.target.closest('#mission-objective-list .ae-row');
@@ -826,18 +683,11 @@ window.krtLiveSync.createReceiver({
     });
 })();
 
-// ---- Create-form Ziele + Ablauf editors: client-side rows serialized into the mission create POST.
-// On the create page the mission has no id yet, so — unlike the Verwaltung section editors above —
-// these rows carry no id and no section version and issue NO AJAX: the user adds / removes / reorders
-// rows locally and on submit they are serialized into the hidden objectivesJson / stepsJson carriers
-// the write controller parses into CreateMissionRequest.objectives / .steps. On a validation-failure
-// re-render the rows are re-hydrated from those same carriers so nothing typed is lost. Both sections
-// are optional (empty is fine) and only present on the create page (the lists exist only there).
 (function () {
     const objectiveList = document.getElementById('mission-create-objective-list');
     const stepList = document.getElementById('mission-create-step-list');
     if (!objectiveList && !stepList) {
-        return; // not the create page
+        return;
     }
     const form = document.getElementById('mission-form');
     const objectivesJson = document.getElementById('mission-objectives-json');
@@ -921,8 +771,6 @@ window.krtLiveSync.createReceiver({
         }
     }
 
-    // Collects the non-empty rows of a list into the payload shape the backend expects. `extraKey`
-    // is 'kind' for goals (a select) or 'meta' for steps (an optional text field), or null.
     function serialize(list, extraKey) {
         const out = [];
         if (!list) {
@@ -932,7 +780,7 @@ window.krtLiveSync.createReceiver({
             const titleInput = row.querySelector('.ae-title');
             const title = titleInput ? titleInput.value.trim() : '';
             if (!title) {
-                return; // a blank title means an empty row — drop it
+                return;
             }
             const entry = { title };
             if (extraKey === 'kind') {
@@ -983,8 +831,6 @@ window.krtLiveSync.createReceiver({
         }
     });
 
-    // Serialize into the hidden carriers before the classic create submit navigates. Capture phase,
-    // so the values are set before the browser collects the form data.
     if (form) {
         form.addEventListener(
             'submit',
@@ -1002,17 +848,10 @@ window.krtLiveSync.createReceiver({
         );
     }
 
-    // Re-hydrate rows from the carriers on load (validation-failure re-render / error re-flash).
     hydrate(objectiveList, objectiveTemplate, objectivesJson);
     hydrate(stepList, stepTemplate, stepsJson);
 })();
 
-// ---- KRT modal helpers ----
-// The mission page's own open/close helpers, its Escape handler, its [data-modal-dismiss] click and
-// its hand-rolled Tab trap were one of the ninety copies FE-SIMP-04 folded into window.krtModal
-// (krt-modal.js): the dialogs are native <dialog>s opened with showModal(), which traps focus and
-// makes the page inert by itself. The two names stay as aliases because this file calls them in
-// twenty places and the edit-finance bootstrap in mission-detail.html does too.
 (function () {
     window.krtModalOpen = function (overlay) {
         window.krtModal.open(overlay);
@@ -1020,8 +859,6 @@ window.krtLiveSync.createReceiver({
     window.krtModalClose = function (overlay) {
         window.krtModal.close(overlay);
     };
-    // Finance type segment controls: the buttons mirror their value into the hidden
-    // type input so the classic Spring form binding keeps working unchanged.
     window.krtSegSet = function (targetId, value) {
         const seg = document.querySelector('.seg[data-seg-target="' + targetId + '"]');
         const input = document.getElementById(targetId);
@@ -1052,7 +889,6 @@ window.krtLiveSync.createReceiver({
 })();
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Modal Logic
     const pModal = document.getElementById('participant-modal');
     const pBtn = document.getElementById('add-participant-btn');
 
@@ -1062,7 +898,6 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    // Edit Modal Logic
     const eModal = document.getElementById('edit-participant-modal');
     const eForm = document.getElementById('edit-participant-form');
     const eJob = document.getElementById('edit-job');
@@ -1071,9 +906,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const eComment = document.getElementById('edit-comment');
 
     if (eModal) {
-        // .edit-participant-btn live inside the crew board, which an in-place swap re-renders
-        // (#571/#574). Re-bind on krt:swapped; the dataset guard skips buttons that persist
-        // across a swap so they are never double-bound.
         function bindEditParticipantButtons() {
             document.querySelectorAll('.edit-participant-btn').forEach((btn) => {
                 if (btn.dataset.epBound) return;
@@ -1090,7 +922,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     eJob.value = this.getAttribute('data-job');
                     if (ePlannedJob) ePlannedJob.value = this.getAttribute('data-planned-job');
                     if (eOrgUnits) {
-                        // Preselect the participant's current org-unit ids in the multi-select.
                         const selected = (this.getAttribute('data-org-units') || '')
                             .split(',')
                             .filter(Boolean);
@@ -1098,9 +929,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             opt.selected = selected.includes(opt.value);
                         });
                     }
-                    // A registered member's org units come from their account and are never
-                    // selected: show them read-only and hide the picker. An EXTERNAL row has no
-                    // account to derive them from, so it keeps the picker (ADR-0159, decision D4).
                     const isExternal = this.getAttribute('data-external') === 'true';
                     const eOrgUnitsGroup = document.getElementById('edit-org-units-group');
                     const eOrgUnitsReadonlyGroup = document.getElementById(
@@ -1109,9 +937,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     const eOrgUnitsReadonly = document.getElementById('edit-org-units-readonly');
                     if (eOrgUnitsGroup && eOrgUnitsReadonlyGroup) {
                         eOrgUnitsGroup.style.display = isExternal ? '' : 'none';
-                        // The read-only group's hidden default is the krtm-display-none-5790 class
-                        // (ADR-0093), which a `style.display = ''` reveal cannot override — toggle the
-                        // class so registered members actually see the org-units read-out.
                         eOrgUnitsReadonlyGroup.classList.toggle(
                             'krtm-display-none-5790',
                             isExternal,
@@ -1157,14 +982,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     if (eVersion) eVersion.value = this.getAttribute('data-version') || '';
 
-                    // Modal head shows who is being edited ("mara.k bearbeiten" pattern from the mock).
                     const eTitle = document.getElementById('edit-participant-title');
                     if (eTitle && this.getAttribute('data-name')) {
                         eTitle.textContent = this.getAttribute('data-name');
                     }
 
-                    // The footer "Abmelden" button mirrors the row's delete button: same classic
-                    // delete action + participant id, routed through the shared delete-confirm modal.
                     const eUnregister = document.getElementById('edit-participant-unregister-btn');
                     if (eUnregister && window.missionId) {
                         const pid = this.getAttribute('data-participant-id') || '';
@@ -1176,18 +998,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         eUnregister.setAttribute('data-name', this.getAttribute('data-name') || '');
                     }
 
-                    // Hidden-Submit-Felder (name="startTime"/"endTime") mit dem UTC-ISO-Wert aus
-                    // dem Backend befuellen. Diese werden nur ueberschrieben, wenn der Nutzer
-                    // die Zeit aendert (siehe Submit-Handler unten) bzw. der Splitter feuert.
                     const startUtc = this.getAttribute('data-start-time') || '';
                     const endUtc = this.getAttribute('data-end-time') || '';
                     if (eStartTimeHidden) eStartTimeHidden.value = startUtc;
                     if (eEndTimeHidden) eEndTimeHidden.value = endUtc;
 
-                    // UI-Hidden innerhalb der datetime-split-group: UTC-ISO setzen und den
-                    // Splitter erneut synchronisieren, damit die sichtbaren date/time-Parts in
-                    // der Browser-Lokalzeit vorbelegt werden. Ohne expliziten Sync blieben die
-                    // Felder leer, weil der Splitter nur einmal beim DOMContentLoaded laeuft.
                     if (eStartTimeUi) {
                         eStartTimeUi.value = startUtc;
                         if (typeof window.krtSyncDatetimeSplitGroup === 'function') {
@@ -1222,12 +1037,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 const eEndTimeHidden = document.getElementById('edit-participant-end-time-hidden');
 
                 function toUtcISOString(localDateStr) {
-                    // localDateStr is already YYYY-MM-DDThh:mm and will be handled by the server
-                    // Backend will parse this as Europe/Berlin timezone
                     return localDateStr || '';
                 }
 
-                // Only overwrite hidden fields if UI fields are rendered (user has permission to edit times)
                 if (eStartTimeUi !== null && eStartTimeHidden) {
                     eStartTimeHidden.value = toUtcISOString(eStartTimeUi.value);
                 }
@@ -1238,10 +1050,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Frequenzen werden im Backend und in der Anzeige immer mit `.` als Trennzeichen
-    // gespeichert/gerendert. Beim Tippen tolerieren wir beides: ein eingegebenes `,` wird
-    // sofort zu `.` normalisiert, damit `parseFloat` in den AJAX-Submit-Handlern (und die
-    // klassischen Spring-Form-Bindings) den Wert nicht beim Komma abschneiden.
     document.querySelectorAll('.freq-input').forEach(function (input) {
         input.addEventListener('input', function () {
             if (this.value.indexOf(',') !== -1) {
@@ -1254,9 +1062,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const frequencyForm = document.getElementById('frequency-form');
 
     if (frequencyModal) {
-        // #1120: document-delegated so the .set-freq-btn buttons survive a live-sync swap of the
-        // #mission-organisation-results fragment (REQ-FE-015). A per-button listener bound here
-        // would be dead the first time a peer's typed-frequency edit re-renders the panel.
         document.addEventListener('click', function (event) {
             const btn = event.target.closest && event.target.closest('.set-freq-btn');
             if (!btn) {
@@ -1270,10 +1075,6 @@ document.addEventListener('DOMContentLoaded', function () {
             window.krtModalOpen(frequencyModal);
         });
 
-        // Paket 3B: intercept submit and call PUT /frequencies/ajax, then
-        // update the displayed value in place without a full page reload.
-        // The value renders twice (Uebersicht kv-list + Verwaltung panel),
-        // so every matching display/edit-button/row container is synced.
         if (frequencyForm) {
             frequencyForm.addEventListener('submit', async function (event) {
                 event.preventDefault();
@@ -1307,9 +1108,6 @@ document.addEventListener('DOMContentLoaded', function () {
                                 )
                                 .forEach(function (display) {
                                     display.textContent = formatted;
-                                    // A first-time value's span renders with the krtm-hidden class
-                                    // (its f == null default, ADR-0093); remove the class to reveal it
-                                    // — clearing the inline display would leave the class rule in force.
                                     display.classList.remove('krtm-hidden');
                                 });
                             document
@@ -1317,25 +1115,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                 .forEach(function (editBtn) {
                                     editBtn.setAttribute('data-current-value', String(match.value));
                                 });
-                            // #1148: the typed-frequency edit is a last-writer-wins upsert — the
-                            // payload (frequencyTypeId + value) never echoes a version, so the backend
-                            // takes no client version and cannot 409 on an existing row. The former
-                            // per-row data-version sync here was dead state nothing ever sent; removed
-                            // so the contract is coherent (the custom-frequency twin, which DOES echo
-                            // and check a version, keeps its data-version handling below).
                         }
                     }
                     window.krtModalClose(frequencyModal);
-                    // The in-place patch above keeps the Verwaltung row value current, but the
-                    // Übersicht Funk panel now only renders frequencies that carry a value (#816): a
-                    // frequency set for the first time has no row to patch there, so re-render the
-                    // overview section in place. krtRefreshMissionSection also broadcasts 'overview'
-                    // to peers (REQ-FE-010), replacing the prior notify.
                     if (window.krtRefreshMissionSection) {
-                        // Refresh + broadcast the overview mirror (a first-time value only renders
-                        // there, #816), and additionally broadcast `organisation` so peers re-render
-                        // the typed-frequency panel — the actor already patched it in place above
-                        // (#1120).
                         window.krtRefreshMissionSection('overview');
                         if (window.krtNotifyMissionChanged) {
                             window.krtNotifyMissionChanged('organisation');
@@ -1348,13 +1131,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // ---- Weitere Frequenzen (REQ-MISSION-014): mission-specific custom channels ----------------
-    // Add / edit share one modal (empty hidden id = add), delete asks a KRT confirm (no native
-    // dialog). Every mutation goes through krtMissionWrite (CSRF + retry-once-on-403 + the shared
-    // 409 reload-confirm) against the /frequencies/custom AJAX proxies, then re-renders the editor
-    // + overview Funk fragments in place via krtRefreshMissionSection (which also broadcasts to
-    // peers, REQ-FE-010). The click handlers are delegated on document so they survive the fragment
-    // swap; the modal lives outside the swapped fragment so its listeners persist.
     (function () {
         const customFreqModal = document.getElementById('custom-frequency-modal');
         const customFreqForm = document.getElementById('custom-frequency-form');
@@ -1475,11 +1251,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             if (result.ok) {
                 window.krtModalClose(customFreqModal);
-                // On an edit, fan the bumped @Version from the response out to the row (and the
-                // hidden modal version input) BEFORE the async frequencies swap lands, so a rapid
-                // re-open of the same custom frequency within the (load-inflated) swap window reads
-                // the fresh version instead of self-409ing into the reload-confirm (#1144). The slim
-                // PUT returns the updated List<MissionFrequencyDto>; find this row's entry by id.
                 if (isEdit && Array.isArray(result.body) && window.krtFetch) {
                     const updated = result.body.find(function (e) {
                         return e && e.id === fid;
@@ -1500,15 +1271,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     })();
 
-    // Autocomplete Logic
-
-    // Delete Modal Logic
     const deleteModal = document.getElementById('delete-confirm-modal');
     const deleteForm = document.getElementById('delete-confirm-form');
 
     if (deleteModal) {
-        // The confirm body names the consequence per sub-section (mock pattern):
-        // which entity, and what happens to dependent data.
         function deleteMessageFor(btn) {
             const section = btn.getAttribute('data-sub-section') || 'default';
             const dict = window.MISSION_DELETE_I18N || {};
@@ -1517,12 +1283,6 @@ document.addEventListener('DOMContentLoaded', function () {
             msg = msg.replace('{count}', btn.getAttribute('data-crew-count') || '0');
             return msg;
         }
-        // The delete openers live across the crew board and finance pane (both re-rendered by an
-        // in-place swap) plus the static admin area; re-bind on krt:swapped with a dataset guard
-        // so swapped-in buttons get wired without double-binding the persistent ones (#571/#574).
-        // NOTE: .delete-crew-btn (and the data-sub-section="crew" branches below + in the shared
-        // delete-confirm submit handler) currently match nothing — crew removal happens via
-        // drag-to-pool in moveParticipant() — and are kept as a dormant forward-compatible hook.
         function bindDeleteOpeners() {
             document
                 .querySelectorAll(
@@ -1536,15 +1296,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             this.getAttribute('data-action'),
                             deleteForm.action,
                         );
-                        // Paket 3C: propagate AJAX-capable sub-section metadata so the
-                        // shared delete-confirm-form submit handler can route to the
-                        // appropriate /ajax endpoint (no page reload, no parent-version bump).
                         const subSection = this.getAttribute('data-sub-section') || '';
                         let subId;
                         if (subSection === 'crew') {
-                            // Crew delete needs BOTH unitId and crewId; the primary subId
-                            // is the crewId, the unit is stored as auxiliary metadata so the
-                            // AJAX handler can build the nested URL /units/{u}/crew/{c}/ajax.
                             subId = this.getAttribute('data-crew-id') || '';
                             deleteForm.setAttribute(
                                 'data-sub-unit-id',
@@ -1570,8 +1324,6 @@ document.addEventListener('DOMContentLoaded', function () {
         document.addEventListener('krt:swapped', bindDeleteOpeners);
     }
 
-    // Add Unit & Crew Logic — #add-unit-btn lives inside the crew board, so re-bind it on
-    // krt:swapped (dataset-guarded) after the board re-renders (#571/#574).
     const addUnitModal = document.getElementById('add-unit-modal');
     function bindAddUnitButton() {
         const addUnitBtn = document.getElementById('add-unit-btn');
@@ -1592,8 +1344,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const editUnitHvu = document.getElementById('edit-unit-hvu');
 
     if (editUnitModal) {
-        // .edit-unit-btn live inside the crew board, which an in-place swap re-renders; re-bind
-        // on krt:swapped (dataset-guarded) so swapped-in buttons stay wired (#571/#574).
         function bindEditUnitButtons() {
             document.querySelectorAll('.edit-unit-btn').forEach((btn) => {
                 if (btn.dataset.euBound) return;
@@ -1607,9 +1357,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         'data-unit-id',
                         this.getAttribute('data-unit-id') || '',
                     );
-                    // #1131: carry the unit's @Version so the save echoes it back for the
-                    // optimistic-lock check. The crew fragment refresh on success re-renders this
-                    // button with the bumped version, so a follow-up edit reads the fresh one.
                     editUnitForm.setAttribute(
                         'data-version',
                         this.getAttribute('data-version') || '',
@@ -1633,9 +1380,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     const editUnitResponsible = document.getElementById('edit-unit-responsible');
                     if (editUnitResponsible) {
                         const responsibleVal = this.getAttribute('data-responsible') || '';
-                        // After the global enhancer upgrades the <select> into a searchable combobox,
-                        // its id lives on the hidden input; use the combobox API so BOTH the submitted
-                        // value and the visible textbox reflect the preselected responsible member.
                         if (editUnitResponsible.krtCombobox) {
                             editUnitResponsible.krtCombobox.setValue(responsibleVal);
                         } else {
@@ -1655,13 +1399,6 @@ document.addEventListener('DOMContentLoaded', function () {
         document.addEventListener('krt:swapped', bindEditUnitButtons);
     }
 
-    // --- Paket 3C: Units via AJAX (MissionSubresource) -----------------------
-    // Writes to units, crew and other sub-panels go through the backend's /slim
-    // endpoints via dedicated frontend /ajax proxy routes. On success the page
-    // is reloaded so that the server-rendered Thymeleaf view reflects the new
-    // state; because the backend no longer bumps the parent Mission.version
-    // when a sub-aggregate is written (Option A), concurrent users editing OTHER
-    // sub-panels keep their in-flight changes and are not hit by a spurious 409.
     (function wireUnitAjax() {
         if (!window.krtMissionWrite || !window.missionId) {
             return;
@@ -1688,8 +1425,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 if (res.ok) {
                     window.krtModalClose(addForm.closest('.krt-modal-overlay'));
-                    // 'overview' too: the Übersicht Funk panel mirrors the units' frequencies (#816),
-                    // so a new unit with a frequency must surface there without a reload.
                     window.krtRefreshMissionSection(['crew', 'overview']);
                 }
             });
@@ -1701,7 +1436,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 ev.preventDefault();
                 const unitId = editForm.getAttribute('data-unit-id');
                 if (!unitId) {
-                    // No AJAX target -> fall back to classical submit so the user is not blocked.
                     editForm.submit();
                     return;
                 }
@@ -1715,7 +1449,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     frequency: fd.get('frequency') ? parseFloat(fd.get('frequency')) : null,
                     responsibleUserId: fd.get('responsibleUserId') || null,
                     note: fd.get('note') || null,
-                    // #1131: echo the unit @Version for the optimistic-lock check (409 on stale form).
                     version: versionAttr ? Number(versionAttr) : null,
                 };
                 const res = await window.krtMissionWrite({
@@ -1726,21 +1459,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 if (res.ok) {
                     window.krtModalClose(editForm.closest('.krt-modal-overlay'));
-                    // 'overview' too: an edited unit frequency is mirrored in the Funk panel (#816).
                     window.krtRefreshMissionSection(['crew', 'overview']);
                 }
             });
         }
 
-        // Delete flow: intercept the shared delete-confirm form only when
-        // a unit delete triggered it (data-sub-section="unit").
         const dForm = document.getElementById('delete-confirm-form');
         if (dForm) {
             dForm.addEventListener('submit', async function (ev) {
                 const sub = dForm.getAttribute('data-sub-section');
                 const subId = dForm.getAttribute('data-sub-id');
                 if (sub !== 'unit' || !subId) {
-                    return; // let the classical POST run for non-unit deletes
+                    return;
                 }
                 ev.preventDefault();
                 const res = await window.krtMissionWrite({
@@ -1750,7 +1480,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 if (res.ok) {
                     window.krtModalClose(dForm.closest('.krt-modal-overlay'));
-                    // 'overview' too: a deleted unit drops out of the Funk panel mirror (#816).
                     window.krtRefreshMissionSection(['crew', 'overview']);
                 }
             });
@@ -1759,25 +1488,16 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.addEventListener('DOMContentLoaded', function () {
-    // --- Paket 3C (Option b): Participants via AJAX (MissionSubresource) ----
-    // Same pattern as wireUnitAjax: intercept add/edit/delete + check-in/check-out
-    // submits and route them through the backend's /slim participant endpoints
-    // via dedicated frontend /ajax proxy routes. On success the page is reloaded
-    // so the server-rendered Thymeleaf view reflects the new state.
     (function wireParticipantAjax() {
         if (!window.krtMissionWrite || !window.missionId) {
             return;
         }
 
-        // Add form: POST /missions/{id}/participants/ajax
         const addForm = document.getElementById('add-participant-form');
         if (addForm) {
             addForm.addEventListener('submit', async function (ev) {
                 ev.preventDefault();
                 const fd = new FormData(addForm);
-                // Org units only matter for external entries; when a registered user is selected
-                // the backend derives the affiliations and ignores the submitted list. Send the
-                // multi-select values regardless — the backend ignores them for registered users.
                 const addOrgUnitIds =
                     addForm.querySelector('#participant-user-id') &&
                     addForm.querySelector('#participant-user-id').value
@@ -1809,13 +1529,12 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        // Edit form: PUT /missions/{id}/participants/{pid}/ajax
         const editForm = document.getElementById('edit-participant-form');
         if (editForm) {
             editForm.addEventListener('submit', async function (ev) {
                 const pId = editForm.getAttribute('data-participant-id');
                 if (!pId) {
-                    return; // fall back to classical submit
+                    return;
                 }
                 ev.preventDefault();
                 const fd = new FormData(editForm);
@@ -1838,12 +1557,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 if (res.ok) {
                     window.krtModalClose(editForm.closest('.krt-modal-overlay'));
-                    // Propagate the fresh @Version from the slim response to EVERY container/button
-                    // for this participant SYNCHRONOUSLY, before the async fragment refetch lands —
-                    // mirroring the check-in/out fan-out below. Without it a rapid re-edit of the
-                    // same participant within the (load-inflated) swap window re-reads the pre-edit
-                    // data-version and self-409s into the reload-confirm (#1116). The PUT /ajax proxy
-                    // returns the updated MissionParticipantDto, which carries the bumped version.
                     const dto = res.body;
                     if (
                         dto &&
@@ -1857,17 +1570,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 window.krtFetch.syncVersion(c, dto.version);
                             });
                     }
-                    // 'overview' too: editing a participant's planned mission job type can change
-                    // who the Einsatzleiter is, and the facts-bar "Leiter" is patched off the
-                    // overview fragment's data-leader (REQ-MISSION-013).
                     window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
                 }
             });
         }
 
-        // Check-in / Check-out forms: ONE document-delegated submit listener so the forms keep
-        // working after the crew board is re-rendered by an in-place swap (the per-form binding
-        // they used before died on the first innerHTML swap). POST .../check-in|check-out/ajax.
         document.addEventListener('submit', async function (ev) {
             const f = ev.target;
             if (
@@ -1880,7 +1587,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const pId = f.getAttribute('data-participant-id');
             const action = f.getAttribute('data-participant-action');
             if (!pId || (action !== 'check-in' && action !== 'check-out')) {
-                return; // fall back to classical submit
+                return;
             }
             ev.preventDefault();
             const res = await window.krtMissionWrite({
@@ -1896,12 +1603,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 sectionKey: 'participant',
             });
             if (res.ok) {
-                // Propagate the fresh @Version from the slim response to EVERY container/button for
-                // this participant synchronously, BEFORE the async fragment refetch lands. Without
-                // this, a rapid follow-up edit of the same participant (its modal opened from a
-                // button still showing the pre-check-in data-version) would echo a stale version and
-                // self-409 on the user's own sequential edits (mission-scale hardening: S1
-                // participant self-409). The check-in/out /ajax proxy returns the participant DTO.
                 const dto = res.body;
                 if (dto && dto.version !== undefined && dto.version !== null && window.krtFetch) {
                     document
@@ -1914,15 +1615,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Delete flow: intercept the shared delete-confirm form when triggered by a
-        // participant delete (data-sub-section="participant").
         const dForm = document.getElementById('delete-confirm-form');
         if (dForm) {
             dForm.addEventListener('submit', async function (ev) {
                 const sub = dForm.getAttribute('data-sub-section');
                 const subId = dForm.getAttribute('data-sub-id');
                 if (sub !== 'participant' || !subId) {
-                    return; // let the classical POST (or unit handler) run
+                    return;
                 }
                 ev.preventDefault();
                 const res = await window.krtMissionWrite({
@@ -1932,15 +1631,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 if (res.ok) {
                     window.krtModalClose(dForm.closest('.krt-modal-overlay'));
-                    // 'overview' too: unregistering a participant may remove the Einsatzleiter, so
-                    // the facts-bar "Leiter" (patched off the overview's data-leader) must refresh.
                     window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
                 }
             });
         }
     })();
 
-    // Edit-crew modal: opened from the board chip-select ("Funktionen bearbeiten…").
     const editCrewModal = document.getElementById('edit-crew-modal');
     const editCrewForm = document.getElementById('edit-crew-form');
     const editCrewJobs = document.getElementById('edit-crew-jobs');
@@ -1951,15 +1647,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 source.getAttribute('data-action') || '/missions',
                 editCrewForm.action,
             );
-            // Paket 3C (Option c - Crew): store AJAX target + unit/crew ids on
-            // the shared edit-crew-form so wireCrewAjax can intercept the submit.
             editCrewForm.setAttribute(
                 'data-ajax-action',
                 source.getAttribute('data-action-ajax') || '',
             );
             editCrewForm.setAttribute('data-unit-id', source.getAttribute('data-unit-id') || '');
             editCrewForm.setAttribute('data-crew-id', source.getAttribute('data-crew-id') || '');
-            // #1131: carry the crew's @Version so the save echoes it for the optimistic-lock check.
             editCrewForm.setAttribute('data-version', source.getAttribute('data-version') || '');
             const jobIds = (source.getAttribute('data-jobs') || '').split(',');
 
@@ -1971,18 +1664,12 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    // Legacy backdrop-click close keeps working on the new krt-modal overlays.
     window.addEventListener('click', function (event) {
         if (event.target.classList && event.target.classList.contains('krt-modal-overlay')) {
             window.krtModalClose(event.target);
         }
     });
 
-    // --- Paket 3C (Option c - Crew): Crew via AJAX (MissionSubresource) -----
-    // Intercepts edit-crew-form (update) and the shared delete-confirm-form
-    // (for data-sub-section="crew") and routes them through the backend's
-    // /slim crew endpoints via dedicated frontend /ajax proxies. Crew ADD now
-    // happens through the board (drop / click / keyboard) instead of a modal.
     (function wireCrewAjax() {
         if (!window.krtMissionWrite || !window.missionId) {
             return;
@@ -1996,7 +1683,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 .filter((v) => v);
         }
 
-        // Update flow: PUT /missions/{id}/units/{u}/crew/{c}/ajax
         const editForm = document.getElementById('edit-crew-form');
         if (editForm) {
             editForm.addEventListener('submit', async function (ev) {
@@ -2004,13 +1690,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const unitId = editForm.getAttribute('data-unit-id');
                 const crewId = editForm.getAttribute('data-crew-id');
                 if (!ajaxUrl || !unitId || !crewId) {
-                    return; // fall back to classical submit
+                    return;
                 }
                 ev.preventDefault();
                 const versionAttr = editForm.getAttribute('data-version');
                 const payload = {
                     jobTypeIds: collectJobTypeIds(editForm),
-                    // #1131: echo the crew @Version for the optimistic-lock check (409 on stale form).
                     version: versionAttr ? Number(versionAttr) : null,
                 };
                 const res = await window.krtMissionWrite({
@@ -2026,8 +1711,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        // Delete flow: intercept the shared delete-confirm form when triggered by
-        // a crew delete (data-sub-section="crew"). Requires both unitId and crewId.
         const dForm = document.getElementById('delete-confirm-form');
         if (dForm) {
             dForm.addEventListener('submit', async function (ev) {
@@ -2035,7 +1718,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const crewId = dForm.getAttribute('data-sub-id');
                 const unitId = dForm.getAttribute('data-sub-unit-id');
                 if (sub !== 'crew' || !crewId || !unitId) {
-                    return; // let the classical POST (or unit/participant handlers) run
+                    return;
                 }
                 ev.preventDefault();
                 const res = await window.krtMissionWrite({
@@ -2058,9 +1741,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
-    // REQ-FE-016: the /users/search relay fetches one row more than these two autocompletes render
-    // (PickerSearch.PAGE_SIZE = 51 against this cap), so a 51st match means there are more and the
-    // list says so instead of looking complete. PickerSearchLimitsParityTest pins this value.
     const USER_SEARCH_RENDER_CAP = 50;
 
     /**
@@ -2084,7 +1764,6 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(hint);
     }
 
-    // Autocomplete Logic (participant add modal)
     const searchInput = document.getElementById('participant-search-input');
     const userIdInput = document.getElementById('participant-user-id');
     const resultsDiv = document.getElementById('participant-search-results');
@@ -2095,10 +1774,8 @@ document.addEventListener('DOMContentLoaded', function () {
         searchInput.addEventListener('input', function () {
             const val = this.value;
 
-            // Reset ID on any input change
             userIdInput.value = '';
 
-            // No registered user selected anymore -> reveal the external org-unit picker again.
             const orgUnitsGroup = document.getElementById('participant-org-units-group');
             if (orgUnitsGroup) {
                 orgUnitsGroup.style.display = '';
@@ -2128,7 +1805,6 @@ document.addEventListener('DOMContentLoaded', function () {
                                 'gi',
                             );
                             const displayName = user.effectiveName || '';
-                            // Use DOM nodes instead of innerHTML so displayName is treated as text.
                             displayName.split(regex).forEach((part, i) => {
                                 if (i % 2 === 1) {
                                     const strong = document.createElement('strong');
@@ -2142,8 +1818,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             div.addEventListener('click', function () {
                                 searchInput.value = displayName;
                                 userIdInput.value = user.id;
-                                // A registered user's org units are derived server-side, so hide
-                                // the external-only picker once a user is matched.
                                 const orgUnitsGroup = document.getElementById(
                                     'participant-org-units-group',
                                 );
@@ -2173,15 +1847,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Party Lead autocomplete — same /users/search mechanic as the participant add: picking a
-    // member fills the hidden userId, typing a free-text name clears it so the backend resolves
-    // the name (unique member -> linked, unknown -> kept as an external name).
-    //
-    // #1120: every handler here is document-delegated (not bound to the elements at load) so the
-    // party-lead form + clear button survive a live-sync swap of the #mission-organisation-results
-    // fragment (REQ-FE-015). A peer's party-lead or typed-frequency change re-renders this panel,
-    // and a per-element listener would then be dead on the next edit; the elements are re-queried
-    // inside each handler.
     let partyLeadDebounce;
 
     function partyLeadCloseLists() {
@@ -2205,7 +1870,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         const val = input.value;
-        // Any manual edit drops a previously resolved id; the backend re-resolves the name.
         userIdEl.value = '';
         clearTimeout(partyLeadDebounce);
         if (!val) {
@@ -2251,7 +1915,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.addEventListener('click', function (e) {
-        // Close the autocomplete dropdown when clicking outside its input.
         if (!e.target || e.target.id !== 'party-lead-search-input') {
             partyLeadCloseLists();
         }
@@ -2268,18 +1931,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!input || !userIdEl || !form) {
             return;
         }
-        // Clear the inputs and submit empty userId + guestName so the backend clears the party
-        // lead. requestSubmit() fires the 'submit' event (unlike .submit()) so the delegated submit
-        // handler below runs.
         input.value = '';
         userIdEl.value = '';
         form.requestSubmit();
     });
 
-    // In-place party-lead set/clear (#574): patch the display + bumped partyLeadVersion without a
-    // reload, then broadcast overview + organisation so peers re-render both the mirror and this
-    // panel — refreshing a peer's stale #party-lead-version that would otherwise 409 their next
-    // edit (#1120 / REQ-FE-010).
     document.addEventListener('submit', async function (ev) {
         if (!ev.target || ev.target.id !== 'party-lead-form') {
             return;
@@ -2291,10 +1947,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!input || !userIdEl) {
             return;
         }
-        // Snapshot THIS submit's userId/guestName intent now, but read the version live at send time
-        // (#1143). A static payload baked in the pre-bump partyLeadVersion, so a set immediately
-        // followed by Clear queued a second write with a stale version that 409'd, leaving the wrong
-        // lead assigned. Only the version is re-read in the thunk.
         const submittedUserId = userIdEl.value || null;
         const submittedGuestName = input.value || null;
         const res = await window.krtMissionWrite({
@@ -2324,8 +1976,6 @@ document.addEventListener('DOMContentLoaded', function () {
             : dto.partyLeadGuestName || noneLabel;
         if (display) display.textContent = resolvedName;
         if (overview) overview.textContent = resolvedName;
-        // The facts-bar "Leiter" now shows the Einsatzleiter (mission-lead participant), not the
-        // party lead, so a party-lead change no longer patches it here (REQ-MISSION-013).
         if (versionInput && dto.partyLeadVersion != null) {
             versionInput.value = dto.partyLeadVersion;
         }
@@ -2333,8 +1983,6 @@ document.addEventListener('DOMContentLoaded', function () {
         input.value = dto.partyLeadUser
             ? dto.partyLeadUser.effectiveName || ''
             : dto.partyLeadGuestName || '';
-        // Already patched in place above; signal peers to re-render their overview mirror AND their
-        // Organisation panel (fresh party-lead display + version) — live sync, #1120 / REQ-FE-010.
         if (window.krtNotifyMissionChanged) {
             window.krtNotifyMissionChanged(['overview', 'organisation']);
         }
@@ -2366,7 +2014,6 @@ function setNowToInput(inputId) {
         input.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // actualStartTime/actualEndTime are persisted immediately and patched in place (#574).
     if (inputId === 'actualStartTime' || inputId === 'actualEndTime') {
         saveActualTimeInPlace(inputId, now);
     }
@@ -2379,9 +2026,6 @@ async function saveActualTimeInPlace(field, nowDate) {
         console.error('[mission-detail] Mission ID nicht gefunden');
         return;
     }
-    // actual-time only touches the schedule section, so it carries the dedicated
-    // scheduleVersion counter — concurrent edits on the core or flags section therefore
-    // never trigger a 409 here (and vice versa).
     const versionInput =
         document.getElementById('mission-schedule-version') ||
         document.getElementById('mission-version');
@@ -2401,15 +2045,9 @@ async function saveActualTimeInPlace(field, nowDate) {
         return;
     }
 
-    // Routed through krtMissionWrite (#574): CSRF construction + retry-once-on-403 and the shared
-    // OPTIMISTIC_LOCK reload-confirm replace the former hand-rolled fetch + unconditional reload.
     await window.krtMissionWrite({
         method: 'POST',
         url: '/missions/' + encodeURIComponent(currentMissionId) + '/actual-time',
-        // Thunk, not a static object (#1143): the schedule version is re-read at SEND time so two
-        // queued schedule writes ('Jetzt' on Beginn then Ende, or a double-click) each pick up the
-        // version the previous one bumped via its onSuccess writeback below. A static payload would
-        // bake in the pre-bump version and the second write would self-409 into the reload-confirm.
         payload() {
             return {
                 field,
@@ -2420,8 +2058,6 @@ async function saveActualTimeInPlace(field, nowDate) {
         sectionKey: 'schedule',
         toast: false,
         onSuccess(dto) {
-            // actual-time PATCHes /schedule, so the schedule version (and the top-level version)
-            // bump — write them back so a follow-up schedule edit / actual-time set does not 409.
             if (dto && dto.scheduleVersion != null && versionInput) {
                 versionInput.value = dto.scheduleVersion;
             }
@@ -2429,7 +2065,6 @@ async function saveActualTimeInPlace(field, nowDate) {
             if (dto && dto.version != null && topVersionInput) {
                 topVersionInput.value = dto.version;
             }
-            // Patch the Tab-1 overview display for the field just set and re-localise it.
             const span = document.getElementById(
                 field === 'actualStartTime' ? 'overview-actual-start' : 'overview-actual-end',
             );
@@ -2439,8 +2074,6 @@ async function saveActualTimeInPlace(field, nowDate) {
                     window.krtLocalizeDates(span.parentNode || span);
                 }
             }
-            // Participation % in the payout table is derived from the actual times — refresh it.
-            // 'overview' too: the Tab-1 actual start/end mirror this change for peers (REQ-FE-010).
             window.krtRefreshMissionSection(['finance', 'overview']);
         },
     });
@@ -2486,10 +2119,6 @@ async function changeMissionOwner() {
 
         const cleanMissionId = String(currentMissionId).trim();
         const cleanUserId = String(userId).trim();
-        // The ownership counter is read LAZILY inside the payload thunk, at the moment the
-        // serialized section:owner chain sends the write — the same pattern as the owning-org-unit
-        // reassignment below — so a second change queued behind the first picks up the version the
-        // first one's onSuccess wrote back instead of self-409ing on the one read at click time.
         const currentOwnershipVersion = function () {
             const liveRow = document.getElementById('owner-row');
             const attr = liveRow ? liveRow.getAttribute('data-ownership-version') : null;
@@ -2504,8 +2133,6 @@ async function changeMissionOwner() {
             },
             sectionKey: 'owner',
             onSuccess(dto) {
-                // Write the bumped ownershipVersion straight back from the response before the chain
-                // releases the next queued write; the mgmt refetch below repaints it too, but later.
                 if (dto && dto.ownershipVersion != null) {
                     const liveRow = document.getElementById('owner-row');
                     if (liveRow) {
@@ -2515,8 +2142,6 @@ async function changeMissionOwner() {
                         );
                     }
                 }
-                // Re-render the management panel in place and broadcast it to peers (REQ-FE-010),
-                // whose re-rendered panel carries the new data-ownership-version as well.
                 window.krtRefreshMissionSection('mgmt');
             },
         });
@@ -2527,12 +2152,6 @@ async function changeMissionOwner() {
     }
 }
 
-// Repaints the sticky-header owning-org-unit badge in place for the ACTING user after a
-// reassignment (REQ-ORG-018), straight from the returned DTO so it updates without waiting for a
-// fragment round-trip. Peers repaint theirs via the overview krt:swapped listener (which reads
-// #overview-head-meta). The badge sits outside every swap container. Built via DOM APIs (not
-// innerHTML) so the name/shorthand are inserted as text. Ownerless empties the slot
-// (display:contents → no leftover gap).
 function updateMissionHeadOrgBadge(owningSquadron) {
     const slot = document.getElementById('mission-head-org-badge-slot');
     if (!slot) {
@@ -2555,14 +2174,7 @@ async function changeMissionOwningOrgUnit() {
         return;
     }
     const rawValue = select.value;
-    // Empty value = the "Keine" option → ownerless target (null). The target is captured at click
-    // time (the user's intent), but the owningOrgUnitVersion is read LAZILY inside the payload thunk
-    // below — mirroring the steps/objectives stepsVersion() pattern — so a rapid second reassignment
-    // picks up the version the first write bumped instead of the stale one that would otherwise be
-    // baked in here before the async mgmt refetch has repainted the row.
     const owningOrgUnitId = rawValue && rawValue.trim() !== '' ? rawValue.trim() : null;
-    // Re-reads the dedicated owningOrgUnit section counter from the LIVE #owning-org-unit-row at the
-    // moment the seam sends the write (inside the serialized section:owningOrgUnit task).
     const currentOwningOrgUnitVersion = function () {
         const liveRow = document.getElementById('owning-org-unit-row');
         const attr = liveRow ? liveRow.getAttribute('data-owning-org-unit-version') : null;
@@ -2605,10 +2217,6 @@ async function changeMissionOwningOrgUnit() {
             },
             sectionKey: 'owningOrgUnit',
             onSuccess(dto) {
-                // Write the bumped owningOrgUnitVersion straight back from the response DTO before
-                // the serialized section:owningOrgUnit chain releases the next queued write, so a
-                // rapid back-to-back reassignment reads the fresh version instead of self-409ing on
-                // the stale one the async mgmt refetch below has not repainted yet.
                 if (dto && dto.owningOrgUnitVersion != null) {
                     const liveRow = document.getElementById('owning-org-unit-row');
                     if (liveRow) {
@@ -2618,14 +2226,9 @@ async function changeMissionOwningOrgUnit() {
                         );
                     }
                 }
-                // Repaint the sticky-header owning-squadron badge for the acting user straight from
-                // the DTO — it lives outside every swap container.
                 if (dto) {
                     updateMissionHeadOrgBadge(dto.owningSquadron);
                 }
-                // Re-render the management panel in place (read-only value, dropdown selection,
-                // bumped owningOrgUnitVersion) and broadcast it to peers (REQ-FE-010): the overview
-                // fragment's krt:swapped listener repaints peers' badges from #overview-head-meta.
                 window.krtRefreshMissionSection('mgmt');
                 if (window.krtNotifyMissionChanged) {
                     window.krtNotifyMissionChanged('overview');
@@ -2719,19 +2322,10 @@ async function addMissionManager() {
 async function updatePayoutPreference(selectElement) {
     const url = selectElement.getAttribute('data-payout-url');
     const value = selectElement.value;
-    // Routed through krtFetch.write (#574): gains CSRF construction + retry-once-on-403 (a stale
-    // tab no longer silently fails) and unified problem+json handling. Stays a pure in-place
-    // patch — a single preference toggle changes no list structure, so no fragment swap.
     const result = await window.krtFetch.write({
         method: 'POST',
         url,
         payload: { preference: value },
-        // Join the participant section's serial chain (#1145): check-in/out and the participant edit
-        // form all serialize on 'section:participant' because they bump and re-sync the SAME
-        // MissionParticipant @Version. A bare select 'change' write ran outside that chain, so two
-        // rapid toggles could commit in reverse order (persisting the user's FIRST choice) and an
-        // older payout response could win the version fan-out over a newer check-in. Serializing
-        // orders them one-at-a-time in submission order.
         serialize: 'section:participant',
         toast: false,
         errorMessage:
@@ -2740,24 +2334,18 @@ async function updatePayoutPreference(selectElement) {
                 : 'Speichern fehlgeschlagen.',
     });
     if (!result.ok) {
-        // krtFetch already surfaced the error toast; roll the select back to its last value.
         selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';
         return;
     }
-    // The answer is the participant row alone (the slim endpoint), not the whole Einsatz.
     const updatedParticipant = result.body;
     if (!updatedParticipant) return;
     selectElement.setAttribute('data-original-value', value);
-    // The payout preference shows in the finance/payout table; signal peers to re-render it
-    // (this handler patches its own view in place, REQ-FE-010).
     if (window.krtNotifyMissionChanged) {
         window.krtNotifyMissionChanged('finance');
     }
     const participantId = selectElement.getAttribute('data-participant-id');
     if (participantId) {
         if (updatedParticipant.id === participantId) {
-            // Update the payout preference on the edit-button(s) so the next modal pre-fills
-            // with the new value.
             document
                 .querySelectorAll(
                     '.edit-participant-btn[data-participant-id="' + participantId + '"]',
@@ -2765,18 +2353,10 @@ async function updatePayoutPreference(selectElement) {
                 .forEach((btn) => {
                     btn.setAttribute('data-payout-preference', value);
                 });
-            // Container-wide data-version sync: the participant's version renders on the payout
-            // <tr> AND on its board person-row (plus their action buttons/modals). Every container
-            // carrying the participant id is synced so a follow-up click anywhere in the page
-            // never ships a stale version (spurious 409).
             if (updatedParticipant.version != null) {
                 document
                     .querySelectorAll('[data-participant-id="' + participantId + '"]')
                     .forEach((container) => {
-                        // Monotonic guard (#1145): under load a payout response can resolve AFTER a
-                        // newer check-in response that already synced version N+1. Without this, the
-                        // stale payout version N would overwrite it and re-arm the very spurious-409
-                        // the fan-out exists to prevent — so only ever advance, never regress.
                         const current = parseInt(container.getAttribute('data-version'), 10);
                         if (Number.isNaN(current) || updatedParticipant.version > current) {
                             window.krtFetch.syncVersion(container, updatedParticipant.version);
@@ -2787,17 +2367,12 @@ async function updatePayoutPreference(selectElement) {
     }
 }
 
-// --- Finance entries via AJAX (#574): add/edit/delete swap the finance pane in place instead
-//     of POST->redirect. The classic forms/links remain the no-JavaScript fallback. ---
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.krtMissionWrite || !window.missionId) {
         return;
     }
     const financeMissionId = window.missionId;
 
-    // Re-render the finance fragment in place; the Finanzen tab badge is patched by the
-    // document-level krt:swapped listener above (the single source of truth, shared with
-    // peer-driven swaps), so this no longer patches the badge itself.
     function refreshFinanceAndBadge() {
         return window.krtRefreshMissionSection('finance');
     }
@@ -2831,7 +2406,7 @@ document.addEventListener('DOMContentLoaded', function () {
         editForm.addEventListener('submit', async function (ev) {
             const entryId = editForm.getAttribute('data-entry-id');
             if (!entryId) {
-                return; // no AJAX target -> classic submit
+                return;
             }
             ev.preventDefault();
             const fd = new FormData(editForm);
@@ -2849,12 +2424,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             if (res.ok) {
                 window.krtModalClose(editForm.closest('.krt-modal-overlay'));
-                // Fan the bumped @Version from the response out to the finance edit button (and the
-                // hidden modal input) BEFORE the async finance swap lands, so a rapid re-open of the
-                // same entry within the (load-inflated) swap window reads the fresh version instead
-                // of self-conflicting (finance 409 = BUSINESS_CONFLICT, an unrecoverable error toast
-                // until the swap catches up; #1144). The PUT /ajax proxy returns the updated
-                // MissionFinanceEntryDto with its bumped version.
                 const dto = res.body;
                 if (dto && dto.version != null && window.krtFetch) {
                     document
@@ -2872,13 +2441,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Delete: extend the shared delete-confirm-form chain with a finance branch (the entry id is
-    // parsed from the action the opener set, since the finance button carries no data-sub-id).
     const dForm = document.getElementById('delete-confirm-form');
     if (dForm) {
         dForm.addEventListener('submit', async function (ev) {
             if (dForm.getAttribute('data-sub-section') !== 'finance') {
-                return; // let the unit/participant/crew handlers or the classic POST run
+                return;
             }
             ev.preventDefault();
             const match = (dForm.getAttribute('action') || '').match(
@@ -2951,15 +2518,6 @@ document.addEventListener('DOMContentLoaded', function () {
     setupShipFilter('edit-unit-shiptype', 'edit-unit-ship');
 });
 
-// CSP-safe delegated bindings (open/close finance modals fall through to the global
-// *-modal-display common handlers, the rest call into page-local functions defined above).
-//
-// Defer until DOMContentLoaded if the document is still parsing: a future head-script
-// load-order regression (cf. 56751e2) that leaves `window.krtEvents` undefined at
-// parse time would otherwise silently drop every registration, with the Jetzt button
-// (mission-set-now) and Owner/Manager/Payout/Finance handlers all stuck inert.
-// Logging the missing global makes the next breakage visible in the console instead
-// of silently failing.
 function registerMissionDetailEventHandlers() {
     if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
         console.error(
@@ -2996,19 +2554,15 @@ if (document.readyState === 'loading') {
     registerMissionDetailEventHandlers();
 }
 
-// ---- Tab navigation: ?tab= deeplink (priority) > #tab= > server-side error hint >
-//      last tab from localStorage > "ueb". Browser back/forward re-applies the URL state.
 (function () {
     const tabs = Array.from(document.querySelectorAll('.tab-nav .tab[data-tab]'));
     if (!tabs.length) {
-        return; // create page renders without tabs
+        return;
     }
     const validKeys = tabs.map((t) => t.getAttribute('data-tab'));
     const storeKey = 'krt.einsatz.' + (window.missionId || 'new') + '.tab';
     let dirty = false;
 
-    // Unsaved-changes guard: any input in the Verwaltung pane marks the page dirty
-    // until one of its forms is submitted (replaces the old panel-collapse states).
     const verwPane = document.getElementById('pane-verw');
     if (verwPane) {
         verwPane.addEventListener('input', function () {
@@ -3036,9 +2590,7 @@ if (document.readyState === 'loading') {
         });
         try {
             localStorage.setItem(storeKey, key);
-        } catch {
-            /* private mode */
-        }
+        } catch {}
     }
 
     async function show(key, push) {
@@ -3070,10 +2622,6 @@ if (document.readyState === 'loading') {
         if (q && validKeys.includes(q)) return q;
         const h = (window.location.hash.match(/tab=([\w-]+)/) || [])[1];
         if (h && validKeys.includes(h)) return h;
-        // A re-render with server-side validation errors must land on the form. Scope to
-        // :not(:empty) because #589 made the core-edit .field-error divs always-present (empty
-        // when there is no error) so the client can fill them — a bare `.field-error` would now
-        // always match and wrongly pin every load to the Verwaltung tab.
         if (
             document.querySelector('#pane-verw #mission-form .field-error:not(:empty)') &&
             validKeys.includes('verw')
@@ -3083,9 +2631,7 @@ if (document.readyState === 'loading') {
             try {
                 const s = localStorage.getItem(storeKey);
                 if (s && validKeys.includes(s)) return s;
-            } catch {
-                /* private mode */
-            }
+            } catch {}
         }
         return 'ueb';
     }
@@ -3096,7 +2642,6 @@ if (document.readyState === 'loading') {
         }),
     );
 
-    // Arrow-key navigation per WAI-ARIA tabs pattern.
     document.querySelector('.tab-nav').addEventListener('keydown', function (e) {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
         const i = tabs.indexOf(document.activeElement);
@@ -3111,7 +2656,6 @@ if (document.readyState === 'loading') {
         apply(resolveInitial(false));
     });
 
-    // Overview summary cards jump into their tabs.
     document.querySelectorAll('[data-tab-jump]').forEach((card) => {
         card.addEventListener('click', function () {
             show(card.getAttribute('data-tab-jump'), true);
@@ -3120,8 +2664,6 @@ if (document.readyState === 'loading') {
 
     apply(resolveInitial(true));
 
-    // Sticky offset: the global <header> is itself sticky at top 0, so the mission
-    // head sticks directly beneath its real rendered height.
     const sticky = document.getElementById('mission-head-sticky');
     const pageHeader = document.querySelector('body > header');
     function syncStickyOffset() {
@@ -3133,14 +2675,6 @@ if (document.readyState === 'loading') {
     syncStickyOffset();
 })();
 
-// #589: in-place save of the mission core-edit form. The classic POST->redirect (updateMission)
-// stays the no-JS fallback; this intercepts the EDIT form (data-mission-edit) and posts to the
-// X-Requested-With twin (updateMissionAjax). On 200 it writes the four fresh versions back into
-// the hidden inputs (so a second consecutive save does not 409) and toasts success WITHOUT a
-// navigation; on 422 it renders the {field:message} map into the per-field .field-error slots; on
-// 409 it offers the sanctioned conflict reload. The CREATE form (no data-mission-edit) keeps its
-// classic navigate-to-the-new-mission submit. The pane-verw 'submit' listener (above) still fires
-// through preventDefault, so the unsaved-changes tab guard is cleared exactly as before.
 (function () {
     const form = document.getElementById('mission-form');
     if (!form || form.dataset.missionEdit !== 'true') return;
@@ -3178,8 +2712,6 @@ if (document.readyState === 'loading') {
         Object.keys(map || {}).forEach(function (field) {
             const slot = form.querySelector('.field-error[data-error-for="' + field + '"]');
             if (slot) slot.textContent = map[field];
-            // No matching slot (e.g. a future backend-added constraint) -> toast so the validation
-            // message is never silently dropped.
             else if (window.showFrontendErrorToast) window.showFrontendErrorToast(map[field]);
         });
     }
@@ -3201,9 +2733,6 @@ if (document.readyState === 'loading') {
                 window.location.reload();
             }
         } else if (window.showFrontendErrorToast) {
-            // Shared, not re-derived: this handler bypasses krtFetch's handleProblem, so without
-            // the branch the `problem.detail` fallback below renders the backend's English
-            // owner-picker sentence in a German toast (REQ-ORG-023).
             const ownerRequired =
                 window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
                     ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
@@ -3215,13 +2744,6 @@ if (document.readyState === 'loading') {
             );
         }
     }
-    // Dirty-section tracking (#1136): the save fans out to up to three backend PATCHes
-    // (schedule / core / flags), and applyMissionUpdate skips the PATCH for any section the user
-    // left untouched. Skipping stops a peer's concurrent schedule bump (a 'Jetzt' actual-time stamp
-    // or a PLANNED->ACTIVE auto-transition) from 409ing a name-only edit, and never re-writes an
-    // untouched section's (possibly auto-stamped) values. We snapshot each section's fields at load
-    // and, at submit, mark a section dirty iff its current values differ, writing the result into
-    // the hidden dirtyCore/dirtySchedule/dirtyFlags inputs the FormData carries.
     const SECTION_FIELDS = {
         core: ['name', 'description', 'calendarLink', 'status', 'operationId', 'meetingPoint'],
         schedule: [
@@ -3234,8 +2756,6 @@ if (document.readyState === 'loading') {
         flags: ['isInternal'],
     };
     function sectionSnapshot(fd, fields) {
-        // getAll yields [] (-> '') for an absent field (e.g. an unchecked isInternal checkbox), so
-        // the per-section compare is a plain, stable string equality.
         return fields
             .map(function (n) {
                 return n + '=' + fd.getAll(n).join(',');
@@ -3270,21 +2790,11 @@ if (document.readyState === 'loading') {
     }
 
     async function submitInPlace() {
-        // No-JS / no-krtFetch fallback: let the native POST->redirect (updateMission) run.
         if (!window.krtFetch) {
             form.submit();
             return;
         }
-        // Compute the dirty flags into the hidden inputs BEFORE submitForm snapshots the FormData at
-        // send time (#1136).
         markDirtySections();
-        // #1118: route through krtFetch.submitForm instead of a hand-rolled fetch + manual CSRF +
-        // retry-on-403 loop. serialize:'section:schedule' joins the whole save to the same serial
-        // chain as the actual-time ('Jetzt') writer — which also bumps scheduleVersion — so the two
-        // never self-collide; submitForm rebuilds the FormData inside the serialized task, so a
-        // queued save re-reads the fresh scheduleVersion the prior schedule write wrote back. CSRF
-        // construction and the 403-refresh-retry are inherited from krtFetch (REQ-FE-001), and the
-        // captured submit button is the double-submit guard (replacing the old inFlight boolean).
         await window.krtFetch.submitForm({
             form,
             url: form.action,
@@ -3301,15 +2811,11 @@ if (document.readyState === 'loading') {
                     handleConflict(body || {});
                     return true;
                 }
-                return false; // let krtFetch surface the generic error toast
+                return false;
             },
             onSuccess(body) {
                 writeVersions(body);
                 clearFieldErrors();
-                // Re-render the overview pane (name / status / schedule / flags mirror the edited
-                // core data) and signal peers to do the same (live multi-user sync, REQ-FE-010).
-                // Returning the refresh promise makes the serialized chain wait for the version
-                // holders to be rewritten before the next queued schedule write runs.
                 if (window.krtRefreshMissionSection) {
                     return window.krtRefreshMissionSection('overview');
                 }
@@ -3323,20 +2829,9 @@ if (document.readyState === 'loading') {
     });
 })();
 
-// ---- Crew board: drag & drop + click fallback + keyboard operation. ----
-// Drop on a unit = the same backend action as the old "Crew zuweisen" modal
-// (POST crew, empty function set — the function is picked via the chip-select);
-// drop on the pool = remove the assignment; unit→unit = remove + add.
-//
-// All handlers are DELEGATED on the stable #crew-board-results wrapper (#571/#574): an in-place
-// crew swap replaces the wrapper's innerHTML but the wrapper itself persists, so a single set of
-// container-level listeners keeps the board fully operable after every swap with no re-init. The
-// native drag events (dragstart/dragover/drop) bubble, so one listener per type covers all rows
-// and zones. The dragged/selected closure state is cleared on krt:swapped (the swapped-out nodes
-// are detached) so a follow-up action never references a stale row.
 (function () {
     if (!window.missionCanEdit) {
-        return; // the board is read-only without edit permission
+        return;
     }
     const board = document.getElementById('crew-board-results');
     if (!board) {
@@ -3345,21 +2840,11 @@ if (document.readyState === 'loading') {
 
     let dragged = null;
     let selected = null;
-    // True once the active drag was released on a real drop-zone; lets `dragend`
-    // distinguish "released over no unit" (→ remove the assignment) from a genuine
-    // zone drop (which already handled the move).
     let droppedOnZone = false;
 
-    // ---- Edge auto-scroll while dragging a crew row. ----
-    // Native HTML5 drag does not scroll the page, so a unit scrolled out of view is
-    // unreachable as a drop target on a long board. We drive the scroll ourselves:
-    // a document-level `dragover` (fires as the pointer moves) sets a direction when
-    // the pointer enters the top/bottom edge band, and a rAF loop keeps scrolling —
-    // even while the pointer is held still in the band — until the drag ends or the
-    // pointer leaves the band. Speed eases with distance into the band.
     const EDGE_ZONE_PX = 72;
     const MAX_SCROLL_STEP_PX = 22;
-    let autoScrollDir = 0; // -1 = up, +1 = down, 0 = idle
+    let autoScrollDir = 0;
     let autoScrollStep = 0;
     let autoScrollRaf = null;
 
@@ -3381,9 +2866,6 @@ if (document.readyState === 'loading') {
         }
     }
 
-    // Aims the edge auto-scroll at a viewport y. Shared by the mouse drag's document `dragover`
-    // and the touch drag's `pointermove` (#1936): both want the same band, easing and rAF loop,
-    // and a second copy of the arithmetic is a second place for the two to drift apart.
     function driveEdgeScroll(y) {
         const h = window.innerHeight;
         if (y <= EDGE_ZONE_PX) {
@@ -3415,11 +2897,6 @@ if (document.readyState === 'loading') {
         }
     }
 
-    // Refreshes the 'crew' section only — NOT ['crew','finance'] like the other participant
-    // writes. A crew move mutates the Crew join entities, not the Participant entity, so the
-    // participant's @Version is unchanged and the payout <tr> in #finance-results (which carries
-    // data-version=${p.version}) stays in sync without a re-render. If a future backend change
-    // ever bumps the Participant @Version on a crew move, switch this to ['crew','finance'].
     async function moveParticipant(row, zone) {
         if (!window.krtMissionWrite || !window.missionId) return;
         const participantId = row.getAttribute('data-participant-id');
@@ -3454,13 +2931,10 @@ if (document.readyState === 'loading') {
                 payload: { participantId, jobTypeIds: [] },
                 sectionKey: 'crew',
             });
-            // Re-render regardless of the add outcome: after a successful delete the server
-            // state already changed and the board must reflect it.
             window.krtRefreshMissionSection('crew');
         }
     }
 
-    // Drag start/end on a row (delegated — drag events bubble to the container).
     board.addEventListener('dragstart', function (e) {
         const row = e.target.closest('.person-row');
         if (!row || !board.contains(row)) return;
@@ -3468,11 +2942,6 @@ if (document.readyState === 'loading') {
         droppedOnZone = false;
         if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
     });
-    // A drag released outside every drop-zone — over no unit and not over the pool —
-    // falls back to removing the unit assignment, so a participant deep in a long
-    // board can be unassigned by dragging into empty space (mirrors a pool drop).
-    // Pool rows (no unit) are a no-op. dragend always fires, so it also halts the
-    // edge auto-scroll and clears the drag state.
     board.addEventListener('dragend', function () {
         if (dragged && !droppedOnZone) {
             const pool = document.getElementById('board-pool');
@@ -3489,10 +2958,8 @@ if (document.readyState === 'loading') {
         droppedOnZone = false;
     });
 
-    // Click: a row toggles its selection; a zone (empty space) receives the selected person.
     board.addEventListener('click', function (e) {
         if (suppressClick) {
-            // The click a finished touch drag leaves behind (#1936) — consumed, not acted on.
             suppressClick = false;
             return;
         }
@@ -3520,7 +2987,6 @@ if (document.readyState === 'loading') {
         }
     });
 
-    // Keyboard: Enter/Space toggles a focused row or, on a focused zone, assigns the selection.
     board.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter' && e.key !== ' ') return;
         if (!e.target || typeof e.target.closest !== 'function') return;
@@ -3539,7 +3005,6 @@ if (document.readyState === 'loading') {
         }
     });
 
-    // Drag over/leave/drop on a zone (delegated).
     board.addEventListener('dragover', function (e) {
         const zone = e.target.closest('.drop-zone');
         if (!zone || !board.contains(zone)) return;
@@ -3563,40 +3028,21 @@ if (document.readyState === 'loading') {
         }
     });
 
-    // Edge auto-scroll driver — document-level so the band stays live even when the
-    // pointer leaves the board (e.g. over the sticky header) mid-drag. Gated on an
-    // active crew drag; never calls preventDefault, so it does not affect drop
-    // eligibility (the board-level dragover still governs that per zone).
     document.addEventListener('dragover', function (e) {
         if (!dragged) return;
         driveEdgeScroll(e.clientY);
     });
 
-    // ---- Touch / pen drag (#1936). ----
-    // Native HTML5 drag is a mouse gesture: no mobile browser turns touch input into dragstart,
-    // so on a phone the board's entire drag half was dead — a long press produced the browser's
-    // own context menu and nothing moved. This is that gesture rebuilt on Pointer Events, and it
-    // drives the SAME moveParticipant, so every drop semantic (unit → unit, drop on the pool,
-    // release over no zone = unassign) is identical to the mouse path by construction. The mouse
-    // is excluded on purpose: it already has the native implementation, drag image and all.
-    //
-    // Why a hold rather than an immediate drag: on a phone the rows ARE the board, so a drag that
-    // began on first contact would leave no way to scroll it. A finger that travels before the
-    // hold elapses is therefore a scroll and cancels the press; only one that stays put takes the
-    // gesture over. That is also why `touch-action` on `.person-row` still concedes pan-y to the
-    // browser — the hold is what claims the gesture, not the CSS.
     const LONG_PRESS_MS = 320;
     const MOVE_CANCEL_PX = 12;
 
-    let touchRow = null; // the row under the finger once a press starts (not yet a drag)
-    let touchActive = false; // true once the hold elapsed and the drag owns the gesture
-    let touchZone = null; // the zone currently under the finger
+    let touchRow = null;
+    let touchActive = false;
+    let touchZone = null;
     let touchPointerId = null;
     let pressTimer = null;
     let pressX = 0;
     let pressY = 0;
-    // A finished drag is followed by a synthetic click on the row. Without this it would also
-    // toggle that row's selection, leaving the board armed after every single drop.
     let suppressClick = false;
 
     function clearPressTimer() {
@@ -3606,9 +3052,6 @@ if (document.readyState === 'loading') {
         }
     }
 
-    // The board zone under a viewport point. elementFromPoint is the only hit-test available:
-    // the pointer is captured by the row, so the event's own target stays the row no matter
-    // where the finger actually is.
     function zoneAt(x, y) {
         const el = document.elementFromPoint(x, y);
         if (!el || typeof el.closest !== 'function') return null;
@@ -3630,10 +3073,7 @@ if (document.readyState === 'loading') {
             if (touchPointerId !== null) {
                 try {
                     touchRow.releasePointerCapture(touchPointerId);
-                } catch (_e) {
-                    // Never captured (the pointer was already gone, or is synthetic in a test)
-                    // or released twice — either way there is nothing left to undo.
-                }
+                } catch (_e) {}
             }
         }
         setTouchZone(null);
@@ -3645,10 +3085,9 @@ if (document.readyState === 'loading') {
 
     board.addEventListener('pointerdown', function (e) {
         suppressClick = false;
-        if (e.pointerType === 'mouse') return; // the mouse keeps the native HTML5 drag
+        if (e.pointerType === 'mouse') return;
         const row = e.target.closest('.person-row');
         if (!row || !board.contains(row)) return;
-        // Same carve-out as the click fallback: a row's own controls are not drag handles.
         if (
             e.target.closest('button') ||
             e.target.closest('select') ||
@@ -3656,7 +3095,7 @@ if (document.readyState === 'loading') {
             e.target.closest('a')
         )
             return;
-        endTouchDrag(); // a press left over from an interrupted gesture never survives into this
+        endTouchDrag();
         touchRow = row;
         touchPointerId = e.pointerId;
         pressX = e.clientX;
@@ -3668,18 +3107,13 @@ if (document.readyState === 'loading') {
             touchRow.classList.add('is-touch-dragging');
             try {
                 touchRow.setPointerCapture(touchPointerId);
-            } catch (_e) {
-                // The pointer is no longer active, or is synthetic. The document-level listeners
-                // below see the rest of the gesture regardless, so capture is a nicety here and
-                // never a precondition.
-            }
+            } catch (_e) {}
         }, LONG_PRESS_MS);
     });
 
     document.addEventListener('pointermove', function (e) {
         if (!touchRow || e.pointerId !== touchPointerId) return;
         if (!touchActive) {
-            // Still inside the hold: a finger that travels is scrolling the board, not dragging.
             if (
                 Math.abs(e.clientX - pressX) > MOVE_CANCEL_PX ||
                 Math.abs(e.clientY - pressY) > MOVE_CANCEL_PX
@@ -3695,7 +3129,7 @@ if (document.readyState === 'loading') {
     document.addEventListener('pointerup', function (e) {
         if (!touchRow || e.pointerId !== touchPointerId) return;
         if (!touchActive) {
-            endTouchDrag(); // a short tap — the click handler turns it into a selection
+            endTouchDrag();
             return;
         }
         const row = touchRow;
@@ -3706,8 +3140,6 @@ if (document.readyState === 'loading') {
             if (!zone.contains(row)) moveParticipant(row, zone);
             return;
         }
-        // Released over no zone at all — the unassign fallback the mouse path applies on
-        // `dragend`, so a row deep in a long board is freed without reaching for the pool.
         const pool = document.getElementById('board-pool');
         if (pool && row.getAttribute('data-crew-id') && row.getAttribute('data-unit-id')) {
             moveParticipant(row, pool);
@@ -3719,9 +3151,6 @@ if (document.readyState === 'loading') {
         endTouchDrag();
     });
 
-    // The page must not scroll out from under an active drag. Chrome treats a document-level
-    // touchmove listener as passive by default and ignores a passive listener's preventDefault,
-    // so {passive: false} is what makes this work at all. It is a no-op unless a drag is live.
     document.addEventListener(
         'touchmove',
         function (e) {
@@ -3730,16 +3159,10 @@ if (document.readyState === 'loading') {
         { passive: false },
     );
 
-    // Android raises its context menu on the very press this drag starts on — the symptom that
-    // made the board unusable on a phone (#1936). Suppressed for as long as a touch press on a
-    // row is live; the mouse returns above before touchRow is ever set, so right-click keeps its
-    // menu everywhere.
     board.addEventListener('contextmenu', function (e) {
         if (touchRow) e.preventDefault();
     });
 
-    // On-board function chip-select (delegated): quick single-function change via the crew
-    // update endpoint; "__edit" opens the multi-select crew modal, "__multi" is a no-op label.
     board.addEventListener('change', async function (e) {
         const sel = e.target.closest('.crew-role-select');
         if (!sel || !board.contains(sel)) return;
@@ -3760,8 +3183,6 @@ if (document.readyState === 'loading') {
         const res = await window.krtMissionWrite({
             method: 'PUT',
             url: ajaxUrl,
-            // #1131: the quick single-function change also rewrites the crew's whole job-type set,
-            // so it echoes the crew @Version too; a stale select 409s instead of clobbering.
             payload: {
                 jobTypeIds: value ? [value] : [],
                 version: versionAttr ? Number(versionAttr) : null,
@@ -3775,18 +3196,11 @@ if (document.readyState === 'loading') {
         }
     });
 
-    // After an in-place board swap the previously selected/dragged nodes are detached; clear the
-    // closure state so a follow-up action never references a stale row.
     document.addEventListener('krt:swapped', function (ev) {
         if (ev.detail && ev.detail.container === board) {
             selected = null;
             dragged = null;
             droppedOnZone = false;
-            // A touch drag ends in a swap, so its own state is stale by the time this runs: the
-            // row it held is detached and the zone it highlighted no longer exists (#1936).
-            // `suppressClick` is deliberately NOT cleared here — it is tied to the click the
-            // browser still owes for the finished drag, not to any node the swap replaced, and
-            // the next `pointerdown` clears it anyway.
             endTouchDrag();
             stopAutoScroll();
         }
@@ -3800,8 +3214,6 @@ function krtFormatLocalDateTime(el) {
         if (!isNaN(date)) {
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
-            // The facts bar shows time only (data-format="time") — the full date lives in the
-            // Übersicht details; everywhere else keeps the full dd.MM.yyyy HH:mm.
             if (el.getAttribute('data-format') === 'time') {
                 el.innerText = `${hours}:${minutes}`;
                 return;
@@ -3816,10 +3228,6 @@ function krtFormatLocalDateTime(el) {
     el.innerText = '—';
 }
 
-// Localises every UTC timestamp under root (default: document). Exposed on window so the
-// actual-time in-place patch can re-localise its display, and re-run on krt:swapped so swapped-in
-// fragments (finance refinery times, crew board) are localised too — a one-shot DOMContentLoaded
-// pass would otherwise leave swapped content showing raw UTC (#571/#574).
 window.krtLocalizeDates = function (root) {
     const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
     scope.querySelectorAll('.krt-local-dt').forEach(krtFormatLocalDateTime);

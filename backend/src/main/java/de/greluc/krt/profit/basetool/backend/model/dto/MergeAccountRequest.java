@@ -24,14 +24,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Body of an account-merge request (REQ-SEC-045): move everything an older account owns onto the
- * registration the member can actually log into now.
+ * Body of an account-merge request that moves everything an older account owns onto the
+ * registration in the path, which survives (REQ-SEC-045).
  *
- * <p>The direction is the opposite of {@link LinkRegistrationRequest}'s. Linking moves a Discord
- * <em>identity</em> onto a surviving account; this moves a member's <em>data</em> off an account
- * they can no longer reach. The registration in the path is the one that survives.
- *
- * @param sourceUserId the older account to empty — the one whose callsign collided; required
+ * @param sourceUserId the older account to empty; required
  * @param version the registration's optimistic-lock version the admin last read; {@code null}
  *     bypasses the check
  */

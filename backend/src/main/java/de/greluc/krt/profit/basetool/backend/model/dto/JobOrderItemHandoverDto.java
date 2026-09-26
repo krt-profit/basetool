@@ -25,19 +25,14 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A persisted item-handover event with its delivered lines. Mirrors {@link JobOrderHandoverDto}
- * (the material counterpart) including the cross-staffel audit snapshot — {@code executingUser}
- * plus {@code executingSquadron} record who carried out the handover, since a logistician from one
- * squadron may fulfil another squadron's order.
+ * A persisted item handover with its delivered lines and the executing user and squadron.
  *
  * @param id the handover primary key
  * @param jobOrderId the parent order id
  * @param handoverTime when the handover occurred (UTC)
  * @param recipientHandle the recipient's handle
- * @param executingUser slim reference to the user who executed the handover ({@code null} for
- *     pre-audit rows)
- * @param executingSquadron snapshot of that user's squadron at handover time ({@code null} when
- *     unassigned)
+ * @param executingUser the user who executed the handover, or {@code null} when not recorded
+ * @param executingSquadron that user's squadron at handover time, or {@code null}
  * @param entries the delivered item-line quantities
  * @param version optimistic-lock version
  */

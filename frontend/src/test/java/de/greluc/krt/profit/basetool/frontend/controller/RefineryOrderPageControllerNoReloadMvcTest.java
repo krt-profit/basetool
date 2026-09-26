@@ -51,13 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #575 no-reload AJAX twins on {@link RefineryOrderWriteController}: update /
- * store / cancel, each routed by the {@code X-Requested-With} header so the classic form-POST
- * handlers stay the no-JS fallback. Verifies the navigation-target JSON on success, the 400 on a
- * validation/empty-goods failure, and the {@code propagateBackendError} RFC 7807 passthrough (409
- * {@code OPTIMISTIC_LOCK} relayed as {@code application/problem+json} with the {@code code}
- * preserved) that {@code krt-fetch.js} needs to keep its reload-vs-toast conflict UX on this
- * profit/refinery editing surface.
+ * MVC tests for the AJAX twins of {@link RefineryOrderWriteController} (update, store, cancel):
+ * navigation-target JSON on success, 400 on a validation or empty-goods failure, and a backend 409
+ * {@code OPTIMISTIC_LOCK} relayed as {@code application/problem+json} with its {@code code}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -121,7 +117,6 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   void storeOrderAjax_EmptyItems_Returns400() throws Exception {
     UUID id = UUID.randomUUID();
 
-    // RefineryOrderStoreForm.items is @NotEmpty, so a no-items submit fails validation -> 400.
     mockMvc
         .perform(
             post("/refinery-orders/" + id + "/store")
@@ -181,10 +176,6 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER"})
   void updateOrderAjax_backendConflict_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
-    // A concurrent edit bumps the refinery order's optimistic-lock version -> backend 409
-    // OPTIMISTIC_LOCK. propagateBackendError must relay it as application/problem+json with the
-    // RFC 7807 code intact so krt-fetch.js keeps its reload-vs-toast distinction on this financial
-    // editing surface instead of degrading to a plain error toast.
     when(backendApiClient.put(
             eq("/api/v1/refinery-orders/" + id), any(), eq(RefineryOrderDto.class)))
         .thenThrow(
@@ -208,8 +199,6 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER"})
   void storeOrderAjax_backendConflict_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
-    // Twin of the update case for the store/complete twin: a 409 from the store call must also flow
-    // through propagateBackendError as problem+json with the code preserved.
     when(backendApiClient.post(
             eq("/api/v1/refinery-orders/" + id + "/store"), any(), eq(Void.class)))
         .thenThrow(

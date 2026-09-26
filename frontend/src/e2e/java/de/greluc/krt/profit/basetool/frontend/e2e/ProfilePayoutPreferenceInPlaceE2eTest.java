@@ -38,21 +38,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the stale optimistic-lock {@code @Version} bug class on in-place writes (epic
- * #571): the profile default-payout-preference save ({@code POST /profile/payout-preference} →
- * {@code PUT /api/v1/users/me/payout-preference}) saves through {@code window.krtFetch.write}
- * without a page reload and must survive a SECOND consecutive in-place save.
+ * Verifies that the profile payout-preference save updates in place and that a second consecutive
+ * in-place save does not 409 on a stale {@code @Version}.
  *
- * <p>The proven bug: the pre-fix backend returned a stale user {@code version} after a real payout
- * change while the DB advanced one further, so replaying the returned version on the next write
- * 409ed with {@code OPTIMISTIC_LOCK}. The fix flushes (save → saveAndFlush) so the response carries
- * the fresh version that the page writes back via {@code syncAllVersions}.
- *
- * <p>Each save flips the preference to a <em>genuinely different</em> enum value (the only two
- * values are {@code PAYOUT} and {@code DONATE}, so the two saves alternate between them): re-saving
- * the same value is a no-op that never bumps the {@code @Version} and would not exercise the bug. A
- * window marker set on the live document proves no reload happened between the two saves, and the
- * persisted preference is read back from the backend to confirm the second write actually landed.
+ * <p>The saves alternate between {@code PAYOUT} and {@code DONATE} so both bump the version; a
+ * window marker proves no reload happened, and the persisted preference is read back from the
+ * backend.
  */
 @Tag("e2e")
 class ProfilePayoutPreferenceInPlaceE2eTest {
@@ -91,12 +82,9 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
   }
 
   /**
-   * Changes the payout preference to the value the form is NOT currently on and saves in place
-   * (asserting a success toast and that the page was never reloaded), then — without reloading —
-   * flips it to the third (other) value and saves again, asserting the second consecutive save
-   * succeeds (success toast, no error/conflict toast, no reload-confirm dialog, marker survives)
-   * and that the second value is the one the backend persisted. The second save only succeeds if
-   * the twin wrote the fresh {@code @Version} back into the hidden input — a stale version 409s.
+   * Switches the payout preference to the other value and saves in place, then switches back and
+   * saves again without reloading, asserting the second save succeeds without a conflict and the
+   * backend persisted its value.
    */
   @Test
   void savesPayoutPreferenceInPlaceThenDoubleSaveDoesNotConflict() {
@@ -112,9 +100,6 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/profile");
         page.waitForLoadState();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // both saves stayed in place. The position:fixed footer can cover the bottom submit button,
-        // so it is dropped out of the way before the (non-navigating) AJAX clicks.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -124,14 +109,10 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
             page.locator("#profile-payout-form select[name='defaultPayoutPreference']");
         Locator submit = page.locator("#profile-payout-form button[type='submit']");
 
-        // Pick the two distinct values: start from whatever is selected, flip to the other, then
-        // back. The enum has exactly two members (PAYOUT, DONATE), so alternating them guarantees a
-        // real change — and therefore a real @Version bump — on each of the two saves.
         String initial = select.inputValue();
         String firstTarget = "PAYOUT".equals(initial) ? "DONATE" : "PAYOUT";
         String secondTarget = initial.isBlank() ? "PAYOUT" : initial;
 
-        // First in-place save: a genuinely different value.
         select.selectOption(new SelectOption().setValue(firstTarget));
         saveInPlace(page, submit);
         assertEquals(
@@ -141,9 +122,6 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
         assertEquals(
             firstTarget, persistedPayoutPreference(), "the first in-place save must persist");
 
-        // Second consecutive in-place save WITHOUT a reload, to the other value: only succeeds if
-        // the twin wrote the fresh @Version back (otherwise the stale version 409s
-        // OPTIMISTIC_LOCK).
         select.selectOption(new SelectOption().setValue(secondTarget));
         saveInPlace(page, submit);
         assertEquals(
@@ -162,11 +140,8 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
   }
 
   /**
-   * Clears any prior toast, submits the payout form, waits for the in-place {@code POST
-   * /profile/payout-preference} to settle, and asserts the success UX: a non-error success toast
-   * appeared, NO error toast surfaced, and the {@code OPTIMISTIC_LOCK} reload-confirm dialog
-   * ({@code .krt-confirm-overlay}) never opened. The latter two are the discriminators that turn a
-   * stale second save red on the pre-fix backend.
+   * Submits the payout form in place and asserts a success toast, no error toast and no {@code
+   * OPTIMISTIC_LOCK} reload-confirm dialog ({@code .krt-confirm-overlay}).
    *
    * @param page the authenticated profile page
    * @param submit the payout form's submit button

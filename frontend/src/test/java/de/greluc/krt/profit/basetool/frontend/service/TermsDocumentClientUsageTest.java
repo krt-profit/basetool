@@ -32,20 +32,8 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * The frontend has exactly one WebClient that carries no caller identity, and exactly one call site
- * allowed to use it (REQ-SEC-052, ADR-0159).
- *
- * <p>Its predecessor was called {@code publicWebClient} and was selected by an {@code isPublic}
- * boolean passed at roughly forty call sites — the mission list, the order queue, the catalogue
- * pickers, the home page. Every one of those was a decision to send a request with no identity,
- * taken by typing {@code true} into an argument list, and none of them was reviewable as such: a
- * boolean is the wrong shape for "this request has no caller". The flag is gone and the client is
- * named for its one job, but a name alone does not stop the next person from injecting the bean
- * somewhere else. This test does.
- *
- * <p>Deliberately structural rather than behavioural. What it protects is not what {@code
- * getTermsDocumentAnonymously()} returns — {@code BackendApiClientHappyPathTest} covers that — but
- * that the surface stays a single door: one field, one reader, and it is the terms document.
+ * Asserts structurally that the frontend's single identity-less WebClient is used by exactly one
+ * call site, the terms document read {@code getTermsDocumentAnonymously()} (REQ-SEC-052, ADR-0159).
  */
 class TermsDocumentClientUsageTest {
 
@@ -84,8 +72,6 @@ class TermsDocumentClientUsageTest {
             .filter(name -> !name.endsWith("#<init>"))
             .collect(Collectors.toSet());
 
-    // The constructor assignment is filtered out above; what is left is every method that reads the
-    // field. One entry, and it is the named one — a second would mean a second anonymous call.
     assertThat(readers)
         .as("only the terms document may be fetched without a caller")
         .containsExactly("BackendApiClient#getTermsDocumentAnonymously");

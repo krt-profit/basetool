@@ -31,11 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Materialises the admin-curated default blueprints (REQ-INV-016) into {@code personal_blueprint}
  * rows for users who do not yet own them.
  *
- * <p>Both grants are single set-based {@code INSERT … SELECT … ON CONFLICT (owner_user_id,
- * product_key) DO NOTHING} statements, so they are idempotent and never produce a duplicate —
- * running them repeatedly (first-login event, admin add, periodic sweep, startup backfill) only
- * ever inserts the still-missing rows. Because each is one bulk insert that touches no managed
- * entity, the CLAUDE.md detach-clear trap does not apply.
+ * <p>Each grant is one set-based {@code INSERT … SELECT … ON CONFLICT DO NOTHING}, so repeated runs
+ * only insert the still-missing rows.
  */
 @Service
 @RequiredArgsConstructor

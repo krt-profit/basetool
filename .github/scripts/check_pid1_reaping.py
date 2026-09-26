@@ -1,22 +1,9 @@
 #!/usr/bin/env python3
 """Enforce REQ-OPS-019: a forking healthcheck requires a zombie-reaping PID 1.
 
-BusyBox ``wget`` forks an ``ssl_client`` TLS helper for every ``https://`` fetch. The helper
-reparents to PID 1 inside the container, and neither a bare JVM nor a Go binary calls ``wait()``,
-so one ``<defunct>`` accumulates per probe and permanently occupies a slot of the service's ``pids``
-cgroup cap. At the cap the kernel refuses every ``fork()``: the healthcheck itself can no longer
-run, the container reports ``unhealthy``, and a JVM additionally dies with
-``pthread_create failed (EAGAIN)``.
-
-This has now shipped twice — ingest on 2026-07-12 (native-thread OOM, 712 zombies against the 2048
-cap) and grafana on 2026-07-26 (493 zombies against a 512 cap, unhealthy for two days). Both times
-the fix was ``init: true``. This check exists so there is no third time: it fails the build when any
-compose service combines a forking probe with a PID 1 that cannot reap.
-
-The probe is resolved the way Docker resolves it — an explicit compose ``healthcheck.test`` wins,
-otherwise the ``HEALTHCHECK`` baked into the image, which for our own images lives in the
-Dockerfiles in this repo. ``curl``-based probes are deliberately NOT flagged: curl links TLS
-in-process and forks nothing.
+Fails when a compose service runs a BusyBox ``wget`` ``https://`` healthcheck (which forks an
+``ssl_client`` per probe) without ``init: true``. The probe is the compose ``healthcheck.test``,
+else the ``HEALTHCHECK`` of this repository's own Dockerfile stage.
 
 Usage:
     python3 .github/scripts/check_pid1_reaping.py [--selftest]
@@ -32,9 +19,6 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# Our own images carry their HEALTHCHECK in one shared Dockerfile, in a per-module tail stage
-# (`FROM runtime AS runtime-<module>`), because HEALTHCHECK expands no build args; a service using
-# the image inherits it unless the compose file overrides `healthcheck`.
 APP_DOCKERFILE = "docker/app/Dockerfile"
 IMAGE_DOCKERFILES = {
     "basetool-backend": (APP_DOCKERFILE, "runtime-backend"),
@@ -44,20 +28,14 @@ IMAGE_DOCKERFILES = {
 
 
 class ComposeLoader(yaml.SafeLoader):
-    """SafeLoader that tolerates the Compose spec's custom tags.
-
-    Compose adds merge-control tags such as ``!override`` and ``!reset`` that plain ``SafeLoader``
-    rejects outright, aborting the parse of a file that is otherwise perfectly valid YAML. Only the
-    tag decoration is meaningless here — the value it decorates is a normal node — so unknown tags
-    are unwrapped to their underlying scalar/sequence/mapping.
-    """
+    """SafeLoader that unwraps unknown tags such as Compose's ``!override`` and ``!reset``."""
 
 
 def _construct_unknown(loader: ComposeLoader, _suffix: str, node):
     """Unwrap any unrecognised YAML tag to the plain value it decorates.
 
     :param loader: the active loader instance.
-    :param _suffix: the unmatched tag suffix; irrelevant because every tag is treated alike.
+    :param _suffix: the unmatched tag suffix, ignored.
     :param node: the tagged node to construct.
     :return: the node's value as a scalar, list or dict.
     """
@@ -72,10 +50,7 @@ ComposeLoader.add_multi_constructor("", _construct_unknown)
 
 
 def probe_forks_tls_helper(probe: str) -> bool:
-    """Report whether a healthcheck command spawns a TLS helper process.
-
-    Only BusyBox ``wget`` does: it execs a separate ``ssl_client`` binary for ``https://`` URLs.
-    ``curl`` performs TLS in-process, and a plain ``http://`` fetch needs no helper at all.
+    """Report whether a healthcheck command spawns a TLS helper process (``wget`` over ``https://``).
 
     :param probe: the healthcheck command line, already flattened to a single string.
     :return: ``True`` when the command is a ``wget`` fetch of an ``https://`` URL.
@@ -86,8 +61,7 @@ def probe_forks_tls_helper(probe: str) -> bool:
 def flatten_probe(test) -> str | None:
     """Flatten a compose ``healthcheck.test`` value into one command string.
 
-    Compose accepts a bare string or a list whose first element is the form marker (``CMD`` /
-    ``CMD-SHELL`` / ``NONE``). The marker is dropped so it cannot be confused with the command.
+    A leading ``CMD`` / ``CMD-SHELL`` marker is dropped.
 
     :param test: the raw ``healthcheck.test`` value, or ``None`` when absent.
     :return: the flattened command, or ``None`` when there is no probe or it is explicitly ``NONE``.
@@ -106,11 +80,6 @@ def flatten_probe(test) -> str | None:
 
 def stage_text(dockerfile: str, stage: str) -> str | None:
     """Return the instructions of one named build stage, line continuations already joined.
-
-    Continuations are joined FIRST, then matched. Matching before joining is what once silently
-    broke this check: our HEALTHCHECK puts its flags and its CMD on separate lines, and a greedy
-    ``[^\\n]*`` swallows the trailing backslash, so the continuation never matches and the probe
-    reads as absent — every JVM service would then pass this check vacuously.
 
     :param dockerfile: the Dockerfile's full text.
     :param stage: the stage name after ``AS`` (case-insensitive, as Docker treats it).
@@ -149,10 +118,7 @@ def dockerfile_probe(image: str) -> str | None:
 def collect_services() -> dict[str, dict]:
     """Merge every root compose file into one service view.
 
-    Services are merged across files (base plus overrides) rather than judged per file, because
-    ``init`` and ``healthcheck`` routinely live in different ones — evaluating a single override in
-    isolation would report a violation that the base file already fixes. ``yaml.safe_load`` resolves
-    the ``x-*`` anchors and ``<<`` merge keys, so template-inherited ``init: true`` is seen too.
+    Later files override earlier ones per key; anchors and ``<<`` merge keys are resolved.
 
     :return: service name mapped to ``{"init": bool | None, "probe": str | None, "files": [...]}``.
     """
@@ -196,11 +162,7 @@ def find_violations(services: dict[str, dict]) -> list[tuple[str, str]]:
 
 
 def selftest() -> int:
-    """Prove the detector discriminates instead of passing vacuously.
-
-    Guards the exact shapes this check exists for: the grafana regression (forking probe, no init),
-    the fixed form, and the two probes that must never be flagged (plain HTTP, and curl-over-TLS,
-    which forks nothing).
+    """Check the detector against forking and non-forking probes and the repository's own images.
 
     :return: process exit code -- ``0`` when every fixture behaves as specified.
     """
@@ -220,7 +182,6 @@ def selftest() -> int:
             failures += 1
         print(f"  [{status}] forks={actual!s:<5} expected={expected!s:<5} {probe[:60]}")
 
-    # A forking probe without init must be reported; the same service with init must not be.
     bad = {"svc": {"init": None, "probe": cases[0][0], "image": None, "files": ["x"]}}
     good = {"svc": {"init": True, "probe": cases[0][0], "image": None, "files": ["x"]}}
     if len(find_violations(bad)) != 1:
@@ -230,15 +191,6 @@ def selftest() -> int:
         print("  [FAIL] a forking probe WITH init was wrongly reported")
         failures += 1
 
-    # Anti-vacuity guard. Our JVM services declare no compose healthcheck in the dev profile, so
-    # their probe can only come from the image's HEALTHCHECK. An earlier revision of this script
-    # failed to join Dockerfile line continuations and read that probe as ABSENT, which made every
-    # JVM service pass without being checked at all. Assert the resolution really produces a
-    # forking probe, so the check can never go quietly blind again.
-    #
-    # Since the three images share one Dockerfile, each probe must also come from ITS OWN tail
-    # stage: a resolver that read the first HEALTHCHECK in the file would hand all three the
-    # backend's probe and still pass the forking check above. The port tells them apart.
     own_port = {"basetool-backend": "11261", "basetool-frontend": "18081", "basetool-ingest": "11262"}
     for marker in IMAGE_DOCKERFILES:
         probe = dockerfile_probe(f"ghcr.io/krt-profit/{marker}:stable")

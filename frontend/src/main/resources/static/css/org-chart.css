@@ -1,29 +1,6 @@
-/* ============================================================================
-   Profit-Bereich Organigramm — top-down org-chart layout.
-   A classic org chart drawn in the KRT HUD style: square boxes, hairline
-   connectors, the orange bloom as the only "elevation", no invented colours.
-
-   Connectors are built from two primitives so every line stays unbroken and
-   centred (the previous <ul>-elbow approach left gaps at single-child seams):
-     - .oc-v   : a vertical link element that *is* one --oc-gap of height, with
-                 a centred hairline filling it. Used between a node and its sole
-                 child (Bereichsleiter→Stab, Staffel→Staffelleiter, Kommando→…).
-                 Gap-free by construction — the element is the gap.
-     - .oc-fan : a node fanning out to a row of children: a centred drop into a
-                 horizontal bus, then a centred drop into every child. Used for
-                 the units row and a Staffelleiter→Kommandos row.
-   Shared knobs: --oc-gap (vertical step), --oc-col-gap (horizontal step),
-   --oc-box-w (every box's width, so each type lines up). The whole chart
-   scrolls horizontally on narrow screens with a KRT-styled scrollbar.
-   ============================================================================ */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    /* The chart is far wider than the global 1200px reading column, so on this page
-   <main> drops the cap and uses the full viewport width — large screens then show
-   the whole tree without panning. The title block and toolbar stay capped and
-   centred so the header keeps a readable measure. */
     main.oc-page {
         max-width: none;
     }
@@ -33,10 +10,6 @@
         margin-inline: auto;
     }
 
-    /* The title box carries the inline-editor toggle on its trailing edge: the heading + subtitle are
-   the leading text column, the "Bearbeiten" button is pushed to the right (margin-inline-start:auto)
-   and vertically centred. flex-wrap lets the button drop below the text on a narrow viewport instead
-   of crushing the heading; it stays right-aligned on its own line. */
     main.oc-page .oc-greeting {
         display: flex;
         align-items: center;
@@ -62,18 +35,6 @@
         margin-top: 1.5rem;
     }
 
-    /* The horizontal scrollbar intentionally inherits the global HUD scrollbar from
-   styles.css — the previous local override pre-dated and diverged from the
-   design-system spec (size + hover colour). */
-
-    /* --- sticky horizontal scrollbar (REQ-ORG-013) ------------------------------
-   A wide chart is usually also tall, so its own horizontal scrollbar sits at the bottom of the
-   chart — far down the page, often below the fixed footer, so panning means scrolling the whole page
-   down first. #oc-scrollbar is a proxy scrollbar org-chart.js pins just above the footer and keeps
-   in sync with the chart's horizontal scroll, so it is always one drag away. It is created + toggled
-   by the JS (hidden until the chart overflows); while it is active the chart's own bar is suppressed
-   (.oc-chart--proxied) so there is never a duplicate. Pinned above the fixed footer via the shared
-   --krt-footer-height and kept just under it in the stacking order. */
     .oc-scrollbar {
         position: fixed;
         left: 0;
@@ -87,17 +48,6 @@
         border-top: 1px solid var(--color-gray-3);
     }
 
-    /* On the phone class the footer is `position: static` and scrolls with the page, so
-   `--krt-footer-height` publishes 0 and the bar above would sit at `bottom: 0` — painting over the
-   legal links once the reader reaches the end, with the footer's own `z-index: 999` no longer
-   applying because a static element has no stacking position. `sticky` keeps the same
-   viewport-pinned feel while the chart is in view and releases at the end of the flow, which is
-   where the footer is. The bar is inserted `afterend` of the chart by org-chart.js, so it is in
-   flow and sticky works.
-
-   AFTER the rule it overrides. A media query adds no specificity: written before it, the two
-   `.oc-scrollbar` selectors tied and `position: fixed` won on the very class this block exists
-   for, so the 14px proxy bar sat at `bottom: 0` over the legal links at z-index 998. */
     @media (width <= 768px) {
         .oc-scrollbar {
             position: sticky;
@@ -137,26 +87,18 @@
         font-size: 1rem;
     }
 
-    /* --- connector primitives --------------------------------------------------- */
     .oc-tree {
         display: flex;
-        /* `safe` keeps the tree centred when it fits, but falls back to start-aligned
-       once it is wider than the viewport. Plain `center` pushes the overflowing
-       left half into negative scroll space that the scrollbar can never reach,
-       so the leftmost Staffel/Kommando columns become unscrollable. */
         justify-content: safe center;
         min-width: 100%;
     }
 
-    /* a centred column: spine, unit column, command column */
     .oc-col {
         display: flex;
         flex-direction: column;
         align-items: center;
     }
 
-    /* vertical link: occupies exactly one --oc-gap, hairline centred down its
-   middle. Sits flush between the two boxes it joins, so there is never a gap. */
     .oc-v {
         flex: 0 0 auto;
         width: 100%;
@@ -174,10 +116,6 @@
         border-left: var(--oc-line-w) solid var(--oc-line);
     }
 
-    /* fan-out: a centred drop into a horizontal bus (top half of the gap), then a
-   centred drop from the bus into each child (bottom half). The end children
-   trim the outer bus half but keep their own drop, so the bus spans exactly
-   from the first to the last child and every child stays connected. */
     .oc-fan {
         list-style: none;
         margin: 0;
@@ -236,13 +174,11 @@
         border-top: 0;
     }
 
-    /* wider horizontal gap between OrgUnits (Staffeln / SKs) than between tiles inside one */
     .oc-fan--units > li {
         padding-left: calc(var(--oc-unit-gap) / 2);
         padding-right: calc(var(--oc-unit-gap) / 2);
     }
 
-    /* --- boxes ------------------------------------------------------------------ */
     .oc-node {
         position: relative;
         display: flex;
@@ -271,28 +207,17 @@
         overflow-wrap: break-word;
     }
 
-    /* the Bereichsleiter reads as the hero: orange frame + bloom. Its frame is a hair
-   thicker (2px vs the 1px hairline of every other node) so the leader box reads as
-   heavier even when its bloom is replaced by a flat department colour in a tier. */
     .oc-node--hero {
         border-width: 2px;
         border-color: var(--color-primary);
         box-shadow: var(--glow-primary);
     }
 
-    /* Keyboard focus inside the tree is a SHARP outline with an offset — deliberately
-   distinct from the hero's soft orange bloom (box-shadow) above, so a focused node
-   never reads the same as the always-glowing Bereichsleiter. Covers the roving
-   treeitems and the inline edit / remove / add controls (none of which the global
-   focus rule reaches); :focus-visible keeps it off mouse interactions. */
     .oc-tree :focus-visible {
         outline: 2px solid var(--color-primary);
         outline-offset: 2px;
     }
 
-    /* Vacant slot: a subtle filled box + readable italic label so the seat reads
-   clearly (not the old near-invisible grey-on-transparent); the dashed frame
-   still signals "empty". */
     .oc-node--vacant {
         border-style: dashed;
         border-color: var(--color-gray-2);
@@ -305,11 +230,6 @@
         font-style: italic;
     }
 
-    /* Free-text holder: a Kartell member named on the chart who has no Basetool account yet. The seat
-   IS occupied (solid frame, like an account node), but a small muted "Kein Account" pill marks that
-   the name is provisional until the member is linked to an account. Distinct from the dashed vacant
-   slot. The pill is a maintenance cue, not part of the public read of the chart, so it surfaces only
-   while the inline editor is on (.oc-chart.editing); otherwise it stays hidden. */
     .oc-node-flag {
         display: none;
         align-self: flex-start;
@@ -354,9 +274,6 @@
         text-align: center;
     }
 
-    /* SK cards are marked in the Profit-Bereich green (Staffel cards use the brand
-   orange) so the two OrgUnit kinds stay visually distinct — top edge + shorthand,
-   mirroring the Staffel treatment. */
     .oc-unit-box--sk {
         border-top-color: var(--color-dept-profit);
     }
@@ -365,21 +282,10 @@
         color: var(--color-dept-profit);
     }
 
-    /* --- multi-Bereich tiers (epic #692, REQ-ORG-026) ---------------------------
-   The chart stacks several independent ARIA trees: the Organisationsleitung on
-   top, one tier per Bereich (tinted by its Bereichsfarbe), then the
-   legacy/ungrouped tier. Each tier is a caption + an .oc-tree; subsequent tiers
-   get extra top spacing so the captions clearly separate the trees. */
     .oc-tree + .oc-caption {
         margin-top: 2.75rem;
     }
 
-    /* The Organisationsleitung apex box: a neutral white top edge so it reads as
-   sitting above every (department-coloured) Bereich rather than belonging to one.
-   As the apex it is not locked to the shared column width (--oc-box-w): its label
-   is the long single word "ORGANISATIONSLEITUNG", which otherwise clings to the
-   frame. It grows to fit that label with comfortable side padding — floored at the
-   shared width so it never shrinks below a unit box, capped so it never sprawls. */
     .oc-unit-box--ol {
         border-top-color: var(--color-white);
         width: auto;
@@ -392,11 +298,6 @@
         color: var(--color-white);
     }
 
-    /* Per-Bereich Bereichsfarbe. The template maps the department enum name to one of
-   these classes (oc-dept--<name>), which only sets the --oc-dept custom property
-   the tier rules below consume. Used as decorative ACCENTS on borders + a caption
-   swatch only (never on text), so every department hue stays well clear of the
-   WCAG 4.5:1 text-contrast floor on the dark canvas (REQ-ORG-026). */
     .oc-dept--profit {
         --oc-dept: var(--color-dept-profit);
     }
@@ -421,9 +322,6 @@
         --oc-dept: var(--color-dept-search-rescue);
     }
 
-    /* Caption swatch: a small square in the Bereichsfarbe next to the Bereich name.
-   Decorative (aria-hidden in the template) and rendered only when the Bereich has
-   a department assigned. */
     .oc-dept-swatch {
         display: inline-block;
         width: 0.85rem;
@@ -433,10 +331,6 @@
         border: 1px solid var(--color-gray-3);
     }
 
-    /* Within a Bereich tier the nodes carry the Bereichsfarbe: the Bereichsleiter is
-   framed in it (replacing the orange hero bloom), the Stab + unit-leader nodes get a
-   left accent rule, and the Staffel/SK boxes take the dept colour on their top edge.
-   All text stays white/orange — only borders are tinted. */
     .oc-bereich-tier .oc-node--hero {
         border-color: var(--oc-dept, var(--color-primary));
         box-shadow: none;
@@ -450,12 +344,6 @@
         border-top-color: var(--oc-dept, var(--color-primary));
     }
 
-    /* --- Bereiche side by side under the OL (epic #692) --------------------------
-   The Bereiche fan out beneath the OL with the SAME connector lines a Bereich draws to its
-   Staffeln/SKs — .oc-fan--bereiche reuses the .oc-fan primitive, but top-aligns the columns (a whole
-   Bereich subtree is far taller than one unit box) and uses the wider unit gap. min-width:100%
-   centres the connector bus under the OL apex box, which is centred in its own full-width tree above,
-   so the OL→bus drop lands on the OL box. */
     .oc-fan--bereiche {
         min-width: 100%;
         justify-content: safe center;
@@ -467,8 +355,6 @@
         padding-right: calc(var(--oc-unit-gap) / 2);
     }
 
-    /* No-OL fallback: the Bereiche still stand side by side, just without a connector head (there is no
-   OL apex to fan from yet). */
     .oc-bereich-row {
         display: flex;
         justify-content: safe center;
@@ -477,31 +363,21 @@
         min-width: 100%;
     }
 
-    /* A Bereich's caption now sits above its own Bereichsleiter (per column) rather than as a full-width
-   tier heading, so it needs only a small gap to its box. */
     .oc-fan--bereiche .oc-caption,
     .oc-bereich-row .oc-caption {
         margin-bottom: 0.6rem;
     }
 
-    /* The legacy/ungrouped tier follows the Bereich fan (a <ul>) or row (a <div>), neither of which the
-   .oc-tree + .oc-caption rule matches, so give its caption the same tier separation. */
     .oc-fan--bereiche + .oc-caption,
     .oc-bereich-row + .oc-caption {
         margin-top: 2.75rem;
     }
 
-    /* --- per-Bereich collapse toggle -------------------------------------------- */
-    /* The Bereichsleiter box is wrapped so the collapse toggle can pin to its corner; the wrap is the
-   box width and centred in the column, regardless of how wide the unit fan below makes the column. */
     .oc-leader-wrap {
         position: relative;
         width: var(--oc-box-w);
     }
 
-    /* Square toggle in the Bereichsleiter's top-right corner. Available to everyone (not edit-mode), so
-   anyone can fold a Bereich down to just its Bereichsleiter. The chevron is CSS-drawn and rotates
-   with aria-expanded — no icon dependency, CSP-safe. */
     .oc-collapse {
         position: absolute;
         top: 4px;
@@ -526,11 +402,6 @@
         border-color: var(--color-primary);
     }
 
-    /* Keep the chevron box visually compact (1.6rem) but stretch the clickable region to the 44px
-   design-system minimum (var(--touch-target), "min hit area for every interactive control") via a
-   transparent, centred overlay — the standard "small glyph, fat-finger target" pattern. The toggle
-   sits in the card's top-right corner with empty space above/right, so the overlay grows mostly
-   outward and never swallows clicks meant for the flow-positioned .oc-actions controls. */
     .oc-collapse::after {
         content: '';
         position: absolute;
@@ -547,19 +418,14 @@
         height: 0.5rem;
         border-right: 2px solid currentcolor;
         border-bottom: 2px solid currentcolor;
-        /* expanded → chevron points down (body shown below) */
         transform: translateY(-2px) rotate(45deg);
         transition: transform 0.2s ease;
     }
 
     .oc-collapse[aria-expanded='false'] .oc-collapse-icon {
-        /* collapsed → chevron points right */
         transform: translateX(-1px) rotate(-45deg);
     }
 
-    /* The collapsible part of a Bereich: the Stab spine + the unit fan. Continues the centred column;
-   hidden (display:none) when the Bereich is collapsed, which also drops its treeitems out of the
-   keyboard-nav order (see treeItems() in org-chart.html). */
     .oc-bereich-body {
         display: flex;
         flex-direction: column;
@@ -571,7 +437,6 @@
         display: none;
     }
 
-    /* Kommando(gruppe) header: names the command, sits above its Kommandoleiter. */
     .oc-command-head {
         gap: 0.15rem;
         border-top: 2px solid var(--color-primary);
@@ -590,7 +455,6 @@
         font-style: italic;
     }
 
-    /* --- inline editor controls (admin, only while .editing) -------------------- */
     .oc-actions {
         display: none;
         gap: 0.4rem;
@@ -605,8 +469,6 @@
         display: inline-flex;
     }
 
-    /* The "Kein Account" pill (.oc-node-flag) is hidden by default (see its rule above) and revealed
-   only here, so it reads purely as an edit-mode maintenance cue. */
     .oc-chart.editing .oc-node-flag {
         display: inline-block;
     }
@@ -640,9 +502,6 @@
         background: rgb(163 0 10 / 12%);
     }
 
-    /* add-affordances are hidden until edit mode; they share --oc-box-w so they sit
-   in the column like a node. They are actions, not org nodes, so no connector
-   line is drawn to them. */
     .oc-add {
         display: none;
         align-items: center;
@@ -671,11 +530,6 @@
         border-color: var(--color-primary);
     }
 
-    /* Edit-mode legend: a quiet info line shown only while the inline editor is on
-   (toggled with the toolbar button + .oc-edit-hint--on). Reuses the .alert grammar —
-   tint fill + a 4px left rule — in the brand orange, since editing is an admin/action
-   context and there is no .alert-info variant to lean on. Capped + centred like the
-   toolbar above the full-bleed chart. */
     .oc-edit-hint {
         display: none;
         max-width: var(--content-max);
@@ -692,8 +546,6 @@
         display: block;
     }
 
-    /* Holder-mode chooser in the assign/reassign dialog: pick a Basetool account or type a free-text
-   name for a member who has none yet. A plain stacked radio group in the HUD style. */
     .oc-holder-mode {
         display: flex;
         flex-direction: column;
@@ -712,7 +564,6 @@
         color: var(--color-gray-1);
     }
 
-    /* --- responsive: keep the tree, let it pan; narrow the shared box width ------ */
     @media (width <= 768px) {
         .oc-chart {
             --oc-box-w: 160px;

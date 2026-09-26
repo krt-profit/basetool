@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of one grant-matrix row (REQ-BANK-009, G1/G2 mockups).
+ * Frontend mirror of one grant-matrix row (REQ-BANK-009).
  *
  * @param userId the grantee's user id
  * @param userHandle the grantee's effective display name
@@ -32,8 +32,8 @@ import java.util.UUID;
  * @param canDeposit deposit capability flag
  * @param canWithdraw withdrawal capability flag
  * @param canTransfer transfer/rebooking capability flag
- * @param granteeHasBankRole {@code false} renders the row inert ({@code tr.is-inert}) — the grantee
- *     currently lacks the Bank Employee role, the only inert case
+ * @param granteeHasBankRole whether the grantee holds the Bank Employee role; {@code false} renders
+ *     the row inert
  * @param version optimistic-locking version to echo on flag changes
  */
 public record BankGrantDto(

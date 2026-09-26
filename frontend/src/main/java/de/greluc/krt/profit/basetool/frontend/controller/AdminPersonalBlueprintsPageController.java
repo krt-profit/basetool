@@ -71,13 +71,9 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Admin counterpart of {@link PersonalInventoryBlueprintsPageController} (#327, Phase 7): lets
- * administrators pick a target user and manage that user's acquired blueprints — owned list,
- * multi-select add, note edit / remove, and the blueprint import — mirroring {@code
- * /admin/personal-inventory}. Everything proxies to the admin backend surface ({@code
- * /api/v1/admin/personal-blueprints/...}) with the target {@code sub} from the path; the product
- * type-ahead reuses the shared user search endpoint. {@code @PreAuthorize("hasRole('ADMIN')")}
- * gates the whole controller.
+ * Admin counterpart of {@link PersonalInventoryBlueprintsPageController}: manages a selected user's
+ * owned blueprints (list, multi-select add, note edit, remove, import) via {@code
+ * /api/v1/admin/personal-blueprints/...}. ADMIN only.
  */
 @Controller
 @UsesLayoutModel
@@ -98,22 +94,16 @@ public class AdminPersonalBlueprintsPageController {
   private final WebClient webClient;
 
   /**
-   * Renders the admin Blueprints page: a user picker plus, once a user is selected, that user's
-   * owned-blueprint list with the add bar and import controls.
+   * Renders the admin Blueprints page: a user picker and, once a user is selected, their owned
+   * blueprints with the add and import controls.
    *
-   * <p>{@code userSub} is parsed to a {@link UUID} before anything is relayed: Keycloak issues the
-   * {@code sub} as one and the backend declares it as one, so a value that is not a UUID selects no
-   * member — the same empty page the picker starts on — instead of travelling into the relayed URI
-   * as a raw string (REQ-SEC-051).
+   * <p>A {@code userSub} that is not a UUID selects no member (REQ-SEC-051).
    *
    * @param userSub target user's Keycloak {@code sub}, or {@code null} for the bare picker
    * @param q optional case-insensitive product-name filter
-   * @param fragment when {@code "results"} only the owned-blueprint table fragment is rendered
-   *     (AJAX filter swap, REQ-FE-002); the member picker sits outside the swap target, so the user
-   *     list is then not fetched. Otherwise the full page is returned
-   * @param model Thymeleaf model populated with users, the selection and the blueprint list
-   * @return the {@code admin/personal-blueprints} view name, or its {@code results} fragment for an
-   *     AJAX swap
+   * @param fragment {@code "results"} to render only the owned-blueprint table (REQ-FE-002)
+   * @param model Thymeleaf model populated with the selection and the blueprint list
+   * @return the {@code admin/personal-blueprints} view name, or its {@code results} fragment
    */
   @NotNull
   @GetMapping
@@ -124,10 +114,6 @@ public class AdminPersonalBlueprintsPageController {
       Model model) {
     boolean isFragment = "results".equals(fragment);
     UUID selectedSub = RelayParams.uuidOrNull(userSub);
-    // The member picker is now a server-side searchable combobox (remote-users, #1193): instead of
-    // preloading the whole roster, seed only the selected member's option (edit-mode label) via a
-    // single lookup. It lives OUTSIDE the swap target, so a same-user filter swap does not touch
-    // it.
     if (!isFragment && selectedSub != null) {
       model.addAttribute("selectedUser", fetchUser(selectedSub));
     }
@@ -237,9 +223,8 @@ public class AdminPersonalBlueprintsPageController {
   }
 
   /**
-   * Previews a blueprint export import (SCMDB or Basetool BP Extractor) on behalf of the target
-   * user (multipart upload forwarded via the authenticated WebClient). Backend parse failures (400)
-   * propagate.
+   * Previews a blueprint export import (SCMDB or Basetool BP Extractor) for the target user;
+   * backend parse failures (400) propagate.
    *
    * @param userSub target user's Keycloak {@code sub}
    * @param file the uploaded blueprint export JSON
@@ -312,10 +297,8 @@ public class AdminPersonalBlueprintsPageController {
   }
 
   /**
-   * Admin global purge: clears the removable owned blueprints of ALL users (REQ-INV-024). Guarded
-   * in the UI by a type-to-confirm danger modal. No-JS fallback: flashes a countless success toast
-   * and redirects to the bare admin Blueprints page (the AJAX twin below shows the removed count).
-   * Auto-granted defaults (REQ-INV-016) are preserved by the backend.
+   * Clears the removable owned blueprints of all users (REQ-INV-024); auto-granted defaults are
+   * kept. No-JS fallback that redirects with a success toast.
    *
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the admin Blueprints page
@@ -337,14 +320,10 @@ public class AdminPersonalBlueprintsPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #deleteAllUsers}: clears every user's removable owned
-   * blueprints (REQ-INV-024) and returns the removed count as JSON so {@code
-   * admin/personal-blueprints.html} toasts "{n} Blueprints entfernt" and re-renders the current
-   * member's owned-list fragment in place (REQ-FE-002) instead of a full-page reload. A backend
-   * failure is relayed as {@code problem+json}.
+   * AJAX twin of {@link #deleteAllUsers} that returns the removed count as JSON (REQ-INV-024); a
+   * backend failure is relayed as {@code problem+json}.
    *
-   * @return {@code 200} with the removed count on success, or the relayed backend {@code
-   *     problem+json}
+   * @return {@code 200} with the removed count, or the relayed backend {@code problem+json}
    */
   @PostMapping(value = "/delete-all-users", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
@@ -362,20 +341,16 @@ public class AdminPersonalBlueprintsPageController {
   }
 
   /**
-   * Resolves a single member for the picker's edit-mode seed (#1193): the picker now searches
-   * server-side rather than preloading the roster, so only the currently-selected member's option
-   * is rendered and needs its display name. Returns {@code null} on any failure (a malformed sub is
-   * rejected by the backend {@code UUID} binding), leaving the picker with just its placeholder.
+   * Resolves the selected member for the picker's seed option.
    *
    * @param userSub the selected member's Keycloak {@code sub}; never {@code null} here.
-   * @return the member DTO for the seed option, or {@code null} when the lookup fails.
+   * @return the member DTO, or {@code null} when the lookup fails.
    */
   @Nullable
   private UserDto fetchUser(UUID userSub) {
     try {
       return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
     } catch (Exception e) {
-      // REQ-OBS-004: log the id only, never the resolved name.
       log.warn(
           "Failed to fetch selected member {} for admin personal blueprints picker", userSub, e);
       return null;
@@ -398,11 +373,6 @@ public class AdminPersonalBlueprintsPageController {
               .append(PAGE_SIZE)
               .append("&sort=productName,asc");
       if (q != null && !q.isBlank()) {
-        // Free-text term as a WebClient URI-template variable so it is percent-encoded exactly once
-        // across the frontend->backend hop (REQ-FE-016); URLEncoder form-encoding (space -> '+')
-        // double-encodes umlauts / reserved chars when WebClient's TEMPLATE_AND_VALUES mode
-        // re-encodes the '%', yielding zero matches. The user id above needs no encoding at all
-        // now that it is bound as a UUID.
         uri.append("&q={q}");
         return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE, q);
       }

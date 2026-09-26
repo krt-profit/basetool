@@ -35,20 +35,11 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
- * Logs a concise startup banner as soon as the gateway's context is fully ready — the ingest twin
- * of the backend listener of the same name, so all three modules announce their effective runtime
- * configuration the same way.
+ * Logs a startup banner with the gateway's effective configuration: profiles, backend and frontend
+ * URLs, handoff lifetime, issuer, throttles, client gates (REQ-INGEST-011) and logging settings.
  *
- * <p>The banner surfaces exactly the facts an on-call engineer reaches for when an ingest incident
- * starts: which profiles are live, which backend the relay forwards to, which frontend URL the
- * extractor is sent to, how long a handoff stays valid, which Keycloak issues the tokens being
- * validated, whether the throttles are armed and with which budgets, which client gates actually
- * refuse callers (REQ-INGEST-011), and the effective logging knobs. This is the difference between
- * reading a misconfiguration off the first ten log lines and inferring it from a 502 an hour later.
- *
- * <p>No secret is ever printed: the Redis password, the keystore password and the monitoring-scrape
- * credentials are deliberately absent, and the Redis endpoint is rendered host:port only, with any
- * embedded credentials stripped by {@link #sanitiseRedisEndpoint(String, String)} (REQ-OBS-004).
+ * <p>No secret is printed; the Redis endpoint is sanitised by {@link #sanitiseRedisEndpoint(String,
+ * String)} (REQ-OBS-004).
  */
 @Slf4j
 @Component
@@ -78,11 +69,7 @@ public class StartupBannerListener {
   @Value("${spring.data.redis.port:}")
   private String redisPort;
 
-  /**
-   * Emits the startup banner once the application context is fully initialized. Triggered by {@link
-   * ApplicationReadyEvent} so the {@code @ConfigurationProperties} beans and the resource-server
-   * setup are wired and report real values rather than placeholders.
-   */
+  /** Emits the startup banner once the application context is fully ready. */
   @EventListener(ApplicationReadyEvent.class)
   public void onReady() {
     log.info("============================================================");
@@ -109,11 +96,9 @@ public class StartupBannerListener {
   }
 
   /**
-   * Renders the Redis endpoint as {@code host:port}, stripping anything before an {@code @} so a
-   * {@code user:password@host}-style host value cannot leak a credential into the banner.
+   * Renders the Redis endpoint as {@code host:port}, dropping any {@code user:password@} prefix.
    *
-   * @param host the configured Redis host, possibly carrying an inline {@code user:password@}
-   *     prefix; {@code null} or blank yields {@code unknown}
+   * @param host the configured Redis host; {@code null} or blank yields {@code unknown}
    * @param port the configured Redis port; {@code null} or blank renders the host alone
    * @return the sanitised {@code host} or {@code host:port} string
    */

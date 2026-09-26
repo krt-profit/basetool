@@ -60,17 +60,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Pins that the two {@link GlobalExceptionHandler} branches which log at ERROR — the catch-all
- * {@code Exception} handler and the {@code SUPPRESSED} {@link AppException} branch — leave the
- * request's {@code correlationId} MDC key exactly as they found it (REQ-OBS-001, REQ-OBS-002).
- *
- * <p>Both branches used to put the id and then remove it unconditionally in a {@code finally}. On a
- * real request {@link CorrelationIdFilter} owns that key for the whole chain, so the removal
- * stripped it from every line written afterwards on the same thread — above all the {@link
- * RequestLoggingFilter} access-log line for the resulting 500, which then could not be joined to
- * the ERROR line or to the {@code correlationId} the caller received. The MockMvc tests run the two
- * real filters in their production order around a throwing controller; the direct-call tests pin
- * the other half of the contract, that a key the handler minted itself is not left behind.
+ * Verifies that the ERROR-logging branches of {@link GlobalExceptionHandler} leave the request's
+ * {@code correlationId} MDC key as they found it, and do not leave behind a key they minted
+ * (REQ-OBS-001, REQ-OBS-002).
  */
 class GlobalExceptionHandlerCorrelationIdTest {
 
@@ -111,9 +103,6 @@ class GlobalExceptionHandlerCorrelationIdTest {
     when(authHelperService.isAuthenticated()).thenReturn(false);
     when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
 
-    // Production order: CorrelationIdFilter (LOWEST_PRECEDENCE - 100) wraps RequestLoggingFilter
-    // (LOWEST_PRECEDENCE - 50), so the access line is written while the correlation filter still
-    // owns the MDC key — which is exactly the window the handler's removal used to empty.
     mockMvc =
         MockMvcBuilders.standaloneSetup(new ThrowingController())
             .setControllerAdvice(handler)
@@ -200,8 +189,6 @@ class GlobalExceptionHandlerCorrelationIdTest {
 
   @Test
   void unexpectedException_withBlankPriorValue_restoresItAfterLoggingAMintedId() {
-    // A blank value is not a usable id, so the handler mints one for the line and the body — but
-    // the key belongs to whoever set it, and is handed back unchanged.
     MDC.put(MDC_KEY, " ");
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRequestURI()).thenReturn("/blank");
@@ -265,9 +252,8 @@ class GlobalExceptionHandlerCorrelationIdTest {
   private record CapturedEvent(Level level, String message, String correlationId) {}
 
   /**
-   * Records the {@code correlationId} MDC value as it stands <em>at append time</em>, which is when
-   * the logback pattern reads it. {@code ILoggingEvent.getMDCPropertyMap()} resolves lazily, so
-   * reading it after the request has finished would see the filter's final cleanup, not the line.
+   * Appender that records the {@code correlationId} MDC value at append time, when the logback
+   * pattern reads it.
    */
   private static final class CapturingAppender extends AppenderBase<ILoggingEvent> {
 

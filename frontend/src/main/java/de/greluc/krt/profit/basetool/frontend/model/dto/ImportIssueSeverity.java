@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Frontend mirror of the backend {@code ImportIssueSeverity} enum (#434/#435). Drives the visual
- * grading (danger / warning / info tints) of an import review finding on the refinery create page.
- * Must stay in lockstep with the backend enum (mirror-DTO rule).
+ * Frontend mirror of the backend {@code ImportIssueSeverity}: the visual grading (danger / warning
+ * / info) of an import review finding.
  */
 public enum ImportIssueSeverity {
 

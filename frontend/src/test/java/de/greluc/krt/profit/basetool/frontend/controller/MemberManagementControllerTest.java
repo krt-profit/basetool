@@ -74,10 +74,6 @@ class MemberManagementControllerTest {
     redirectAttributes = new RedirectAttributesModelMap();
   }
 
-  // ---------------------------------------------------------------
-  // deleteMember (existing tests preserved verbatim)
-  // ---------------------------------------------------------------
-
   @Test
   void deleteMember_ShouldRedirectAndAddSuccessToast() {
     UUID userId = UUID.randomUUID();
@@ -102,10 +98,6 @@ class MemberManagementControllerTest {
     assertEquals("error.user.delete", redirectAttributes.getFlashAttributes().get("errorToast"));
   }
 
-  // ---------------------------------------------------------------
-  // Live multi-user sync — the `members` roster room (#1235, REQ-FE-015)
-  // ---------------------------------------------------------------
-
   @Nested
   class RosterLiveSyncPublishTests {
 
@@ -125,7 +117,6 @@ class MemberManagementControllerTest {
 
     @Test
     void syncMembersAjax_publishesTheRosterSection() {
-      // A Keycloak reconcile can add, remove or re-rank rows across the whole roster.
       when(backendApiClient.post(
               eq("/api/v1/users/sync"),
               any(),
@@ -152,8 +143,6 @@ class MemberManagementControllerTest {
 
     @Test
     void deleteMember_onBackendFailure_doesNotPublish() {
-      // The roster did NOT change, so peers must not be told it did — a publish in the catch block
-      // would make every open list re-fetch for nothing on every failed delete.
       doThrow(new RuntimeException("API Error")).when(backendApiClient).delete(anyString(), any());
 
       controller.deleteMember(UUID.randomUUID(), redirectAttributes);
@@ -171,10 +160,6 @@ class MemberManagementControllerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // listMembers — search query assembly + page injection + error path
-  // ---------------------------------------------------------------
-
   @Nested
   class ListMembersTests {
 
@@ -187,9 +172,6 @@ class MemberManagementControllerTest {
       String view = controller.listMembers(null, null, null, null, model);
 
       assertEquals("members", view);
-      // SPEZIALKOMMANDO_PLAN.md §7.5: listMembers now also fetches per-user memberships for the
-      // SK column. Verify the FIRST call (the users-list endpoint) — subsequent membership calls
-      // are exercised by their own test.
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
           .get(uriCaptor.capture(), anyTypeRef());
@@ -209,8 +191,6 @@ class MemberManagementControllerTest {
 
       controller.listMembers("alice", null, null, null, model);
 
-      // The empty page yields no per-user SK-membership calls, so the search is the only backend
-      // GET — the free-text term rides as a single-encoded URI variable, forwarded verbatim.
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       ArgumentCaptor<Object> varCaptor = ArgumentCaptor.forClass(Object.class);
       verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), varCaptor.capture());
@@ -223,8 +203,6 @@ class MemberManagementControllerTest {
       assertEquals("alice", model.getAttribute("search"));
     }
 
-    // #1344 regression: a multi-word member search must reach the backend single-encoded (the real
-    // spaces), not double-encoded (%2520). Verify the raw value is forwarded as the URI variable.
     @Test
     void withMultiWordSearch_passesTermAsUriVariable() {
       Model model = new ConcurrentModel();
@@ -243,7 +221,6 @@ class MemberManagementControllerTest {
 
     @Test
     void blankSearch_routesToListEndpoint() {
-      // Treat blank search as "no search" — uses the listing endpoint, not search.
       Model model = new ConcurrentModel();
       when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(newPage(List.of()));
 
@@ -270,8 +247,6 @@ class MemberManagementControllerTest {
 
     @Test
     void nullPageResponse_setsNullUsersAndNullPage() {
-      // Defensive: if the backend returns null (e.g. mid-degradation), the model
-      // must NOT NPE — users stays null and the view still renders.
       Model model = new ConcurrentModel();
       when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
 
@@ -297,22 +272,15 @@ class MemberManagementControllerTest {
 
     @Test
     void fragmentRequest_returnsResultsFragmentSelector() {
-      // Given — an AJAX swap request (fragment=true) for in-place filter/paging (#573).
       Model model = new ConcurrentModel();
       when(backendApiClient.get(anyString(), anyTypeRef()))
           .thenReturn(newPage(List.of(newUser("alice"))));
 
-      // When
       String view = controller.listMembers(null, null, null, "results", model);
 
-      // Then — only the table fragment is rendered, not the full page.
       assertEquals("members :: membersTableFragment", view);
     }
   }
-
-  // ---------------------------------------------------------------
-  // searchMembers — JSON API endpoint
-  // ---------------------------------------------------------------
 
   @Test
   void searchMembers_returnsContentList() {
@@ -324,8 +292,6 @@ class MemberManagementControllerTest {
     assertEquals(2, result.size());
   }
 
-  // The picker typeahead forwards the free-text term as a single-encoded URI variable so a
-  // multi-word query reaches the backend with real spaces (#1344 re-encoding trap).
   @Test
   void searchMembers_passesMultiWordQueryAsUriVariable() {
     when(backendApiClient.get(
@@ -350,10 +316,6 @@ class MemberManagementControllerTest {
     assertNull(controller.searchMembers("ali"));
   }
 
-  // ---------------------------------------------------------------
-  // editMember
-  // ---------------------------------------------------------------
-
   @Nested
   class EditMemberTests {
 
@@ -377,8 +339,6 @@ class MemberManagementControllerTest {
 
     @Test
     void prefilledFormWithNullSource_isReplacedWithSourceParam() {
-      // If a form is already in the model (e.g. after a redirect with flash) but
-      // its source is null, the controller substitutes the request's source param.
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
@@ -447,10 +407,6 @@ class MemberManagementControllerTest {
 
     @Test
     void detailFetchFails_marksFormStaffelDetailNotLoaded_withBlankSlots() {
-      // REQ-ORG-017 wipe-guard: a transient failure of GET /memberships/detail (resilience timeout
-      // /
-      // open circuit breaker) — while the main user GET succeeds — must NOT render seeded slots.
-      // The form is flagged staffelDetailLoaded=false so the save skips the Staffel reconcile.
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
@@ -511,18 +467,11 @@ class MemberManagementControllerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // updateMember — validation errors + happy path + backend failure + source routing
-  // ---------------------------------------------------------------
-
   @Nested
   class UpdateMemberTests {
 
     @Test
     void validationErrors_reRenderForm_doNotRedirect() {
-      // bindingResult.hasErrors() -> direct render via editMember(...) without
-      // flash. The BindingResult stays request-scoped (the fix for the
-      // RedisSessionConfig flash-cycle bug).
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
@@ -555,7 +504,6 @@ class MemberManagementControllerTest {
       String view = controller.updateMember(id, form, br, model, redirectAttributes);
 
       assertEquals("redirect:/members", view);
-      // Verify the PUT call's body shape.
       ArgumentCaptor<UserAttributesUpdateDto> body =
           ArgumentCaptor.forClass(UserAttributesUpdateDto.class);
       verify(backendApiClient)
@@ -628,9 +576,6 @@ class MemberManagementControllerTest {
 
     @Test
     void detailLoadFailed_skipsMembershipReconcilePatch() {
-      // REQ-ORG-017 wipe-guard (save half): when the form carries staffelDetailLoaded=false the
-      // membership PATCH is skipped entirely, so the blank slots cannot strip the member's
-      // Staffeln.
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
@@ -663,10 +608,6 @@ class MemberManagementControllerTest {
       verify(backendApiClient).patch(eq("/api/v1/users/" + id + "/memberships"), any(), any());
     }
   }
-
-  // ---------------------------------------------------------------
-  // updateMemberAjax / deleteMemberAjax — in-place JSON twins (epic #571)
-  // ---------------------------------------------------------------
 
   @Nested
   class AjaxTwinTests {
@@ -702,8 +643,6 @@ class MemberManagementControllerTest {
               5, "desc", "Alice", 4L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
-      // The refreshed re-fetch (no squadron/flag change) AND the post-save version read both hit
-      // /api/v1/users/{id}; the stub's version (1L) is what the twin echoes back to the form.
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
           .thenReturn(newUser("alice"));
 
@@ -804,10 +743,6 @@ class MemberManagementControllerTest {
       assertEquals("SERVICE_UNAVAILABLE", ((java.util.Map<?, ?>) response.getBody()).get("code"));
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private static UserDto newUser(String name) {
     return new UserDto(

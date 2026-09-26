@@ -22,28 +22,12 @@ package de.greluc.krt.profit.basetool.backend.support;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Central constant holder for role codes, replacing the raw string literals (S3, part of #905) that
- * used to be copy-pasted across {@code SecurityConfig}, {@code DataInitializer} and every
- * {@code @PreAuthorize} expression, where a rename or typo failed silently with no compile check.
+ * Central constants for the bare role codes, identical to {@code Role.code} and to the Keycloak
+ * realm role names without the {@code ROLE_} prefix; changing a value is a breaking change.
  *
- * <p>Values are <b>byte-identical</b> to the existing wire contract and must stay that way — a
- * changed constant here is a breaking change. Every constant is the bare code: {@code Role.code} as
- * persisted by {@code DataInitializer} / the role-management screens, and the Keycloak realm role
- * name minus its {@code ROLE_} prefix. The handful of call sites that need the {@code
- * ROLE_}-prefixed Spring-authority form ({@code CustomJwtGrantedAuthoritiesConverter} prepends
- * {@code ROLE_}; the {@link
- * de.greluc.krt.profit.basetool.backend.config.SecurityConfig#roleHierarchy()} chain, where {@code
- * RoleHierarchyImpl.fromHierarchy(...)} expects the prefixed form on both sides) derive it via
- * {@link #authority(String)} rather than a duplicated {@code ROLE_*} constant per role.
- *
- * <p>{@code LOGISTICIAN} and {@code MISSION_MANAGER} are <b>not</b> seeded in the {@code Role}
- * table — {@code CustomJwtGrantedAuthoritiesConverter} derives them from the {@code app_user}
- * {@code is_logistician} / {@code is_mission_manager} flags, and {@link
- * de.greluc.krt.profit.basetool.backend.config.SecurityConfig#roleHierarchy()} additionally grants
- * them to {@code ADMIN} / {@code OFFICER} via the role hierarchy.
- *
- * <p>Lives in the dependency-leaf {@code support} package (ADR-0047) — plain {@code String}
- * constants with no dependency on the security API, {@code model} or {@code service}.
+ * <p>{@link #authority(String)} derives the prefixed Spring-authority form. {@code LOGISTICIAN} and
+ * {@code MISSION_MANAGER} are not seeded roles but derived from user flags. Lives in the
+ * dependency-leaf {@code support} package (ADR-0047).
  */
 public final class Roles {
 
@@ -53,41 +37,27 @@ public final class Roles {
   /** Prefix Spring Security authorities carry; {@code hasRole(...)} strips/re-adds it itself. */
   public static final String ROLE_PREFIX = "ROLE_";
 
-  // --- Role.code values (DB-seeded, Keycloak realm role names minus the ROLE_ prefix) ----------
-
   public static final String ADMIN = "ADMIN";
   public static final String OFFICER = "OFFICER";
   public static final String KRT_MEMBER = "KRT_MEMBER";
   public static final String BANK_EMPLOYEE = "BANK_EMPLOYEE";
   public static final String BANK_MANAGEMENT = "BANK_MANAGEMENT";
 
-  // --- Refusal markers (never seeded, never granted; see below) ---------------------------------
-
   /**
-   * The marker authority an approved account holding no application role carries (REQ-SEC-053).
+   * The marker authority of an approved account holding no application role (REQ-SEC-053), already
+   * {@code ROLE_}-prefixed.
    *
-   * <p>Not a role and not in the hierarchy: nothing grants on it, and the only code that reads it
-   * is {@code PendingApprovalAccessFilter}, which turns it into {@code 403 NO_ROLE} before a
-   * handler runs. It exists so such an account is <em>refused</em> rather than left with an empty
-   * authority set — which would pass every {@code isAuthenticated()} gate and fail only the ones
-   * naming a role, making admission a per-endpoint accident instead of a decision.
-   *
-   * <p>Spelled with the {@code ROLE_} prefix already applied, unlike every constant above: it is
-   * never a {@code Role.code} and never a Keycloak realm role, so there is no bare form of it.
+   * <p>Not in the role hierarchy; {@code PendingApprovalAccessFilter} turns it into {@code 403
+   * NO_ROLE} before any handler runs.
    */
   public static final String NO_ROLE_MARKER = ROLE_PREFIX + "NO_ROLE";
-
-  // --- Hierarchy-derived roles (never seeded; see class Javadoc) ---------------------------------
 
   public static final String LOGISTICIAN = "LOGISTICIAN";
   public static final String MISSION_MANAGER = "MISSION_MANAGER";
 
   /**
-   * Returns the {@code ROLE_}-prefixed Spring-authority form of a bare role code, for the handful
-   * of call sites that need the literal prefixed string rather than the {@code hasRole(...)}
-   * shorthand: the {@link
-   * de.greluc.krt.profit.basetool.backend.config.SecurityConfig#roleHierarchy()} chain and a {@code
-   * hasAnyAuthority(...)} call that mixes permission strings with a role.
+   * Returns the {@code ROLE_}-prefixed Spring-authority form of a bare role code, for call sites
+   * that cannot use the {@code hasRole(...)} shorthand.
    *
    * @param code a bare role code, e.g. {@link #ADMIN}
    * @return the prefixed authority, e.g. {@code "ROLE_ADMIN"}
@@ -97,23 +67,10 @@ public final class Roles {
     return ROLE_PREFIX + code;
   }
 
-  /**
-   * Pre-built {@code @PreAuthorize} SpEL expression for the "admin or officer" gate repeated
-   * verbatim across the promotion/rank/evaluation surface (member evaluations, promotion
-   * categories/topics/level content/eligibility, rank requirements, hangar admin). A compile-time
-   * constant per JLS 4.12.4/15.28, so {@code @PreAuthorize(Roles.ADMIN_OR_OFFICER)} is a legal
-   * annotation value — collapses ~24 identical splices into one referenced literal.
-   */
+  /** Compile-time {@code @PreAuthorize} SpEL expression for the admin-or-officer gate. */
   public static final String ADMIN_OR_OFFICER = "hasAnyRole('" + ADMIN + "','" + OFFICER + "')";
 
-  /**
-   * Pre-built {@code @PreAuthorize} SpEL for the single-role {@code hasRole('ADMIN')} gate — a
-   * compile-time constant per JLS 4.12.4/15.28, so {@code @PreAuthorize(Roles.HAS_ROLE_ADMIN)} is a
-   * legal annotation value and the literal it inlines to is exactly what the security ArchUnit
-   * rules read from the bytecode. Collapses the {@code "hasRole('" + Roles.ADMIN + "')"} splice
-   * that was repeated verbatim at ~98 admin-gated endpoints into one named literal, mirroring
-   * {@link #ADMIN_OR_OFFICER}.
-   */
+  /** Compile-time {@code @PreAuthorize} SpEL expression for the {@code hasRole('ADMIN')} gate. */
   public static final String HAS_ROLE_ADMIN = "hasRole('" + ADMIN + "')";
 
   /**

@@ -70,20 +70,10 @@ public interface NotificationRuleRepository extends JpaRepository<NotificationRu
   Optional<NotificationRule> findByIdWithSelectors(@Param("id") UUID id);
 
   /**
-   * Removes every {@code SPECIFIC_USER} selector that targets the given user, as part of the hard
-   * account deletion (REQ-DATA-008). Declared here rather than on a selector repository of its own
-   * because {@code NotificationRuleSelector} has no repository — it is otherwise reached only
-   * through its owning rule's cascade.
+   * Removes every {@code SPECIFIC_USER} selector targeting the given user, as part of the hard
+   * account deletion (REQ-DATA-008).
    *
-   * <p>Without this the selector outlives the account and keeps <em>manufacturing</em> orphans: the
-   * rule engine returns the dead subject verbatim with no existence check and a notification row is
-   * persisted for it, so every subsequent matching event mints a new row for a user who no longer
-   * exists. The admin rule editor shows only the raw UUID, so the broken selector is invisible
-   * there.
-   *
-   * <p>A rule left with no selectors is kept, not deleted: it may still carry role- or org-relative
-   * selectors, and an emptied rule is an admin-visible configuration question rather than something
-   * a user deletion should silently decide.
+   * <p>Rules left without selectors are kept.
    *
    * @param userId the departing user's Keycloak {@code sub} (equal to {@code app_user.id})
    * @return the number of selectors removed, for the audit summary event

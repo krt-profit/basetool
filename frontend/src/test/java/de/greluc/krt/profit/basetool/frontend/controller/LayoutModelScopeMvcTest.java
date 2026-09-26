@@ -45,42 +45,17 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Pins that the layout {@code @ControllerAdvice} beans are scoped to view controllers and therefore
- * do <strong>not</strong> run for a {@code @RestController}.
- *
- * <p>The five layout advices build the Thymeleaf chrome — org-unit context, capability flags, app
- * title, unread notification count, CSRF metas, app version. Three of them reach the backend to do
- * it. Until they were scoped they carried no {@code annotations} / {@code basePackages} / {@code
- * assignableTypes} selector, so Spring's {@code ModelFactory} ran them ahead of <em>every</em>
- * handler in the module — including the 17 {@code @RestController}s, whose responses Jackson
- * serialises and which never see a model. Every authenticated JSON call therefore paid three
- * uncached backend round trips to build a model it discarded, on the hot path of the in-place
- * mutation model of REQ-FE-001..REQ-FE-010.
- *
- * <p>{@code GET /csrf} is the sharpest probe available: {@link CsrfTokenController} is
- * authenticated (so the advices' {@code isAuthenticated()} guards would pass), returns JSON, and
- * needs none of the layout model.
- *
- * <p>Since FE-PERF-01 the same holds for a {@code ResponseBody} handler <em>inside</em> a view
- * controller, and a rendered page reads the layout in one call instead of four.
- *
- * <p>The <em>positive</em> half of this contract — that view controllers still receive the model —
- * is covered by the module's ~100 existing {@code @SpringBootTest} render tests (for instance
- * {@link FanKitComplianceMvcTest}, which asserts against rendered {@code GET /} markup). Scoping
- * the advices too narrowly fails those, so it is not restated here.
+ * Verifies that the layout {@code @ControllerAdvice} beans do not run for a {@code @RestController}
+ * or for a {@code ResponseBody} handler, probed via {@link CsrfTokenController}. That view
+ * controllers still receive the model is covered by the render tests.
  */
 @SpringBootTest
 @ActiveProfiles("test")
 class LayoutModelScopeMvcTest {
 
   /**
-   * The backend reads performed solely to populate the layout model, as they appear in the
-   * arguments of a {@link BackendApiClient} call: four URI paths plus the {@code CachedCatalog}
-   * enum constant behind {@code getCached}, whose {@code toString()} is its name.
-   *
-   * <p>Matching on arguments rather than on {@code verify(...)} per method keeps one assertion
-   * across all five {@code get}/{@code getCached} overloads, so an advice that switches overload
-   * cannot slip past the check.
+   * The backend reads made only to populate the layout model, as they appear in the first argument
+   * of a {@link BackendApiClient} call: URI paths and the {@code CachedCatalog} constant name.
    */
   private static final Set<String> LAYOUT_MODEL_BACKEND_CALLS =
       Set.of(
@@ -130,10 +105,8 @@ class LayoutModelScopeMvcTest {
   }
 
   /**
-   * The unread-count poll is a {@code ResponseBody} handler inside a view controller ({@code
-   * NotificationPageController} carries {@code UsesLayoutModel}), so the type-level selector alone
-   * cannot spare it: before FE-PERF-01 every poll — once a minute per open tab — paid the whole
-   * layout model on top of its own read. It must cost exactly one backend call now, its own.
+   * The unread-count poll, a {@code ResponseBody} handler inside a view controller, makes exactly
+   * one backend call, its own.
    */
   @Test
   @WithMockUser

@@ -54,11 +54,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Unit tests for {@link BlueprintCraftabilityService} (#781, REQ-INV-048): craftable count,
- * best-first effective quality, the min-quality + no-degradation floor exclusion, the refinery
- * fold-in, and the ITEM / unresolved-recipe carve-outs.
- */
+/** Unit tests for {@link BlueprintCraftabilityService} (REQ-INV-048). */
 @ExtendWith(MockitoExtension.class)
 class BlueprintCraftabilityServiceTest {
 
@@ -80,15 +76,13 @@ class BlueprintCraftabilityServiceTest {
   @Test
   void computeForOwner_craftableCountIsTheLimitingMaterialAndQualityExcludesDegradingStock() {
     stubOwned(owned("widget", "Widget"));
-    // Group 0: damage modifier ×0.95→×1.05 (no-degradation floor 500) + 10 SCU Iron + an ITEM line.
-    // Group 1: no modifier + 5 SCU Tungsten.
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", twoSlotBlueprint()));
     when(inventoryItemService.getOwnedStockSlices(USER_ID))
         .thenReturn(
             List.of(
-                new OwnedStockSlice(MAT_A, 1000, 25.0), // qualifies (≥ floor 500)
-                new OwnedStockSlice(MAT_A, 300, 100.0), // excluded — below the no-degradation floor
+                new OwnedStockSlice(MAT_A, 1000, 25.0),
+                new OwnedStockSlice(MAT_A, 300, 100.0),
                 new OwnedStockSlice(MAT_B, 600, 12.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
@@ -97,15 +91,15 @@ class BlueprintCraftabilityServiceTest {
     assertTrue(dto.recipeResolved());
     assertTrue(dto.hasResourceIngredients());
     assertTrue(dto.hasItemIngredients());
-    assertEquals(2, dto.craftable()); // min(floor(25/10)=2, floor(12/5)=2)
-    assertEquals(2, dto.craftableWithRefinery()); // includeRefinery=false → equals inventory
-    assertEquals("Tungsten", dto.limitingMaterialName()); // ratio 2.4 < 2.5
+    assertEquals(2, dto.craftable());
+    assertEquals(2, dto.craftableWithRefinery());
+    assertEquals("Tungsten", dto.limitingMaterialName());
 
     CraftabilityMaterialDto iron = material(dto, MAT_A);
     assertEquals(10.0, iron.requiredScu(), 1e-9);
     assertEquals(500, iron.qualityFloor());
-    assertEquals(25.0, iron.availableScu(), 1e-9); // the 300-quality stack does not count
-    assertEquals(1000.0, iron.effectiveQuality(), 1e-9); // one craft drawn entirely from q1000
+    assertEquals(25.0, iron.availableScu(), 1e-9);
+    assertEquals(1000.0, iron.effectiveQuality(), 1e-9);
     assertEquals(0.0, iron.missingScu(), 1e-9);
     assertEquals(2, iron.craftable());
 
@@ -127,9 +121,7 @@ class BlueprintCraftabilityServiceTest {
         .thenReturn(Map.of("widget", twoSlotBlueprint()));
     when(inventoryItemService.getOwnedStockSlices(USER_ID))
         .thenReturn(
-            List.of(
-                new OwnedStockSlice(MAT_A, 300, 100.0), // below the no-degradation floor → excluded
-                new OwnedStockSlice(MAT_B, 600, 50.0)));
+            List.of(new OwnedStockSlice(MAT_A, 300, 100.0), new OwnedStockSlice(MAT_B, 600, 50.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
@@ -148,21 +140,17 @@ class BlueprintCraftabilityServiceTest {
         .thenReturn(Map.of("widget", twoSlotBlueprint()));
     when(inventoryItemService.getOwnedStockSlices(USER_ID))
         .thenReturn(
-            List.of(
-                new OwnedStockSlice(
-                    MAT_A, 1000, 6.0), // 6 < 10 → not craftable from inventory alone
-                new OwnedStockSlice(MAT_B, 600, 50.0)));
+            List.of(new OwnedStockSlice(MAT_A, 1000, 6.0), new OwnedStockSlice(MAT_B, 600, 50.0)));
     when(refineryOrderService.getOwnedOpenRefineryYieldSlices(USER_ID))
         .thenReturn(List.of(new OwnedStockSlice(MAT_A, 900, 8.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, true));
 
-    assertEquals(0, dto.craftable()); // inventory alone
-    assertEquals(1, dto.craftableWithRefinery()); // 6 + 8 = 14 → floor(14/10)
+    assertEquals(0, dto.craftable());
+    assertEquals(1, dto.craftableWithRefinery());
     CraftabilityMaterialDto iron = material(dto, MAT_A);
     assertEquals(6.0, iron.availableScu(), 1e-9);
     assertEquals(14.0, iron.availableScuWithRefinery(), 1e-9);
-    // One craft (10 SCU) drawn best-first: 6 @ q1000 + 4 @ q900 → (6000 + 3600) / 10 = 960.
     assertEquals(960.0, iron.effectiveQualityWithRefinery(), 1e-9);
   }
 
@@ -174,10 +162,6 @@ class BlueprintCraftabilityServiceTest {
     slot.setOrderIndex(0);
     slot.setName("Frame");
     bp.addRequirementGroup(slot);
-    // A RESOURCE ingredient resolving to a PIECE material: its 2.6 per-craft quantity rounds to a
-    // whole 3 pieces (parity with JobOrderItemService.roundForQuantityType), so 7 owned pieces
-    // craft
-    // floor(7/3) = 2 times — the count must be in pieces, not treated as SCU.
     bp.addIngredient(resource(0, material(MAT_A, "Hadanite", QuantityType.PIECE), 2.6, null, slot));
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", bp));
@@ -190,7 +174,7 @@ class BlueprintCraftabilityServiceTest {
     assertEquals("Hadanite", dto.limitingMaterialName());
     CraftabilityMaterialDto hadanite = material(dto, MAT_A);
     assertEquals(QuantityType.PIECE, hadanite.quantityType());
-    assertEquals(3.0, hadanite.requiredScu(), 1e-9); // 2.6 rounded up to a whole piece
+    assertEquals(3.0, hadanite.requiredScu(), 1e-9);
     assertEquals(7.0, hadanite.availableScu(), 1e-9);
     assertEquals(0.0, hadanite.missingScu(), 1e-9);
     assertEquals(2, hadanite.craftable());
@@ -199,10 +183,6 @@ class BlueprintCraftabilityServiceTest {
   @Test
   void computeForOwner_pieceBridgedItemIngredientIsEvaluated() {
     stubOwned(owned("widget", "Widget"));
-    // A recipe whose only material-bearing line is an ITEM the wiki counts in pieces (a hand-mined
-    // gem such as Beradom) which is NOT craftable but exists as a PIECE material by name: it must
-    // be
-    // bridged and evaluated, not skipped (#840 follow-up, ADR-0046).
     Blueprint bp = new Blueprint();
     BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
     slot.setOrderIndex(0);
@@ -222,21 +202,18 @@ class BlueprintCraftabilityServiceTest {
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertTrue(dto.recipeResolved());
-    assertTrue(dto.hasResourceIngredients()); // the bridged ITEM counts as an evaluable requirement
-    assertFalse(
-        dto.hasItemIngredients()); // the only ITEM was bridged, so nothing stays unevaluated
-    assertEquals(3, dto.craftable()); // floor(7 / 2)
+    assertTrue(dto.hasResourceIngredients());
+    assertFalse(dto.hasItemIngredients());
+    assertEquals(3, dto.craftable());
     assertEquals("Beradom", dto.limitingMaterialName());
 
     CraftabilityMaterialDto beradomMat = material(dto, MAT_A);
     assertEquals(QuantityType.PIECE, beradomMat.quantityType());
-    assertEquals(2.0, beradomMat.requiredScu(), 1e-9); // the per-craft whole-unit count
+    assertEquals(2.0, beradomMat.requiredScu(), 1e-9);
     assertEquals(7.0, beradomMat.availableScu(), 1e-9);
     assertEquals(0.0, beradomMat.missingScu(), 1e-9);
     assertEquals(3, beradomMat.craftable());
 
-    // The slot overlay resolves its driving material from the bridged ITEM, so its slider defaults
-    // to the stock's effective quality rather than the band maximum.
     assertEquals(1, dto.groups().size());
     assertEquals(MAT_A, dto.groups().get(0).materialId());
     assertEquals(400.0, dto.groups().get(0).effectiveQuality(), 1e-9);
@@ -245,10 +222,6 @@ class BlueprintCraftabilityServiceTest {
   @Test
   void computeForOwner_craftableItemIngredientStaysNotEvaluated() {
     stubOwned(owned("widget", "Widget"));
-    // An ITEM ingredient whose game item is itself the output of a blueprint is a genuine
-    // sub-assembly: it is NOT bridged to a material and stays "not evaluated", even if a material
-    // of
-    // the same name existed.
     Blueprint bp = new Blueprint();
     BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
     slot.setOrderIndex(0);
@@ -329,8 +302,6 @@ class BlueprintCraftabilityServiceTest {
 
     assertTrue(service.computeForOwner(USER_ID, false).isEmpty());
   }
-
-  /* ----------------------------------------------------------------- fixtures */
 
   private void stubOwned(PersonalBlueprintResponse... owned) {
     when(personalBlueprintService.listOwn(eq(USER_ID), isNull(), any(Pageable.class)))

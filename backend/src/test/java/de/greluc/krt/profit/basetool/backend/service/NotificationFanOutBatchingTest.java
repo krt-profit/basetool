@@ -40,14 +40,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pins BE-PERF-04: JDBC batching is on. A notification fan-out to 100 recipients — the {@code
- * saveAll} at the heart of {@code NotificationCreationService.createFromEvent} — reaches the
- * database as a handful of batched statements rather than one {@code INSERT} per recipient.
- *
- * <p>Hibernate's {@code getPrepareStatementCount} counts prepared statements, and a JDBC batch
- * reuses one per batch, so with {@code hibernate.jdbc.batch_size=50} the 100 inserts cost two; with
- * batching off they would cost a hundred. Runs in a rolled-back test transaction and flushes
- * explicitly, because the inserts are only issued at flush.
+ * Verifies that JDBC batching is on: a 100-recipient notification fan-out costs a handful of
+ * prepared statements rather than one per recipient.
  */
 @SpringBootTest
 @ActiveProfiles("test")

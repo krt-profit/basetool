@@ -36,22 +36,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: add a finance entry to a mission through the UI, then reopen the mission-detail
- * page and assert it still renders.
+ * Verifies that a mission whose finance entry was added through the UI still renders its detail
+ * page, covering a populated finance loop.
  *
- * <p>Regression coverage for the production 500 where {@code GET /missions/{id}} threw a Thymeleaf
- * {@code TemplateProcessingException} as soon as the mission owned at least one finance entry: the
- * finance loop rendered the edit button's amount with the {@code @moneyFormat} bean inside the
- * restricted {@code th:data-amount} attribute. The fix binds the rounded value via {@code th:with}
- * (see PR #509 and the unit regression in {@code MissionPageControllerMvcTest}). Every prior render
- * test passed an empty finance list, so the loop body never executed and no e2e exercised a
- * populated finance loop — which is why the bug reached production.
- *
- * <p>The mission and a guest participant (the finance modal's participant dropdown is {@code
- * required}) are seeded via {@link BackendSeeder}; the test then drives only the finance-create
- * flow through the UI and reloads the detail page, reusing one authenticated session via {@link
- * E2eSupport#authenticatedStorageState}. A mission is staffel-scoped, so the user is assigned to
- * the IRIDIUM Squadron first.
+ * <p>The mission and a guest participant are seeded via {@link BackendSeeder}; the user is assigned
+ * to the IRIDIUM Squadron first.
  */
 @Tag("e2e")
 class MissionFinanceEntryE2eTest {
@@ -124,28 +113,16 @@ class MissionFinanceEntryE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Open the seeded mission's detail page on the finance tab (?tab=fin deeplink —
-        // the "Neuer Eintrag" button lives inside the Finanzen tab pane) and the modal.
         E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
         page.waitForLoadState();
         page.locator("button[data-trigger='open-modal-display'][data-modal-id='finance-modal']")
             .click();
 
-        // Fill an income entry. The participant picker is a searchable combobox; its empty-value
-        // placeholder is not a list option, so the first option is the first real (seeded guest)
-        // participant — the equivalent of the former selectOption().setIndex(1). The type is a
-        // segment control mirroring into the hidden type input; INCOME is the default, the explicit
-        // click guards against a changed default.
         Locator modal = page.locator("#finance-modal");
         E2eSupport.selectComboboxFirstOption(modal.locator(".krt-combobox__input"));
         modal.locator(".seg button[data-type-value='INCOME']").click();
         modal.locator("input[name='amount']").fill(FINANCE_AMOUNT);
 
-        // Submit in place (#574): the finance add now swaps the Finanzen pane via AJAX — there is
-        // no
-        // Post/Redirect/Get navigation to await. Mark the window so we can prove no full reload
-        // happened, click submit, then web-first-wait for the new entry's edit button to appear in
-        // the re-rendered pane (which also proves the entry was persisted).
         page.evaluate("window.__krtNoReload = true;");
         modal.locator("button[type='submit']").click();
         assertThat(
@@ -157,10 +134,6 @@ class MissionFinanceEntryE2eTest {
             page.evaluate("window.__krtNoReload === true"),
             "finance add must swap in place — no full-page reload cleared the window marker");
 
-        // Reopen the detail page. Before the th:with fix this 500'd: the populated finance loop
-        // called @moneyFormat inside the restricted th:data-amount attribute and threw a
-        // TemplateProcessingException. It must now render 200 with the finance edit button
-        // carrying the rounded amount as a plain data-amount value.
         Response reopened =
             E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
         assertEquals(

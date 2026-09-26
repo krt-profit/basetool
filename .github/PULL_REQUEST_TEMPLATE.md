@@ -59,7 +59,8 @@ don't use "tests pass" as a stand-in.
 
 - [ ] `./gradlew spotlessApply` was run, and `./gradlew check` passes locally (Spotless, Checkstyle, SpotBugs, the frontend asset linters and type check, tests).
 - [ ] All Checkstyle and SpotBugs findings in the **changed code** are fixed — no new warnings on top.
-- [ ] No `@SuppressWarnings` / `@SuppressFBWarnings` / Checkstyle suppressions without a one-line comment that explains the justification for this specific call site.
+- [ ] No `@SuppressWarnings` / `@SuppressFBWarnings` / Checkstyle suppressions without a justification for this specific call site — in `@SuppressFBWarnings(justification = "...")` where available, otherwise in the commit message and this PR, never in a code comment.
+- [ ] No code comments besides Javadoc; the reasoning is in the commit messages and this PR (ADR-0214).
 - [ ] Constructor injection via Lombok `@RequiredArgsConstructor`, no field `@Autowired`.
 - [ ] Loggers exclusively via `@Slf4j` (`@JBossLog` in `keycloak-spi`), not instantiated manually.
 - [ ] Records for DTOs and immutable config wrappers, no POJO boilerplate.

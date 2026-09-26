@@ -46,23 +46,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD for Kommandogruppen — the named sub-structures of a Staffel (epic #800, REQ-ROLE-003). A
- * Kommandogruppe is descriptive structure only; it grants no rights. The rank-bearing authority
- * sits on a member's {@code org_unit_membership.role} row, assigned via {@code
- * OrgUnitMembershipService}.
+ * CRUD for Kommandogruppen, the descriptive, rights-free sub-structures of a Staffel
+ * (REQ-ROLE-003).
  *
- * <p>Cardinality and shape are guarded both here (clean 400s) and at the DB layer (V185): at most
- * four groups per squadron, the parent must be a {@code SQUADRON}, and a group still bound to a
- * Kommandoleiter / stellv. Kommandoleiter / Ensign cannot be deleted. Every mutation is recorded in
- * the {@code ROLE} activity audit log (REQ-AUDIT-001) in the same transaction.
- *
- * <p>Each group mutation also mirrors onto the descriptive org chart (epic #800, REQ-ROLE-006): a
- * create adds a leaderless {@code COMMAND_LEAD} Kommando node tied to the group, a rename / reorder
- * updates it, and a delete removes it — all in the same transaction via {@link OrgChartService}.
- * The chart stays descriptive (grants nothing); the rank-bearing authority remains on the
- * membership row.
- *
- * <p>Class-level {@code @Transactional(readOnly = true)}; the mutating methods override it.
+ * <p>Enforces at most four groups per Staffel and a {@code SQUADRON} parent, and refuses to delete
+ * a group that still has members. Every mutation is audit-logged (REQ-AUDIT-001) and mirrored onto
+ * the org chart's Kommando node (REQ-ROLE-006) in the same transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -97,15 +86,13 @@ public class KommandoGroupService {
   }
 
   /**
-   * Creates a Kommandogruppe at the end of a Staffel's order. Rejects a non-Staffel parent and a
-   * fifth group with a clean 400 before the V185 triggers would turn either into a 500.
+   * Creates a Kommandogruppe at the end of a Staffel's order.
    *
    * @param squadronId the Staffel to create the group in; must be a {@code SQUADRON} org unit.
    * @param request the create payload (group name); never {@code null}.
    * @return the persisted group.
    * @throws NotFoundException if no org unit matches the id.
-   * @throws BadRequestException if the org unit is not a Staffel, or the squadron already holds
-   *     four groups.
+   * @throws BadRequestException if the org unit is not a Staffel, or it already holds four groups.
    */
   @Transactional
   @NotNull
@@ -124,7 +111,6 @@ public class KommandoGroupService {
             .sortIndex((int) existing)
             .build();
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    // Mirror the group onto the descriptive chart as a leaderless Kommando node (REQ-ROLE-006).
     orgChartService.mirrorCreateKommandoGroup(saved);
     auditService.record(
         AuditEventType.KOMMANDO_GROUP_CREATED,
@@ -136,8 +122,7 @@ public class KommandoGroupService {
   }
 
   /**
-   * Renames and/or reorders a Kommandogruppe. The inbound {@code version} is checked against the
-   * row's {@code @Version} to surface a concurrent edit as a 409.
+   * Renames and/or reorders a Kommandogruppe, checking the inbound {@code version}.
    *
    * @param groupId the group to update; never {@code null}.
    * @param request the update payload (name + sort index + version); never {@code null}.
@@ -155,7 +140,6 @@ public class KommandoGroupService {
     group.setName(request.name().strip());
     group.setSortIndex(request.sortIndex());
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    // Mirror the rename / reorder onto the Kommando node (REQ-ROLE-006).
     orgChartService.mirrorUpdateKommandoGroup(saved);
     auditService.record(
         AuditEventType.KOMMANDO_GROUP_UPDATED, saved.getId(), saved.getName(), null, null);
@@ -163,9 +147,7 @@ public class KommandoGroupService {
   }
 
   /**
-   * Deletes a Kommandogruppe. Rejects the delete with a clean 400 while any membership is still
-   * assigned to the group (the members must be reassigned first), so the V185 group-link CHECK can
-   * never be violated and no member is silently orphaned.
+   * Deletes a Kommandogruppe; members must be reassigned first.
    *
    * @param groupId the group to delete; never {@code null}.
    * @throws NotFoundException if no group matches the id.
@@ -180,7 +162,6 @@ public class KommandoGroupService {
           "Kommandogruppe still has assigned members — reassign them before deleting it");
     }
     String name = group.getName();
-    // Remove the mirrored Kommando node first, then the group (REQ-ROLE-006).
     orgChartService.mirrorDeleteKommandoGroup(groupId);
     kommandoGroupRepository.delete(group);
     auditService.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);

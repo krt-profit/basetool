@@ -4,20 +4,6 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
-# Regression tests for scripts/provision-keycloak-mobile-client.py.
-#
-# Drives the provisioner against a stub that impersonates kcadm, so the whole suite runs in a
-# second with no Docker, no Keycloak and no network. What it pins down is exactly what a live
-# smoke test would not catch cheaply: the two realm-global lists are REPLACED on write, so a merge
-# bug silently deletes somebody else's client policy, and the write order is load-bearing because
-# Keycloak refuses to edit a client while the DPoP policy is attached to it.
-#
-# The provisioner was additionally run end-to-end against a throwaway Keycloak 26.7 on 2026-08-17;
-# these tests are the part of that run that can be repeated in CI.
-#
-# Usage:
-#   scripts/provision-keycloak-mobile-client.test.sh
 
 set -euo pipefail
 
@@ -37,9 +23,6 @@ tests_failed=0
 
 CLIENT_UUID="11111111-2222-3333-4444-555555555555"
 
-# Builds a throwaway state directory holding the JSON the stub serves, and writes the stub itself.
-# The stub is stateful for the two client-policy lists: an `update` overwrites the file a later
-# `get` reads back, which is what makes the idempotency assertions meaningful.
 make_stub() {
   local state="$1"
   mkdir -p "$state"
@@ -59,12 +42,6 @@ JSON
   echo '[]' >"${state}/roles.json"
   echo '[]' >"${state}/mappers.json"
   echo '[]' >"${state}/optional-scopes.json"
-  # The realm's own roles, as `kcadm get roles` would serve them, and what the client's scope
-  # already holds. The pre-existing `Bereichsleitung` mapping is the interesting part: it is a real
-  # realm role that MEMBER_REALM_ROLES does not name, so the provisioner has to take it back, or a
-  # hand-edit in the Admin Console survives every later run. It was `Admin` until 2026-09-01 (Admin
-  # became a granted role, REQ-SEC-035 reversed) and `Guest` until 2026-09-06, when ADR-0159 removed
-  # that role — a probe has to be a role that exists.
   cat >"${state}/realm-roles.json" <<'JSON'
 [{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
  {"id":"r-adm","name":"Admin"},{"id":"r-brl","name":"Bereichsleitung"},
@@ -74,9 +51,6 @@ JSON
 [{"id":"r-brl","name":"Bereichsleitung"}]
 JSON
 
-  # The stub is Python rather than a shell script on purpose: the provisioner spawns it through
-  # subprocess, and a shebanged shell script is not directly executable on a Windows developer
-  # machine. Invoking it as `python3 kcadm_stub.py` keeps this suite runnable everywhere.
   cat >"${state}/kcadm_stub.py" <<'STUB'
 """Minimal kcadm impersonator: serves reads, applies writes, logs every call.
 
@@ -96,20 +70,16 @@ STUB_UUID = "11111111-2222-3333-4444-555555555555"
 with (state / "calls.log").open("a", encoding="utf-8") as log:
     log.write(f"{verb} {path}\n")
 
-
 def load(name):
     return json.loads((state / name).read_text(encoding="utf-8"))
 
-
 def save(name, value):
     (state / name).write_text(json.dumps(value, indent=2), encoding="utf-8")
-
 
 def read_target(request_path):
     if request_path.startswith("realms/"):
         return "realm.json"
     if request_path == "roles":
-        # The REALM's roles, not a client's — the two paths differ only by prefix.
         return "realm-roles.json"
     if request_path.endswith("/scope-mappings/realm"):
         return "scope-mappings.json"
@@ -125,7 +95,6 @@ def read_target(request_path):
         "client-policies/policies": "policies.json",
     }.get(request_path)
 
-
 if verb == "get":
     name = read_target(path)
     if name is None:
@@ -137,7 +106,6 @@ elif verb in ("create", "update"):
     if path in ("client-policies/profiles", "client-policies/policies"):
         save(path.rsplit("/", 1)[1] + ".json", body)
     elif path == "clients" or (path.startswith("clients/") and path.count("/") == 1):
-        # Record every client payload for assertions, and reflect it as the live client.
         with (state / "client-writes.json").open("a", encoding="utf-8") as sink:
             sink.write(json.dumps(body, indent=2, sort_keys=True))
         save("clients.json", [{**body, "id": body.get("id", STUB_UUID)}])
@@ -162,15 +130,6 @@ else:
 STUB
 }
 
-# Runs the provisioner against the stub in state dir $1; extra arguments are passed through.
-# Echoes the provisioner's combined output and returns its exit code.
-# The stub's path is handed to a CHILD python through --kcadm-command, so it has to be a path that
-# child can open. On Windows the interpreter behind `python3` is a native one while this shell is
-# MSYS, and the two do not agree on `/tmp`: MSYS means C:\Users\<user>\AppData\Local\Temp, native
-# Python reads the same string as <current drive>:\tmp. The whole suite therefore died on its first
-# assertion with `can't open file 'D:\tmp\...\kcadm_stub.py'`, before this change and after it.
-# `cygpath -m` yields the mixed form (C:/Users/...) that both accept; on Linux and in CI there is no
-# cygpath and the path is passed through untouched.
 to_child_path() {
   if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi
 }
@@ -200,9 +159,7 @@ assert_not_contains() {
   if [[ "$haystack" != *"$needle"* ]]; then pass "$label"; else fail "$label" "unexpected: ${needle}"; fi
 }
 
-# ---------------------------------------------------------------------------
 echo "1. a foreign client policy survives the merge"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state"
 run_provisioner "$state" >/dev/null
@@ -214,11 +171,7 @@ assert_contains "$policies" "someone-elses-policy" "the pre-existing policy is c
 assert_contains "$policies" "krt-mobile-dpop-policy" "our policy is attached"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "2. the policy is detached before the client is written"
-# ---------------------------------------------------------------------------
-# Keycloak refuses `invalid_client_metadata: DPoP token is disabled` for any client edit while the
-# policy is attached, so a client write that happens first fails on a real server.
 state="$(mktemp -d)"
 make_stub "$state"
 cat >"${state}/policies.json" <<'JSON'
@@ -235,9 +188,7 @@ else
 fi
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "3. the client payload pins the values the posture depends on"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state"
 run_provisioner "$state" >/dev/null
@@ -252,10 +203,7 @@ assert_contains "$written" '"existing.untouched": "keep"' \
 assert_not_contains "$written" '*' "no redirect URI carries a wildcard"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "4. session bounds are clamped to what the realm permits"
-# ---------------------------------------------------------------------------
-# Keycloak rejects a client whose session bounds exceed the realm's SSO values outright.
 state="$(mktemp -d)"
 make_stub "$state"
 cat >"${state}/realm.json" <<'JSON'
@@ -268,9 +216,7 @@ assert_contains "$written" '"client.session.idle.timeout": "1800"' "the idle bou
 assert_contains "$written" '"client.session.max.lifespan": "36000"' "the max bound is clamped"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "5. running twice converges"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state"
 run_provisioner "$state" >/dev/null
@@ -289,14 +235,10 @@ else
 fi
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "6. --verify-only rejects a realm that would break the posture"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state"
 run_provisioner "$state" >/dev/null
-# Someone flips the per-client switch in the console: both tokens bind again and the backend
-# starts refusing every request. Verification has to catch that.
 cat >"${state}/clients.json" <<JSON
 [{"id":"${CLIENT_UUID}","clientId":"basetool-android","publicClient":true,
   "directAccessGrantsEnabled":false,"redirectUris":["https://profit-base.online/app/callback"],
@@ -309,7 +251,6 @@ if [[ $rc -ne 0 ]]; then pass "a bound access token is reported as a failure"; e
   fail "a bound access token is reported as a failure" "exit was 0"; fi
 assert_contains "$output" "dpop.bound.access.tokens is not false" "the message names the cause"
 
-# And the healthy realm verifies clean.
 cat >"${state}/clients.json" <<JSON
 [{"id":"${CLIENT_UUID}","clientId":"basetool-android","publicClient":true,
   "directAccessGrantsEnabled":false,"redirectUris":["https://profit-base.online/app/callback"],
@@ -321,20 +262,7 @@ if [[ $rc -eq 0 ]]; then pass "the intended state verifies clean"; else
   fail "the intended state verifies clean" "exit was ${rc}"; fi
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "7. the client scope carries exactly the roles the list names, Admin included"
-# ---------------------------------------------------------------------------
-# The failure this pins is not "the app has fewer rights". `fullScopeAllowed` is off, so a client
-# with no scope mappings sends a token with NO realm roles at all — and the backend replaces the
-# local role set from that claim on every login. Measured on the test stack before this existed:
-# an account holding Admin + Officer + KRT Member came out holding the authority-less Guest role of
-# the time; since ADR-0159 the same shape is refused outright with 403 NO_ROLE, which is louder but
-# no less an outage.
-#
-# `Admin` moved from asserted-absent to granted on 2026-09-01 (owner decision, REQ-SEC-035
-# reversed). What survives that reversal is the property this section really guards: the scope is
-# converged to EXACTLY the list, in both directions, so it can neither shrink by accident nor grow
-# by a hand-edit in the Admin Console.
 state="$(mktemp -d)"
 make_stub "$state"
 run_provisioner "$state" >/dev/null
@@ -343,14 +271,9 @@ assert_contains "$scope" '"KRT Member"' "KRT Member reaches the app"
 assert_contains "$scope" '"Officer"' "Officer reaches the app"
 assert_contains "$scope" '"Bank Employee"' "Bank Employee reaches the app"
 assert_contains "$scope" '"Bank Management"' "Bank Management reaches the app"
-# The reversal itself: without this the administrator's app has no org unit to pin and „Alle
-# Org-Einheiten" resolves to their own empty reach rather than to everything.
 assert_contains "$scope" '"Admin"' "Admin reaches the app"
-# Converging downwards still has to work, or the list stops being the authority. The stub seeded
-# Bereichsleitung on the scope to model a hand-edit in the Admin Console.
 assert_not_contains "$scope" '"Bereichsleitung"' "a hand-added mapping outside the list is taken back"
 
-# A second run must not re-add or re-remove anything.
 before="$scope"
 run_provisioner "$state" >/dev/null
 if [[ "$before" == "$(cat "${state}/scope-mappings.json")" ]]; then
@@ -359,7 +282,6 @@ else
   fail "the client scope is unchanged by a second run"
 fi
 
-# Verification has to catch a scope somebody emptied, and one somebody widened.
 echo '[]' >"${state}/scope-mappings.json"
 rc=0
 output="$(run_provisioner "$state" --verify-only)" || rc=$?
@@ -377,8 +299,6 @@ if [[ $rc -ne 0 ]]; then pass "a widened client scope is reported as a failure";
 assert_contains "$output" "without a decision" "the message names the failure mode"
 assert_contains "$output" "'Bereichsleitung'" "the message names the role that was added"
 
-# The complement: the exact intended scope, Admin included, must verify clean. Without this the
-# section above could pass while the granted list itself was wrong.
 echo '[{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
       {"id":"r-bem","name":"Bank Employee"},{"id":"r-bmg","name":"Bank Management"},
       {"id":"r-adm","name":"Admin"}]' >"${state}/scope-mappings.json"
@@ -388,7 +308,6 @@ if [[ $rc -eq 0 ]]; then pass "the intended scope, with Admin, verifies clean"; 
   fail "the intended scope, with Admin, verifies clean" "exit was ${rc}"; fi
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo
 if [[ $tests_failed -gt 0 ]]; then
   echo "FAILED: ${tests_failed} of ${tests_run} assertions"

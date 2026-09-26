@@ -38,30 +38,11 @@ import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
- * Attributes every authenticated API request to the client software that made it (A8, REQ-OBS-018).
+ * Counts every authenticated API request by the client ({@code azp}) that made it (REQ-OBS-018).
  *
- * <p>Today the answer is almost always "the web frontend", and that is exactly why the counter is
- * worth having before the API is exposed: once a second first-party client and an
- * internet-reachable vhost exist, "which client is this traffic" is the first question of every
- * abuse investigation, the denominator for a per-client budget, and the only signal a client kill
- * switch could act on. Adding it afterwards would mean asking it of a surface that has no history.
- *
- * <p><b>Observes, never refuses.</b> An unknown client is counted under {@link
- * MetricNames#CLIENT_ID_OTHER} and served exactly as before. That is deliberate: the ingest gateway
- * enforces a client allowlist because it fronts a single approved tool (REQ-INGEST-011), while this
- * surface serves whichever first-party clients the realm carries, and turning an unrecognised
- * {@code azp} into a 403 here would lock out a client the day it is registered in Keycloak and
- * before it is added to a properties file. The gate that matters is the audience check on the token
- * itself; this is the telemetry that makes the gate's effect visible.
- *
- * <p><b>Placement is load-bearing.</b> Registered <em>before</em> {@link ActingMemberFilter}: that
- * filter replaces the {@link org.springframework.security.core.context.SecurityContext} of an
- * on-behalf-of call with an {@code ActingMemberAuthentication}, which carries no token and
- * therefore no {@code azp}, so a gateway request observed after it would be indistinguishable from
- * a browser's. It also sits ahead of the pending-approval, terms, page-size and per-subject gates,
- * so a client that is being refused downstream is still counted — a foreign client hammering the
- * API into 429s must not be able to hide behind its own rejections, which is precisely the case
- * {@code ApiUnknownClient} exists to catch.
+ * <p>Observes only: an unknown client is counted under {@link MetricNames#CLIENT_ID_OTHER} and
+ * served normally. Must run before {@link ActingMemberFilter}, which replaces the token-carrying
+ * authentication, and before the refusing gates, so refused requests are counted too.
  */
 @RequiredArgsConstructor
 public class ApiClientMetricsFilter extends OncePerRequestFilter {
@@ -73,11 +54,7 @@ public class ApiClientMetricsFilter extends OncePerRequestFilter {
   private final MeterRegistry meterRegistry;
 
   /**
-   * Skips everything that is not an API request.
-   *
-   * <p>The scope is matched against the <b>decoded</b> path (REQ-SEC-029): {@code getRequestURI()}
-   * is percent-encoded, so an encoded spelling must not drop out of the attribution — a caller that
-   * can make its requests invisible to the counter defeats the counter.
+   * Skips every request whose decoded path lies outside {@code /api/**} (REQ-SEC-029).
    *
    * @param request the incoming request.
    * @return {@code true} when the request is outside {@code /api/**}.
@@ -95,10 +72,6 @@ public class ApiClientMetricsFilter extends OncePerRequestFilter {
       @NotNull FilterChain chain)
       throws ServletException, IOException {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    // Anonymous callers are deliberately not counted: they have no client identity to attribute,
-    // and a series that lumped every guest request under one literal would only dilute the ratio
-    // this metric exists to show. "Has a subject" is asked through the seam rather than through an
-    // instanceof, so a future authentication type cannot silently drop out of the count (ADR-0129).
     if (AuthenticatedSubject.of(authentication).isPresent()) {
       meterRegistry
           .counter(

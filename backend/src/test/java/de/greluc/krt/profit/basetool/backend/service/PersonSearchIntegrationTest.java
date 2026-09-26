@@ -37,20 +37,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The one property of the admin Personensuche that needs seeded rows to prove: <b>it matches
- * case-insensitively, in both directions</b> (REQ-SEC-060, ADR-0184).
- *
- * <p>The casing the admin types and the casing the row happens to hold are independent of each
- * other. That is not a nicety. The search exists so that an Art. 16 rectification or a granted Art.
- * 17 erasure can cover <em>every</em> mention of a name, and a name written into free text six
- * months ago is written the way its author felt like writing it. A search that only matched the
- * typed casing would answer "no further mentions" and be wrong — the one failure mode this surface
- * must not have, because nothing downstream would reveal it.
- *
- * <p>The registry's completeness, the validity of its statements against the live schema, the
- * minimum term length and the wildcard escaping are asserted by {@link
- * de.greluc.krt.profit.basetool.backend.repository.PersonSearchCoverageTest} and are deliberately
- * not repeated here.
+ * Verifies that the admin Personensuche matches case-insensitively in both directions (REQ-SEC-060,
+ * ADR-0184); coverage and escaping are tested in {@link
+ * de.greluc.krt.profit.basetool.backend.repository.PersonSearchCoverageTest}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -80,12 +69,8 @@ class PersonSearchIntegrationTest {
 
   @Test
   void findsTheMentionWhateverCaseTheAdminTypes() {
-    // Given a member whose handle also sits inside a sentence in a free-text column -- the shape
-    // the search exists for, where no foreign key leads to the mention
     seedMember(HANDLE, "Flew wing with " + HANDLE + " during the last operation.");
 
-    // When the admin types it in each of the three plausible casings
-    // Then every one of them finds the handle, and the wrong casing still finds the sentence
     assertThat(hits(HANDLE, "username")).as("typed exactly as stored").hasSize(1);
     assertThat(hits(HANDLE.toLowerCase(Locale.ROOT), "username")).as("typed lower").hasSize(1);
     assertThat(hits(HANDLE.toUpperCase(Locale.ROOT), "username")).as("typed upper").hasSize(1);
@@ -96,28 +81,18 @@ class PersonSearchIntegrationTest {
 
   @Test
   void findsTheMentionWhateverCaseTheRowHolds() {
-    // Given the same name written three different ways by three different authors, which is what
-    // free text actually looks like after a year
     seedMember(HANDLE.toLowerCase(Locale.ROOT), null);
     seedMember(HANDLE.toUpperCase(Locale.ROOT), null);
     seedMember(HANDLE, null);
 
-    // When the admin searches once
     List<PersonSearchHitDto> found = hits(HANDLE, "username");
 
-    // Then all three rows are reported. A rectification that missed two of them would leave the
-    // name in the system while the record said it was gone.
     assertThat(found).as("one hit per seeded member").hasSize(3);
     assertThat(found).allSatisfy(h -> assertThat(h.area()).isEqualTo("MEMBER"));
   }
 
-  // covers REQ-SEC-060 - the snippet has to contain the name that was searched for
   @Test
   void theSnippetIsAWindowAroundTheMatchAndNotTheValuesFirstCharacters() {
-    // The snippet used to be left(column, 200). A long note that mentions the person late -- the
-    // ordinary shape of a note -- then produced a snippet without the name in it, so the admin had
-    // to open every hit to find out whether it was the right person. On a surface whose job is to
-    // be exhaustive, that is the difference between a usable list and a list nobody finishes.
     String longPrefix = "x".repeat(400);
     seedMember(HANDLE, longPrefix + " und " + HANDLE + " waren beide dabei.");
 
@@ -129,14 +104,8 @@ class PersonSearchIntegrationTest {
         .contains(HANDLE);
   }
 
-  // covers REQ-SEC-060 - the per-column cap is reported, not swallowed
   @Test
   void aColumnThatHitsItsOwnCapIsNamed() {
-    // 75 searched columns at 25 hits each: a name occurring 40 times in ONE column produced 25
-    // hits, a union total far below the overall 300, and truncated == false. The admin read a
-    // complete-looking list and never learned 15 occurrences had been dropped -- on the surface
-    // whose whole purpose is to be exhaustive, and while the privacy record claimed in as many
-    // words that it "says so when it capped".
     for (int i = 0; i < PersonSearchService.PER_TARGET_LIMIT + 3; i++) {
       seedMember(HANDLE + "Nr" + i, null);
     }
@@ -154,7 +123,6 @@ class PersonSearchIntegrationTest {
         .isFalse();
   }
 
-  // covers REQ-SEC-060 - a column comfortably under its cap is not named
   @Test
   void aColumnUnderItsCapIsNotNamed() {
     seedMember(HANDLE, null);
@@ -186,9 +154,6 @@ class PersonSearchIntegrationTest {
 
   /**
    * Searches for a term and keeps only the hits on one {@code app_user} column.
-   *
-   * <p>Narrowed to a single column because the assertions count seeded rows, and a seeded member
-   * matches in both of the columns this class writes.
    *
    * @param term the search term
    * @param column the {@code app_user} column to keep

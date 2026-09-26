@@ -21,30 +21,10 @@
  * Derives the frontend's TypeScript view of the backend DTOs from `openapi.json`.
  *
  * Emits `components['schemas'][<Name>]` declarations that `types/dto.d.ts` lifts into the global
- * `ApiDto<'…'>` alias, so a backend field rename fails `:frontend:typecheckJs` instead of silently
- * emptying a picker at runtime (REQ-FE-018, ADR-0125/ADR-0130).
+ * `ApiDto<'…'>` alias (REQ-FE-018, ADR-0130).
  *
- * WHY THIS IS HAND-ROLLED RATHER THAN `openapi-typescript`
- * -------------------------------------------------------
- * Emitting a `.d.ts` is printing text. `openapi-typescript` printed the same text through the
- * TypeScript compiler API (`ts.factory`, `ts.createPrinter`), and TypeScript 7's native compiler
- * removed that API — `require('typescript')` now resolves to `lib/version.cjs` and exposes nothing
- * else. That made a maintained third-party generator the single thing pinning the whole repo to
- * the TypeScript 5.x line, for output we consume three annotations of. Printing the declarations
- * ourselves costs ~90 lines, has no dependency to pin, and drops the generated file from 54 334
- * lines to ~3 000 because we emit only `components.schemas` — `paths` and `operations` had zero
- * usages (ADR-0130 records the full reasoning and the measurements).
- *
- * SCOPE — WHAT THIS DELIBERATELY DOES NOT HANDLE
- * ----------------------------------------------
- * springdoc emits flat object schemas: at the time of writing all 398 schemas are `type: object`
- * and the spec contains **no** `allOf` / `oneOf` / `anyOf` at all. So this generator handles
- * exactly what the spec uses — `$ref`, `items`, `enum`, `additionalProperties`, `nullable` and the
- * primitive types — and nothing more. If a DTO ever gains polymorphism (a `@JsonSubTypes` on a
- * backend model is the realistic trigger), those keywords will appear in the spec and this
- * generator must be extended; it will emit `unknown` for the unhandled node rather than fail, so
- * the symptom is a suddenly-untyped DTO rather than a broken build. The `assertNoPolymorphism`
- * guard below turns that silent degradation into a loud one.
+ * Handles the flat-object subset springdoc emits: `$ref`, `items`, `enum`, `additionalProperties`,
+ * `nullable` and the primitive types. Polymorphic constructs fail the build.
  *
  * Usage: node scripts/gen-api-types.mjs <openapi.json> <out.d.ts>
  */
@@ -66,10 +46,8 @@ if (Object.keys(schemas).length === 0) {
 }
 
 /**
- * Fails the build when the spec grows a construct this generator cannot express.
- *
- * Without it an unhandled keyword degrades the affected DTO to `unknown`, which type-checks
- * everywhere and silently removes exactly the drift protection the file exists to provide.
+ * Fails the build when the spec contains a construct this generator cannot express
+ * (`allOf`, `oneOf`, `anyOf`, `not`, `discriminator`).
  */
 function assertNoPolymorphism(node, path) {
   if (!node || typeof node !== "object") return;

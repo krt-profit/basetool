@@ -91,8 +91,6 @@ class BankHolderServiceTest {
 
   @Test
   void registerHolder_snapshotsTheEffectiveNameAsHandle() {
-    // Given: a user whose display name differs from the username — the snapshot must capture
-    // the effective name so the ledger stays readable after user deletion
     User user = new User();
     user.setId(userId);
     user.setUsername("greluc_raw");
@@ -102,10 +100,8 @@ class BankHolderServiceTest {
     when(holderRepository.save(any(BankHolder.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     bankHolderService.registerHolder(new RegisterBankHolderRequest(userId));
 
-    // Then
     ArgumentCaptor<BankHolder> saved = ArgumentCaptor.forClass(BankHolder.class);
     verify(holderRepository).save(saved.capture());
     assertEquals("greluc", saved.getValue().getHandle());
@@ -116,14 +112,12 @@ class BankHolderServiceTest {
 
   @Test
   void registerHolder_rejectsSecondRowForSameUser() {
-    // Given
     User user = new User();
     user.setId(userId);
     user.setUsername("greluc");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(holderRepository.existsByUserId(userId)).thenReturn(true);
 
-    // When / Then
     assertThrows(
         DuplicateEntityException.class,
         () -> bankHolderService.registerHolder(new RegisterBankHolderRequest(userId)));
@@ -132,7 +126,6 @@ class BankHolderServiceTest {
 
   @Test
   void updateHolder_deactivationIsAudited() {
-    // Given
     UUID holderId = UUID.randomUUID();
     BankHolder holder = new BankHolder();
     holder.setId(holderId);
@@ -144,17 +137,14 @@ class BankHolderServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
     when(holderPostingRepository.holderTotal(holderId)).thenReturn(BigDecimal.ZERO);
 
-    // When
     bankHolderService.updateHolder(holderId, new UpdateBankHolderRequest(false, 4L));
 
-    // Then
     verify(bankAuditService)
         .record(eq(BankAuditEventType.HOLDER_DEACTIVATED), any(), any(), any(), eq("carol"));
   }
 
   @Test
   void updateHolder_staleVersionFailsFastWith409() {
-    // Given
     UUID holderId = UUID.randomUUID();
     BankHolder holder = new BankHolder();
     holder.setId(holderId);
@@ -162,7 +152,6 @@ class BankHolderServiceTest {
     holder.setVersion(9L);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
 
-    // When / Then
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> bankHolderService.updateHolder(holderId, new UpdateBankHolderRequest(false, 8L)));
@@ -171,7 +160,6 @@ class BankHolderServiceTest {
 
   @Test
   void getHolder_pairsTheGlobalCustodyTotal() {
-    // Given (REQ-BANK-032): the holder header carries the global custody total
     UUID holderId = UUID.randomUUID();
     BankHolder holder = new BankHolder();
     holder.setId(holderId);
@@ -180,27 +168,21 @@ class BankHolderServiceTest {
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
     when(holderPostingRepository.holderTotal(holderId)).thenReturn(total);
 
-    // When
     bankHolderService.getHolder(holderId);
 
-    // Then: the externally computed total is paired into the mapper
     verify(bankHolderMapper).toDto(holder, total);
   }
 
   @Test
   void getHolder_missingHolder_throwsNotFound() {
-    // Given
     UUID holderId = UUID.randomUUID();
     when(holderRepository.findById(holderId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(NotFoundException.class, () -> bankHolderService.getHolder(holderId));
   }
 
   @Test
   void getHolderBookings_resolvesAccountForDepositAndCounterHolderForUmbuchung() {
-    // Given (REQ-BANK-032): a deposit leg annotated with the account it moved on, and a
-    // HOLDER_TRANSFER leg annotated with the counter holder (no account)
     UUID holderId = UUID.randomUUID();
     UUID tx1 = UUID.randomUUID();
     UUID tx2 = UUID.randomUUID();
@@ -230,8 +212,6 @@ class BankHolderServiceTest {
     when(holderPostingRepository.findHolderBookings(eq(holderId), any()))
         .thenReturn(new PageImpl<>(List.of(deposit, umbuchung)));
 
-    // The account leg of the deposit shares the holder leg's (positive) sign; the Umbuchung has
-    // none. The holder legs carry this holder's two legs plus the Umbuchung counterparty (+500).
     when(postingRepository.findLegsByTransactionIds(any()))
         .thenReturn(
             List.of(
@@ -249,11 +229,9 @@ class BankHolderServiceTest {
                 new BankHolderLeg(tx2, holderId, "greluc", new BigDecimal("-500")),
                 new BankHolderLeg(tx2, UUID.randomUUID(), "carol", new BigDecimal("500"))));
 
-    // When
     List<BankHolderBookingDto> rows =
         bankHolderService.getHolderBookings(holderId, PageRequest.of(0, 20)).getContent();
 
-    // Then
     assertEquals(2, rows.size());
     BankHolderBookingDto depositRow = rows.get(0);
     assertEquals("KB-0001", depositRow.counterAccountNo());
@@ -262,17 +240,14 @@ class BankHolderServiceTest {
     BankHolderBookingDto umbuchungRow = rows.get(1);
     assertEquals("carol", umbuchungRow.counterHolderHandle());
     assertNull(umbuchungRow.counterAccountNo());
-    // The holder→holder Umbuchung is fee-free (REQ-BANK-031, ADR-0052); the zero fee maps through.
     assertEquals(0, umbuchungRow.transferFee().signum(), "Umbuchung is fee-free");
   }
 
   @Test
   void getHolderBookings_missingHolder_throwsNotFound() {
-    // Given
     UUID holderId = UUID.randomUUID();
     when(holderRepository.findById(holderId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(
         NotFoundException.class,
         () -> bankHolderService.getHolderBookings(holderId, PageRequest.of(0, 20)));

@@ -1,67 +1,19 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  Reusable design-system component fragments — the canonical Buttons, Alerts and
-  data Tables from krt-components.css / the preview/ specimen cards. Use these
-  instead of hand-rolling the markup so every instance inherits the spec classes,
-  status colours and 44px touch targets (and so a future spec change lands in one
-  place).
 
-  button(label, variant, type, extraClass)
-    label      : already-resolved text — pass #{key} or a literal string.
-    variant    : null/'' = primary (.btn); 'secondary' | 'danger' | 'success' | 'outline-danger'.
-    type       : null = 'button'; pass 'submit' / 'reset' as needed.
-    extraClass : optional extra classes (e.g. 'btn-sm'), or null.
-    Buttons that also need data-*, th:href, id, name, value or sec:authorize cannot be
-    expressed through fragment parameters — render `<button class="btn btn-…">` /
-    `<a class="btn btn-…">` directly; the .btn / .btn-* classes carry the whole spec.
-
-  alert(type, msgKey, extraClass)
-    type       : 'danger' | 'success' | 'warning'.
-    msgKey     : i18n message key (resolved here via #{…}). Wrap the call in th:if for
-                 conditional display, e.g. th:if="${error}".
-    extraClass : optional extra classes (e.g. 'mt-2'), or null.
-
-  dataTable(head, body)
-    Responsive-wrapped .krt-table shell — supplies the .table-responsive wrapper plus
-    the <thead>/<tbody> scaffold so callers only provide the header cells and body rows
-    as markup fragments. The child blocks feed the fragment via ~{::sel} and are NOT
-    rendered in place because th:replace swaps the host element out:
-
-      <div th:replace="~{fragments/components :: dataTable(head=~{::tblHead}, body=~{::tblBody})}">
-          <th:block th:fragment="tblHead">
-              <th th:text="#{col.a}">A</th>
-              <th th:text="#{col.b}">B</th>
-          </th:block>
-          <th:block th:fragment="tblBody">
-              <tr th:each="row : ${rows}">
-                  <td th:text="${row.a}">a</td>
-                  <td th:text="${row.b}">b</td>
-              </tr>
-          </th:block>
-      </div>
-*/-->
-
-<!--/* Button — uppercase, square, 44px min target. */-->
 <button th:fragment="button(label, variant, type, extraClass)"
         th:attr="type=${type != null ? type : 'button'}"
         class="btn"
         th:classappend="${(variant != null and variant != '' ? 'btn-' + variant : '') + (extraClass != null and extraClass != '' ? ' ' + extraClass : '')}"
         th:text="${label}">Button</button>
 
-<!--/* Alert — 20% tint fill + 4px solid left border in the status colour. */-->
 <div th:fragment="alert(type, msgKey, extraClass)"
      th:if="${msgKey != null}"
      class="alert"
      th:classappend="${'alert-' + type + (extraClass != null and extraClass != '' ? ' ' + extraClass : '')}"
      th:text="#{${msgKey}}">Alert message</div>
 
-<!--/* Empty-state body — title + text + an optional filter-reset hint shown only while a filter is
-     active. Insert into a `<div class="empty-state" th:if="...">` host via th:insert: th:insert
-     (precedence 100) fills the host body first, then the host's own th:if (precedence 300) still
-     removes the whole div when the collection is non-empty, so the empty-check keeps gating it. The
-     hint reads the request-scoped `filterQuery` attribute the host page already exposes. */-->
 <th:block th:fragment="emptyStateBody(titleKey, textKey, filterHintKey)">
   <span class="empty-title" th:text="#{${titleKey}}">Noch keine Eintr&auml;ge</span>
   <span class="empty-text" th:text="#{${textKey}}">Noch keine Eintr&auml;ge vorhanden.</span>
@@ -70,11 +22,6 @@
         th:text="#{${filterHintKey}}">Filter aktiv.</span>
 </th:block>
 
-<!--/* Bank account-name live filter (REQ-BANK-046) — the search box duplicated on the bank dashboard
-     and the org-unit bank. `inputId` is the input's id/label target; `filterScope` is the CSS
-     selector bank.js scopes the name filter to; `filterEmpty` is the selector of the "no matches"
-     empty-state it toggles. Reuses the shared bank.filter.* i18n keys. The caller keeps any
-     surrounding th:if / wrapper (this fragment renders the box itself, unconditionally). */-->
 <div th:fragment="bankAccSearch(inputId, filterScope, filterEmpty)" class="bank-acc-search">
   <label th:for="${inputId}" class="visually-hidden" th:text="#{bank.filter.label}"
     >Konten nach Namen filtern</label
@@ -89,7 +36,6 @@
     th:attr="data-filter-scope=${filterScope},data-filter-empty=${filterEmpty},placeholder=#{bank.filter.placeholder},aria-label=#{bank.filter.label}" />
 </div>
 
-<!--/* Data table — responsive-wrapped, uppercase orange head-rule, zebra rows. */-->
 <div th:fragment="dataTable(head, body)" class="table-responsive">
     <table class="krt-table">
         <thead><tr th:insert="${head}"></tr></thead>
@@ -97,18 +43,6 @@
     </table>
 </div>
 
-
-<!--/* Filter toggle (REQ-FE-021) — the one control that collapses a list page's filter block.
-     Pair it with `data-filter-panel` on the block it controls; `krt-filter-panel.js` wires the two
-     through `aria-controls` alone, so a toggle that does not announce what it controls is also one
-     the script will not find.
-
-     Rendered EXPANDED: `hidden` is the collapse mechanism and the script applies it on load, which
-     is what keeps the filters reachable when JavaScript never runs. The count chip starts hidden
-     and the script fills it.
-
-     `panelId` is the id of the panel; `testid` is optional and only exists so the e2e suite can
-     address a specific page's toggle. */-->
 <button th:fragment="filterToggle(panelId, testid)"
         type="button" class="btn btn-ghost filter-toggle"
         th:attr="aria-controls=${panelId},data-testid=${testid}"

@@ -29,45 +29,22 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Caffeine-backed Spring cache manager for the project's reference-data caches.
- *
- * <p>Per-cache TTLs (L-4 from the performance audit) instead of one global value, because the
- * caches have very different freshness requirements:
+ * Caffeine-backed cache manager with per-cache TTLs.
  *
  * <ul>
- *   <li><b>Master data (12 h)</b> — cities, terminals, points of interest, outposts, materials
- *       (list + by-id), ship types, locations, frequency types, job types, manufacturers, refining
- *       methods, star systems, material categories, and the blueprint variant-family index (rebuilt
- *       from the active blueprint master; no per-write evict hook of its own). Quasi-static: editor
- *       flows already trigger {@code @CacheEvict (allEntries=true)} on writes, and the periodic UEX
- *       / SC Wiki sync sweeps evict the caches they rewrite on completion (via {@code
- *       MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so a stale entry only survives
- *       until the next admin write, the next sync sweep, or the 12 h lapse — whichever comes first.
- *       Because freshness comes from the eviction and not the TTL, the TTL is a long backstop that
- *       avoids re-querying data which almost never changes (the sync runs at most daily; admin
- *       edits are rare).
- *   <li><b>Squadrons (6 h)</b> — org-structure, changed only by admin lifecycle actions that evict.
- *       {@code SquadronService} evicts on writes; the long backstop applies for the same reason as
- *       the master data. Kept a notch shorter than master data because the squadron catalogue also
- *       drives the active-squadron switcher.
- *   <li><b>Roles (2 min)</b> — kept short deliberately. A Keycloak role/permission change should
- *       propagate quickly so a freshly-elevated officer does not stare at a stale "you don't have
- *       permission" page; 2 min is the fast-propagation floor for permission-sensitive data and
- *       stays short even though the master-data caches were lengthened.
+ *   <li><b>Master data and the blueprint family index (12 h)</b> — evicted on writes and by the
+ *       sync sweeps; the TTL is only a backstop.
+ *   <li><b>Squadrons (6 h)</b> — evicted by {@code SquadronService} on writes.
+ *   <li><b>Roles (2 min)</b> — short so permission changes propagate quickly.
  * </ul>
  *
- * <p>All caches share the same Caffeine sizing ({@code maximumSize=1000}, statistics on) and the
- * {@code setAllowNullValues=false} contract — a missed lookup must remain a miss so the next call
- * retries instead of caching the absence. The {@link CaffeineCacheManager#registerCustomCache} API
- * lets us keep one manager bean while giving each cache its own builder, instead of falling back to
- * {@code SimpleCacheManager} (which would change the bean type and trip the existing {@code
- * CacheConfigTest.cacheManagerIsTheCaffeineBackedOne} assertion).
+ * <p>All caches hold at most 1000 entries, record statistics and never cache {@code null}.
  */
 @Configuration
 @EnableCaching
 public class CacheConfig {
 
-  /** Default cache size in entries — the same value historically used for every cache. */
+  /** Maximum number of entries per cache. */
   private static final long MAX_CACHE_SIZE = 1000;
 
   /**
@@ -85,11 +62,7 @@ public class CacheConfig {
    */
   private static final Duration SQUADRONS_TTL = Duration.ofHours(6);
 
-  /**
-   * TTL for permission-sensitive data; kept deliberately short. A Keycloak role/permission change
-   * must propagate quickly, so this stays the fast-propagation floor even though the master-data
-   * caches were lengthened.
-   */
+  /** TTL for permission-sensitive role data, kept short so role changes propagate quickly. */
   private static final Duration ROLES_TTL = Duration.ofMinutes(2);
 
   /** Cache name for the city reference catalogue. */
@@ -139,11 +112,8 @@ public class CacheConfig {
   public static final String MATERIALS_CACHE = "materials";
 
   /**
-   * Cache name for single-material by-id lookups. Kept separate from {@link #MATERIALS_CACHE} so
-   * the unbounded per-{@code Pageable} list entries of the list catalogue cannot evict a hot
-   * single-entity lookup (and vice-versa) when they share one {@code maximumSize} budget
-   * (CACHE-02). Both caches are evicted together on every material write and on the UEX / SC Wiki
-   * sync sweep.
+   * Cache name for single-material lookups by id, separate from {@link #MATERIALS_CACHE} so list
+   * entries cannot evict them; both are evicted together on every material write and sync.
    */
   public static final String MATERIAL_BY_ID_CACHE = "materialById";
 
@@ -160,21 +130,19 @@ public class CacheConfig {
   public static final String STAR_SYSTEMS_CACHE = "starSystems";
 
   /**
-   * Cache name for the blueprint variant-family index ({@code familyKey -> product keys}). Built
-   * once from the ~1600-row active blueprint master, it backs the family-aware owner drill-down on
-   * the availability overview (#364), keeping the per-expand query bounded to a family's product
-   * keys instead of a table scan. Master-data TTL; the catalog only changes on the SC Wiki
-   * blueprint sync.
+   * Cache name for the blueprint variant-family index ({@code familyKey -> product keys}) built
+   * from the active blueprint master; uses the master-data TTL.
    */
   public static final String BLUEPRINT_FAMILY_INDEX_CACHE = "blueprintFamilyIndex";
 
   /**
-   * Builds the shared {@link CacheManager} with per-cache Caffeine specs. Every cache name is
-   * pre-registered via {@link CaffeineCacheManager#registerCustomCache(String,
-   * com.github.benmanes.caffeine.cache.Cache)} so an unknown name on a {@code @Cacheable}
-   * annotation throws at startup rather than silently creating a default-policy cache.
+   * Builds the shared {@link CacheManager} with a Caffeine spec per cache.
    *
-   * @return configured Caffeine cache manager with per-cache TTLs (see class Javadoc)
+   * <p>Every cache name is pre-registered via {@link
+   * CaffeineCacheManager#registerCustomCache(String, com.github.benmanes.caffeine.cache.Cache)}, so
+   * an unknown cache name fails at startup.
+   *
+   * @return configured Caffeine cache manager with per-cache TTLs
    */
   @NotNull
   @Bean
@@ -205,13 +173,11 @@ public class CacheConfig {
   }
 
   /**
-   * Registers a Caffeine cache under {@code name} with the shared sizing/statistics policy and the
-   * supplied TTL. Centralised here so changing the shared sizing later is a one-line edit and the
-   * per-cache lines above stay focused on the policy decision.
+   * Registers a Caffeine cache under {@code name} with the shared sizing and statistics policy.
    *
    * @param manager target Spring cache manager
-   * @param name cache name (the constant referenced from {@code @Cacheable(cacheNames = …)})
-   * @param ttl write-expire duration
+   * @param name cache name as referenced from {@code @Cacheable}
+   * @param ttl expire-after-write duration
    */
   private static void register(@NotNull CaffeineCacheManager manager, String name, Duration ttl) {
     manager.registerCustomCache(

@@ -53,25 +53,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * End-to-end seeding test for {@link P4kImportService} against the real Testcontainers Postgres of
- * the {@code test} profile (Flyway-migrated through {@code V140}). The {@link
- * de.greluc.krt.profit.basetool.backend.service.P4kImportServiceTest pure-Mockito suite} cannot
- * catch a NOT&nbsp;NULL / CHECK violation on a seeded row because its repositories never reach a
- * database — this boots the full context (Flyway-migrated through {@code V141}) and actually
- * persists one new row of every catalog type with seeding opted in, proving:
+ * Verifies against Postgres that {@link P4kImportService} seeds one row of every catalog type
+ * without constraint violations, round-trips the P4K provenance columns and resolves references to
+ * rows seeded in the same run.
  *
- * <ul>
- *   <li>every {@code source = P4K} seed satisfies the live schema (no NOT&nbsp;NULL / CHECK / FK
- *       violation), including the {@code blueprint_ingredient} RESOURCE/ITEM exclusivity CHECKs;
- *   <li>the {@code V140} provenance lane ({@code p4k_uuid} / {@code p4k_synced_at}) round-trips;
- *   <li>cross-seed resolution works in one run — an item links to a manufacturer seeded earlier in
- *       the same pass, and a blueprint's output item plus its ingredient FKs resolve to rows seeded
- *       earlier in the same pass.
- * </ul>
- *
- * <p>The class is {@code @Transactional}, so every seeded row is rolled back after the test; the
- * intermediate auto-flushes still exercise the constraints. {@link JwtDecoder} is mocked so the
- * resource-server context boots without a reachable Keycloak.
+ * <p>Transactional, so seeded rows roll back; {@link JwtDecoder} is mocked. The mocked-repository
+ * counterpart is {@link de.greluc.krt.profit.basetool.backend.service.P4kImportServiceTest}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -99,11 +86,6 @@ class P4kImportServiceIntegrationTest {
 
   @Test
   void apply_withSeeding_persistsOneNewRowOfEveryTypeAgainstTheRealSchema() {
-    // Given — fresh GUIDs guarantee no collision with any Flyway/DataInitializer seed data, and the
-    // distinctive non-dev names/identifiers clear both the real-record and dev-asset filters. The
-    // item + ship reference the manufacturer GUID, the blueprint references the item (output) and
-    // both the commodity (RESOURCE line) and the item (ITEM line), so the whole graph is seeded and
-    // cross-linked inside a single apply pass.
     UUID mfgGuid = UUID.randomUUID();
     UUID itemGuid = UUID.randomUUID();
     UUID shipGuid = UUID.randomUUID();
@@ -148,10 +130,8 @@ class P4kImportServiceIntegrationTest {
                 commodityGuid,
                 itemGuid);
 
-    // When
     P4kImportResultDto result = service.applyImport(upload(json), true);
 
-    // Then — the run reports exactly one seed of every type.
     assertFalse(result.dryRun(), "apply is not a dry run");
     assertNotNull(result.runId(), "an applied run is stamped with a run id");
     assertEquals(1, result.manufacturers().created(), "one manufacturer seeded");
@@ -160,14 +140,12 @@ class P4kImportServiceIntegrationTest {
     assertEquals(1, result.commodities().created(), "one commodity seeded");
     assertEquals(1, result.blueprints().created(), "one blueprint seeded");
 
-    // Manufacturer row persisted with its P4K lane.
     Manufacturer manufacturer = manufacturerRepository.findByScwikiUuid(mfgGuid).orElseThrow();
     assertEquals("Zephyr Dynamics", manufacturer.getName());
     assertEquals("ZPHR", manufacturer.getAbbreviation());
     assertEquals(mfgGuid, manufacturer.getP4kUuid());
     assertNotNull(manufacturer.getP4kSyncedAt());
 
-    // Item row persisted, stamped source = P4K, linked to the manufacturer seeded in the same pass.
     GameItem item = gameItemRepository.findByExternalUuid(itemGuid).orElseThrow();
     assertEquals("Zephyr Blade", item.getName());
     assertEquals(GameItemSourceSystem.P4K, item.getSourceSystems());
@@ -178,7 +156,6 @@ class P4kImportServiceIntegrationTest {
     assertSame(
         manufacturer, item.getManufacturer(), "item links the same-pass seeded manufacturer");
 
-    // Ship row persisted, stamped source = P4K, linked to the same manufacturer.
     ShipType ship = shipTypeRepository.findByExternalUuid(shipGuid).orElseThrow();
     assertEquals("Zephyr Courier", ship.getName());
     assertEquals(GameItemSourceSystem.P4K, ship.getSourceSystems());
@@ -186,7 +163,6 @@ class P4kImportServiceIntegrationTest {
     assertNotNull(ship.getP4kSyncedAt());
     assertSame(manufacturer, ship.getManufacturer());
 
-    // Commodity row persisted invisible for review, NO_REFINE, source = P4K.
     Material material = materialRepository.findByScwikiUuid(commodityGuid).orElseThrow();
     assertEquals("Zephyrium", material.getName());
     assertEquals(Boolean.FALSE, material.getIsVisible());
@@ -194,8 +170,6 @@ class P4kImportServiceIntegrationTest {
     assertEquals(MaterialSourceSystem.P4K, material.getSourceSystems());
     assertNotNull(material.getP4kSyncedAt());
 
-    // Blueprint row persisted with output + both ingredient lines resolved to the same-pass seeds,
-    // exercising the RESOURCE/ITEM exclusivity CHECKs on blueprint_ingredient.
     Blueprint blueprint = blueprintRepository.findByScwikiUuid(bpGuid).orElseThrow();
     assertEquals("BP_CRAFT_ZEPHYR_BLADE", blueprint.getScwikiKey());
     assertEquals(90, blueprint.getCraftTimeSeconds());

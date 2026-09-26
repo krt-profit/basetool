@@ -26,34 +26,19 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration for structured logging, MDC correlation and slow-request detection.
+ * Validated configuration under {@code app.logging.*} for structured logging, MDC correlation and
+ * slow-request detection.
  *
- * <p>Bound under the {@code app.logging.*} prefix in {@code application*.yml}. Because all
- * components are validated via Jakarta-Validation, any misconfiguration fails the application
- * context start early (see {@code LoggingPropertiesTest} for the contract). An immutable record
- * (BE-MOD-04).
- *
- * @param correlationIdHeader the HTTP header used to accept an inbound correlation id and echo the
- *     effective one back; {@code X-Correlation-Id} by default, matching the widely used de-facto
- *     standard across gateways and proxies
- * @param correlationIdMdcKey the MDC key under which the correlation id is stored for the duration
- *     of a request; must stay in sync with the {@code %X{correlationId}} placeholder in {@code
+ * @param correlationIdHeader the HTTP header carrying the inbound and echoed correlation id
+ * @param correlationIdMdcKey the MDC key of the correlation id; must match {@code
  *     logback-spring.xml}
- * @param userIdMdcKey the MDC key under which the authenticated user's JWT {@code sub} claim is
- *     stored; intentionally limited to {@code sub} to avoid leaking names, emails or token contents
- *     into log files
+ * @param userIdMdcKey the MDC key of the caller's JWT {@code sub}; never names, emails or tokens
  * @param orgUnitIdMdcKey the MDC key under which {@link
- *     de.greluc.krt.profit.basetool.backend.logging.CorrelationIdFilter} stores the resolved
- *     OrgUnit context of the current request — the caller's active OrgUnit (Staffel or
- *     Spezialkommando, possibly the union of memberships), or the sentinel {@code anonymous} /
- *     {@code none} / {@code all} when no single OrgUnit applies; keep it in sync with the {@code
- *     %X{orgUnitId}} placeholder in {@code logback-spring.xml}
- * @param slowRequestThresholdMs requests taking longer than this threshold (in milliseconds) are
- *     logged at {@code WARN} instead of {@code INFO} by {@code RequestLoggingFilter}; set it to a
- *     large value to disable
- * @param structuredEnabled the feature flag for structured (JSON) logging; {@code
- *     logback-spring.xml} activates the JSON appender only when this is {@code true} (typically in
- *     production)
+ *     de.greluc.krt.profit.basetool.backend.logging.CorrelationIdFilter} stores the request's
+ *     OrgUnit context or a sentinel; must match {@code logback-spring.xml}
+ * @param slowRequestThresholdMs the duration in milliseconds above which a request is logged at
+ *     WARN
+ * @param structuredEnabled whether {@code logback-spring.xml} activates the JSON appender
  */
 @Validated
 @ConfigurationProperties(prefix = "app.logging")

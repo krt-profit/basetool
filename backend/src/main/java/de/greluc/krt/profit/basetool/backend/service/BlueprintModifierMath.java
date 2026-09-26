@@ -26,19 +26,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Stat-modifier curve math for the blueprint craftability calculation (#781) — the server-side
- * mirror of the frontend {@code computeModifierValue} in {@code
- * personal-inventory-blueprints-recipe.js}. A modifier maps an ingredient quality to a stat
- * <em>multiplier</em>: a segmented modifier follows its ordered segments (interpolated within a
- * {@code linear} segment, held constant for a stepped form such as {@code
- * linear_integer_additive}); a non-segmented modifier interpolates linearly between its endpoint
- * multipliers across the band.
+ * Stat-modifier curve math for the blueprint craftability calculation, mirroring the frontend
+ * {@code computeModifierValue}.
  *
- * <p>The craftability rule (REQ-INV-048) reuses this to find the lowest ingredient quality at which
- * a slot's stats are not <em>worsened</em>: a multiplier below {@code 1.0} (neutral) degrades a
- * {@code higher}-is-better stat, above {@code 1.0} degrades a {@code lower}-is-better stat. Only
- * multipliers are known (no absolute base stat), so "neutral = ×1.0" is the only meaningful
- * worsening threshold.
+ * <p>A modifier maps an ingredient quality to a stat multiplier; below {@code 1.0} worsens a
+ * higher-is-better stat, above {@code 1.0} a lower-is-better one (REQ-INV-048).
  */
 final class BlueprintModifierMath {
 
@@ -57,12 +49,11 @@ final class BlueprintModifierMath {
   private BlueprintModifierMath() {}
 
   /**
-   * Computes the stat multiplier a modifier applies at the given ingredient quality, mirroring the
-   * frontend slider math verbatim.
+   * Computes the stat multiplier a modifier applies at the given ingredient quality.
    *
    * @param modifier the stat modifier
    * @param quality the ingredient quality to evaluate at
-   * @return the multiplier, or {@code null} when the curve is underspecified (no usable endpoints)
+   * @return the multiplier, or {@code null} when the curve has no usable endpoints
    */
   @Nullable
   static Double computeModifierValue(
@@ -87,8 +78,6 @@ final class BlueprintModifierMath {
             return vs == null ? ve : vs;
           }
           if (vs == null || ve == null) {
-            // A linear segment needs both endpoints to interpolate; an underspecified one yields no
-            // value (mirrors the frontend's null result and keeps the lerp call provably non-null).
             return null;
           }
           double t = b.equals(a) ? 0.0d : clamp01((quality - a) / (b - a));
@@ -109,10 +98,8 @@ final class BlueprintModifierMath {
   }
 
   /**
-   * Tests whether a modifier would <em>worsen</em> its stat at the given quality: a {@code
-   * higher}-is-better stat is degraded by a multiplier below neutral, a {@code lower}-is-better
-   * stat by one above neutral. A {@code neutral}/unknown direction, or an underspecified curve,
-   * never degrades.
+   * Tests whether a modifier worsens its stat at the given quality. A neutral or unknown direction,
+   * or an underspecified curve, never degrades.
    *
    * @param modifier the stat modifier
    * @param quality the ingredient quality to evaluate at
@@ -134,11 +121,8 @@ final class BlueprintModifierMath {
   }
 
   /**
-   * Returns the lowest quality (0..1000) at which none of a slot's modifiers worsen their stat —
-   * the no-degradation quality floor (REQ-INV-048). Modifiers that worsen across the entire band
-   * impose no floor (they are treated as inherently penalised and ignored), so an unusual recipe
-   * never silently becomes uncraftable; the floor is the strictest reachable crossover among the
-   * rest.
+   * Returns the lowest quality (0..1000) at which none of a slot's modifiers worsen their stat
+   * (REQ-INV-048). Modifiers that worsen across the entire band are ignored.
    *
    * @param modifiers the slot's stat modifiers (may be empty)
    * @return the lowest non-degrading quality, or {@code 0} when nothing constrains it

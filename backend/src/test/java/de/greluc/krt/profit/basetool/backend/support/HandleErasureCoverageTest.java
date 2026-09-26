@@ -31,17 +31,9 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Keeps the Art. 17 erasure's set of columns closed against the schema (REQ-SEC-062, ADR-0183).
- *
- * <p>{@code HandleAnonymisationService} used to describe its set as closed in a comment, and the
- * comment went out of date: five columns survived a granted erasure, among them the bank custodian
- * registry, whose whole purpose is to outlive the account. The person search never drifted the same
- * way because {@code PersonSearchCoverageTest} would not let it. This is that gate for the erasure.
- *
- * <p>Every column {@link PersonSearchTargets} registers as a place a person is named must carry a
- * disposition in {@link HandleErasureCoverage}. Adding a search target therefore forces somebody to
- * answer "and what does an erasure do about this one?" while they still have the context to answer
- * it — which is the whole mechanism, not a side effect of it.
+ * Requires every column {@link PersonSearchTargets} registers as naming a person to carry a
+ * disposition in {@link HandleErasureCoverage}, keeping the Art. 17 erasure's column set closed
+ * (REQ-SEC-062, ADR-0183).
  */
 class HandleErasureCoverageTest {
 
@@ -52,7 +44,6 @@ class HandleErasureCoverageTest {
         .collect(Collectors.toSet());
   }
 
-  // covers REQ-SEC-062 - no place a person is named may be left without a stated disposition
   @Test
   void everyPersonNameColumnHasADisposition() {
     List<String> missing =
@@ -72,7 +63,6 @@ class HandleErasureCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-062 - and no disposition may describe a column that is no longer searched
   @Test
   void noDispositionDescribesAColumnThatIsNotRegistered() {
     Set<String> registered = registeredColumns();
@@ -90,11 +80,8 @@ class HandleErasureCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-062 - every disposition states a reason an admin serving a request can act on
   @Test
   void everyDispositionStatesAReason() {
-    // A cross-reference ("See bank_transaction.note.") is a real answer and is deliberately short;
-    // anything else has to be a sentence. The bar is against a placeholder, not against brevity.
     assertThat(HandleErasureCoverage.COVERAGE)
         .allSatisfy(
             (column, coverage) -> {
@@ -112,14 +99,8 @@ class HandleErasureCoverageTest {
             });
   }
 
-  // covers REQ-SEC-062 - the columns the service rewrites are exactly the ones marked ANONYMISED
   @Test
   void theAnonymisedSetMatchesWhatTheServiceActuallyRewrites() {
-    // Read from the service, not restated here. A literal copy in this test is how the two came
-    // apart: it held fourteen entries while the service rewrote fifteen columns, and adding the
-    // missing one failed the sibling assertion because that column is EXEMPT from the search -- so
-    // the only configuration in which everything was green was the one that understated the
-    // erasure. One list, in the class that does the work.
     Set<String> declared =
         HandleErasureCoverage.COVERAGE.entrySet().stream()
             .filter(e -> e.getValue().disposition() == Disposition.ANONYMISED)
@@ -131,7 +112,6 @@ class HandleErasureCoverageTest {
         .isEqualTo(Set.copyOf(HandleAnonymisationService.ANONYMISED_COLUMNS));
   }
 
-  // covers REQ-SEC-062 - and every column it rewrites is one the person search can find again
   @Test
   void everyAnonymisedColumnIsAlsoSearchable() {
     Set<String> registered = registeredColumns();
@@ -143,13 +123,8 @@ class HandleErasureCoverageTest {
         .allSatisfy(column -> assertThat(registered).contains(column));
   }
 
-  // covers REQ-SEC-062 - the manual residue is visible rather than implied
   @Test
   void theManualResidueIsAcknowledgedAndNotEmpty() {
-    // If this ever hits zero, either every prose column became mechanically erasable -- which
-    // cannot happen, a name inside a sentence is not a column -- or somebody reclassified the
-    // residue away to make the registry look complete. The privacy record promises an admin walks
-    // the Personensuche hits for exactly these; that promise has to have something behind it.
     long byHand =
         HandleErasureCoverage.COVERAGE.values().stream()
             .map(Coverage::disposition)

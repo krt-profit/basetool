@@ -53,10 +53,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Integration tests for the two bank PDF exports against the real Testcontainers PostgreSQL:
- * statement balance math, period filtering, holder-distribution section and audit events
- * (REQ-BANK-014), and the three-month report's per-account summaries (REQ-BANK-015). Content is
- * asserted through {@code PdfTextExtractor} — the same channel the handover regression tests use.
+ * Integration tests for the bank PDF exports against real Postgres: the account statement
+ * (REQ-BANK-014) and the three-month report (REQ-BANK-015).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -78,26 +76,19 @@ class BankReportServiceTest {
   @BeforeEach
   void seed() {
     account = newAccount("Report Konto " + UUID.randomUUID());
-    // A short, unique handle so it renders contiguously in the narrow booking-row holder column
-    // (the wide per-account distribution table that used to carry it was removed, ADR-0039).
     holderHandle = "rh-" + UUID.randomUUID().toString().substring(0, 8);
     holder = newHolder(holderHandle);
   }
 
   @Test
   void statement_containsBalancesRunningColumnAndPerBookingHolder() throws IOException {
-    // Given
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     deposit("500");
-    // The fee is added on top (ADR-0052): a 200 payout debits the account the gross 201 (200 + 1
-    // fee), so the statement shows the leg -201 and a closing balance of 500 - 201 = 299.
     withdraw("200");
     Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
 
-    // When
     byte[] pdf = statementService.generateStatement(account.getId(), before, after, null);
 
-    // Then
     String text = extractText(pdf);
     assertTrue(text.contains("KONTOAUSZUG"), "title present");
     assertTrue(text.contains(account.getAccountNo()), "account number present");
@@ -108,8 +99,6 @@ class BankReportServiceTest {
     assertTrue(text.contains("-201"), "withdrawal gross (200 + 1 fee) present");
     assertTrue(text.contains("Einzahlung"), "deposit type label present");
     assertTrue(text.contains("Auszahlung"), "withdrawal type label present");
-    // The per-booking holder annotation (derived from the holder ledger by amount sign, ADR-0039)
-    // is present; the per-account holder-distribution section was removed.
     assertTrue(text.contains(holderHandle), "holder handle present on the booking rows");
     assertFalse(
         text.contains("HALTER-VERTEILUNG ZUM STICHTAG"),
@@ -121,7 +110,6 @@ class BankReportServiceTest {
 
   @Test
   void statement_appliesPeriodFilterToBothDirections() throws IOException, InterruptedException {
-    // Given: a deposit strictly before tMid, a withdrawal strictly after
     Instant start = Instant.now().minus(1, ChronoUnit.HOURS);
     deposit("500");
     Thread.sleep(75);
@@ -130,63 +118,48 @@ class BankReportServiceTest {
     withdraw("200");
     Instant end = Instant.now().plus(1, ChronoUnit.HOURS);
 
-    // When
     String firstHalf =
         extractText(statementService.generateStatement(account.getId(), start, mid, null));
     String secondHalf =
         extractText(statementService.generateStatement(account.getId(), mid, end, null));
 
-    // Then: first half sees only the deposit (opening 0 -> closing 500). Assert the withdrawal's
-    // absence via its type label, not the amount: the leg renders as "-201" (gross = 200 + 1 fee,
-    // ADR-0052) and a bare "-200" substring would flakily collide with the random "rh-<hex>" holder
-    // handle rendered on the deposit row (e.g. "rh-200...").
     assertTrue(firstHalf.contains("+500"), "deposit inside first period");
     assertFalse(firstHalf.contains("Auszahlung"), "withdrawal outside first period");
     assertTrue(firstHalf.contains("500 aUEC"), "closing 500 in first period");
-    // ... and the second half only the withdrawal on an opening of 500
     assertFalse(secondHalf.contains("+500"), "deposit outside second period");
-    // The 200 payout debits the gross 201 (200 + 1 fee on top, ADR-0052): leg -201, closing 299.
     assertTrue(secondHalf.contains("-201"), "withdrawal gross inside second period");
     assertTrue(secondHalf.contains("299 aUEC"), "closing 299 in second period");
   }
 
   @Test
   void statement_emptyPeriodShowsEmptyRowAndZeroMovement() throws IOException {
-    // Given: bookings exist, but the period ends before them
     deposit("500");
     Instant farPast = Instant.now().minus(48, ChronoUnit.HOURS);
     Instant past = Instant.now().minus(24, ChronoUnit.HOURS);
 
-    // When
     String text =
         extractText(statementService.generateStatement(account.getId(), farPast, past, null));
 
-    // Then
     assertTrue(text.contains("Keine Buchungen im Zeitraum."), "empty row present");
     assertFalse(text.contains("+500"), "no booking row leaks into the period");
   }
 
   @Test
   void statement_recordsOneAuditEventPerExport() {
-    // Given
     deposit("100");
     long before = auditEventRepository.count();
 
-    // When
     statementService.generateStatement(
         account.getId(),
         Instant.now().minus(1, ChronoUnit.HOURS),
         Instant.now().plus(1, ChronoUnit.HOURS),
         null);
 
-    // Then
     assertEquals(before + 1, auditEventRepository.count(), "exactly one STATEMENT_EXPORTED row");
   }
 
   @Test
   void statement_redactedVariant_omitsHolderColumnButKeepsHistory() throws IOException {
-    // REQ-BANK-038: the org-unit-facing statement drops the player-custody (Halter) column entirely
-    // while the full booking history (amount/type/running balance) stays intact.
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     deposit("500");
     withdraw("200");
@@ -197,23 +170,16 @@ class BankReportServiceTest {
     String redacted =
         extractText(statementService.generateStatement(account.getId(), before, after, null, true));
 
-    // The full (bank-staff) statement names the holder; the redacted one does not.
     assertTrue(full.contains(holderHandle), "full statement keeps the holder column");
     assertFalse(redacted.contains(holderHandle), "redacted statement hides the holder handle");
     assertFalse(redacted.contains("HALTER"), "redacted statement drops the Halter column header");
-    // The history itself is unchanged in the redacted variant.
     assertTrue(redacted.contains("+500"), "deposit amount still present when redacted");
-    // The 200 payout debits the gross 201 (200 + 1 fee on top, ADR-0052): leg -201, closing 299.
     assertTrue(redacted.contains("-201"), "withdrawal gross still present when redacted");
     assertTrue(redacted.contains("299 aUEC"), "closing balance still present when redacted");
   }
 
   @Test
   void statement_showsCounterpartyOnQuellZielkontoColumnForBothVariants() throws IOException {
-    // REQ-BANK-044 (amended): a deposit's recorded counterparty (Einzahler) shows in the
-    // Quell-/Zielkonto column of the statement — for bank staff AND, now, for org-unit viewers
-    // (owner
-    // decision). Only the aUEC-custody Halter stays redacted on the org-unit-facing variant.
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     String counterpartyHandle = "cp-" + UUID.randomUUID().toString().substring(0, 8);
     User counterparty = newUser(counterpartyHandle);
@@ -248,10 +214,6 @@ class BankReportServiceTest {
 
   @Test
   void statement_rendersReasonAndNoteInDetailSubRow() throws IOException {
-    // REQ-BANK-045 (amended): the Begründung and Notiz of a booking are carved out of the main row
-    // into a per-booking sub-row, reason first (the more important field). Both texts render and
-    // the
-    // reason precedes the note; the "Notiz" sub-row label renders too.
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     deposit("500");
     String reason = "reason-" + UUID.randomUUID().toString().substring(0, 8);
@@ -281,10 +243,8 @@ class BankReportServiceTest {
 
   @Test
   void statement_rejectsInvertedPeriodAndUnknownAccount() {
-    // Given
     Instant now = Instant.now();
 
-    // When / Then
     assertThrows(
         BadRequestException.class,
         () ->
@@ -299,14 +259,11 @@ class BankReportServiceTest {
 
   @Test
   void threeMonthReport_containsAccountSummariesAndAuditEvent() throws IOException {
-    // Given
     deposit("750");
     long auditBefore = auditEventRepository.count();
 
-    // When
     byte[] pdf = managementReportService.generateThreeMonthReport(null);
 
-    // Then
     String text = extractText(pdf);
     assertTrue(text.contains("3-MONATS-REPORT"), "title present");
     assertTrue(text.contains(account.getAccountNo()), "seeded account section present");
@@ -324,16 +281,13 @@ class BankReportServiceTest {
 
   @Test
   void threeMonthReport_startsEachAccountOnItsOwnPage() throws IOException {
-    // Given a second account so the report has two account sections
     BankAccount second = newAccount("Report Konto 2 " + UUID.randomUUID());
     bankLedgerService.bookDeposit(
         new BankDepositRequest(second.getId(), holder.getId(), new BigDecimal("321"), null));
     deposit("750");
 
-    // When
     byte[] pdf = managementReportService.generateThreeMonthReport(null);
 
-    // Then: the two account numbers render on different pages (page break before each account)
     try (PdfReader reader = new PdfReader(pdf)) {
       PdfTextExtractor extractor = new PdfTextExtractor(reader);
       int firstAccountPage = -1;
@@ -402,8 +356,6 @@ class BankReportServiceTest {
     BankAccount a = new BankAccount();
     a.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));
     a.setName(name);
-    // AREA carries a free-form area name and no org-unit FK (V150/V168 owner-ref CHECK) — a
-    // justification-optional type, so the seeded withdrawals need no Begründung (REQ-BANK-045).
     a.setType(BankAccountType.AREA);
     a.setAreaName(name);
     a.setStatus(BankAccountStatus.ACTIVE);

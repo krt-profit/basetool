@@ -34,13 +34,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-Mockito unit tests for {@link PromotionEligibilityController}. The controller is a thin
- * pass-through: the {@code /my} endpoints receive the caller's user id via {@code @CurrentUserId}
- * and forward it to the service, while the {@code /user/{userId}} branch is the officer/admin view
- * gated by a method-level {@code @PreAuthorize}. These tests pin the subject/argument forwarding
- * for all three endpoints; the JWT-subject extraction and its {@code AccessDenied} failure modes
- * now live in {@code CurrentUserArgumentResolver} and are covered by {@code
- * CurrentUserArgumentResolverTest}.
+ * Unit tests for {@link PromotionEligibilityController}: subject and argument forwarding for the
+ * {@code /my} and {@code /user/{userId}} endpoints.
  */
 @ExtendWith(MockitoExtension.class)
 class PromotionEligibilityControllerTest {

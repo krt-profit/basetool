@@ -31,25 +31,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 /**
- * Pins what the {@code io.opentelemetry.exporter} log-level pin actually does — which is not what
- * REQ-OBS-013 claimed it did until 2026-09-02.
- *
- * <p>The requirement asserted that pinning the logger to WARN made the OTLP exporter "keep logging
- * export failures at WARN (not ERROR)". A logback level is a <em>threshold</em>, not a rewrite: the
- * exporter logs a transport failure at JUL {@code SEVERE}, {@code jul-to-slf4j} delivers it as
- * ERROR, and ERROR clears a WARN threshold untouched. Production proved it — {@code
- * 2026-09-02T07:24:04Z ERROR io.opentelemetry.exporter.internal.http.HttpExporter: Failed to export
- * spans} — an ERROR line from the very logger the pin covers.
- *
- * <p>The behaviour was left alone and the requirement corrected, because it is acceptable on its
- * own terms: the SDK's {@code ThrottlingLogger} caps that source at one message per minute, two
- * orders below {@code LogbackErrorSpike}'s {@code > 0.2/s}, and an unreachable Alloy pages through
- * {@code TargetDown} regardless.
- *
- * <p>The third assertion is the one that matters. It fails if someone quietly sets the logger to
- * {@code OFF} — which would satisfy the requirement's original wording literally, and would also
- * remove the only local breadcrumb for "why is this window's trace missing", since Micrometer's
- * {@code MetricsTurboFilter} gates on the effective level and would stop counting the event too.
+ * Pins what the {@code io.opentelemetry.exporter} WARN level does: exporter failures still log at
+ * ERROR, and the logger is not set to {@code OFF} (REQ-OBS-013).
  */
 class OtelExporterLogLevelTest {
 
@@ -67,9 +50,6 @@ class OtelExporterLogLevelTest {
     LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
     exporterLogger = context.getLogger(EXPORTER_LOGGER);
     originalLevel = exporterLogger.getLevel();
-    // The test profile does not load the production application.yml's logging levels, so the pin is
-    // applied here explicitly. What is under test is the SEMANTICS of the pin — that WARN is a
-    // threshold and not a demotion — not whether a particular YAML file was read.
     exporterLogger.setLevel(Level.WARN);
   }
 
@@ -80,14 +60,11 @@ class OtelExporterLogLevelTest {
 
   @Test
   void theWarnPinSuppressesInfoChatter() {
-    // The pin's real, residual effect, and the reason it is not dead configuration to be deleted.
     assertFalse(exporterLogger.isInfoEnabled());
   }
 
   @Test
   void theWarnPinDoesNotSuppressError() {
-    // The corrected claim. A threshold of WARN passes ERROR through unchanged — which is why the
-    // 07:24:04Z production line exists at all, and why REQ-OBS-013 no longer says otherwise.
     assertTrue(exporterLogger.isErrorEnabled());
   }
 

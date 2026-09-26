@@ -28,9 +28,7 @@ import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
  */
 public final class TestLoggingProperties {
 
-  private TestLoggingProperties() {
-    // Test-support holder — not instantiable.
-  }
+  private TestLoggingProperties() {}
 
   /**
    * Returns the production defaults: {@code X-Correlation-Id}, the {@code correlationId} / {@code

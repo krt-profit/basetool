@@ -39,27 +39,9 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Pins the servlet-filter order of the gateway as the container will actually register it
- * (ING-SIMP-01), read through Boot's own {@link ServletContextInitializerBeans} — the same
- * machinery that turns the {@code @Component} filters into registrations at startup — rather than
- * by comparing the {@code ORDER} constants with each other, which would only prove the constants
- * are what the constants say.
- *
- * <p>Two defects this guards against, both real:
- *
- * <ul>
- *   <li><b>A tie.</b> {@link BotProtectionFilter} and {@link RequestLoggingFilter} both sat at
- *       {@code HIGHEST_PRECEDENCE + 15}, which left their relative order to bean-registration order
- *       — an accident of classpath scanning, not a decision.
- *   <li><b>Body buffering before throttling.</b> {@link PayloadSizeLimitFilter} ({@code +20}) ran
- *       before {@link RateLimitingFilter} ({@code +30}), so a caller already over their budget
- *       still made the gateway read and hold a chunked body of up to 2&nbsp;MiB per request before
- *       the 429. The limiter now runs first.
- * </ul>
- *
- * <p>Every one of them must also run before the Spring Security chain: the bot filter exists to
- * spare the resource server a JWKS round trip per scanner probe, and the correlation id has to be
- * in the MDC before any security line is logged.
+ * Pins the gateway's servlet-filter order as registered by Boot's {@link
+ * ServletContextInitializerBeans}: no two filters share an order, {@link RateLimitingFilter} runs
+ * before {@link PayloadSizeLimitFilter}, and every filter runs before the Spring Security chain.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class FilterOrderTest {

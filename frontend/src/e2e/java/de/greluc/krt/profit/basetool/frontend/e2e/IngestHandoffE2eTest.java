@@ -44,21 +44,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end coverage for the one-click ingest handoff (epic #639, {@code REQ-INGEST-003/-004}):
- * the gateway stages a draft in Redis under {@code ingest:handoff:<sub>:<id>}, the extractor opens
- * {@code ?handoff=<id>}, and the frontend pre-fills the existing review form from the staged draft
- * — single-use and scoped to the browsing user.
+ * End-to-end coverage for the one-click ingest handoff (REQ-INGEST-003/-004): a draft staged in
+ * Redis under {@code ingest:handoff:<sub>:<id>} pre-fills the review form via {@code
+ * ?handoff=<id>}.
  *
- * <p>The gateway is not run here; instead the test reproduces what the gateway does, using the real
- * backend matcher: it posts the {@code RefineryExtract} fixture to {@code
- * /api/v1/refinery-orders/import-extract} (resolving the fixture's names against the seeded
- * catalog) and stages the verbatim draft answer in the same Redis the frontend reads. That keeps
- * the draft shape honest — it is the exact JSON production would stage — without standing up the
- * device grant.
- *
- * <p>Covers the happy path (pre-fill matches the manual-upload result), single-use consumption (a
- * replayed id falls back to the friendly notice), and per-{@code sub} isolation (a handoff staged
- * for another user is invisible and stays unconsumed — no IDOR).
+ * <p>Stages the draft itself from the real backend matcher instead of running the gateway. Covers
+ * pre-fill, single-use consumption and per-{@code sub} isolation.
  */
 @Tag("e2e")
 class IngestHandoffE2eTest {
@@ -108,9 +99,6 @@ class IngestHandoffE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      // The fixture's first row "E2E IMPORT MATERIAL" folds onto this RAW material; its
-      // misspelled second row stays unmatched. E2eStackExtension seeds the material before any page
-      // renders (the picker's catalogue is cached from the first render on); this looks its id up.
       materialId =
           seeder.ensureRefineryMaterial(
               USERNAME, PASSWORD, E2eStackExtension.PICKER_MATERIAL_IMPORT);
@@ -119,7 +107,6 @@ class IngestHandoffE2eTest {
           Files.readString(
               Path.of(
                   IngestHandoffE2eTest.class.getResource("/refinery-extract-e2e.json").toURI()));
-      // Exactly what the gateway forwards + stages: the backend's verbatim draft for this extract.
       draftJson = seeder.importRefineryExtractDraft(USERNAME, PASSWORD, extract);
     }
   }
@@ -136,9 +123,8 @@ class IngestHandoffE2eTest {
   }
 
   /**
-   * Happy path + single-use: a staged refinery handoff pre-fills the create form exactly like the
-   * manual upload, and replaying the same id falls back to the friendly notice (the entry was
-   * consumed by the first pickup).
+   * A staged refinery handoff pre-fills the create form like a manual upload; replaying the same id
+   * shows the fallback notice.
    */
   @Test
   void stagedHandoffPrefillsTheFormAndIsSingleUse() {
@@ -157,8 +143,6 @@ class IngestHandoffE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create?handoff=" + handoffId);
 
-        // The staged draft pre-fills the form and shows the review banner — same as a manual
-        // upload.
         assertThat(page.getByTestId("refinery-import-banner"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("#inputMaterialId_0")).hasValue(materialId);
@@ -166,14 +150,11 @@ class IngestHandoffE2eTest {
         assertThat(page.locator("#outputQuantity_0")).hasValue("120");
         assertThat(page.locator("#quality_0")).hasValue("618");
         assertThat(page.locator("#startedAt")).hasValue("2026-06-01T19:39:01Z");
-        // The misspelled second row stays unmatched, exactly as in the manual import flow.
         assertThat(page.locator("#inputMaterialId_1")).hasValue("");
 
-        // The pickup is single-use: Redis no longer holds the entry...
         assertNull(
             get(key(sub, handoffId)), "the handoff must be consumed (GETDEL) on first pickup");
 
-        // ...so replaying the same id renders the fresh form plus the friendly not-found notice.
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create?handoff=" + handoffId);
         assertThat(page.getByTestId("refinery-import-error").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
@@ -208,18 +189,14 @@ class IngestHandoffE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Our session's sub does not own this id, so the lookup misses → friendly notice, no
-        // banner.
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create?handoff=" + foreignId);
         assertThat(page.getByTestId("refinery-import-error").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.getByTestId("refinery-import-banner")).hasCount(0);
         assertThat(page.locator("#inputMaterialId_0")).hasValue("");
 
-        // The foreign user's draft is untouched — our read never reached their sub-scoped key.
         assertNotNull(get(foreignKey), "a foreign handoff must not be consumable by another user");
 
-        // A wholly unknown id behaves identically (no leak, friendly notice).
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create?handoff=" + newHandoffId());
         assertThat(page.getByTestId("refinery-import-error").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
@@ -247,8 +224,7 @@ class IngestHandoffE2eTest {
 
   /**
    * Wraps a backend draft as the {@link
-   * de.greluc.krt.profit.basetool.frontend.model.dto.StagedHandoff} JSON the gateway stores (kind +
-   * the verbatim draft as a string).
+   * de.greluc.krt.profit.basetool.frontend.model.dto.StagedHandoff} JSON the gateway stores.
    */
   private static String stagedHandoff(String draft) {
     JsonObject staged = new JsonObject();

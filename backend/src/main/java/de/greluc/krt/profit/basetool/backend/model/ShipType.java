@@ -38,20 +38,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Ship / vehicle catalogue entry, jointly synced from UEX and (R4+) SC Wiki.
+ * Ship / vehicle catalogue entry, synced from UEX and SC Wiki.
  *
- * <p>R2 expands the entity to mirror SC_WIKI_SYNC_PLAN.md §6.5: the hardened {@code
- * UexVehicleService} populates the 36 {@code is_*} capability flags, dimensions, fuel and urls from
- * the extended {@code UexVehicleDto}, plus the shared {@link #externalUuid} / {@link #uexVehicleId}
- * cross-source keys. It writes neither description column — UEX serves no description at all — so
- * {@link #descriptionEn} is filled by the SC-Wiki vehicle sync and the P4K import, never by UEX.
- * Wiki-side columns ({@link #scwikiSlug}, {@link #gameName}, {@link #descriptionDe}, …) stay
- * nullable until R4.
- *
- * <p>SC Wiki sync R9 Step 4 dropped the legacy synthesized {@code description} column — migration
- * {@code V125__drop_legacy_material_and_ship_type_columns.sql}, shipped 2026-06-01 — together with
- * the JPA field that mapped it, so no {@code description} member exists on this entity any more.
- * Ship-type descriptions come from {@link #descriptionEn} / {@link #descriptionDe}.
+ * <p>The UEX vehicle sync fills the capability flags, dimensions, fuel, URLs and the cross-source
+ * keys {@link #externalUuid} / {@link #uexVehicleId}; descriptions ({@link #descriptionEn}, {@link
+ * #descriptionDe}) come only from the SC Wiki sync and the P4K import. Wiki-side columns are
+ * nullable.
  */
 @Entity
 @Getter
@@ -77,8 +69,6 @@ public class ShipType extends AbstractEntity<UUID> {
 
   private boolean hidden = false;
 
-  // ───── joint cross-source keys (R2 writes) ─────
-
   /** In-game RSI asset UUID. Shared with SC Wiki; the cross-source join key. */
   @Column(name = "external_uuid", unique = true)
   private UUID externalUuid;
@@ -94,8 +84,6 @@ public class ShipType extends AbstractEntity<UUID> {
   /** SC Wiki kebab-case slug (e.g. {@code "orig-100i"}). R4 writes. */
   @Column(name = "scwiki_slug")
   private String scwikiSlug;
-
-  // ───── canonical specs (last writer wins by field per §6.3.3) ─────
 
   /** Full marketing name (e.g. {@code "Origin 100i"}). */
   @Column(name = "name_full")
@@ -174,8 +162,6 @@ public class ShipType extends AbstractEntity<UUID> {
   /** Shield health points. */
   @Column(name = "shield_hp")
   private Integer shieldHp;
-
-  // ───── 36 UEX capability flags ─────
 
   /** Add-on module to a parent ship (not a stand-alone vehicle). */
   @Column(name = "is_addon")
@@ -321,8 +307,6 @@ public class ShipType extends AbstractEntity<UUID> {
   @Column(name = "is_tractor_beam")
   private Boolean isTractorBeam;
 
-  // ───── URLs ─────
-
   /** RSI pledge store URL. */
   @Column(name = "url_store", length = 512)
   private String urlStore;
@@ -347,21 +331,13 @@ public class ShipType extends AbstractEntity<UUID> {
   @Column(name = "url_wiki", length = 512)
   private String urlWiki;
 
-  // ───── multi-language descriptions ─────
-
-  /**
-   * English description. Replaces the legacy synthesized {@code description} column, which V125
-   * dropped on 2026-06-01 together with its JPA field — no {@code description} member exists on
-   * this entity any more.
-   */
+  /** English description, filled by the SC Wiki vehicle sync and the P4K import, never by UEX. */
   @Column(name = "description_en", columnDefinition = "TEXT")
   private String descriptionEn;
 
   /** German description (filled by R4 Wiki sync; UEX does not expose a DE field today). */
   @Column(name = "description_de", columnDefinition = "TEXT")
   private String descriptionDe;
-
-  // ───── provenance ─────
 
   /** Last successful UEX sync touch. */
   @Column(name = "uex_synced_at")
@@ -383,8 +359,6 @@ public class ShipType extends AbstractEntity<UUID> {
   @Enumerated(EnumType.STRING)
   @Column(name = "source_systems", nullable = false, length = 16)
   private GameItemSourceSystem sourceSystems = GameItemSourceSystem.UEX_ONLY;
-
-  // ───── KRT P4K Reader source lane (catalog import) ─────
 
   /**
    * DataForge {@code __ref} asset GUID observed by the KRT P4K Reader import for this ship. Kept

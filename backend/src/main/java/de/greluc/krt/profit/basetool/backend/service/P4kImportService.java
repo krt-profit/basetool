@@ -69,53 +69,22 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * KRT P4K Reader catalog import engine. Consumes the single JSON catalog the external KRT P4K
- * Reader extracts from the game's {@code Data/Game2.dcb} (DataForge) and <em>enriches, reconciles
- * and (opt-in) seeds</em> the {@code game_item} / {@code ship_type} / {@code manufacturer} / {@code
- * material} / {@code blueprint} rows against it.
- *
- * <p>The game itself reads this DCB, so the catalog is the upstream source of truth — it routinely
- * carries player-facing records UEX and the SC Wiki have not catalogued yet. For a matched row the
- * import enriches in place (fill-if-null); for an unmatched record it either <b>seeds a brand-new
- * {@code source = P4K} row</b> (when seeding is enabled and the record passes the real-record
- * filter) or reports it as unmatched.
- *
- * <p>Two entry points share the same reconciliation logic:
+ * Import engine for the KRT P4K Reader catalog extracted from the game's {@code Data/Game2.dcb}. It
+ * enriches, reconciles and optionally seeds the {@code game_item} / {@code ship_type} / {@code
+ * manufacturer} / {@code material} / {@code blueprint} rows.
  *
  * <ul>
- *   <li>{@link #previewImport(MultipartFile)} computes every action ({@code dryRun = true}, seeding
- *       analysed) without writing anything or emitting audit rows.
- *   <li>{@link #applyImport(MultipartFile, boolean)} applies the same actions inside a read-write
- *       transaction, emitting {@code SyncReportService} events for UUID backfills ({@link
- *       SyncEventType#LINKED_VIA_NAME}), UUID conflicts ({@link SyncEventType#BACKFILL_AMBIGUOUS})
- *       and seeded rows ({@link SyncEventType#CREATED_FROM_P4K}), one {@link
- *       SyncEventType#SYNC_RUN_SUMMARY} per run, and pruning the P4K sync-report history at the
- *       end.
+ *   <li>{@link #previewImport(byte[])} computes every action without writing anything.
+ *   <li>{@link #applyImport(byte[], boolean)} applies them in one transaction, emitting {@code
+ *       SyncReportService} events and pruning the P4K sync-report history.
  * </ul>
  *
- * <p><b>UUID-conflict policy (keep both + report).</b> On every matched row the import always
- * stamps {@code p4k_uuid = <P4K guid>} and {@code p4k_synced_at = now}. It backfills the canonical
- * UUID ({@code external_uuid} for items/ships, {@code scwiki_uuid} for manufacturers / commodities
- * / blueprints) only when that column is currently null AND no other row already holds the GUID —
- * which only happens when the row was reached through the case-insensitive name/slug fallback,
- * hence the backfill is logged as {@link SyncEventType#LINKED_VIA_NAME}. When the existing
- * canonical UUID is non-null and differs from the P4K GUID it is left untouched and a {@link
- * SyncEventType#BACKFILL_AMBIGUOUS} event is logged. {@code source_systems} is never changed on an
- * enriched row — P4K participation there is signalled solely by a non-null {@code p4k_synced_at}.
- *
- * <p><b>Seeding (opt-in).</b> New rows are inserted only when {@code seedNew} is set on apply (a
- * preview always shows the potential). The real-record filter requires a parseable GUID, a resolved
- * player-facing name (the export leaves dev/test/template records nameless) and rejects identifiers
- * that smell like dev assets; every insert is guarded against the relevant UNIQUE columns. Seeded
- * commodities are inserted {@code is_visible = false} so they stay out of trading flows until an
- * admin reviews them, mirroring the SC-Wiki commodity sync. Enrichment is otherwise fill-if-null:
- * an existing non-null value is never overwritten. Manufacturers are processed first so items and
- * ships can link to them (including freshly-seeded ones) via the manufacturer GUID index.
- *
- * <p>Enrichment mutates by dirty-checking the managed entities loaded through the repositories (no
- * explicit {@code save()} on matched rows, per the CLAUDE.md concurrency rules); seeded rows are
- * persisted explicitly. The audit rows are saved through {@code SyncReportService} and commit
- * atomically with the data.
+ * <p>Matched rows are enriched fill-if-null and stamped with {@code p4k_uuid} / {@code
+ * p4k_synced_at}. A null canonical UUID is backfilled when unclaimed ({@link
+ * SyncEventType#LINKED_VIA_NAME}); a differing one is kept and reported ({@link
+ * SyncEventType#BACKFILL_AMBIGUOUS}). With seeding enabled, unmatched records that pass the
+ * real-record filter become new {@code source = P4K} rows; seeded commodities are invisible until
+ * reviewed. Manufacturers are processed first so items and ships can link to them.
  */
 @Service
 @RequiredArgsConstructor
@@ -155,9 +124,8 @@ public class P4kImportService {
   private final SyncReportService syncReportService;
 
   /**
-   * Curated corrections for CIG-mislabeled blueprint {@code output_name}s (#327). The seed path
-   * writes {@code output_name} from the produced item's name, so it applies the same guarded
-   * override the SC Wiki sync uses, for consistency. See {@link BlueprintOutputNameOverrides}.
+   * Curated corrections for mislabeled blueprint {@code output_name}s, applied when seeding a
+   * blueprint's output name.
    */
   private final BlueprintOutputNameOverrides outputNameOverrides;
 
@@ -178,16 +146,11 @@ public class P4kImportService {
   }
 
   /**
-   * Applies a P4K catalog import: enriches / reconciles the matching local rows and, when {@code
-   * seedNew} is set, seeds brand-new rows for unmatched player-facing records. Emits sync-report
-   * events for backfills, conflicts and seeded rows plus one run summary, then prunes the P4K
-   * report history.
+   * Applies a P4K catalog import: enriches and reconciles matching rows, seeds new rows for
+   * unmatched player-facing records when {@code seedNew} is set, emits the sync-report events and
+   * prunes the P4K report history.
    *
-   * <p>The whole apply runs in a single transaction and is deliberately all-or-nothing: an
-   * unexpected failure on any record (e.g. a constraint violation while seeding) rolls the entire
-   * run back — every enrichment included — rather than leaving the master data half-updated. There
-   * is no per-record error isolation; re-run the import after correcting the offending catalog
-   * record.
+   * <p>All-or-nothing: any failure rolls back the entire run.
    *
    * @param bytes the uploaded P4K catalog JSON bytes
    * @param seedNew {@code true} to insert new {@code source = P4K} rows for unmatched records that
@@ -207,8 +170,6 @@ public class P4kImportService {
     log.info("P4K import applied (run {}): {}", runId, summaryDetail(result));
     return result;
   }
-
-  // ────────────────────────────────────────────────────────── reconciliation ──
 
   /**
    * Runs the full reconciliation across all five types. Manufacturers are processed first to build
@@ -293,7 +254,6 @@ public class P4kImportService {
         byGuid.put(dto.guid(), target);
       }
 
-      // Canonical UUID backfill (scwiki_uuid), guarded against UNIQUE collisions.
       backfillCanonicalUuid(
           counts,
           guid,
@@ -735,8 +695,6 @@ public class P4kImportService {
     return resolved;
   }
 
-  // ───────────────────────────────────────────────────────────────── seeding ──
-
   /**
    * Seeds a brand-new {@code game_item} for an unmatched item record when seeding is on and the
    * record looks like real player content. Requires a parseable GUID (the cross-source join key), a
@@ -824,12 +782,9 @@ public class P4kImportService {
   }
 
   /**
-   * Seeds a brand-new {@code manufacturer} for an unmatched record and registers it in {@code
-   * byGuid} so items / ships in the same run can link to it — including on a dry-run preview (the
-   * entity is built and indexed but only persisted on apply) so the preview's item/ship enrichment
-   * counts match the apply. Requires a parseable GUID, a resolved name and a non-blank code ({@code
-   * name} is NOT NULL + UNIQUE, {@code abbreviation} is NOT NULL but no longer UNIQUE since V158);
-   * guards all three keys so it never re-seeds a manufacturer the run already knows.
+   * Seeds a new {@code manufacturer} for an unmatched record and indexes it in {@code byGuid}, also
+   * in a dry run, so items and ships of the same run can link to it. Requires a parseable GUID, a
+   * resolved name and a non-blank code, and never re-seeds a manufacturer the run already knows.
    *
    * @return whether a row was (or would be) inserted
    */
@@ -866,7 +821,6 @@ public class P4kImportService {
     manufacturer.setDescription(StringNormalization.blankToNull(dto.desc()));
     manufacturer.setP4kUuid(guid);
     manufacturer.setP4kSyncedAt(now);
-    // Indexed for in-run linking on preview and apply (count parity); persisted only on apply.
     byGuid.put(dto.guid(), manufacturer);
     if (apply) {
       manufacturerRepository.save(manufacturer);
@@ -949,8 +903,6 @@ public class P4kImportService {
       GameItem produced = resolveProducedItem(dto.producedItemGuid());
       blueprint.setOutputItem(produced);
       if (produced != null) {
-        // #327: apply the same guarded CIG-mislabel correction the SC Wiki sync uses, for
-        // consistency on seeded rows (a no-op unless the produced name matches a known wrong name).
         blueprint.setOutputName(outputNameOverrides.correct(dto.key(), produced.getName()));
       }
       blueprint.setCraftTimeSeconds(dto.craftTimeSeconds());
@@ -1031,10 +983,8 @@ public class P4kImportService {
   }
 
   /**
-   * A real, player-facing display name: present, not an unresolved {@code @LOC} key, and not a
-   * placeholder token. Dev / test / template records in the DCB carry no localized name, so the
-   * export leaves their name null — this is the primary filter that keeps the seed from inserting
-   * the engine's thousands of internal records.
+   * Whether the name is a real, player-facing display name: present, not an unresolved {@code @LOC}
+   * key, and not a placeholder token. This is the primary filter against seeding internal records.
    *
    * @param name the candidate display name
    * @return {@code true} when the name looks like real content
@@ -1102,8 +1052,6 @@ public class P4kImportService {
     }
     return false;
   }
-
-  // ──────────────────────────────────────────────────────────── shared steps ──
 
   /**
    * Resolves an inbound row to a single local entity through the standard chain: canonical UUID
@@ -1197,7 +1145,7 @@ public class P4kImportService {
 
   /**
    * Backfills a {@code ship_type}'s {@code external_uuid} from the P4K GUID under the keep-both
-   * policy (see {@link #backfillExternalUuidGameItem}).
+   * policy: fill only when null and unclaimed; log a conflict on a differing value.
    *
    * @param counts the type's counter accumulator (mutated)
    * @param target the matched ship
@@ -1231,20 +1179,17 @@ public class P4kImportService {
   }
 
   /**
-   * Generic canonical-UUID backfill implementing the keep-both policy for one row. Increments
-   * {@code uuidBackfilled} (and logs {@link SyncEventType#LINKED_VIA_NAME} in apply mode) when
-   * {@code existingUuid} is null, the GUID is present and no other row already holds it — this only
-   * happens when the row was reached by the name/slug fallback, so the link was established via the
-   * name, not the UUID. Increments {@code uuidConflicts} and invokes {@code onConflict} when {@code
-   * existingUuid} is non-null and differs. A null GUID or an already-matching GUID is a no-op.
+   * Backfills a row's canonical UUID under the keep-both policy. A null {@code existingUuid} with
+   * an unclaimed GUID is filled and counted as {@code uuidBackfilled} (logged as {@link
+   * SyncEventType#LINKED_VIA_NAME} on apply); a differing non-null value counts as {@code
+   * uuidConflicts} and invokes {@code onConflict}. A null or already-matching GUID is a no-op.
    *
    * @param counts the type's counter accumulator (mutated)
    * @param guid the parsed P4K GUID, or {@code null}
    * @param existingUuid the row's current canonical UUID, or {@code null}
-   * @param alreadyClaimed predicate that returns {@code true} when another row already holds the
-   *     GUID (the UNIQUE-collision guard); only evaluated when a backfill is otherwise possible
-   * @param setter sets the canonical UUID on the row (a no-op in dry-run mode by the caller's
-   *     lambda)
+   * @param alreadyClaimed returns {@code true} when another row already holds the GUID; evaluated
+   *     only when a backfill is otherwise possible
+   * @param setter sets the canonical UUID on the row
    * @param onConflict invoked with the existing UUID when a non-null differing value is found
    * @param apply whether to emit the backfill audit row
    * @param runId the audit run id, or {@code null}
@@ -1267,7 +1212,6 @@ public class P4kImportService {
     }
     if (existingUuid == null) {
       if (alreadyClaimed.getAsBoolean()) {
-        // Another row already owns this GUID — skip the backfill to avoid a UNIQUE collision.
         log.debug(
             "P4K import: {} GUID {} already held by another row; skipping backfill of '{}'.",
             aggregate,
@@ -1383,8 +1327,6 @@ public class P4kImportService {
     return true;
   }
 
-  // ───────────────────────────────────────────────────────────────── parsing ──
-
   /**
    * Binds the uploaded catalog bytes straight to a {@link P4kCatalogDto} in one pass, with no
    * intermediate {@code JsonNode} tree, so a large catalog costs roughly the bound object rather
@@ -1483,8 +1425,6 @@ public class P4kImportService {
         + c.unmatched()
         + "]";
   }
-
-  // ───────────────────────────────────────────────────────────── value types ──
 
   /**
    * Mutable per-type counter accumulator used while scanning a type's records, converted to the

@@ -44,17 +44,9 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 
 /**
- * A client that went away mid-response is not an application error (REQ-OBS-001, REQ-NOTIF-010).
- *
- * <p>Pins the fix for the 2026-09-25 burst: 33 {@code ERROR} lines in two minutes on {@code GET
- * /notifications/stream}, each an {@link AsyncRequestNotUsableException} that the relay's async
- * result dispatched into {@link GlobalExceptionHandler}'s {@code Exception} catch-all, followed by
- * Tomcat's own line when that catch-all tried to render the error page into the dead response.
- *
- * <p>Three halves are asserted separately because each failed on its own in the incident: the
- * routing (the exception must reach its own handler, not the fallback), the response (nothing may
- * be written), and the log (no {@code ERROR}, no {@code WARN}). The last one runs through a real
- * dispatcher, so a handler that routes correctly but still renders a view would fail here.
+ * Tests that a client disconnecting mid-response is not an application error (REQ-OBS-001,
+ * REQ-NOTIF-010): the exception reaches its own handler in {@link GlobalExceptionHandler}, nothing
+ * is written to the response, and nothing is logged at {@code WARN} or {@code ERROR}.
  */
 class DisconnectedClientHandlingTest {
 

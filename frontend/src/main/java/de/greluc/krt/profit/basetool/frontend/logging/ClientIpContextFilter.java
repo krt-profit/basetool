@@ -40,38 +40,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Servlet filter that resolves the originating client IP in a <b>spoofing-resistant</b> way and
- * snapshots it into {@link ClientIpContext} for the duration of the request, clearing it on the way
- * out (finding SEC-02).
+ * Resolves the originating client IP in a spoofing-resistant way and holds it in {@link
+ * ClientIpContext} for the duration of the request.
  *
- * <p><b>Why this does NOT just read {@code getRemoteAddr()}:</b> the frontend relies on Spring's
- * {@code ForwardedHeaderFilter} to rebuild {@code X-Forwarded-Host}/{@code -Proto} so the OAuth2
- * redirect URI and HSTS are built against the external origin. But that filter takes the
- * <em>leftmost</em> {@code X-Forwarded-For} entry with <b>no</b> trusted-proxy check, and
- * nginx-proxy-manager appends the real peer on the <em>right</em> — so the leftmost entry is
- * whatever the client put there. Reading {@code getRemoteAddr()} after that filter therefore yields
- * an attacker-chosen value, letting an unauthenticated caller mint a fresh per-IP rate-limit bucket
- * per request by rotating a forged {@code X-Forwarded-For} (SEC-02). The ingest module sidesteps
- * this with the {@code native}/RemoteIpValve strategy (INGEST-RATELIMIT-1); the frontend cannot,
- * because {@code native} does not reconstruct {@code X-Forwarded-Host} for the OAuth2 redirect.
- *
- * <p><b>What it does instead:</b> it runs at {@link Ordered#HIGHEST_PRECEDENCE} — <em>before</em>
- * {@code ForwardedHeaderFilter} (re-registered one slot later by {@code ForwardedHeaderConfig},
- * with {@code server.forward-headers-strategy: none}, because Spring Boot pins the auto-registered
- * filter to {@code Integer.MIN_VALUE}, which nothing can precede) consumes/rewrites the headers —
- * so it sees the raw TCP peer ({@code getRemoteAddr()} = the proxy) and the raw {@code
- * X-Forwarded-For} chain. It then applies the RemoteIpValve algorithm: honour {@code
- * X-Forwarded-For} only when the peer is a configured trusted proxy ({@link
- * ClientIpProperties#getTrustedProxies()}), and walk the chain right-to-left skipping trusted hops,
- * taking the first untrusted address as the client. Because the proxy appends the true peer on the
- * right, a client-supplied (left-side) forged entry is never reached. {@code ForwardedHeaderFilter}
- * still runs afterwards and rewrites scheme/host/remote-addr for OAuth2 and HSTS exactly as before
- * — only the rate-limit attribution changes.
- *
- * <p>The resolved value is held in a {@link ClientIpContext} thread-local because {@link
- * ClientIpRelayFilter} runs on Netty reactor threads where {@code RequestContextHolder} is not
- * bound; Reactor's automatic context propagation carries it across the hop. The {@code finally}
- * cleanup prevents bleed-through onto pooled or virtual threads.
+ * <p>Runs at {@link Ordered#HIGHEST_PRECEDENCE}, before {@code ForwardedHeaderFilter} rewrites the
+ * headers, so it sees the raw TCP peer and {@code X-Forwarded-For} chain. The header is honoured
+ * only when the peer is a trusted proxy ({@link ClientIpProperties#getTrustedProxies()}), and the
+ * chain is walked right-to-left, skipping trusted hops. The context is cleared in a {@code
+ * finally}.
  */
 @Slf4j
 @Component
@@ -94,10 +70,8 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
   }
 
   /**
-   * Filter order: {@link Ordered#HIGHEST_PRECEDENCE} so this filter runs before {@code
-   * ForwardedHeaderFilter} (re-registered at {@code HIGHEST_PRECEDENCE + 1} by {@code
-   * ForwardedHeaderConfig}) consumes the {@code X-Forwarded-For} header and rewrites {@code
-   * getRemoteAddr()}. Only then is the raw proxy chain visible for trusted-proxy-aware resolution.
+   * Returns {@link Ordered#HIGHEST_PRECEDENCE}, so this filter runs before {@code
+   * ForwardedHeaderFilter} rewrites {@code X-Forwarded-For} and {@code getRemoteAddr()}.
    *
    * @return the filter order
    */
@@ -122,15 +96,8 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
   }
 
   /**
-   * Folds every {@code X-Forwarded-For} line of the request into one chain.
-   *
-   * <p>HTTP permits a header to be repeated. Some proxies append to the existing line ({@code
-   * $proxy_add_x_forwarded_for}), others add a second line (HAProxy's {@code http-request
-   * add-header}, several CDNs, any chain where two hops each add their own). {@code getHeader}
-   * returns only the <b>first</b> line, so on the add-header shape it hands back the
-   * client-supplied entry and the walk returns exactly the value this filter distrusts. Tomcat's
-   * {@code RemoteIpFilter} concatenates {@code getHeaders} for the same reason. Today's edge
-   * normalises duplicates, so this is defence against a topology change.
+   * Joins every {@code X-Forwarded-For} line of the request into one chain, so a repeated header is
+   * not reduced to its first, client-supplied line.
    *
    * @param request the incoming request.
    * @return the joined chain, or {@code null} when the header is absent entirely.
@@ -149,18 +116,12 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
   }
 
   /**
-   * Resolves the originating client IP from the raw TCP peer and {@code X-Forwarded-For} chain
-   * using the RemoteIpValve algorithm (package-private + static so it is unit-testable without a
-   * servlet container).
+   * Resolves the client IP from the raw TCP peer and {@code X-Forwarded-For} chain.
    *
-   * <p>The header is honoured <b>only</b> when the immediate peer is a trusted proxy; otherwise the
-   * peer itself is returned and the (untrusted) header is ignored. When honoured, the chain is
-   * walked right-to-left, skipping trusted-proxy hops, and the first untrusted address is returned
-   * — the real client, which the proxy appended on the right. A client-supplied forged entry sits
-   * to the left of that and is never reached, so it cannot influence the result.
+   * <p>The header is honoured only when the peer is a trusted proxy; the chain is then walked
+   * right-to-left, skipping trusted hops, and the first untrusted address is returned.
    *
-   * @param remoteAddr the raw TCP peer address ({@code request.getRemoteAddr()} before {@code
-   *     ForwardedHeaderFilter}); may be {@code null} only for a malformed request.
+   * @param remoteAddr the raw TCP peer address; may be {@code null} only for a malformed request.
    * @param xffHeader the raw {@code X-Forwarded-For} header, or {@code null}/blank when absent.
    * @param trustedProxies the compiled trusted-proxy matchers; never {@code null}.
    * @return the resolved client IP, or {@code remoteAddr} when no trusted-proxy-relayed client
@@ -174,8 +135,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
     if (remoteAddr == null) {
       return null;
     }
-    // A direct connection (dev, or an attacker reaching the container directly) can never influence
-    // attribution: its X-Forwarded-For is not trusted, so the raw peer is used.
     if (xffHeader == null || xffHeader.isBlank() || !isTrusted(remoteAddr, trustedProxies)) {
       return remoteAddr;
     }
@@ -189,7 +148,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
         return candidate;
       }
     }
-    // Every hop was itself a trusted proxy (no client address present): fall back to the peer.
     return remoteAddr;
   }
 
@@ -208,8 +166,7 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
         if (matcher.matches(ip)) {
           return true;
         }
-      } catch (IllegalArgumentException ex) {
-        // Unparseable candidate (not an IP literal): cannot be a trusted proxy.
+      } catch (IllegalArgumentException ignored) {
       }
     }
     return false;

@@ -55,16 +55,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * REQ-AUDIT-001 audit-trail coverage for the two non-book-out state mutations of {@link
- * InventoryCheckoutService} — the delivered-flag toggle ({@link
- * InventoryCheckoutService#updateDelivered}) and the admin global-wipe ({@link
- * InventoryCheckoutService#deleteAllGlobalInventory}).
- *
- * <p>These paths were exercised for their flag/return/scope behaviour elsewhere but their audited
- * side effects (INVENTORY_ITEM_DELIVERY_TOGGLED, INVENTORY_WIPED) were never verified. Dropping or
- * mis-typing either audit call would leave the audited Lager area with no trace of a delivered
- * toggle or — most damaging — of the destructive global wipe, with nothing failing. This test
- * drives the service directly against Mockito mocks and pins the exact audit events.
+ * Audit tests (REQ-AUDIT-001) for the delivered-flag toggle ({@link
+ * InventoryCheckoutService#updateDelivered}) and the admin global wipe ({@link
+ * InventoryCheckoutService#deleteAllGlobalInventory}) of {@link InventoryCheckoutService}, pinning
+ * the exact audit events each records.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryCheckoutServiceAuditTest {
@@ -82,8 +76,6 @@ class InventoryCheckoutServiceAuditTest {
 
   @Test
   void updateDelivered_recordsDeliveryToggledAudit() {
-    // Gap 4: toggling the delivered flag records INVENTORY_ITEM_DELIVERY_TOGGLED against the row id
-    // and its owner.
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
@@ -100,16 +92,12 @@ class InventoryCheckoutServiceAuditTest {
     item.setVersion(1L);
     item.setUser(owner);
     item.setAmount(5.0);
-    // Variante C (REQ-INV-027): delivered lives on the job-order slice, not the entry. Earmark the
-    // entry's stock to the requested order so updateDelivered has that order's slice to flip.
     InventoryJobOrderAllocation slice = InventoryAllocations.addJobOrder(item, order, 5.0, false);
 
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, orderId, 1L);
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
-    // A non-null DTO: updateDelivered wraps it with the post-commit force-increment version
-    // (withVersion), so a null mapping would NPE (REQ-INV-027).
     when(inventoryItemMapper.toDto(item))
         .thenReturn(
             new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
@@ -145,9 +133,6 @@ class InventoryCheckoutServiceAuditTest {
 
   @Test
   void deleteAllGlobalInventory_recordsWipedAuditWithScopeAndCount() {
-    // Gap 4: the admin global wipe records INVENTORY_WIPED (aggregate-less: null
-    // subject/label/target
-    // user) with the scope and the removed count in its details payload.
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(inventoryItemRepository.deleteAllNonPersonal(true, null, Set.of())).thenReturn(42);
@@ -164,10 +149,8 @@ class InventoryCheckoutServiceAuditTest {
     assertTrue(rendered.contains("scope=adminAll"), "audit details carry the wipe scope");
   }
 
-  // covers REQ-INV-029 / REQ-AUDIT-001 (item book-out audits render the gameItem name, never "—")
   @Test
   void bookOut_gameItemRow_recordsConsumedAuditWithGameItemNameLabelAndDetail() {
-    // Given a game-item stock row (material == null) consumed in full
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     User owner = new User();
@@ -189,7 +172,6 @@ class InventoryCheckoutServiceAuditTest {
     item.setPersonal(false);
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
 
-    // When — a whole-unit DISCARD that depletes the row
     service.bookOutInventoryItem(
         itemId,
         new InventoryItemBookOutDto(
@@ -197,8 +179,6 @@ class InventoryCheckoutServiceAuditTest {
         ownerId,
         false);
 
-    // Then — the subject label and the material detail both render the game-item name; without
-    // the catalog fallback every reused audit event on item stock would log "— @ <location>".
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(

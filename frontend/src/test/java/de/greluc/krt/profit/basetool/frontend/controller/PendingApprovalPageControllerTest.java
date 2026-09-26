@@ -36,15 +36,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Unit tests for {@link PendingApprovalPageController} (REQ-SEC-017) — the status poll that lets
- * the waiting page forward a member into the tool the moment an admin approves, and the render
- * branch that decides which copy that page shows.
- *
- * <p>The render branch is the half that was missing: the routing filter sends {@code PENDING} and
- * {@code REJECTED} to the same path because both are equally access-less, so a rejected
- * registration was shown "waiting for an administrator" indefinitely and reported the rejection as
- * a stuck approval. All three approval states are pinned here, plus the unreadable-backend case,
- * which must degrade to the waiting copy rather than accusing a pending member of being declined.
+ * Unit tests for {@link PendingApprovalPageController} (REQ-SEC-017): the status poll that forwards
+ * an approved member, and the render branch choosing the copy for each approval state. An
+ * unreadable backend falls back to the waiting copy.
  */
 class PendingApprovalPageControllerTest {
 
@@ -70,8 +64,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void status_relaysARejection() {
-    // The poll is what turns an open waiting page into the rejection page without a reload, so a
-    // REJECTED verdict has to survive the relay rather than being flattened into "keep waiting".
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("REJECTED"));
 
@@ -80,8 +72,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void status_whenBackendUnavailable_reportsUnknownRatherThanFailing() {
-    // The page polls every few seconds; a backend hiccup must degrade to "keep waiting", not to an
-    // error surface on the one page a pending member is allowed to see.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenThrow(new BackendServiceException("backend down", null, 503));
 
@@ -90,7 +80,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void status_whenFallbackReturnsNoBody_reportsUnknown() {
-    // Resilience4j's fallback hands back null rather than throwing.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class)).thenReturn(null);
 
     assertThat(controller.status().approvalStatus()).isNull();
@@ -98,9 +87,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void status_whenTokenIsGone_propagatesSoTheBrowserReauthenticates() {
-    // Deliberately NOT swallowed: GlobalExceptionHandler turns this into the 401 +
-    // X-Reauthenticate contract (REQ-SEC-012), so the page re-authenticates instead of polling a
-    // session that can no longer reach the backend.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenThrow(new ReauthenticationRequiredException("token gone", null));
 
@@ -123,8 +109,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_forARejectedRegistration_selectsTheRejectionCopy() {
-    // The regression: REJECTED is terminal (the backend answers a second decision with a 409), so
-    // the waiting copy promises an approval that can no longer arrive.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("REJECTED"));
     Model model = new ConcurrentModel();
@@ -138,8 +122,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_forAnApprovedCaller_redirectsIntoTheTool() {
-    // Only reachable via a stale bookmark or a tab left open across the approval — an approved
-    // member must not be shown a waiting page for an approval they already hold.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("ACTIVE"));
     Model model = new ConcurrentModel();
@@ -153,13 +135,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_forAnApprovedCaller_clearsTheStaleVerdictSoTheFilterCannotBounceThemBack() {
-    // Redirect-loop regression. This page is only reached because BackendRoleSyncFilter believes
-    // the caller is not approved, and it serves that belief from the session for up to 15 s without
-    // re-reading. Redirecting to "/" while that stale PENDING verdict survives makes the filter
-    // bounce the browser straight back here — and since neither hop touches the backend, the loop
-    // runs at full speed into the browser's redirect cap instead of merely being slow. The literal
-    // attribute names mirror the filter's own constants; if those are renamed, this test fails
-    // loudly rather than silently stopping to test anything.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("ACTIVE"));
     MockHttpSession session = new MockHttpSession();
@@ -176,12 +151,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_forARoleLessCaller_staysPutEvenThoughTheRegistrationIsActive() {
-    // Redirect-loop regression, found by the E2E suite (2026-09-06). A role-less account IS
-    // approved — the registration endpoint answers ACTIVE for it — so the ACTIVE branch alone sends
-    // the one caller this page exists for back to the dashboard, where BackendRoleSyncFilter meets
-    // the same 403 NO_ROLE and returns them here. The redirect also clears the cached verdict, so
-    // neither side settles and the browser gives up with a redirect-cap error. The role-less
-    // verdict is therefore read before the redirect and suppresses it.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("ACTIVE"));
     MockHttpSession session = new MockHttpSession();
@@ -203,8 +172,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_forARoleLessCallerWhoseRegistrationWasRejected_showsTheRejection() {
-    // The two states are not mutually exclusive in the session, and REJECTED is the stronger
-    // statement: it is terminal, while a missing role is a thing an administrator still fixes.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("REJECTED"));
     MockHttpSession session = new MockHttpSession();
@@ -220,7 +187,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_withoutASession_stillRedirectsAnApprovedCaller() {
-    // getSession(false) hands back null rather than creating one; the redirect must not NPE on it.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("ACTIVE"));
 
@@ -230,8 +196,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_forARejectedCaller_leavesTheSessionVerdictAlone() {
-    // Only the ACTIVE branch contradicts the filter. Clearing on REJECTED would just buy an extra
-    // backend read per request for a verdict that is already correct and terminal.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("REJECTED"));
     MockHttpSession session = new MockHttpSession();
@@ -246,8 +210,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_whenBackendUnavailable_keepsTheWaitingCopy() {
-    // Fail-safe direction: an unreadable backend must never tell a still-pending member they were
-    // declined. It also must not redirect them into the tool, which the filter would bounce back.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenThrow(new BackendServiceException("backend down", null, 503));
     Model model = new ConcurrentModel();
@@ -271,8 +233,6 @@ class PendingApprovalPageControllerTest {
 
   @Test
   void pendingApproval_whenTokenIsGone_propagatesSoTheBrowserReauthenticates() {
-    // The render shares the poll's read, so it shares its re-authentication contract:
-    // GlobalExceptionHandler answers a page request with a redirect into the Keycloak login flow.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenThrow(new ReauthenticationRequiredException("token gone", null));
 

@@ -39,22 +39,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end visibility matrix for the org-unit bank account-responsibility feature
- * (REQ-BANK-034..038, ADR-0043), driven through the real Keycloak login + JWT-to-authority chain
- * that the unit tests ({@code OrgUnitBankAccessServiceTest}) can only mock.
+ * End-to-end visibility matrix for org-unit bank account responsibility (REQ-BANK-034..038), driven
+ * through the real Keycloak login and JWT-to-authority chain.
  *
- * <p>The matrix is asserted race-free against the backend endpoints as each user (mirroring {@code
- * BankPermissionsE2eTest}), with one UI check for the Halter-redacted drill-in. It deliberately
- * exercises the two account types that are reliably seedable on the shared ephemeral stack — {@code
- * ORG_UNIT} (per-unit, idempotent) and {@code SPECIAL} (non-singleton) — across all four grantee
- * kinds (MEMBERSHIP_ROLE/GLOBAL_ROLE/USER/ALL_MEMBERS) plus the admin override. The
- * fixed-visibility global singletons {@code CARTEL} / {@code CARTEL_BANK} are awkward to seed on a
- * shared stack and carry no per-grant logic, so they stay covered by the unit suite.
- *
- * <p>The crown jewel here is the role-model assertion: a caller holding the {@code OFFICER}
- * Keycloak role but <em>no</em> Bereich/OL membership must NOT auto-see a Sonderkonto
- * (REQ-BANK-037) — the auto-view keys off membership, never the role — which only an end-to-end
- * test with a real token can prove.
+ * <p>Covers {@code ORG_UNIT} and {@code SPECIAL} accounts across all four grantee kinds plus the
+ * admin override; the {@code CARTEL} singletons stay with the unit tests. Asserts that the {@code
+ * OFFICER} role without a Bereich/OL membership does not auto-see a Sonderkonto (REQ-BANK-037).
  */
 @Tag("e2e")
 class OrgUnitBankVisibilityMatrixE2eTest {
@@ -81,9 +71,8 @@ class OrgUnitBankVisibilityMatrixE2eTest {
   private static Browser browser;
   private static BackendSeeder seeder;
 
-  // Shared, read-mostly fixtures (mutating scenarios create their own accounts to stay order-free).
-  private static String specialAccountId; // Sonderkonto: auto-view = OL + Bereichsleiter only
-  private static String orgUnitAccountId; // Staffel ORG_UNIT account
+  private static String specialAccountId;
+  private static String orgUnitAccountId;
   private static String memberUserId;
 
   @BeforeAll
@@ -95,8 +84,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // test-bereich becomes a Bereichsleiter (membership) — this, not any Keycloak role, is what
-    // confers the Sonderkonto auto-view (REQ-BANK-037).
     String bereichId =
         seeder.createBereich(ADMIN_USER, ADMIN_PASSWORD, "E2E Bank Vis Bereich", "EBVBR");
     seeder.addBereichLeader(
@@ -106,19 +93,17 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.getUserId(BEREICH_USER, BEREICH_PASSWORD),
         "LEITER");
 
-    // A Staffel + its ORG_UNIT bank account.
     String squadronId =
         seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Bank Vis Staffel", "EBVST");
     orgUnitAccountId =
         seeder.ensureOrgUnitBankAccount(
             MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Staffelkonto", squadronId);
 
-    // A Sonderkonto for the auto-view / denial assertions (no mutation in those tests).
     specialAccountId =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Sonderkonto", "SPECIAL");
 
     memberUserId = seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD);
-    seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD); // materialise test-officer's row
+    seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
   }
 
   @AfterAll
@@ -133,8 +118,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
 
   @Test
   void specialAutoViewIsMembershipBasedNotOfficerRole() {
-    // A Bereichsleiter auto-sees the Sonderkonto; an OFFICER-role holder with no Bereich/OL seat
-    // does NOT (the auto-view keys off membership, never the role); a plain member does not either.
     assertTrue(
         balancesContain(BEREICH_USER, BEREICH_PASSWORD, specialAccountId),
         "a Bereichsleiter auto-sees the Sonderkonto");
@@ -159,8 +142,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
 
   @Test
   void nonViewerDeniedOnDrillInEndpoints() {
-    // The endpoints are only isAuthenticated()-gated; the seam's canView is the real gate. A member
-    // with no oversight, grant or Bereich/OL seat sees nothing and is denied the drill-in.
     assertFalse(
         balancesContain(NONVIEWER_USER, NONVIEWER_PASSWORD, specialAccountId),
         "a non-viewer's balances must not contain the Sonderkonto");
@@ -185,8 +166,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
 
   @Test
   void userGrantMakesOrgUnitAccountVisibleToThatUser() {
-    // USER grantee kind on an ORG_UNIT account: a plain member only sees it once individually
-    // granted (admin override configures the grant).
     assertFalse(
         balancesContain(MEMBER_USER, MEMBER_PASSWORD, orgUnitAccountId),
         "a plain member does not see the Staffel account before the grant");
@@ -208,8 +187,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
 
   @Test
   void globalRoleAndAllMembersGrantsOnSpecial() {
-    // GLOBAL_ROLE + ALL_MEMBERS grantee kinds on a Sonderkonto. Fresh account so the grants do not
-    // bleed into the auto-view assertions above.
     String special =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Grant SK", "SPECIAL");
     String detail = "/api/v1/org-units/bank/accounts/" + special;
@@ -237,8 +214,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
 
   @Test
   void targetAndVisibilityConfigAuthority() {
-    // Balance-target authority on the shared ORG_UNIT account: admin (override) may set it; a plain
-    // member may not.
     long version = accountVersion(ADMIN_USER, ADMIN_PASSWORD, orgUnitAccountId);
     assertEquals(
         200,
@@ -257,8 +232,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
             "{\"target\":1,\"version\":0}"),
         "a plain member may not set a balance target");
 
-    // Sonderkonto visibility config: OL or bank management only — a Bereichsleiter (who can SEE it)
-    // may not CONFIGURE it. Fresh account so the management grant does not bleed elsewhere.
     String special =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Config SK", "SPECIAL");
     assertEquals(
@@ -281,13 +254,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
 
   @Test
   void drillInDetailHistoryOmitsHalterColumn() {
-    // The read-only drill-in history must NOT carry the Halter (player-custody) column
-    // (REQ-BANK-038): once at least one booking exists the table renders with exactly five header
-    // cells (expand-toggle / Datum / Typ / Quell-/Zielkonto / Betrag) and no Halter column. Since
-    // #967 the justification and note live in the expandable sub-row, so they are no longer their
-    // own column. A fresh, booked Sonderkonto keeps the shared fixtures untouched; a Bereichsleiter
-    // auto-views it. (The empty-state shows no table at all — th:if on a non-empty page — so a
-    // seeded booking is required to assert the redaction.)
     String special =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Drill SK", "SPECIAL");
     String holderId = seeder.registerBankHolder(MGMT_USER, MGMT_PASSWORD, memberUserId);
@@ -308,9 +274,6 @@ class OrgUnitBankVisibilityMatrixE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("[data-testid='org-unit-bank-bookings-panel'] thead th"))
             .hasCount(5);
-        // Guard the redaction itself, not just the count (which legitimately grows as columns are
-        // added): no header cell carries the Halter label. The default locale is German, so the
-        // redacted header would read "Halter".
         assertThat(
                 page.locator(
                     "[data-testid='org-unit-bank-bookings-panel'] thead th",

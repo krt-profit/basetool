@@ -49,12 +49,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link ScWikiCommoditySyncService} — the R3 Wiki commodity merge.
- *
- * <p>Covers the behaviours that drive the merge's correctness: the §8.9 junk filter, the §4.3
- * "looks like an item" carve-out, each step of the §8.1.1 resolution chain, the conflict policy
- * (§4.6 — UEX name/code/kind never overwritten), the {@code UEX_ONLY → BOTH} transition, the
- * canonical multi-match rejection, and the §8.7 orphan-sweep gating.
+ * Unit tests for {@link ScWikiCommoditySyncService}, the Wiki commodity merge: the junk filter, the
+ * item-like carve-out, each resolution step, the conflict policy (UEX name/code/kind never
+ * overwritten), the {@code UEX_ONLY → BOTH} transition, multi-match rejection and orphan-sweep
+ * gating.
  */
 @ExtendWith(MockitoExtension.class)
 class ScWikiCommoditySyncServiceTest {
@@ -89,8 +87,6 @@ class ScWikiCommoditySyncServiceTest {
             scWikiClient, properties, materialRepository, aliasService, syncReportService);
   }
 
-  // ─── feature flag + empty response ──────────────────────────────────────
-
   @Test
   void syncCommodities_isNoOp_whenFeatureFlagOff() {
     config.put("commodity-sync-enabled", false);
@@ -110,15 +106,11 @@ class ScWikiCommoditySyncServiceTest {
 
     verify(materialRepository, never()).markScwikiDeleted(any(), any());
     verify(materialRepository, never()).save(any());
-    // An empty Wiki response writes no rows → 0 items, the signal SyncZeroItems watches (#1041
-    // item 2).
     assertEquals(0, written, "an empty Wiki response must report zero written rows");
   }
 
   @Test
   void syncCommodities_notModified_reportsLiveCount_andSkipsMergeAndSweep() {
-    // A 304 (unchanged) catalogue merges nothing, but is healthy — it must report the live linked-
-    // material count, NOT 0, so an all-304 run is not read as a zero-item outage (#1182).
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
         .thenReturn(ScWikiClient.FetchResult.unchanged());
     when(materialRepository.countLiveScwikiMaterials()).thenReturn(1234L);
@@ -129,11 +121,8 @@ class ScWikiCommoditySyncServiceTest {
         1234, written, "a 304 (unchanged) catalogue must report the live linked-material count");
     verify(materialRepository, never()).save(any());
     verify(materialRepository, never()).markScwikiDeleted(any(), any());
-    // No merge run is opened on a 304 — it short-circuits before beginRun().
     verify(syncReportService, never()).beginRun();
   }
-
-  // ─── junk filter ────────────────────────────────────────────────────────
 
   @Test
   void isCommodityHardJunk_dropsHtmlUnderscorePlaceholderAndAtmosphere() {
@@ -149,7 +138,6 @@ class ScWikiCommoditySyncServiceTest {
 
   @Test
   void isCommodityHardJunk_keepsRealHarvestablesThatHaveNoFlags() {
-    // §4.3 verification: these have no flags but ARE real commodities — must survive the filter.
     assertFalse(ScWikiCommoditySyncService.isCommodityHardJunk(commodity("Uncut SLAM")));
     assertFalse(ScWikiCommoditySyncService.isCommodityHardJunk(commodity("Blue Bilva")));
     assertFalse(ScWikiCommoditySyncService.isCommodityHardJunk(commodity("Agricium")));
@@ -169,8 +157,6 @@ class ScWikiCommoditySyncServiceTest {
     verify(materialRepository, never()).save(any());
   }
 
-  // ─── canonical name helper ──────────────────────────────────────────────
-
   @Test
   void canonicalName_stripsQualifiersAndParentheticals() {
     assertEquals("silicon", ScWikiCommoditySyncService.canonicalName("Raw Silicon"));
@@ -179,8 +165,6 @@ class ScWikiCommoditySyncServiceTest {
     assertEquals("stileron", ScWikiCommoditySyncService.canonicalName("Stileron (Ore)"));
     assertNull(ScWikiCommoditySyncService.canonicalName(null));
   }
-
-  // ─── resolution chain ───────────────────────────────────────────────────
 
   @Test
   void resolve_byScwikiUuid_isTheFastPath() {
@@ -261,12 +245,9 @@ class ScWikiCommoditySyncServiceTest {
     verify(syncReportService)
         .logCommodityEvent(
             any(), eq(SyncEventType.MULTI_MATCH_AMBIGUOUS), any(), eq("Iron"), any());
-    // Ambiguous → skipped: no row saved, no orphan sweep (seen set empty).
     verify(materialRepository, never()).save(any());
     verify(materialRepository, never()).markScwikiDeleted(any(), any());
   }
-
-  // ─── WIKI_ONLY creation ─────────────────────────────────────────────────
 
   @Test
   void resolve_noMatch_createsWikiOnlyInvisibleRow_andEmitsCreatedWikiOnly() {
@@ -313,8 +294,6 @@ class ScWikiCommoditySyncServiceTest {
         .logCommodityEvent(any(), eq(SyncEventType.LOOKS_LIKE_ITEM), any(), eq("MedGel"), any());
   }
 
-  // ─── orphan sweep ───────────────────────────────────────────────────────
-
   @Test
   void orphanSweep_runs_whenAtLeastOneCommodityMerged() {
     ScWikiCommodityDto dto = commodity("Agricium");
@@ -333,8 +312,6 @@ class ScWikiCommoditySyncServiceTest {
     verify(materialRepository).markScwikiDeleted(any(), any());
     verify(syncReportService).pruneRuns(SyncSourceSystem.SCWIKI);
   }
-
-  // ─── helpers ────────────────────────────────────────────────────────────
 
   private ScWikiCommodityDto commodity(String name) {
     return new ScWikiCommodityDto(

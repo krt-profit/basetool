@@ -26,17 +26,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration for structured logging, MDC correlation, slow-request detection and slow
- * WebClient call detection in the frontend module. Bound under {@code app.logging.*} in {@code
- * application*.yml} through the canonical record constructor; invalid values fail the context start
- * early. Component-level {@link DefaultValue} annotations preserve the previous field-initializer
- * defaults when a key is absent.
+ * Type-safe configuration for structured logging, MDC correlation and slow-request and slow
+ * WebClient call detection in the frontend, bound under {@code app.logging.*}. Invalid values fail
+ * the context start.
  *
  * @param correlationIdHeader HTTP header used to accept an inbound correlation id and echo the
  *     effective one back
  * @param correlationIdMdcKey MDC key for the correlation id; must match the {@code
  *     %X{correlationId}} pattern
- * @param userIdMdcKey MDC key for the JWT {@code sub} claim (intentionally no emails/names)
+ * @param userIdMdcKey MDC key for the JWT {@code sub} claim
  * @param slowRequestThresholdMs requests slower than this are logged at WARN by {@code
  *     RequestLoggingFilter}
  * @param slowBackendCallThresholdMs WebClient calls slower than this are logged at WARN by {@code

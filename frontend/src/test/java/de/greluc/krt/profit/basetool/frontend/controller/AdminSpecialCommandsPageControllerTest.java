@@ -46,10 +46,8 @@ import org.springframework.ui.Model;
 @SuppressWarnings("unchecked")
 class AdminSpecialCommandsPageControllerTest {
 
-  // covers REQ-ADMIN-001 — SKs beyond the first backend page are still rendered
   @Test
   void listSpecialCommands_concatenatesAllPages_andSortsByName() {
-    // Given — two backend pages: [Zulu, Alpha] + [Mike]
     BackendApiClient client = mock(BackendApiClient.class);
     AdminSpecialCommandsPageController controller = new AdminSpecialCommandsPageController(client);
     String base = "/api/v1/special-commands?size=1000&sort=name,asc&includeInactive=false";
@@ -62,10 +60,8 @@ class AdminSpecialCommandsPageControllerTest {
     when(client.get(eq(base + "&page=1"), anyTypeRef())).thenReturn(secondPage);
     Model model = new ConcurrentModel();
 
-    // When
     String view = controller.listSpecialCommands(false, null, model);
 
-    // Then
     assertEquals("admin/special-commands", view);
     List<SpecialCommandDto> commands =
         (List<SpecialCommandDto>) model.getAttribute("specialCommands");
@@ -77,10 +73,8 @@ class AdminSpecialCommandsPageControllerTest {
     assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
   }
 
-  // covers REQ-ADMIN-002 — a capped walk raises the warning-banner flag instead of staying silent
   @Test
   void listSpecialCommands_capHit_setsCatalogTruncated() {
-    // Given — a backend that reports more pages than the safety cap allows
     BackendApiClient client = mock(BackendApiClient.class);
     AdminSpecialCommandsPageController controller = new AdminSpecialCommandsPageController(client);
     int reportedPages = CatalogPages.MAX_CATALOG_PAGES + 1;
@@ -90,10 +84,8 @@ class AdminSpecialCommandsPageControllerTest {
     when(client.get(anyString(), anyTypeRef())).thenReturn(endlessPage);
     Model model = new ConcurrentModel();
 
-    // When
     controller.listSpecialCommands(false, null, model);
 
-    // Then
     assertEquals(Boolean.TRUE, model.getAttribute("catalogTruncated"));
   }
 }

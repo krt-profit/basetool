@@ -49,12 +49,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Pure-Mockito unit tests for {@link AdminController}. The controller is small but each endpoint
- * touches a different MapStruct mapper — the role/user-DTO conversion is the spot where an
- * accidental copy-paste during a future refactor would silently leak a JPA entity through the REST
- * boundary (the ArchUnit rule catches the static return type but not the entity *inside* the mapper
- * output). These tests pin the explicit toDto-call on the response path so the conversion stays in
- * place.
+ * Pure-Mockito unit tests for {@link AdminController}, pinning the mapper call on each response
+ * path so no JPA entity leaks through the REST boundary.
  */
 @ExtendWith(MockitoExtension.class)
 class AdminControllerTest {
@@ -88,8 +84,6 @@ class AdminControllerTest {
         false);
   }
 
-  // ── /api/v1/admin/roles ───────────────────────────────────────────────
-
   @Test
   void getAllRoles_pagesEntitiesThroughMapperIntoPageResponse() {
     Role roleA = new Role();
@@ -105,9 +99,6 @@ class AdminControllerTest {
 
     PageResponse<RoleDto> result = controller.getAllRoles(0, 20, "name,asc");
 
-    // The PageResponse must carry the MAPPED DTOs, never the raw entities — otherwise the
-    // ArchUnit-enforced "no entity at controller boundary" contract would still be honoured
-    // statically (return type is Page<RoleDto>) while the actual payload leaked JPA proxies.
     assertThat(result.content()).containsExactly(dtoA, dtoB);
     assertThat(result.page()).isZero();
     assertThat(result.size()).isEqualTo(20);
@@ -129,8 +120,6 @@ class AdminControllerTest {
     verify(roleService).getAllRoles(any(Pageable.class));
   }
 
-  // ── PUT /api/v1/admin/roles/{name}/permissions ────────────────────────
-
   @Test
   void updatePermissions_mapsServiceResultThroughRoleMapper() {
     Role updated = new Role();
@@ -146,8 +135,6 @@ class AdminControllerTest {
     verify(roleMapper).toDto(updated);
   }
 
-  // ── PUT /api/v1/admin/roles/{name}/description ────────────────────────
-
   @Test
   void updateRoleDescription_mapsServiceResultThroughRoleMapper() {
     Role updated = new Role();
@@ -160,8 +147,6 @@ class AdminControllerTest {
     assertThat(result).isSameAs(dto);
     verify(roleService).updateRoleDescription("ADMIN", "New text");
   }
-
-  // ── PUT /api/v1/admin/users/{id}/attributes ───────────────────────────
 
   @Test
   void updateUserAttributes_unpacksRequestRecordAndForwardsToService() {
@@ -179,9 +164,6 @@ class AdminControllerTest {
 
     UserDto result = controller.updateUserAttributes(userId, request);
 
-    // The controller must spread the record's fields into the service's positional argument list
-    // exactly as documented — otherwise an admin's "set rank=12" edit could silently apply to
-    // displayName or vice-versa. Verify-call pins the exact argument order.
     assertThat(result).isSameAs(dto);
     verify(userService)
         .updateUserAttributes(userId, 12, "Test description", "Display name", 3L, joinDate);
@@ -190,9 +172,6 @@ class AdminControllerTest {
 
   @Test
   void updateUserAttributes_passesNullableOptionalFieldsAsIs() {
-    // rank, description, displayName and joinDate are all nullable in the record; the controller
-    // must forward null verbatim so the service decides whether a null means "leave unchanged"
-    // (its actual contract) — not the controller pre-coercing null into an empty string.
     UUID userId = UUID.randomUUID();
     AdminController.AdminUserAttributesRequest request =
         new AdminController.AdminUserAttributesRequest(null, null, null, 1L, null);

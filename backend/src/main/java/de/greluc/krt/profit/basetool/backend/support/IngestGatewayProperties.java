@@ -25,16 +25,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Which Keycloak clients may act for another member via {@link
- * ActingMemberHeader#ON_BEHALF_OF_HEADER} (ADR-0129).
+ * The Keycloak clients, matched on the token's {@code azp}, that may act for another member via
+ * {@link ActingMemberHeader#ON_BEHALF_OF_HEADER} (ADR-0129).
  *
- * <p>Matched on the token's {@code azp}, so only a token minted for one of these clients qualifies
- * — possessing a user's token is not enough, and neither is holding any role.
- *
- * <p><strong>Empty by default, and empty means nobody.</strong> A deployment that has not created
- * the gateway's confidential client refuses every on-behalf-of header rather than trusting one, so
- * the dangerous direction requires a deliberate act of configuration. An immutable record
- * (BE-MOD-04).
+ * <p>Empty by default, and empty admits no client.
  *
  * @param clientIds the {@code azp} values allowed to act for another member; empty disables the
  *     mechanism
@@ -44,23 +38,16 @@ import org.springframework.validation.annotation.Validated;
 public record IngestGatewayProperties(@DefaultValue List<String> clientIds) {
 
   /**
-   * Keycloak's naming convention for the user row backing a client's service account.
+   * Keycloak's name prefix for the user backing a client's service account.
    *
-   * <p>A display convention rather than a reserved namespace — an ordinary user can be created with
-   * that exact name — so it must never be the basis of a security decision. {@code
-   * UserDeletionService} therefore asks Keycloak which user backs a configured client before it
-   * waives its delete guard. It is good enough for a <em>gauge</em>, though, which is the one place
-   * it is used: excluding a hand-made lookalike from a monitoring count is a nuisance and not a
-   * hole, and the alternative is a Keycloak round trip on every metrics tick.
+   * <p>Any user can carry this name, so it must never drive a security decision; it is used only to
+   * exclude service accounts from a monitoring gauge.
    */
   public static final String SERVICE_ACCOUNT_PREFIX = "service-account-";
 
   /**
-   * Whether {@code azp} names a configured ingest gateway.
-   *
-   * <p>The single place the rule lives, so the two decisions that depend on it — "may act for
-   * another member" and "is a machine, not a member" — cannot drift apart. A blank or absent {@code
-   * azp} is never a gateway, and neither is anything when the list is empty.
+   * Checks whether {@code azp} names a configured ingest gateway; a blank or absent value never
+   * does.
    *
    * @param azp the authorized-party claim from the caller's token, may be {@code null}
    * @return {@code true} when this caller is a configured gateway

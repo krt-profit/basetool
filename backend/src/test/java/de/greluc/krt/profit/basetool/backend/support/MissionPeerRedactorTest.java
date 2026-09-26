@@ -52,7 +52,6 @@ class MissionPeerRedactorTest {
 
     UserDto redacted = redactor.cleanupUserForPeer(full);
 
-    // Public callsign tuple + non-sensitive scalars kept.
     assertThat(redacted.id()).isEqualTo(full.id());
     assertThat(redacted.username()).isEqualTo("bob.callsign");
     assertThat(redacted.displayName()).isEqualTo("Bob");
@@ -60,7 +59,6 @@ class MissionPeerRedactorTest {
     assertThat(redacted.rank()).isEqualTo(5);
     assertThat(redacted.inKeycloak()).isTrue();
     assertThat(redacted.version()).isEqualTo(1L);
-    // PII + authorization surface dropped.
     assertThat(redacted.email()).isNull();
     assertThat(redacted.description()).isNull();
     assertThat(redacted.roles()).isNull();
@@ -83,7 +81,6 @@ class MissionPeerRedactorTest {
 
     assertThat(redacted.user().email()).isNull();
     assertThat(redacted.user().username()).isEqualTo("bob.callsign");
-    // A peer is a member of the organisation: payout preference and the free-text comment stay.
     assertThat(redacted.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
     assertThat(redacted.comment()).isEqualTo("my comment");
   }
@@ -107,19 +104,13 @@ class MissionPeerRedactorTest {
 
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
-    // Owner / managers stripped: this caller may not change either, so the response does not name
-    // them.
     assertThat(redacted.owner()).isNull();
     assertThat(redacted.managers()).isNull();
-    // The flags are forwarded, not forced — here they happen to be false, which is the whole
-    // reason the pair above is withheld.
     assertThat(redacted.canEdit()).isFalse();
     assertThat(redacted.canManageManagers()).isFalse();
-    // Member-peer view keeps the free-text description, the organisation and the planning data.
     assertThat(redacted.description()).isEqualTo("secret plan");
     assertThat(redacted.owningSquadron()).isEqualTo(squadron);
     assertThat(redacted.steps()).isSameAs(steps);
-    // Participant PII is stripped recursively, but payout + comment survive at the peer level.
     MissionParticipantDto cleaned = redacted.participants().iterator().next();
     assertThat(cleaned.user().email()).isNull();
     assertThat(cleaned.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
@@ -127,16 +118,7 @@ class MissionPeerRedactorTest {
   }
 
   /**
-   * A peer who may manage the mission is shown the list the same response says they may edit.
-   *
-   * <p>The case exists because the combination is reachable and was self-contradictory: a bare
-   * {@code MISSION_MANAGER} is below Logistician — the hierarchy puts ADMIN/OFFICER above both
-   * roles but never MISSION_MANAGER above LOGISTICIAN — so they read through this pass, and it
-   * answered {@code canManageManagers: true} with {@code managers: null}. The detail view rendered
-   * the Verwaltung panel with the owner as {@code -}, no co-manager chips, and add/remove controls
-   * operating on a list nobody could see. {@code UserReferenceDto} carries no PII to begin with:
-   * id, username, display name, effective name, rank — the same tuple every participant on the same
-   * mission already carries.
+   * A peer who may manage the mission keeps the managers list the same response says they may edit.
    */
   @Test
   void cleanupMissionForPeer_forAManagingPeer_keepsTheListItSaysTheyMayEdit() {
@@ -149,19 +131,12 @@ class MissionPeerRedactorTest {
     assertThat(redacted.canManageManagers()).isTrue();
     assertThat(redacted.owner()).isEqualTo(full.owner());
     assertThat(redacted.managers()).isEqualTo(full.managers());
-    // Everything else this pass does is unchanged by the caller's capability — the exemption is
-    // the management pair, not the redaction.
     assertThat(redacted.participants().iterator().next().user().email()).isNull();
   }
 
   /**
-   * REQ-SEC-040: the nested ship owner must be redacted like any other user leaving the API.
-   *
-   * <p>{@code assignedUnits} is forwarded to guests as mission planning data, and each unit's
-   * {@code ship} carries a full {@link UserDto} owner. Because {@code UserMapper} nulls only the
-   * email, an un-redacted pass-through handed an <em>unauthenticated</em> caller of the public
-   * mission detail the owner's roles and permissions — i.e. who holds ADMIN/OFFICER — plus their
-   * free-text description, org-unit memberships, join date and Discord-link status.
+   * The owner of each assigned unit's ship is redacted like any other user leaving the API
+   * (REQ-SEC-040).
    */
   @Test
   void cleanupMissionForPeer_redactsTheOwnerOfEachAssignedUnitsShip() {
@@ -181,10 +156,8 @@ class MissionPeerRedactorTest {
     assertThat(owner.discordLinked()).isNull();
     assertThat(owner.isLogistician()).isFalse();
     assertThat(owner.isMissionManager()).isFalse();
-    // The public callsign tuple survives — the unit card still names its ship's owner.
     assertThat(owner.username()).isEqualTo("bob.callsign");
     assertThat(owner.rank()).isEqualTo(5);
-    // The unit's own planning fields are untouched.
     assertThat(redacted.assignedUnits().getFirst().name()).isEqualTo("Alpha");
     assertThat(redacted.assignedUnits().getFirst().ship().name()).isEqualTo("Rocinante");
   }
@@ -278,9 +251,8 @@ class MissionPeerRedactorTest {
    * @param participant the single roster row, carrying the nested user whose PII is stripped
    * @param steps the mission steps, forwarded by identity so a test can assert on sameness
    * @param assignedUnits the assigned units, whose nested ship owner is redacted separately
-   * @param managing what {@code MissionMapper} resolved for THIS caller — both {@code canEdit} and
-   *     {@code canManageManagers}, which travel together in every case this class needs to tell
-   *     apart: a peer who may change the mission, and one who may only read it
+   * @param managing the value for both {@code canEdit} and {@code canManageManagers} for this
+   *     caller
    * @return a fully populated {@link MissionDto}
    */
   private static MissionDto mission(

@@ -59,7 +59,6 @@ class BlueprintControllerTest {
 
   @Test
   void getBlueprints_rejectsNonWhitelistedSortField() {
-    // PaginationUtil enforces the sort whitelist before the service is consulted.
     assertThrows(
         IllegalArgumentException.class,
         () -> blueprintController.getBlueprints(null, 0, 10, "maliciousField"));

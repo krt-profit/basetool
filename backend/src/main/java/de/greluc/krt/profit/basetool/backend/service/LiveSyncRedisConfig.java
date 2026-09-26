@@ -40,16 +40,9 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Wires the app live-sync bridge's fan-out (ADR-0143).
- *
- * <p>Two beans, selected by one property. With {@code app.live-sync.redis-fanout.enabled=true} the
- * Redis bridge publishes and consumes on the frontend's channel; without it the local no-op takes
- * over and the app's live sync degrades to "everything this backend instance itself relayed", which
- * is the ADR-0084 posture: an optional external must never keep the container from starting or from
- * reporting healthy.
- *
- * <p>Kept beside the notification fan-out's config rather than in {@code config} because it is the
- * same shape, wires the same kind of collaborator and is easiest to keep honest side by side.
+ * Wires the app live-sync fan-out (ADR-0143): the Redis bridge when {@code
+ * app.live-sync.redis-fanout.enabled=true}, otherwise the local no-op, so the backend starts
+ * without Redis (ADR-0084).
  */
 @Slf4j
 @Configuration
@@ -98,11 +91,7 @@ public class LiveSyncRedisConfig {
   }
 
   /**
-   * The listener pool the Redis container dispatches consumed frames on.
-   *
-   * <p>Bounded and caller-runs on rejection, like the notification listener's: a consume that
-   * cannot be handed off should slow the listener down, never spawn an unbounded thread — the July
-   * native-thread-OOM was exactly that mistake.
+   * The bounded, caller-runs listener pool the Redis container dispatches consumed frames on.
    *
    * @return the initialised executor
    */
@@ -125,13 +114,8 @@ public class LiveSyncRedisConfig {
   }
 
   /**
-   * Subscribes the bridge to its channel.
-   *
-   * <p>A {@link ResilientRedisMessageListenerContainer}, not a plain one, because a plain container
-   * whose first subscription fails throws out of {@code SmartLifecycle#start()} and cancels the
-   * whole context refresh — the 2026-09-02 07:07:09Z backend crash loop, in which an
-   * <em>optional</em> fan-out (ADR-0084, ADR-0143) decided whether the API existed. The container's
-   * own recovery back-off never covered that first attempt.
+   * Subscribes the bridge to its channel through a {@link ResilientRedisMessageListenerContainer},
+   * so a failed first subscription does not abort context startup.
    *
    * @param connectionFactory the Redis connection factory
    * @param fanout the bridge, acting as the message listener

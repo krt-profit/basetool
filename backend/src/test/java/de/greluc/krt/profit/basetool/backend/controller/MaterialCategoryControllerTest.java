@@ -35,9 +35,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-method unit tests for {@link MaterialCategoryController}. Coverage before this file was 0%
- * on every endpoint. Asserts the controller-to- service delegation and the mapper round-trip on the
- * write endpoints.
+ * Unit tests for {@link MaterialCategoryController}: service delegation and the mapper round-trip
+ * on the write endpoints.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialCategoryControllerTest {
@@ -49,7 +48,6 @@ class MaterialCategoryControllerTest {
 
   @Test
   void getAll_returnsServiceListMappedToDtos() {
-    // Given
     MaterialCategory minerals = new MaterialCategory();
     MaterialCategory gases = new MaterialCategory();
     MaterialCategoryDto mineralsDto = new MaterialCategoryDto(UUID.randomUUID(), "Mineral", 1L);
@@ -59,10 +57,8 @@ class MaterialCategoryControllerTest {
     when(mapper.toDto(minerals)).thenReturn(mineralsDto);
     when(mapper.toDto(gases)).thenReturn(gasesDto);
 
-    // When
     List<MaterialCategoryDto> result = controller.getAll();
 
-    // Then — the list order from the service is preserved
     assertEquals(2, result.size());
     assertSame(mineralsDto, result.get(0));
     assertSame(gasesDto, result.get(1));

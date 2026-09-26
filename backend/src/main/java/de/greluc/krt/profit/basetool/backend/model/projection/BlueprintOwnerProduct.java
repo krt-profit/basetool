@@ -22,12 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.projection;
 import java.util.UUID;
 
 /**
- * Lightweight JPQL constructor projection of a {@code personal_blueprint} row carrying only the two
- * columns the availability-overview aggregation and the item-order owner drill-down actually read:
- * the owner and the product name. Both surfaces group rows by variant family and count distinct
- * owners, so hydrating the full entity (all columns, the whole table for an admin all-scope view)
- * just to read these two fields is wasted I/O and heap (REQ-DATA-003) — the projection scales with
- * the two needed columns instead.
+ * JPQL projection of a {@code personal_blueprint} row reduced to its owner and product name, for
+ * the availability overview and the item-order owner drill-down (REQ-DATA-003).
  *
  * @param ownerUserId the {@code app_user.id} of the blueprint's owner.
  * @param productName the product name as stored on the blueprint (case-preserving).

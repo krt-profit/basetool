@@ -5,14 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-/*
- * Delegated Leitung page (epic #800, REQ-ROLE-004). Drives the appointment surfaces:
- *  - a shared add-member modal for Bereich / OL (user picker + optional role);
- *  - in-roster controls for squadron ranks + Kommandogruppen, SK-lead toggles and member removals.
- * Every write goes through krtFetch.write (CSRF + retry-on-403 + RFC-7807 toast + OPTIMISTIC_LOCK
- * reload-confirm); on success the whole leitungSections fragment is re-swapped so derived state never
- * desyncs. Per-unit authorisation is enforced by the backend; the page only renders manageable units.
- */
 (function () {
     'use strict';
 
@@ -23,8 +15,6 @@
             window.location.reload();
             return;
         }
-        // Return the swap promise so a serialized write awaits the section refresh before the next
-        // Leitung write starts (see the serialize key in write()).
         return window.krtFetch.swap({
             url: '/organisation/leitung?fragment=leitungSections',
             container: '#leitung-sections',
@@ -45,24 +35,15 @@
             successMessage: opts.success,
             errorMessage: i18n.error,
             conflict: i18n.conflict,
-            // Serialize all Leitung writes so back-to-back rank / group / SK-lead actions run in
-            // order and never overlap; each success reswaps the whole section (refreshing every
-            // row's version) before the next write fires.
             serialize: 'leitung',
             onSuccess: reswap,
         });
     }
 
-    // ----------------------------------------------------- shared add-member modal --
-
     const modal = document.getElementById('leitung-modal');
     const modalUnit = document.getElementById('leitung-modal-unit');
     const modalRoleGroup = document.getElementById('leitung-modal-role-group');
 
-    // The user picker is upgraded into a searchable combobox by the global krt-searchable-select.js
-    // auto-initialiser (the <select> carries data-krt-combobox). Enhancement moves the original id
-    // onto the combobox's hidden input, so always resolve the control LIVE — a reference captured
-    // before enhancement would point at the detached original <select> and read a stale value.
     function getModalUser() {
         return document.getElementById('leitung-modal-user');
     }
@@ -106,9 +87,7 @@
         }
         lastTrigger = trigger;
         window.krtModal.open(modal);
-        // Reuse the modalUser resolved above (same open call, the control is not replaced in between).
         if (modalUser) {
-            // Focus the visible combobox textbox (the resolved element is the hidden input).
             const box = modalUser.closest ? modalUser.closest('.krt-combobox') : null;
             const focusTarget = box ? box.querySelector('.krt-combobox__input') : modalUser;
             if (focusTarget) {
@@ -187,8 +166,6 @@
             }
         });
     }
-
-    // ------------------------------------------------ delegated in-fragment actions --
 
     const sections = document.getElementById('leitung-sections');
 

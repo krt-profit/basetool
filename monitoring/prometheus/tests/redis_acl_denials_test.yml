@@ -1,21 +1,9 @@
-# promtool unit tests for RedisAclDenials (REQ-SEC-068, ADR-0207).
-#
-# With one Redis ACL user per service, an ACL refusal is a service whose password does not match
-# the rendered users.acl, a rule too narrow for what the service does, or a client that is none of
-# ours. The rollout's likeliest mistake -- a password typo in .env -- is a service failing AUTH on
-# every connection attempt, which is the first case below.
-#
-# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
-#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/redis_acl_denials_test.yml'
-
 rule_files:
   - ../alerts/infrastructure.yml
 
 evaluation_interval: 1m
 
 tests:
-  # A service whose password is wrong retries its connection and fails AUTH every time.
   - name: fires - a service failing AUTH continuously
     interval: 1m
     input_series:
@@ -33,7 +21,6 @@ tests:
               summary: "Redis is refusing authentication or commands under its ACL (20 in 5m)"
               description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/iri/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
 
-  # A rule too narrow for a real command: the refusals are channel refusals, not AUTH.
   - name: fires - a service refused a channel on every publish
     interval: 1m
     input_series:
@@ -49,7 +36,6 @@ tests:
               summary: "Redis is refusing authentication or commands under its ACL (5 in 5m)"
               description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/iri/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
 
-  # One stray refusal (an operator's mistyped redis-cli, a probe) must not page.
   - name: silent - a single refusal
     interval: 1m
     input_series:
@@ -66,7 +52,6 @@ tests:
         alertname: RedisAclDenials
         exp_alerts: []
 
-  # The steady state.
   - name: silent - no refusals
     interval: 1m
     input_series:

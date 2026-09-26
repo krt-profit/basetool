@@ -34,15 +34,12 @@ class OperationStatusTest {
 
   @ParameterizedTest(name = "{0} -> {1} is allowed")
   @CsvSource({
-    // Same-status updates are always allowed (rename / re-description path).
     "PLANNED, PLANNED",
     "ACTIVE, ACTIVE",
     "COMPLETED, COMPLETED",
     "CANCELED, CANCELED",
-    // Forward progress through the happy path.
     "PLANNED, ACTIVE",
     "ACTIVE, COMPLETED",
-    // Cancellation is allowed from any non-terminal state.
     "PLANNED, CANCELED",
     "ACTIVE, CANCELED"
   })
@@ -52,15 +49,11 @@ class OperationStatusTest {
 
   @ParameterizedTest(name = "{0} -> {1} is rejected")
   @CsvSource({
-    // PLANNED cannot skip the ACTIVE phase.
     "PLANNED, COMPLETED",
-    // ACTIVE cannot un-start.
     "ACTIVE, PLANNED",
-    // COMPLETED is terminal.
     "COMPLETED, PLANNED",
     "COMPLETED, ACTIVE",
     "COMPLETED, CANCELED",
-    // CANCELED is terminal.
     "CANCELED, PLANNED",
     "CANCELED, ACTIVE",
     "CANCELED, COMPLETED"
@@ -71,8 +64,6 @@ class OperationStatusTest {
 
   @Test
   void everyStatusCanTransitionToItself() {
-    // Even terminal statuses must permit a same-status update so the caller
-    // can rename / re-describe the entity without tripping the gate.
     for (OperationStatus s : OperationStatus.values()) {
       assertTrue(s.canTransitionTo(s));
     }

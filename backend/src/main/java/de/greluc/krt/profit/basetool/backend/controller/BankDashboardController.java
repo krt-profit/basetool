@@ -35,9 +35,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the bank dashboard (epic #556, REQ-BANK-016): balances, 30-day deltas and
- * sparkline series of every visible account in one grouped payload — employees get their granted
- * accounts, management/admin get all accounts plus the totals strip (REQ-BANK-010).
+ * REST surface for the bank dashboard (REQ-BANK-016): balances, 30-day deltas and sparklines of
+ * every visible account, plus the totals strip for management/admin (REQ-BANK-010).
  */
 @RestController
 @RequestMapping("/api/v1/bank/dashboard")

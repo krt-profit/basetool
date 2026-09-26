@@ -20,12 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Outcome summary of a bulk personal-blueprint clear (REQ-INV-023 / REQ-INV-024). Both the "delete
- * all my blueprints" (owner-scoped) and the admin "delete all users' blueprints" (global purge)
- * skip the auto-granted, non-removable default blueprints (REQ-INV-016), so {@link #deleted} counts
- * only the removable rows that were actually removed.
+ * Outcome of a bulk personal-blueprint clear (REQ-INV-023, REQ-INV-024); non-removable default
+ * blueprints are preserved and not counted.
  *
- * @param deleted number of removable owned-blueprint rows removed by the operation (never counts a
- *     preserved default)
+ * @param deleted number of removable owned-blueprint rows removed
  */
 public record PersonalBlueprintBulkDeleteResult(int deleted) {}

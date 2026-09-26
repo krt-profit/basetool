@@ -47,28 +47,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the {@code Mission @Version} optimistic-locking guarantee under <em>real</em> concurrent
- * access. The previous incarnation of this test simulated two users sequentially (load → update →
- * save → load-stale → update-stale → save-stale-throws) which exercised the SQL semantics of the
- * version column but could not surface timing-dependent bugs (early commit, connection-pool
- * starvation, persistence-context cross-thread leakage, …).
- *
- * <p>This rewrite launches several worker threads, makes them all load the same entity, holds them
- * at a {@link CountDownLatch} until everyone has the same stale version, then releases them to
- * attempt a full-replace update ({@code MissionService.updateMission}) simultaneously. Since #1114
- * every mutable {@code Mission} scalar is {@code @OptimisticLock(excluded = true)} so a bare scalar
- * save no longer bumps the row {@code @Version} (that decoupling is what stops a core edit from
- * 409-ing a concurrent schedule edit); the whole-mission "exactly one wins" guarantee now rides on
- * {@code updateMission}, which force-increments {@code @Version} via {@code
- * OPTIMISTIC_FORCE_INCREMENT}. Postgres serialises the resulting {@code UPDATE … WHERE version = N}
- * via row-level locks; exactly one thread's returns rows-affected = 1 (success), and every other
- * thread sees rows-affected = 0 which Hibernate translates to {@link
+ * Verifies the {@code Mission @Version} optimistic-locking guarantee under real concurrency: worker
+ * threads load the same mission, wait at a {@link CountDownLatch}, then call {@code
+ * MissionService.updateMission} simultaneously; exactly one wins and the rest get {@link
  * ObjectOptimisticLockingFailureException}.
  *
- * <p>The test is deliberately <strong>not</strong> annotated with {@code @Transactional} — a
- * Spring-managed test transaction would wrap all setup in one rolled-back transaction that the
- * worker threads (each running in their own session) could not see. Each thread relies on Spring
- * Data JPA's per-method {@code @Transactional} on the repository calls.
+ * <p>Not {@code @Transactional}, so each worker runs in its own session.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -92,9 +76,6 @@ class ConcurrencyTest {
 
   @AfterEach
   void cleanupSeedRow() {
-    // Without an outer @Transactional the seed mission survives the test;
-    // remove it so adjacent tests that snapshot the table can rely on a
-    // clean baseline.
     if (seedMissionId != null) {
       missionRepository.deleteById(seedMissionId);
       seedMissionId = null;
@@ -127,15 +108,6 @@ class ConcurrencyTest {
             pool.submit(
                 () -> {
                   try {
-                    // Since #1114 every mutable Mission scalar is @OptimisticLock(excluded=true),
-                    // so a
-                    // bare save after mutating one scalar no longer bumps the row @Version (that is
-                    // what stops a core edit from 409-ing a concurrent schedule edit). The
-                    // row-level
-                    // "exactly one wins" guarantee now lives on the legacy full-replace path
-                    // (updateMission), which force-increments @Version via
-                    // OPTIMISTIC_FORCE_INCREMENT
-                    // — this test exercises that path.
                     Long staleVersion = missionRepository.findById(id).orElseThrow().getVersion();
                     ready.countDown();
                     if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {

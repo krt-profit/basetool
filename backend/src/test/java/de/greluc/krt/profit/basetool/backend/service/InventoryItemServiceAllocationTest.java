@@ -65,15 +65,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Pure-Mockito unit tests for the Variante-C per-allocation write methods of {@link
- * InventoryItemService} (REQ-INV-027): {@code addAllocation} / {@code changeAllocation} / {@code
- * removeAllocation}. Every guard is pinned — the over-allocation 422 (rule R5), the
- * personal-no-assignment reject, the material-required gate, the duplicate-target reject, the
- * whole-number-for-PIECE reject, the optimistic-lock echo, and the not-found paths — because each
- * is a silent regression at the type level.
- *
- * <p>The three write methods live on the facade and use the injected mocks directly (they never
- * touch the aggregation / checkout sub-services), so no delegate wiring is needed.
+ * Mockito unit tests for the per-allocation write methods of {@link InventoryItemService}
+ * (REQ-INV-027): {@code addAllocation}, {@code changeAllocation} and {@code removeAllocation},
+ * covering every guard, the optimistic-lock echo and the not-found paths.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceAllocationTest {
@@ -147,8 +141,6 @@ class InventoryItemServiceAllocationTest {
         null, 2L, null, null);
   }
 
-  // --- add ---------------------------------------------------------------------------------
-
   @Test
   void addAllocation_jobOrder_addsSliceAndAudits() {
     InventoryItem item = entry(10.0);
@@ -167,9 +159,6 @@ class InventoryItemServiceAllocationTest {
             new InventoryAllocationWriteDto(
                 InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L));
 
-    // The response carries the mapped DTO with the post-commit force-increment version: the entry
-    // @Version (1) is bumped at commit by OPTIMISTIC_FORCE_INCREMENT, so the client must echo 2 on
-    // its next write to the same entry, else a second consecutive chip edit 409s (REQ-INV-027).
     assertEquals(2L, result.version());
     assertEquals(1, item.getJobOrderAllocations().size());
     assertEquals(4.0, item.getJobOrderAllocations().get(0).getAmount(), 1e-9);
@@ -235,7 +224,6 @@ class InventoryItemServiceAllocationTest {
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item)).thenReturn(sentinelDto());
 
-    // 6 + 4 == 10 exactly — must NOT trip the over-allocation guard.
     service.addAllocation(
         itemId,
         new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderB, 4.0, 1L));
@@ -296,10 +284,6 @@ class InventoryItemServiceAllocationTest {
                     new InventoryAllocationWriteDto(
                         InventoryAllocationDimension.JOB_ORDER, orderId, 2.0, 1L)));
 
-    // The MESSAGE is pinned, not just the type: it is an i18n key that
-    // GlobalExceptionHandler#resolveDetail looks up, and the popover now shows the resolved
-    // `detail` to the user. A literal English string here would silently put English prose on a
-    // German screen, and a key absent from the bundle would put the key itself there.
     assertEquals("error.inventory.allocation.duplicate.jobOrder", ex.getMessage());
   }
 
@@ -345,11 +329,9 @@ class InventoryItemServiceAllocationTest {
     assertEquals("A PIECE allocation amount must be a whole number", ex.getMessage());
   }
 
-  // --- game-item rows (V220, REQ-INV-029/031) --------------------------------
-
   /**
-   * Builds a managed-like game-item stock row sharing the fixture entry shape: gameItem set,
-   * material and quality {@code null} (the V220 catalog XOR), non-personal, version 1.
+   * Builds a managed-like game-item stock row: game item set, material and quality {@code null},
+   * non-personal, version 1.
    *
    * @param amount the row's amount.
    * @param gameItemId the stocked game item's id.
@@ -366,10 +348,8 @@ class InventoryItemServiceAllocationTest {
     return item;
   }
 
-  // covers REQ-INV-031 (kind dispatch: item rows gate on the order's requested game items)
   @Test
   void addAllocation_jobOrder_onItemRow_qualifyingItemOrder_addsSlice() {
-    // Given an item row and an ITEM order requesting exactly its game item
     UUID gameItemId = UUID.randomUUID();
     InventoryItem item = itemEntry(10.0, gameItemId);
     UUID orderId = UUID.randomUUID();
@@ -380,23 +360,17 @@ class InventoryItemServiceAllocationTest {
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item)).thenReturn(sentinelDto());
 
-    // When
     service.addAllocation(
         itemId,
         new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L));
 
-    // Then — the slice is written via the gameItem gate; the material gate is never consulted
-    // (the row has no material to check — the kind dispatch of REQ-INV-031).
     assertEquals(1, item.getJobOrderAllocations().size());
     assertSame(order, item.getJobOrderAllocations().get(0).getJobOrder());
     verify(jobOrderItemService, never()).requiredMaterialIds(any(JobOrder.class));
   }
 
-  // covers REQ-INV-031 (item earmark rejected when the order does not request the game item)
   @Test
   void addAllocation_jobOrder_onItemRow_orderNotRequestingItem_throwsBadRequest() {
-    // Given an item row and an order requesting a different game item (or a MATERIAL order, whose
-    // requested set is empty by contract — the same rejection)
     InventoryItem item = itemEntry(10.0, UUID.randomUUID());
     UUID orderId = UUID.randomUUID();
     JobOrder order = jobOrder(orderId, 7);
@@ -404,7 +378,6 @@ class InventoryItemServiceAllocationTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(jobOrderItemService.requiredGameItemIds(order)).thenReturn(Set.of(UUID.randomUUID()));
 
-    // When / Then
     assertThrows(
         BadRequestException.class,
         () ->
@@ -415,15 +388,11 @@ class InventoryItemServiceAllocationTest {
     verify(inventoryItemRepository, never()).saveAndFlush(any());
   }
 
-  // covers REQ-INV-031 (item rows carry no mission dimension — addAllocation)
   @Test
   void addAllocation_mission_onItemRow_throwsBadRequest() {
-    // Given an item row and a mission-dimension write
     InventoryItem item = itemEntry(10.0, UUID.randomUUID());
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
-    // When / Then — 400 (code BAD_REQUEST; 422 stays reserved for over-allocation), before any
-    // mission lookup
     assertThrows(
         BadRequestException.class,
         () ->
@@ -435,14 +404,11 @@ class InventoryItemServiceAllocationTest {
     verifyNoMissionLookups();
   }
 
-  // covers REQ-INV-031 (item rows carry no mission dimension — changeAllocation)
   @Test
   void changeAllocation_mission_onItemRow_throwsBadRequest() {
-    // Given an item row and a mission-dimension amount change
     InventoryItem item = itemEntry(10.0, UUID.randomUUID());
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
-    // When / Then
     assertThrows(
         BadRequestException.class,
         () ->
@@ -454,15 +420,11 @@ class InventoryItemServiceAllocationTest {
     verifyNoMissionLookups();
   }
 
-  // covers REQ-INV-029 (item allocation amounts are whole units)
   @Test
   void addAllocation_fractionalAmount_onItemRow_throwsBadRequest() {
-    // Given an item row and a fractional slice amount
     InventoryItem item = itemEntry(10.0, UUID.randomUUID());
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
-    // When / Then — item rows restrict amounts to whole numbers like PIECE materials, without any
-    // material dereference (the row's material is null); the 400 detail names the item kind
     BadRequestException ex =
         assertThrows(
             BadRequestException.class,
@@ -522,8 +484,6 @@ class InventoryItemServiceAllocationTest {
                     InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L)));
   }
 
-  // --- change ------------------------------------------------------------------------------
-
   @Test
   void changeAllocation_updatesAmount() {
     InventoryItem item = entry(10.0);
@@ -551,7 +511,6 @@ class InventoryItemServiceAllocationTest {
     addJobOrderSlice(item, jobOrder(orderB, 2), 3.0);
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
-    // Raising A from 6 to 8 while B holds 3 → Σ = 11 > 10.
     assertThrows(
         OverAllocationException.class,
         () ->
@@ -574,8 +533,6 @@ class InventoryItemServiceAllocationTest {
                 new InventoryAllocationWriteDto(
                     InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 2.0, 1L)));
   }
-
-  // --- remove ------------------------------------------------------------------------------
 
   @Test
   void removeAllocation_removesSlice() {

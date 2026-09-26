@@ -1,16 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  Reusable account-rendering fragments for the bank dashboard (REQ-BANK-016): the card grid, the
-  table, and the by-Bereich-group wrapper that composes them. Kept in a dedicated fragments file so a
-  full-page render never processes them inline with unbound parameters. The card/row markup is
-  inlined in accGrid/accTable (each is the sole place a card/row renders), so there is no bare <tr>
-  at body level and no leaf-fragment parameter passing. Each expects a list of
-  BankPageController.BankDashboardCardView, or the group wrapper a BankDashboardGroupView + layout.
-*/-->
 
-<!--/* A grid of account cards. Each card carries data-filter-name for the live name filter. */-->
 <div th:fragment="accGrid(cards)" class="bank-acc-grid mt-2">
     <a th:each="card : ${cards}" class="kpi-card"
        th:classappend="${card.account().status() == 'CLOSED'} ? ' kpi-card--closed' : ''"
@@ -41,7 +32,6 @@
     </a>
 </div>
 
-<!--/* A table of account rows. Each row carries data-filter-name for the live name filter. */-->
 <div th:fragment="accTable(cards)" class="table-responsive mt-2">
     <table class="data-table bank-acc-table" data-testid="bank-account-table">
         <thead>
@@ -86,16 +76,11 @@
     </table>
 </div>
 
-<!--/* One by-Bereich group: a colour-marked header (its Bereichsfarbe) plus the group's accounts in
-     the chosen layout. Fixed groups use an i18n title key; a Bereich group uses its live name. */-->
 <section th:fragment="accGroup(group, layout)" class="bank-acc-group"
          th:attr="data-bank-acc-group=${group.key()}" data-testid="bank-acc-group">
     <h2 class="bank-acc-group-head"
         th:classappend="${group.deptClass() != null} ? ' ' + ${group.deptClass()} : ''"
         th:text="${group.titleKey() != null} ? #{__${group.titleKey()}__} : ${group.bereichName()}">Bereich</h2>
-    <!--/* th:if/th:unless gate an OUTER wrapper and never share an element with th:replace: the latter
-         (attribute precedence 1) runs before the condition (3), which would render BOTH the table and
-         the grid for every group. */-->
     <th:block th:if="${layout == 'table'}">
         <th:block th:replace="~{fragments/bank-account-views :: accTable(${group.cards()})}"></th:block>
     </th:block>

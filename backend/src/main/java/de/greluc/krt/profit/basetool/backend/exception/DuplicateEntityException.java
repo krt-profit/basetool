@@ -20,16 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * Thrown when an insert or update would violate a uniqueness constraint that the service layer
- * checks explicitly (e.g. duplicate Keycloak {@code sub}, duplicate name within a scope).
+ * Thrown when an insert or update would violate a uniqueness constraint the service layer checks
+ * explicitly, such as a duplicate Keycloak {@code sub}.
  *
- * <p>Mapped to HTTP {@code 409 Conflict} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
- * AppException} dispatch handler with the stable error code {@code DUPLICATE_ENTITY}. Use this
- * rather than letting a database {@code DataIntegrityViolationException} bubble up so the client
- * receives a localized message instead of a raw SQL error string. Every accessor is inherited
- * unchanged from {@link AppException} — it delegates to {@link AppExceptionKind#DUPLICATE_ENTITY},
- * the fixed identity passed to the superclass constructor.
+ * <p>Mapped to HTTP {@code 409} with the code {@code DUPLICATE_ENTITY}.
  */
 public final class DuplicateEntityException extends AppException {
 

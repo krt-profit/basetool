@@ -49,17 +49,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The endpoint bound of the acting-member header, driven directly against a raw request URI.
- *
- * <p>Deliberately not part of {@link ActingMemberFilterChainTest}: MockMvc normalises the path
- * before any filter sees it, so the chain level cannot reproduce a percent-encoded spelling — the
- * same limitation {@code TermsAcceptanceAccessFilterTest} records for the identical guard. Testing
- * it there would produce a green assertion that never exercises the code it names.
- *
- * <p>What is at stake: {@code getRequestURI()} is the raw, still-encoded URI while MVC routes on
- * the decoded path (REQ-SEC-029). A {@code startsWith} bound would accept {@code
- * /%61pi/v1/missions} here and let the request dispatch as {@code /api/v1/missions} — impersonation
- * on an endpoint ADR-0129 never granted it.
+ * Tests the endpoint bound of the acting-member header against raw, possibly percent-encoded
+ * request URIs, which MockMvc would normalise away (REQ-SEC-029, ADR-0129).
  */
 class ActingMemberFilterPathMatchingTest {
 
@@ -124,9 +115,6 @@ class ActingMemberFilterPathMatchingTest {
 
     filter().doFilter(gatewayRequest("/%61pi/v1/missions"), response, chain);
 
-    // Asserted by REASON, not by status alone: every guard in this filter answers 403, so a status
-    // assertion passes even when a different guard fired for a different reason. The reason tag is
-    // the only thing that says WHICH bound held.
     assertThat(refusalReason()).isEqualTo(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
     assertThat(response.getStatus()).isEqualTo(403);
     verify(chain, never()).doFilter(any(), any());
@@ -140,8 +128,6 @@ class ActingMemberFilterPathMatchingTest {
   void stillActsOnAnEncodedSpellingOfAnActingPath() throws Exception {
     MockHttpServletResponse response = new MockHttpServletResponse();
     FilterChain chain = mock(FilterChain.class);
-    // Stubbed rather than left to Mockito's null: the filter puts this straight into the
-    // authentication it installs, so an unstubbed null would test a state that cannot occur.
     when(authorities.authoritiesFor(any())).thenReturn(List.of());
 
     filter().doFilter(gatewayRequest("/api/v1/%72efinery-orders/import-extract"), response, chain);

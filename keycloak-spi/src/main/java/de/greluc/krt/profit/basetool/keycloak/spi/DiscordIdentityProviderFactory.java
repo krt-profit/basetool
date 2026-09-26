@@ -26,14 +26,7 @@ import org.keycloak.broker.social.SocialIdentityProviderFactory;
 import org.keycloak.models.IdentityProviderModel;
 import org.keycloak.models.KeycloakSession;
 
-/**
- * Factory that registers {@link DiscordIdentityProvider} as a social identity provider.
- *
- * <p>Discovered by Keycloak via {@code META-INF/services/
- * org.keycloak.broker.social.SocialIdentityProviderFactory}, which makes "Discord" selectable in
- * the realm's <em>Identity Providers → Add provider → Social</em> menu and addressable from the
- * login flow with {@code kc_idp_hint=discord} (when the IdP alias is {@code discord}).
- */
+/** Registers {@link DiscordIdentityProvider} as the "Discord" social identity provider. */
 public class DiscordIdentityProviderFactory
     extends AbstractIdentityProviderFactory<DiscordIdentityProvider>
     implements SocialIdentityProviderFactory<DiscordIdentityProvider> {

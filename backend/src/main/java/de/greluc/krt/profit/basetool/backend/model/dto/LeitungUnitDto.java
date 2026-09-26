@@ -24,40 +24,24 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * One manageable org unit in the delegated Leitung view (epic #800, REQ-ROLE-004), with the two
- * delegated-capability flags that gate its two appointment surfaces and its current roster. The
- * meaning of the two caps is tier-relative (the page branches on {@link #kind}):
+ * One manageable org unit in the delegated Leitung view, with its roster and the two capability
+ * flags that gate its appointment surfaces (REQ-ROLE-004).
  *
- * <ul>
- *   <li><b>canAppointLead</b> — may set the unit's top seat: a Staffelleiter on a {@code SQUADRON}
- *       (the parent Bereichsleiter), an SK-Leiter on a {@code SPECIAL_COMMAND} (the parent
- *       Bereichsleiter), a Bereichsleiter on a {@code BEREICH} (a pure OL member), an OL member on
- *       the {@code ORGANISATIONSLEITUNG} (admin only).
- *   <li><b>canManageRoster</b> — may manage the in-unit subordinate ranks: Kommandoleiter / stellv.
- *       Kommandoleiter / Ensign and the Kommandogruppen on a {@code SQUADRON} (its Staffelleiter),
- *       Koordinatoren / Operatoren on a {@code BEREICH} (its Bereichsleiter), the member list and
- *       the Logistiker / Einsatzmanager flags on a {@code SPECIAL_COMMAND} (its own SK lead, per
- *       {@code SpecialCommandSecurityService#canManageMembers}; the page links to the SK member
- *       page for it); always {@code false} on the OL.
- * </ul>
- *
- * <p>Admin sees and may act on every unit (both caps {@code true}); a delegated leader sees only
- * the units their tier can act on, with the matching cap(s) set.
+ * <p>{@code canAppointLead} allows setting the unit's top seat; {@code canManageRoster} allows
+ * managing its subordinate ranks, and is always {@code false} on the Organisationsleitung. Admin
+ * gets both flags on every unit.
  *
  * @param id the org unit id; always populated.
  * @param name the org unit name.
  * @param shorthand the org unit shorthand (kürzel).
- * @param kind the org-unit kind, so the page renders the right rank options and section.
- * @param canAppointLead whether the caller may set this unit's top seat (see class doc).
- * @param canManageRoster whether the caller may manage this unit's subordinate roster (see class
- *     doc).
- * @param members the unit's current roster rows (leadership, plus all members for a squadron so a
- *     Staffelleiter can promote any member); never {@code null}.
- * @param groups the unit's Kommandogruppen ({@code SQUADRON} only; empty for every other kind);
- *     never {@code null}.
- * @param grandAdmiralUserId the account id of this unit's Grand Admiral (REQ-ORG-021), or {@code
- *     null}. Only ever populated on the {@code ORGANISATIONSLEITUNG}, so the page can badge the
- *     current holder and offer the promote / vacate actions; {@code null} for every other kind.
+ * @param kind the org-unit kind, which decides the rank options and section.
+ * @param canAppointLead whether the caller may set this unit's top seat.
+ * @param canManageRoster whether the caller may manage this unit's subordinate roster.
+ * @param members the unit's current roster rows; never {@code null}.
+ * @param groups the unit's Kommandogruppen, empty for every kind but {@code SQUADRON}; never {@code
+ *     null}.
+ * @param grandAdmiralUserId the Grand Admiral's account id on the {@code ORGANISATIONSLEITUNG}
+ *     (REQ-ORG-021); {@code null} otherwise.
  */
 public record LeitungUnitDto(
     UUID id,

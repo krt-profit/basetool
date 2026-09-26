@@ -43,15 +43,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Live multi-user sync for the refinery queue (#1235, REQ-FE-015, ADR-0094).
- *
- * <p>The refinery surface publishes <b>server-side</b> rather than from the client because every
- * mutation navigates away — the classic handlers redirect and the AJAX twins answer a {@code
- * targetUrl} the detail page immediately follows — so a client broadcast would race the socket
- * teardown, and the no-JS form-POST fallback would emit nothing at all. These tests pin that the
- * poke fires on success, does <b>not</b> fire when the backend refused (a peer must not re-fetch
- * for a change that never happened), and that the store path additionally pokes the shared Lager,
- * whose rows it writes.
+ * Tests the server-side live-sync publish of the refinery queue (REQ-FE-015, ADR-0094): the poke
+ * fires on success, not after a backend refusal, and the store path also pokes the shared Lager.
  */
 class RefineryOrderLiveSyncPublishTest {
 
@@ -76,9 +69,6 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void topicsAndSectionsUsedHere_areTheOnesTheRegistryWhitelists() {
-    // Guards the string literals below (and in the controller): the relay silently DROPS a section
-    // key outside its class whitelist, so a typo would leave every peer stale with no error — the
-    // REQ-FE-010 failure mode. Pin both rooms this controller publishes to.
     assertThat(LiveSyncTopicClass.REFINERY.prefix()).isEqualTo("refinery");
     assertThat(LiveSyncTopicClass.REFINERY.allowedSections()).containsExactlyElementsOf(QUEUE);
     assertThat(LiveSyncTopicClass.INVENTORY_ALL.prefix()).isEqualTo("inventory");
@@ -123,8 +113,6 @@ class RefineryOrderLiveSyncPublishTest {
 
     controller.storeOrder(id, storeForm(), noErrors(), redirectAttributes);
 
-    // "Einlagern" writes the refined output into the inventory, so an open Lager must refresh too —
-    // without this cross-room poke it would sit stale until a manual reload (REQ-INV-027, #1307).
     verify(liveSyncLocalBus).publish("refinery", QUEUE);
     verify(liveSyncLocalBus).publish("inventory", STOCK);
   }
@@ -153,7 +141,6 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void storeOrderAjax_onValidationFailure_pokesNeitherRoom() {
-    // A rejected store never reached the backend; nothing changed for peers to re-fetch.
     UUID id = UUID.randomUUID();
     BindingResult errors = noErrors();
     errors.reject("invalid");

@@ -35,22 +35,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Pins that {@code UexUniverseSyncService.reconcileRefineryTerminalFlags()} actually COMMITS its
- * derived flags when called the way production calls it — from {@code UexScheduler}'s {@code
- * finally}, with no ambient transaction (REQ-REFINERY-020).
+ * Verifies that {@code UexUniverseSyncService.reconcileRefineryTerminalFlags()} commits its flags
+ * when called without an ambient transaction (REQ-REFINERY-020); unlike {@link
+ * UexUniverseSyncRefineryFlagTest} it is deliberately not transactional.
  *
- * <p>Deliberately NOT annotated {@code @Transactional}, which is the entire point and the reason
- * this lives apart from {@link UexUniverseSyncRefineryFlagTest}. That sibling class is
- * {@code @Transactional}, so the method under test merely joins the test's own read-write
- * transaction and passes regardless of its own transaction settings. Without an outer transaction
- * the Spring proxy applies whatever the method declares, and {@code UexUniverseSyncService} is
- * annotated {@code @Transactional(readOnly = true)} at class level: were the explicit
- * {@code @Transactional} on the method ever dropped, Hibernate would switch the new transaction to
- * {@code FlushMode.MANUAL} and discard the flag writes <em>silently</em> — no exception, no log,
- * and an empty refinery picker in production while every other test stayed green.
- *
- * <p>Writes are committed for real here, so the fixture is removed in {@link #cleanUp()} rather
- * than rolled back.
+ * <p>Writes are committed, so {@link #cleanUp()} removes the fixture.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -102,8 +91,6 @@ class UexRefineryFlagCommitTest {
 
     service.reconcileRefineryTerminalFlags();
 
-    // Re-read in a fresh transaction: a read-only reconciliation would have dropped this write on
-    // the floor and the flag would still be false.
     assertTrue(
         spaceStationRepository.findByName(STATION_NAME).orElseThrow().getHasRefineryTerminal(),
         "reconcileRefineryTerminalFlags() must commit the derived flag outside an ambient"

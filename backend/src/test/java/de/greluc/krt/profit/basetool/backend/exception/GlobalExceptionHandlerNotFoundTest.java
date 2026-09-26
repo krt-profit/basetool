@@ -71,13 +71,10 @@ class GlobalExceptionHandlerNotFoundTest {
 
   @Test
   void handleNotFound_shouldReturn404ProblemJson() {
-    // Given
     NotFoundException ex = new NotFoundException("Mission not found");
 
-    // When
     ResponseEntity<ProblemDetail> response = handler.handleNotFound(ex, request);
 
-    // Then
     assertEquals(HttpStatus.NOT_FOUND.value(), response.getStatusCode().value());
     assertEquals(MediaType.APPLICATION_PROBLEM_JSON, response.getHeaders().getContentType());
     ProblemDetail pd = response.getBody();

@@ -37,21 +37,15 @@ import org.thymeleaf.context.Context;
 
 /**
  * Renders {@code fragments/modal-wrapper :: modal} with every parameter shape the templates use and
- * asserts the shell it emits (REQ-UI-013, ADR-0177): a {@code <dialog class="krt-modal-overlay">}
- * whose {@code .krt-modal} frame has an {@code <h2>} title and one ✕ close control, and the page's
- * body inserted below the head.
- *
- * <p>A fragment fails only when it is rendered, never when it is compiled, and every dialog in the
- * app now goes through this one — so a broken parameter here would break all of them at once, on
- * the first page that opens.
+ * asserts the emitted shell (REQ-UI-013, ADR-0177): a {@code <dialog class="krt-modal-overlay">}
+ * whose {@code .krt-modal} frame has an {@code <h2>} title, one ✕ close control and the page body
+ * below the head.
  */
 @SpringBootTest
 class ModalWrapperRenderTest {
 
   @Autowired private ITemplateEngine templateEngine;
 
-  // The full application context refuses to start without these collaborators; the engine render
-  // itself does not touch them (the same pattern as ComponentFragmentsRenderTest).
   @MockitoBean private BackendApiClient backendApiClient;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;

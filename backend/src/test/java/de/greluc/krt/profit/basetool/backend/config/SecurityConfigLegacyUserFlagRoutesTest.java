@@ -41,16 +41,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins what the security chain does with the two retired per-user flag endpoints, {@code PATCH
- * /api/v1/users/{id}/logistician} and {@code PATCH /api/v1/users/{id}/mission-manager}.
- *
- * <p>Both endpoints were removed when the Logistician / Mission-Manager flags moved onto the
- * per-Staffel membership row ({@code PATCH /api/v1/squadrons/{id}/members/{userId}}), but {@link
- * SecurityConfig} kept a dedicated ADMIN-only matcher for each until 2026-09-22 — rules guarding
- * URLs nothing serves, which read as if the endpoints still existed. Deleting them must not open
- * the paths: they now fall to the {@code /api/v1/users/**} catch-all, which is ADMIN-only as well.
- * This class proves both halves — a non-admin is still refused by the chain, and an admin reaches
- * no handler at all.
+ * Pins that the removed endpoints {@code PATCH /api/v1/users/{id}/logistician} and {@code
+ * .../mission-manager} stay closed: the ADMIN-only {@code /api/v1/users/**} catch-all refuses
+ * non-admins, and admins reach no handler.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -71,9 +64,9 @@ class SecurityConfigLegacyUserFlagRoutesTest {
   }
 
   /**
-   * An OFFICER was never allowed here and still is not: the catch-all refuses before any handler.
+   * An OFFICER is refused by the catch-all before any handler.
    *
-   * @param flag the retired path segment
+   * @param flag the removed path segment
    * @throws Exception when MockMvc fails to perform the request
    */
   @ParameterizedTest(name = "PATCH .../{0} as OFFICER is 403")

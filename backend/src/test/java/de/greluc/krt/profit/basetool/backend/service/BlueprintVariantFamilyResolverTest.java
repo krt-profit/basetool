@@ -32,21 +32,14 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Tests {@link BlueprintVariantFamilyResolver} against the real Star Citizen naming corpus that
- * drove its design: cosmetic-variant merging in both directions, the deliberately-conservative
- * non-merging of unquoted sub-models and cross-family names, the magazine exclusion (atomic,
- * capacity-sensitive, energy/ballistic/throwable spellings), the normalization traps (double-space
- * re-collapse, apostrophes inside a nickname, curly quotes), and the curated alias overrides. The
- * real {@link BlueprintNameNormalizer} and {@link BlueprintVariantAliasOverrides} are wired in so
- * the derivation runs end-to-end exactly as production does.
+ * Tests {@link BlueprintVariantFamilyResolver} on real Star Citizen names: variant merging,
+ * conservative non-merging, magazine exclusion, normalization edge cases and alias overrides.
  */
 class BlueprintVariantFamilyResolverTest {
 
   private final BlueprintVariantFamilyResolver resolver =
       new BlueprintVariantFamilyResolver(
           new BlueprintNameNormalizer(), new BlueprintVariantAliasOverrides());
-
-  // ─────────────────────────── base ⇄ variant merging ───────────────────────────
 
   /**
    * Provides (base, variant) pairs from the real corpus: each cosmetic variant carries a quoted
@@ -56,13 +49,11 @@ class BlueprintVariantFamilyResolverTest {
    */
   private static Stream<Arguments> baseAndVariant() {
     return Stream.of(
-        // The owner's canonical examples.
         Arguments.of("Fresnel Energy LMG", "Fresnel \"Rockfall\" Energy LMG"),
         Arguments.of("Fresnel Energy LMG", "Fresnel \"Molten\" Energy LMG"),
         Arguments.of("Novian Crossbow", "Novian \"Wildshot\" Crossbow"),
         Arguments.of("Novian Crossbow", "Novian \"Nighthunter\" Crossbow"),
         Arguments.of("Novian Crossbow", "Novian \"Ghostmaker\" Crossbow"),
-        // Web-grounded real families.
         Arguments.of("Gallant Rifle", "Gallant \"Nightstalker\" Rifle"),
         Arguments.of("Demeco LMG", "Demeco \"Purgatory Camo\" LMG"),
         Arguments.of("Arrowhead Sniper Rifle", "Arrowhead \"Lamplighter\" Sniper Rifle"),
@@ -86,7 +77,6 @@ class BlueprintVariantFamilyResolverTest {
 
   @Test
   void twoVariantsOfTheSameBaseShareFamilyKey() {
-    // A required variant must match a member who owns a *different* variant (sibling-to-sibling).
     assertEquals(
         resolver.familyKey("Novian \"Wildshot\" Crossbow"),
         resolver.familyKey("Novian \"Ghostmaker\" Crossbow"));
@@ -103,14 +93,10 @@ class BlueprintVariantFamilyResolverTest {
 
   @Test
   void doubleSpaceFromMidNameNicknameIsRecollapsed() {
-    // Regression: removing a mid-name quoted token leaves a double space; the re-collapse is
-    // mandatory or the variant key never equals the single-spaced base key.
     String key = resolver.familyKey("Fresnel \"Rockfall\" Energy LMG");
     assertFalse(key.contains("  "), "family key must not contain a double space");
     assertEquals("fresnel energy lmg", key);
   }
-
-  // ─────────────────────────── normalization edge cases ───────────────────────────
 
   @Test
   void apostropheInsideNicknameSurvivesAndWholeQuotedSpanIsRemoved() {
@@ -121,7 +107,6 @@ class BlueprintVariantFamilyResolverTest {
 
   @Test
   void curlyQuotedVariantMergesWithStraightQuotedAndBase() {
-    // U+201C/U+201D are folded to ASCII quotes by the normalizer before stripping.
     assertEquals(
         resolver.familyKey("Sawtooth Combat Knife"),
         resolver.familyKey("Sawtooth “Sirocco” Combat Knife"));
@@ -147,8 +132,6 @@ class BlueprintVariantFamilyResolverTest {
     assertEquals("", resolver.familyKey(null));
   }
 
-  // ─────────────────────────── conservative non-merging ───────────────────────────
-
   /**
    * Provides pairs of names that must stay in <em>distinct</em> families: cross-family names, ship
    * sub-models, and unquoted sub-models the conservative rule deliberately does not merge.
@@ -157,13 +140,10 @@ class BlueprintVariantFamilyResolverTest {
    */
   private static Stream<Arguments> mustStayDistinct() {
     return Stream.of(
-        // The planted cross-family trap: a knife model vs a rifle — the type word is load-bearing.
         Arguments.of("Sawtooth \"Sirocco\" Combat Knife", "Karna \"Valor\" Rifle"),
-        // Ship sub-models.
         Arguments.of("Aurora MR", "Aurora LN"),
         Arguments.of("Cutlass Black", "Cutlass Red"),
         Arguments.of("300i", "325a"),
-        // Different weapon-type word within a family name -> different craftable.
         Arguments.of("Karna Rifle", "Karna Pistol"));
   }
 
@@ -172,8 +152,6 @@ class BlueprintVariantFamilyResolverTest {
   void distinctProductsDoNotMerge(String a, String b) {
     assertNotEquals(resolver.familyKey(a), resolver.familyKey(b));
   }
-
-  // ─────────────────────────── magazines are never variants ───────────────────────────
 
   /**
    * Provides (weapon, magazine) pairs spanning the real ammo-container spellings: ballistic
@@ -207,10 +185,8 @@ class BlueprintVariantFamilyResolverTest {
 
   @Test
   void magazineKeyIsAtomicAndCapacitySensitive() {
-    // Two capacities of the same magazine are distinct products and must not merge with each other.
     assertNotEquals(
         resolver.familyKey("S-38 Magazine (15 cap)"), resolver.familyKey("S-38 Magazine (20 cap)"));
-    // ... and a magazine only ever equals an identical magazine.
     assertEquals(
         resolver.familyKey("Karna Magazine (40 cap)"),
         resolver.familyKey("Karna Magazine (40 cap)"));
@@ -229,53 +205,36 @@ class BlueprintVariantFamilyResolverTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        // A parenthetical that is a state/sub-model, not a capacity (no digit + "cap").
-        "Coda Pistol (Modified)",
-        // Substrings that merely contain the letters cap/mag are NOT magazines.
-        "Capacitor Module",
-        "Magma Cutter"
-      })
+  @ValueSource(strings = {"Coda Pistol (Modified)", "Capacitor Module", "Magma Cutter"})
   void nonMagazinesAreNotMisdetected(String name) {
     assertFalse(resolver.isMagazine(name), name + " must not be detected as a magazine");
   }
 
   @Test
   void nicknameContainingMagLettersDoesNotTriggerMagazineDetection() {
-    // A hypothetical "Magma" livery must still merge into its weapon family, not be atomized.
     assertEquals(
         resolver.familyKey("Pulverizer LMG"), resolver.familyKey("Pulverizer \"Magma\" LMG"));
   }
 
-  // ─────────────────────────── curated alias overrides ───────────────────────────
-
   @Test
   void baseNameDriftIsCanonicalizedByAliasLayer() {
-    // "Pulse \"Blacklist\" Pistol" -> "pulse pistol" (drops "Laser"); the alias folds it onto the
-    // full "pulse laser pistol" that the manufacturer-livery skins keep.
     assertEquals(
         resolver.familyKey("Pulse \"ArcCorp\" Laser Pistol"),
         resolver.familyKey("Pulse \"Blacklist\" Pistol"));
     assertEquals("pulse laser pistol", resolver.familyKey("Pulse \"Blacklist\" Pistol"));
   }
 
-  // ─────────────────────────── display base name ───────────────────────────
-
   @Test
   void displayBaseNamePreservesCaseAndStripsNickname() {
     assertEquals("Fresnel Energy LMG", resolver.displayBaseName("Fresnel \"Molten\" Energy LMG"));
     assertEquals("Novian Crossbow", resolver.displayBaseName("Novian “Wildshot” Crossbow"));
     assertEquals("Custodian SMG", resolver.displayBaseName("Custodian \"Citizen's Pride\" SMG"));
-    // A magazine has no cosmetic quote, so its label is returned unchanged.
     assertEquals(
         "Karna Rifle Battery (35 cap)", resolver.displayBaseName("Karna Rifle Battery (35 cap)"));
   }
 
   @Test
   void unquotedSubModelsAreMergedOnlyWhenAliased() {
-    // Curated equivalences: Salvo signature editions and the Model II Arclight fold onto their
-    // base.
     assertEquals(
         resolver.familyKey("Salvo Frag Pistol"), resolver.familyKey("Salvo Esteban Frag Pistol"));
     assertEquals(

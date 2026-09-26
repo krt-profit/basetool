@@ -43,11 +43,8 @@ class JobOrderIntegrityServiceTest {
   @Mock private JobOrderItemRepository jobOrderItemRepository;
   @InjectMocks private JobOrderIntegrityService service;
 
-  // covers REQ-ORDERS-033 (drifted lines are collected and counted for the integrity gauge)
   @Test
   void verifyReportsEveryDriftedLine() {
-    // Given the production case that motivated the check: a Cryo-Star SL line still pointing at
-    // the HeatSink blueprint after an SC-Wiki re-point, plus a second, unrelated drift.
     JobOrderItemBlueprintDrift cooler =
         new JobOrderItemBlueprintDrift(
             UUID.randomUUID(),
@@ -73,7 +70,6 @@ class JobOrderIntegrityServiceTest {
     assertThat(report.isClean()).isFalse();
   }
 
-  // covers REQ-ORDERS-033 (a consistent database reports clean, so the gauge falls back to 0)
   @Test
   void verifyReportsCleanWhenNoLineDrifted() {
     when(jobOrderItemRepository.findBlueprintOutputDrift()).thenReturn(List.of());

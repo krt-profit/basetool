@@ -45,11 +45,8 @@ class BlueprintsMockupCheckE2eTest {
   private static Browser browser;
 
   /**
-   * Skips the class unless {@code BP_CHECK=true}, then boots the headless browser of the configured
-   * engine ({@code -Pe2e.browser}) through {@link E2eSupport#launchBrowser}. The assumption runs
-   * <em>before</em> any browser launch: a CI matrix cell installs only its own engine, so an
-   * unconditional launch of a hard-coded one fails the whole class with a {@code DriverException}
-   * instead of skipping it.
+   * Skips the class unless {@code BP_CHECK=true}, then launches the configured engine through
+   * {@link E2eSupport#launchBrowser}.
    */
   @BeforeAll
   static void setUp() {
@@ -102,7 +99,6 @@ class BlueprintsMockupCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "bp-initial.png")));
 
-      // Add a blueprint through the typeahead if the collection is still empty.
       Locator rows = page.locator("#krt-bp-master-rows .master-row");
       if (rows.count() == 0) {
         page.locator("#krt-bp-search-input").fill("Demo");
@@ -138,7 +134,6 @@ class BlueprintsMockupCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "bp-master-detail.png")));
 
-      // Open the edit-note modal: must use the wide KRT frame without scrollbars.
       if (page.locator("#krt-bp-detail-edit").isVisible()) {
         page.locator("#krt-bp-detail-edit").click();
         page.waitForTimeout(300);

@@ -29,12 +29,9 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Locks the JSON property names of {@link MatrixGridDto} to exactly what the browser grid ({@code
- * /js/materials-matrix.js}) reads. The boolean components ({@code isIllegal}, {@code
- * hasLoadingDock}, …) carry {@code @JsonProperty} precisely because Jackson would otherwise strip
- * the {@code is}/{@code has} prefix and emit {@code illegal} / {@code loadingDock}, silently
- * breaking the client at render time (the build would still pass). This test fails fast if anyone
- * removes those annotations or renames a field out of sync with the script.
+ * Locks the JSON property names of {@link MatrixGridDto} to what {@code /js/materials-matrix.js}
+ * reads, including the {@code @JsonProperty}-kept {@code is} / {@code has} prefixes of the boolean
+ * components.
  */
 class MatrixGridDtoTest {
 
@@ -80,7 +77,6 @@ class MatrixGridDtoTest {
       assertTrue(json.contains(key), "expected JSON key " + key + " in: " + json);
     }
 
-    // The bean-stripped forms must NOT appear — the client does not read them.
     assertFalse(json.contains("\"illegal\""), "isIllegal must not be stripped to 'illegal'");
     assertFalse(json.contains("\"loadingDock\""), "hasLoadingDock must not be stripped");
     assertFalse(json.contains("\"autoLoad\""), "isAutoLoad must not be stripped to 'autoLoad'");

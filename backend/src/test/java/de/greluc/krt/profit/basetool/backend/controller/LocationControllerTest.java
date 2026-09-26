@@ -42,16 +42,13 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Pure-method unit tests for {@link LocationController}. Key behaviour documented in the test
- * names:
+ * Unit tests for {@link LocationController}.
  *
  * <ul>
- *   <li>The POST create endpoint must pass through {@link
- *       LocationMapper#stripServerManaged(Location)} so a client cannot mass-assign onto an
- *       existing row via {@code id} / {@code version}.
- *   <li>The "lookup" endpoint returns reference DTOs directly from the service — no mapper
- *       involvement.
- *   <li>Pagination wrapping ({@link PageResponse}) honours the {@code includeHidden} flag verbatim.
+ *   <li>Create passes through {@link LocationMapper#stripServerManaged(Location)}, so {@code id} /
+ *       {@code version} cannot be mass-assigned.
+ *   <li>The lookup endpoint returns the service's reference DTOs unmapped.
+ *   <li>{@link PageResponse} wrapping honours the {@code includeHidden} flag.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -98,10 +95,6 @@ class LocationControllerTest {
 
   @Test
   void lookup_returnsReferenceListDirectlyFromService_noMapper() {
-    // The lookup endpoint exposes a stripped-down ReferenceDto for
-    // dropdowns; the service produces it directly so the mapper is not
-    // involved. A refactor that re-routed through the mapper would
-    // accidentally expose internal fields.
     List<LocationReferenceDto> refs =
         List.of(
             new LocationReferenceDto(UUID.randomUUID(), "Lorville"),
@@ -159,10 +152,6 @@ class LocationControllerTest {
 
   @Test
   void create_stripsServerManagedFields_andDelegatesToService() {
-    // SECURITY: a client must not be able to set `id` or `version` via the
-    // POST body and trigger an UPDATE instead of an INSERT. The controller
-    // calls stripServerManaged() on the freshly mapped entity to guarantee
-    // an INSERT path. This test pins that contract.
     LocationDto request = new LocationDto(UUID.randomUUID(), "New Loc", "desc", false, false, 99L);
     Location mappedEntity = new Location();
     mappedEntity.setId(request.id());
@@ -182,8 +171,6 @@ class LocationControllerTest {
 
     assertSame(response, result);
 
-    // Capture the entity actually passed to the service — its id/version
-    // MUST be null (stripped).
     ArgumentCaptor<Location> entityCap = ArgumentCaptor.forClass(Location.class);
     verify(service).createLocation(entityCap.capture());
     Location forwarded = entityCap.getValue();
@@ -193,8 +180,6 @@ class LocationControllerTest {
 
   @Test
   void update_forwardsIdAndDtoToService_withoutEntityMapping() {
-    // Note: the update endpoint forwards the DTO directly (NOT the mapped
-    // entity) so the service can apply only the user-mutable fields.
     UUID id = UUID.randomUUID();
     LocationDto request = new LocationDto(id, "Renamed", "desc", false, false, 4L);
     Location updated = new Location();

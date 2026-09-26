@@ -530,12 +530,14 @@ On a workstation, never on production:
 1. Reproduce the line on the **new** digest under a pids cap well below what a thread-spawning class
    needs — for example a class that starts threads in a loop, run with
    `docker run --rm --pids-limit 60 eclipse-temurin:25-jre-alpine@sha256:<new> java Spawn.java`.
-2. Compare what it prints with the filter and with the verbatim line recorded in the rule's comment.
-   If the wording changed, widen the filter so it matches both, and replace the recorded line.
+2. Compare what it prints with the filter and with the verbatim lines recorded in
+   `scripts/check-loki-rule-signatures.py`. If the wording changed, widen the filter so it matches
+   both, and replace the recorded lines.
 3. Confirm the three masking replaces in `alloy/config.alloy`'s `container_mask` cannot touch either
    phrase (they match a JWT, an e-mail address and a bearer/token/session-id keyword), and that the
    only `stage.drop` is still `older_than = "167h"`.
-4. Record the verified digest and date in the rule's comment and run `scripts/check-loki-rules.sh`.
+4. Record the verified digest and date in the paragraph above and in REQ-OBS-007
+   (`docs/specs/observability.md`), and run `scripts/check-loki-rules.sh`.
 5. The same bump owes `JvmStartupCacheRejected` its re-check (same file, same stream): build an app
    image on the new digest, start it with `JAVA_TOOL_OPTIONS=-XX:-UseCompactObjectHeaders` (the
    image's cache is trained with the flag on), and compare the `[aot]` lines it prints with the
@@ -604,8 +606,8 @@ pre-2026-09-13 frontend/ingest figure was taken on a different collector (ADR-01
 re-measurement under the new layout is owed (`REQ-OPS-030`) and no limit may be re-derived from the
 older numbers. The cutover to Podman is a third such boundary for anything cgroup-derived.
 
-Three traps, all of which have produced a wrong fix here (see the **JVM CONTAINER SIZING** block in
-`docker-compose.yml`):
+Three traps, all of which have produced a wrong fix here (the measured figures are in the REQ-OPS-020
+[sizing ledger](../docs/specs/deployment-delivery.md#sizing-ledger)):
 
 - **`working_set != heap + nonheap`.** A third term — JVM-internal native memory that no JVM metric
   reports (G1 auxiliary structures sized off *max* heap, JIT scratch, glibc malloc arenas) — was

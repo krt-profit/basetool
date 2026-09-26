@@ -17,20 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Operations-index create/delete module (/operations), extracted verbatim from the two former inline
- * scripts of operations-index.html (ADR-0069, follow-up to #924).
- *
- * Wires the delete-confirmation modal opener and the in-place AJAX create + delete flows (#576): each
- * intercepts the classic form submit, writes through the krtFetch X-Requested-With twin, and refreshes
- * the list fragment via window.krtOperationsReload (exposed by the sibling operations.js filter module)
- * so the active filter query is preserved — no full-page reload. The classic POST->redirect forms stay
- * the no-JS fallback.
- *
- * The localized toast + conflict strings are the only Thymeleaf interpolation, so they stay inline in
- * the page bootstrap as the OPS_MSG global this module reads.
- */
-
 /* global OPS_MSG */
 
 function openDeleteModal(id) {
@@ -42,17 +28,12 @@ function openDeleteModal(id) {
     window.krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
-// CSP-safe delegated binding (replaces onclick="openDeleteModal(this.getAttribute('data-id'))").
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'operations-open-delete', function (el) {
         openDeleteModal(el.getAttribute('data-id'));
     });
 }
 
-// #576: create + delete an operation in place (no full-page reload). The classic POST->redirect
-// forms stay the no-JS fallback; here we intercept the submit, write via the krtFetch
-// X-Requested-With twin, then refresh the list fragment in place via window.krtOperationsReload
-// (exposed by operations.js) so the active filter query is preserved.
 function opsConflictStrings() {
     return {
         title: OPS_MSG.conflictTitle,
@@ -73,15 +54,13 @@ function reloadOperationsList() {
 }
 
 (function () {
-    if (!window.krtFetch) return; // no-JS / no-foundation: the classic POST->redirect forms run.
+    if (!window.krtFetch) return;
 
     const createForm = document.getElementById('create-operation-form');
     if (createForm) {
         createForm.addEventListener('submit', function (event) {
             event.preventDefault();
             const owner = createForm.querySelector('[name="owningOrgUnitId"]');
-            // Disable the submit while the write is in flight so a double-click cannot create
-            // the operation twice (the old POST->redirect flow blocked this via full navigation).
             const submitBtn = createForm.querySelector('button[type="submit"]');
             if (submitBtn) submitBtn.disabled = true;
             window.krtFetch
@@ -113,8 +92,6 @@ function reloadOperationsList() {
     if (deleteForm) {
         deleteForm.addEventListener('submit', function (event) {
             event.preventDefault();
-            // Disable the submit while the write is in flight so a double-click cannot fire a
-            // second delete (whose stale version would 409 after the first one succeeded).
             const submitBtn = deleteForm.querySelector('button[type="submit"]');
             if (submitBtn) submitBtn.disabled = true;
             window.krtFetch

@@ -80,9 +80,6 @@
         </div>
     </div>
 
-    <!--/* Rejected registrations (REQ-SEC-034). Read-only apart from the reopen action, which returns
-         a row to the queue above so an erroneous rejection is recoverable from the UI instead of by
-         a manual database write. */-->
     <div class="hud-box mt-2">
         <h2 class="mt-0" th:text="#{admin.discordRegistrations.rejected.title}">Abgelehnte Registrierungen</h2>
         <p class="reg-when" th:text="#{admin.discordRegistrations.rejected.hint}">Eine irrtümlich abgelehnte Registrierung kann wieder in die Warteschlange zurückgeholt werden.</p>
@@ -130,7 +127,6 @@
         </div>
     </div>
 
-    <!--/* Reject reason modal (no native dialogs, REQ-UI) */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide', body=~{::reject-modal-body})}">
         <th:block th:ref="reject-modal-body">
             <div class="krt-modal-body">
@@ -144,8 +140,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Reopen-confirmation modal (no native dialogs, REQ-UI). Carries an optional note that lands
-         in the approval audit alongside the REOPENED decision (REQ-SEC-034). */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reopen-modal', titleKey='admin.discordRegistrations.reopen.modal.title', variant='krt-modal--wide', body=~{::reopen-modal-body})}">
         <th:block th:ref="reopen-modal-body">
             <div class="krt-modal-body">
@@ -160,9 +154,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Link-to-existing-account modal (no native dialogs, REQ-UI). Server-searched account picker
-         (remote-users combobox) so an admin can find the existing account even when the Discord
-         handle differs from the in-app name (REQ-SEC-026). */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='link-modal', titleKey='admin.discordRegistrations.link.modal.title', variant='krt-modal--wide', body=~{::link-modal-body})}">
         <th:block th:ref="link-modal-body">
             <div class="krt-modal-body">
@@ -179,11 +170,6 @@
             </div>
         </th:block>
     </th:block>
-    <!--/* Merge-an-older-account modal (no native dialogs, REQ-UI). The remedy for the queue's
-         duplicate-callsign marker: a login whose subject matches no account no longer adopts one
-         found by name, so a member who ended up with two accounts needs their data moved onto the
-         one they can reach (REQ-SEC-045). Same server-searched account picker as the link modal --
-         the two differ in what moves, not in how the account is chosen. */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='merge-modal', titleKey='admin.discordRegistrations.merge.modal.title', variant='krt-modal--wide', body=~{::merge-modal-body})}">
         <th:block th:ref="merge-modal-body">
             <div class="krt-modal-body">

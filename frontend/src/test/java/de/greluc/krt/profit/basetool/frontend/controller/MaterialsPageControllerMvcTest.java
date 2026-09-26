@@ -51,23 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level rendering checks for the {@code /materials} category-listing page and the {@code
- * /materials/{id}} detail page.
- *
- * <p>Originally added because Thymeleaf 3.1's JavaScript-inline mechanism truncates the rest of the
- * surrounding {@code <script>} block as soon as it serialises a Java {@code List}/{@code
- * Collection} into a JS context — the substituted {@code ["Aluminum"]} value swallows every event
- * after it. That truncation killed the {@code window.krtEvents.on('click', 'materials-toggle-kind',
- * …)} registration further down in the script, so clicking a category header no longer expanded the
- * materials grid. The autocomplete name list now lives in a {@code <datalist>} sibling element
- * instead, which means the script no longer needs to inline a {@code List}. The detail page carried
- * the same broken pattern (terminal names list); the second test in this class pins the
- * post-datalist filter binding there.
- *
- * <p>The assertions below pin both halves of the contract: the post-datalist binding survives into
- * the rendered HTML, and the page ends with the closing {@code </html>} tag (i.e. Thymeleaf did not
- * abort mid-render). A regression that re-introduces the broken inline pattern would fail the
- * second assertion long before any human notices the missing click handler.
+ * Render tests for the {@code /materials} listing and {@code /materials/{id}} detail pages: the
+ * delegated filter and toggle bindings appear in the output and the page renders completely, which
+ * fails if a Java list is inlined into the page script again.
  */
 @SpringBootTest
 class MaterialsPageControllerMvcTest {
@@ -110,27 +96,14 @@ class MaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/materials"))
         .andExpect(status().isOk())
-        // The click/grouping handlers moved into static/js/materials.js (ADR-0069); pin that the
-        // page loads the module. If the render truncated mid-stream (the bug this test exists to
-        // prevent), the th:src tag near the end of the body would disappear from the output.
         .andExpect(content().string(containsString("src=\"/js/materials.js\"")))
-        // The category-grouping view toggle and both views (grouped accordion + flat grid) must
-        // render. The flat grid materialises the shared material-card fragment, so a broken
-        // fragment reference would 500 the render before any of these strings appear.
         .andExpect(content().string(containsString("data-trigger=\"materials-toggle-grouping\"")))
         .andExpect(content().string(containsString("id=\"materialsGrouped\"")))
         .andExpect(content().string(containsString("id=\"materialsFlat\"")))
-        // Rendering must not abort mid-stream. A truncated response stops at the substituted
-        // expression value (e.g. ["Aluminum"]) and never emits the closing </body></html> pair.
         .andExpect(content().string(containsString("</body>")))
         .andExpect(content().string(containsString("</html>")))
-        // The datalist that carries the autocomplete names must have rendered with the material as
-        // an option — that's the data source the surrounding script now reads from.
         .andExpect(content().string(containsString("<datalist id=\"materialNames-data\">")))
         .andExpect(content().string(containsString("<option value=\"Aluminum\">")))
-        // covers the .form-group checkbox regression class (PR #1405): the page-scoped rule must
-        // carry the :where() exclusion so it can never capture a checkbox/radio (the grouping
-        // toggle sits right next to the filter's .form-group) and stretch it into a padded bar.
         .andExpect(
             PageStylesheets.content(
                 containsString(
@@ -159,14 +132,8 @@ class MaterialsPageControllerMvcTest {
   }
 
   /**
-   * Mirror of {@link #listMaterials_rendersCategoryToggleBindingAndCompletesScript()} for the
-   * per-material detail page ({@code /materials/{id}}). Pre-fix, {@code material-detail.html}
-   * carried the same broken inline pattern (now {@code const terminalNames = …}) at the top of its
-   * script, so the {@code 'material-detail-filter-terminals'} delegated binding registered at the
-   * tail of the script — plus the surrounding sortable-column handler — silently never wired. The
-   * datalist workaround moves the terminal names into {@code <datalist id="terminalNames-data">}
-   * next to the filter input. This test pins both halves of the same contract: the post-datalist
-   * binding key is in the rendered HTML, and the response actually contains {@code </html>}.
+   * Same as {@link #listMaterials_rendersCategoryToggleBindingAndCompletesScript()} for the detail
+   * page: the terminal filter binding is present and the page renders completely.
    */
   @Test
   @WithMockUser
@@ -199,9 +166,6 @@ class MaterialsPageControllerMvcTest {
             200,
             true,
             true);
-    // The detail price list is page-walked (CatalogPages.fetchAll); a totalPages=1 response ends
-    // the
-    // walk after page 0 (REQ-UI-015).
     PageResponse<MaterialPriceDto> pricesPage =
         new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, List.of());
 
@@ -215,20 +179,11 @@ class MaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/materials/" + id))
         .andExpect(status().isOk())
-        // Post-datalist binding: the filter/sort handlers moved into static/js/material-detail.js
-        // (ADR-0069); pin that the page loads the module. If the render truncated, the th:src tag
-        // near the end of the body would disappear from the output.
         .andExpect(content().string(containsString("src=\"/js/material-detail.js\"")))
-        // Rendering completion marker: the truncation aborts before </body></html>.
         .andExpect(content().string(containsString("</body>")))
         .andExpect(content().string(containsString("</html>")))
-        // The datalist that carries the terminal names must be rendered with the price's terminal
-        // as an option — that's the data source the surrounding script now reads from.
         .andExpect(content().string(containsString("id=\"terminalNames-data\"")))
         .andExpect(content().string(containsString("value=\"Area18\"")))
-        // covers the .form-group checkbox regression class (PR #1405): the page-scoped rule must
-        // carry the :where() exclusion so it can never capture a checkbox/radio and stretch it into
-        // a full-width padded bar (it ties the global KRT square rule and renders after it).
         .andExpect(
             PageStylesheets.content(
                 containsString(

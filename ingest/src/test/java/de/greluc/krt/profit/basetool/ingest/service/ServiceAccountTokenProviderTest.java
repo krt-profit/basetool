@@ -49,12 +49,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
 /**
- * Behaviour of the gateway's own identity for the backend hop (ADR-0129).
- *
- * <p>This grant sits on the critical path of <em>every</em> ingest upload since the gateway stopped
- * relaying the caller's token, and it fails in a hop no client can see. The cases that matter are
- * therefore the unhappy ones: an unconfigured gateway, a refusing Keycloak, and an answer that
- * parses but carries nothing usable.
+ * Unit tests for the gateway's own identity on the backend hop (ADR-0129), focused on the failure
+ * cases: an unconfigured gateway, a refusing Keycloak, and an answer without a usable token.
  */
 class ServiceAccountTokenProviderTest {
 
@@ -144,11 +140,8 @@ class ServiceAccountTokenProviderTest {
   }
 
   /**
-   * A token whose remaining life is inside the refresh skew is replaced.
-   *
-   * <p>The skew exists so a token that expires in flight never reaches the backend — the failure
-   * would surface there as an opaque 401 with no hint that the clock, not the credential, was
-   * wrong.
+   * A cached token whose remaining life is inside the refresh skew is replaced, so it cannot expire
+   * in flight.
    */
   @Test
   void reMintsWhenTheCachedTokenIsInsideTheRefreshSkew() {
@@ -157,7 +150,6 @@ class ServiceAccountTokenProviderTest {
     ServiceAccountTokenProvider provider = provider(true);
 
     assertThat(provider.currentToken()).isEqualTo("AT-1");
-    // expires_in 10s minus the 30s default skew is already in the past, so the next call re-mints.
     assertThat(provider.currentToken()).isEqualTo("AT-2");
     assertThat(keycloak.getRequestCount()).isEqualTo(2);
   }
@@ -173,13 +165,7 @@ class ServiceAccountTokenProviderTest {
     assertThat(outcome("failed")).isEqualTo(1.0);
   }
 
-  /**
-   * A 200 that carries no access token is a failure, not an empty success.
-   *
-   * <p>Without this the gateway would put an empty bearer on the backend hop, and the backend would
-   * answer a malformed-token 401 — the failure would be reported one layer away from its cause,
-   * which is exactly the shape of the incident this whole change exists to fix.
-   */
+  /** A 200 without an access token is a failure, so no empty bearer reaches the backend. */
   @Test
   void failsWhenTheAnswerCarriesNoAccessToken() {
     keycloak.enqueue(
@@ -208,7 +194,6 @@ class ServiceAccountTokenProviderTest {
   /** A partially configured gateway is treated as unconfigured — all three values or none. */
   @Test
   void treatsAPartialConfigurationAsUnconfigured() {
-    // secret deliberately left blank
     ServiceAccountProperties properties =
         TestProperties.serviceAccount(
             "token-uri", keycloak.url("/token").toString(), "client-id", "basetool-ingest-gateway");
@@ -272,9 +257,8 @@ class ServiceAccountTokenProviderTest {
   }
 
   /**
-   * {@code invalidate()} drops the cache: the next call mints a fresh token although the old one
-   * had minutes left. This is what the backend-401/403 mapping relies on (ING-SEC-02) — a refused
-   * token must not be replayed until its natural expiry.
+   * {@code invalidate()} drops the cache, so the next call mints a fresh token although the old one
+   * had not expired.
    */
   @Test
   void invalidateForcesTheNextCallToMintAFreshToken() {

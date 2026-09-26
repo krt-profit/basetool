@@ -27,20 +27,14 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Write payload for posting a material wanted-listing (Gesuch) to the Materialbörse ("Material
- * suchen", REQ-MARKET-015) — the request-side counterpart to {@link
- * MaterialExchangeReleaseRequest}.
+ * Payload for posting a material wanted-listing (Gesuch) to the Materialbörse (REQ-MARKET-015).
  *
- * <p>Unlike a material release there is no backing Lager row: the requester names the catalogue
- * material directly, the desired quantity in the material's own unit (SCU or Stück), and an
- * optional minimum quality they are looking for. Owner and squadron are stamped from the acting
- * member; there is no ownership or stock check. A member may post several requests for the same
- * material (no de-duplication).
+ * <p>Owner and squadron are set server-side; several requests for the same material are allowed.
  *
  * @param materialId the catalogue material being requested; must exist.
  * @param minQuality the optional minimum desired quality (0–1000), or {@code null} for no floor.
  * @param requestedAmount the desired quantity in the material's own unit; must be positive.
- * @param remark the free-form Markdown description, at most 20 000 characters (may be blank).
+ * @param remark the Markdown description, at most 20 000 characters (may be blank).
  */
 public record MaterialRequestCreateRequest(
     @NotNull UUID materialId,

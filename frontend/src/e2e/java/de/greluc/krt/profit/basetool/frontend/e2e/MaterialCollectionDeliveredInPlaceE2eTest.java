@@ -40,27 +40,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the stale optimistic-lock {@code @Version} bug class on in-place writes (epic
- * #571, #577): the material-collection "delivered" checkbox ({@code PATCH
- * /inventory/{id}/delivered} → {@code InventoryItemService.updateDelivered}) toggles through {@code
- * window.krtFetch.write} without a page reload and must survive a SECOND consecutive toggle of the
- * SAME row.
+ * E2E regression test: the material-collection "delivered" checkbox toggles in place and a second
+ * consecutive toggle of the same row must not conflict, i.e. each write syncs the fresh
+ * {@code @Version} onto the row.
  *
- * <p>The proven bug: a pre-fix backend returned a stale item version after the first toggle, so the
- * second toggle — replaying that version — 409ed with {@code OPTIMISTIC_LOCK}. The fix flushes
- * (save → saveAndFlush) so the response carries the fresh version, which the page syncs back onto
- * the row's {@code data-version} via {@code containerSelector}.
- *
- * <p>Each toggle flips the boolean (off → on, then on → off), so both are genuine changes that bump
- * the {@code @Version}. A window marker proves no reload happened between the two toggles; the
- * persisted {@code delivered} flag is read back from the backend to confirm the second write
- * landed; and the absence of an error toast is the discriminator that turns the second toggle red
- * on the pre-fix backend.
- *
- * <p><b>Drive via UI, verify via API.</b> The job order + a job-order-linked inventory item are
- * seeded through {@link BackendSeeder}; the outcome is read back from {@code GET
- * /api/v1/orders/{jobOrderId}/material-collection} rather than re-inspecting the toggled checkbox,
- * so the assertion never races the post-write render.
+ * <p>Asserts no reload via a window marker and reads the persisted flag back from the backend.
  */
 @Tag("e2e")
 class MaterialCollectionDeliveredInPlaceE2eTest {
@@ -80,8 +64,6 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
   private static BackendSeeder seeder;
   private static Path storageState;
 
-  // Seeded once: a job order, its requested material, a storage location, and a job-order-linked
-  // inventory item whose delivered flag the test toggles twice.
   private static String jobOrderId;
   private static String deliveredItemId;
 
@@ -125,12 +107,8 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
   }
 
   /**
-   * Opens the job order's material-collection page, toggles the seeded row's delivered checkbox
-   * once (asserting a success toast and no reload), then — without reloading — toggles it back,
-   * asserting the second consecutive toggle succeeds (success toast, no error toast, marker
-   * survives) and that the second value is the one the backend persisted. The second toggle only
-   * succeeds if the write synced the fresh {@code @Version} onto the row's {@code data-version} — a
-   * stale version 409s.
+   * Toggles the seeded row's delivered checkbox twice without reloading and asserts both toggles
+   * succeed and the second value is persisted.
    */
   @Test
   void togglesDeliveredInPlaceThenSecondToggleDoesNotConflict() {
@@ -145,8 +123,6 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId + "/material-collection");
         page.waitForLoadState();
 
-        // Marker on the live document: a full reload wipes it, so its survival proves both toggles
-        // stayed in place.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         Locator checkbox =
@@ -155,7 +131,6 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
 
         boolean initial = persistedDelivered();
 
-        // First in-place toggle: flips the boolean, a genuine change.
         toggleInPlace(page, checkbox);
         assertEquals(
             Boolean.TRUE,
@@ -163,8 +138,6 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
             "the delivered toggle must update in place — no page reload on success");
         assertEquals(!initial, persistedDelivered(), "the first in-place toggle must persist");
 
-        // Second consecutive in-place toggle WITHOUT a reload: only succeeds if the first write
-        // synced the fresh @Version onto the row's data-version (otherwise the stale version 409s).
         toggleInPlace(page, checkbox);
         assertEquals(
             Boolean.TRUE,
@@ -182,10 +155,8 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
   }
 
   /**
-   * Clears any prior toast, clicks the delivered checkbox, waits for the in-place {@code PATCH
-   * /inventory/{id}/delivered} to settle, and asserts the success UX: a non-error success toast
-   * appeared and NO error toast surfaced — the latter being what a stale second toggle would
-   * trigger on the pre-fix backend.
+   * Clicks the delivered checkbox, waits for the in-place {@code PATCH /inventory/{id}/delivered},
+   * and asserts a success toast and no error toast.
    *
    * @param page the authenticated material-collection page
    * @param checkbox the seeded row's delivered checkbox

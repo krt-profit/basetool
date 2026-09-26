@@ -54,29 +54,12 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import org.springframework.web.util.pattern.PatternParseException;
 
 /**
- * Rejects an oversized non-multipart request body on the configured heavy JSON import paths with
- * 413 BEFORE Spring MVC binds it, so a multi-million-element array cannot be materialised in heap
- * only to be thrown away by Jakarta {@code @Size} validation afterwards (security review,
- * memory-DoS on the refinery {@code import-extract} endpoint).
+ * Rejects an oversized non-multipart request body on the configured JSON import paths with 413
+ * before Spring MVC binds it.
  *
- * <p>An honestly-declared {@code Content-Length} over the cap is rejected without reading the body.
- * A {@code Transfer-Encoding: chunked} body carries no {@code Content-Length} ({@code
- * getContentLengthLong()} returns {@code -1}), which could otherwise smuggle an unbounded body past
- * a length-only check; for that case the body is counted as it is read and rejected the instant it
- * crosses the cap, holding at most the cap (plus one read buffer) in memory. A within-cap chunked
- * body is buffered and re-served to the controller unchanged.
- *
- * <p>Scoped to {@link RequestBodyLimitProperties#getPaths()} only (the refinery extract by default)
- * and skips multipart uploads (handled by the {@code spring.servlet.multipart} cap), so ordinary
- * small JSON writes and the multipart imports are unaffected.
- *
- * <p>The configured paths are matched as parsed {@link PathPattern}s against the <em>decoded</em>
- * request path, not compared to the raw {@code getRequestURI()}. {@code getRequestURI()} is the raw
- * percent-encoded URI per the servlet spec while Spring MVC routes on the decoded path, so the
- * previous exact string comparison left the cap off for {@code /%61pi/v1/refinery-orders/…} — an
- * encoded spelling the dispatcher decodes and delivers to the very controller the cap protects. The
- * default {@code StrictHttpFirewall} blocks {@code %2e}, {@code %2f} and {@code %25}, but not
- * ordinary letter escapes like {@code %61}.
+ * <p>An over-cap {@code Content-Length} is rejected without reading; a chunked body is counted
+ * while read and rejected once it crosses the cap, otherwise buffered and re-served unchanged.
+ * Paths are matched as {@link PathPattern}s against the decoded request path.
  */
 @Slf4j
 public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
@@ -85,22 +68,17 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
   private final AppProblemProperties problemProperties;
   private final MeterRegistry meterRegistry;
 
-  /**
-   * The configured paths, compiled once at construction. A configured entry is normally a literal
-   * path, which compiles to a pattern that matches exactly that path — the semantics of the {@code
-   * List#contains} test this replaced — while still allowing an operator to configure a wildcard.
-   */
+  /** The configured capped paths, compiled once; a literal entry matches exactly that path. */
   private final List<PathPattern> cappedPaths;
 
   /**
-   * Compiles {@link RequestBodyLimitProperties#getPaths()} into {@link PathPattern}s up front, so a
-   * malformed entry fails the context start with a message naming it instead of silently never
-   * matching and leaving the endpoint uncapped at runtime.
+   * Compiles {@link RequestBodyLimitProperties#getPaths()} into {@link PathPattern}s, failing
+   * startup on a malformed entry.
    *
    * @param properties the validated cap configuration (enabled flag, byte cap, capped paths)
-   * @param problemProperties RFC 7807 problem-type base URI used in the 413 body
-   * @param meterRegistry registry the {@code basetool_request_body_rejected_total} counter binds to
-   * @throws IllegalStateException when a configured path is blank or not valid {@link PathPattern}
+   * @param problemProperties RFC 7807 problem-type base URI for the 413 body
+   * @param meterRegistry registry for the {@code basetool_request_body_rejected_total} counter
+   * @throws IllegalStateException when a configured path is blank or invalid {@link PathPattern}
    *     syntax
    */
   public RequestBodySizeLimitFilter(
@@ -172,9 +150,8 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Skips every request the cap does not apply to: the filter is disabled, the decoded path matches
-   * none of the configured patterns, the request has no body ({@code GET}/{@code HEAD}/{@code
-   * DELETE}), or it is a multipart upload (bounded separately by the multipart cap).
+   * Skips requests the cap does not apply to: filter disabled, path not configured, no body ({@code
+   * GET}/{@code HEAD}/{@code DELETE}), or a multipart upload.
    *
    * @param request the current request
    * @return {@code true} to bypass the filter
@@ -206,12 +183,11 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Writes the 413 {@code application/problem+json} response and counts the rejection on {@code
-   * basetool_request_body_rejected_total} (REQ-OBS-011) so a flood of oversized-body probes is
-   * observable rather than silent.
+   * Writes the 413 {@code application/problem+json} response and increments {@code
+   * basetool_request_body_rejected_total} (REQ-OBS-011).
    *
    * @param response the response to populate
-   * @param request the request being rejected (its URI is echoed as the problem {@code instance})
+   * @param request the rejected request; its URI becomes the problem {@code instance}
    * @throws IOException if writing the body fails
    */
   private void reject(@NotNull HttpServletResponse response, @NotNull HttpServletRequest request)
@@ -235,8 +211,6 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
             + "\"}";
     byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
     response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
-    // Set the header directly and write UTF-8 bytes so the media type stays a clean
-    // application/problem+json without a `;charset=` suffix (matches RateLimitingFilter).
     response.setHeader("Content-Type", "application/problem+json");
     response.setHeader("X-Correlation-Id", correlationId);
     response.setContentLength(bytes.length);
@@ -244,10 +218,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Reads up to {@code maxBytes} from the stream, returning the buffered bytes — or {@code null}
-   * once the stream exceeds {@code maxBytes}, signalling the caller to reject with 413. At most
-   * {@code maxBytes} plus one read buffer is ever held, and reading stops the instant the cap is
-   * crossed.
+   * Reads the stream up to {@code maxBytes}, stopping as soon as the cap is crossed.
    *
    * @param in the request body stream
    * @param maxBytes the inclusive cap

@@ -24,16 +24,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Body of a consolidate-account request (REQ-SEC-055, #1828): fold the duplicate account named in
- * the path into the account the member keeps.
+ * Body of a consolidate-account request: folds the duplicate account named in the path into the
+ * account the member keeps (REQ-SEC-055).
  *
- * <p>The path carries the account that is <em>dissolved</em> and this body the one that
- * <em>survives</em> — the opposite way round from {@code POST /admin/registrations/{id}/merge},
- * deliberately: the admin acts on the duplicate's row in the member list, so the row they clicked
- * is the one the URL names.
- *
- * @param targetUserId the account the member keeps and everything moves onto; required
- * @param version the duplicate's optimistic-lock version the admin last read; {@code null} bypasses
- *     the check
+ * @param targetUserId the surviving account everything moves onto; required
+ * @param version the duplicate's optimistic-lock version; {@code null} bypasses the check
  */
 public record ConsolidateAccountRequest(@NotNull UUID targetUserId, @Nullable Long version) {}

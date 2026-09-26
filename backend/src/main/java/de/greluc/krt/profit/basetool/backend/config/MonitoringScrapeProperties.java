@@ -24,24 +24,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * Basic-auth credentials for the Prometheus scrape endpoint {@code /actuator/prometheus} (prefix
- * {@code app.monitoring.scrape}, fed by the {@code MONITORING_SCRAPE_USER} / {@code
- * MONITORING_SCRAPE_PASSWORD} environment variables — REQ-OBS-005, ADR-0072).
+ * Basic-auth credentials for the Prometheus scrape endpoint, bound under {@code
+ * app.monitoring.scrape} (REQ-OBS-005).
  *
- * <p>Both values are deliberately optional and carry no {@code @NotBlank} constraint: an
- * environment without a Prometheus scraper (dev, test, e2e, prod before the monitoring rollout)
- * simply leaves them unset. {@link MonitoringScrapeSecurityConfig} reacts fail-closed — with {@link
- * #isConfigured()} {@code false} the endpoint denies every request instead of falling back to an
- * unauthenticated default. An immutable record registered via {@code @ConfigurationPropertiesScan}
- * on {@code BackendApplication} (BE-MOD-04); its {@link #toString()} redacts the password.
+ * <p>Both values are optional; while unset, {@link MonitoringScrapeSecurityConfig} denies every
+ * request. {@link #toString()} redacts the password.
  *
- * @param username the username the Prometheus scraper presents via HTTP basic auth. Blank (the
- *     default) means "no scraper in this environment" and keeps the endpoint in its fail-closed
- *     deny-all state.
- * @param password the password the Prometheus scraper presents via HTTP basic auth. Blank (the
- *     default) means "no scraper in this environment" and keeps the endpoint in its fail-closed
- *     deny-all state. The plaintext value from the environment is BCrypt-hashed at startup by
- *     {@link MonitoringScrapeSecurityConfig}; it is never stored or logged beyond this binding.
+ * @param username the scraper's basic-auth username; blank means no scraper is configured
+ * @param password the scraper's basic-auth password, BCrypt-hashed at startup; blank means no
+ *     scraper is configured
  */
 @ConfigurationProperties(prefix = "app.monitoring.scrape")
 public record MonitoringScrapeProperties(

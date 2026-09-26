@@ -27,27 +27,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The frontend must drop an idle backend connection before the backend does.
- *
- * <p>Both ends bound the same idle connection and only the shorter bound is safe. The backend's
- * embedded Tomcat closes an idle HTTP/2 connection after {@code Http2Protocol.keepAliveTimeout};
- * the frontend's pool keeps offering one for {@code BACKEND_POOL_MAX_IDLE_TIME}. Whichever side
- * waits longer is the side that hands out a socket the peer has already torn down — and under
- * HTTP/2 with strict connection reuse that socket is carrying the whole burst, so a single mistimed
- * acquisition loses every stream on it at once rather than one request.
- *
- * <p>Both were 20&nbsp;s until 2026-09-20, which is not an alignment but a collision: the client's
- * window necessarily opens later than the server's (it starts when the last response finished
- * arriving, the server's when it finished being written), so equal lengths guarantee a slice of
- * time in which only one side still believes in the connection. Production lost fourteen streams on
- * one connection in the same millisecond against a backend that neither restarted nor logged
- * anything but 200s.
- *
- * <p>The server's side of the comparison is read off the {@link Http2Protocol} <b>on the
- * classpath</b> rather than typed in, so a Tomcat upgrade that lowers the default fails here
- * instead of in production. Nothing in this repository calls {@code setKeepAliveTimeout}, so the
- * default is what the backend runs; both modules resolve Tomcat through the same Spring Boot BOM,
- * so the version read here is the version the backend serves with.
+ * Verifies that the frontend drops an idle backend connection before the backend does: {@code
+ * BACKEND_POOL_MAX_IDLE_TIME} must be shorter than the {@link Http2Protocol} keep-alive timeout on
+ * the classpath.
  */
 class WebClientBackendPoolIdleBoundTest {
 

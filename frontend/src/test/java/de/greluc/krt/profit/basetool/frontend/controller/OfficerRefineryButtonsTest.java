@@ -64,10 +64,6 @@ class OfficerRefineryButtonsTest {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
-    // record RefineryOrderDto(UUID id, UserReferenceDto owner, LocationDto location,
-    // MissionReferenceDto mission, OffsetDateTime startedAt, Integer durationMinutes, Integer
-    // expenses, RefiningMethodDto refiningMethod, List<RefineryGoodDto> goods, RefineryOrderStatus
-    // status, Long version)
     RefineryOrderDto order =
         new RefineryOrderDto(
             orderId,
@@ -118,10 +114,6 @@ class OfficerRefineryButtonsTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.authentication(authToken)))
         .andExpect(status().isOk())
-        .andExpect(
-            content()
-                .string(
-                    org.hamcrest.Matchers.containsString(
-                        "Einlagern"))); // Should be visible for LOGISTICIAN (Officer)
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Einlagern")));
   }
 }

@@ -36,7 +36,6 @@
     <th:block th:unless="${isAllSquadronsMode}">
 
     <div class="hud-box mt-2">
-        <!--/* Save-all banner: only visible while ≥1 textarea is dirty. */-->
         <div id="pa-save-all-banner" class="pa-save-all-banner" role="status">
             <span>
                 <span class="pa-save-all-count" id="pa-save-all-count">0</span>
@@ -163,7 +162,6 @@
                         </summary>
                         <div class="pa-category-body">
                             <th:block th:with="contents=${categoryContentMap[cat.id.toString()]}">
-                                <!--/* Stufe A */-->
                                 <div class="pa-level-row"
                                      th:with="lc=${contents != null and !contents.?[level == 'LEVEL_A'].isEmpty() ? contents.?[level == 'LEVEL_A'][0] : null}">
                                     <span class="pa-level-label" th:text="#{promotion.level.a}">Stufe A</span>
@@ -182,7 +180,6 @@
                                             th:title="#{promotion.admin.levelcontent.save}"
                                             th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                                 </div>
-                                <!--/* Stufe B */-->
                                 <div class="pa-level-row"
                                      th:with="lc=${contents != null and !contents.?[level == 'LEVEL_B'].isEmpty() ? contents.?[level == 'LEVEL_B'][0] : null}">
                                     <span class="pa-level-label" th:text="#{promotion.level.b}">Stufe B</span>
@@ -201,7 +198,6 @@
                                             th:title="#{promotion.admin.levelcontent.save}"
                                             th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                                 </div>
-                                <!--/* Stufe C */-->
                                 <div class="pa-level-row"
                                      th:with="lc=${contents != null and !contents.?[level == 'LEVEL_C'].isEmpty() ? contents.?[level == 'LEVEL_C'][0] : null}">
                                     <span class="pa-level-label" th:text="#{promotion.level.c}">Stufe C</span>
@@ -232,10 +228,7 @@
     </th:block>
 </main>
 
-<!--/* The dialogs render only where their openers and their script do: in the admin's
-     all-squadrons view the page shows a pick-a-squadron prompt and loads neither. */-->
 <th:block th:unless="${isAllSquadronsMode}">
-<!--/* Create Topic Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create-topic', titleKey='promotion.admin.topics.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-topic-body})}">
     <th:block th:ref="modal-create-topic-body">
         <div class="krt-modal-body">
@@ -260,7 +253,6 @@
     </th:block>
 </th:block>
 
-<!--/* Edit Topic Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-edit-topic', titleKey='promotion.admin.topics.modal.edit.title', variant='krt-modal--wide', body=~{::modal-edit-topic-body})}">
     <th:block th:ref="modal-edit-topic-body">
         <div class="krt-modal-body">
@@ -286,7 +278,6 @@
     </th:block>
 </th:block>
 
-<!--/* Create Category Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create-category', titleKey='promotion.admin.category.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-category-body})}">
     <th:block th:ref="modal-create-category-body">
         <div class="krt-modal-body">
@@ -311,7 +302,6 @@
     </th:block>
 </th:block>
 
-<!--/* Edit Category Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-edit-category', titleKey='promotion.admin.category.modal.edit.title', variant='krt-modal--wide', body=~{::modal-edit-category-body})}">
     <th:block th:ref="modal-edit-category-body">
         <div class="krt-modal-body">
@@ -342,7 +332,6 @@
 <th:block th:replace="~{fragments/toast :: toast}" />
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
-    /*<![CDATA[*/
     var MSG_SAVED         = /*[[#{promotion.admin.topics.saved}]]*/ 'Saved';
     var MSG_DELETED       = /*[[#{promotion.admin.topics.deleted}]]*/ 'Deleted';
     var MSG_ERROR         = /*[[#{promotion.admin.topics.error}]]*/ 'Error';
@@ -356,7 +345,6 @@
     var MSG_CANCEL        = /*[[#{general.cancel}]]*/ 'Cancel';
     var MSG_DIRTY_LEAVE   = /*[[#{promotion.admin.topics.dirty.leave}]]*/ 'You have unsaved changes. Leave anyway?';
     var MSG_REFRESH_FAILED = /*[[#{promotion.refresh.failed}]]*/ 'Saved, but the view could not be refreshed. Please reload the page.';
-    /*]]>*/
 </script>
 <script th:src="@{/js/promotion-admin-topics.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </body>

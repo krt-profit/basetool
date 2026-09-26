@@ -50,13 +50,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the delegated appointment surface (epic #800, REQ-ROLE-004). Verifies
- * that the new {@code @PreAuthorize} SpEL expressions actually bind to {@link
- * OrgRoleManagementSecurityService} (a typo'd bean method would blow up the request, not return a
- * clean 403/200) and behave as the ladder requires: an authenticated non-leader is forbidden, while
- * both an admin and a caller the delegated authoriser approves are let through to the (mocked)
- * service. The verdict <em>logic</em> itself is unit-tested in {@code
- * OrgRoleManagementSecurityServiceTest}; here we only pin the wiring.
+ * MockMvc gate matrix for the delegated appointment surface (REQ-ROLE-004): verifies the
+ * {@code @PreAuthorize} expressions bind to {@link OrgRoleManagementSecurityService}, forbidding a
+ * non-leader and admitting an admin or an approved caller.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -80,9 +76,6 @@ class DelegatedAppointmentControllerSecurityTest {
   }
 
   private OrgUnitMembershipDto dtoStub() {
-    // The squadron-rank endpoints now return the service's DTO projection (assignSquadronRankDto),
-    // so the mocked service yields a DTO directly (L4, #923). This gate matrix only asserts the
-    // status, so a minimal DTO with null display fields is sufficient.
     return new OrgUnitMembershipDto(
         targetUser, null, squadronId, null, false, false, false, null, 1L);
   }
@@ -95,8 +88,6 @@ class DelegatedAppointmentControllerSecurityTest {
     }
     return jwt().jwt(j -> j.subject(UUID.randomUUID().toString())).authorities(auths);
   }
-
-  // --- squadron rank (PUT /api/v1/squadrons/{squadronId}/ranks/{userId}) ----
 
   @Test
   void assignSquadronRank_nonLeader_isForbidden() throws Exception {
@@ -137,8 +128,6 @@ class DelegatedAppointmentControllerSecurityTest {
         .andExpect(status().isOk());
   }
 
-  // --- Kommandogruppe create (POST /api/v1/squadrons/{squadronId}/kommando-groups) --
-
   @Test
   void createKommandoGroup_nonLeader_isForbidden() throws Exception {
     mockMvc
@@ -163,8 +152,6 @@ class DelegatedAppointmentControllerSecurityTest {
                 .with(member("ROLE_OFFICER")))
         .andExpect(status().isOk());
   }
-
-  // --- Bereich role (POST /api/v1/org-hierarchy/bereiche/{id}/members) ------
 
   @Test
   void addBereichRole_nonLeader_isForbidden() throws Exception {

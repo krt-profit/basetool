@@ -45,14 +45,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies the live-filter behaviour of the mission overview page:
- *
- * <ul>
- *   <li>the legacy "Filtern" submit button is no longer rendered,
- *   <li>the reset control and the AJAX results container are present,
- *   <li>the {@code fragment=results} query parameter returns only the results fragment (no outer
- *       page chrome).
- * </ul>
+ * Verifies the mission overview's live filter: no "Filtern" submit button, a reset control and AJAX
+ * results container are present, and {@code fragment=results} returns only the results fragment.
  */
 @SpringBootTest
 class MissionsLiveFilterPageTest {
@@ -80,17 +74,10 @@ class MissionsLiveFilterPageTest {
     mockMvc
         .perform(get("/missions"))
         .andExpect(status().isOk())
-        // Legacy filter submit button must be gone. The generic "<button type=submit>" backstop was
-        // removed because the global sidebar logout is now a CSRF-protected POST form/button (audit
-        // L-3), so a submit button legitimately renders on every page.
         .andExpect(content().string(not(containsString("id=\"missions-filter-submit\""))))
-        // AJAX results container must be present.
         .andExpect(content().string(containsString("id=\"missions-results\"")))
-        // Live-filter JS must be wired in.
         .andExpect(content().string(containsString("/js/missions.js")))
-        // KRT loading indicator present.
         .andExpect(content().string(containsString("missions-loading-indicator")))
-        // Reset control replaces the old filter submit.
         .andExpect(content().string(containsString("id=\"missions-filter-reset\"")));
   }
 
@@ -100,7 +87,6 @@ class MissionsLiveFilterPageTest {
     mockMvc
         .perform(get("/missions").param("fragment", "results"))
         .andExpect(status().isOk())
-        // The AJAX fragment must not include the outer page chrome.
         .andExpect(content().string(not(containsString("id=\"missions-filter-form\""))))
         .andExpect(content().string(not(containsString("id=\"missions-results\""))))
         .andExpect(content().string(not(containsString("<html"))));

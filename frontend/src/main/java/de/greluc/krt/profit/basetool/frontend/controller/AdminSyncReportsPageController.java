@@ -47,13 +47,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Spring MVC controller backing the {@code /admin/sync-reports} pages (SC_WIKI_SYNC_PLAN.md §8.8):
- * a combined view plus per-source views for SC Wiki and UEX. All three render the same {@code
- * admin/sync-reports} template, differing only in the {@code source} filter relayed to the backend
- * and the active-tab marker.
- *
- * <p>Admin-only — class-level {@code @PreAuthorize("hasRole('ADMIN')")} matches the backend gate.
- * Read-only: the page never mutates the audit log.
+ * Admin-only, read-only controller for the {@code /admin/sync-reports} pages: a combined view and
+ * per-source views for SC Wiki and UEX, all rendered by {@code admin/sync-reports}.
  */
 @Controller
 @UsesLayoutModel
@@ -119,15 +114,10 @@ public class AdminSyncReportsPageController {
   }
 
   /**
-   * Deletes sync-report events older than {@code days} days, optionally scoped to the active source
-   * tab, then redirects back to that tab with a flash result. A blank {@code source} purges the
-   * combined view (both catalogues); {@code "SCWIKI"} / {@code "UEX"} confine the purge to one
-   * source. The deleted-row count is relayed via the {@code deletedCount} flash attribute so the
-   * page can show a success banner; a backend failure or invalid input lands as an {@code error}
-   * flash attribute instead.
+   * Deletes sync-report events older than {@code days} days, for one source or both, and redirects
+   * back to the tab with the deleted count or an error as flash attribute.
    *
-   * @param source active source tab ({@code "SCWIKI"} / {@code "UEX"}), or blank for the combined
-   *     view
+   * @param source active source tab ({@code "SCWIKI"} / {@code "UEX"}), or blank for both
    * @param days minimum age in days a report must exceed to be deleted
    * @param redirectAttributes flash attributes carrier
    * @return redirect back to the matching sync-reports tab
@@ -157,13 +147,9 @@ public class AdminSyncReportsPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #deleteOld} — routed here ahead of the classic handler by the
-   * {@code X-Requested-With} header so the no-JS form keeps its redirect fallback. Performs the
-   * same purge but returns the deleted-row count as {@code {"deleted": <n>}} so the page can show a
-   * count toast and re-swap the results table in place instead of reloading.
+   * AJAX twin of {@link #deleteOld} that returns the deleted count as {@code {"deleted": <n>}}.
    *
-   * @param source active source tab ({@code "SCWIKI"} / {@code "UEX"}), or blank for the combined
-   *     view
+   * @param source active source tab ({@code "SCWIKI"} / {@code "UEX"}), or blank for both
    * @param days minimum age in days a report must exceed to be deleted
    * @return {@code 200 {"deleted": <n>}} on success, {@code 400} when {@code days < 1}, {@code 500}
    *     on a backend failure
@@ -191,17 +177,10 @@ public class AdminSyncReportsPageController {
   }
 
   /**
-   * Canonicalizes the caller-supplied source tab to one of the two catalogue names, or {@code null}
-   * for the combined view.
+   * Canonicalizes the caller-supplied source tab, so only one of two literals is ever relayed to
+   * the backend.
    *
-   * <p>Both callers of this used to differ on what "the source" was: the redirect trimmed and
-   * upper-cased it while the relayed backend query took the raw value, so {@code ?source=scwiki}
-   * landed the user on the SC Wiki tab but sent {@code scwiki} to the backend — which does not
-   * recognise it and therefore purges *both* catalogues. Canonicalizing once fixes that, and it is
-   * also what keeps the value out of the relayed URI: what is forwarded is one of two literals from
-   * this switch, never the caller's string.
-   *
-   * @param source active source tab, in any case and with surrounding whitespace, or {@code null}
+   * @param source source tab in any case and with surrounding whitespace, or {@code null}
    * @return {@code "SCWIKI"}, {@code "UEX"}, or {@code null} for the combined view
    */
   private static @Nullable String canonicalSource(@Nullable String source) {
@@ -252,21 +231,17 @@ public class AdminSyncReportsPageController {
   }
 
   /**
-   * Shared render path: fetches one page of events from the backend (filtered to {@code source}
-   * when non-null), populates the model, and returns the view name. A backend failure collapses to
-   * an error banner with an empty list rather than a 500.
+   * Fetches one page of sync-report events, optionally filtered by source, and populates the model;
+   * a backend failure yields an error banner and an empty list.
    *
-   * @param source backend source filter ({@code "SCWIKI"} / {@code "UEX"}), or {@code null} for the
-   *     combined view
-   * @param activeTab marker for the active tab in the template ({@code "ALL"} / {@code "SCWIKI"} /
-   *     {@code "UEX"})
-   * @param basePath the page's own path, used to build pager links
+   * @param source backend source filter ({@code "SCWIKI"} / {@code "UEX"}), or {@code null} for
+   *     both
+   * @param activeTab active tab marker ({@code "ALL"} / {@code "SCWIKI"} / {@code "UEX"})
+   * @param basePath the page's own path, for pager links
    * @param page zero-based page index
-   * @param fragment when {@code "results"} only the table + pager fragment is rendered (AJAX pager
-   *     swap, REQ-FE-002); otherwise the full page is returned
+   * @param fragment {@code "results"} to render only the table and pager (REQ-FE-002)
    * @param model Thymeleaf model
-   * @return the {@code admin/sync-reports} view name, or its {@code results} fragment for an AJAX
-   *     swap
+   * @return the {@code admin/sync-reports} view name, or its {@code results} fragment
    */
   @NotNull
   private String render(

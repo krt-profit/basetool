@@ -50,13 +50,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Write half of the {@code /refinery-orders} surface (#924, L5): the classic create / update /
- * delete / store form handlers and their {@code X-Requested-With}-routed AJAX twins, moved verbatim
- * out of {@link RefineryOrderPageController} so the read controller only renders pages. The
- * non-mutating {@code POST /refinery-orders/import} relay deliberately stays on the read controller
- * because it needs the whole create-page render machinery. Every endpoint here only relays the
- * bound form to the backend REST API via {@link BackendApiClient} — no other collaborator is
- * injected.
+ * Write handlers of the {@code /refinery-orders} surface: create, update, delete and store, each as
+ * a classic form handler and an {@code X-Requested-With} AJAX twin, relaying to the backend via
+ * {@link BackendApiClient}. Page rendering stays in {@link RefineryOrderPageController}.
  */
 @Controller
 @UsesLayoutModel
@@ -69,10 +65,8 @@ public class RefineryOrderWriteController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094, #1235). Every refinery mutation
-   * navigates away — the classic handlers redirect, the AJAX twins answer a {@code targetUrl} the
-   * detail page immediately follows — so a client-side broadcast would race the socket teardown.
-   * Publishing here also covers the no-JS fallback path with the same call site.
+   * Publishes live-sync pokes server-side after each refinery mutation (REQ-FE-015, ADR-0094),
+   * since every mutation navigates away before a client-side broadcast could go out.
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
@@ -80,21 +74,16 @@ public class RefineryOrderWriteController {
   private static final List<String> REFINERY_QUEUE_SECTION = List.of("queue");
 
   /**
-   * The shared-Lager section poked in addition to the refinery queue when an order is
-   * <em>stored</em>: "Einlagern" writes the refined output into the inventory, so an open Lager
-   * (REQ-INV-027, #1307) would otherwise sit stale until a manual reload. The {@code inventory}
-   * room and its {@code stock} key are owned by {@code LiveSyncTopicClass.INVENTORY_ALL}.
+   * The shared Lager section poked in addition to the refinery queue when an order is stored,
+   * because storing writes the refined output into the inventory.
    */
   private static final List<String> INVENTORY_STOCK_SECTION = List.of("stock");
 
   /**
    * Parses the start instant submitted by the form as a UTC {@link java.time.Instant}.
    *
-   * <p>Why: All timestamps in the system are persisted and transported solely in UTC (AGENTS.md
-   * "Consistent Date/Time/Zone Handling"). The frontend (datetime-splitter.js) therefore always
-   * sends an ISO-Instant string with 'Z' or with an offset. Backward compatible forms are
-   * additionally parsed (date only, local DateTime without zone - the latter is defensively
-   * interpreted as UTC to avoid an implicit and DST-prone use of {@code ZoneId.systemDefault()}).
+   * <p>Accepts an ISO instant with {@code Z} or an offset, a date only, or a local date-time
+   * without zone, which is interpreted as UTC.
    */
   static java.time.Instant parseStartedAt(String raw) {
     if (raw == null || raw.trim().isEmpty()) {
@@ -104,35 +93,28 @@ public class RefineryOrderWriteController {
     try {
       return java.time.Instant.parse(input);
     } catch (Exception ignored) {
-      /* not an instant */
     }
     try {
       return java.time.OffsetDateTime.parse(input).toInstant();
     } catch (Exception ignored) {
-      /* not offset date time */
     }
     if (input.length() == 10) {
-      // Date only -> start of day in UTC
       return java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
     }
-    // LocalDateTime without zone -> defensively interpret as UTC to avoid a double
-    // DST conversion. Correct inputs always carry 'Z' or an offset.
     return java.time.LocalDateTime.parse(input).toInstant(java.time.ZoneOffset.UTC);
   }
 
   /**
    * Persists a new refinery order from the create form.
    *
-   * <p>Translates each form-bound {@code RefineryGoodForm} into a {@code RefineryGoodDto} with
-   * minimal id-only Material/Location/User stubs (the backend re-hydrates the full records from the
-   * ids). Empty goods short-circuit with a localized error before reaching the backend. On failure
-   * the form is flashed back so the user keeps their input.
+   * <p>Empty goods fail with a localized error before any backend call; on failure the form is
+   * flashed back so the input is kept.
    *
    * @param form refinery-order create form
    * @param bindingResult validation errors carrier
    * @param redirectAttributes flash attributes carrier
-   * @return redirect to {@code /refinery-orders/create} on failure (preserves input), otherwise to
-   *     the source page or the list
+   * @return redirect to {@code /refinery-orders/create} on failure, otherwise to the source page or
+   *     the list
    */
   @NotNull
   @PostMapping("/create")
@@ -181,9 +163,8 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * Persists an edit to an existing refinery order. Mirrors {@link #createOrder} for the
-   * stubs-by-id pattern; additionally carries the optimistic-lock {@code version} from the form.
-   * Empty goods list short-circuits with a localized error before the backend call.
+   * Persists an edit to an existing refinery order, including its optimistic-lock {@code version};
+   * empty goods fail with a localized error before any backend call.
    *
    * @param id refinery order id
    * @param form refinery-order edit form
@@ -246,8 +227,7 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * Cancels a refinery order. The backend treats this as a soft-cancel (status transition);
-   * fine-grained authorization is enforced backend-side, the frontend only authenticates.
+   * Cancels a refinery order; the backend performs a status transition and enforces authorization.
    *
    * @param id refinery order id
    * @param redirectAttributes flash attributes carrier
@@ -274,11 +254,8 @@ public class RefineryOrderWriteController {
   /**
    * Completes a refinery order by storing the refined output as inventory entries.
    *
-   * <p>The store form picks the target location and (optionally) the receiving user/job-order; the
-   * backend computes the inventory rows from the order's goods and the chosen target. A validation
-   * failure flashes the form back and re-opens the store modal on the detail page. An item that
-   * combines the personal marker with a job order (REQ-INV-035) is rejected here with its own toast
-   * so the user sees the concrete reason instead of the generic backend-failure message.
+   * <p>A validation failure flashes the form back and re-opens the store modal; an item combining
+   * the personal marker with a job order (REQ-INV-035) gets its own toast.
    *
    * @param id refinery order id
    * @param form store form
@@ -311,7 +288,6 @@ public class RefineryOrderWriteController {
       RefineryOrderStoreDto dto = buildStoreDto(form);
       backendApiClient.post("/api/v1/refinery-orders/" + id + "/store", dto, Void.class);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
-      // Storing the refined output writes inventory rows, so an open Lager must refresh too.
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.store");
     } catch (BackendServiceException e) {
@@ -331,15 +307,14 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * Builds the {@link RefineryOrderDto} from a create/edit form (goods stubs + metadata), shared by
-   * the classic {@link #createOrder} / {@link #updateOrder} handlers and their AJAX twins. Goods
-   * rows without an input material/quantity are dropped. The create path passes a {@code null} id
-   * plus the form's {@code owningOrgUnitId} to stamp the owner; the edit path passes the real
-   * {@code id} and a {@code null} stamp so the backend preserves the original org-unit.
+   * Builds the {@link RefineryOrderDto} from a create or edit form, dropping goods rows without an
+   * input material or quantity. Shared by {@link #createOrder}, {@link #updateOrder} and their AJAX
+   * twins.
    *
    * @param id the refinery order id, or {@code null} when building a create DTO
    * @param form the bound create/edit form
-   * @param owningOrgUnitId the owning org-unit stamp ({@code null} on the edit path)
+   * @param owningOrgUnitId the owning org-unit stamp; {@code null} on the edit path, which keeps
+   *     the original
    * @return the order DTO ready to POST/PUT
    */
   @NotNull
@@ -459,11 +434,8 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * Whether any store row marks its output personal while also picking a job order — the
-   * contradictory combination the backend rejects with HTTP 400, since personal stock never carries
-   * an allocation (REQ-INV-035). The store dialog's JS already disables and clears the job-order
-   * picker while the personal box is ticked, so this only catches the no-JS fallback and a tampered
-   * payload; it exists to turn that case into a precise message instead of a generic store failure.
+   * Answers whether any store row marks its output personal while also picking a job order, which
+   * the backend rejects (REQ-INV-035).
    *
    * @param form the bound store form
    * @return {@code true} when at least one row is personal and carries a job order
@@ -477,11 +449,8 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #updateOrder} (#575): saves a refinery-order edit and returns the
-   * post-update navigation target as JSON, so the detail page navigates itself (and stays put with
-   * an inline toast on a validation/backend failure) instead of a server redirect. Routed by the
-   * {@code X-Requested-With} header; the classic form-POST handler stays the no-JS fallback.
-   * Binding / empty-goods errors → 400.
+   * AJAX twin of {@link #updateOrder}: saves a refinery-order edit and returns the navigation
+   * target as JSON; binding or empty-goods errors yield 400.
    *
    * @param id the refinery order id
    * @param form the bound edit form
@@ -519,10 +488,8 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #storeOrder} (#575): completes a refinery order (stores the refined output)
-   * and returns the navigation target as JSON. Routed by the {@code X-Requested-With} header; the
-   * classic handler stays the no-JS fallback. Binding errors — and an item combining the personal
-   * marker with a job order (REQ-INV-035) — → 400.
+   * AJAX twin of {@link #storeOrder}: stores the refined output and returns the navigation target
+   * as JSON; binding errors and a personal item with a job order (REQ-INV-035) yield 400.
    *
    * @param id the refinery order id
    * @param form the bound store form
@@ -543,7 +510,6 @@ public class RefineryOrderWriteController {
       backendApiClient.post(
           "/api/v1/refinery-orders/" + id + "/store", buildStoreDto(form), Void.class);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
-      // Storing the refined output writes inventory rows, so an open Lager must refresh too.
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
@@ -559,10 +525,7 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #deleteOrder} (#575): soft-cancels a refinery order and returns the list
-   * URL as JSON so the detail page navigates itself (after a KRT confirm) instead of a server
-   * redirect. Routed by the {@code X-Requested-With} header; the classic handler stays the no-JS
-   * fallback.
+   * AJAX twin of {@link #deleteOrder}: cancels a refinery order and returns the list URL as JSON.
    *
    * @param id the refinery order id
    * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
@@ -588,11 +551,8 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #createOrder} (#575): persists a new refinery order and returns the
-   * post-create navigation target as JSON, so the create page navigates itself on success and stays
-   * put with an inline toast (keeping the entered data) on a validation / empty-goods / backend
-   * failure instead of a server redirect. Routed by the {@code X-Requested-With} header; the
-   * classic form-POST handler stays the no-JS fallback. Binding / empty-goods errors → 400.
+   * AJAX twin of {@link #createOrder}: persists a new refinery order and returns the navigation
+   * target as JSON; binding or empty-goods errors yield 400.
    *
    * @param form the bound create form
    * @param bindingResult the binding/validation result
@@ -628,12 +588,7 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * Returns {@code 0.0} when the value is {@code null}. Used when saving a refinery order for the
-   * money fields ({@code expenses}, {@code otherExpenses}, {@code oreSales}): the frontend
-   * pre-fills these with 0 and a blur-handler restores 0 when the user clears the field, but
-   * Spring's form-binding still produces {@code null} for an empty submission. Normalising to 0
-   * means the backend always sees an explicit numeric value and the displayed-vs-stored value never
-   * disagrees on re-render.
+   * Returns {@code 0.0} for {@code null}, so an emptied money field is saved as an explicit zero.
    */
   private static Double nullToZero(Double value) {
     return value != null ? value : 0d;

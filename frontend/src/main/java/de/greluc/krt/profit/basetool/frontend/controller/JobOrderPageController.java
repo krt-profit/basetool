@@ -75,26 +75,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the job-order pages ({@code /orders}, {@code /orders/{id}}, {@code
- * /orders/create} plus a number of POST-only mutators).
+ * Spring MVC controller for the read side of the job-order pages ({@code /orders}, {@code
+ * /orders/{id}}, {@code /orders/create}): page and fragment renders plus read-only JSON proxies.
  *
- * <p>Job orders are the central work unit of the logistics workflow: created by squadron members,
- * assigned to logisticians, materialized via inventory handovers, and finally completed. The
- * controller covers the entire lifecycle plus the priority/status mutations, the assignee
- * management, the handover creation flow, and the unlink endpoints for materials and inventory
- * items. The list view's status filter is persisted client-side in per-browser {@code localStorage}
- * and echoed back as {@code status} query parameters — the former 30-day {@code
- * orders_filter_status} server cookie was removed, and no cookie is set for it any more (ADR-0120).
- *
- * <p>Since the #924 L5 read/write controller split this class holds only the read side — the page
- * and fragment renders plus the read-only JSON proxies; every state-mutating {@code /orders}
- * endpoint (create/update/delete, priority, status, claims, assignees, handovers, unlinks) lives
- * unchanged in {@link JobOrderWriteController}.
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
- * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather than
- * by anything next to the code. A method-level gate still wins where one is present.
+ * <p>Mutations live in {@link JobOrderWriteController}. The class-level {@code isAuthenticated()}
+ * gate is the floor; method-level gates take precedence (REQ-SEC-052).
  */
 @Controller
 @UsesLayoutModel
@@ -112,11 +97,10 @@ public class JobOrderPageController {
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
 
   /**
-   * Selectable page sizes for the order list. Larger than the shared 10/50/100 contract
-   * (REQ-INV-013) by design (REQ-ORDERS-020): the LOGISTICIAN drag-and-drop priority reorder works
-   * within one page, and the active queue (the default {@code OPEN}+{@code IN_PROGRESS} filter)
-   * must comfortably fit on the first page so reordering stays whole in the common case. A crafted
-   * out-of-list {@code size} snaps back to {@link #DEFAULT_PAGE_SIZE}.
+   * Selectable page sizes for the order list, large enough that the default active queue fits on
+   * one page for drag-and-drop reordering (REQ-ORDERS-020).
+   *
+   * <p>Any other {@code size} falls back to {@link #DEFAULT_PAGE_SIZE}.
    */
   private static final List<Integer> PAGE_SIZES = List.of(50, 100, 200);
 
@@ -182,31 +166,20 @@ public class JobOrderPageController {
           new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
 
   /**
-   * Renders the job-order list ({@code /orders}). Two filters drive the view:
+   * Renders the job-order list ({@code /orders}), filtered by status and squadron.
    *
-   * <ul>
-   *   <li>Status filter — the selected statuses arrive as repeatable {@code status} query
-   *       parameters (validated against {@link #VALID_STATUSES}); an empty or all-invalid selection
-   *       falls back to the default of {@code OPEN} + {@code IN_PROGRESS}. The selection is
-   *       persisted client-side in localStorage by {@code orders-index.js} (not a server cookie),
-   *       so the controller simply honours the statuses it receives.
-   *   <li>Squadron filter (multi-select, REQ-ORDERS-027) — a repeatable {@code squadronId} query
-   *       parameter names the selected squadrons (matching responsible OR requesting side). An
-   *       empty/absent selection means "all squadrons" (no narrowing), the default. Its state is
-   *       persisted client-side in localStorage by {@code orders-index.js} (not a server cookie),
-   *       so the controller simply honours the ids it receives.
-   * </ul>
+   * <p>Invalid or missing statuses fall back to {@code OPEN} + {@code IN_PROGRESS}; an empty
+   * squadron selection means all squadrons (REQ-ORDERS-027).
    *
    * @param status optional explicit status filter
    * @param squadronId optional repeatable squadron display filter (empty = all squadrons)
    * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link
    *     #DEFAULT_PAGE_SIZE}
-   * @param fragment when {@code "results"}, only the results-table fragment is rendered for an
-   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with orders, the page envelope ({@code ordersPage}), the
-   *     {@code pageSizes}, the filter-preserving {@code paginationBaseUrl}, the selected filters
-   *     and the aging thresholds for the row-color rendering
+   * @param fragment when {@code "results"}, only the results-table fragment is rendered
+   *     (REQ-FE-005); otherwise the full page
+   * @param model Thymeleaf model populated with the orders, page envelope, page sizes, pagination
+   *     base URL, selected filters and aging thresholds
    * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
    */
   @NotNull
@@ -220,30 +193,16 @@ public class JobOrderPageController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
       Model model) {
-    // Non-profit ordering-squad members (canViewJobOrders=false) still see the orders THEY placed —
-    // the requester-side "Meine Auftraege" list (REQ-ORDERS-023). Only a caller with neither the
-    // queue nor the requester capability is routed to the create form. requesterView drives the
-    // redacted list rendering + hides the reorder/progress affordances in the template.
     boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
     if (!canViewJobOrders && !canViewOwnJobOrders) {
       return "redirect:/orders/create";
     }
     model.addAttribute("requesterView", requesterView);
-    // Status filter (REQ-ORDERS-027): the selected statuses arrive as repeatable `status` query
-    // params, echoed by orders-index.js from its per-browser localStorage (no server cookie). They
-    // are validated against the known statuses for defence-in-depth; an empty, absent or
-    // all-invalid selection falls back to the default OPEN + IN_PROGRESS queue view.
     List<String> requestedStatuses = (status == null) ? List.of() : status;
     List<String> validStatuses =
         requestedStatuses.stream().filter(VALID_STATUSES::contains).toList();
     status = validStatuses.isEmpty() ? List.of("OPEN", "IN_PROGRESS") : validStatuses;
 
-    // Squadron display filter (multi-select, REQ-ORDERS-027): the picker's selected squadron ids
-    // arrive as repeatable squadronId params (echoed by orders-index.js from its per-browser
-    // localStorage state). An empty/absent selection means "all squadrons" (no narrowing) — the new
-    // default, replacing the former mine/all scope toggle. Only applies to the main queue, never
-    // the
-    // requester "Meine Auftraege" list (which is keyed on the caller's own requesting units).
     List<UUID> selectedSquadronIds =
         (squadronId == null) ? List.of() : squadronId.stream().filter(Objects::nonNull).toList();
     int effectivePage = page == null || page < 0 ? 0 : page;
@@ -255,10 +214,6 @@ public class JobOrderPageController {
     int redDays = 90;
     try {
       String statusParam = String.join(",", status);
-      // The requester "Meine Auftraege" list (REQ-ORDERS-023) is keyed on the caller's own
-      // requesting org units and takes no squadron display filter; the main queue applies the
-      // multi-squadron picker (matches responsible OR requesting). Both are paginated server-side
-      // (REQ-ORDERS-020), sorted priority,asc.
       StringBuilder squadronParamBuilder = new StringBuilder();
       if (!requesterView) {
         for (UUID sid : selectedSquadronIds) {
@@ -280,8 +235,6 @@ public class JobOrderPageController {
               PAGE_OF_JOB_ORDER);
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
-        // The nested walk exists purely to emit a per-material debug line; skip the whole
-        // orders×materials iteration (and its per-row varargs allocation) when debug is off.
         if (log.isDebugEnabled()) {
           for (JobOrderDto order : orders) {
             for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto mat :
@@ -325,10 +278,6 @@ public class JobOrderPageController {
     model.addAttribute("pageSizes", PAGE_SIZES);
     model.addAttribute("paginationBaseUrl", buildPaginationBaseUrl(status, selectedSquadronIds));
     model.addAttribute("selectedStatuses", status);
-    // The multi-squadron picker (REQ-ORDERS-027): the active squadrons to offer + the currently
-    // selected ids. An empty selection renders every box checked (the "all squadrons" default); the
-    // client then reconciles the checkboxes against its localStorage on load. Omitted for the
-    // requester view, whose list carries no squadron filter.
     if (!requesterView) {
       model.addAttribute("squadrons", fetchActiveSquadrons());
       model.addAttribute("selectedSquadronIds", selectedSquadronIds);
@@ -342,10 +291,7 @@ public class JobOrderPageController {
   }
 
   /**
-   * Builds the {@code baseUrl} the pagination fragment threads {@code page}/{@code size} onto so
-   * page and size links keep the active status + squadron filter. The repeatable {@code status} and
-   * {@code squadronId} params are reproduced exactly as the filter submits them; the tokens are
-   * fixed enum names / UUIDs, so no extra escaping is required.
+   * Builds the pagination base URL carrying the active status and squadron filters.
    *
    * @param status the resolved (never empty) status filter
    * @param squadronIds the selected squadron ids (empty = no squadron filter)
@@ -379,28 +325,13 @@ public class JobOrderPageController {
       Model model,
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
-    // A non-profit ordering-squad member (canViewJobOrders=false) may still open the detail of an
-    // order THEY placed — the backend returns a redacted view via the requester escape
-    // (REQ-ORDERS-023) or 403 for a foreign order (caught below). requesterView renders the limited
-    // template (no Bearbeiter, no materials summary; comment + not-yet-delivered material edit
-    // only).
-    // Provisional, capability-based value: enough to gate the redirect below and to render the
-    // error path if the order fetch fails. Once the order is loaded it is overridden with the
-    // backend's authoritative PER-ORDER redaction signal (review finding 2).
     boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
     if (!canViewJobOrders && !canViewOwnJobOrders) {
-      // Neither capability: route to the create form (only order surface open to them).
       return fragment != null ? "orders-detail :: fragmentError" : "redirect:/orders/create";
     }
     model.addAttribute("requesterView", requesterView);
     try {
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
-      // Finding 2: key the detail rendering off the backend's per-order redaction flag, not the
-      // global capability. A profit-eligible member who is ALSO the requester of a
-      // foreign-processed
-      // order (canViewJobOrders=true, so the capability value above was false) still receives the
-      // redacted data from the backend — this makes the limited template match it, instead of
-      // rendering the full chrome over zeroed/absent values.
       requesterView = order.redacted();
       model.addAttribute("requesterView", requesterView);
       model.addAttribute("order", order);
@@ -409,9 +340,6 @@ public class JobOrderPageController {
 
       boolean canAssign = !requesterView && isLogistician(principal);
       model.addAttribute("isLogistician", canAssign);
-      // The requester edit modal reuses the material editor, so it needs the materials catalogue to
-      // populate the "add material" picker and a prefilled jobOrderForm (comment + material lines +
-      // version). No user/squadron/owner-picker lookups — the requester touches none of those.
       if (requesterView) {
         model.addAttribute("materials", fetchMaterials());
         if (!model.containsAttribute("jobOrderForm")) {
@@ -437,12 +365,6 @@ public class JobOrderPageController {
       }
 
       if (canAssign) {
-        // These logistician-only lookups are independent; fetch them concurrently and apply the
-        // results on the request thread. Each fetch helper swallows its own failure and returns an
-        // empty list, so join() never throws and the page degrades exactly as the serial version
-        // did. The materials / squadrons / all-kinds org-unit lookups are cache-backed catalogue
-        // reads. #1193: the assignee-add picker now searches users on demand (remote-users combobox
-        // -> /users/search), so the former uncached /users?size=1000 load-all is gone.
         CompletableFuture<List<MaterialDto>> materialsFuture =
             parallelPageLoader.loadAsync(this::fetchMaterials);
         CompletableFuture<List<SquadronDto>> squadronsFuture =
@@ -479,12 +401,6 @@ public class JobOrderPageController {
         }
       }
 
-      // Production book-in section (REQ-INV-032, design §6.4): the acting-user seed of the
-      // #production-modal's owner combobox. The modal's location picker searches locations on
-      // demand (remote-locations combobox -> /catalog/location-search, REQ-FE-016), so no
-      // locations catalog is preloaded. Only the full-page render of an ITEM order for a
-      // logistician dereferences the seed — the modal is not a fragment target, so section
-      // swaps skip the lookup.
       if (canAssign && "ITEM".equals(order.type()) && fragment == null) {
         model.addAttribute("actingUser", fetchActingUser());
       }
@@ -512,41 +428,18 @@ public class JobOrderPageController {
 
       if (!model.containsAttribute("handoverForm")) {
         JobOrderHandoverForm handoverForm = new JobOrderHandoverForm();
-        // The time is pre-filled client-side in the user's browser
-        // (see orders-detail.html, openHandoverModal) so that the user's
-        // browser timezone (not the server/container) is used.
         handoverForm.setRecipientSquadron(
             order.requestingOrgUnit() != null ? order.requestingOrgUnit().shorthand() : null);
         model.addAttribute("handoverForm", handoverForm);
       }
 
-      // Item orders carry their own handover form (per-line whole-unit delivery). Empty by default;
-      // the modal renders one row per still-outstanding ordered-item line, bound by request-param
-      // name. The flag gates the "log handover" button so it hides once every line is delivered.
       if (!model.containsAttribute("itemHandoverForm")) {
         model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
       }
       model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
       model.addAttribute("isFullyDelivered", isFullyDelivered(order));
-      // Kennzahlen-Band (KPI strip): derived totals rendered between the header and the tabs
-      // (REQ-ORDERS-026). Computed server-side so the fragment stays presentation-only and the
-      // ?fragment=kpi swap re-renders the same numbers after a claim / handover / production
-      // booking.
       model.addAttribute("kpi", computeKpi(order));
 
-      // Item-order blueprint coverage: which members of the responsible squadron/SK own the
-      // blueprints for the ordered items. The backend gates this members-only (it returns 403 for a
-      // non-member viewing an otherwise-public SK order), so the call is isolated in its own
-      // try/catch — on any failure the section is simply omitted rather than failing the whole
-      // page.
-      //
-      // The attribute is only ever rendered on the full page (pane-blueprints) or its own in-place
-      // swap (fragment=blueprint-owners, the count-variants toggle re-render); every other section
-      // swap — header, items, item-handovers, kpi, assignees, … — discards it. Fetching it on those
-      // swaps too was a wasted backend round-trip for members and, because the endpoint is
-      // members-only (403 for a non-member of the responsible org unit), a stream of 403/WARN log
-      // noise on the backend for every unrelated swap a non-member's open detail page issued. Scope
-      // the fetch to the two renders that actually consume it.
       if ("ITEM".equals(order.type())
           && (fragment == null || "blueprint-owners".equalsIgnoreCase(fragment))) {
         try {
@@ -560,13 +453,6 @@ public class JobOrderPageController {
         }
       }
 
-      // Item stock (REQ-ORDERS-028): the game-item stock earmarked to this order, grouped per game
-      // item — the item sibling of the material drill-down, rendered inline in each ordered item's
-      // expand row on the "Bestellte Items" tab. Only an ITEM order carries it and the requester
-      // view omits it (mirroring the aggregated pane), so the fetch is scoped to the full page and
-      // the `items` section swap. `itemStockByGameItem` keys each group by its game-item id so the
-      // template matches an ordered line to its earmarked stock in O(1). Isolated so a failure
-      // degrades to "no stock" rather than failing the page.
       if ("ITEM".equals(order.type())
           && !requesterView
           && (fragment == null || "items".equalsIgnoreCase(fragment))) {
@@ -588,11 +474,6 @@ public class JobOrderPageController {
         }
       }
 
-      // Orphaned linked inventory (REQ-ORDERS-019): inventory linked to this order whose material
-      // the order does not require — invisible in the material tables, surfaced as a warning so a
-      // logistician can undo a mis-assignment. Only needed on the full page (not the in-place
-      // section swaps), and isolated so a failure just omits the warning rather than failing the
-      // page.
       if (fragment == null) {
         try {
           model.addAttribute(
@@ -612,8 +493,6 @@ public class JobOrderPageController {
       model.addAttribute("error", "error.joborder.load.details");
       return "redirect:/orders";
     }
-    // In-place section swap (#571/#575): re-render only the section the caller mutated. The full
-    // model is already built above, so each fragment renders with every attribute it needs.
     if (fragment != null) {
       return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
         case "materials" -> "orders-detail :: materialsSection";
@@ -633,15 +512,10 @@ public class JobOrderPageController {
   }
 
   /**
-   * Renders the create-order form ({@code /orders/create}). Seeds the materials + orderable-item
-   * catalogs and the two owner-pickers; the {@code source} parameter threads through so the
-   * post-save redirect can return to the originating page.
+   * Renders the create-order form ({@code /orders/create}) with the material and orderable-item
+   * catalogs and both owner-pickers (ADR-0149).
    *
-   * <p>The route requires a login (ADR-0149). There is no guest rendering any more, and with it
-   * went the pre-selection of the configured intake Spezialkommando that used to stand in for an
-   * anonymous caller's missing org context.
-   *
-   * @param source optional origin marker
+   * @param source optional origin marker for the post-save redirect
    * @param principal the caller
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code order-create} view name
@@ -675,11 +549,10 @@ public class JobOrderPageController {
   }
 
   /**
-   * Renders the item-order edit page — the create form reused in edit mode. Loads the order, blocks
-   * non-item orders and orders that already have an item-handover (those are frozen), prefills the
-   * metadata form, and injects the existing item lines as {@code window.EDIT_ITEMS} so the create
-   * form's JS rebuilds them (item + blueprint + amount + per-material quality + sub-assembly
-   * parent).
+   * Renders the item-order edit page: the create form in edit mode, with the existing lines
+   * injected as {@code window.EDIT_ITEMS}.
+   *
+   * <p>Non-item orders and orders with an item handover redirect to the detail page.
    *
    * @param id the item-order id
    * @param model Thymeleaf model
@@ -708,8 +581,6 @@ public class JobOrderPageController {
       return "redirect:/orders/" + id;
     }
 
-    // The shared create template renders both the (hidden) material form and the item form, so the
-    // material form's th:object bean must exist even in item-edit mode.
     if (!model.containsAttribute("jobOrderForm")) {
       model.addAttribute("jobOrderForm", new JobOrderForm());
     }
@@ -732,13 +603,13 @@ public class JobOrderPageController {
   }
 
   /**
-   * Builds the prefill payload for {@code window.EDIT_ITEMS}: one entry per ordered-item line with
-   * its persistent id, booked production count, game item, blueprint, amount, the index of its
-   * sub-assembly parent line (or {@code null}), and a material-id → quality map. The list index
-   * doubles as the client line id, so a child's {@code parentId} is the list index of its parent.
+   * Builds the {@code window.EDIT_ITEMS} prefill: one entry per item line with its id, booked
+   * production, item, blueprint, amount, parent index and material-quality map.
+   *
+   * <p>The list index serves as the client line id.
    *
    * @param order the item order being edited
-   * @return the JS-serializable prefill list (Thymeleaf inlines it as a JSON array)
+   * @return the JS-serializable prefill list
    */
   @NotNull
   private List<java.util.Map<String, Object>> buildEditItems(@NotNull JobOrderDto order) {
@@ -760,16 +631,9 @@ public class JobOrderPageController {
         }
       }
       java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
-      // The line's persistent id must travel with the prefill and be posted back: it is what lets
-      // the backend re-derive this very row instead of recreating it, so its booked production
-      // survives the edit (REQ-ORDERS-032). Dropping it here silently resets manufactured counts.
       entry.put("id", line.id() != null ? line.id().toString() : null);
-      // Booked production, so the editor can stop the user from removing or shrinking a line the
-      // backend would reject anyway, and explain why up front.
       entry.put("manufactured", line.manufacturedAmount() != null ? line.manufacturedAmount() : 0);
       entry.put("gameItemId", line.gameItem() != null ? line.gameItem().id().toString() : null);
-      // The item picker now loads its options on demand, so the saved item's name must travel with
-      // the prefill to seed the combobox's displayed label (the id alone would render blank).
       entry.put("gameItemName", line.gameItem() != null ? line.gameItem().name() : null);
       entry.put("blueprintId", line.blueprint() != null ? line.blueprint().id().toString() : null);
       entry.put("amount", line.amount() != null ? line.amount() : 1);
@@ -828,17 +692,11 @@ public class JobOrderPageController {
   }
 
   /**
-   * JSON proxy for the item-order picker's live search: looks up orderable items by a free-text
-   * term and returns the matching references (capped server-side at {@link
-   * PickerSearch#PAGE_SIZE}). Replaces preloading the first N items and filtering client-side,
-   * which silently hid every item past the alphabetical cap once the catalog outgrew it. Public for
-   * parity with the anonymous create form; the term rides as a URI variable so spaces and quotes
-   * survive the frontend&rarr;backend hop intact.
+   * JSON proxy for the item-order picker's live search by item name.
    *
    * @param q the case-insensitive item-name search term ({@code null} / blank = first page)
    * @return up to {@link PickerSearch#PAGE_SIZE} matching orderable item references, or an empty
-   *     list on failure. The one row beyond the combobox's render cap is what makes its "keep
-   *     typing" hint appear instead of the cap being silent.
+   *     list on failure
    */
   @GetMapping("/item-search")
   @ResponseBody
@@ -859,13 +717,11 @@ public class JobOrderPageController {
   }
 
   /**
-   * Returns {@code true} iff the option list contains at least one Spezialkommando entry. Computed
-   * server-side because Thymeleaf's SpEL backend cannot parse Java lambda syntax inside template
-   * expressions ({@code .stream().anyMatch(o -> …)} fails with EL1042E), and pre-computing the flag
-   * keeps the template free of {@code #lists.contains(list.![kind], …)}-style gymnastics.
+   * Returns {@code true} iff the option list contains a Spezialkommando entry; computed here for
+   * the template.
    *
-   * @param options the active-org-unit list, may be {@code null}.
-   * @return {@code true} when at least one row's {@code kind} is {@code SPECIAL_COMMAND}.
+   * @param options the active-org-unit list, may be {@code null}
+   * @return {@code true} when at least one row's {@code kind} is {@code SPECIAL_COMMAND}
    */
   private static boolean containsSpecialCommand(List<OrgUnitMembershipOptionDto> options) {
     if (options == null) {
@@ -915,10 +771,8 @@ public class JobOrderPageController {
   }
 
   /**
-   * Resolves the acting user ({@code GET /api/v1/users/me}) whose id + display name seed the
-   * production modal's owner combobox — the book-in owner defaults to the producer (REQ-INV-032).
-   * {@code null} on failure: the owner picker then starts empty and the backend falls back to the
-   * acting user server-side.
+   * Resolves the acting user, whose id and name seed the production modal's owner picker
+   * (REQ-INV-032).
    *
    * @return the acting user, or {@code null} when the lookup fails
    */
@@ -933,13 +787,8 @@ public class JobOrderPageController {
   }
 
   /**
-   * Probes whether the backend has at least one orderable item (a blueprint output with a
-   * resolvable material). The item-order form needs only this existence flag at render time — to
-   * choose between the picker and the "no orderable items" banner — because the picker itself now
-   * searches the catalog live ({@code GET /orders/item-search}) instead of preloading every item. A
-   * {@code size=1} probe stays cheap regardless of catalog size; a backend hiccup fails open
-   * (assume items exist) so a transient blip never hides the live-search picker behind the empty
-   * banner.
+   * Probes whether at least one orderable item exists, deciding between the item picker and the
+   * empty banner; fails open on a backend error.
    *
    * @return {@code true} when at least one orderable item exists (or the probe could not decide)
    */
@@ -955,12 +804,8 @@ public class JobOrderPageController {
   }
 
   /**
-   * Collects the display names of an item order's lines whose blueprint derived no procurable
-   * material (an empty {@code materials} snapshot). The persisted order keeps only resolved
-   * requirements, so an empty list is the detail-time signal that a recipe's RESOURCE ingredients
-   * were all unresolved or ITEM-only; the detail view surfaces these in a warning banner so the
-   * logistician knows the aggregated-materials view is incomplete for that line. Returns an empty
-   * list for material orders or when every line derived at least one material.
+   * Collects the names of an item order's lines whose blueprint derived no procurable material, for
+   * the detail page's warning banner.
    *
    * @param order the loaded order (any kind)
    * @return distinct item names lacking derived materials, in line order; never {@code null}
@@ -983,11 +828,8 @@ public class JobOrderPageController {
   }
 
   /**
-   * Reports whether an item order has at least one ordered-item line that is deliverable now — i.e.
-   * has manufactured-but-not-yet-delivered whole units. Since delivery is gated by manufacture
-   * (REQ-ORDERS-025), the item-handover button appears only when there is something manufactured
-   * left to hand over, not merely something still ordered. Always {@code false} for material orders
-   * or an order with no item lines.
+   * Whether an item order has a line with manufactured but undelivered units, which gates the
+   * item-handover button (REQ-ORDERS-025).
    *
    * @param order the loaded order (any kind)
    * @return {@code true} if any item line has a positive manufactured-but-undelivered quantity
@@ -1007,12 +849,8 @@ public class JobOrderPageController {
   }
 
   /**
-   * Whether every line of the loaded item order is fully delivered (deliveredAmount ≥ amount for
-   * all lines). Gates the item-handover tab's "all items delivered" note so it shows only once the
-   * whole order is delivered — distinct from the "record production first" hint that shows while
-   * the order is not yet fully delivered but nothing is manufactured-but-undelivered to hand over
-   * (both leave {@link #hasOutstandingItemLines} false, REQ-ORDERS-025). Always {@code false} for
-   * material orders or an order with no item lines.
+   * Whether every line of an item order is fully delivered; always {@code false} for material
+   * orders or orders without item lines.
    *
    * @param order the loaded order (any kind)
    * @return {@code true} if the order is an item order with at least one line and every line's
@@ -1036,18 +874,10 @@ public class JobOrderPageController {
   }
 
   /**
-   * Computes the Kennzahlen-Band (KPI strip) values from the already-loaded order, so the {@code
-   * kpiSection} fragment stays presentation-only (REQ-ORDERS-026). For a MATERIAL order: how many
-   * material requirements are fulfilled (currentStock ≥ amount) with a percentage bar, the
-   * still-open material quantity (Σ max(0, amount − stock)), the claim count and the handover
-   * count. For an ITEM order: delivered vs. ordered whole units with a bar, the still-open
-   * aggregated-material quantity, the claim count and the item-handover count. The still-open
-   * quantity is split by the material's quantity type into an SCU sum ({@code openAmountScu}) and a
-   * whole-unit/PIECE sum ({@code openAmountPiece}) — SCU and pieces are incommensurable, so they
-   * are reported as two separate numbers with per-type presence flags ({@code
-   * hasScuMaterial}/{@code hasPieceMaterial}) driving which numbers the tile renders. All sums
-   * null-guard the redacted requester view (where stock/claims are absent) so the tiles render
-   * zeros rather than throwing.
+   * Computes the KPI strip values from the loaded order (REQ-ORDERS-026): fulfilment or delivery
+   * progress, the open quantity split into SCU and pieces, and the claim and handover counts.
+   *
+   * <p>Missing stock or claims in the redacted requester view count as zero.
    *
    * @param order the loaded order (any kind)
    * @return an insertion-ordered map of KPI values keyed for the fragment ({@code fulfilled},
@@ -1070,9 +900,6 @@ public class JobOrderPageController {
     kpi.put("hasPieceMaterial", false);
     kpi.put("claims", 0);
     kpi.put("handovers", 0);
-    // Only SK-public orders carry material claims (the backend populates openAmount for them); a
-    // private squadron order has none, so its claims KPI tile is suppressed rather than showing a
-    // permanent zero.
     kpi.put("supportsClaims", false);
     if (order == null) {
       return kpi;
@@ -1098,8 +925,6 @@ public class JobOrderPageController {
           double required = agg.totalQuantity() != null ? agg.totalQuantity() : 0.0;
           double stock = agg.currentStock() != null ? agg.currentStock() : 0.0;
           double open = Math.max(0.0, required - stock);
-          // SCU and PIECE demand are incommensurable — accumulate into separate sums (a null
-          // material defaults to SCU, mirroring the template's quantity-type null-guard).
           if (agg.material() != null && "PIECE".equals(agg.material().quantityType())) {
             hasPieceMaterial = true;
             openAmountPiece += open;
@@ -1129,8 +954,6 @@ public class JobOrderPageController {
             fulfilled++;
           }
           double open = Math.max(0.0, required - stock);
-          // SCU and PIECE demand are incommensurable — accumulate into separate sums (a null
-          // material defaults to SCU, mirroring the template's quantity-type null-guard).
           if (mat.material() != null && "PIECE".equals(mat.material().quantityType())) {
             hasPieceMaterial = true;
             openAmountPiece += open;
@@ -1188,18 +1011,10 @@ public class JobOrderPageController {
   }
 
   /**
-   * Fetches the active-org-units catalog from {@code GET /api/v1/org-units/active} — the single
-   * source for both Job Order owner-pickers. Job Orders are cross-staffel workspaces, so the picker
-   * offers every active Staffel + Spezialkommando, not just the caller's memberships; each option
-   * carries its {@code isProfitEligible} flag so {@link #addOwnerPickerOptions} can derive the
-   * responsible picker from the requesting one without a second, authenticated SK-catalog call.
-   * Read with the caller's token like every other backend call. It went through the anonymous
-   * client while the endpoint was {@code permitAll} and the form had an anonymous caller; both are
-   * gone (ADR-0149, ADR-0159). This is the degradation path: {@link #fetchRequestingOrgUnitOptions}
-   * prefers the all-kinds catalogue and falls back here when that read fails, which costs the
-   * Bereich/OL tiers but keeps the form renderable.
+   * Fetches every active Staffel and Spezialkommando with its profit-eligibility flag from {@code
+   * GET /api/v1/org-units/active}; the fallback for {@link #fetchRequestingOrgUnitOptions}.
    *
-   * @return picker options or empty list; never {@code null}.
+   * @return picker options or empty list; never {@code null}
    */
   private List<OrgUnitMembershipOptionDto> fetchActiveOrgUnitOptions() {
     try {
@@ -1214,17 +1029,10 @@ public class JobOrderPageController {
   }
 
   /**
-   * Resolves the requesting (Auftraggeber) picker options. An authenticated caller gets every
-   * active org unit of all four kinds — including Bereiche and the Organisationsleitung (epic #692)
-   * — so a Bereichsleitung/OL member can place an order on behalf of their tier; this reads the
-   * authenticated {@code /active-all-kinds} catalog. The anonymous public request form keeps the
-   * Staffel/SK-only {@code permitAll} catalog: a guest is external and does not place orders for an
-   * internal Bereich/OL, and the all-kinds endpoint is authenticated-only. The responsible picker
-   * is the profit-eligible subset of whatever this returns, and Bereiche/OL are never
-   * profit-eligible, so they can only ever be the customer, never the processor. Falls back to the
-   * public Staffel/SK catalog on any backend hiccup so the form stays renderable.
+   * Resolves the requesting-org-unit picker options: every active org unit of all four kinds,
+   * falling back to the Staffel/SK catalog on a backend failure.
    *
-   * @return requesting-picker options; never {@code null}.
+   * @return requesting-picker options; never {@code null}
    */
   private List<OrgUnitMembershipOptionDto> fetchRequestingOrgUnitOptions() {
     try {
@@ -1242,31 +1050,21 @@ public class JobOrderPageController {
   }
 
   /**
-   * Populates the create/edit form model with the two owner-picker option lists, both derived from
-   * a single {@link #fetchRequestingOrgUnitOptions} fetch: {@code requestingOptions} (the customer)
-   * is the full list — every active Staffel/SK plus the Bereich/OL tiers (epic #692), or only the
-   * Staffel/SK catalogue when the all-kinds read failed — and {@code responsibleOptions} (only
-   * profit-eligible squadrons + SKs may process orders) is the {@code isProfitEligible} subset,
-   * which excludes Bereiche/OL because they are never profit-eligible. Each carries a boolean flag
-   * telling the template whether to render the SK optgroup.
+   * Populates the create/edit form model with the requesting options and their profit-eligible
+   * subset as the responsible options.
    *
-   * @param model the Thymeleaf model to populate.
+   * @param model the Thymeleaf model to populate
    */
   private void addOwnerPickerOptions(Model model) {
     applyOwnerPickerOptions(model, fetchRequestingOrgUnitOptions());
   }
 
   /**
-   * Populates the two owner-picker model attributes from an already-fetched requesting-org-unit
-   * option list. Split out from {@link #addOwnerPickerOptions(Model)} so the order-detail render
-   * can fetch the list on a {@link ParallelPageLoader} worker thread alongside the other
-   * logistician lookups and then apply the cheap in-memory derivation on the request thread; {@link
-   * #addOwnerPickerOptions(Model)} remains the serial fetch-and-apply entry point for the
-   * create/edit forms.
+   * Populates the two owner-picker model attributes from an already-fetched requesting-option list.
    *
-   * @param model the Thymeleaf model to populate.
-   * @param requestingOptions the requesting-org-unit options to expose, and to derive the
-   *     profit-eligible {@code responsibleOptions} subset from.
+   * @param model the Thymeleaf model to populate
+   * @param requestingOptions the requesting options, from which the profit-eligible {@code
+   *     responsibleOptions} are derived
    */
   private void applyOwnerPickerOptions(
       Model model, @NotNull List<OrgUnitMembershipOptionDto> requestingOptions) {
@@ -1288,8 +1086,6 @@ public class JobOrderPageController {
     if (fromToken != null) {
       return fromToken;
     }
-    // Only reached for a subject that is not a UUID -- the backend refuses such a token at its own
-    // seam, so this is a floor rather than a supported state.
     try {
       UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
       return me != null ? me.id() : null;
@@ -1312,8 +1108,6 @@ public class JobOrderPageController {
 
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
-    // REQ-OBS-004: log a stable short pseudonym, never principal.getName() (the Keycloak
-    // preferred_username handle, which PiiMasker does not scrub).
     log.debug(
         "JobOrder: Checking logistician status for user u-{}. Original authorities: {}."
             + " Reachable authorities: {}",

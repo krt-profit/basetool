@@ -45,37 +45,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 /**
- * Reads the caller's layout context from the backend at most once per request, and not at all for a
- * handler that can never render it (FE-PERF-01, REQ-FE-020).
+ * Reads the caller's layout context ({@code GET /api/v1/me/layout}) at most once per request and
+ * skips it for handlers that cannot render a model (REQ-FE-020).
  *
- * <p><strong>One call instead of four.</strong> The layout advices used to issue up to four
- * uncached backend reads before every page handler — {@code /api/v1/me/active-org-unit}, {@code
- * /api/v1/me/org-units}, {@code /api/v1/me/capabilities} and {@code
- * /api/v1/notifications/unread-count} — each in its own backend transaction, and together they were
- * 62 % of all backend requests. {@code GET /api/v1/me/layout} (REQ-API-012) answers the same four
- * questions through the same resolvers in one read-only transaction. {@link OrgUnitContextAdvice},
- * {@link CapabilityFlagsAdvice} and {@link LayoutMiscAdvice} each ask this loader, and the first
- * one to ask pays the call; the answer is memoised as a request attribute, so the others read it
- * for free. The squadron catalogue stays where it was — a cached read in {@link
- * OrgUnitContextAdvice#availableSquadrons(HttpServletRequest)}.
- *
- * <p><strong>No call for a handler that cannot render.</strong> {@code @ControllerAdvice} selects
- * per controller <em>type</em>, and Spring's {@code ModelFactory} builds the model before the
- * handler runs whether or not it writes a response body — so the 200-odd {@code ResponseBody}
- * handlers inside the view controllers (the in-place mutation endpoints of REQ-FE-001..010, the
- * unread-count poll) each paid for a model Jackson never reads. {@link #needsLayoutModel} looks at
- * the handler the dispatcher already matched and answers {@code false} for one that writes its body
- * directly <em>and</em> declares no {@code ModelAttribute} parameter. The second condition is
- * load-bearing: {@code JobOrderWriteController}'s AJAX create handlers are {@code ResponseBody} and
- * still read {@code canViewJobOrders} as a parameter, so they keep receiving it. A handler that
- * returns a view — a full page or an XHR fragment — always gets the whole model: the list fragments
- * of hangar, missions, refinery orders, the Lager admin and the promotion pages read {@code
- * isAllSquadronsMode}, so no fragment is skipped on the strength of a request header.
- *
- * <p><strong>Fail-closed, as a whole.</strong> The endpoint answers all four parts or none
- * (REQ-API-012), and ADR-0151's fail-closed rule stays here: a failed or empty answer yields {@link
- * LayoutContext#NONE} — no org unit, no pinnable units, every capability off, no unread badge — and
- * that failure is memoised too, so one broken request does not retry three times.
+ * <p>{@link OrgUnitContextAdvice}, {@link CapabilityFlagsAdvice} and {@link LayoutMiscAdvice} share
+ * the memoised answer. Fails closed: a failed or empty answer yields {@link LayoutContext#NONE},
+ * which is memoised too.
  */
 @Component
 @RequiredArgsConstructor
@@ -88,10 +63,7 @@ public class LayoutContextLoader {
   /** The backend endpoint answering the four layout questions in one read-only transaction. */
   static final String LAYOUT_PATH = "/api/v1/me/layout";
 
-  /**
-   * Per-handler-method answer of {@link #decide(HandlerMethod)}. A handler's signature never
-   * changes at runtime, so reflection runs once per method for the lifetime of the application.
-   */
+  /** Memoised per-handler-method answer of {@link #decide(HandlerMethod)}. */
   private static final Map<Method, Boolean> DECISIONS = new ConcurrentHashMap<>();
 
   /** The single seam to the backend. */
@@ -102,12 +74,11 @@ public class LayoutContextLoader {
 
   /**
    * Returns the caller's layout context, reading {@code GET /api/v1/me/layout} on the first call of
-   * a request and the memoised answer on every later one.
+   * a request and the memo afterwards.
    *
-   * <p>Answers {@link LayoutContext#NONE} without a backend call when the caller is anonymous or
-   * when {@link #needsLayoutModel(HttpServletRequest)} says the matched handler cannot use the
-   * model. A backend failure or an empty body also yields {@code NONE}, logged at {@code debug}
-   * because the page still renders — with the gated menu entries hidden rather than shown.
+   * <p>Yields {@link LayoutContext#NONE} without a call for anonymous callers or when {@link
+   * #needsLayoutModel(HttpServletRequest)} is {@code false}, and on a backend failure or empty
+   * body.
    *
    * @param request the current request; its attributes carry the memo and the matched handler
    * @return the caller's layout context; never {@code null}
@@ -151,18 +122,15 @@ public class LayoutContextLoader {
   }
 
   /**
-   * Whether the handler the dispatcher matched for this request can use the layout model at all.
+   * Whether the matched handler can use the layout model.
    *
-   * <p>{@code false} only for a handler method that writes its response body directly — {@code
-   * ResponseBody} on the method or its class, or an {@link HttpEntity}, {@link ResponseBodyEmitter}
-   * (so also an SSE emitter) or {@link StreamingResponseBody} return type — <em>and</em> declares
-   * no {@link ModelAttribute} parameter. Everything else, including a request with no {@link
-   * HandlerMethod} attribute, answers {@code true}: when in doubt the model is built, because a
-   * missing attribute renders a wrong page while a surplus one only costs a call.
+   * <p>{@code false} only for a handler that writes its body directly ({@code ResponseBody}, {@link
+   * HttpEntity}, {@link ResponseBodyEmitter} or {@link StreamingResponseBody}) and declares no
+   * {@link ModelAttribute} parameter; {@code true} when no {@link HandlerMethod} is known.
    *
    * @param request the current request, carrying {@link
    *     HandlerMapping#BEST_MATCHING_HANDLER_ATTRIBUTE} once the handler mapping has run
-   * @return {@code true} when the layout model may be read by the handler or its view
+   * @return {@code true} when the handler or its view may read the layout model
    */
   public static boolean needsLayoutModel(@NotNull HttpServletRequest request) {
     if (!(request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE)
@@ -219,10 +187,8 @@ public class LayoutContextLoader {
   }
 
   /**
-   * Wire-shape mirror of the backend's {@code MeController.LayoutResponse}. Kept local, like the
-   * advices' own mirrors, to avoid a frontend dependency on the backend module for one envelope.
-   * The nested capabilities mirror carries only the three flags the layout reads; Jackson ignores
-   * the backend's other five.
+   * Wire-shape mirror of the backend's {@code MeController.LayoutResponse}; the nested capabilities
+   * carry only the three flags the layout reads.
    *
    * @param activeOrgUnitId the effective org-unit context, or {@code null}
    * @param orgUnits the org units the caller may pin; {@code null} only on a malformed answer

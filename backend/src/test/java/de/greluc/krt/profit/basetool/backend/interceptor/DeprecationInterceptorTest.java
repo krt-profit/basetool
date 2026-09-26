@@ -51,13 +51,10 @@ class DeprecationInterceptorTest {
   /** No annotations at all → no deprecation headers, and chain continues. */
   @Test
   void preHandle_withCleanHandler_shouldNotAddHeaders() throws Exception {
-    // Given
     HandlerMethod handler = handlerMethodOf(SampleController.class, "clean");
 
-    // When
     boolean proceed = interceptor.preHandle(request, response, handler);
 
-    // Then
     assertTrue(proceed);
     assertNull(response.getHeader("Deprecation"));
     assertNull(response.getHeader("Sunset"));
@@ -67,13 +64,10 @@ class DeprecationInterceptorTest {
   /** Non-HandlerMethod handler (e.g. ResourceHandler) is ignored. */
   @Test
   void preHandle_withNonHandlerMethod_shouldShortCircuit() throws Exception {
-    // Given
     Object handler = new Object();
 
-    // When
     boolean proceed = interceptor.preHandle(request, response, handler);
 
-    // Then
     assertTrue(proceed);
     assertNull(response.getHeader("Deprecation"));
   }
@@ -81,15 +75,11 @@ class DeprecationInterceptorTest {
   /** Method-level {@link Deprecated} alone is enough to emit the header. */
   @Test
   void preHandle_withJavaDeprecatedMethod_shouldAddDeprecationTrue() throws Exception {
-    // Given
     HandlerMethod handler = handlerMethodOf(SampleController.class, "javaDeprecatedOnly");
 
-    // When
     interceptor.preHandle(request, response, handler);
 
-    // Then
     assertEquals("true", response.getHeader("Deprecation"));
-    // No ApiDeprecation → no Sunset/Link
     assertNull(response.getHeader("Sunset"));
     assertNull(response.getHeader("Link"));
   }
@@ -97,15 +87,11 @@ class DeprecationInterceptorTest {
   /** Full ApiDeprecation with sunset + replacement emits all three headers. */
   @Test
   void preHandle_withFullApiDeprecation_shouldAddDeprecationSunsetAndLink() throws Exception {
-    // Given
     HandlerMethod handler = handlerMethodOf(SampleController.class, "fullyDeprecated");
 
-    // When
     interceptor.preHandle(request, response, handler);
 
-    // Then
     assertEquals("true", response.getHeader("Deprecation"));
-    // Sunset header is HTTP-date for 2027-01-01 00:00:00 UTC → "Fri, 01 Jan 2027 00:00:00 GMT"
     assertEquals("Fri, 01 Jan 2027 00:00:00 GMT", response.getHeader("Sunset"));
     assertEquals("</api/v2/things>; rel=\"alternate\"", response.getHeader("Link"));
   }
@@ -114,13 +100,10 @@ class DeprecationInterceptorTest {
   @Test
   void preHandle_withApiDeprecationWithoutSunsetOrReplacement_shouldOnlyAddDeprecation()
       throws Exception {
-    // Given
     HandlerMethod handler = handlerMethodOf(SampleController.class, "minimalApiDeprecation");
 
-    // When
     interceptor.preHandle(request, response, handler);
 
-    // Then
     assertEquals("true", response.getHeader("Deprecation"));
     assertNull(response.getHeader("Sunset"));
     assertNull(response.getHeader("Link"));
@@ -129,29 +112,22 @@ class DeprecationInterceptorTest {
   /** Malformed sunset date is logged and skipped — no Sunset header emitted, no exception. */
   @Test
   void preHandle_withInvalidSunsetDate_shouldEmitDeprecationButNoSunset() throws Exception {
-    // Given
     HandlerMethod handler = handlerMethodOf(SampleController.class, "badSunsetDate");
 
-    // When
     assertDoesNotThrow(() -> interceptor.preHandle(request, response, handler));
 
-    // Then
     assertEquals("true", response.getHeader("Deprecation"));
     assertNull(response.getHeader("Sunset"));
-    // Replacement still emitted
     assertEquals("</api/v2/foo>; rel=\"alternate\"", response.getHeader("Link"));
   }
 
   /** Class-level ApiDeprecation falls through when the method has none. */
   @Test
   void preHandle_classLevelApiDeprecation_shouldApplyToUnannotatedMethod() throws Exception {
-    // Given
     HandlerMethod handler = handlerMethodOf(DeprecatedClassSample.class, "anything");
 
-    // When
     interceptor.preHandle(request, response, handler);
 
-    // Then
     assertEquals("true", response.getHeader("Deprecation"));
     assertEquals("</api/v3/legacy>; rel=\"alternate\"", response.getHeader("Link"));
   }
@@ -159,22 +135,16 @@ class DeprecationInterceptorTest {
   /** Class-level @Deprecated also flips the Deprecation header without ApiDeprecation. */
   @Test
   void preHandle_classLevelJavaDeprecated_shouldApplyToUnannotatedMethod() throws Exception {
-    // Given
     HandlerMethod handler = handlerMethodOf(JavaDeprecatedClassSample.class, "anything");
 
-    // When
     interceptor.preHandle(request, response, handler);
 
-    // Then
     assertEquals("true", response.getHeader("Deprecation"));
     assertNull(response.getHeader("Sunset"));
     assertNull(response.getHeader("Link"));
   }
 
-  /**
-   * A malformed {@code sunset} value warns at most once per handler, not on every request — {@code
-   * sunset()} is a compile-time constant, so re-warning per call would be pure noise.
-   */
+  /** A malformed {@code sunset} value warns at most once per handler, not on every request. */
   @Test
   void preHandle_withInvalidSunsetDate_warnsAtMostOncePerHandler() throws Exception {
     Logger logger = (Logger) LoggerFactory.getLogger(DeprecationInterceptor.class);
@@ -201,8 +171,6 @@ class DeprecationInterceptorTest {
     }
   }
 
-  // ─── helpers ────────────────────────────────────────────────────────────────
-
   private static HandlerMethod handlerMethodOf(Class<?> beanClass, String methodName)
       throws Exception {
     Method method = beanClass.getMethod(methodName);
@@ -210,7 +178,7 @@ class DeprecationInterceptorTest {
     return new HandlerMethod(bean, method);
   }
 
-  @SuppressWarnings("unused") // reflectively referenced
+  @SuppressWarnings("unused")
   static class SampleController {
     public SampleController() {}
 

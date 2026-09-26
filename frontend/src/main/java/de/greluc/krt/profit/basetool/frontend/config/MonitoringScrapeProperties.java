@@ -24,17 +24,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Basic-auth credentials for the Prometheus scrape endpoint {@code /actuator/prometheus} (prefix
- * {@code app.monitoring.scrape}, fed by the {@code MONITORING_SCRAPE_USER} / {@code
- * MONITORING_SCRAPE_PASSWORD} environment variables — REQ-OBS-005, ADR-0072). Mirrors the
- * backend/ingest classes of the same name; each module keeps its own copy per the established
- * no-shared-module convention.
+ * {@code app.monitoring.scrape}, fed by {@code MONITORING_SCRAPE_USER} / {@code
+ * MONITORING_SCRAPE_PASSWORD}; REQ-OBS-005, ADR-0072).
  *
- * <p>Both values are deliberately optional and carry no {@code @NotBlank} constraint: an
- * environment without a Prometheus scraper (dev, test, e2e, prod before the monitoring rollout)
- * simply leaves them unset. {@link MonitoringScrapeSecurityConfig} reacts fail-closed — with {@link
- * #isConfigured()} {@code false} the endpoint denies every request instead of falling back to an
- * unauthenticated default. Registered via {@code @ConfigurationPropertiesScan} on {@code
- * FrontendApplication}.
+ * <p>Both values are optional; when {@link #isConfigured()} is {@code false}, {@link
+ * MonitoringScrapeSecurityConfig} denies every request.
  */
 @Data
 @ConfigurationProperties(prefix = "app.monitoring.scrape")

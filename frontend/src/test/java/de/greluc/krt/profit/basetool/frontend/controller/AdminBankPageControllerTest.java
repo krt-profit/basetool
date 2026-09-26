@@ -37,9 +37,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Unit tests for {@link AdminBankPageController}: the wipe-reset PRG flow and the legacy bank-audit
- * redirect. The audit viewer itself moved to the unified {@code /admin/audit-log} page
- * (REQ-AUDIT-001) and is covered by {@code AdminAuditLogPageControllerTest}.
+ * Unit tests for {@link AdminBankPageController}: the wipe-reset PRG flow and the bank-audit
+ * redirect to {@code /admin/audit-log}.
  */
 class AdminBankPageControllerTest {
 
@@ -54,13 +53,10 @@ class AdminBankPageControllerTest {
 
   @Test
   void wipeReset_withoutConfirmToken_skipsBackendAndFlagsError() {
-    // Given
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
 
-    // When
     String view = controller.wipeReset("nope", attrs);
 
-    // Then
     assertEquals("redirect:/admin/bank", view);
     assertEquals("admin.bank.wipe.error.confirm", attrs.getFlashAttributes().get("error"));
     verify(backendApiClient, never()).post(any(), any(), any());
@@ -68,16 +64,13 @@ class AdminBankPageControllerTest {
 
   @Test
   void wipeReset_withCounts_flashesResult() {
-    // Given
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     when(backendApiClient.post(
             eq("/api/v1/bank/admin/wipe-reset"), any(), eq(BankWipeResetResultDto.class)))
         .thenReturn(new BankWipeResetResultDto(5, 12, new BigDecimal("1250")));
 
-    // When
     String view = controller.wipeReset("WIPE", attrs);
 
-    // Then
     assertEquals("redirect:/admin/bank", view);
     BankWipeResetResultDto result =
         (BankWipeResetResultDto) attrs.getFlashAttributes().get("wipeResult");
@@ -87,31 +80,25 @@ class AdminBankPageControllerTest {
 
   @Test
   void wipeReset_zeroCounts_flashesNoop() {
-    // Given
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     when(backendApiClient.post(
             eq("/api/v1/bank/admin/wipe-reset"), any(), eq(BankWipeResetResultDto.class)))
         .thenReturn(new BankWipeResetResultDto(0, 0, BigDecimal.ZERO));
 
-    // When
     controller.wipeReset("WIPE", attrs);
 
-    // Then
     assertEquals(Boolean.TRUE, attrs.getFlashAttributes().get("wipeNoop"));
   }
 
   @Test
   void wipeReset_backendFailure_flashesError() {
-    // Given
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     when(backendApiClient.post(
             eq("/api/v1/bank/admin/wipe-reset"), any(), eq(BankWipeResetResultDto.class)))
         .thenThrow(new RuntimeException("boom"));
 
-    // When
     controller.wipeReset("WIPE", attrs);
 
-    // Then
     assertEquals("admin.bank.wipe.error.failed", attrs.getFlashAttributes().get("error"));
   }
 
@@ -127,16 +114,13 @@ class AdminBankPageControllerTest {
 
   @Test
   void wipeReset_emptyBackendBody_treatedAsNoop() {
-    // Given
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     when(backendApiClient.post(
             eq("/api/v1/bank/admin/wipe-reset"), eq(Map.of()), eq(BankWipeResetResultDto.class)))
         .thenReturn(null);
 
-    // When
     controller.wipeReset("WIPE", attrs);
 
-    // Then
     assertEquals(Boolean.TRUE, attrs.getFlashAttributes().get("wipeNoop"));
   }
 }

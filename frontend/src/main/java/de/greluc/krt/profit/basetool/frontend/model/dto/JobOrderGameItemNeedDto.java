@@ -22,20 +22,15 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code JobOrderGameItemNeedDto}: one ITEM order's outstanding need
- * for a single game item, used to label the item-mode allocation pickers (REQ-INV-039).
- *
- * <p>Not the material figure in pieces — {@code orderedAmount − deliveredAmount − allocatedAmount},
- * because an item line counts what was built and handed over separately from what is earmarked. All
- * counts are whole units and there is no quality floor: item rows carry no quality (REQ-INV-029).
+ * Frontend mirror of the backend {@code JobOrderGameItemNeedDto}: an ITEM order's outstanding need
+ * for one game item, in whole units, labelling the item-mode allocation pickers (REQ-INV-039).
  *
  * @param gameItemId the game item this order still wants
  * @param orderedAmount whole units requested across the order's lines naming it
  * @param deliveredAmount whole units already handed over
  * @param allocatedAmount whole units of item stock currently earmarked to this order
- * @param outstandingAmount {@code ordered − delivered − allocated}, floored at 0 — what to render.
- *     The floor guards against <b>over-earmarking</b> (nothing caps an earmark against the order's
- *     remaining need), not against a handover, which can never over-deliver
+ * @param outstandingAmount {@code ordered − delivered − allocated}, floored at 0; the figure to
+ *     render
  */
 public record JobOrderGameItemNeedDto(
     UUID gameItemId,

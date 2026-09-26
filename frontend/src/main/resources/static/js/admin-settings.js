@@ -17,33 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Admin-settings page module (/admin/settings), extracted verbatim from the former inline script of
- * admin-settings.html (ADR-0069, follow-up to #924).
- *
- * Per-squadron promotion + profit-eligibility toggles and the per-SK profit toggle each PATCH the
- * proxy endpoint through window.krtFetch on change with optimistic UI (flip the label, revert on
- * error). The multi-setting form saves in place (#582) through window.krtFetch and writes the five
- * bumped optimistic-lock versions back into the hidden inputs; without krtFetch the native
- * POST->redirect runs (no-JS fallback). No write here hand-rolls CSRF (REQ-FE-002).
- *
- * The Thymeleaf-interpolated toast/label/conflict strings stay inline in the page bootstrap as the
- * MSG_* / SAVE_* / SAVE_CONFLICT globals this module reads.
- */
-
 /* global MSG_ENABLED, MSG_DISABLED, MSG_ERROR, MSG_SAVED, MSG_PROFIT_ENABLED, MSG_PROFIT_DISABLED, MSG_PROFIT_ERROR, MSG_PROFIT_SAVED, SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
 
-/*
- * Toggles: optimistic UI — flips the label text immediately, reverts on error. CSP-safe (no
- * inline onclick attributes) so the strict script-src-attr policy stays intact.
- */
-
 /**
- * Wires one family of optimistic boolean toggles: on every checkbox change the label flips
- * immediately and a PATCH goes out through krtFetch.write (CSRF, the bare-403 retry, re-auth and
- * the double-submit guard all come from krtFetch — REQ-FE-002). On an error response or a network
- * failure the checkbox and its label are reverted and the page's own localized error toast is
- * shown; a 409 is left to krtFetch so an optimistic-lock conflict gets the shared reload-confirm.
+ * Wires one family of optimistic boolean toggles: each change flips the label at once and PATCHes
+ * through krtFetch.write (REQ-FE-002). On failure the checkbox and label are reverted and an error
+ * toast is shown; a 409 is left to krtFetch's conflict handling.
  *
  * @param {string} selector the checkbox selector (e.g. '.squadron-promotion-toggle')
  * @param {string} idAttribute the attribute carrying the target id
@@ -75,7 +54,6 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
                 method: 'PATCH',
                 url: urlFor(id),
                 payload: bodyFor(checked),
-                // The checkbox is disabled while its PATCH is in flight (double-submit guard).
                 submitter: checkbox,
                 successMessage: labels.saved,
                 errorMessage: labels.error,
@@ -89,7 +67,6 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
                     return true;
                 },
                 onNetworkError() {
-                    // krtFetch then shows labels.error as its default network-error toast.
                     revert();
                     return false;
                 },
@@ -98,12 +75,6 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
     });
 }
 
-/*
- * Per-squadron promotion-feature toggle: PATCH /api/proxy/squadrons/{id}/promotion-enabled.
- * Per-squadron profit-eligibility toggle: PATCH /api/proxy/squadrons/{id}/profit-eligible.
- * Per-SK profit-eligibility toggle: PATCH /api/proxy/special-commands/{id}/profit-eligible — reuses
- * the MSG_PROFIT_* labels (generic "berechtigt"/"nicht berechtigt").
- */
 document.addEventListener('DOMContentLoaded', function () {
     wireToggle(
         '.squadron-promotion-toggle',
@@ -145,14 +116,6 @@ document.addEventListener('DOMContentLoaded', function () {
         profitLabels,
     );
 });
-
-/*
- * In-place settings save (#582): the multi-setting form saves via the AJAX twin and writes the
- * five bumped optimistic-lock versions back into the hidden inputs so a second save does not
- * 409. A 422 validation problem+json carries a localized detail that krtFetch toasts directly;
- * an OPTIMISTIC_LOCK conflict triggers the reload-confirm. Without krtFetch the native
- * POST->redirect runs (no-JS fallback).
- */
 
 document.addEventListener('DOMContentLoaded', function () {
     const settingsForm = document.getElementById('admin-settings-form');

@@ -37,31 +37,10 @@ import org.springframework.cache.support.NoOpCacheManager;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * RFC7807 mapping and REQ-OBS-011 metric coverage for {@link BackendApiClient} on the <b>write</b>
- * verbs (POST/PUT/PATCH/DELETE).
- *
- * <p>The sibling {@code BackendApiClientProblemJsonTest} exercises Problem+JSON decoding on GET
- * only, {@code BackendApiClientHappyPathTest} drives the writes with HTTP 200 only, and {@code
- * BackendApiClientResilienceTest} asserts the {@code basetool_backend_client_errors_total} counter
- * only for the {@code circuit_open}/{@code bulkhead_full}/{@code timeout}/{@code unknown} reasons.
- * Nothing drives a state-changing call that returns a Problem+JSON body, and the {@code
- * backend_4xx} vs {@code backend_5xx} split inside {@code handleWebClientException} is never
- * asserted.
- *
- * <p>Writes are exactly where the 409 {@code OPTIMISTIC_LOCK} and the bank conflict codes surface,
- * and they carry the reload-vs-inline distinction that {@code krt-fetch.js} depends on. If a write
- * path failed to route the {@link
- * org.springframework.web.reactive.function.client.WebClientResponseException} through {@code
- * handleWebClientException} (e.g. a wrong catch order after a refactor), a 409 conflict would
- * degrade to a generic 500 with {@code CODE_UNKNOWN} — {@code GlobalExceptionHandler} would lose
- * the stable code — and the REQ-OBS-011 {@code reason=backend_4xx} counter would never be
- * incremented, blinding the dashboard/alert. Each test therefore asserts both the mapped {@link
- * BackendServiceException} (status + stable code) and the exact metric that was counted.
- *
- * <p>A bare {@link WebClient} (no Resilience4j filter) points at a per-test {@link MockWebServer},
- * so a single enqueued Problem+JSON response is consumed exactly once — the counter reflects one
- * failed call with no retry double-count — and the {@link SimpleMeterRegistry} starts empty per
- * test.
+ * RFC 7807 mapping and REQ-OBS-011 metric coverage for {@link BackendApiClient}'s write verbs
+ * (POST, PUT, PATCH, DELETE): each test asserts the mapped {@link BackendServiceException} status
+ * and stable code, and the exact {@code backend_4xx} / {@code backend_5xx} counter incremented.
+ * Uses a bare {@link WebClient} without retries against a per-test {@link MockWebServer}.
  */
 class BackendApiClientWriteProblemJsonTest {
 
@@ -97,8 +76,6 @@ class BackendApiClientWriteProblemJsonTest {
     server.shutdown();
   }
 
-  // ── POST ────────────────────────────────────────────────────────────────
-
   @Test
   void post_ShouldMapOptimisticLock409_andCountBackend4xx() throws Exception {
     server.enqueue(
@@ -113,17 +90,14 @@ class BackendApiClientWriteProblemJsonTest {
             BackendServiceException.class,
             () -> client.post("/api/v1/missions/1/core", "{\"version\":3}", String.class));
 
-    // The write path must preserve the stable RFC7807 code + status, not degrade to a generic 500.
     assertEquals(409, ex.getStatusCode());
     assertEquals("OPTIMISTIC_LOCK", ex.getProblemCode());
     assertEquals("corr-409", ex.getCorrelationId());
     assertEquals("Entity was updated concurrently", ex.getReadableErrorMessage());
 
-    // The call was genuinely a POST (the WebClientResponseException came from the write verb).
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("POST", req.getMethod());
 
-    // REQ-OBS-011: counted once under reason=backend_4xx + method=POST, and NOT under backend_5xx.
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_4XX, "POST"));
     assertNull(
         findCounter(MetricNames.REASON_BACKEND_5XX, "POST"),
@@ -147,14 +121,11 @@ class BackendApiClientWriteProblemJsonTest {
     assertEquals(503, ex.getStatusCode());
     assertEquals(BackendServiceException.CODE_SERVICE_UNAVAILABLE, ex.getProblemCode());
 
-    // The 5xx side of the split: counted under backend_5xx, never backend_4xx.
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_5XX, "POST"));
     assertNull(
         findCounter(MetricNames.REASON_BACKEND_4XX, "POST"),
         "a 5xx write must not increment the backend_4xx counter");
   }
-
-  // ── PUT ─────────────────────────────────────────────────────────────────
 
   @Test
   void put_ShouldMapConflict409_andCountBackend4xx() {
@@ -174,8 +145,6 @@ class BackendApiClientWriteProblemJsonTest {
     assertEquals("BANK_BOOKING_CONFLICT", ex.getProblemCode());
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_4XX, "PUT"));
   }
-
-  // ── PATCH ───────────────────────────────────────────────────────────────
 
   @Test
   void patch_ShouldMapValidation400_andCountBackend4xx() {
@@ -198,8 +167,6 @@ class BackendApiClientWriteProblemJsonTest {
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_4XX, "PATCH"));
   }
 
-  // ── DELETE ──────────────────────────────────────────────────────────────
-
   @Test
   void delete_ShouldMapLocked423_andCountBackend4xx() {
     server.enqueue(
@@ -217,8 +184,6 @@ class BackendApiClientWriteProblemJsonTest {
     assertEquals("LOCKED", ex.getProblemCode());
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_4XX, "DELETE"));
   }
-
-  // ── GET (5xx split, previously unasserted) ───────────────────────────────
 
   @Test
   void get_Should503Problem_countBackend5xx() {
@@ -239,8 +204,6 @@ class BackendApiClientWriteProblemJsonTest {
         findCounter(MetricNames.REASON_BACKEND_4XX, "GET"),
         "a 5xx GET must not increment the backend_4xx counter");
   }
-
-  // ── helpers ──────────────────────────────────────────────────────────────
 
   private static MockResponse problemJson(int status, String body) {
     return new MockResponse()

@@ -76,17 +76,6 @@
                     <button type="button" class="btn btn--cta" data-trigger="materials-open-create-modal" th:text="#{admin.materials.create.button}">Material anlegen</button>
                     <div class="form-group krtm-margin-bottom-0-width-300px-max-width-100-po-85dc">
                         <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="materialsTable" autocomplete="off">
-                        <!--/*
-                          Material names are exposed to JavaScript via this server-
-                          rendered <datalist> instead of a Thymeleaf JS-inline
-                          expression. Thymeleaf 3.1 truncates the surrounding
-                          <script> block right after the first List/Collection
-                          JS-inline serialisation, so the data-krt-confirm form
-                          delete-confirmation handlers + updateMaterial bindings
-                          defined further down in the script would silently never
-                          be wired. Keep the datalist; do NOT move this back into
-                          the <script> block.
-                        */-->
                         <datalist id="materialNames-data" class="krtm-display-none-5790">
                             <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
                         </datalist>
@@ -167,7 +156,6 @@
     </div>
 </main>
 
-<!--/* Create Material Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create-material', titleKey='admin.materials.create.modal.title', variant='krt-modal--wide krt-modal-create-material', titleId='modal-create-material-title', closeTrigger='materials-close-create-modal', body=~{::modal-create-material-body})}">
     <th:block th:ref="modal-create-material-body">
         <div class="krt-modal-body">
@@ -241,10 +229,6 @@
 
 <script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    // Thymeleaf-interpolated i18n strings only; the imperative logic lives in the admin-materials.js
-    // page module loaded immediately after this bootstrap (ADR-0069). Each value is a single-primitive
-    // comment-form interpolation (safe under th:inline; the Thymeleaf 3.1 list-inline truncation caveat
-    // behind the materialNames datalist does not apply here).
     const CAT_MSG = {
         createSuccess: /*[[#{notification.success.save}]]*/ 'Gespeichert.',
         createError:   /*[[#{notification.error.save}]]*/ 'Speichern fehlgeschlagen.',
@@ -261,7 +245,6 @@
         dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
-    // Per-field update + create toasts (hoisted from the fetch handlers).
     const MSG_UPDATE_SUCCESS = /*[[#{notification.success.save}]]*/ 'Erfolgreich gespeichert.';
     const MSG_UPDATE_ERROR = /*[[#{notification.error.save}]]*/ 'Fehler beim Speichern.';
     const MSG_CREATE_SUCCESS = /*[[#{admin.materials.create.success}]]*/ 'Material wurde angelegt.';

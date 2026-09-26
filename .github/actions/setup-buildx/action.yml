@@ -5,56 +5,6 @@ description: >
   does, but pre-pulls the BuildKit image first — with retry/backoff and a
   fallback registry — so a transient Docker Hub failure cannot fail the job.
 
-# Why this wrapper exists:
-#
-# The `docker-container` driver runs BuildKit as a container, so booting a
-# builder pulls `moby/buildkit:buildx-stable-1` from Docker Hub — an anonymous,
-# unauthenticated pull that is subject to Docker Hub's per-IP rate limit and to
-# the shared-runner egress being intermittently slow. buildx wraps that pull in
-# a short context deadline; when it expires the boot dies with
-#   `ERROR: Error response from daemon: Get "https://registry-1.docker.io/v2/":
-#    context deadline exceeded`
-# and takes the whole job with it. That is exactly what failed the v1.5.17
-# `Build & sign keycloak-spi bundle` job (run 30160708503) after its Gradle
-# build had already succeeded — a pure infrastructure flake with no code cause,
-# on a release whose other seven image jobs all passed.
-#
-# The fix leans on a documented buildx behaviour: when the driver's own image
-# pull fails, buildx falls back to the **local image store** and only aborts if
-# the image is absent there too. Getting the image into the local store by any
-# means therefore guarantees the boot succeeds. This action does that in two
-# escalating stages.
-#
-# Stage 1 — retry Docker Hub. `docker pull` has no short internal deadline, so
-# retrying it with backoff already survives a brief egress hiccup.
-#
-# Stage 2 — fall back to a different registry. Retrying alone was not enough:
-# the v1.5.26 `Build (backend / linux/amd64)` job (run 30615321686) burned every
-# attempt against an egress path that stayed broken for the whole ~110s window
-# and still lost the boot, while the `main` run that started 22 seconds earlier
-# passed all eight image jobs. Docker Hub was healthy; that one runner could not
-# reach it. No amount of patience on the same host and the same route fixes
-# that — only a different route does. `mirror.gcr.io` is Google's anonymous
-# pull-through cache of Docker Hub: a wholly separate network path and operator,
-# serving the byte-identical index for `buildx-stable-1` (re-verified 2026-09-22
-# for the digest now pinned in ./Dockerfile), with linux/amd64 and linux/arm64
-# children for both runner fleets. It is consulted ONLY after Docker Hub has
-# refused, so the canonical source still wins whenever it is reachable — and
-# because the image is pulled BY DIGEST from either source (audit item
-# CI-SEC-13), the mirror can only ever hand over the pinned bytes.
-#
-# The step is fatal in exactly one case: a BuildKit reference that carries no
-# digest. That is a configuration error in this repository, not a flake.
-#
-# This is the same reasoning as the `cosign sign` retry wrappers in
-# release-images.yml / promote.yml: signing and builder-boot are both network
-# round-trips to a shared public service, and a single flake there must not fail
-# an otherwise-complete release.
-#
-# The step is deliberately **non-fatal**: if every source fails we still hand
-# over to `setup-buildx-action`, which may well succeed on its own. The wrapper
-# can only improve the odds, never fail a job that would have passed.
-
 inputs:
   buildkit-image:
     description: >
@@ -94,8 +44,6 @@ runs:
       run: |
         set -eu
 
-        # The reference comes from the carrier Dockerfile next to this file unless overridden, and
-        # it must carry a digest: a tag alone is whatever the registry serves that minute.
         if [ -n "$BUILDKIT_IMAGE_INPUT" ]; then
           BUILDKIT_IMAGE="$BUILDKIT_IMAGE_INPUT"
         else
@@ -110,14 +58,10 @@ runs:
         esac
         echo "BuildKit image: ${BUILDKIT_IMAGE}"
 
-        # What the driver boots. The canonical reference whenever it is in the local store under
-        # that name; a local alias only on the mirror path, below.
         emit() {
           echo "image=$1" >> "$GITHUB_OUTPUT"
         }
 
-        # Pull $1 up to $2 times with exponential backoff capped at 30s. Returns
-        # 0 as soon as the image is in the local store, 1 once attempts run out.
         pull_with_retry() {
           local ref=$1
           local attempts=$2
@@ -139,7 +83,6 @@ runs:
           done
         }
 
-        # Stage 1: the canonical source. Wins whenever Docker Hub is reachable.
         if pull_with_retry "$BUILDKIT_IMAGE" 4; then
           echo "BuildKit image present locally: ${BUILDKIT_IMAGE}"
           emit "$BUILDKIT_IMAGE"
@@ -152,19 +95,9 @@ runs:
           exit 0
         fi
 
-        # Stage 2: a different registry on a different network path. Pulled BY THE SAME DIGEST,
-        # so the mirror can only ever hand over the bytes the pin names.
         mirror_ref="${FALLBACK_REGISTRY}/${BUILDKIT_IMAGE}"
         echo "::warning::Docker Hub unreachable for ${BUILDKIT_IMAGE}; falling back to ${mirror_ref}" >&2
         if pull_with_retry "$mirror_ref" 3; then
-          # buildx's local-store fallback resolves the driver image BY NAME, and an image pulled
-          # from the mirror is known locally only under the mirror's name. `docker tag` cannot
-          # write a digest reference, so the canonical `…@sha256:` name cannot be recreated;
-          # instead the verified image gets a local-only alias, and the driver boots that. Its
-          # registry sits under `.invalid`, a TLD reserved never to resolve (RFC 2606), so buildx's
-          # own pull attempt fails on the DNS lookup at once -- measured 0.5 s, where a `localhost`
-          # alias waited out a 60 s dial timeout on Docker Desktop -- and buildx then boots the
-          # local image.
           digest="${BUILDKIT_IMAGE##*@sha256:}"
           alias_ref="buildkit-pinned.invalid/moby-buildkit:sha256-${digest}"
           docker tag "$mirror_ref" "$alias_ref"
@@ -173,12 +106,10 @@ runs:
           exit 0
         fi
 
-        # Non-fatal on purpose — see the header comment. setup-buildx-action
-        # still gets its own attempt at pulling the image.
         echo "::warning::could not pre-pull ${BUILDKIT_IMAGE} from Docker Hub or ${FALLBACK_REGISTRY}; letting buildx try its own pull" >&2
         emit "$BUILDKIT_IMAGE"
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       with:
         driver-opts: image=${{ steps.prepull.outputs.image }}

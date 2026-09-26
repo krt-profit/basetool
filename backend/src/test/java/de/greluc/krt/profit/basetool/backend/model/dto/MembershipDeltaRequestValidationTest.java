@@ -36,11 +36,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bean Validation contract tests for {@link MembershipDeltaRequest}. The two list components
- * declare {@code List<@Valid StaffelChange>} / {@code List<@Valid SpecialCommandChange>} so
- * element-level constraints cascade into the entries; these tests guard that cascade, which broke
- * silently if the {@code @Valid} were placed on the container (the deprecated {@code @Valid
- * List<...>} form, HV000271) instead of the type argument.
+ * Bean Validation tests that element constraints of {@link MembershipDeltaRequest}'s lists cascade
+ * into the entries via the type-argument {@code @Valid}.
  */
 class MembershipDeltaRequestValidationTest {
 
@@ -62,15 +59,12 @@ class MembershipDeltaRequestValidationTest {
 
   @Test
   void invalidStaffelChangeElementCascadesToViolation() {
-    // Given a staffeln entry that violates @NotNull squadronId
     MembershipDeltaRequest req =
         new MembershipDeltaRequest(
             List.of(new StaffelChange(null, Boolean.FALSE, Boolean.FALSE)), null);
 
-    // When
     Set<ConstraintViolation<MembershipDeltaRequest>> violations = validator.validate(req);
 
-    // Then the element-level constraint is reported via the cascade
     assertTrue(
         violations.stream().anyMatch(v -> v.getPropertyPath().toString().contains("squadronId")),
         "StaffelChange.squadronId @NotNull must be validated through List<@Valid StaffelChange>");
@@ -78,7 +72,6 @@ class MembershipDeltaRequestValidationTest {
 
   @Test
   void invalidSpecialCommandChangeElementCascadesToViolation() {
-    // Given an SK entry that violates @NotNull action
     MembershipDeltaRequest req =
         new MembershipDeltaRequest(
             null,
@@ -86,10 +79,8 @@ class MembershipDeltaRequestValidationTest {
                 new SpecialCommandChange(
                     UUID.randomUUID(), null, Boolean.FALSE, Boolean.FALSE, null)));
 
-    // When
     Set<ConstraintViolation<MembershipDeltaRequest>> violations = validator.validate(req);
 
-    // Then the element-level constraint is reported via the cascade
     assertTrue(
         violations.stream().anyMatch(v -> v.getPropertyPath().toString().contains("action")),
         "SpecialCommandChange.action @NotNull must be validated through List<@Valid ...>");
@@ -97,13 +88,11 @@ class MembershipDeltaRequestValidationTest {
 
   @Test
   void wellFormedPayloadHasNoViolations() {
-    // Given a valid delta touching both sides
     MembershipDeltaRequest req =
         new MembershipDeltaRequest(
             List.of(new StaffelChange(UUID.randomUUID(), null, null)),
             List.of(new SpecialCommandChange(UUID.randomUUID(), Action.ADD, null, null, null)));
 
-    // When / Then
     assertTrue(validator.validate(req).isEmpty(), "a well-formed payload must have no violations");
   }
 }

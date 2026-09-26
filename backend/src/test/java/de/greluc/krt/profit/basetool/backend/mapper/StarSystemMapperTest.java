@@ -33,7 +33,6 @@ class StarSystemMapperTest {
 
   @Test
   void toDto_shouldMapAllFields() {
-    // Given
     UUID id = UUID.randomUUID();
     StarSystem entity = new StarSystem();
     entity.setId(id);
@@ -46,10 +45,8 @@ class StarSystemMapperTest {
     entity.setFactionName("Empire");
     entity.setVersion(3L);
 
-    // When
     StarSystemDto dto = mapper.toDto(entity);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals(42, dto.idSystem());
@@ -64,16 +61,13 @@ class StarSystemMapperTest {
 
   @Test
   void toEntity_shouldMapAllFields() {
-    // Given
     UUID id = UUID.randomUUID();
     StarSystemDto dto =
         new StarSystemDto(
             id, 99, "Pyro", "Lawless", false, "https://example.org/pyro", "Lawless", "Pirates", 1L);
 
-    // When
     StarSystem entity = mapper.toEntity(dto);
 
-    // Then
     assertNotNull(entity);
     assertEquals(id, entity.getId());
     assertEquals(99, entity.getIdSystem());
@@ -88,16 +82,13 @@ class StarSystemMapperTest {
 
   @Test
   void roundtrip_shouldPreserveAllFields() {
-    // Given
     StarSystemDto dto =
         new StarSystemDto(
             UUID.randomUUID(), 1, "Sol", "Cradle of humanity", true, "wiki", "UEE", "Empire", 5L);
 
-    // When
     StarSystem entity = mapper.toEntity(dto);
     StarSystemDto back = mapper.toDto(entity);
 
-    // Then
     assertEquals(dto, back);
   }
 

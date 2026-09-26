@@ -29,15 +29,12 @@ public record PageResponse<T>(
     List<T> content, int page, int size, long totalElements, int totalPages, List<String> sort) {
 
   /**
-   * Wraps a Spring Data {@link Page} into the outbound envelope, rendering each active sort order
-   * as a {@code field,asc|desc} token with a lowercase direction so the client receives the same
-   * syntax {@code PaginationUtil.createPageRequest} accepts on the next request. Replaces the
-   * per-controller {@code toPageResponse} helpers that were copy-pasted across the controller layer
-   * (two of which rendered the direction in uppercase; this factory unifies them on lowercase).
+   * Wraps a Spring Data {@link Page} into the outbound envelope, rendering sort orders as {@code
+   * field,asc|desc} tokens with a lowercase direction.
    *
-   * @param page the Spring Data page to wrap, must not be {@code null}
+   * @param page the Spring Data page to wrap
    * @param <T> the element type of the page content
-   * @return an envelope carrying the page's content, paging metadata and lowercase sort tokens
+   * @return the envelope with content, paging metadata and sort tokens
    */
   @NotNull
   public static <T> PageResponse<T> of(@NotNull Page<T> page) {

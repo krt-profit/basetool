@@ -20,18 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Discriminator for the two kinds of {@link MaterialExchangeRequest} on the Materialbörse — a
- * wanted-listing (Gesuch) for a material or for a craftable item (REQ-MARKET-015). It is the
- * request-side sibling of {@link MaterialExchangeOfferKind}, kept as its own enum so the request
- * aggregate stays decoupled from the offer aggregate (ADR-0116).
- *
- * <p>A {@link #MATERIAL} request names a catalogue {@link Material} the member wants, in a stated
- * quantity (SCU or Stück per the material's {@link Material#getQuantityType() quantity type}). An
- * {@link #ITEM} request names a craftable item ("an item for which a blueprint exists") by its
- * normalized {@code product_key}, in a stated whole-piece quantity. Either kind may additionally
- * carry an optional minimum desired quality (0–1000). Unlike an offer there is <b>no backing Lager
- * row</b>: the member states the identity and quantity directly. The exactly-one-branch integrity
- * is enforced at the DB level (V224 {@code CHECK}) and mirrored by the entity's nullability.
+ * Discriminator for the two kinds of {@link MaterialExchangeRequest} (REQ-MARKET-015): a {@link
+ * #MATERIAL} request names a catalogue {@link Material}, an {@link #ITEM} request names a craftable
+ * item by {@code product_key}. A DB {@code CHECK} enforces the exactly-one-branch rule.
  */
 public enum MaterialExchangeRequestKind {
 

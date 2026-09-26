@@ -31,50 +31,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Publishes the Resilience4j meters that the alert rules and the Spring-apps dashboard are written
- * against, because Resilience4j's own auto-configuration silently stopped doing it on Spring Boot
+ * Binds the Resilience4j circuit-breaker, bulkhead and retry meters that the alert rules and
+ * dashboards use, since Resilience4j's own auto-configuration does not register them on Spring Boot
  * 4.
  *
- * <h2>Why this class has to exist</h2>
- *
- * <p>Resilience4j 2.4.0 registers its metrics publishers from {@code
- * CircuitBreakerMetricsAutoConfiguration} and friends, each guarded by
- * {@code @ConditionalOnBean(MeterRegistry.class)} and ordered with {@code @AutoConfigureAfter(name
- * = "org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration")}.
- *
- * <p>Spring Boot 4 moved that class out of the actuator jar into the new {@code
- * spring-boot-micrometer-metrics} module, so the name no longer resolves — and
- * {@code @AutoConfigureAfter(name = …)} <b>ignores a class it cannot find</b> rather than failing.
- * The ordering hint evaporates, the Resilience4j auto-configuration runs before the {@code
- * MeterRegistry} bean definition exists, {@code @ConditionalOnBean} finds nothing, and the
- * publishers are never created.
- *
- * <p>Nothing about that is visible in a log. Spring's condition report even reports the
- * auto-configuration itself as {@code matched}; only its inner {@code @Bean} methods are skipped.
- * The symptom is three alert rules that can never fire and a dashboard row that is always empty — a
- * dead alert, which REQ-OBS-014 treats as worse than no alert because it reads as coverage. Found
- * on 2026-08-29 by reading the production Prometheus: the whole {@code resilience4j_*} family had
- * no series at all.
- *
- * <h2>Why a MeterBinder rather than the publishers</h2>
- *
- * <p>Declaring the publisher beans here would inherit the same ordering hazard. A {@link
- * MeterBinder} does not: Spring Boot binds every {@code MeterBinder} bean to the registry
- * <em>after</em> the registry exists, which is precisely the mechanism this situation calls for.
- * The three {@code Tagged*Metrics} types already implement it.
- *
- * <p>Remove this class if a Resilience4j release fixes the ordering for Boot 4 — and remove it only
- * with {@code AlertedMeterPresenceTest} still green, which is the check that would notice.
+ * <p>Uses {@link MeterBinder} beans, which Boot binds once the registry exists. {@code
+ * AlertedMeterPresenceTest} guards the meters' presence.
  */
 @Configuration(proxyBeanMethods = false)
 public class Resilience4jMetricsConfig {
 
   /**
-   * Binds the circuit-breaker meters, including {@code resilience4j_circuitbreaker_state} — the
-   * metric the {@code CircuitBreakerOpen} alert is written against.
+   * Binds the circuit-breaker meters, including {@code resilience4j_circuitbreaker_state}.
    *
    * @param registry the auto-configured circuit-breaker registry
-   * @return the binder Spring Boot attaches to the meter registry once it exists
+   * @return the binder Spring Boot attaches to the meter registry
    */
   @Bean
   @NotNull
@@ -83,11 +54,10 @@ public class Resilience4jMetricsConfig {
   }
 
   /**
-   * Binds the bulkhead meters, including {@code resilience4j_bulkhead_available_concurrent_calls} —
-   * the metric the bulkhead-saturation alert is written against.
+   * Binds the bulkhead meters, including {@code resilience4j_bulkhead_available_concurrent_calls}.
    *
    * @param registry the auto-configured bulkhead registry
-   * @return the binder Spring Boot attaches to the meter registry once it exists
+   * @return the binder Spring Boot attaches to the meter registry
    */
   @Bean
   @NotNull
@@ -96,11 +66,10 @@ public class Resilience4jMetricsConfig {
   }
 
   /**
-   * Binds the retry meters, including {@code resilience4j_retry_calls_total} — the metric the
-   * retry-rate alert is written against.
+   * Binds the retry meters, including {@code resilience4j_retry_calls_total}.
    *
    * @param registry the auto-configured retry registry
-   * @return the binder Spring Boot attaches to the meter registry once it exists
+   * @return the binder Spring Boot attaches to the meter registry
    */
   @Bean
   @NotNull

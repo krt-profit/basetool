@@ -27,13 +27,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Default single-instance {@link NotificationFanout}: delivers only to this backend instance's SSE
- * emitters — byte-for-byte the behaviour before ADR-0094.
+ * Default single-instance {@link NotificationFanout} that delivers only to this backend instance's
+ * SSE emitters.
  *
- * <p>Active unless {@code app.notifications.redis-fanout.enabled} is {@code true} (mutually
- * exclusive with {@code RedisNotificationFanout} on the same property, so exactly one binding is
- * present and no bean-ordering condition is needed). Default off, so dev/test and any environment
- * without Redis keep the local-only push.
+ * <p>Active unless {@code app.notifications.redis-fanout.enabled} is {@code true}, mutually
+ * exclusive with {@code RedisNotificationFanout}.
  */
 @Component
 @ConditionalOnProperty(

@@ -38,13 +38,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * The one rule behind every free-text roster name (BE-SIMP-04): a unique member match links the
- * member, none keeps the name as an external person, several are a 409.
- *
- * <p>The rule was written four times before, and the fourth copy — inside {@code
- * MissionParticipantService} — used a single-result query that threw a 500 on the ambiguous case
- * the other three answered with a 409. One implementation, pinned here, is what keeps the answer
- * the same whichever door the name came through.
+ * Verifies the free-text roster name rule: a unique member match links the member, no match keeps
+ * an external person, several matches yield 409.
  */
 @ExtendWith(MockitoExtension.class)
 class ParticipantTargetResolverTest {

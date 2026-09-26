@@ -42,14 +42,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Binding-level tests for the request parameters the frontend relays into a backend URI
- * (REQ-SEC-051).
- *
- * <p>The unit tests around each controller prove what happens to a value that reaches the method
- * body; these prove that a value carrying URI syntax never gets that far. Periods and identifiers
- * are bound as {@link java.time.Instant} and {@link UUID} — the same types the backend's own
- * controllers declare — so Spring's type conversion rejects them at the seam and {@code
- * GlobalExceptionHandler} answers {@code 400}, with no backend call made.
+ * Binding tests for request parameters the frontend relays into a backend URI (REQ-SEC-051): values
+ * bound as {@link java.time.Instant} or {@link UUID} that carry URI syntax are rejected with {@code
+ * 400} before any backend call.
  */
 @SpringBootTest
 class RelayParamBindingMvcTest {
@@ -115,8 +110,6 @@ class RelayParamBindingMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void adminPersonalInventoryPage_ignoresAMemberIdThatIsNotAUuid() throws Exception {
-    // The page degrades instead of erroring — an unparseable member selects nobody, which is the
-    // empty page the picker starts on — but the raw value must not reach the backend either.
     mockMvc
         .perform(get("/admin/personal-inventory").param("userSub", "../../etc/passwd"))
         .andExpect(status().isOk());

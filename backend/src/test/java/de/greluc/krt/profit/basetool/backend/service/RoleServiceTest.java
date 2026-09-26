@@ -59,10 +59,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
 /**
- * Unit tests for {@link RoleService#updatePermissions} — the one mutation in the audited "Rollen"
- * area that rewrites what a role may DO. {@code role_permissions} keeps current state only, so the
- * audit row and the log line are the sole record of the previous grant and the acting admin
- * (REQ-AUDIT-001).
+ * Unit tests for {@link RoleService#updatePermissions}, whose audit row and log line are the only
+ * record of the previous grant (REQ-AUDIT-001).
  */
 @ExtendWith(MockitoExtension.class)
 class RoleServiceTest {
@@ -100,7 +98,6 @@ class RoleServiceTest {
     roleService.updatePermissions(
         "Officer", Set.of(Permissions.HANGAR_READ, Permissions.ROLE_MANAGE));
 
-    // MISSION_READ went, ROLE_MANAGE arrived, HANGAR_READ is unchanged and therefore absent.
     assertEquals(
         "added=ROLE_MANAGE removed=MISSION_READ unknownAdded=0 unknownRemoved=0",
         capturedDetails());
@@ -108,9 +105,6 @@ class RoleServiceTest {
 
   @Test
   void updatePermissions_rendersAnEmptySideAsADash_andCountsUnknownValuesWithoutNamingThem() {
-    // The endpoint takes a bare Set<String> body, so a permission string is client-supplied text:
-    // anything outside the fixed Permissions vocabulary is applied but never named in the payload.
-    // It must still leave a trace, otherwise this edit is indistinguishable from a no-op change.
     when(roleRepository.findByName("Officer")).thenReturn(Optional.of(officer));
     when(roleRepository.save(officer)).thenReturn(officer);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ACTOR));
@@ -139,8 +133,6 @@ class RoleServiceTest {
 
   @Test
   void updatePermissions_doesNotCountAnUnknownPermissionThatTheEditLeavesInPlace() {
-    // Only a *changed* out-of-vocabulary member may raise the tally: a leftover the admin did not
-    // touch would otherwise report a phantom change on every single save of the role.
     officer.setPermissions(new HashSet<>(Set.of(Permissions.HANGAR_READ, NOT_A_PERMISSION)));
     when(roleRepository.findByName("Officer")).thenReturn(Optional.of(officer));
     when(roleRepository.save(officer)).thenReturn(officer);
@@ -154,8 +146,6 @@ class RoleServiceTest {
 
   @Test
   void updatePermissions_countsANullElementInTheRequestBodyInsteadOfFailing() {
-    // The request body is a raw Set<String>, so a JSON null reaches the difference; probing an
-    // immutable Set with it would throw and turn an otherwise valid admin edit into a 500.
     when(roleRepository.findByName("Officer")).thenReturn(Optional.of(officer));
     when(roleRepository.save(officer)).thenReturn(officer);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ACTOR));
@@ -186,8 +176,6 @@ class RoleServiceTest {
     List<ILoggingEvent> events = appender.list;
     assertEquals(1, events.size());
     ILoggingEvent event = events.getFirst();
-    // INFO, not WARN: an admin editing a role on the role-management screen is the intended use of
-    // the screen, not an anomaly.
     assertEquals(Level.INFO, event.getLevel());
     String message = event.getFormattedMessage();
     assertTrue(message.contains("OFFICER"), message);
@@ -220,7 +208,6 @@ class RoleServiceTest {
     assertEquals(1, appender.list.size());
     String message = appender.list.getFirst().getFormattedMessage();
     assertTrue(message.contains("unknownAdded=2"), message);
-    // Log forging: a client-supplied permission string must never be interpolated into the line.
     assertFalse(message.contains(NOT_A_PERMISSION), message);
     assertFalse(message.contains("FAKE"), message);
   }
@@ -236,10 +223,6 @@ class RoleServiceTest {
 
   @Test
   void auditVocabularyNamesExactlyThePermissionsConstants() {
-    // Parity between the audited vocabulary and the Permissions holder, in the shape used by
-    // ClientErrorReportControllerTest#beaconModuleShipsExactlyTheServerSideKindAllowlist: the two
-    // halves drift silently otherwise. A permission the vocabulary does not know is still applied,
-    // yet its audit row would read "added=-" — a grant of rights that looks like a no-op.
     List<String> constants = declaredPermissionConstants();
     assertFalse(constants.isEmpty(), "Permissions declares no constants");
     when(roleRepository.findByName("Officer")).thenReturn(Optional.of(officer));
@@ -266,7 +249,6 @@ class RoleServiceTest {
               + " is not part of the audited vocabulary: RoleService must derive it from the"
               + " Permissions constants, never from a hand-written list");
     }
-    // The counterpart: a value outside the holder stays a count, so the vocabulary is closed.
     assertEquals(
         "added=- removed=- unknownAdded=1 unknownRemoved=0", captured.getLast().toString());
   }
@@ -290,11 +272,8 @@ class RoleServiceTest {
   }
 
   /**
-   * The permission values {@link Permissions} declares, read independently of {@code RoleService}
-   * so the parity test above compares two halves rather than one value with itself. Also asserts
-   * the two properties the reflective derivation relies on: every public constant in the holder is
-   * a {@code String}, and its value equals its field name — a constant of any other kind would
-   * silently join the audited vocabulary.
+   * Reads the permission values {@link Permissions} declares, independently of {@code RoleService},
+   * asserting that every public constant is a {@code String} equal to its field name.
    *
    * @return the declared permission constant values
    */

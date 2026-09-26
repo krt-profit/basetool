@@ -49,14 +49,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #578 header-gated hangar write twins ({@link
- * HangarPageController#addShipAjax}/{@code updateShipAjax}/{@code deleteShipAjax}/{@code
- * setHomeLocationAjax}). They assert that an {@code X-Requested-With=XMLHttpRequest} JSON request
- * forwards to the backend and answers {@code 204}, a missing required field is rejected up front
- * with {@code 422} {@code problem+json} (code {@code VALIDATION}) without ever calling the backend,
- * a backend optimistic-lock failure is relayed as {@code 409} {@code problem+json} carrying its
- * {@code code}, and that a plain (no-header) POST still routes to the classic POST→redirect
- * fallback (the twins must not shadow it).
+ * MVC tests for the AJAX hangar write endpoints ({@link HangarPageController#addShipAjax}, {@code
+ * updateShipAjax}, {@code deleteShipAjax}, {@code setHomeLocationAjax}): success answers {@code
+ * 204}, a missing field {@code 422} without a backend call, a backend lock conflict is relayed as
+ * {@code 409} {@code problem+json}, and a header-less POST still reaches the redirect handler.
  */
 @SpringBootTest
 class HangarWriteAjaxControllerTest {
@@ -175,8 +171,6 @@ class HangarWriteAjaxControllerTest {
   @Test
   @WithMockUser
   void addShip_withoutAjaxHeader_routesToClassicRedirectFallback() throws Exception {
-    // No X-Requested-With header -> the classic @ModelAttribute handler wins and redirects, proving
-    // the header-gated twin does not shadow the no-JS fallback (REQ-FE-006).
     mockMvc
         .perform(
             post("/hangar/add")

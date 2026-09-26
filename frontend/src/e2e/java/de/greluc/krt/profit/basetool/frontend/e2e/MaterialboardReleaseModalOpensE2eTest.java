@@ -34,29 +34,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the Materialbörse release modal opening <em>invisibly</em> (REQ-MARKET-002/007).
+ * E2E regression test: the Materialbörse release modal must become visible when opened and hidden
+ * when dismissed (REQ-MARKET-002/007).
  *
- * <p>The shared release/edit modal is a {@code .krt-modal-overlay}, whose global default in {@code
- * styles.css} is {@code display:none}; a modal is opened by switching it to {@code display:flex},
- * NOT by clearing a {@code hidden} attribute. The app-wide handlers do that by adding the {@code
- * krtm-modal-open} class (ADR-0093, {@code common-handlers.js open-modal-display}); this page's own
- * {@code materialboerse-release.js} sets {@code modal.style.display = 'flex'}. The first cut of
- * {@code materialboerse-release.js} opened with {@code modal.hidden = false}, which removed the
- * attribute but left the CSS {@code display:none} in place — so clicking "Material anbieten" (and
- * the Mein-Lager "Für Börse freigeben" checkbox) ran the open logic and even fetched the picker,
- * yet the user saw nothing and could never submit, so no offer was ever created. Only a real
- * browser catches this: MockMvc render tests do not evaluate CSS, so the modal markup looked
- * correct.
- *
- * <p>This drives the board in a real engine and asserts the modal is hidden on load (also guarding
- * the inverse "modal renders open on load" regression the {@code styles.css} default protects
- * against), becomes genuinely visible after the CTA click, and hides again when dismissed —
- * Playwright's visibility checks resolve a {@code display:none} element as hidden, which is exactly
- * the discriminator that turns this red on the pre-fix frontend.
- *
- * <p>The actor is {@code test-admin}, whose seeded IRIDIUM membership carries KRT_MEMBER, the role
- * the board requires. No inventory seed is needed: the "new" release dialog opens with an empty
- * picker, so the modal's visibility is exercised without any releasable Lager posten.
+ * <p>Needs a real browser because visibility depends on the {@code .krt-modal-overlay} CSS.
  */
 @Tag("e2e")
 class MaterialboardReleaseModalOpensE2eTest {
@@ -92,16 +73,11 @@ class MaterialboardReleaseModalOpensE2eTest {
   }
 
   /**
-   * Opens the board, clicks "Material anbieten", and asserts the release modal actually appears on
-   * screen (not merely present in the DOM), then closes and asserts it disappears. Pre-fix the
-   * modal stayed {@code display:none} despite the {@code hidden} attribute being cleared, so the
-   * visibility assertion after the click fails.
+   * Asserts the release modal is hidden on load, visible after clicking "Material anbieten", and
+   * hidden again after closing.
    *
-   * <p>Also guards a second regression: the material picker <em>dropdown</em> must be <b>closed on
-   * open</b>. The first cut force-opened the absolutely-positioned listbox as the modal appeared,
-   * so it covered the remark/footer and blocked the other inputs. The list must reveal itself only
-   * on an explicit gesture — a click into the (auto-focused) picker input — which is what the
-   * assertions below exercise.
+   * <p>Also asserts the picker dropdown stays closed on open and opens only on a click into the
+   * picker input.
    */
   @Test
   void clickingOfferCtaShowsReleaseModal() {
@@ -116,34 +92,24 @@ class MaterialboardReleaseModalOpensE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/materialboerse");
         page.waitForLoadState();
-        // Both deferred scripts must have wired up: the board's delegated click handler and the
-        // shared release modal's window.krtMaterialRelease. waitForLoadState() already guarantees
-        // deferred scripts ran, but assert the seam explicitly so a click can never land early.
         page.waitForFunction("() => typeof window.krtMaterialRelease === 'object'");
 
-        // Closed on load: the .krt-modal-overlay global default is display:none.
         assertThat(page.locator("#mb-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
         page.locator("[data-mb-open-release]").first().click();
 
-        // The regression discriminator: the modal must be genuinely visible, not just un-hidden.
         assertThat(page.locator("#mb-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        // "new" mode reveals the material picker so the user can choose a releasable posten.
         assertThat(page.locator("#mb-modal [data-mb-picker]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // The picker DROPDOWN stays closed on open: the modal auto-focuses the input, and a
-        // programmatic focus must not pop the list (pre-fix it force-opened, covering the fields).
         assertThat(page.locator("#mb-modal [data-mb-picker-list]"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
-        // Clicking into the picker input opens it (an empty actor still shows the notice row).
         page.locator("#mb-modal [data-mb-picker-input]").click();
         assertThat(page.locator("#mb-modal [data-mb-picker-list]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Dismiss via the header close button and confirm it hides again (display toggles back).
         page.locator("#mb-modal [data-mb-modal-close]").first().click();
         assertThat(page.locator("#mb-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));

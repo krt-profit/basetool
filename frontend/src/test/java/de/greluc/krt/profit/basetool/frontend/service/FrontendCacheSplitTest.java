@@ -33,11 +33,9 @@ import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Integration test for the per-domain frontend cache split (FE-CACHE-1/2). Pins the {@link
- * CachedCatalog} URIs and fetch modes (so a refactor cannot silently change a cache target or
- * re-truncate a page-walked catalogue, REQ-ADMIN-003), proves every domain is a registered Caffeine
- * cache, and — the split's whole point — that {@code evict(domain)} drops only that domain's cache
- * while a sibling domain is retained.
+ * Integration test for the per-domain frontend caches: pins the {@link CachedCatalog} URIs and
+ * fetch modes (REQ-ADMIN-003), checks every domain is a registered Caffeine cache, and that {@code
+ * evict(domain)} drops only that domain's cache.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -65,9 +63,6 @@ class FrontendCacheSplitTest {
 
   @Test
   void cachedCatalogFetchModesArePinned() {
-    // REQ-ADMIN-003: exactly these paged catalogues are assembled complete by the page walk
-    // inside getCached — dropping one from this set silently reintroduces the bounded-page
-    // truncation this test exists to prevent.
     java.util.EnumSet<CachedCatalog> expectedPageWalked =
         java.util.EnumSet.of(
             CachedCatalog.SQUADRONS,
@@ -90,15 +85,11 @@ class FrontendCacheSplitTest {
           catalog.isPageWalked(),
           () -> catalog.name() + " has an unexpected fetch mode");
     }
-    // ITEM_CATALOG is a deliberate single-row existence probe (size=1) — pinned SINGLE so nobody
-    // "fixes" it into a walk and pulls the whole item catalogue into the probe cache entry.
     assertEquals(CachedCatalog.Fetch.SINGLE, CachedCatalog.ITEM_CATALOG.getFetch());
   }
 
   @Test
   void pageWalkedCatalogUrisSupportPageAppending() {
-    // The walk appends "&page=N" to the pinned URI, so every page-walked URI must already carry
-    // a query string with an explicit chunk size and must not pin a page index of its own.
     for (CachedCatalog catalog : CachedCatalog.values()) {
       if (!catalog.isPageWalked()) {
         continue;

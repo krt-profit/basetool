@@ -23,13 +23,7 @@ import java.math.BigDecimal;
 
 /**
  * Frontend mirror of the backend {@code MissionFinanceTotalsDto}: the aggregated totals for a
- * mission's "Finanzen" summary strip, fetched from {@code
- * /api/v1/missions/{id}/finance-entries/summary}.
- *
- * <p>It replaces the previous "fetch the whole ledger ({@code size=1000}) and sum it in the page
- * controller" pattern with a single backend SQL aggregate (ADR-0078 mission-scale hardening), so a
- * finance render no longer materializes every ledger row. Distinct from {@link
- * MissionFinanceSummaryDto}, which is the operation-rollup per-mission summary carrying full lists.
+ * mission's "Finanzen" summary strip, from {@code /api/v1/missions/{id}/finance-entries/summary}.
  *
  * @param total signed mission bottom line (finance income − expense + refinery profit)
  * @param incomeSum summed amount of all income finance entries

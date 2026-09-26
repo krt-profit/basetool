@@ -23,18 +23,11 @@ import java.util.UUID;
 
 /**
  * Per-mission refinery profit/loss aggregate produced by {@link
- * RefineryOrderRepository#aggregateProfitByMissionIds} via a grouped JPQL constructor expression —
- * one row per mission, {@code SUM}med across the mission's refinery orders in a single query.
- *
- * <p>Each order contributes {@code oreSales − expenses − otherExpenses} (legacy null fields
- * coalesced to 0, identical to the in-memory roll-up it replaces). It exists so the operation
- * finance roll-up folds refinery profit into each mission's total without materializing every
- * refinery-order row across every child mission (the operation-side ADR-0078 gap, #1121). A SQL
- * {@code SUM} over an empty set is {@code NULL}, so {@link #profitSum} may be {@code null} when a
- * mission has no refinery order; the caller coalesces to zero.
+ * RefineryOrderRepository#aggregateProfitByMissionIds}: the sum of {@code oreSales − expenses −
+ * otherExpenses} (null fields as 0) across one mission's refinery orders.
  *
  * @param missionId the mission the sum belongs to (the {@code GROUP BY} key)
- * @param profitSum summed {@code oreSales − expenses − otherExpenses} across the mission's refinery
- *     orders, or {@code null} when the mission has none
+ * @param profitSum the summed profit, or {@code null} when the mission has no refinery order;
+ *     callers coalesce to zero
  */
 public record RefineryMissionProfitAggregate(UUID missionId, Double profitSum) {}

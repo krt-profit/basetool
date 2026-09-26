@@ -38,11 +38,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link BankBookingRequest} rows (epic #666, F2). Unlike the
- * append-only ledger repositories this aggregate is mutable (off-ledger, ADR-0021), so
- * {@code @Modifying} writes via the standard {@code save} path are expected. The {@code account /
- * account.orgUnit / holder / resultingTransaction} graph is eagerly fetched on the list/queue reads
- * so the DTO assembly never triggers an N+1 (REQ-DATA-003).
+ * Spring Data repository for the mutable, off-ledger {@link BankBookingRequest} aggregate
+ * (ADR-0021). List and queue reads fetch the account, org unit, holder and resulting transaction
+ * eagerly (REQ-DATA-003).
  */
 @Repository
 public interface BankBookingRequestRepository extends JpaRepository<BankBookingRequest, UUID> {
@@ -67,10 +65,8 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   Instant findOldestCreatedAtByStatus(@Param("status") BankBookingRequestStatus status);
 
   /**
-   * Loads one request under a pessimistic write lock for the surrounding transaction. The decision
-   * paths (confirm/reject/cancel) lock the request row first so two decisions on the same request
-   * serialize — the second blocks until the first commits and then sees the terminal state, which
-   * prevents a double-booking before the {@code @Version} check would catch it.
+   * Loads one request under a pessimistic write lock, so two decisions on the same request
+   * serialize and the second sees the terminal state.
    *
    * @param id the request id
    * @return the locked request, or empty when it does not exist
@@ -98,8 +94,8 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   List<BankBookingRequest> findByRequestedByOrderByCreatedAtDesc(UUID requestedBy);
 
   /**
-   * One page of requests in the given lifecycle state across all accounts — the management/admin
-   * confirmation queue (sees every account, REQ-BANK-023).
+   * Returns one page of requests in the given state across all accounts, the management/admin
+   * confirmation queue (REQ-BANK-023).
    *
    * @param status the lifecycle state to list (e.g. {@code PENDING})
    * @param pageable page, size and whitelisted sort
@@ -117,9 +113,8 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   Page<BankBookingRequest> findByStatus(BankBookingRequestStatus status, Pageable pageable);
 
   /**
-   * One page of requests in the given state restricted to the supplied accounts — the bank-employee
-   * confirmation queue, scoped to the accounts the employee is granted on (REQ-BANK-023). An empty
-   * id collection yields an empty page.
+   * Returns one page of requests in the given state on the supplied accounts, the bank-employee
+   * confirmation queue (REQ-BANK-023). An empty id collection yields an empty page.
    *
    * @param status the lifecycle state to list
    * @param accountIds the accounts the employee may see
@@ -139,9 +134,8 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
       BankBookingRequestStatus status, Collection<UUID> accountIds, Pageable pageable);
 
   /**
-   * One page of requests in any of the given lifecycle states across all accounts — the
-   * management/admin confirmation queue with the parallel status filter (REQ-BANK-023). An empty
-   * status collection yields an empty page.
+   * Returns one page of requests in any of the given states across all accounts (REQ-BANK-023). An
+   * empty status collection yields an empty page.
    *
    * @param statuses the lifecycle states to include (any-of)
    * @param pageable page, size and whitelisted sort
@@ -160,10 +154,8 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
       Collection<BankBookingRequestStatus> statuses, Pageable pageable);
 
   /**
-   * One page of requests in any of the given states restricted to the supplied accounts — the
-   * bank-employee confirmation queue with the parallel status filter, scoped to the accounts the
-   * employee is granted on (REQ-BANK-023). An empty status or account collection yields an empty
-   * page.
+   * Returns one page of requests in any of the given states on the supplied accounts
+   * (REQ-BANK-023). An empty status or account collection yields an empty page.
    *
    * @param statuses the lifecycle states to include (any-of)
    * @param accountIds the accounts the employee may see
@@ -185,9 +177,8 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
       Pageable pageable);
 
   /**
-   * Every request on the given accounts, most-recent first — the "Fremde Anträge" tab where a
-   * responsible holder sees all requests raised against the accounts they are responsible for
-   * (REQ-BANK-041). An empty id collection yields an empty list.
+   * Lists every request on the given accounts, newest first, for the responsible holder's "Fremde
+   * Anträge" tab (REQ-BANK-041). An empty id collection yields an empty list.
    *
    * @param accountIds the accounts the caller is responsible for
    * @return the requests on those accounts, newest first
@@ -214,19 +205,11 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   boolean existsByAccountIdAndStatus(UUID accountId, BankBookingRequestStatus status);
 
   /**
-   * Replaces every handle snapshot of this member on the booking requests with the erasure
-   * sentinel, for a granted Art. 17 request (REQ-SEC-062).
+   * Replaces this member's handle snapshots in all four handle columns of the booking requests
+   * (requester, deciding employee, counterparty, approving holder) with the erasure sentinel, for a
+   * granted Art. 17 request (REQ-SEC-062).
    *
-   * <p>Four columns in one statement, because a member can appear on the same request in more than
-   * one part: as the requester, as the bank employee who decided it, as the counterparty, and as
-   * the responsible holder who granted an over-limit approval. Erasing one and leaving another
-   * would leave the person named on a row the request claims no longer names them.
-   *
-   * <p><b>This bulk update does not bump {@code version}.</b> The entity carries an optimistic lock
-   * and a bulk statement bypasses it, so a request being edited in another session at this exact
-   * moment could write its own row back with the handle restored. Accepted: the operation is a
-   * deliberate one-off act by one admin on a leaver's rows, and the alternative — loading and
-   * saving every request a member ever touched — would 409 against unrelated concurrent bank work.
+   * <p>Bulk update; does not bump {@code version}.
    *
    * @param userId the member whose handle snapshots are erased
    * @param sentinel {@code HandleAnonymisation#SENTINEL}

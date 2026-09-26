@@ -27,29 +27,13 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta payload. Endpoint {@code PATCH
- * /api/v1/users/{id}/memberships} accepts this record so the admin member-edit page can bundle
- * every Staffel-assignment change, every SK add / remove and every flag toggle into one
- * transactional round-trip.
+ * Payload of {@code PATCH /api/v1/users/{id}/memberships}, applying all Staffel and SK membership
+ * changes of the admin member-edit page in one transaction.
  *
- * <p>The payload is two-part: the {@link #staffeln} list — the caller's desired <em>complete</em>
- * Staffel membership set (REQ-ORG-017 allows up to two) — plus a list of {@link
- * SpecialCommandChange}s. Both parts are optional and treated independently:
- *
- * <ul>
- *   <li>{@code staffeln == null} → the user's Staffel memberships are left untouched.
- *   <li>{@code staffeln} non-null (including an empty list) → the backend <em>reconciles</em> the
- *       user's Staffel memberships to exactly this set: squadrons present here but not yet a
- *       membership are added, current Staffel memberships absent here are removed, and a
- *       still-present squadron's flags are patched in place. An empty list therefore removes every
- *       Staffel membership.
- *   <li>{@code specialCommands == null} / empty → the SK side is left untouched.
- * </ul>
- *
- * @param staffeln the desired complete Staffel membership set (0–2 entries), or {@code null} to
- *     leave the Staffel side untouched. A non-null list is reconciled against the current state.
- * @param specialCommands the list of SK changes to apply in this transaction, or {@code null} /
- *     empty when only the Staffel side is being touched.
+ * @param staffeln the desired complete Staffel membership set (0–2 entries, REQ-ORG-017), which the
+ *     backend reconciles against the current state; {@code null} leaves the Staffel side untouched.
+ * @param specialCommands the SK changes to apply, or {@code null} / empty to leave the SK side
+ *     untouched.
  */
 public record MembershipDeltaRequest(
     @Size(max = 2, message = "A user may belong to at most two Staffeln") @Nullable
@@ -57,20 +41,13 @@ public record MembershipDeltaRequest(
     @Nullable List<@Valid SpecialCommandChange> specialCommands) {
 
   /**
-   * One entry of the desired Staffel membership set. Declarative, not action-tagged: each entry
-   * names a target Squadron plus the flag values that membership should carry once the reconcile
-   * has run. Whether the entry results in an add (no membership yet) or an in-place flag patch (the
-   * user is already a member) is decided by the backend reconcile, not the caller — so the client
-   * sends the same shape regardless. Removal is expressed by <em>omitting</em> a currently-held
-   * squadron from the {@link MembershipDeltaRequest#staffeln} list.
+   * One entry of the desired Staffel membership set; the reconcile decides whether it adds a
+   * membership or patches its flags, and an omitted squadron is removed.
    *
-   * @param squadronId the target Squadron id; never {@code null} (a "no Staffel" intent is an empty
-   *     {@link MembershipDeltaRequest#staffeln} list, not a {@code null} entry).
-   * @param isLogistician desired value of the Logistician flag on this Staffel membership row;
-   *     {@code null} is treated as {@code false}. The flag is scoped to this squadron
-   *     (REQ-SEC-005).
-   * @param isMissionManager desired value of the Mission Manager flag on this Staffel membership
-   *     row; {@code null} is treated as {@code false}.
+   * @param squadronId the target Squadron id; never {@code null}.
+   * @param isLogistician desired Logistician flag, scoped to this squadron (REQ-SEC-005); {@code
+   *     null} means {@code false}.
+   * @param isMissionManager desired Mission Manager flag; {@code null} means {@code false}.
    */
   public record StaffelChange(
       @NotNull UUID squadronId,
@@ -78,23 +55,15 @@ public record MembershipDeltaRequest(
       @Nullable Boolean isMissionManager) {}
 
   /**
-   * SK-side instruction. One entry per SK the admin wants to add, remove or patch. The {@link
-   * #action} tag picks between the three branches; the remaining fields are read or ignored
-   * depending on the action.
+   * One SK membership change, selected by its {@link #action}. The lead flag is not part of it.
    *
    * @param orgUnitId the {@code SpecialCommand} id this entry targets; never {@code null}.
-   * @param action which branch to take: {@link Action#ADD} creates a new membership row (flags
-   *     default to {@code false} unless explicitly supplied); {@link Action#REMOVE} deletes the
-   *     existing row; {@link Action#PATCH} updates the flag values on an existing row under
-   *     optimistic-lock.
-   * @param isLogistician new flag value for ADD or PATCH; ignored on REMOVE. {@code null} on PATCH
-   *     means "leave unchanged"; {@code null} on ADD means "default to false".
+   * @param action {@link Action#ADD} creates a membership, {@link Action#REMOVE} deletes it, {@link
+   *     Action#PATCH} updates its flags under optimistic lock.
+   * @param isLogistician new flag value for ADD or PATCH; {@code null} means unchanged on PATCH and
+   *     {@code false} on ADD.
    * @param isMissionManager new flag value for ADD or PATCH; ignored on REMOVE.
-   * @param version current {@code @Version} of the membership row; required for PATCH; ignored for
-   *     ADD and REMOVE.
-   *     <p>{@code is_lead} is intentionally NOT part of this payload — Lead toggles stay ADMIN-only
-   *     and isolated in the SK detail page workflow per plan D2, so the audit trail can attribute
-   *     promotion / demotion actions cleanly to a specific admin call.
+   * @param version the membership row's current version; required for PATCH only.
    */
   public record SpecialCommandChange(
       @NotNull UUID orgUnitId,

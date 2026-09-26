@@ -25,14 +25,10 @@ import java.util.UUID;
 /**
  * Response DTO for {@link de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias}.
  *
- * <p>{@code materialName} is denormalised from the linked material so the admin table view does not
- * need a second round-trip per row. {@code version} is the optimistic-lock token: the admin UI
- * echoes it back on the update form so concurrent edits surface as a 409.
- *
  * @param id alias UUID
- * @param version optimistic-lock token
+ * @param version optimistic-lock token, echoed back on update
  * @param materialId linked material UUID (FK)
- * @param materialName linked material name, denormalised for table-view rendering
+ * @param materialName linked material name, denormalised for the table view
  * @param sourceSystem catalogue identifier ({@code "UEX"}, {@code "SCWIKI"} or {@code
  *     "REFINERY_SCREEN"})
  * @param externalName commodity name in the external catalogue
@@ -40,7 +36,7 @@ import java.util.UUID;
  * @param externalUuid optional external UUID
  * @param externalCode optional external short code
  * @param note free-form provenance / verification note
- * @param createdBy {@code "system"} for V108 seeds, JWT {@code sub} otherwise
+ * @param createdBy {@code "system"} for seeded rows, the JWT {@code sub} otherwise
  * @param createdAt row creation timestamp
  * @param updatedAt row last-update timestamp
  */

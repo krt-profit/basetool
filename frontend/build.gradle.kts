@@ -1,13 +1,6 @@
 import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
 
-// Security override on THIS script's buildscript classpath, where the `org.openapi.generator`
-// plugin below is loaded: openapi-generator 7.25.0 pins handlebars 4.3.1, which carries
-// CVE-2026-55760 (FileTemplateLoader path traversal, Dependabot alert #15). A constraint rather
-// than a plugin bump because 7.25.0 is the newest generator and upstream still pins 4.3.1. It
-// ships nowhere -- the generator runs at build time with the default Mustache engine and loads no
-// Handlebars template -- but the dependency-submission workflow reports every build classpath.
-// The version, the reasoning and the removal condition live on `handlebars` in the version catalog.
 buildscript { dependencies { constraints { classpath(libs.handlebars) } } }
 
 plugins {
@@ -21,114 +14,38 @@ plugins {
   alias(libs.plugins.spotbugs.base)
   alias(libs.plugins.pitest)
   id("com.diffplug.spotless")
-  // Node toolchain for the web-asset linters (ESLint / Stylelint / HTMLHint). The
-  // plugin downloads its own Node + npm under `.gradle/nodejs` (download = true
-  // below), so neither the developer machine nor the CI runner needs a
-  // pre-installed Node — consistent with the "only the Gradle wrapper" rule.
   alias(libs.plugins.node.gradle)
-  // Generates the wire models from the backend's committed OpenAPI document (ADR-0161 §8.2).
-  // Nothing in `main` consumes them yet -- see the `openApiGenerate` block below for what they are
-  // for today and what would have to happen for them to replace the hand-written mirrors.
   alias(libs.plugins.openapi.generator)
 }
 
 description = "frontend"
 
-// Toolchain, repositories, Lombok/JetBrains on `main`/`test`, the Mockito agent,
-// `spotbugsMain` and the SBOM settings come from the root
-// build.gradle.kts (`subprojects { plugins.withId(...) }`) and settings.gradle.kts.
-
-// ---------------------------------------------------------------------------
-// Generated wire models (ADR-0161 §8.2)
-//
-// 261 hand-maintained records under `model/dto` mirror the backend's response shapes, and four
-// contract tests exist to notice when they stop matching. A generator makes the mismatch
-// impossible instead of detectable -- that is the maintainability win gRPC was asked for, and it
-// needs no protocol change to collect.
-//
-// WHAT THIS DOES TODAY, AND WHAT IT DOES NOT. The generator runs, its output compiles, and
-// `GeneratedDtoAgreementTest` compares it field by field against the hand-written mirrors. Nothing
-// in `main` imports a generated type. That ordering is deliberate and is what §8.2 asks for:
-// "the contract tests should be KEPT initially, proving the generator agrees with them before
-// anything is deleted". The swap is an epic of its own, and it is not a small one -- the generator
-// emits classes with getters where the mirrors are records, `List` where they use `Set`, and
-// `OffsetDateTime`/`String` where they use `Instant`, so every accessor call site moves and the
-// Javadoc that explains WHY fields exist (see MissionDto's slimming note) is not reproducible from
-// a schema.
-//
-// The output goes to the TEST source set. In `main` it would ship 261 unused classes in the jar
-// and put generated code under Checkstyle's Javadoc gate; in `test` it is compiled, reflected over
-// and otherwise inert.
 val generatedContract = layout.buildDirectory.dir("generated/openapi")
 
 openApiGenerate {
   generatorName.set("java")
-  // A RegularFile, NOT a `file:` URI string. The extension's `set(String)` overload runs the value
-  // through `isRemoteUri()`, and `file:///D:/...` matches -- so it assigned `remoteInputSpec` and
-  // NULLED `inputSpec`, which the plugin says out loud on every run: "Using remoteInputSpec may
-  // result in stale build caches if the remote content changes." That discarded `inputSpec`'s
-  // tracked `@InputFile @PathSensitive(RELATIVE)` and left a machine-absolute string in a
-  // @CacheableTask key, so a CI entry, the main checkout, every worktree copy and the Docker image
-  // build were four distinct keys and regenerated 411 models from scratch in each.
-  //
-  // The `RegularFile` overload keeps the file tracked and the key relocatable, and it sidesteps the
-  // Windows drive-letter trap the URI form was reaching for in the first place -- that trap is what
-  // `isRemoteUri()`'s own regex documents itself as avoiding.
   inputSpec.set(
     rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json")
   )
-  // Without this the generator writes the new tree and LEAVES the old files. Rename or drop a
-  // backend schema and the stale class still compiles, `scan(GENERATED_PACKAGE)` still finds it,
-  // and the branch in GeneratedDtoAgreementTest that reads "no schema of this name in
-  // openapi.json" never fires -- green on every machine with a warm `frontend/build`, red only on
-  // a clean CI workspace. That is the inverse of what a drift gate should do.
   cleanupOutput.set(true)
   outputDir.set(generatedContract)
   modelPackage.set("de.greluc.krt.profit.basetool.frontend.contract.model")
   apiPackage.set("de.greluc.krt.profit.basetool.frontend.contract.api")
   packageName.set("de.greluc.krt.profit.basetool.frontend.contract")
-  // MODELS ONLY. The generator can emit API interfaces too and they are deliberately not taken:
-  // BackendApiClient classifies failures by the backend's stable problem `code`, folds some
-  // refusals into successes, single-flights through Caffeine and page-walks catalogues -- none of
-  // which a generated client does. What the generation is for is the TYPE of the payload.
   globalProperties.set(mapOf("models" to "", "modelDocs" to "false", "modelTests" to "false"))
   configOptions.set(
     mapOf(
       "library" to "native",
-      // Jackson 2 annotations, and that is a CONSTRAINT ON THE EPIC rather than a detail. All 411
-      // generated files import `com.fasterxml.jackson.annotation.*`; openapi-generator 7.25 offers
-      // no Jackson 3 option. Spring 7 binds with `tools.jackson`, which ignores those annotations
-      // entirely -- so the "replace the mirrors with generated types" step this generation exists
-      // to prepare CANNOT be taken on this output as it stands: every @JsonProperty-renamed field
-      // and every @JsonCreator/@JsonInclude behaviour would misbind at runtime. That is fine for
-      // what the output is used for TODAY, which is a reflective name-by-name comparison in
-      // GeneratedDtoAgreementTest, and it is the first thing the epic has to solve.
-      //
-      // It also makes the Jackson 2 dependency below load-bearing for `compileTestJava`: closing
-      // issue #294 by deleting it now breaks 411 files. See the note beside that dependency.
       "serializationLibrary" to "jackson",
-      // Jakarta, not javax: this module is on Spring Boot 4 / Jakarta EE 10.
       "useJakartaEe" to "true",
-      // JsonNullable would pull org.openapitools:jackson-databind-nullable onto the classpath for
-      // a distinction the mirrors do not make either -- they use a plain null.
       "openApiNullable" to "false",
-      // Without this every regeneration rewrites 261 files with a new timestamp, which turns an
-      // up-to-date check into a diff.
       "hideGenerationTimestamp" to "true",
-      // Off, or every model imports the ApiClient that a models-only generation never emits, for a
-      // `toUrlQueryString()` helper nothing here calls. The generation compiles without it and
-      // fails outright with it, which is the whole of the reason.
       "supportUrlQuery" to "false",
       "sourceFolder" to "src/main/java",
     )
   )
 }
 
-// The generator takes its spec as a URI STRING, so Gradle never sees the file and the task's cache
-// key would not include the contract at all. On a developer machine that is invisible because a
-// local build regenerates anyway; on CI it serves a FROM-CACHE result that predates a contract
-// change and the comparison below passes against a stale generation. Declaring the file as an
-// input is what makes the cache key honest. (Learned the expensive way in the Android module.)
 tasks.openApiGenerate.configure {
   inputs
     .file(rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json"))
@@ -140,35 +57,6 @@ sourceSets.named("test") { java.srcDir(generatedContract.map { it.dir("src/main/
 
 tasks.named<JavaCompile>("compileTestJava") { dependsOn(tasks.openApiGenerate) }
 
-// Resolve the version string that ends up in `META-INF/build-info.properties`
-// (consumed by `AppVersionAdvice` to render the sidebar's discreet version
-// chip). Priority chain — first non-blank wins:
-//
-//   1. `-PappVersion=<value>` on the Gradle command line. Used by the CI
-//      Docker build, where `.git` is excluded from the build context via
-//      `.dockerignore`: the GitHub Actions workflow computes the version on
-//      the runner and forwards it as a `--build-arg APP_VERSION=...` which
-//      the Dockerfile relays to Gradle via this property.
-//   2. `git describe --tags --always --dirty` against the worktree's `.git`.
-//      Used by local developer builds, where the host has both `.git` and
-//      a `git` binary on PATH. `--tags` matches lightweight tags (the
-//      project uses `vX.Y.Z` tags); `--always` falls back to a short SHA
-//      when no tag is reachable; `--dirty` appends a marker if the worktree
-//      has uncommitted changes so a half-committed build never claims to
-//      be the clean tag. Run through `providers.exec` (audit item
-//      BLD-PERF-04): a raw `ProcessBuilder` started at configuration time is
-//      a configuration-cache violation, while the provider makes the command's
-//      output a tracked input of the cache entry instead.
-//   3. `project.version` (currently `0.0.1-SNAPSHOT`) as the final fallback
-//      for Docker builds without an injected `-PappVersion` and for hosts
-//      without git installed (the exec then fails, which `runCatching` turns
-//      into "no answer").
-//
-// The leading `v` from a canonical tag (e.g. `v0.2.3`) is stripped at the
-// end so the sidebar's i18n template `v{0}` does not produce `vv0.2.3`. The
-// SNAPSHOT fallback has no `v` prefix and surfaces as `v0.0.1-SNAPSHOT`,
-// SHA-only fallback surfaces as `vabc1234` — both consistent with the
-// canonical-tag rendering.
 val projectVersion = project.version.toString()
 val gitDescribe = providers.exec {
   commandLine("git", "describe", "--tags", "--always", "--dirty")
@@ -195,162 +83,62 @@ val resolvedAppVersion: Provider<String> =
     )
     .map { it.removePrefix("v") }
 
-// Generate `META-INF/build-info.properties` at build time so Spring Boot's
-// `ProjectInfoAutoConfiguration` auto-wires a `BuildProperties` bean. The bean
-// feeds the sidebar's discreet version label (rendered by `AppVersionAdvice`)
-// without forcing every Thymeleaf template to read a Gradle-substituted token
-// directly. `bootBuildInfo` is wired into `processResources`, so the file is on
-// the test/runtime classpath without an extra task dependency.
 springBoot {
   buildInfo {
     properties {
-      // Override the default `project.version` value with the chain resolved
-      // above so the deployed image's sidebar reflects the actual git tag of
-      // the commit it was built from.
       version.set(resolvedAppVersion)
     }
   }
 }
 
-// `build-info.properties` changes on every build -- a fresh `build.time`, and the version string
-// moves with every commit through `git describe` -- and it sits on the test runtime classpath. So
-// `:frontend:test` never had a stable cache key and ran in full on every CI build, even for a
-// change that touched nothing it reads (audit item BLD-PERF-07, ~1:45 min plus JaCoCo per run).
-// No test reads that file: `AppVersionAdvice`'s tests hand it a `BuildProperties` of their own. So
-// the file is ignored when the runtime classpath is normalised for up-to-date checks and the build
-// cache. The jar still contains it unchanged, and every test input that DID ride on this churn by
-// accident -- the backend DTO mirrors, the OpenAPI document, the test TLS keystore -- is
-// declared on the test task explicitly below, which is what makes the normalisation safe.
 normalization { runtimeClasspath { ignore("META-INF/build-info.properties") } }
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
-  // CBOR on the frontend<->backend hop (ADR-0161 §8.5). No version: the Spring Boot BOM already
-  // manages tools.jackson:jackson-bom, and pinning a second one here is how the two Jackson 3
-  // module sets drift apart. Its only job is to be PRESENT -- Spring Framework 7 detects
-  // `tools.jackson.dataformat.cbor.CBORMapper` on the classpath and registers the CBOR converter
-  // and the reactive CBOR codecs on its own, so no wiring follows from this line. Which side
-  // actually asks for CBOR is `app.http.codec` on the frontend, and nothing else asks at all.
   implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
-  // Jackson 2 — kept ONLY for ThymeleafJavaScriptSerializerConfig, the JS-inlining bridge that must
-  // track Thymeleaf's own Jackson version. Every other frontend class is on Jackson 3
-  // (tools.jackson).
-  // Thymeleaf 3.1.x (via thymeleaf-spring6) only supports Jackson 2 internally: the bridge
-  // delegates
-  // primitive values to Thymeleaf's StandardJavaScriptSerializer and mirrors its character-escape
-  // table, and it needs the JSR-310 module so [[${dto}]] inline expressions can render java.time.*
-  // fields (Instant/OffsetDateTime/LocalDateTime). Drop both deps once Thymeleaf supports Jackson 3
-  // and the bridge is migrated — tracked in https://github.com/krt-profit/basetool/issues/294.
-  //
-  // SINCE ADR-0161 8.2 these two are ALSO load-bearing for `compileTestJava`: openapi-generator
-  // emits `com.fasterxml.jackson.annotation.*` into all 411 generated models (7.25 has no Jackson 3
-  // option), so deleting them to close #294 breaks the test source set. Closing #294 now means
-  // solving the generator's serialization library first.
   implementation("com.fasterxml.jackson.core:jackson-databind")
   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
   implementation("org.springframework.boot:spring-boot-starter-security")
   implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
-  // WebSocket for the mission-detail presence/awareness feature: shows in real time which
-  // section of a mission another user is currently editing. Native Spring WebSocket
-  // (no STOMP) — minimal wire format, no broker required. The in-memory presence store
-  // is single-instance only; running multiple frontend replicas would need a Redis-backed
-  // fan-out (see MissionPresenceService javadoc).
   implementation("org.springframework.boot:spring-boot-starter-websocket")
   implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
-  // Validation for @ConfigurationProperties validation
   implementation("org.springframework.boot:spring-boot-starter-validation")
-  // Caching
   implementation("org.springframework.boot:spring-boot-starter-cache")
   implementation("com.github.ben-manes.caffeine:caffeine")
-  // CommonMark renderer for the mission-description markdown (escaped + URL-sanitized HTML).
   implementation(libs.commonmark.core)
-  // Actuator for /actuator/health -- consumed by the Docker HEALTHCHECK
   implementation("org.springframework.boot:spring-boot-starter-actuator")
-  // Prometheus text-format rendering for /actuator/prometheus (REQ-OBS-005). Version from the
-  // Spring Boot BOM. The endpoint itself is guarded by the fail-closed basic-auth chain in
-  // MonitoringScrapeSecurityConfig.
   implementation("io.micrometer:micrometer-registry-prometheus")
-  // Distributed tracing (REQ-OBS-009, epic #936 Phase 1b): Boot 4's OpenTelemetry starter
-  // (Micrometer Tracing on the OTel SDK + OTLP export auto-configuration). Version from the
-  // Spring Boot BOM. Inert unless MONITORING_TRACING_ENABLED=true (see application.yml
-  // `management.tracing`). micrometer-registry-otlp is excluded: it would activate Boot's OTLP
-  // metrics PUSH with a localhost default endpoint in every environment (periodic
-  // connection-refused noise) - metrics are exclusively Prometheus PULL via
-  // /actuator/prometheus (REQ-OBS-005).
   implementation("org.springframework.boot:spring-boot-starter-opentelemetry") {
     exclude(group = "io.micrometer", module = "micrometer-registry-otlp")
   }
-  // Spring Session with Redis for persistent sessions across restarts
   implementation("org.springframework.session:spring-session-data-redis")
   implementation("org.springframework.boot:spring-boot-starter-data-redis")
-  // Resilience4j for resilience patterns + Reactor operators
   implementation(libs.resilience4j.spring.boot3)
   implementation(libs.resilience4j.reactor)
-  // Reactor ThreadLocal propagation across WebClient worker threads — required so the
-  // active-OrgUnit
-  // pin and the correlation id flow from the servlet thread into the WebClient exchange filter.
-  // Version is resolved by the Spring Boot BOM (no version.ref here).
   implementation(libs.micrometer.context.propagation)
   implementation(libs.logstash.logback.encoder)
-  // The one implementation of LogSafe and the PII maskers the logback configuration names
-  // (ADR-0205). `implementation`, not `testImplementation`: it ships inside the boot JAR.
   implementation(project(":logging-support"))
 
-  // Optional: metadata for IDE assistance on configuration properties
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
-  // Attached to every Test JVM as a Java agent by the root build (BLD-PERF-10); the
-  // Boot-managed version.
   "mockitoAgent"("org.mockito:mockito-core")
 
-  // The endpoint-enumeration engine behind AnonymousSurfaceSweep* (#1804), shared with the other
-  // module's sweep so a defect in it cannot blind both guards at once. Test-scoped: nothing from
-  // that module reaches a runtime classpath, an image or an SBOM.
   testImplementation(project(":test-support"))
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
   testImplementation("org.springframework.security:spring-security-test")
-  // MockWebServer for HTTP simulations in WebClient tests
   testImplementation(libs.okhttp3.mockwebserver)
-  // In-memory certificates for the hostname-verification tests of the backend TLS hop
-  // (REQ-SEC-070): one named for the host a test dials and one that is not, which the
-  // committed test material cannot offer — every one of its leaves names localhost.
   testImplementation(libs.okhttp3.tls)
-  // ArchUnit core (no archunit-junit5 — that pulls in a clashing JUnit Platform
-  // version; we invoke `.check(CLASSES)` from plain @Test methods). Enforces the
-  // frontend's "no JpaRepository / no direct JDBC" rule.
   testImplementation(libs.archunit.core)
-  // Testcontainers for the live-sync Redis pub/sub fan-out integration test (a throwaway
-  // redis container + a real Lettuce connection), mirroring the ingest module's pattern.
   testImplementation(libs.testcontainers.junit)
 }
 
-// Test, JavaCompile, BootRun, JaCoCo, SpotBugs and SBOM setup is shared with the other modules via
-// the root build.gradle.kts `subprojects { plugins.withId(...) }` blocks.
-
-// The SBOM is restricted to `runtimeClasspath` by the root build. The explicit `^e2e.*` skip
-// is this module's own belt-and-braces: its `e2e` source set brings Playwright and
-// Testcontainers, which must never appear in the shipped BOM.
 tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
   skipConfigs.set(listOf("^e2e.*"))
 }
 
-// ---------------------------------------------------------------------------
-// The „Open-Source-Lizenzen“ page (REQ-UI-021, ADR-0197) — generated, never committed.
-//
-// Every shipped module runs the Licensee gate against its own runtime classpath (root
-// build.gradle.kts) and exports the report; this task merges the four reports with the hand-kept
-// `oss-bundled-components.json` (fonts, image layers — nothing Maven can see) into
-// `oss/oss-licenses.json` on the classpath, which `OssLicenseCatalog` reads at startup. So the page
-// lists the exact versions of the build that serves it, and a dependency bump cannot leave it
-// stale. The reports arrive through the `ossLicenseReportElements` variant each module publishes,
-// not through a path into another module's build directory.
-//
-// The licence of each entry is normalised with the SAME tables the gate uses
-// (`ossLicenseUrlAliases`, `ossLicenseCoordinateOverrides`), and SPDX names and links come from the
-// SPDX list inside the Licensee plugin — the one Licensee itself resolved the POMs against.
 val ossLicenseReports = configurations.dependencyScope("ossLicenseReports")
 val ossLicenseReportFiles =
   configurations.resolvable("ossLicenseReportFiles") {
@@ -371,8 +159,6 @@ val generateOssLicenses =
     group = "build"
     description = "Merges the shipped modules' Licensee reports into oss/oss-licenses.json."
 
-    // This module's own report is a task output rather than a variant: a project cannot resolve
-    // its own outgoing configuration.
     val moduleReports =
       files(
         ossLicenseReportFiles,
@@ -403,7 +189,6 @@ val generateOssLicenses =
     doLast {
       val slurper = groovy.json.JsonSlurper()
 
-      // SPDX identifier -> (name, canonical link), from the list Licensee resolves against.
       val spdxList =
         app.cash.licensee.LicenseeTask::class
           .java
@@ -501,35 +286,6 @@ val generateOssLicenses =
 
 sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
 
-// Third instance of the cross-module input defect the backend build already fixes twice
-// (`crossModuleParitySources`, `apiVhostRunbook`). `DtoMirrorConsistencyTest` lives in this module
-// but reads the BACKEND DTO records as source text — there is no compile-time dependency from
-// frontend to backend, so none of those files reaches this task's classpath and nothing told
-// Gradle that a backend DTO change must re-run the one guard standing between a forgotten frontend
-// mirror and a Thymeleaf template that 500s at render time (three red CI runs on
-// `feat(mission): registeredCount`, 2026-08-25).
-//
-// The hole was masked, not harmless — and the distinction is the whole reason to declare it.
-// `bootBuildInfo` stamps a fresh `build.time` into `META-INF/build-info.properties` on EVERY
-// invocation; that file sits on the test runtime classpath, so the classpath hash changed every
-// run and this task was never UP-TO-DATE at all. Measured 2026-09-06: the guard had been executing
-// by accident, and the documented `--rerun-tasks` workaround bought nothing. Pin the timestamp with
-// one `time.set(…)` — exactly what a reproducible-build change would add — and the defect appears
-// in full: task UP-TO-DATE, BUILD SUCCESSFUL, mirror silently out of sync. Verified both ways,
-// before and after this declaration. Since 2026-09-23 the file is excluded from the classpath
-// normalisation on purpose (BLD-PERF-07, `normalization {}` above), so this declaration is now the
-// only thing that re-runs the guard -- which is exactly its job.
-//
-// Declared as the directory rather than file by file, unlike `crossModuleParitySources`: that test
-// reads three fixed, named files, while this one derives its read set at RUNTIME — it lists the
-// frontend DTO directory and resolves each name against the backend one. A static enumeration
-// would go stale the moment a frontend mirror is added, silently re-opening the hole for that
-// pair, and a backend DTO with no twin today is read the day one appears. It has to be an input
-// before that.
-//
-// `*.java`, not `**/*.java`: the test uses `Files.list`, so `dto/request/` is never read and must
-// not invalidate this task. The frontend half needs no declaration — those sources compile into
-// this module's classes, which are already on the test runtime classpath.
 val backendDtoMirrorDir = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto"
 
 tasks.named<Test>("test") {
@@ -538,40 +294,21 @@ tasks.named<Test>("test") {
     .withPropertyName("backendDtoMirrorSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
-  // Three tests — `DtoOpenApiContractTest`, `FrontendDtoContractTest` and
-  // `AdminAuditLogPageControllerTest` — read the BACKEND's committed OpenAPI document off the
-  // filesystem, walking up to the repository root to find it. The frontend ships no `api/`
-  // resource of its own, so unlike the backend's own generator tests there is no
-  // `processResources` copy to track it: without this the frontend mirrors could drift from the
-  // server contract with the task reporting UP-TO-DATE.
   inputs
     .file(rootProject.file("backend/src/main/resources/api/openapi.json"))
     .withPropertyName("backendOpenApiDocument")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
-  // `BackendHealthUrlProdParityTest` compares this module's prod config against the backend's, so
-  // the health URL the frontend probes cannot drift from the endpoint the backend actually exposes.
-  // Its frontend half is tracked through `processResources`; the backend half is not tracked at
-  // all.
   inputs
     .file(rootProject.file("backend/src/main/resources/application-prod.yml"))
     .withPropertyName("backendProdConfig")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
-  // The committed test TLS material (ADR-0139). The two HTTP/2 tests handshake against it through
-  // `TestTls`, which walks up to the repository root to find it -- so it is off this task's
-  // classpath and, like the four files above, invisible to Gradle. Rotating the material would
-  // otherwise leave those tests UP-TO-DATE against a keystore that no longer exists.
   inputs
     .file(rootProject.file("docker/test-tls/basetool-test-backend.p12"))
     .withPropertyName("testTlsKeystore")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
-  // In-module but still off this task's classpath: `E2eAudienceEnforcementParityTest` lives in
-  // `src/test` and reads two files from the `e2e` source set, which `test` neither compiles nor
-  // depends on. It asserts that the audience the compose stack hands the backend matches the
-  // Keycloak client in the E2E realm export — exactly the pair whose silent divergence makes every
-  // E2E flow fail authentication for a reason nothing in the suite explains.
   inputs
     .files(
       rootProject.file(
@@ -581,10 +318,6 @@ tasks.named<Test>("test") {
     )
     .withPropertyName("e2eAudienceParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
-  // `OssBundledComponentsTest` (REQ-UI-021) walks every font directory of the repository and
-  // reads the hand-kept bundled-component list as source files. The backend and keycloak-theme
-  // trees are off this task's classpath entirely, so without this a font added there — with no
-  // OFL.txt beside it — would leave the test UP-TO-DATE and green.
   inputs
     .files(
       fileTree("src/main/resources/static/fonts"),
@@ -596,39 +329,6 @@ tasks.named<Test>("test") {
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
-// L-2 from the performance audit: minify CSS files inside the built jar so the
-// shipped payload is smaller than the readable sources under
-// `src/main/resources/static/css/`. The source files stay untouched (so editing
-// and diffing remain pleasant).
-//
-// `minifyStaticCss` writes its OWN directory, and `processResources` takes the
-// CSS from there instead of from the sources (audit item BLD-PERF-08). Until
-// 2026-09-23 the task overwrote the copies `processResources` had just written
-// into `build/resources/main/static/css/`, i.e. two tasks declared the same
-// output: Gradle then cannot tell whose files those are, `processResources` is
-// never UP-TO-DATE after a minify (its output was changed behind its back), and
-// the build cache stores a pre-minify `processResources` result that a later
-// FROM-CACHE restore puts back unminified if `minifyStaticCss` is itself
-// up-to-date. Now each task owns what it writes.
-//
-// Dropping the minification instead was considered and rejected on evidence:
-// the edge compresses (`gzip on` in docker/edge/nginx.conf, with the
-// upstreams' Accept-Encoding stripped) but sets no `gzip_types`, and nginx's
-// default is `text/html` alone -- so CSS leaves the edge uncompressed today, and
-// this minifier is the only size reduction it gets.
-//
-// The minifier is deliberately conservative: it strips `/* ... */` block
-// comments, drops blank lines, and trims leading/trailing whitespace per line.
-// It does NOT touch whitespace around selectors or values, because CSS treats a
-// space as the descendant combinator (`a :hover` vs `a:hover`) and an
-// over-eager regex would silently change selector semantics. The savings target
-// is ~25–30 % on `styles.css` (the only big file), which is what the audit
-// estimated.
-//
-// No new build-time dependency was added — a battle-tested minifier
-// (yuicompressor / closure-stylesheets) would compress more aggressively, but
-// the LOW-priority finding does not justify a new classpath entry. Revisit if
-// the CSS surface grows beyond ~200 KB.
 val cssSourceDir = layout.projectDirectory.dir("src/main/resources/static/css")
 val minifiedCssDir = layout.buildDirectory.dir("generated/minified-css")
 
@@ -637,8 +337,6 @@ val minifyStaticCss =
     group = "build"
     description = "Writes minified copies of the CSS sources for processResources to ship (L-2)."
 
-    // Locals, not the script-level vals: the action must not reference the build script object,
-    // which the configuration cache cannot serialise.
     val sourceRoot = cssSourceDir.asFile
     val outputDir = minifiedCssDir
     inputs
@@ -681,24 +379,12 @@ val minifyStaticCss =
     }
   }
 
-// The readable originals are left out of the copy and the minified ones copied in their place. The
-// exclude matches on the SOURCE file's location, so it removes exactly the originals and never the
-// minified copies, which live under build/.
 tasks.named<ProcessResources>("processResources") {
   val originalCss = cssSourceDir.asFile
   exclude { it.file.extension == "css" && it.file.startsWith(originalCss) }
   from(minifyStaticCss) { into("static/css") }
 }
 
-// ---------------------------------------------------------------------------
-// E2E (Playwright) source set + task — Phase 0 spike (docs/e2e-test/README.md).
-//
-// Deliberately NOT wired into `check` / `test` / `build`: the suite needs a
-// running stack and a downloaded Chromium, so it only runs on an explicit
-// `./gradlew :frontend:e2eTest`. The `e2e` source set reuses the test
-// dependencies (JUnit 5 + assertions from spring-boot-starter-test) and adds
-// the Playwright Java binding on top.
-// ---------------------------------------------------------------------------
 sourceSets { create("e2e") }
 
 configurations["e2eImplementation"].extendsFrom(configurations["testImplementation"])
@@ -707,40 +393,16 @@ configurations["e2eRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
 
 dependencies {
   "e2eImplementation"(libs.playwright)
-  // axe-core accessibility engine (Playwright binding) for AccessibilitySmokeE2eTest. Injected and
-  // run via Playwright's evaluate, which executes in an isolated world that bypasses the app's
-  // strict CSP, so axe runs even though inline page scripts are blocked.
   "e2eImplementation"(libs.axe.core.playwright)
-  // PostgreSQL driver for the JDBC catalog seeding (UEX-owned reference data the admin API can't
-  // create); version is managed by the Spring Boot BOM.
   "e2eImplementation"("org.postgresql:postgresql")
-  // JUnit Platform launcher so the custom Test task can discover Jupiter tests.
   "e2eRuntimeOnly"("org.junit.platform:junit-platform-launcher")
-  // Lombok + the JetBrains annotations on the `e2e` source set too. `e2eImplementation` extends
-  // `testImplementation` (above), but `e2eCompileOnly` extends nothing, so the compile-only halves
-  // have to be named here or the 100 Playwright sources get neither.
   "e2eCompileOnly"("org.projectlombok:lombok")
   "e2eAnnotationProcessor"("org.projectlombok:lombok")
   "e2eCompileOnly"(libs.jetbrains.annotations)
 }
 
-// Checkstyle auto-creates `checkstyleE2e` and wires it into `check`. E2E code,
-// like test code (see the root build's `checkstyleTest` disable), uses
-// conventions Google style flags as noise — disable it to keep `check` green.
 tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
 
-// Installs the Playwright-managed browsers into the per-user cache (~/.cache/ms-playwright).
-// Cached in CI; a no-op once present. On a CI Linux runner it additionally installs the browsers'
-// OS libraries via `--with-deps` — WebKit needs libs ubuntu-latest lacks and otherwise fails to
-// launch with a DriverException. That path uses apt + passwordless sudo, so it is gated to CI
-// Linux;
-// local runs on any OS just download the browser binaries (a Linux dev installs deps manually).
-//
-// `-Pe2e.browser=<engine>` narrows the install to that one engine (audit item CI-06): every CI
-// matrix cell runs exactly one, and installing all three -- plus, on CI, all three engines' OS
-// libraries through apt -- in each of fifteen cells was pure waste. Without the property (a local
-// run) all three are installed, as before. An unknown value fails here rather than being handed to
-// the Playwright CLI, which would otherwise download nothing and leave the suite to fail later.
 val playwrightInstall =
   tasks.register<JavaExec>("playwrightInstall") {
     group = "verification"
@@ -767,42 +429,18 @@ val playwrightInstall =
     )
   }
 
-// Shared wiring for the two Playwright Test tasks below. Both run from the `e2e` source set with a
-// provisioned Chromium and forward the same `e2e.*` knobs; they differ only in the JUnit tag they
-// select (and therefore the target they assume). E2E_BASE_URL is read straight from the inherited
-// environment by E2eStackExtension, so it needs no forwarding; -Pe2e.baseUrl switches to
-// external/staging mode.
 val playwrightSuiteConfig: Test.() -> Unit = {
   group = "verification"
   testClassesDirs = sourceSets["e2e"].output.classesDirs
   classpath = sourceSets["e2e"].runtimeClasspath
   dependsOn(playwrightInstall)
-  // ServedBuildCheck compares the stack's stylesheets with this task's output
-  // (build/generated/minified-css), which the e2e source set does not otherwise depend on: without
-  // this a CSS change leaves it stale and the check reports a mismatch that is not there.
   dependsOn("minifyStaticCss")
-  // These flows run against a full stack that E2eStackExtension builds at RUNTIME from the
-  // entire app (main code, Thymeleaf templates, Flyway migrations, the backend image) — none of
-  // which is a tracked Gradle input here (only the `e2e` source set + classpath are). So a PR
-  // that touches only main code leaves those inputs unchanged and the Test task resolves
-  // UP-TO-DATE / FROM-CACHE, reporting green WITHOUT ever booting the stack or running a browser
-  // (seen on #733/#734). Force a real run whenever these opt-in, label-gated suites are invoked —
-  // correctness beats caching for a stack-integration test whose true inputs cannot be hashed.
   outputs.upToDateWhen { false }
   outputs.cacheIf { false }
-  // Chromium is provisioned by playwrightInstall; stop Playwright.create() from auto-downloading
-  // the full browser set (Firefox + WebKit) on first run.
   environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
-  // CI passes credentials through the environment (masked in logs) rather than on the command line;
-  // map them onto the e2e.* system properties the tests read. An explicit -P value (below) wins.
-  // E2E_BASE_URL needs no mapping — E2eStackExtension reads it straight from the environment.
   mapOf("E2E_USERNAME" to "e2e.username", "E2E_PASSWORD" to "e2e.password").forEach { (env, prop) ->
     System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
   }
-  // `e2e.prebuilt=true` tells E2eStackExtension the application images are already in the local
-  // Docker store (e2e.yml's `build-stack` job builds them once and every matrix cell loads them),
-  // so
-  // it boots them with `--no-build` instead of building them again.
   listOf(
       "e2e.baseUrl",
       "e2e.browser",
@@ -815,7 +453,6 @@ val playwrightSuiteConfig: Test.() -> Unit = {
     .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
 }
 
-// Full functional flows incl. destructive CRUD; assumes an isolated stack (ephemeral by default).
 tasks.register<Test>("e2eTest") {
   description =
     "Runs the destructive Playwright e2e flows against an isolated stack (JUnit tag: e2e)."
@@ -823,7 +460,6 @@ tasks.register<Test>("e2eTest") {
   useJUnitPlatform { includeTags("e2e") }
 }
 
-// Non-destructive login + core-page checks; target-agnostic, safe to run against staging.
 tasks.register<Test>("smokeTest") {
   description =
     "Runs the non-destructive Playwright smoke checks (JUnit tag: smoke); set E2E_BASE_URL for staging."
@@ -831,33 +467,6 @@ tasks.register<Test>("smokeTest") {
   useJUnitPlatform { includeTags("smoke") }
 }
 
-// ---------------------------------------------------------------------------
-// Web-asset linting: ESLint (JS), Stylelint (CSS), HTMLHint (Thymeleaf HTML).
-//
-// The Gradle Node plugin downloads a private Node + npm under `.gradle/nodejs`
-// (download = true) so no host Node install is required — consistent with the
-// "only the Gradle wrapper" rule. `npmInstall` reads the committed
-// package.json / package-lock.json and is incremental.
-//
-// The three lint tasks are wired into `check` and run STRICT
-// (ignoreExitValue = false): any finding fails the build. Introduction
-// followed the staged SpotBugs pattern — report-only until the existing
-// backlog was cleared (ESLint 79 -> 0, Stylelint 348 -> 0, HTMLHint 0), then
-// flipped to strict. The vendored, minified JS bundles are excluded in the
-// tool configs (eslint.config.mjs / .stylelintrc.json).
-// ---------------------------------------------------------------------------
-//
-// `npmInstall` runs `npm ci`, not `npm install` (CI-SEC-18): `ci` installs exactly what the
-// committed lockfile pins and FAILS when package.json and package-lock.json disagree, where
-// `install` silently re-resolves the ranges and rewrites the lockfile — so a build could lint with
-// a
-// toolchain nobody reviewed. `frontend/.npmrc` adds `ignore-scripts=true`, so no package's
-// install-time lifecycle script runs on a developer machine or a CI runner; none of the lint tools
-// needs one.
-//
-// `distBaseUrl = null` stops the plugin from adding its own Node.js repository to this project: the
-// repository is declared in settings.gradle.kts instead, beside every other one, because
-// `RepositoriesMode.FAIL_ON_PROJECT_REPOS` refuses a project-level declaration (BLD-SIMP-06).
 node {
   version.set(libs.versions.node.get())
   download.set(true)
@@ -878,30 +487,6 @@ val lintCss =
     inputs.file(".stylelintrc.json")
   }
 
-// The CSS inside a Thymeleaf <style> block, which no gate read until 2026-09-13.
-//
-// `lintCss` globs `static/css/**`, `prettierCheck` the same plus `static/js` and `types/`, and
-// HTMLHint does not parse CSS at all — so roughly 2,000 lines of inline CSS across 110 templates
-// were unlinted. A review found what that costs: two templates carried a STRAY `}` after a rule
-// that was already closed, and per CSS Syntax 3 the parser consumes the next rule as part of an
-// invalid prelude and drops it — `.mission-head-sticky` was deleted on three pages at every
-// viewport width, with `nginx -t`-grade confidence from every green check in CI.
-//
-// Stylelint reads inline CSS with `postcss-html`. This task runs with a DELIBERATELY TINY rule set
-// (see .stylelintrc.templates.json) rather than the stylesheet config, because the value is almost
-// all in the parse: run against the broken revision with NO rules enabled at all, it reports
-// `Unexpected }` at mission-detail.html:39:9 — exactly the defect, exactly the line. Adopting the
-// full `stylelint-config-standard` here would instead surface hundreds of pre-existing findings
-// and the gate would never be enabled. `media-feature-range-notation` is the one style rule worth
-// its cost: it is what keeps `@media (max-width: 768px)` from reappearing beside the range form
-// every rule in static/css uses, and it auto-fixes.
-//
-// FE-PERF-02 (2026-09-23) moved every page <style> block into `static/css/pages/<page>.css`, linked
-// in the same place, so the page CSS no longer rides in every HTML response. The coverage moved
-// with it: this task now reads those files with the SAME tiny rule set, and `.stylelintrc.json`
-// ignores the directory so the strict stylesheet config does not suddenly apply to 170 KB of CSS
-// it never read. It still reads the templates too, which should find nothing — a new <style>
-// block fails TemplateCommentHygieneTest — but would parse one if it came back.
 val lintCssInline =
   tasks.register<NpxTask>("lintCssInline") {
     group = "verification"
@@ -924,18 +509,6 @@ val lintCssInline =
     inputs.file(".stylelintrc.templates.json")
   }
 
-// The JavaScript inside TouchClassLayoutE2eTest's Java text block, which no tool could read.
-//
-// That probe is ~500 lines evaluated in the page, and compiling the Java only proves the STRING is
-// valid. Two defects reached CI through that gap: `replaceAll("\s+", " ")`, where `\s` is a legal
-// Java escape for a space so the regex silently became `" +"`; and a guard referencing
-// `badControls`
-// a hundred lines above its `const`, a temporal-dead-zone ReferenceError that turned all 66 routes
-// into "could not be measured" on every device class.
-//
-// `extractProbeJs` writes the script out with its format placeholders stubbed; `lintProbeJs` runs a
-// deliberately tiny rule set over it (see eslint.probe.config.mjs). Verified against the broken
-// revision: it reports `'badControls' was used before it was defined`.
 val probeSource =
   layout.projectDirectory.file(
     "src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java"
@@ -1003,11 +576,6 @@ val lintJs =
     inputs.file("eslint.config.mjs")
   }
 
-// Prettier formats the hand-written CSS + JS — the function modern Stylelint and
-// ESLint no longer cover (both dropped their stylistic rules and defer formatting
-// to a dedicated formatter). It runs through the same node-gradle toolchain as the
-// linters above; vendored/minified bundles are skipped via `.prettierignore`.
-// `prettierCheck` is strict and wired into `check`; `prettierApply` rewrites in place.
 val prettierCheck =
   tasks.register<NpxTask>("prettierCheck") {
     group = "verification"
@@ -1052,27 +620,9 @@ tasks.register<NpxTask>("prettierApply") {
   ignoreExitValue.set(false)
 }
 
-// ---------------------------------------------------------------------------
-// Static type checking of the hand-written browser scripts (ADR-0125).
-//
-// TypeScript runs here as a CHECKER ONLY (`noEmit` in tsconfig.json): nothing is
-// compiled, no bundle is produced, no <script> tag changes and the scripts stay
-// classic non-module scripts sharing one global scope (ADR-0069). Files opt in
-// individually with a leading `// @ts-check`; everything else is parsed for its
-// types but not checked, so the gate was green from the first commit.
-//
-// The backend DTO shapes come from the OpenAPI spec rather than being restated
-// by hand: `generateApiTypes` derives them on every build, so the frontend's
-// view of a DTO cannot drift from the contract the backend publishes. The
-// generated file is build output and is never committed.
-// ---------------------------------------------------------------------------
 val openApiSpec = rootProject.file("backend/src/main/resources/api/openapi.json")
 val generatedApiTypes = layout.buildDirectory.file("generated/ts/api.d.ts")
 
-// Runs our own zero-dependency emitter rather than `openapi-typescript` (ADR-0130): printing a
-// `.d.ts` is printing text, and routing that through the TypeScript compiler API is what pinned
-// the whole module to the TS 5.x line once TypeScript 7 removed `ts.factory`. A NodeTask (not
-// NpxTask) because the script is ours and has no package to resolve.
 val generateApiTypesScript = layout.projectDirectory.file("scripts/gen-api-types.mjs")
 
 val generateApiTypes =
@@ -1110,11 +660,6 @@ val typecheckJs =
     inputs.file("tsconfig.json")
   }
 
-// The emitter replaced a maintained package, so its own correctness is now our problem — and its
-// guard (fail on an OpenAPI construct it cannot express) is the load-bearing part: without it an
-// unhandled keyword degrades a DTO to `unknown`, which type-checks everywhere and silently voids
-// REQ-FE-018's drift protection. Gated in `check` rather than given its own workflow (the pattern
-// the root `scripts/*.test.sh` use) because it is a frontend build script and runs in ~200 ms.
 val testGenApiTypes =
   tasks.register<NodeTask>("testGenApiTypes") {
     group = "verification"

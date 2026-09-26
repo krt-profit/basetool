@@ -17,42 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Hangar page module (/hangar), extracted verbatim from the former inline script of hangar.html
- * (ADR-0069, follow-up to #924).
- *
- * Drives the whole hangar screen from a single DOMContentLoaded handler: the ship create/edit modal,
- * per-row delete + delete-all, the Fleetview multipart import (bespoke fetch, since a multipart body
- * cannot go through krtFetch.write), the bulk home-location set, the ship-type-by-manufacturer filter,
- * and the debounced server-side search + pagination. Every write goes through window.krtFetch and
- * re-swaps the #hangar-results fragment in place (REQ-FE-001/002/005, REQ-HANGAR-002); the classic
- * POST->redirect forms stay the no-JS fallback.
- *
- * The localized toast + conflict strings are the block's only Thymeleaf interpolation, so they stay
- * inline in the page bootstrap as the hangarI18n / hangarConflict globals this module reads. escapeHtml
- * is the shared global from escape-html.js (loaded deferred via fragments/head.html), so it is defined
- * by the time this DOMContentLoaded handler runs.
- */
-
 /* global hangarI18n, hangarConflict */
 
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('ship-modal');
-    // The ship dialog's close-X. It used to be the page's first `.close-modal`
-    // span, which was the legacy modal shape's own class; the canonical shell
-    // styles its close button via `.krt-modal-close`, so the JS hook is now an
-    // explicit, page-scoped class rather than a shared visual one.
     const closeBtn = document.querySelector('.close-ship-modal');
     const form = document.getElementById('ship-form');
     const modalTitle = document.getElementById('modal-title');
 
-    // Re-render the ship table in place after a write (add/edit/delete/import/home-location),
-    // carrying the active page/size/search from the address bar so the write does not bounce the
-    // user back to page 0 or drop the filter (REQ-HANGAR-002). The pagination/search swaps keep
-    // the address bar in sync (history:true), so window.location.search is the live state.
-    // The address-bar state is appended strictly AFTER the `?`, re-serialised through
-    // URLSearchParams, so it can only ever be this page's query and never its path: the URL is
-    // same-origin `/hangar` whatever the address bar holds (CodeQL js/client-side-request-forgery).
     function reswapHangar() {
         if (window.krtFetch) {
             const query = new URLSearchParams(window.location.search).toString();
@@ -110,16 +82,12 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('ship-location').value = btn.getAttribute('data-loc') || '';
         document.getElementById('ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         document.getElementById('ship-version').value = btn.getAttribute('data-version');
-        // The edit action is /hangar/{id}/update; the delete twin lives at /hangar/{id}/delete.
         const action = btn.getAttribute('data-action');
         modalDeleteBtn.setAttribute('data-action', action.replace('/update', '/delete'));
         modalDeleteBtn.style.display = 'block';
         openModal();
     }
 
-    // data-trigger delegation (krtEvents): the add + per-row edit buttons live INSIDE the
-    // #hangar-results fragment, so a delegated binding is what keeps them working after each
-    // in-place re-swap (a direct addEventListener would be lost on the re-rendered nodes).
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'hangar-add-ship', openAddModal);
         window.krtEvents.on('click', 'hangar-edit-ship', openEditModal);
@@ -141,8 +109,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Delete confirm submit -> krtFetch (REQ-FE-001): remove the ship in place; the classic
-    // POST→redirect stays the no-JS fallback (the twin is gated on X-Requested-With).
     if (deleteForm) {
         deleteForm.addEventListener('submit', function (e) {
             e.preventDefault();
@@ -170,20 +136,17 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Open modal automatically if there are validation errors
     const showModal = document.body.getAttribute('data-show-modal') === 'true';
     if (showModal) {
         openModal();
     }
 
-    // ---- Fleetview Import ----
     (function () {
         const importBtn = document.getElementById('fleetview-import-btn');
         const fileInput = document.getElementById('fleetview-file');
         const statusEl = document.getElementById('fleetview-status');
         const resultModal = document.getElementById('import-result-modal');
         const closeResultBtn = document.getElementById('import-result-close');
-        // Same action as the footer's "Schliessen": the shell's head close-X.
         const closeResultX = document.getElementById('import-result-close-x');
 
         function showStatus(msg, color) {
@@ -196,8 +159,6 @@ document.addEventListener('DOMContentLoaded', function () {
             statusEl.style.display = 'none';
         }
 
-        // Replaces list's content with one <p> per ship name. The names are set as textContent, so
-        // no markup string is ever built from the import result.
         function fillParagraphs(list, names) {
             list.replaceChildren(
                 ...names.map(function (n) {
@@ -238,7 +199,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!btn) return;
             btn.addEventListener('click', function () {
                 window.krtModal.close(resultModal);
-                // In-place: re-render the ship table instead of reloading the page (REQ-FE-001).
                 if (document.getElementById('import-res-imported').textContent !== '0') {
                     reswapHangar();
                 }
@@ -258,8 +218,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     showStatus(importBtn.getAttribute('data-error-nofile'), 'var(--color-danger)');
                     return;
                 }
-                // Client half of the upload cap (APPSEC-03): refuse a file the server would reject
-                // with 413 before spending the upload. The server check stays authoritative.
                 const maxBytes = Number(importBtn.getAttribute('data-max-bytes'));
                 if (maxBytes > 0 && file.size > maxBytes) {
                     showStatus(
@@ -284,9 +242,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     );
                 }
 
-                // krtFetch.submitForm (REQ-FE-002): CSRF header, the bare-403 refresh-and-retry and
-                // the re-auth redirect; it leaves Content-Type unset so the browser writes the
-                // multipart boundary. The button is disabled for the in-flight upload.
                 window.krtFetch.submitForm({
                     url: '/hangar/import/ships',
                     method: 'POST',
@@ -298,8 +253,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         fileInput.value = '';
                         openResultModal(data);
                     },
-                    // Every failure is reported in the status line under the button, with the
-                    // server's localized problem detail (e.g. the 413 size message) in brackets.
                     onError(status, body) {
                         showFailure(body && body.detail ? body.detail : String(status));
                         return true;
@@ -313,7 +266,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
-    // ---- Delete All Ships ----
     (function () {
         const deleteAllBtn = document.getElementById('delete-all-ships-btn');
         const deleteAllModal = document.getElementById('delete-all-confirm-modal');
@@ -340,8 +292,6 @@ document.addEventListener('DOMContentLoaded', function () {
             deleteAllConfirmBtn.disabled = true;
             deleteAllCancelBtn.disabled = true;
 
-            // krtFetch.write (REQ-FE-002): CSRF + retry-on-403 + problem handling; on success the
-            // ship table re-renders in place instead of reloading the page (REQ-FE-001).
             window.krtFetch
                 .write({
                     method: 'DELETE',
@@ -366,7 +316,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     })();
 
-    // ---- Set Home Location ----
     (function () {
         const homeModal = document.getElementById('home-location-modal');
         if (!homeModal) return;
@@ -375,9 +324,6 @@ document.addEventListener('DOMContentLoaded', function () {
             window.krtModal.close(homeModal);
         }
 
-        // Re-render the modal body with the LIVE ship count. The count baked in at page load
-        // goes stale once an in-place ship add/delete re-swaps #hangar-results; the trigger
-        // button lives inside that fragment, so its data-ship-count is always current.
         function refreshHomeBody() {
             const body = document.getElementById('home-location-body');
             const trigger = document.querySelector('[data-trigger="hangar-open-home"]');
@@ -387,7 +333,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        // The open button lives in the swapped #hangar-results fragment -> delegate via krtEvents.
         if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             window.krtEvents.on('click', 'hangar-open-home', function () {
                 refreshHomeBody();
@@ -438,10 +383,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
-    // Ship create/edit submit -> krtFetch (REQ-FE-001/002). The classic POST→redirect stays the
-    // no-JS fallback (the AJAX twin is gated on X-Requested-With, which krtFetch always sends).
-    // HTML5 `required` on the ship-type + insurance selects blocks an empty submit before this
-    // handler runs; on success the modal closes and #hangar-results re-renders in place.
     form.addEventListener('submit', function (e) {
         e.preventDefault();
         const action = form.getAttribute('action') || form.action;
@@ -477,7 +418,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     });
 
-    // Filter ship types by manufacturer
     const manufacturerSelect = document.getElementById('ship-manufacturer');
     const shipTypeSelect = document.getElementById('ship-type');
     const shipTypeAllOptions = Array.from(shipTypeSelect.options);
@@ -485,14 +425,11 @@ document.addEventListener('DOMContentLoaded', function () {
     manufacturerSelect.addEventListener('change', function () {
         const selectedManufacturer = this.value;
 
-        // Keep the default option (index 0)
         const defaultOption = shipTypeAllOptions[0];
 
-        // Clear all options
         shipTypeSelect.innerHTML = '';
         shipTypeSelect.appendChild(defaultOption);
 
-        // Add matching options
         shipTypeAllOptions.slice(1).forEach((option) => {
             if (
                 !selectedManufacturer ||
@@ -503,14 +440,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // ---- Server-side search + pagination (REQ-HANGAR-002) ----
-    // The filter now spans the user's whole fleet, not just the rows currently in the DOM: a
-    // debounced keystroke re-swaps #hangar-results via GET /hangar?search=...&size=... so the
-    // backend re-orders + re-pages the matching ships. The form/input live INSIDE the swapped
-    // fragment, so all handlers are delegated on document (the elements are replaced on every
-    // swap) and focus is restored to the search box after the swap. The GET form is the no-JS
-    // fallback. bindSwap wires the in-fragment .page-btn pagination links for the very first
-    // page click (later swaps re-bind the container themselves).
     let hangarFilterTimer = null;
 
     function applyHangarFilter(url) {
@@ -541,16 +470,13 @@ document.addEventListener('DOMContentLoaded', function () {
         return window.krtFetch
             .swap({ url: target, container: resultsContainer, history: true })
             .then(function (ok) {
-                // The swap replaced the input; restore focus + caret so typing is uninterrupted.
                 const input = document.getElementById('hangar-ship-filter');
                 if (input) {
                     input.focus();
                     const v = input.value;
                     try {
                         input.setSelectionRange(v.length, v.length);
-                    } catch (_ignored) {
-                        /* setSelectionRange is unsupported on some input states; ignore */
-                    }
+                    } catch (_ignored) {}
                 }
                 return ok;
             });
@@ -588,8 +514,6 @@ document.addEventListener('DOMContentLoaded', function () {
         applyHangarFilter(clear.getAttribute('href'));
     });
 
-    // Initial-load pagination interception: the .page-btn links inside #hangar-results re-swap
-    // in place instead of navigating (later swaps re-bind the container automatically).
     if (window.krtFetch && typeof window.krtFetch.bindSwap === 'function') {
         window.krtFetch.bindSwap({ container: '#hangar-results', history: true });
     }

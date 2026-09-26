@@ -49,9 +49,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Mockito unit tests for {@link OrgHierarchyService} (epic #692, REQ-ORG-014). Pins the Bereich/OL
- * creation contract (name uniqueness, the OL singleton guard, parent-kind validation on create) and
- * the set-parent kind pairing + optimistic-lock semantics.
+ * Unit tests for {@link OrgHierarchyService} (REQ-ORG-014): Bereich and OL creation, the OL
+ * singleton guard, and parent-kind and optimistic-lock checks on set-parent.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgHierarchyServiceTest {
@@ -61,8 +60,6 @@ class OrgHierarchyServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
 
   @InjectMocks private OrgHierarchyService service;
-
-  // --- listAllOrgUnits ------------------------------------------------------
 
   @Test
   void listAllOrgUnits_delegatesToRepository() {
@@ -76,8 +73,6 @@ class OrgHierarchyServiceTest {
     assertSame(staffel, result.get(0));
     verify(orgUnitRepository).findAllActiveWithParent();
   }
-
-  // --- createBereich --------------------------------------------------------
 
   @Test
   void createBereich_unparented_persists() {
@@ -130,8 +125,6 @@ class OrgHierarchyServiceTest {
     assertSame(ol, result.getParent());
   }
 
-  // --- createOrganisationsleitung -------------------------------------------
-
   @Test
   void createOrganisationsleitung_first_persists() {
     when(organisationsleitungRepository.findAllByActiveTrue()).thenReturn(List.of());
@@ -153,8 +146,6 @@ class OrgHierarchyServiceTest {
         () -> service.createOrganisationsleitung("Leitung", "OL", null));
     verify(organisationsleitungRepository, never()).save(any());
   }
-
-  // --- setParent ------------------------------------------------------------
 
   @Test
   void setParent_squadronToBereich_persists() {

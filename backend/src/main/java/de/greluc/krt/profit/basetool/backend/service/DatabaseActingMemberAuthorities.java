@@ -34,33 +34,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Assembles an acting member's authorities from the database, and refuses when that member is no
- * longer live (ADR-0129).
+ * Assembles an acting member's authorities from the database via {@link
+ * CustomJwtGrantedAuthoritiesConverter#assembleFor(User)}, and refuses a member who is no longer
+ * present or enabled in Keycloak (ADR-0129).
  *
- * <p>Reuses {@link CustomJwtGrantedAuthoritiesConverter#assembleFor(User)}, so a member acting
- * through the ingest gateway carries exactly the authority set they would carry logging in. That
- * reuse is the point: two assemblies would drift, and the drift would be invisible until someone
- * noticed the gateway path granting something different.
- *
- * <p><strong>Both refusals close a hole that only exists once a caller can name a subject instead
- * of presenting its token.</strong> The database does not mirror identity-provider liveness — the
- * roster sync fetches {@code enabled} and never persists it, and the {@code inKeycloak} flag it
- * does maintain is read by no authority code <em>outside this class</em>. A member removed or
- * deactivated in Keycloak therefore keeps {@code ACTIVE} and every role here until a sync says
- * otherwise.
- *
- * <p><strong>Presence and {@code enabled}, checked separately.</strong> {@code inKeycloak} answers
- * "did the last roster pass still see this account", {@code enabledInKeycloak} answers "was it
- * active when it did" (V230). Both had to be persisted before they could be read: the sync fetched
- * {@code enabled} and dropped it, so until V230 a deactivated member was refused nothing at all.
- * Without a token that gap is harmless — a disabled account cannot refresh, so its last access
- * token expires in minutes — and it stops being harmless the moment a caller can <em>name</em> a
- * subject, because a name never expires. Revocation now takes effect at the next sync pass, or
- * immediately on the member's next login, instead of never. While a token is what grants access
- * that is harmless: the account stops being issued tokens and the last one expires in minutes. A
- * named subject never expires, so without these checks the gateway could mint the authorities of a
- * revoked member — and ADR-0129's premise that a named subject cannot escalate beyond what that
- * member "could already do" would stop holding.
+ * <p>The liveness checks rely on the persisted {@code inKeycloak} and {@code enabledInKeycloak}
+ * flags, so a revocation takes effect at the next roster sync or the member's next login.
  */
 @Slf4j
 @Service
@@ -75,9 +54,6 @@ public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities 
   public @NotNull Collection<GrantedAuthority> authoritiesFor(@NotNull UUID member) {
     Optional<User> found = userRepository.findById(member);
     if (found.isEmpty()) {
-      // Deliberately NOT created. The login path creates a row for a first-seen subject, which is
-      // right when a person authenticated; here nobody did, and inventing a member from a header
-      // would turn that header into a registration primitive.
       log.warn("Refusing to act for a subject with no local account");
       throw new AccessDeniedException("The named member is not known here.");
     }
@@ -87,20 +63,9 @@ public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities 
       throw new AccessDeniedException("The named member is no longer active.");
     }
     if (!user.isEnabledInKeycloak()) {
-      // Separate from the branch above on purpose: "deleted" and "deactivated" have different
-      // remedies, and the log line is the only place the two are distinguishable — the answer to
-      // the caller is byte-identical so the endpoint cannot be used to enumerate subjects.
       log.warn("Refusing to act for a member whose Keycloak account is disabled");
       throw new AccessDeniedException("The named member is no longer active.");
     }
-    // Uncached, unlike the login path, which caches the same assembly per token (#1141). No cache
-    // here on purpose: the natural key would be the member's id, and a header can name a different
-    // member on every request, so the hit rate would be whatever the extractor population happens
-    // to be while the entries pin authority sets for callers who are not currently calling. The
-    // cost is one findById plus the assembler's own reads per ingest upload — an upload is already
-    // a multi-second screenshot-extraction round trip, so this is not the expensive part of it.
-    // Revisit only if ingest volume makes it one; correctness first, since a stale cached authority
-    // set here would outlive a revoked member exactly the way the liveness check above refuses to.
     return authorityAssembler.assembleFor(user);
   }
 }

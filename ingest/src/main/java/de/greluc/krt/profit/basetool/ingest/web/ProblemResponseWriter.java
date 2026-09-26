@@ -29,11 +29,8 @@ import org.springframework.http.MediaType;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Writes an RFC 7807 {@code application/problem+json} body directly to the servlet response. Used
- * by the pre-security filters (size cap, rate limit) and the security-chain handlers, which run
- * before Spring MVC, so {@link GlobalExceptionHandler} cannot serialize them. The body itself comes
- * from {@link Problems#of}, the same builder the controller-level problems use, so both carry the
- * identical {@code code} + {@code correlationId} extension shape.
+ * Writes an RFC 7807 problem body built by {@link Problems#of} directly to the servlet response,
+ * for filters and security handlers that run before Spring MVC.
  */
 public final class ProblemResponseWriter {
 

@@ -25,47 +25,35 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend's org-unit bank balance payload (epic #666 F1,
- * REQ-BANK-021/-027/-028). Deliberately balance-only — it carries the account's identity (so the
- * officer/lead page can label the card and target a booking request at the org unit) and the
- * compute-on-read balance, never the transaction history, holders or audit. The status / type /
- * org-unit kind arrive as enum names rendered through i18n keys.
+ * Frontend mirror of the backend's org-unit bank balance payload (REQ-BANK-021, REQ-BANK-028): the
+ * account's identity and balance, never its history, holders or audit.
  *
- * <p>An org-unit account populates the {@code orgUnit*} fields; a special account (Sonderkonto,
- * REQ-BANK-028, only visible to Bereich/OL overseers and admins) carries {@code null} org-unit
- * fields and {@code canRequest = false}, and the page labels its card by {@link #type}. Only active
- * accounts are ever delivered.
+ * <p>Only active accounts are delivered. A special account carries {@code null} org-unit fields and
+ * {@code canRequest = false}.
  *
  * @param accountId the account's id
  * @param accountNo the server-generated display number ({@code KB-0042})
  * @param accountName the account's display name
- * @param status lifecycle enum name (always {@code ACTIVE} here — closed accounts are filtered out)
+ * @param status lifecycle enum name (always {@code ACTIVE} here)
  * @param type account-type enum name ({@code ORG_UNIT} / {@code AREA} / {@code CARTEL} / {@code
- *     SPECIAL}); used to label a special account that has no org-unit identity
+ *     SPECIAL}); labels a special account that has no org-unit identity
  * @param orgUnitId the owning org unit's id, or {@code null} for a special account
  * @param orgUnitName the owning org unit's long-form name, or {@code null} for a special account
  * @param orgUnitShorthand the owning org unit's shorthand, or {@code null}
  * @param orgUnitKind kind enum name ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH} /
  *     {@code ORGANISATIONSLEITUNG}), or {@code null} for a special account
  * @param balance the current balance (signed whole aUEC)
- * @param canRequest {@code true} iff this is the caller's own-level org-unit account (the request
- *     button is shown); {@code false} for a view-only subordinate account reached by the cascade
- *     (epic #692 Phase 6, owner decision Q4) and for every special account
- * @param delta30d the net balance change over the last 30 days (signed), rendered as the
- *     sign-colored trend figure on the card (REQ-BANK-016, mirroring the bank dashboard)
- * @param sparkline the end-of-day balances of the last 30 days, oldest first, last entry = current
- *     balance; scaled into the card's inline SVG sparkline by {@link
- *     de.greluc.krt.profit.basetool.frontend.controller.BankSparkline}
- * @param balanceTarget the aspirational balance goal (REQ-BANK-036), or {@code null} when none is
- *     set; the card shows progress towards it
- * @param canManageSettings {@code true} iff the caller may open the account's settings (set the
- *     target and/or configure who else may view it); drives the per-card settings affordance
- * @param approvalLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
- *     {@code null} when no limit applies — which means approval is required, unless {@code
- *     approvalExempt} is set; the request modal warns whenever approval would be required
- * @param approvalExempt {@code true} iff the caller is this account's responsible holder and is
- *     bound by no approval ceiling (REQ-BANK-041, owner decision); rides onto the source-account
- *     option as {@code data-exempt} so the modal suppresses the warning
+ * @param canRequest {@code true} iff this is the caller's own-level org-unit account; {@code false}
+ *     for a view-only subordinate or special account
+ * @param delta30d the net balance change over the last 30 days (signed)
+ * @param sparkline the end-of-day balances of the last 30 days, oldest first, the last entry being
+ *     the current balance
+ * @param balanceTarget the balance goal (REQ-BANK-036), or {@code null} when none is set
+ * @param canManageSettings {@code true} iff the caller may open the account's settings
+ * @param approvalLimit the caller's approval limit for this account (REQ-BANK-041), or {@code null}
+ *     when approval is always required unless {@code approvalExempt} is set
+ * @param approvalExempt {@code true} iff the caller is the account's responsible holder and bound
+ *     by no approval ceiling
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,

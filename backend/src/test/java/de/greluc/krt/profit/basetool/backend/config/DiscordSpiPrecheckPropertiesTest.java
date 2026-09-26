@@ -60,7 +60,6 @@ class DiscordSpiPrecheckPropertiesTest {
 
   @Test
   void shortSecret_isRejected() {
-    // 16 chars, below the 32-char minimum
     DiscordSpiPrecheckProperties props = new DiscordSpiPrecheckProperties("too-short-secret");
 
     assertThat(validator.validate(props)).isNotEmpty();

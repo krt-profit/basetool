@@ -24,18 +24,10 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The {@link LiveSyncFanout} used when the Redis bridge is switched off — it carries a frame
- * nowhere (ADR-0143).
+ * The {@link LiveSyncFanout} used when the Redis bridge is off; carries a frame nowhere (ADR-0143).
  *
- * <p>Not a degradation of the app's own live sync: the relay delivers to this instance's streams
- * <em>before</em> it reaches the fan-out, so with this bean in place two app clients on the same
- * backend still see each other's changes. What stops is the crossing — a browser will not learn of
- * an app write, and the app will not learn of a browser's, because nothing consumes or publishes on
- * the shared channel.
- *
- * <p>This is the default, and it is the right default: Redis is optional for this backend
- * (ADR-0084), so a test slice or a single-container run must start without it and behave sanely
- * rather than failing to wire.
+ * <p>Streams on this instance are still served by the relay; only the crossing between app and
+ * browser clients stops.
  */
 public class LocalLiveSyncFanout implements LiveSyncFanout {
 
@@ -46,7 +38,5 @@ public class LocalLiveSyncFanout implements LiveSyncFanout {
    * @param sections ignored, for the same reason
    */
   @Override
-  public void publish(@NotNull LiveSyncTopic topic, @NotNull List<String> sections) {
-    // Intentionally empty: without the Redis bridge there is no peer to carry the frame to.
-  }
+  public void publish(@NotNull LiveSyncTopic topic, @NotNull List<String> sections) {}
 }

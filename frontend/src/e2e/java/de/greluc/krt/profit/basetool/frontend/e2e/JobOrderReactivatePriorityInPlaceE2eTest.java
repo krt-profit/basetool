@@ -37,22 +37,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the side-effect stale-UI bug class on the orders-detail in-place status change
- * (epic #571, #575): reactivating a terminal order ({@code COMPLETED}/{@code REJECTED} → {@code
- * OPEN}/{@code IN_PROGRESS}) makes {@code JobOrderService.updateJobOrderStatus} assign a fresh
- * priority server-side. The header kv-list renders that priority, so the in-place status handler
- * must re-pull the header fragment on the reactivate path — not only on the terminal path — or the
- * "Priorität" cell stays stale (showing {@code -}) until a manual reload.
+ * E2E regression test: reactivating a terminal job order in place must refresh the order header, so
+ * the server-assigned priority is shown without a reload.
  *
- * <p>The proven bug: {@code _doStatusUpdate}'s {@code onSuccess} swapped {@code
- * #order-header-results} only inside the {@code COMPLETED}/{@code REJECTED} branch, leaving no
- * header refresh when leaving a terminal state. The fix moves the header swap out of that gate so
- * it runs on every status change.
- *
- * <p><b>Drive via UI, verify via API.</b> The header swap is observed as the {@code GET
- * /orders/{id}?fragment=header} request the reactivate now fires — a request that does not occur on
- * the pre-fix code path. The reassigned priority is read back from {@code GET /api/v1/orders/{id}}.
- * A window marker proves the reactivate stayed in place.
+ * <p>Observes the header fragment request, reads the priority back from {@code GET
+ * /api/v1/orders/{id}}, and asserts no reload via a window marker.
  */
 @Tag("e2e")
 class JobOrderReactivatePriorityInPlaceE2eTest {
@@ -119,8 +108,6 @@ class JobOrderReactivatePriorityInPlaceE2eTest {
       try {
         E2eSupport.navigate(page, detailUrl);
 
-        // Complete the order: a terminal target opens the warning modal first; only the confirm
-        // click posts and nulls the priority server-side.
         page.locator("#status-select").selectOption("COMPLETED");
         assertThat(page.locator("#status-warning-modal")).isVisible();
         page.waitForResponse(
@@ -130,14 +117,9 @@ class JobOrderReactivatePriorityInPlaceE2eTest {
         assertEquals("COMPLETED", persistedStatus(), "status persists after completion");
         assertEquals(true, persistedPriorityNull(), "a terminal status nulls the priority");
 
-        // Reload so the dropdown carries the refreshed @Version, then mark the live document.
         E2eSupport.navigate(page, detailUrl);
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // Reactivate COMPLETED -> IN_PROGRESS: a non-terminal change posts immediately and (the
-        // fix)
-        // re-pulls the header fragment so the freshly assigned priority renders in place. On the
-        // pre-fix path no GET /orders/{id}?fragment=header fires here, so this wait would time out.
         page.waitForResponse(
             response ->
                 response.url().contains("fragment=header")

@@ -20,17 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * A refinery order is being linked to a mission its owner does not take part in (REQ-SEC-042).
+ * Thrown when a refinery order is linked to a mission its owner does not take part in
+ * (REQ-SEC-042).
  *
- * <p>Answers {@code 400} with the stable problem code {@code MISSION_PARTICIPANT_REQUIRED}. The
- * link feeds the mission's operation payout: {@code OperationPayoutCalculator} adds every linked
- * order's result to the pool and credits its expenses to the order's owner. An order whose owner is
- * not on the mission would move that pool without its owner ever being part of the payout, so the
- * link is refused — with no exception for managers, by the owner's decision of 2026-09-22.
- *
- * <p>It is deliberately <em>not</em> a permission failure: the caller may edit the order, the
- * mission choice is simply not valid for its owner. The own type exists so the frontend can name
- * the mission field instead of the generic "invalid material" message it shows for other 400s.
+ * <p>Answers {@code 400} with code {@code MISSION_PARTICIPANT_REQUIRED}; it is a validation
+ * failure, not a permission failure, and applies to managers too.
  */
 public final class MissionParticipantRequiredException extends AppException {
 

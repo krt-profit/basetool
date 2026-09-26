@@ -1,7 +1,3 @@
-/* Page stylesheet of templates/admin/discord-registrations.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {

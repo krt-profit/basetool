@@ -31,13 +31,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Announcement JPA entity.
- *
- * <p>The {@code updatedAt} column lives on {@link AbstractEntity} where {@code @UpdateTimestamp}
- * keeps it fresh on every {@code persist}/{@code update}. Earlier revisions shadowed that field
- * here with a manual {@code @PrePersist}/{@code @PreUpdate} hook — the duplicate has been removed
- * to avoid the JPA column-mapping ambiguity and to silence the CodeQL "missing {@code @Override} on
- * {@code getUpdatedAt}" finding that the shadowing produced.
+ * Announcement JPA entity; its {@code updatedAt} timestamp is inherited from {@link
+ * AbstractEntity}.
  */
 @Entity
 @Setter
@@ -45,9 +40,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Announcement extends AbstractEntity<UUID> {
 
-  // {@code onMethod_ = @__(@Override)} tells Lombok to attach a real {@code @Override} to the
-  // generated {@code getId()} — required because the method implements {@code Persistable.getId()}
-  // and CodeQL flags missing override annotations on interface implementations.
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)

@@ -27,20 +27,11 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 
 /**
- * The one builder for every RFC 7807 problem body the gateway emits (REQ-API-004), whether it is
- * written by a servlet filter before Spring MVC runs ({@link ProblemResponseWriter}) or returned by
- * the {@link GlobalExceptionHandler}.
+ * The single builder for every RFC 7807 problem body the gateway emits (REQ-API-004).
  *
- * <p>It exists because the two used to assemble the body separately, and both read the correlation
- * id from a hard-coded {@code "correlationId"} MDC key — while {@link
- * LoggingProperties#correlationIdMdcKey()} makes that key configurable and {@code
- * CorrelationIdFilter} writes it under the configured name. Renaming the key would have silently
- * dropped the {@code correlationId} extension from every error answer, i.e. exactly the field a
- * member pastes into a support report. Reading it here, from the same properties the filter uses,
- * keeps the writer and the reader of the MDC on one name.
- *
- * <p>The extension <em>member</em> is always called {@code correlationId}: it is part of the public
- * problem shape clients parse, independent of how the MDC is keyed internally.
+ * <p>Reads the correlation id under the MDC key configured in {@link
+ * LoggingProperties#correlationIdMdcKey()}; the extension member is always named {@code
+ * correlationId}.
  */
 public final class Problems {
 
@@ -50,9 +41,7 @@ public final class Problems {
   /** Name of the problem extension member carrying the request's correlation id. */
   public static final String CORRELATION_ID_MEMBER = "correlationId";
 
-  private Problems() {
-    // Static factory holder — not instantiable.
-  }
+  private Problems() {}
 
   /**
    * Builds a problem with the stable {@code code} extension and, when the MDC carries one under the

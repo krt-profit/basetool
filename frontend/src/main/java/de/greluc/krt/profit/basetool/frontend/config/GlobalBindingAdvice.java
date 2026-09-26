@@ -26,23 +26,11 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.InitBinder;
 
 /**
- * Registers the normalising {@code String} property editor for every controller in the module.
+ * Registers the trimming, length-capping {@code String} property editor for every controller,
+ * including the REST controllers whose {@code @RequestParam} and {@code @PathVariable} strings go
+ * through the {@link WebDataBinder}.
  *
- * <p><strong>This advice is deliberately the one that is not scoped to {@link
- * UsesLayoutModel}.</strong> Its five siblings in this package contribute the Thymeleaf layout
- * model, which a {@code ResponseBody} handler can never read, so they select on that marker and
- * skip the REST controllers. This one contributes no model attribute at all — it configures the
- * {@link WebDataBinder}, and the REST controllers genuinely depend on it: Spring runs
- * {@code @RequestParam} and {@code @PathVariable} values of type {@code String} through {@code
- * WebDataBinder.convertIfNecessary}, so the editor below trims and length-caps them. The search
- * terms of {@code BankProxyController} and {@code UserProxyController}, the {@code handoff} of
- * {@code PersonalBlueprintImportProxyController}, the {@code domain} of {@code
- * AuditReportProxyController} and the {@code roleCode} of {@code OrgUnitBankProxyController} all
- * arrive through it. Narrowing this advice would silently lift the length cap on those, which is a
- * validation change, not a performance one.
- *
- * <p>{@code RequestBody} payloads are unaffected either way — Jackson deserialises those and never
- * consults the binder.
+ * <p>Deliberately not scoped to {@link UsesLayoutModel}.
  */
 @ControllerAdvice
 public class GlobalBindingAdvice {

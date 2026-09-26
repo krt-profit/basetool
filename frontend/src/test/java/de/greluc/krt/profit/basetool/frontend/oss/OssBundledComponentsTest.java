@@ -31,13 +31,9 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The half of the licence notice no Licensee report can see (REQ-UI-021): font files the repository
- * ships as plain files. Every directory that holds one must carry the font's licence text beside it
- * — OFL-1.1 §2 requires the licence to accompany each copy — and the font must be listed in {@code
- * frontend/oss-bundled-components.json} so the page names it.
- *
- * <p>The test runs with the {@code frontend} module as its working directory, which is how Gradle
- * starts the test JVM; the sibling modules are reached through {@code ..}.
+ * Asserts that every directory holding a bundled font file also holds its licence text and that the
+ * font is listed in {@code frontend/oss-bundled-components.json} (REQ-UI-021). Runs with the {@code
+ * frontend} module as working directory.
  */
 @DisplayName("Bundled third-party files")
 class OssBundledComponentsTest {

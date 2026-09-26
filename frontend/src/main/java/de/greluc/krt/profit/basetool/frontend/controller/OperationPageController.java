@@ -71,20 +71,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the operations pages ({@code /operations} list and {@code
- * /operations/{id}} detail).
+ * Spring MVC controller for the operations list ({@code /operations}) and detail ({@code
+ * /operations/{id}}) pages, including their AJAX fragments and write twins.
  *
- * <p>Operations are an umbrella over missions — the detail page renders the operation header,
- * embedded missions paginated separately, and the operation-level finance and payout summaries. The
- * {@code canEdit} flag computed in {@link #operationDetails} mirrors the backend's
- * {@code @PreAuthorize("hasRole('MISSION_MANAGER')")} so the template can disable inputs for users
- * who would just bounce off a 403 on submit — without leaking any role logic into the service
- * layer.
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
- * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather than
- * by anything next to the code. A method-level gate still wins where one is present.
+ * <p>The class-level {@code @PreAuthorize("isAuthenticated()")} is the floor (REQ-SEC-052); a
+ * method-level gate takes precedence where present.
  */
 @Controller
 @UsesLayoutModel
@@ -111,29 +102,22 @@ public class OperationPageController {
       new ParameterizedTypeReference<>() {};
 
   /**
-   * Renders the paginated, filtered operations list. Mirrors the missions overview filter contract
-   * within the limits of the operation aggregate: free-text {@code search} matches name +
-   * description, {@code showPast} flips the default status filter from {@code PLANNED}+{@code
-   * ACTIVE} to the full set, and the {@code start}/{@code end} time range filters on the
-   * operation's derived span — an operation has no {@code plannedStartTime} of its own, so the
-   * backend bounds {@code start} against the planned start of the earliest linked mission and
-   * {@code end} against the planned end of the latest linked mission. The two bounds arrive as
-   * ISO-8601 instants assembled client-side by {@code datetime-splitter.js} and are forwarded
-   * verbatim. When {@code fragment=results} is supplied the controller returns just the results
-   * fragment so the client-side AJAX filter can patch the list in place without a full page reload.
+   * Renders the paginated, filtered operations list. {@code search} matches name and description,
+   * {@code showPast} widens the default {@code PLANNED}/{@code ACTIVE} filter to all statuses, and
+   * {@code start}/{@code end} filter on the span of the linked missions. {@code fragment=results}
+   * returns only the results fragment for an in-place AJAX swap.
    *
    * @param search free-text query, may be {@code null}
    * @param start inclusive lower bound (ISO-8601 instant) on the earliest linked mission's planned
-   *     start, may be {@code null}; a value that is not an instant is a {@code 400}
+   *     start, may be {@code null}; a non-instant value is a {@code 400}
    * @param end inclusive upper bound (ISO-8601 instant) on the latest linked mission's planned end,
-   *     may be {@code null}; a value that is not an instant is a {@code 400}
-   * @param showPast when {@code true} (and authenticated), include COMPLETED and CANCELED
+   *     may be {@code null}; a non-instant value is a {@code 400}
+   * @param showPast when {@code true}, include COMPLETED and CANCELED
    * @param page zero-based page index
    * @param size page size (default 20)
    * @param fragment when equal to {@code "results"}, render only the results fragment
    * @param model Thymeleaf model populated with the page content and metadata
-   * @param principal current OIDC user, bound from the security context. {@code showPast} used to
-   *     be honoured only for an authenticated caller; every caller is one now (ADR-0159)
+   * @param principal current OIDC user
    * @return the {@code operations-index} view name, or the results fragment for AJAX
    */
   @NotNull
@@ -151,11 +135,6 @@ public class OperationPageController {
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     StringBuilder uri = new StringBuilder("/api/v1/operations/search?");
-    // Every caller-supplied value is a WebClient URI-template variable, so it is percent-encoded
-    // exactly once across the frontend->backend hop (REQ-SEC-051). The period bounds used to be
-    // URLEncoder-encoded INTO the template, which the WebClient then encoded a second time: the
-    // backend received `2026-01-01T00%3A00%3A00Z` literally, could not parse it as an Instant, and
-    // the date filter never worked (FE-SEC-01).
     List<Object> uriVariables = new ArrayList<>();
     if (search != null && !search.isBlank()) {
       uri.append("query={query}&");
@@ -173,8 +152,6 @@ public class OperationPageController {
     uri.append("size=").append(size).append("&");
     uri.append("sort=createdAt,desc&");
 
-    // The "and not anonymous" half is gone with the caller (ADR-0159): every caller here holds
-    // a session, so the archive toggle means what it says.
     if (showPast) {
       uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
     } else {
@@ -204,19 +181,13 @@ public class OperationPageController {
   }
 
   /**
-   * Fetches the caller's OrgUnit memberships for the R5.d.e owner-picker fragment on the
-   * operation-create modal. Operations have no explicit owner field — the actor (caller) is the
-   * implicit owner — so the picker reflects the caller's own memberships. Returns an empty list for
-   * anonymous callers or on backend hiccup; the fragment collapses to its hidden state in either
-   * case.
+   * Fetches the caller's org-unit memberships for the owner picker of the operation-create modal.
    *
-   * @return picker options or empty list; never {@code null}.
+   * @return picker options, or an empty list for anonymous callers or on backend failure; never
+   *     {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
     try {
-      // Epic #692 Phase 5: drill-down owner picker — the caller's direct memberships plus their
-      // cascading leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs). Unchanged
-      // for an ordinary member.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
       return options != null ? options : List.of();
@@ -227,24 +198,19 @@ public class OperationPageController {
   }
 
   /**
-   * Renders the operation detail page. Pulls operation, embedded missions, the finance roll-up and
-   * payouts <em>concurrently</em> via {@link ParallelPageLoader} (#1123); any backend failure
-   * aborts the render and redirects back to the list with a flash error. The finance read is the
-   * cheap {@code /finance-summary} roll-up (#1121) — each mission's per-entry breakdown loads
-   * lazily via {@link #operationMissionFinance}. Computes {@code canEdit} at the HTTP boundary by
-   * reading the authorities off the {@link Authentication} object — keeps the template free of
-   * role-expression checks and mirrors what the backend's PUT endpoint will accept.
+   * Renders the operation detail page, loading the operation, its missions, the finance roll-up and
+   * the payouts concurrently via {@link ParallelPageLoader}. A backend failure redirects to the
+   * list with a flash error. {@code canEdit} is derived from the {@link Authentication}.
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
    * @param size page size for the embedded missions table (default 10)
-   * @param fragment when {@code "missions"} only the embedded missions sub-table fragment is
-   *     rendered (AJAX pager swap, REQ-FE-002), skipping the finance/payout round-trips; otherwise
-   *     the full page is returned
+   * @param fragment when {@code "missions"} only the embedded missions fragment is rendered
+   *     (REQ-FE-002); otherwise the full page
    * @param authentication current user's authentication (used for {@code canEdit})
    * @param model Thymeleaf model populated with operation, missions, finance and payouts
-   * @return the {@code operation-detail} view name, its {@code missions} fragment for an AJAX swap,
-   *     or a redirect on backend failure of the full-page load
+   * @return the {@code operation-detail} view name, its {@code missions} fragment, or a redirect on
+   *     backend failure of the full-page load
    */
   @NotNull
   @GetMapping("/{id}")
@@ -269,12 +235,9 @@ public class OperationPageController {
   }
 
   /**
-   * Renders a single operation-detail section fragment for an AJAX swap — the missions pager
-   * (REQ-FE-002) and the live-sync peer-refresh targets overview/payout/finance (REQ-FE-015,
-   * ADR-0094). Each case loads only the backend reads its fragment needs (ADR-0078/ADR-0081
-   * fragment-gating); an unknown fragment name or a backend failure degrades to a section-sized
-   * inline error rather than a redirect, so one flaky peer-refresh never injects an unrelated
-   * redirect target into a swap container.
+   * Renders one operation-detail section fragment for an AJAX swap: the missions pager (REQ-FE-002)
+   * or the overview, payout and finance peer-refresh targets (REQ-FE-015). Each case loads only the
+   * data its fragment needs; an unknown fragment or a backend failure renders an inline error.
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
@@ -296,7 +259,6 @@ public class OperationPageController {
       Authentication authentication,
       Model model) {
     if ("missions".equals(fragment)) {
-      // The missions fragment has its own empty-state degradation (never a redirect), kept as-is.
       return missionsFragment(id, page, size, model);
     }
     try {
@@ -336,11 +298,6 @@ public class OperationPageController {
    */
   private void loadFullModel(
       UUID id, Integer page, Integer size, Authentication authentication, Model model) {
-    // #1123: fetch the four independent reads concurrently on virtual threads (ParallelPageLoader
-    // replays the request-scoped context — auth, active-org-unit pin, correlation id, client IP)
-    // instead of blocking through them in series. The finance read is the cheap /finance-summary
-    // roll-up (#1121, the operation-side ADR-0078 gap); each mission's per-entry breakdown loads
-    // lazily via GET /operations/{id}/finance/{missionId} when its panel is expanded.
     CompletableFuture<OperationDto> operationF =
         parallelPageLoader.loadAsync(
             () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
@@ -372,9 +329,6 @@ public class OperationPageController {
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
 
-    // Largest per-mission result, so the "Ergebnis je Einsatz" overview bars can be sized
-    // proportionally (BigDecimal.ZERO when there are no positive results — the template then
-    // renders zero-width bars rather than dividing by zero).
     BigDecimal maxMissionResult =
         operationFinance.missions() == null
             ? BigDecimal.ZERO
@@ -385,18 +339,7 @@ public class OperationPageController {
                 .orElse(BigDecimal.ZERO);
     model.addAttribute("operationMaxMissionResult", maxMissionResult);
 
-    // Resolved at the HTTP boundary so the template stays free of inline
-    // role-expression checks. The backend's PUT /api/v1/operations/{id}
-    // requires ROLE_MISSION_MANAGER (or any role that reaches it via the
-    // hierarchy — ADMIN, OFFICER) AND the same role is granted by the
-    // app_user.is_mission_manager flag through the JWT-converter, so the
-    // role check here matches what the backend enforces.
     model.addAttribute("canEdit", hasMissionManagerRole(authentication));
-    // The "Bezahlt"-checkbox is asymmetric: any mission manager can set
-    // it to paid, but only an officer or admin may clear it back to
-    // unpaid. The template uses this flag to disable an already-checked
-    // checkbox for plain mission managers — mirrors the asymmetric
-    // @PreAuthorize on the backend's payouts/paid-out endpoint.
     model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
   }
 
@@ -445,11 +388,9 @@ public class OperationPageController {
   }
 
   /**
-   * Renders just the embedded missions sub-table for an AJAX pager swap (REQ-FE-002). Fetches only
-   * the operation (needed for the pagination base URL) and the requested missions page — the
-   * finance/payout round-trips the full page does are skipped. Unlike the full-page load this never
-   * redirects: a backend failure degrades to an empty missions list so the swapped-in fragment
-   * shows its empty state rather than injecting an unrelated redirect target into the sub-table.
+   * Renders the embedded missions sub-table for an AJAX pager swap (REQ-FE-002), loading only the
+   * operation and the requested missions page. A backend failure yields an empty list, never a
+   * redirect.
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
@@ -496,13 +437,9 @@ public class OperationPageController {
   }
 
   /**
-   * Renders one mission's finance breakdown fragment for the lazy per-mission {@code <details>} on
-   * the operation-detail finance tab (#1121). The operation-detail page fetches this on first
-   * expand and injects the returned HTML in place, so the full page render no longer materializes
-   * every finance entry / refinery order across every child mission. Authorized like the rest of
-   * the operation page (the backend re-checks {@code canSeeOperation} and that the mission belongs
-   * to the operation); a backend failure degrades to an inline error message inside the panel
-   * rather than a redirect, so one flaky expand never takes down the whole page.
+   * Renders one mission's finance breakdown fragment, loaded when the operation-detail finance
+   * panel expands that mission. The backend checks visibility and that the mission belongs to the
+   * operation; a backend failure renders an inline error.
    *
    * @param id operation id
    * @param missionId the mission whose breakdown to load (must belong to the operation)
@@ -595,11 +532,6 @@ public class OperationPageController {
       backendApiClient.put("/api/v1/operations/" + id, form, Void.class);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
     } catch (BackendServiceException e) {
-      // #1155: BackendApiClient never lets WebClientResponseException escape — it always rethrows a
-      // parsed BackendServiceException — so the former catch(WebClientResponseException.Conflict)
-      // was
-      // dead and a stale-version 409 flashed the generic error, misleading the losing editor into a
-      // blind retry. Branch on the actual status the client throws.
       if (e.getStatusCode() == 409) {
         log.warn("Optimistic locking failure updating operation: {}", id);
         redirectAttributes.addFlashAttribute("errorMessage", "error.optimistic.locking");
@@ -615,22 +547,14 @@ public class OperationPageController {
   }
 
   /**
-   * AJAX endpoint behind the per-row "Bezahlt" checkbox in the Auszahlungen panel. Proxies the call
-   * straight to {@code PUT /api/v1/operations/{id}/payouts/paid-out}, forwarding the operation id
-   * from the URL and the participant key plus new flag from the request body. The backend
-   * re-renders the affected payout row and we hand it back as JSON so the client can patch a single
-   * table row without refetching the whole breakdown.
-   *
-   * <p>Authorization is asymmetric and mirrors the backend: any mission manager (or higher via the
-   * role hierarchy) can set {@code paidOut=true}, but only ADMIN or OFFICER can clear it back to
-   * {@code false}. The SpEL guard returns 403 for a plain mission manager attempting to uncheck the
-   * box; the JS handler surfaces this as the {@code operation.payout.paid.forbidden} toast.
+   * AJAX endpoint behind the per-row "Bezahlt" checkbox, proxying to {@code PUT
+   * /api/v1/operations/{id}/payouts/paid-out}. Any mission manager may set {@code paidOut=true};
+   * only ADMIN or OFFICER may clear it.
    *
    * @param id operation id (from the URL)
    * @param request participant key + new {@code paidOut} value
-   * @return refreshed paid-out status block on success, or a 403 / 404 / 409 / 500 mirroring the
-   *     backend status (a 409 is a same-row toggle race that survived the backend's retry — never a
-   *     500, #1111)
+   * @return the refreshed paid-out status block, or a 403 / 404 / 409 / 500 mirroring the backend
+   *     status
    */
   @PostMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
@@ -663,10 +587,6 @@ public class OperationPageController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
       }
       if (e.getStatusCode() == 409) {
-        // A same-row toggle race that survived the backend's bounded retry. Mirror it as a truthful
-        // 409 instead of collapsing every non-401/403/404 into a 500 — the toggle is a concurrency
-        // conflict, not a server fault, so the client reverts to the current value rather than
-        // showing a generic server-error toast (#1111).
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -677,12 +597,9 @@ public class OperationPageController {
   }
 
   /**
-   * Server-side Markdown preview for the Verwaltung description editor's "Vorschau" tab. Renders
-   * the posted Markdown through the same {@link MarkdownRenderer} (the {@code @markdown} bean) the
-   * detail page uses, so the live preview is byte-identical to what is shown on save — raw HTML is
-   * escaped and unsafe link/image protocols stripped, making the returned fragment safe for the
-   * client to inject via {@code innerHTML}. Authenticated-only (the operation pages are
-   * auth-gated).
+   * Renders a Markdown preview for the description editor's "Vorschau" tab through the same
+   * sanitising {@link MarkdownRenderer} the detail page uses, so the result is safe to inject via
+   * {@code innerHTML}.
    *
    * @param request JSON body carrying the raw Markdown under the {@code markdown} key
    * @return the sanitized rendered HTML (text/html)
@@ -722,15 +639,10 @@ public class OperationPageController {
   }
 
   /**
-   * AJAX twin of {@link #createOperation} (#576): creates an operation in place. Routed by the
-   * {@code X-Requested-With} header (more specific than the classic {@code POST
-   * /operations/create}, which stays the no-JavaScript fallback). On success returns {@code 200}
-   * with no body — the client closes the create modal and swaps the list fragment; a backend
-   * failure is propagated as {@code problem+json} so the client surfaces an inline toast instead of
-   * reloading.
+   * AJAX twin of {@link #createOperation}, selected by the {@code X-Requested-With} header.
    *
    * @param form the bound operation form (JSON body)
-   * @return {@code 200} on success, or the propagated backend error
+   * @return {@code 200} with no body on success, or the backend error as {@code problem+json}
    */
   @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
@@ -746,17 +658,9 @@ public class OperationPageController {
   }
 
   /**
-   * AJAX twin of {@link #updateOperation} (#576): saves the operation core-edit form in place.
-   * Routed by the {@code X-Requested-With} header (the classic {@code POST /operations/{id}/update}
-   * stays the no-JavaScript fallback). The backend {@code PUT} returns the persisted operation
-   * <em>in-transaction</em>, so the twin hands its fresh {@code {version, name, status}} straight
-   * back — the client writes the bumped optimistic-lock version into the form (a second consecutive
-   * save does not 409) and patches the page title in place. Returning the PUT body (rather than a
-   * follow-up {@code GET}) is deliberate: a second round-trip could observe a concurrent writer's
-   * {@code version+2} (a silent lost update on the next save) or turn an already-committed write
-   * into a reported failure if the re-read transiently fails. A backend {@code 409} is propagated
-   * as {@code problem+json} preserving the {@code OPTIMISTIC_LOCK} code so the client offers the
-   * sanctioned conflict reload.
+   * AJAX twin of {@link #updateOperation}, selected by the {@code X-Requested-With} header. Returns
+   * the fresh {@code {version, name, status}} from the backend's {@code PUT} response so the client
+   * can update the form's version in place; a {@code 409} keeps its {@code OPTIMISTIC_LOCK} code.
    *
    * @param id the operation id
    * @param form the bound operation form (JSON body; carries the optimistic-lock version)
@@ -782,15 +686,11 @@ public class OperationPageController {
   }
 
   /**
-   * AJAX twin of {@link #deleteOperation} (#576): deletes an operation in place. Routed by the
-   * {@code X-Requested-With} header (the classic {@code POST /operations/{id}/delete} stays the
-   * no-JavaScript fallback). Admin-only, mirroring the classic handler. On success returns {@code
-   * 200}; the list page swaps the results fragment and the detail page navigates back to the list.
-   * A backend failure (e.g. the operation still has missions) is propagated as {@code problem+json}
-   * so the client keeps the page and surfaces a toast.
+   * AJAX twin of {@link #deleteOperation}, selected by the {@code X-Requested-With} header;
+   * admin-only.
    *
    * @param id the operation id
-   * @return {@code 200} on success, or the propagated backend error
+   * @return {@code 200} on success, or the backend error as {@code problem+json}
    */
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")

@@ -35,19 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the mission Verwaltung <em>Organisation</em> panel (#1120,
- * REQ-FE-015 / ADR-0094): a party-lead change one viewer makes on the Verwaltung tab must appear on
- * another viewer's (default-tab) overview without a manual reload — the {@code organisation}/{@code
- * overview} section keys crossing the mission relay.
+ * Verifies that a party-lead change on the mission Verwaltung Organisation panel reaches another
+ * viewer's overview without a reload (REQ-FE-015, ADR-0094).
  *
- * <p>Mission detail rides the shared {@code /ws/sync} socket via the {@code missionPresence}
- * adapter's {@code mission:{id}} subscription (the legacy per-mission socket was removed in #1236),
- * so the deterministic pre-mutation wait is the same acked-subscription check ({@code
- * window.krtLiveSync.subscribedTopics()} contains {@code mission:{id}}) the shipped {@link
- * MissionLiveSyncE2eTest} anchor uses. Two browser contexts authenticated as the same test user are
- * two distinct sockets — exactly what the relay fans out between. A distinctive party-lead name
- * resolves to no realm user, so the set stays on the guest path (no second member needed),
- * mirroring the anchor's guest-participant approach.
+ * <p>Waits for the {@code mission:{id}} subscription to be acked before mutating; two contexts of
+ * the same user are two sockets.
  */
 @Tag("e2e")
 class MissionOrganisationLiveSyncE2eTest {
@@ -110,22 +102,15 @@ class MissionOrganisationLiveSyncE2eTest {
       Page pageA = contextA.newPage();
       Page pageB = contextB.newPage();
       try {
-        // A lands on the Verwaltung tab where the party-lead form is interactable; B stays on the
-        // default tab, where the overview's #overview-party-lead is visible and must update live.
         E2eSupport.navigate(pageA, baseUrl + "/missions/" + missionId + "?tab=verw");
         pageA.waitForLoadState();
         E2eSupport.navigate(pageB, baseUrl + "/missions/" + missionId);
         pageB.waitForLoadState();
 
-        // B starts with no party lead ("Keine" / none).
         assertThat(pageB.locator("#overview-party-lead")).not().hasText(GUEST_LEAD_NAME);
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: an acked mission-room subscription on /ws/sync implies B is
-        // registered
-        // with the relay, so A's subsequent change frame cannot race past it (anchor semantics).
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -135,16 +120,12 @@ class MissionOrganisationLiveSyncE2eTest {
                             + missionId
                             + "') !== -1)")));
 
-        // Context A sets a guest party lead through the Organisation panel form.
         pageA.locator("#party-lead-search-input").fill(GUEST_LEAD_NAME);
         pageA.locator("#party-lead-form button[type='submit']").click();
-        // A's own panel updates in place (sanity: the mutation succeeded).
         assertThat(pageA.locator("#party-lead-display"))
             .containsText(
                 GUEST_LEAD_NAME, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
 
-        // The assertion under test: context B — which did nothing — shows the new party lead in its
-        // overview, pushed over the presence WebSocket and applied as an in-place overview swap.
         assertThat(pageB.locator("#overview-party-lead"))
             .containsText(
                 GUEST_LEAD_NAME, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));

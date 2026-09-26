@@ -48,25 +48,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration tests for the DB-enforced mission section-counter locking (#1112/#1114/#1147) against
- * a real database. Complements the mocked {@code MissionServiceSectionPatchTest} / {@code
- * MissionStep|ObjectiveServiceTest} by proving the behaviour those mocks can only assume:
+ * Integration tests of the DB-enforced mission section counters.
  *
  * <ul>
- *   <li>the conditional bump query increments the counter on a matching echo and is a no-op on a
- *       stale one (the atomic guard that closes the in-memory TOCTOU window);
- *   <li>a section edit advances only its own counter and — thanks to
- *       {@code @OptimisticLock(excluded = true)} on every mutable scalar plus
- *       {@code @DynamicUpdate} — never bumps the row {@code @Version} or a sibling section counter,
- *       so concurrent edits on other sections cannot 409 it (#1114 / #1112);
- *   <li>the deferrable unique {@code (mission_id, order_index)} constraint (V208) tolerates the
- *       transient in-flush collision a reorder produces, yet still rejects a genuinely duplicate
- *       ordinal once the check is made immediate (#1147).
+ *   <li>The conditional bump increments on a matching version and is a no-op on a stale one.
+ *   <li>A section edit bumps only its own counter, never the row {@code @Version} or a sibling.
+ *   <li>The deferrable unique {@code (mission_id, order_index)} constraint tolerates a reorder but
+ *       rejects a real duplicate once checked immediately.
  * </ul>
- *
- * <p>{@code @Transactional} so every test rolls back. Duplicate-ordinal rejection is verified via
- * {@code SET CONSTRAINTS ALL IMMEDIATE} because the constraint is {@code INITIALLY DEFERRED} and
- * would otherwise only fire at commit, which the rollback never reaches.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -89,13 +78,10 @@ class MissionSectionLockDbEnforcementTest {
   void conditionalBump_incrementsOnMatchingEcho_andIsNoOpOnStaleEcho() {
     UUID id = persistPlannedMission("Bump Guard").getId();
 
-    // A matching echo (0) increments the counter and reports one affected row.
     assertEquals(1, missionRepository.bumpCoreVersionIfMatches(id, 0L));
     entityManager.clear();
     assertEquals(1L, missionRepository.findById(id).orElseThrow().getCoreVersion());
 
-    // A now-stale echo (0, but the DB is at 1) matches no rows and leaves the counter untouched —
-    // this zero is what enforceSectionVersion maps to the 409.
     assertEquals(0, missionRepository.bumpCoreVersionIfMatches(id, 0L));
     entityManager.clear();
     assertEquals(1L, missionRepository.findById(id).orElseThrow().getCoreVersion());
@@ -161,12 +147,6 @@ class MissionSectionLockDbEnforcementTest {
     UUID first = ordered.get(0).getId();
     UUID second = ordered.get(1).getId();
 
-    // Swap: second -> index 0, first -> index 1. Whichever order Hibernate flushes the two UPDATEs,
-    // the intermediate state momentarily has two rows on the same order_index; an
-    // immediately-checked
-    // unique index would reject it. The flush must succeed because the V208 constraint is
-    // DEFERRABLE
-    // INITIALLY DEFERRED.
     missionTimelineService.reorderSteps(id, List.of(second, first), 2L);
     assertDoesNotThrow(() -> entityManager.flush());
     entityManager.clear();
@@ -183,9 +163,8 @@ class MissionSectionLockDbEnforcementTest {
   void duplicateStepOrderIndex_isRejectedOnceTheDeferredConstraintIsCheckedImmediately() {
     Mission mission = persistPlannedMission("Dup Step Order");
     persistStep(mission, "A", 0);
-    persistStep(mission, "B", 0); // same (mission_id, order_index) — tolerated while deferred
+    persistStep(mission, "B", 0);
 
-    // Forcing the deferred check surfaces the unique_violation the V208 backstop exists to catch.
     RuntimeException thrown =
         assertThrows(RuntimeException.class, this::forceImmediateConstraintCheck);
     assertTrue(
@@ -197,7 +176,7 @@ class MissionSectionLockDbEnforcementTest {
   void duplicateObjectiveOrderIndex_isRejectedOnceTheDeferredConstraintIsCheckedImmediately() {
     Mission mission = persistPlannedMission("Dup Goal Order");
     persistObjective(mission, "Primary", 0);
-    persistObjective(mission, "Secondary", 0); // duplicate ordinal
+    persistObjective(mission, "Secondary", 0);
 
     RuntimeException thrown =
         assertThrows(RuntimeException.class, this::forceImmediateConstraintCheck);
@@ -237,10 +216,8 @@ class MissionSectionLockDbEnforcementTest {
   }
 
   /**
-   * Promotes all deferred constraints to immediate on the current connection, forcing Postgres to
-   * validate the (otherwise commit-time) {@code INITIALLY DEFERRED} unique constraints now. Raw
-   * JDBC via {@code doWork} so the {@code SET CONSTRAINTS} statement is issued verbatim; a pending
-   * duplicate surfaces as a wrapped {@code SQLException}.
+   * Makes all deferred constraints immediate on the current connection, so a pending duplicate
+   * surfaces now as a wrapped {@code SQLException}.
    */
   private void forceImmediateConstraintCheck() {
     entityManager

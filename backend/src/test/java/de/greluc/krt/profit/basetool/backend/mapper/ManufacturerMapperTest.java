@@ -33,7 +33,6 @@ class ManufacturerMapperTest {
 
   @Test
   void toDto_shouldMapAllFields() {
-    // Given
     UUID id = UUID.randomUUID();
     Manufacturer entity = new Manufacturer();
     entity.setId(id);
@@ -44,10 +43,8 @@ class ManufacturerMapperTest {
     entity.setDescription("Founding manufacturer");
     entity.setHidden(true);
 
-    // When
     ManufacturerDto dto = mapper.toDto(entity);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals("Roberts Space Industries", dto.name());

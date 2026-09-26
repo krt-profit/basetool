@@ -53,12 +53,10 @@ import org.openpdf.text.pdf.parser.PdfTextExtractor;
 import org.springframework.context.MessageSource;
 
 /**
- * Unit tests for {@link BankAuditReportService} (REQ-AUDIT-003 — the bank tab's period export). The
- * bank keeps its own {@code bank_audit_event} table, so this is the bank sibling of {@link
- * AuditReportServiceTest}: the PDF carries the raw event code + actor handle (asserted via {@code
- * PdfTextExtractor}); the JSON maps the events; each export records a {@code AUDIT_LOG_EXPORTED}
- * bank audit event; an inverted period and an over-cap period are both rejected, and exactly the
- * cap is accepted.
+ * Unit tests for {@link BankAuditReportService}, the bank tab's period export (REQ-AUDIT-003).
+ *
+ * <p>Covers PDF and JSON content, the {@code AUDIT_LOG_EXPORTED} event, and period validation up to
+ * the cap.
  */
 @ExtendWith(MockitoExtension.class)
 class BankAuditReportServiceTest {
@@ -73,7 +71,6 @@ class BankAuditReportServiceTest {
 
   @Test
   void exportPdf_rendersEventsAndRecordsExportEvent() throws IOException {
-    // Given — one account-less bank audit row (account-less avoids a bankAccountRepository lookup).
     lenient()
         .when(messageSource.getMessage(any(String.class), isNull(), eq(Locale.GERMAN)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -88,10 +85,8 @@ class BankAuditReportServiceTest {
             .build();
     when(bankAuditEventRepository.findForExport(from, to)).thenReturn(List.of(event));
 
-    // When
     byte[] pdf = bankAuditReportService.generateAuditLogPdf(from, to, null);
 
-    // Then — the raw event code + actor handle render; the export is itself audit-logged.
     String compact = extractText(pdf).replaceAll("\\s+", "");
     assertTrue(compact.contains("DEPOSIT_BOOKED"), "raw event code present");
     assertTrue(compact.contains("banker_jo"), "actor handle present");
@@ -101,7 +96,6 @@ class BankAuditReportServiceTest {
 
   @Test
   void exportJson_mapsEventsAndRecordsExportEvent() {
-    // Given
     Instant from = Instant.now().minus(1, ChronoUnit.HOURS);
     Instant to = Instant.now().plus(1, ChronoUnit.HOURS);
     BankAuditEvent event =
@@ -121,10 +115,8 @@ class BankAuditReportServiceTest {
     when(bankAuditEventRepository.findForExport(from, to)).thenReturn(List.of(event));
     when(bankAuditEventMapper.toDto(event, null)).thenReturn(dto);
 
-    // When
     List<BankAuditEventDto> result = bankAuditReportService.generateAuditLogJson(from, to);
 
-    // Then
     assertEquals(List.of(dto), result);
     verify(bankAuditService)
         .record(eq(BankAuditEventType.AUDIT_LOG_EXPORTED), isNull(), isNull(), isNull(), any());
@@ -155,7 +147,6 @@ class BankAuditReportServiceTest {
 
   @Test
   void export_acceptsExactlyTheCapRowCount() {
-    // The guard is count > MAX_EXPORT_ROWS, so exactly the cap (100_000) must be accepted.
     lenient()
         .when(messageSource.getMessage(any(String.class), isNull(), eq(Locale.GERMAN)))
         .thenAnswer(invocation -> invocation.getArgument(0));

@@ -46,37 +46,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Translates an <em>identity-provider unreachable</em> failure into a retryable {@code 503 Service
- * Unavailable} instead of the opaque {@code 500} it produces by default (REQ-SEC-024).
+ * Turns an unreachable identity provider during token validation into a retryable {@code 503}
+ * instead of a {@code 500} (REQ-SEC-024).
  *
- * <p>Background: the backend is a JWT resource server. When Keycloak's JWKS endpoint is slow or
- * down, {@code NimbusJwtDecoder} fails the key fetch with a {@code JwtException}, which {@code
- * JwtAuthenticationProvider} wraps into an {@link AuthenticationServiceException}. Spring
- * Security's {@code AuthenticationEntryPointFailureHandler} deliberately <b>re-throws</b> {@code
- * AuthenticationServiceException} (it denotes a server-side error, not a credential failure), so it
- * escapes the bearer-token filter unhandled and Tomcat's error dispatch renders it as {@code 500
- * INTERNAL_ERROR} on <em>every</em> authenticated endpoint — a transient Keycloak blip thus looks
- * like an application crash and trips the {@code Http5xxRateHigh} alert.
- *
- * <p>This filter is installed <b>before</b> the {@code BearerTokenAuthenticationFilter} so its
- * {@code try/catch} wraps that filter's execution. It catches only {@link
- * AuthenticationServiceException} and only re-maps it to {@code 503} when the cause chain shows a
- * transport / 5xx failure ({@link IOException} — incl. socket/connect/unknown-host/closed-channel,
- * {@link UnresolvedAddressException} for a Docker-DNS strand, Spring's {@link
- * ResourceAccessException}, or an upstream {@link HttpStatusCodeException} with a 5xx status). A
- * genuine token rejection never reaches here — bad/expired tokens throw {@code BadJwtException} →
- * {@code InvalidBearerTokenException} → {@code 401} inside the entry point, untouched. Any {@code
- * AuthenticationServiceException} without a transport cause is re-thrown unchanged, preserving the
- * existing {@code 500} behaviour.
- *
- * <p>The {@code 503} carries a {@code Retry-After} header and the same RFC&nbsp;7807 {@code
- * application/problem+json} shape the rest of the API uses (mirrors {@code
- * PendingApprovalAccessFilter} and {@code BasetoolErrorController}), so the frontend's existing
- * {@code SERVICE_UNAVAILABLE} handling renders a "temporarily unavailable, retry" page rather than
- * a generic error. It is logged at {@code WARN} (not {@code ERROR}) and counted on {@code
- * basetool_http_error_total{code="SERVICE_UNAVAILABLE"}} so an identity-provider outage is
- * measurable without polluting the {@code logback_events_total} error-rate signal the {@code
- * LogbackErrorSpike} alert watches (REQ-OBS-011/-013).
+ * <p>Runs before the bearer-token filter and maps only an {@link AuthenticationServiceException}
+ * with a transport or upstream-5xx cause; token rejections and other failures pass unchanged. The
+ * response is an RFC 7807 problem document with {@code Retry-After}, logged at {@code WARN}.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -113,16 +88,15 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
   private final @NotNull MeterRegistry meterRegistry;
 
   /**
-   * Runs the downstream chain and, on an {@link AuthenticationServiceException} whose cause chain
-   * denotes an unreachable identity provider, short-circuits with a retryable 503 problem document;
-   * every other exception (and every {@code AuthenticationServiceException} without a transport
-   * cause) propagates unchanged so existing 401/403/500 semantics are preserved.
+   * Runs the downstream chain and answers a retryable 503 problem document when an {@link
+   * AuthenticationServiceException} stems from an unreachable identity provider; every other
+   * exception propagates unchanged.
    *
    * @param request the current request
-   * @param response the response to write the 503 into when the IdP is unreachable
-   * @param filterChain the downstream chain (includes the bearer-token authentication filter)
+   * @param response the response to write the 503 into
+   * @param filterChain the downstream chain, including the bearer-token filter
    * @throws ServletException propagated from the downstream chain
-   * @throws IOException propagated from the downstream chain or raised while writing the body
+   * @throws IOException propagated from the chain or raised while writing the body
    */
   @Override
   protected void doFilterInternal(
@@ -142,13 +116,11 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Walks the (bounded) cause chain and reports whether the authentication failure stems from a
-   * transport-level or upstream-5xx problem talking to the identity provider — the signature of an
-   * unreachable Keycloak / JWKS endpoint — as opposed to a programming error that also surfaced as
-   * an {@link AuthenticationServiceException}.
+   * Whether the bounded cause chain contains a transport or upstream-5xx failure towards the
+   * identity provider.
    *
    * @param throwable the caught {@link AuthenticationServiceException}
-   * @return {@code true} when a transport / 5xx cause is present, {@code false} otherwise
+   * @return {@code true} when a transport or 5xx cause is present
    */
   private static boolean isIdentityProviderUnreachable(@NotNull Throwable throwable) {
     Throwable cause = throwable;
@@ -172,14 +144,12 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Writes the retryable RFC-7807 503 body, sets {@code Retry-After}, mirrors the correlation id
-   * and increments the error counter. Localizes from {@code request.getLocale()} because {@code
-   * LocaleContextHolder} is not yet populated this early in the chain, and writes raw UTF-8 bytes
-   * so German umlauts in the localized text survive (the servlet writer defaults to ISO-8859-1).
+   * Writes the RFC 7807 503 body as UTF-8, sets {@code Retry-After}, mirrors the correlation id and
+   * increments the error counter; localizes from {@code request.getLocale()}.
    *
-   * @param request the failed request (its URI becomes the {@code instance})
+   * @param request the failed request, whose URI becomes the {@code instance}
    * @param response the response to populate
-   * @param cause the classified failure, logged (class name only, at WARN) for diagnosis
+   * @param cause the classified failure, logged by class name at WARN
    * @throws IOException if serializing or writing the body fails
    */
   private void writeServiceUnavailable(
@@ -197,9 +167,6 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
             "The authentication service is temporarily unreachable. Please retry shortly.",
             locale);
 
-    // WARN, not ERROR: an unreachable identity provider is an availability event, not an
-    // application fault — keeping it out of ERROR avoids inflating the logback error-rate signal
-    // (LogbackErrorSpike). Log the cause class only, never the message/stack (may carry a URL).
     log.warn(
         "Identity provider unreachable for {} {} [cause={}, correlationId={}] — returning 503",
         request.getMethod(),

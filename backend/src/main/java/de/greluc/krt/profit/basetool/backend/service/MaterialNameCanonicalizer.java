@@ -31,17 +31,11 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
- * Shared commodity-name folding used wherever an external spelling has to be reconciled with the
- * local {@code material} catalogue: the R3 SC Wiki commodity sync ({@code
- * ScWikiCommoditySyncService#canonicalName}) and the refinery screenshot import ({@code
- * RefineryImportService}, #434). Both sides of a comparison must be folded with the same rules —
- * master data stores raw ores in the UEX convention {@code "Stileron (Raw)"} while the SC
- * refinement screen renders {@code "STILERON (ORE)"}; only canonicalizing <em>both</em> makes them
- * meet at {@code "stileron"}.
+ * Folds commodity names so external spellings meet the local {@code material} catalogue (e.g.
+ * {@code "Stileron (Raw)"} and {@code "STILERON (ORE)"} both become {@code "stileron"}).
  *
- * <p>Folding rules (identical for both methods): lowercase, drop parenthetical groups, drop the
- * qualifier words {@code raw / ore / refined / pure / r}, strip non-alphanumeric characters inside
- * each word.
+ * <p>Folding lowercases, drops parenthetical groups and the qualifiers {@code raw / ore / refined /
+ * pure / r}, and strips non-alphanumerics inside each word.
  */
 public final class MaterialNameCanonicalizer {
 
@@ -55,17 +49,14 @@ public final class MaterialNameCanonicalizer {
   /** Matches any run of non-alphanumeric characters, used to fold names to a canonical core. */
   private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]+");
 
-  private MaterialNameCanonicalizer() {
-    // static utility, never instantiated
-  }
+  private MaterialNameCanonicalizer() {}
 
   /**
-   * Computes a commodity's canonical core with all word boundaries removed: {@code "Raw Silicon"},
-   * {@code "Silicon (Raw)"} and {@code "SILICON"} all canonicalise to {@code "silicon"}. Used for
-   * exact-equality matching (the historical {@code ScWikiCommoditySyncService.canonicalName}
-   * semantics, kept bit-identical so the Wiki sync's behaviour does not change).
+   * Computes a commodity's canonical core with all word boundaries removed, for exact matching:
+   * {@code "Raw Silicon"}, {@code "Silicon (Raw)"} and {@code "SILICON"} all yield {@code
+   * "silicon"}.
    *
-   * @param name the raw commodity name as read from an external source or the local catalogue
+   * @param name the raw commodity name
    * @return the canonical core, or {@code null} for null / blank input
    */
   @Contract("null -> null")
@@ -81,10 +72,8 @@ public final class MaterialNameCanonicalizer {
   }
 
   /**
-   * Computes the same folding as {@link #canonicalCore(String)} but keeps a single space between
-   * the surviving words ({@code "RECYCLED CONSTRUCTION SALVAGE"} → {@code "recycled construction
-   * salvage"}). Word boundaries are preserved because the fuzzy stage's token-set Jaccard signal
-   * ({@code BlueprintFuzzyMatcher}) is meaningless on a fully concatenated key.
+   * Computes the same folding as {@link #canonicalCore(String)} but keeps single spaces between
+   * words, for token-based fuzzy matching.
    *
    * @param name the raw commodity name
    * @return the space-joined canonical key, or {@code null} for null / blank input

@@ -27,31 +27,12 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 
 /**
- * The one way the backend memoises a value for the rest of the current HTTP request (REQ-DATA-003).
+ * Memoises a value for the rest of the current HTTP request under a typed {@link Key}
+ * (REQ-DATA-003).
  *
- * <p>Several hot paths — the scope predicates behind every list query and {@code canSee*} gate, the
- * cascaded leadership reach, the Staffel projection of every embedded user, the appointment ladder
- * — each ask the same membership question many times per request. They used to cache the answer in
- * a request attribute, each with its own string key and its own unchecked cast on the way back out.
- * A typed {@link Key} now carries the value type, so the cast lives in exactly one place: a {@code
- * Key<T>} is the only thing that writes its attribute, so what it reads back is a {@code T}.
- *
- * <p>Two flavours, matching how the callers reach the request:
- *
- * <ul>
- *   <li>{@link #get(HttpServletRequest, Key, Supplier)} works on a request the caller already holds
- *       — an injected request proxy, which fails outside a request exactly as it did before.
- *   <li>{@link #getIfBound(Key, Supplier)} reads the request bound to the current thread through
- *       {@link RequestContextHolder} and answers {@code null} when there is none, so a scheduled
- *       job or a plain unit test computes without a memo.
- * </ul>
- *
- * <p>Allocation is the value itself and nothing else: no wrapper is stored, so a memoised value may
- * not be {@code null} — callers memoise an {@code Optional}, a collection or a {@code Boolean}
- * instead, which is what every caller already did.
- *
- * <p>Every memo assumes its answer does not change within the request that asks; a request that
- * writes what a memo holds and then reads it again must not go through the memo.
+ * <p>{@link #get(HttpServletRequest, Key, Supplier)} works on a given request; {@link
+ * #getIfBound(Key, Supplier)} uses the thread-bound request and returns {@code null} without one.
+ * Memoised values must not be {@code null}, and must not change within the request.
  */
 public final class RequestMemo {
 
@@ -103,7 +84,7 @@ public final class RequestMemo {
      * @return {@code raw} typed as {@code T}
      */
     @Nullable
-    @SuppressWarnings("unchecked") // Only RequestMemo writes this attribute, and only as a T.
+    @SuppressWarnings("unchecked")
     private T cast(@Nullable Object raw) {
       return (T) raw;
     }

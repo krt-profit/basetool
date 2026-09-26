@@ -1,14 +1,3 @@
-# promtool unit test for ContainerCleanupStaleOrMissing (ADR-0194).
-#
-# The weekly cleanup was renamed from docker-cleanup to container-cleanup, and for the length of that
-# rename the alert accepted both metric names; this file locked all four combinations. The old name
-# was dropped on 2026-09-22 (OPS-SIMP-02) once both Rocky hosts had run the role, so what is locked
-# now is the one name: fresh is silent, stale fires, absent fires -- and the old name alone no longer
-# satisfies it, because nothing writes it any more and a host that did would be running the retired
-# script.
-#
-# Run it the way the other tests in this directory are run — see monitoring/README.md.
-
 rule_files:
   - ../alerts/ops-automation.yml
 
@@ -19,7 +8,7 @@ tests:
     interval: 1m
     input_series:
       - series: 'basetool_container_cleanup_last_success_timestamp'
-        values: "0+60x180"          # tracks time(): always "just succeeded"
+        values: "0+60x180"
     alert_rule_test:
       - eval_time: 3h
         alertname: ContainerCleanupStaleOrMissing

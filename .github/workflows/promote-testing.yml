@@ -1,42 +1,5 @@
 name: Promote to testing
 
-# Promote an already-built image to the rolling `:testing` tag that the PVE testing
-# host's deploy.sh polls. Does NOT rebuild — it re-tags an existing digest, exactly
-# like promote.yml does for `:stable`, so the testing deploy that follows is by
-# definition identical to what `release-images.yml` validated (built, scanned,
-# signed) earlier.
-#
-# Because re-tagging leaves the digest untouched, the cosign signature attached to
-# that digest stays valid for the new tag — no re-sign, and the host-side gate in
-# scripts/deploy.sh (REQ-OPS-015) verifies against the same release-images identity
-# it always did.
-#
-# Promotes the three app images (backend/frontend/ingest), the `basetool-config`
-# host-configuration bundle AND the `basetool-keycloak-spi` provider-JAR bundle
-# together, so the compose file, the Keycloak provider JAR and the app images the
-# host applies always match each other (see ADR-0049, ADR-0055).
-#
-# HOW THIS DIFFERS FROM promote.yml — and why (REQ-OPS-022):
-#   * Target tag is `testing`, not `stable`. Production never reads it.
-#   * The `approve` job declares `environment: testing`, which is deliberately
-#     configured WITHOUT a required reviewer. On `production` that reviewer is the
-#     seam that separates "may fire a workflow" (actions:write) from "may change
-#     production" — a stolen or over-scoped PAT can start the run but not approve
-#     it. The testing environment holds no production data and serves no users, so
-#     that seam buys nothing there and would only add friction. The environment
-#     itself stays, because it still mints one deployment record per promotion —
-#     the answer to "which version has been on testing since when". Adding the
-#     reviewer later is a repo setting, not a workflow change.
-#
-# WHEN TO RUN IT (changed — REQ-OPS-022). Testing no longer needs a manual run to
-# keep up: promoting to production carries `:testing` forward whenever it would
-# otherwise fall behind, so `testing >= stable` holds without anyone remembering.
-# What is left for this workflow is the case that invariant cannot produce —
-# putting testing AHEAD of production, to try a version out without touching prod.
-#
-# Trigger: workflow_dispatch only. Nothing reaches the testing host on a `main`
-# merge either — the operator decides what gets tested, same principle as prod.
-
 on:
   workflow_dispatch:
     inputs:
@@ -46,18 +9,9 @@ on:
         type: string
 
 concurrency:
-  # Serialise testing promotions among themselves so two simultaneous flips cannot
-  # leave the app images and the config bundle on different versions. Still a
-  # DIFFERENT group from promote.yml's `promote-stable`, so a testing promotion
-  # never queues behind a whole production run — but no longer because the two
-  # touch disjoint tags. They stopped being disjoint when promote.yml gained its
-  # `sync-testing` job, and that job joins THIS group rather than `promote-stable`,
-  # which is what keeps the two writers of `:testing` from interleaving.
   group: promote-testing
   cancel-in-progress: false
 
-# Nothing at the workflow level; each job names what it uses (audit item CI-SEC-04). No
-# `id-token: write`: a keyless `cosign verify` needs no OIDC token -- only signing does.
 permissions: {}
 
 env:
@@ -71,8 +25,6 @@ jobs:
     timeout-minutes: 2
     permissions: {}
     steps:
-      # The `testing` environment only accepts deployments from `main`; this says so before the
-      # run gets there. Same reasoning as promote.yml's identical step.
       - name: Refuse a run from any ref other than main
         if: ${{ github.ref != 'refs/heads/main' }}
         env:
@@ -93,15 +45,6 @@ jobs:
           echo "::error::version input is empty."
           exit 1
 
-  # Records the promotion as a GitHub deployment on the `testing` environment. With
-  # no required reviewer configured, this job runs straight through — that is the
-  # intended behaviour, not an oversight (see the header note). Keeping it as its
-  # OWN single job rather than putting `environment:` on the promote matrix is not
-  # cosmetic: every job referencing an environment mints its own deployment record,
-  # so a matrix-bound environment would mint five per run and GitHub's
-  # `auto_inactive` would flip four of them to `inactive`, leaving the repo home
-  # page showing a permanent misleading "Inactive" badge. promote.yml learned this
-  # the hard way. Do NOT move `environment:` onto the matrix.
   approve:
     name: Record testing promotion
     needs: validate-inputs
@@ -120,43 +63,29 @@ jobs:
     needs: approve
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Writes the `:testing` tag (reading the signature needs no more than that), and reads the
-    # repository for the shared action.
     permissions:
       contents: read
       packages: write
 
     strategy:
-      # If one promotion fails, do NOT carry on with the others — otherwise the next
-      # timer tick lands the host in a version skew (new app images against the old
-      # compose, or vice-versa). Same policy as promote.yml, same reason.
       fail-fast: true
       matrix:
         module: [backend, frontend, ingest, config, keycloak-spi]
 
     steps:
-      # No `Set up Docker Buildx` here on purpose — see promote.yml for the full
-      # rationale. Promotion only runs registry-side manifest operations, so booting
-      # a docker-container builder would pull moby/buildkit once per matrix module
-      # purely to leave it idle.
       - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A local action is loaded from the workspace, so the job checks out -- sparsely, only
-      # .github/actions, and without persisting the token. Nothing from the checkout runs except
-      # the shared promotion action itself, at the commit this workflow file comes from.
       - name: Checkout the shared promotion action
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           sparse-checkout: .github/actions
           persist-credentials: false
 
-      # Resolve, cosign-verify against the release identity, re-tag, summarise: one copy shared
-      # with the other promote workflow (.github/actions/retag-verified-digest, audit item CI-08).
       - name: Verify and re-tag as :testing
         uses: ./.github/actions/retag-verified-digest
         with:

@@ -47,7 +47,6 @@ class MissionServicePayoutTest {
 
   @Test
   void shouldCheckInParticipant() {
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Mission mission = new Mission();
@@ -59,28 +58,18 @@ class MissionServicePayoutTest {
     p.setMission(mission);
     mission.getParticipants().add(p);
 
-    // #1140: check-in/out resolve the single participant and read mission scalars via
-    // participant.getMission() — they no longer load the mission aggregate via missionRepository.
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
-    // When
     Mission updatedMission = missionParticipantService.checkIn(missionId, participantId);
 
-    // Then
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
     assertNotNull(updatedParticipant.getStartTime(), "Start time should be set");
-    // Option A: parent Mission.version must NOT be bumped by a sub-section write.
     verify(missionRepository, never()).save(any(Mission.class));
-    // #1135: check-in flushes so the slim DTO carries the committed participant @Version.
     verify(missionParticipantRepository).saveAndFlush(p);
   }
 
   @Test
   void repeatedCheckIn_preservesOriginalStartTime_andIsANoOp() {
-    // #1134: a second check-in (stale crew board, duplicate delivery) must NOT reset startTime —
-    // startTime feeds the credited-time payout breakdown, so a reset to a later now() would
-    // silently
-    // shrink the participant's credited duration and skew the money distribution.
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Mission mission = new Mission();
@@ -91,17 +80,13 @@ class MissionServicePayoutTest {
     MissionParticipant p = new MissionParticipant();
     p.setId(participantId);
     p.setMission(mission);
-    p.setStartTime(originalArrival); // already checked in earlier
+    p.setStartTime(originalArrival);
     mission.getParticipants().add(p);
 
-    // #1140: check-in/out resolve the single participant and read mission scalars via
-    // participant.getMission() — they no longer load the mission aggregate via missionRepository.
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
-    // When — a second check-in arrives
     Mission updatedMission = missionParticipantService.checkIn(missionId, participantId);
 
-    // Then — the original arrival time is preserved and the no-op neither persists nor re-audits
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
     assertSame(
         originalArrival,
@@ -113,7 +98,6 @@ class MissionServicePayoutTest {
 
   @Test
   void shouldCheckOutParticipant() {
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Mission mission = new Mission();
@@ -125,25 +109,18 @@ class MissionServicePayoutTest {
     p.setStartTime(Instant.now().minusSeconds(3600));
     mission.getParticipants().add(p);
 
-    // #1140: check-in/out resolve the single participant and read mission scalars via
-    // participant.getMission() — they no longer load the mission aggregate via missionRepository.
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
-    // When
     Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
 
-    // Then
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
     assertNotNull(updatedParticipant.getEndTime(), "End time should be set");
-    // Option A: parent Mission.version must NOT be bumped by a sub-section write.
     verify(missionRepository, never()).save(any(Mission.class));
-    // #1135: check-out flushes so the slim DTO carries the committed participant @Version.
     verify(missionParticipantRepository).saveAndFlush(p);
   }
 
   @Test
   void shouldUpdatePayoutPreference() {
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Mission mission = new Mission();
@@ -155,32 +132,20 @@ class MissionServicePayoutTest {
     p.setPayoutPreference(PayoutPreference.PAYOUT);
     mission.getParticipants().add(p);
 
-    // #1140: updatePayoutPreference resolves the single participant (via getParticipant) instead of
-    // loading the aggregate and streaming its roster.
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
-    // When
     Mission updatedMission =
         missionParticipantService.updatePayoutPreference(
             missionId, participantId, PayoutPreference.DONATE);
 
-    // Then
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
     assertEquals(PayoutPreference.DONATE, updatedParticipant.getPayoutPreference());
-    // Option A: parent Mission.version must NOT be bumped by a sub-section write.
     verify(missionRepository, never()).save(any(Mission.class));
     verify(missionParticipantRepository).save(p);
   }
 
   @Test
   void checkOut_clampsEndTimeToActualEndTime_whenMissionAlreadyEnded() {
-    // The mission ended an hour ago; the participant (who started before the mission end) checks
-    // out
-    // late. checkOut must clamp endTime to the mission's actual end time — crediting the extra
-    // hours
-    // since the mission closed would inflate this participant's credited window and skew the payout
-    // (the primary clamp branch, financial-correctness guard).
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Instant missionEnd = Instant.now().minusSeconds(3600);
@@ -191,16 +156,13 @@ class MissionServicePayoutTest {
     MissionParticipant p = new MissionParticipant();
     p.setId(participantId);
     p.setMission(mission);
-    // Started well before the mission ended, so the negative-duration guard does not apply.
     p.setStartTime(Instant.now().minusSeconds(3 * 3600));
     mission.getParticipants().add(p);
 
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
-    // When
     Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
 
-    // Then
     MissionParticipant updated = updatedMission.getParticipants().iterator().next();
     assertEquals(
         missionEnd,
@@ -212,17 +174,13 @@ class MissionServicePayoutTest {
 
   @Test
   void checkOut_setsEndTimeToStartTime_whenParticipantStartedAfterMissionEnd() {
-    // The mission ended two hours ago but the participant's recorded start time is after that end.
-    // Clamping to actualEndTime would produce endTime < startTime (a negative credited window), so
-    // the negative-duration guard pins endTime to startTime instead — never before it.
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Mission mission = new Mission();
     mission.setId(missionId);
     mission.setActualEndTime(Instant.now().minusSeconds(2 * 3600));
 
-    Instant startAfterEnd = Instant.now().minusSeconds(3600); // after the mission's actual end
+    Instant startAfterEnd = Instant.now().minusSeconds(3600);
     MissionParticipant p = new MissionParticipant();
     p.setId(participantId);
     p.setMission(mission);
@@ -231,10 +189,8 @@ class MissionServicePayoutTest {
 
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
-    // When
     Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
 
-    // Then
     MissionParticipant updated = updatedMission.getParticipants().iterator().next();
     assertEquals(
         startAfterEnd,

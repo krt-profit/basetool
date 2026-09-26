@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Per-name resolution outcome mirroring the backend {@code BlueprintImportStatus} (#327). Drives
- * how the import preview modal groups each row: auto-confirmed matches versus rows needing a manual
- * pick.
+ * Frontend mirror of the backend {@code BlueprintImportStatus}: the per-name resolution outcome
+ * that groups rows in the import preview.
  */
 public enum BlueprintImportStatus {
   /** The external name matched an existing product directly. */

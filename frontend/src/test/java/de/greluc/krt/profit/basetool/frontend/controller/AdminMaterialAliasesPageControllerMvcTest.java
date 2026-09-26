@@ -51,11 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminMaterialAliasesPageController}'s in-place AJAX twins (epic #571 /
- * #582). Proves the {@code X-Requested-With} header routing: the create/delete twins are
- * {@code @ResponseBody} (create binding the JSON body and returning the persisted {@link
- * MaterialExternalAliasDto}), while the same create URL POSTed without the header still hits the
- * classic redirect handler. Fails if the header gating breaks.
+ * MVC test for {@link AdminMaterialAliasesPageController}'s AJAX twins: with {@code
+ * X-Requested-With} the create/delete twins answer as {@code @ResponseBody} (create returning the
+ * persisted {@link MaterialExternalAliasDto}); without it the create URL still redirects.
  */
 @SpringBootTest
 class AdminMaterialAliasesPageControllerMvcTest {
@@ -101,11 +99,6 @@ class AdminMaterialAliasesPageControllerMvcTest {
         Instant.parse("2026-06-01T00:00:00Z"));
   }
 
-  // REQ-FE-016: the add-alias form's material select opts into the server-side-search combobox —
-  // the marker with its remote-materials registry value must sit on the (statically attributed)
-  // #newMaterialId select, and the page must no longer fetch the full material catalogue (the
-  // remote picker queries /catalog/material-search instead). The list() handler swallows backend
-  // failures, so the unstubbed alias fetch still renders the page.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listPage_materialPickerCarriesComboboxMarker() throws Exception {
@@ -122,11 +115,6 @@ class AdminMaterialAliasesPageControllerMvcTest {
     verify(backendApiClient, never()).get(eq("/api/v1/materials/lookup"), anyTypeRef());
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
-  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
-  // The list() handler swallows backend failures, so no stubbing is needed.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listPage_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -139,8 +127,6 @@ class AdminMaterialAliasesPageControllerMvcTest {
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
-  // covers #582 — the create twin (X-Requested-With + JSON body) relays to the backend and returns
-  // the persisted alias.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createAjax_withHeader_returns200AndCreatedAlias() throws Exception {
@@ -163,8 +149,6 @@ class AdminMaterialAliasesPageControllerMvcTest {
         .andExpect(content().string(containsString("ALUM")));
   }
 
-  // covers #582 — the delete twin (X-Requested-With) returns 200 so the page removes the alias row
-  // in place rather than reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteAjax_withHeader_returns200() throws Exception {
@@ -179,8 +163,6 @@ class AdminMaterialAliasesPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — header routing: the same create URL WITHOUT the header still hits the classic
-  // form handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void create_withoutHeader_redirects() throws Exception {

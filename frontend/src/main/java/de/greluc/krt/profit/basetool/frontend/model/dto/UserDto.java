@@ -26,18 +26,11 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying User payload.
+ * Frontend mirror of a user.
  *
- * <p>{@code squadron} is the user's primary Staffel (kept for API stability); {@code squadrons} is
- * the complete Staffel membership set (REQ-ORG-017 allows up to two). Surfaces that must render
- * every membership — the admin member list badge — read {@code squadrons}; both are {@code null} /
- * empty for a user without a Staffel.
- *
- * <p>{@code discordLinked} is a privacy-safe, read-only indicator mirrored from the backend: {@code
- * true} when a Discord account is federated to the user's Basetool account, {@code false}
- * otherwise, and {@code null} on peer/guest-redacted projections that never expose it. The raw
- * Discord id is never carried — only this boolean. The admin member-management page renders it as
- * the Discord column (REQ-SEC-019).
+ * <p>{@code squadron} is the primary Staffel and {@code squadrons} all of them (up to two,
+ * REQ-ORG-017). {@code discordLinked} tells whether a Discord account is federated (REQ-SEC-019)
+ * and is {@code null} on redacted projections.
  */
 public record UserDto(
     UUID id,

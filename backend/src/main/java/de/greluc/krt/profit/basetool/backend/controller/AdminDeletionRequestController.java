@@ -42,15 +42,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The admin queue for the members' Art. 17 erasure requests (REQ-SEC-061).
- *
- * <p>Admin-only, and the reason is not merely that deletion is destructive: the queue names every
- * member who has asked to be erased, which is itself information about them.
- *
- * <p>The two decisions are separate endpoints rather than one with a flag, because they are not
- * variants of each other. {@code /decline} writes a reason and tells the member; {@code /execute}
- * deletes an account and cannot be undone. Giving them one path would make the difference a
- * parameter, and a parameter is a thing a mistake can flip.
+ * The admin-only queue for the members' Art. 17 erasure requests (REQ-SEC-061), with separate
+ * endpoints to decline and to execute a request.
  */
 @RestController
 @RequestMapping("/api/v1/admin/deletion-requests")
@@ -74,9 +67,6 @@ public class AdminDeletionRequestController {
               + "an anonymous request.")
   public List<DeletionRequestDto> pending() {
     List<DeletionRequest> pending = deletionRequestService.listPending();
-    // One query for the whole page, not one per row (REQ-DATA-003). A queue of twenty requests
-    // used to issue twenty-one statements, on the page an admin refreshes while working through a
-    // month of Art. 12(3) deadlines.
     Map<UUID, String> handles =
         deletionRequestService.handlesOf(pending.stream().map(DeletionRequest::getUserId).toList());
     return pending.stream()
@@ -85,11 +75,7 @@ public class AdminDeletionRequestController {
   }
 
   /**
-   * Refuses a request, recording why.
-   *
-   * <p>The note is mandatory: Art. 12(4) requires the requester to be told the reason, together
-   * with their right to complain to a supervisory authority and to a judicial remedy. The member is
-   * notified, and reads the reason on their profile page.
+   * Refuses a request with a mandatory reason (Art. 12(4)) and notifies the member.
    *
    * @param id the request to refuse
    * @param request the decision, whose {@code note} must not be blank
@@ -114,19 +100,13 @@ public class AdminDeletionRequestController {
   }
 
   /**
-   * Carries a request out: deletes the account, and — when the admin grants it — anonymises the
-   * member's surviving handle snapshots first.
-   *
-   * <p><b>Irreversible.</b> Both halves happen: the local row and the Keycloak account. See
-   * REQ-DATA-008 for exactly what is purged, reassigned and unlinked.
-   *
-   * <p>{@code grantHistoryErasure} is the admin's answer to the member's wish and is deliberately
-   * independent of it — a wish is not an instruction, and the interest in an auditable ledger is
-   * weighed case by case ({@code docs/privacy/data-subject-requests.md}).
+   * Irreversibly carries out a request: deletes the local account and the Keycloak account
+   * (REQ-DATA-008), anonymising the member's surviving handle snapshots first when the admin grants
+   * {@code grantHistoryErasure}.
    *
    * @param id the request to carry out
    * @param request the decision, including whether the history wish is granted
-   * @return {@code 204}; the request row no longer exists, having cascaded away with the account
+   * @return {@code 204}; the request row cascades away with the account
    */
   @PostMapping("/{id}/execute")
   @PreAuthorize("hasRole('ADMIN')")
@@ -144,9 +124,6 @@ public class AdminDeletionRequestController {
   })
   public ResponseEntity<Void> execute(
       @PathVariable UUID id, @NotNull @Valid @RequestBody DecideDeletionRequestRequest request) {
-    // request.note() is deliberately not read here: an execution has nowhere durable to
-    // record a note (see DeletionRequestService#decline). The field stays on the shared
-    // request record because a refusal requires it.
     deletionRequestService.execute(id, request.grantHistoryErasure(), request.version());
     return ResponseEntity.noContent().build();
   }

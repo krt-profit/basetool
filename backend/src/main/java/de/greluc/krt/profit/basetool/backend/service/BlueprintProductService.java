@@ -47,16 +47,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service backing the user-facing blueprint product search (#327). Exposes the SC Wiki
- * blueprint master as a de-duplicated list of <em>products</em> (the unit of ownership): all active
- * recipes whose output name normalizes to the same {@code product_key} collapse into one entry,
- * carrying a variant count, an example Wiki key, the manufacturer (when resolved) and an "already
- * owned by the caller" flag.
+ * Read service for the blueprint product search: active recipes grouped by normalized {@code
+ * product_key} into products, each with a variant count, an example Wiki key, the manufacturer and
+ * an owned-by-caller flag.
  *
- * <p>Grouping happens in memory rather than in SQL because the {@code product_key} is a normalized
- * form of {@code output_name} (see {@link BlueprintNameNormalizer}) that PostgreSQL cannot compute.
- * The active blueprint set is on the order of 1600 rows, so loading the (optionally name-filtered)
- * rows and grouping them in Java is cheap and mirrors the existing UEX location search.
+ * <p>Grouping happens in memory, because PostgreSQL cannot compute the normalized key.
  */
 @Service
 @RequiredArgsConstructor
@@ -75,14 +70,13 @@ public class BlueprintProductService {
   private final BlueprintMapper blueprintMapper;
 
   /**
-   * Searches the blueprint products by a case-insensitive substring of the product name, returning
-   * up to {@code limit} (capped at {@link #MAX_LIMIT}) alphabetically sorted products, each flagged
-   * with whether {@code ownerUserId} already owns it.
+   * Searches blueprint products by case-insensitive name substring, flagging those {@code
+   * ownerUserId} already owns.
    *
-   * @param query case-insensitive product-name substring; {@code null} / blank returns all products
-   * @param limit requested maximum number of products; clamped to {@code [1, MAX_LIMIT]}
-   * @param ownerUserId {@code app_user.id} of the caller, used to compute the owned flag
-   * @return the matching products, alphabetically by name, capped to the effective limit
+   * @param query product-name substring; {@code null} / blank returns all products
+   * @param limit requested maximum; clamped to {@code [1, MAX_LIMIT]}
+   * @param ownerUserId {@code app_user.id} of the caller, for the owned flag
+   * @return the matching products, alphabetically by name
    */
   @NotNull
   public List<BlueprintProductDto> searchProducts(
@@ -112,12 +106,11 @@ public class BlueprintProductService {
   }
 
   /**
-   * Resolves a normalized product key back to its canonical product (display name + optional
-   * resolved output-item id). Used by the add flow (Phase 3) and the import (Phase 4) to stamp a
-   * new ownership row. Returns empty for a blank key or one that no active blueprint produces.
+   * Resolves a normalized product key to its canonical product (display name and optional
+   * output-item id).
    *
    * @param productKey normalized product key
-   * @return the resolved product, or empty if unknown
+   * @return the resolved product, or empty for a blank key or one no active blueprint produces
    */
   @NotNull
   public Optional<ResolvedProduct> resolveByProductKey(@Nullable String productKey) {
@@ -131,23 +124,15 @@ public class BlueprintProductService {
   }
 
   /**
-   * Resolves a game item (a Lager item-stock row's catalog reference) to its blueprint product —
-   * the identity bridge for a <b>stock-backed</b> Materialbörse item offer (design §8,
-   * REQ-MARKET-014, ADR-0108). A stock row keys on a {@link
-   * de.greluc.krt.profit.basetool.backend.model.GameItem}, but an offer keys on the blueprint
-   * {@code product_key} (ADR-0087), so a release from item stock derives the key + snapshot name
-   * from the row's game item: of the active blueprints that produce it, it normalizes each {@code
-   * outputName} to a product key and picks the lowest key — a <b>deterministic</b> choice when a
-   * game item has several producing blueprints, since {@code findByOutputItemId} carries no {@code
-   * ORDER BY} — then resolves that back to the canonical product — the <em>same</em> {@link
-   * ResolvedProduct} a free-stated item offer of the same item would carry, so both flavours share
-   * one identity. The item-catalog predicate (REQ-INV-029, {@code findItemsWithActiveBlueprint})
-   * guarantees a stocked game item has such a blueprint, so the key resolves; a game item with no
-   * (longer any) active blueprint yields empty and the caller rejects the release.
+   * Resolves a game item to its blueprint product, the identity of a stock-backed Materialbörse
+   * item offer (REQ-MARKET-014, ADR-0108).
+   *
+   * <p>Of the active blueprints producing the item, the lowest normalized product key is chosen, so
+   * the result is deterministic and equals that of a free-stated offer for the same item.
    *
    * @param gameItemId the game item to resolve, or {@code null}
-   * @return the resolved blueprint product for that game item, or empty if the id is {@code null}
-   *     or the game item is not produced by any active blueprint
+   * @return the resolved product, or empty if the id is {@code null} or no active blueprint
+   *     produces the item
    */
   @NotNull
   public Optional<ResolvedProduct> resolveByGameItem(@Nullable UUID gameItemId) {
@@ -159,28 +144,20 @@ public class BlueprintProductService {
         .filter(name -> name != null && !name.isBlank())
         .map(normalizer::normalize)
         .filter(key -> !key.isEmpty())
-        // Sort the candidate product keys so the pick is deterministic when several active
-        // blueprints produce this game item (findByOutputItemId has no ORDER BY); the lowest key
-        // keeps the derived identity stable across runs.
         .sorted()
         .findFirst()
         .flatMap(this::resolveByProductKey);
   }
 
   /**
-   * Resolves a normalized product key to the recipe graph of a representative SC Wiki recipe for
-   * the Personal Inventory blueprint view (#327): the build slots with their ingredients and
-   * per-quality stat modifiers, plus the count of recipe variants collapsing into the product.
-   * Returns empty for a blank key or one that no active recipe produces.
+   * Resolves a normalized product key to the recipe graph of its representative recipe: build slots
+   * with ingredients and per-quality stat modifiers, plus the variant count.
    *
-   * <p>Resolution mirrors the product grouping used by {@link #searchProducts}: active recipes are
-   * grouped by the {@link BlueprintNameNormalizer}-normalized output name; the first recipe (in the
-   * deterministic scan order of {@code findActiveIdNameRows}) of the matching group is the
-   * representative whose graph is mapped. The mapping touches the lazy recipe collections, so the
-   * call must run inside the read transaction this service declares.
+   * <p>The representative is the first recipe of the group in {@code findActiveIdNameRows} order.
+   * Must run inside this service's read transaction.
    *
    * @param productKey normalized product key (see {@link BlueprintNameNormalizer})
-   * @return the representative recipe view, or empty if the key is blank or unknown
+   * @return the recipe view, or empty if the key is blank or unknown
    */
   @NotNull
   public Optional<PersonalBlueprintRecipeResponse> resolveRecipe(@Nullable String productKey) {
@@ -216,17 +193,12 @@ public class BlueprintProductService {
   }
 
   /**
-   * Resolves a batch of normalized product keys to their representative recipe entities in one
-   * pass, for the blueprint craftability calculation (#781). Mirrors {@link #resolveRecipe(String)}
-   * but scans the active master once for the whole set: the first recipe (in the deterministic
-   * {@code findActiveIdNameRows} order) of each matching group is the representative — the
-   * <em>same</em> recipe {@code resolveRecipe} picks, so a craftability overlay aligns
-   * index-for-index with the recipe view. The returned entities are managed; the caller must touch
-   * their lazy recipe collections inside this service's read transaction.
+   * Resolves product keys to their representative recipe entities in one pass, picking the same
+   * recipe as {@link #resolveRecipe(String)}. The entities are managed; their lazy collections must
+   * be read inside this service's read transaction.
    *
-   * @param productKeys the normalized product keys to resolve (blank/null entries are ignored)
-   * @return a map from product key to its representative {@link Blueprint}; keys with no active
-   *     recipe are absent
+   * @param productKeys the normalized product keys (blank/null entries are ignored)
+   * @return product key to representative {@link Blueprint}; keys with no active recipe are absent
    */
   @NotNull
   public Map<String, Blueprint> resolveRepresentativeBlueprints(
@@ -283,23 +255,13 @@ public class BlueprintProductService {
   }
 
   /**
-   * Builds the index from a blueprint's structural key (lower-cased, trimmed {@code scwiki_key}) to
-   * its normalized {@code product_key}, over every active recipe. Backs the scmdb.net import's
-   * high-confidence <em>tag match</em> (REQ-INV-019): an scmdb.net export entry carries the
-   * DataForge blueprint key under {@code tag}, which equals a blueprint's {@code scwiki_key}, so
-   * the import can resolve it straight to the owned product — bypassing the name chain and the
-   * CIG-mislabel pitfalls the name match has to correct for (REQ-INV-047).
+   * Builds the index from lower-cased {@code scwiki_key} to normalized {@code product_key} over
+   * every active recipe, backing the scmdb.net import's tag match (REQ-INV-019).
    *
-   * <p>The key is lower-cased because the two sources spell the same DataForge identifier with
-   * different casing (the Wiki keeps CamelCase like {@code BP_CRAFT_AMRS_LaserCannon_S1}; scmdb.net
-   * lower-cases it). A structural key that maps to two <em>different</em> product keys (a duplicate
-   * {@code scwiki_key} across recipes with diverging output names — possible because {@code
-   * scwiki_key} is not UNIQUE) is <strong>excluded</strong> rather than resolved to an arbitrary
-   * one, so the tag match only ever fires when unambiguous and the import falls back to the name
-   * chain for that entry.
+   * <p>A structural key that maps to two different product keys is excluded.
    *
-   * @return structural key (lower-cased {@code scwiki_key}) → normalized {@code product_key}, with
-   *     ambiguous keys removed; never {@code null}
+   * @return lower-cased {@code scwiki_key} to {@code product_key}, ambiguous keys removed; never
+   *     {@code null}
    */
   @NotNull
   public Map<String, String> scwikiKeyToProductKeyIndex() {
@@ -327,9 +289,8 @@ public class BlueprintProductService {
   }
 
   /**
-   * Loads the active blueprint rows matching {@code q} and groups them by normalized product key,
-   * preserving first-seen order. Each group records the first display name, the recipe count, and
-   * the first non-null example key / manufacturer / output-item id.
+   * Loads the active blueprint rows matching {@code q} and groups them by normalized product key in
+   * first-seen order.
    *
    * @param q case-insensitive output-name substring ({@code ""} = no filter)
    * @return product accumulators keyed by normalized product key

@@ -33,11 +33,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-/**
- * Bean Validation contract tests for the personal inventory write DTOs. Failures here would
- * silently allow malformed payloads through the {@code @Valid}-annotated controller methods – treat
- * any new failure as a regression.
- */
+/** Bean Validation contract tests for the personal inventory write DTOs. */
 class PersonalInventoryItemRequestValidationTest {
 
   private static ValidatorFactory factory;
@@ -58,12 +54,10 @@ class PersonalInventoryItemRequestValidationTest {
 
   @Test
   void validCreateRequestShouldHaveNoViolations() {
-    // Given
     PersonalInventoryItemCreateRequest req =
         new PersonalInventoryItemCreateRequest(
             "Medkit", "first aid", 42, PersonalInventoryLocationType.CITY, 3);
 
-    // When / Then
     assertTrue(validator.validate(req).isEmpty());
   }
 

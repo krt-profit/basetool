@@ -36,20 +36,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies REQ-UI-016: the price-overview matrix filters (material / system multi-selects,
- * has-loading-dock, is-auto-load) are persisted per browser in {@code localStorage} and restored on
- * the next page load — the shipped defect was that every reload reset the whole selection.
+ * E2E check of REQ-UI-016: the price-overview matrix filters persist in {@code localStorage} and
+ * are restored on reload, before the first {@code /materials/overview/data} request.
  *
- * <p>The test sets both boolean filters (always server-rendered, so this part is data-independent
- * and runs on an ephemeral stack with no seeded UEX data), additionally narrows the material
- * multi-select to a subset where the catalogue offers more than one material, reloads, and asserts
- * the widgets come back restored. It also asserts the restored selection is applied to the
- * <em>initial</em> {@code /materials/overview/data} request after the reload — restore must happen
- * before the first fetch, not as a cosmetic widget update after an unfiltered load.
- *
- * <p>Read-only and target-agnostic: it navigates, toggles client-side filter widgets and asserts,
- * mutating no server state, so it is safe against a shared deployment. The actor is {@code
- * test-admin}, who may open the trade pages.
+ * <p>Read-only, so it is safe against a shared deployment.
  */
 @Tag("e2e")
 class MaterialsOverviewFilterPersistenceE2eTest {
@@ -101,33 +91,21 @@ class MaterialsOverviewFilterPersistenceE2eTest {
         assertThat(page.locator("#tableContainer"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
 
-        // Decide up front whether the material multi-select can be narrowed to a subset: with
-        // fewer than two options an uncheck would leave zero checked, which the query builder
-        // (and the stored preference) deliberately treats as "no filter" again.
         boolean narrowMaterials = page.locator("input.matCheck").count() > 1;
 
-        // Change the filters inside the waitForResponse window so the debounced refetch they
-        // trigger is provably consumed here and cannot bleed into the post-reload assertion.
         page.waitForResponse(
             response -> isFilteredDataUrl(response.url()),
             () -> {
               page.locator("#filterLoadingDock").check();
               page.locator("#filterAutoLoad").check();
               if (narrowMaterials) {
-                // Open the dropdown (the option checkboxes are hidden until it is open) and
-                // exclude the first material, turning the dimension into a persisted subset.
                 page.locator("#materialHeader").click();
                 page.locator("input.matCheck").first().uncheck();
               }
             });
 
-        // Drain any second debounced dispatch (200 ms debounce per change) so every pre-reload
-        // data request has been issued before the reload's request-observation window opens —
-        // otherwise a straggler carrying the same parameters could satisfy the assertion below
-        // without the restore-before-fetch path ever running.
         page.waitForTimeout(500);
 
-        // Reload and require the *initial* data request to already carry the restored selection.
         Request initialFetch =
             page.waitForRequest(
                 request -> isFilteredDataUrl(request.url()),
@@ -140,8 +118,6 @@ class MaterialsOverviewFilterPersistenceE2eTest {
                   + initialFetch.url());
         }
 
-        // The widgets themselves are restored (checked-state assertions work on the closed,
-        // hidden dropdown options — they read the DOM property, not visibility).
         assertThat(page.locator("#filterLoadingDock")).isChecked();
         assertThat(page.locator("#filterAutoLoad")).isChecked();
         if (narrowMaterials) {

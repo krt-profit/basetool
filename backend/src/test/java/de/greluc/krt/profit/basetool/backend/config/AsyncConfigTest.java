@@ -83,18 +83,11 @@ class AsyncConfigTest {
 
   @Test
   void uexExecutorBeanName_isStableConstant() {
-    // The constant is referenced from @Async(AsyncConfig.UEX_EXECUTOR) on UexScheduler;
-    // changing it silently would break that wiring at runtime, not at compile time.
     assertEquals("uexExecutor", AsyncConfig.UEX_EXECUTOR);
   }
 
   @Test
   void uexExecutor_propagatesMdcFromSubmittingThreadToWorker() throws InterruptedException {
-    // Regression anchor: classic ThreadLocals (including SLF4J's MDC) are not copied across
-    // thread boundaries by default. A @Async-dispatched UEX-sync task picks a worker thread from
-    // this pool that never ran the request filter chain, so the log lines on that worker would
-    // emit empty correlationId / userId / orgUnitId. The MdcPropagatingTaskDecorator restores the
-    // submitting thread's MDC snapshot on the worker before the runnable runs.
     Executor executor = config.uexExecutor();
     created = (ThreadPoolTaskExecutor) executor;
 
@@ -131,27 +124,18 @@ class AsyncConfigTest {
 
   @Test
   void uexExecutor_clearsMdcAfterTask_noBleedAcrossSubmissions() throws InterruptedException {
-    // The decorator must MDC.clear() in its finally block so two consecutive tasks on the same
-    // pool thread cannot inherit each other's correlation ids. A missing clear here would silently
-    // tag the second submission with the first submission's correlationId — exactly the kind of
-    // audit-trail confusion the original UEX-MDC bleed surfaced.
     Executor executor = config.uexExecutor();
     created = (ThreadPoolTaskExecutor) executor;
 
-    // First submission carries an MDC value.
     MDC.put("correlationId", "first-id");
     CountDownLatch firstDone = new CountDownLatch(1);
     executor.execute(
         () -> {
-          // capture happens but we don't care about the value; what matters is that the worker
-          // cleared MDC before returning to the pool.
           firstDone.countDown();
         });
     assertEquals(true, firstDone.await(5, TimeUnit.SECONDS));
     MDC.clear();
 
-    // Second submission has NO MDC on the submitting thread; if the previous task did not clear
-    // MDC on the worker, this task would observe "first-id".
     AtomicReference<String> leakedCorrelation = new AtomicReference<>("never-written");
     CountDownLatch secondDone = new CountDownLatch(1);
     executor.execute(

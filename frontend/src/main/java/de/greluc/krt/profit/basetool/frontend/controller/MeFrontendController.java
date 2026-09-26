@@ -36,20 +36,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.view.RedirectView;
 
 /**
- * Owner of the per-user "active OrgUnit" preference (admin and non-admin alike). The state lives in
- * the frontend's Redis-backed Spring Session — NOT in the backend — because backend REST calls
- * relay only the OAuth2 bearer token and no session cookies, so a backend-side {@code
- * HttpSession.setAttribute} would be lost as soon as the response returned. The active OrgUnit is
- * propagated to the backend on every API call via the {@code X-Active-Org-Unit-Id} request header
- * (see {@code ActiveSquadronRelayFilter} on the frontend and {@link
- * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#ACTIVE_ORG_UNIT_HEADER} on the
- * backend); the backend honours the pinned id only when it matches one of the caller's actual
- * memberships (non-admin path) or is set by an admin (admin path).
- *
- * <p>Class-level gate is {@code isAuthenticated()} since R5.e widened the switcher to every
- * authenticated user with &gt;1 membership. The backend independently re-validates the pin against
- * the caller's actual memberships, so a spoofed POST cannot make a single-Staffel user appear to
- * pin an OrgUnit they do not belong to.
+ * Manages the caller's active OrgUnit, stored in the frontend session and relayed to the backend as
+ * the {@code X-Active-Org-Unit-Id} header. The backend re-validates the pin against the caller's
+ * memberships.
  */
 @Controller
 @UsesLayoutModel
@@ -59,36 +48,17 @@ import org.springframework.web.servlet.view.RedirectView;
 public class MeFrontendController {
 
   /**
-   * HTTP session attribute name under which the caller's currently selected OrgUnit lives. Mirrored
-   * on the backend's {@link de.greluc.krt.profit.basetool.backend.service.OwnerScopeService} via
-   * the {@code X-Active-Org-Unit-Id} request header set by the {@code ActiveSquadronRelayFilter};
-   * the actual storage is the frontend's Spring Session (Redis-backed in dev/prod), NOT the
-   * backend's request-scoped session.
+   * Frontend session attribute holding the caller's active OrgUnit id, relayed to the backend as
+   * {@code X-Active-Org-Unit-Id}.
    */
   public static final String ACTIVE_ORG_UNIT_SESSION_KEY = "iridium.activeOrgUnitId";
 
   /**
-   * Sets or clears the caller's active OrgUnit selection in the frontend session. {@code orgUnitId}
-   * blank/empty clears the selection (admin returns to "all OrgUnits" mode; non-admin returns to
-   * "union of memberships"); a non-blank UUID activates that OrgUnit. The redirect makes the next
-   * page render see the new context; the backend learns about the change on the next API call
-   * through the {@code X-Active-Org-Unit-Id} header.
-   *
-   * <p>The frontend does not validate that the picked OrgUnit is actually one of the caller's
-   * memberships — the backend's {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#currentScopePredicate()}
-   * re-validates the pin against the membership union and silently falls back to the union read if
-   * the pin is foreign. Defence in depth against a spoofed POST.
-   *
-   * <p>{@code orgUnitId} is bound as a {@link UUID}, so a value that is not one is a {@code 400}
-   * from Spring's type conversion instead of the {@code 500} an unguarded {@code UUID.fromString}
-   * used to produce. {@code _referer} is honoured only when it is a same-origin path — see {@link
-   * #safeRedirectTarget(String)} — because the redirect is the one place a crafted form could send
-   * a signed-in user off-site (FE-SEC-02).
+   * Sets the caller's active OrgUnit, or clears it for a blank id, and redirects back.
    *
    * @param orgUnitId the OrgUnit to activate, {@code null} (absent or blank) to clear.
-   * @param referer optional referer field used to redirect back; anything but a same-origin path
-   *     falls back to {@code /}.
+   * @param referer optional redirect target; anything but a same-origin path falls back to {@code
+   *     /}.
    * @param request HTTP request injected by Spring; never {@code null}.
    * @param redirectAttributes flash attribute carrier for the success toast.
    * @return redirect view to the referring page so the next render sees the new context.
@@ -104,13 +74,10 @@ public class MeFrontendController {
   }
 
   /**
-   * Returns {@code referer} when it is a path on this origin, otherwise {@code /}.
+   * Returns {@code referer} when it is a same-origin path, otherwise {@code /}.
    *
-   * <p>Accepted is a path with exactly one leading {@code /}. Everything else falls back: an
-   * absolute URL ({@code https://evil}), a scheme ({@code javascript:x}), a protocol-relative
-   * {@code //evil}, and {@code /\evil} — browsers read a backslash after the leading slash as a
-   * second slash, which makes it protocol-relative too. A control character anywhere falls back as
-   * well, so a line break can never reach the {@code Location} header.
+   * <p>Only a path with exactly one leading {@code /}, not followed by a backslash and free of
+   * control characters, is accepted.
    *
    * @param referer the raw {@code _referer} form field, may be {@code null}
    * @return {@code referer} when it is a same-origin path, otherwise {@code "/"}
@@ -132,13 +99,11 @@ public class MeFrontendController {
   }
 
   /**
-   * Implementation backing {@link #setActiveOrgUnit}. Writes the chosen OrgUnit id to {@link
-   * #ACTIVE_ORG_UNIT_SESSION_KEY} on the frontend session (or clears it on blank input) and emits
-   * the {@code orgUnit.switcher.activated} / {@code orgUnit.switcher.cleared} flash toast.
+   * Stores or clears the active OrgUnit in {@link #ACTIVE_ORG_UNIT_SESSION_KEY} and adds the
+   * matching flash toast.
    *
    * @param orgUnitId the OrgUnit id to activate, {@code null} to clear.
-   * @param referer optional referer field used to redirect back; validated by {@link
-   *     #safeRedirectTarget(String)}.
+   * @param referer optional redirect target, validated by {@link #safeRedirectTarget(String)}.
    * @param request HTTP request injected by Spring.
    * @param redirectAttributes flash attribute carrier for the success toast.
    * @return redirect view to the referring page, or to {@code /} when it is not a same-origin path.
@@ -154,12 +119,6 @@ public class MeFrontendController {
       session.removeAttribute(ACTIVE_ORG_UNIT_SESSION_KEY);
       redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.cleared");
     } else {
-      // Store as the UUID's canonical string form so the Redis-backed Spring Session can
-      // round-trip the value without serializer ambiguity. Spring Session's default
-      // JdkSerializationRedisSerializer plus the JSON wrapper in some configurations can
-      // change a UUID instance into a String on deserialization — storing the String
-      // representation up front avoids that brittleness and matches how the readers parse
-      // it back.
       session.setAttribute(ACTIVE_ORG_UNIT_SESSION_KEY, orgUnitId.toString());
       redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.activated");
     }

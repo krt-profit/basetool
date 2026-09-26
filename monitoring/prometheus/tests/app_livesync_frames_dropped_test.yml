@@ -1,20 +1,9 @@
-# promtool unit tests for AppLiveSyncFramesDropped (BE-PERF-13, ADR-0143 amendment, REQ-OBS-011).
-#
-# The backend writes app live-sync frames off the publishing thread through a bounded per-stream
-# queue; a frame offered to a full queue is dropped and counted. The rule must stay silent for the
-# healthy zero and for a one-off stall, and fire for a sustained stream of drops.
-#
-# Run locally (no promtool on the host - use an ephemeral container, see monitoring/README.md):
-#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 test rules tests/app_livesync_frames_dropped_test.yml
-
 rule_files:
   - ../alerts/business.yml
 
 evaluation_interval: 1m
 
 tests:
-  # Micrometer creates the counter on the first drop, so the healthy state has no series at all.
   - name: silent - streams open, nothing ever dropped
     interval: 1m
     input_series:
@@ -25,7 +14,6 @@ tests:
         alertname: AppLiveSyncFramesDropped
         exp_alerts: []
 
-  # One phone stalled on a busy room for a moment: two drops, then nothing.
   - name: silent - a one-off stall drops two frames
     interval: 1m
     input_series:
@@ -36,7 +24,6 @@ tests:
         alertname: AppLiveSyncFramesDropped
         exp_alerts: []
 
-  # A subscriber population that keeps falling behind: one drop a minute for an hour and a half.
   - name: fires - drops keep arriving
     interval: 1m
     input_series:

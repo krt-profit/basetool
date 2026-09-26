@@ -50,18 +50,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the AJAX {@code DELETE /orders/{id}/assignees/{userId}} unenroll path in {@link
- * JobOrderWriteController#removeAssignee}. Since the Bearbeiter section moved to AJAX, the endpoint
- * no longer redirects with a flash toast — it re-renders the {@code orders-detail ::
- * assigneesSection} fragment and the page JS swaps it in place. The tests assert:
- *
- * <ul>
- *   <li>A Logistician removing an assignee gets the re-rendered fragment (HTTP 200).
- *   <li>A plain member may also call the endpoint ({@code isAuthenticated()}); the backend owns the
- *       per-entry authorization.
- *   <li>A backend failure is relayed as the matching HTTP status (here 500), so the page JS can
- *       surface an error toast.
- * </ul>
+ * MVC tests for the AJAX unenroll endpoint {@link JobOrderWriteController#removeAssignee}: it
+ * returns the re-rendered assignees fragment to logisticians and plain members, and relays backend
+ * failures with their status.
  */
 @SpringBootTest
 class JobOrderPageControllerRemoveAssigneeMvcTest {
@@ -123,8 +114,6 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
 
     verify(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class));
-    // BE-PERF-05: the re-rendered section reads no user list (the picker searches on demand,
-    // #1193), so a Logistician's assignee mutation no longer pulls up to 1000 users.
     verify(backendApiClient, never()).get(startsWith("/api/v1/users?"), any(Class.class));
     verify(backendApiClient, never())
         .get(startsWith("/api/v1/users?"), any(ParameterizedTypeReference.class));
@@ -140,8 +129,6 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
             eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class)))
         .thenReturn(orderWithNoAssignees(orderId));
 
-    // The frontend endpoint only requires isAuthenticated(); the backend owns the per-entry
-    // self-or-logistician rule and would return 403 there if violated.
     mockMvc
         .perform(delete("/orders/" + orderId + "/assignees/" + userId).with(csrf()))
         .andExpect(status().isOk())

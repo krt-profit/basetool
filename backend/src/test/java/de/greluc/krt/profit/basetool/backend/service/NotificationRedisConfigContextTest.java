@@ -34,27 +34,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-/**
- * Context-wiring guard for {@link NotificationRedisConfig} with the Redis fan-out <b>enabled</b>.
- *
- * <p>The fan-out is off by default, so the plain unit tests ({@code RedisNotificationFanoutTest})
- * never instantiate the {@link RedisMessageListenerContainer} bean — which is exactly how a wiring
- * regression shipped: the container's dispatch-executor parameter was injected by type, but the
- * backend context holds several {@link ThreadPoolTaskExecutor} beans (the async
- * uex/scWiki/import/notification/mail executors), so an un-qualified inject failed with {@code
- * NoUniqueBeanDefinitionException} and the backend crashed on startup <em>only</em> in the
- * fan-out-enabled deployments (prod, and the e2e stack, which default it {@code true}). This test
- * reproduces that multi-executor context with the fan-out enabled and asserts the container wires,
- * so the bug cannot return without a red unit test rather than a 45-minute e2e timeout.
- */
+/** Context-wiring tests for {@link NotificationRedisConfig} with the Redis fan-out enabled. */
 class NotificationRedisConfigContextTest {
 
   /**
-   * Loads the config with {@code enabled=true} and two decoy {@link ThreadPoolTaskExecutor} beans
-   * (on top of the config's own {@code notificationRedisListenerExecutor}), reproducing the
-   * ambiguous-by-type situation, and asserts the context starts and the container bean exists.
-   * Fails with an ambiguity {@code UnsatisfiedDependencyException} if the {@code @Qualifier} on the
-   * container's executor parameter is removed.
+   * The listener container wires despite several {@link ThreadPoolTaskExecutor} beans, relying on
+   * the {@code @Qualifier} of its executor parameter.
    */
   @Test
   void listenerContainerWires_whenFanoutEnabled_despiteMultipleExecutorBeans() {
@@ -67,12 +52,8 @@ class NotificationRedisConfigContextTest {
             NotificationFanoutProperties.class,
             () -> new NotificationFanoutProperties(true, "basetool:notify:published"))
         .withBean(RedisConnectionFactory.class, () -> mock(RedisConnectionFactory.class))
-        // Decoy executors: the real backend context holds five async ThreadPoolTaskExecutor beans,
-        // so the container's executor inject is ambiguous by type — the exact multi-bean situation.
         .withBean("uexExecutor", ThreadPoolTaskExecutor.class, ThreadPoolTaskExecutor::new)
         .withBean("mailExecutor", ThreadPoolTaskExecutor.class, ThreadPoolTaskExecutor::new)
-        // Keep the container from opening a real Redis subscription at lifecycle start against the
-        // mock connection factory — the bean wiring, not the connection, is what this guards.
         .withBean(
             "noAutoStart", BeanPostProcessor.class, NotificationRedisConfigContextTest::noAutoStart)
         .withUserConfiguration(NotificationRedisConfig.class)
@@ -103,18 +84,8 @@ class NotificationRedisConfigContextTest {
   }
 
   /**
-   * Loads the same enabled configuration against a Redis that refuses every connection, with
-   * auto-start left ON, and asserts the context still comes up with the fan-out bean present.
-   *
-   * <p>This is the 2026-09-02 07:07:09Z outage as a test. The container subscribes during context
-   * refresh; upstream rethrows the connection failure out of {@code SmartLifecycle#start()}, and
-   * Spring turns that into {@code ApplicationContextException: Failed to start bean …} — the whole
-   * backend crash-looping because an <em>optional</em> fan-out could not reach an optional
-   * dependency. The {@code noAutoStart} post-processor of the test above deliberately hides exactly
-   * this, which is why the outage shipped with that test green.
-   *
-   * <p>The second assertion is what stops the cheap fix: disabling the container would satisfy
-   * "context starts" while silently ending cross-instance notification delivery for good.
+   * The context starts, with the fan-out bean present and auto-start on, against a Redis that
+   * refuses every connection.
    */
   @Test
   void contextStarts_whenRedisRefusesTheSubscription() {

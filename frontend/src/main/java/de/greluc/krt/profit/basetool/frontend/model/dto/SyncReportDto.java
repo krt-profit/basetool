@@ -23,13 +23,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code SyncReportDto}. Lives in the frontend module so {@code
- * AdminSyncReportsPageController} can deserialise the REST response without depending on the
- * backend module.
- *
- * <p>Fields and types must stay in lockstep with {@code
- * de.greluc.krt.profit.basetool.backend.model.dto.SyncReportDto} — any backend change requires a
- * matching change here in the same commit (mirror-DTO rule).
+ * Frontend mirror of the backend {@code SyncReportDto}, read by {@code
+ * AdminSyncReportsPageController}; must match it field for field.
  *
  * @param id event id
  * @param runId run id grouping a sync cycle's events

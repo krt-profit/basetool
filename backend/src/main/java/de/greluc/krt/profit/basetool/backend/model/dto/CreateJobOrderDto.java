@@ -27,21 +27,14 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying Create / Update Job Order payload.
- *
- * <p>Two org-unit references:
+ * Create / update payload for a material job order.
  *
  * <ul>
- *   <li>{@code responsibleOrgUnitId} — the org unit that <em>processes</em> the order. Required,
- *       and must be a profit-eligible squadron or Spezialkommando; the service returns 400
- *       otherwise. Creating an order requires a login (ADR-0149), so there is one rule rather than
- *       the two this field used to carry — the forgiving guest path that routed an anonymous
- *       request onto a configured intake Spezialkommando went with the public request form. Ignored
- *       on update — the responsible org unit is only changed through the dedicated reassignment
- *       endpoint ({@code PATCH /api/v1/orders/{id}/responsible-org-unit}).
- *   <li>{@code requestingOrgUnitId} — the org unit the order is placed on behalf of (the customer).
- *       Any squadron or Spezialkommando, no profit-eligibility restriction. Mandatory; the service
- *       returns 400 when it does not resolve.
+ *   <li>{@code responsibleOrgUnitId} — the processing org unit; required and profit-eligible,
+ *       otherwise 400. Ignored on update; changed only via {@code PATCH
+ *       /api/v1/orders/{id}/responsible-org-unit}.
+ *   <li>{@code requestingOrgUnitId} — the customer org unit; any squadron or Spezialkommando;
+ *       mandatory.
  *   <li>{@code comment} — optional free-text note (≤1000 chars), HTML-escaped on display.
  * </ul>
  */

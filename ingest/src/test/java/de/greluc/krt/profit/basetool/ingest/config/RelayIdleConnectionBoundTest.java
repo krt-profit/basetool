@@ -26,20 +26,8 @@ import org.apache.coyote.http11.Http11NioProtocol;
 import org.junit.jupiter.api.Test;
 
 /**
- * The gateway must drop an idle backend connection before the backend does (ING-PERF-01, ADR-0204).
- *
- * <p>The reactive client this replaced pooled connections with no idle eviction at all, so a
- * connection the backend had already closed could be handed to the next relay — a {@code POST},
- * which nothing retries. The JDK client closes an idle HTTP/1.1 connection after {@code
- * jdk.httpclient.keepalive.timeout} (30&nbsp;s unless the property is set); the backend's embedded
- * Tomcat closes it after its HTTP/1.1 keep-alive, which the backend never configures and which
- * therefore is Tomcat's default. The relay is pinned to HTTP/1.1, so that is the pair that matters.
- *
- * <p>Tomcat's side is read off the protocol class <b>on the classpath</b> rather than typed in, so
- * a Tomcat upgrade that lowers the default fails here instead of in production; the ingest and the
- * backend resolve Tomcat through the same Spring Boot BOM. The margin mirrors the frontend's {@code
- * WebClientBackendPoolIdleBoundTest}: equal bounds are a collision, not an alignment, because the
- * two clocks start at different moments.
+ * The gateway's idle timeout for backend connections is shorter than the backend Tomcat's HTTP/1.1
+ * keep-alive, read from the Tomcat protocol class on the classpath, with a margin (ADR-0204).
  */
 class RelayIdleConnectionBoundTest {
 

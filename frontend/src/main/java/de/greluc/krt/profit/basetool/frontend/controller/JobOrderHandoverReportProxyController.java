@@ -74,8 +74,6 @@ public class JobOrderHandoverReportProxyController {
               .uri("/api/v1/orders/" + jobOrderId + "/handovers/" + handoverId + "/report")
               .headers(
                   h -> {
-                    // Forward the user's IANA time zone to the backend so the PDF renders the
-                    // handover date/time in the user's local zone (not the backend server's zone).
                     if (userTimeZone != null && !userTimeZone.isBlank()) {
                       h.set("X-User-Time-Zone", userTimeZone);
                     }
@@ -104,13 +102,11 @@ public class JobOrderHandoverReportProxyController {
   }
 
   /**
-   * Proxies the download of a persisted item-handover report PDF to the backend. Item orders use
-   * their own delivery-note endpoint ({@code /item-handovers/{id}/report}); the material variant
-   * above stays on {@code /handovers/{id}/report}.
+   * Proxies the download of a persisted item-handover report PDF to the backend.
    *
    * @param jobOrderId the job order UUID
    * @param handoverId the item-handover UUID
-   * @param userTimeZone the caller's IANA time zone, forwarded so the PDF renders local times
+   * @param userTimeZone the caller's IANA time zone, so the PDF renders local times
    * @return the PDF as a byte array with appropriate headers
    */
   @GetMapping("/{jobOrderId}/item-handovers/{handoverId}/report")

@@ -62,7 +62,7 @@ public class ShipTypeService {
   }
 
   /**
-   * Returns the ship type.
+   * Returns the ship type with the given id (cached).
    *
    * @param id ship type primary key
    * @return the ship type

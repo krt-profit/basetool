@@ -47,15 +47,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Spring MVC controller for the unified admin audit-log page ({@code /admin/audit-log},
- * REQ-AUDIT-001, ADR-0037). One page, a nine-way tab switcher: the existing bank trail plus the
- * eight generic areas (Lager / Aufträge / Raffinerie / Mein Inventar / Missionen / Operationen /
- * Rollen / Beförderung). The bank tab reads the existing {@code /api/v1/bank/admin/audit} endpoint,
- * the others read {@code /api/v1/audit/{domain}}; both DTO shapes are adapted into the uniform
- * {@link AuditRowView} so a single template renders every tab.
- *
- * <p>Admin-only — the class-level {@code @PreAuthorize} matches the backend's admin URL gates;
- * filtering and paging swap in place via {@code krtFetch} (epic #571 pattern).
+ * Controller for the admin-only unified audit-log page ({@code /admin/audit-log}, REQ-AUDIT-001,
+ * ADR-0037), with one tab for the bank trail and one per generic audit area. Both row shapes are
+ * adapted to {@link AuditRowView}.
  */
 @Controller
 @UsesLayoutModel
@@ -83,19 +77,9 @@ public class AdminAuditLogPageController {
   private static final String GENERIC_EVENT_PREFIX = "admin.audit.event.";
 
   /**
-   * The originating-client values the generic trail can hold (REQ-AUDIT-005), in filter order.
-   *
-   * <p>Mirrors the backend's bounded vocabulary — the two first-party clients of {@code
-   * app.monitoring.api-clients.known-client-ids} plus the {@code other} / {@code none} buckets that
-   * {@code ClientAttribution} collapses everything else into. Hardcoded here for the same reason
-   * {@link #EVENT_TYPES_BY_DOMAIN} is: the frontend holds no backend beans, and a filter list is
-   * only useful if it is fixed enough to render as a {@code <select>}. A deployment that renames
-   * its Keycloak clients through that property must extend this list, or the trail will record a
-   * client the viewer cannot filter for.
-   *
-   * <p>The list is the same on <em>every</em> tab, the bank included: both trails record the value
-   * through one {@code ClientAttribution} seam, so a filter that meant something different per tab
-   * would be a bug rather than a feature.
+   * The originating-client values the audit filter offers (REQ-AUDIT-005), in filter order: the two
+   * first-party clients plus {@code other} and {@code none}. Must match the backend's known client
+   * ids.
    */
   private static final List<String> CLIENT_IDS =
       List.of("basetool-frontend", "basetool-android", "other", "none");
@@ -144,7 +128,6 @@ public class AdminAuditLogPageController {
               "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED",
               "CARTEL_APPROVAL_TIERS_SET",
               "CARTEL_APPROVAL_TIERS_CLEARED",
-              // The one bank event that records a mutation of the trail itself (REQ-SEC-062).
               "HANDLE_SNAPSHOTS_ANONYMISED"),
           "INVENTORY",
           List.of(
@@ -279,9 +262,6 @@ public class AdminAuditLogPageController {
               "KOMMANDO_GROUP_DELETED",
               "USER_DELETED",
               "USER_MERGED",
-              // Data-protection events (REQ-SEC-058/060/061/062). They sit on the ROLE tab because
-              // that is where the member lifecycle already lives; each names the member as its
-              // target, so filtering the tab by actor or by type finds them.
               "ACCOUNT_DELETION_REQUESTED",
               "ACCOUNT_DELETION_REQUEST_WITHDRAWN",
               "ACCOUNT_DELETION_REQUEST_DECLINED",
@@ -343,14 +323,9 @@ public class AdminAuditLogPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the paged, filterable unified audit-log viewer for one selected area tab.
-   *
-   * <p>Every filter that ends up in the relayed backend URI is bound or narrowed to something that
-   * cannot express URI syntax (REQ-SEC-051): the period as instants and the actor as a {@link UUID}
-   * — both matching the backend's own {@code AuditAdminController} signature — and the two
-   * vocabulary filters against the very lists this page renders as {@code <select>} options. An
-   * unknown event type or client id degrades to "no filter", the same way an unknown {@code domain}
-   * already falls back to the default tab.
+   * Renders the paged, filterable audit-log view for one tab. Filters are bound to typed values or
+   * checked against the offered options before entering the backend URI (REQ-SEC-051); unknown
+   * values mean no filter.
    *
    * @param domain the selected tab (one of {@link #DOMAINS}); defaults to and falls back to {@code
    *     BANK}
@@ -358,11 +333,9 @@ public class AdminAuditLogPageController {
    * @param to period end filter, or absent
    * @param actorUserId actor filter (the actor's Keycloak {@code sub}), or absent
    * @param eventType event-type filter; ignored unless it is one of the active tab's own types
-   * @param clientId originating-client filter (REQ-AUDIT-005); ignored unless it is one of {@link
-   *     #CLIENT_IDS}
+   * @param clientId originating-client filter; ignored unless it is one of {@link #CLIENT_IDS}
    * @param page zero-based page index
-   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
-   *     in-place AJAX swap; otherwise the full page
+   * @param fragment {@code "results"} to render only the results fragment; otherwise the full page
    * @param model Thymeleaf model
    * @return the {@code admin/audit-log} view name, or its {@code auditResults} fragment selector
    */

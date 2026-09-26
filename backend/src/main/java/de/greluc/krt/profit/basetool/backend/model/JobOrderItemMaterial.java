@@ -38,12 +38,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * One material requirement of a single {@link JobOrderItem} line, snapshotted from the chosen
- * blueprint at order-creation time so the order stays stable even if the wiki/blueprint data later
- * changes. {@link #requiredQuantity} is a raw number whose unit is interpreted from the linked
- * {@link Material#getQuantityType()} (SCU fractional vs PIECE whole-number) — the unit is never
- * stored here. {@link #qualityRequirement} captures the requester's per-order Gut/Keine choice.
- * Aggregation for the detail view groups these rows by {@code (material, qualityRequirement)}.
+ * One material requirement of a {@link JobOrderItem} line, snapshotted from the chosen blueprint at
+ * order creation.
+ *
+ * <p>{@link #requiredQuantity}'s unit comes from {@link Material#getQuantityType()} (SCU or PIECE);
+ * {@link #qualityRequirement} holds the requester's Gut/Keine choice.
  */
 @Entity
 @Getter

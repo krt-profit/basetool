@@ -33,18 +33,11 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 
 /**
- * Builds a {@link ClientHttpRequestFactory} whose JDK {@link HttpClient} pins its trust set to a
- * named Spring SSL bundle's truststore — used by the resource-server JWKS decoder so an opt-in
- * internal-Keycloak key fetch validates the self-signed {@code https://keycloak:18443} certificate
- * (REQ-SEC-024). Module-local twin of the backend's helper of the same name: the ingest gateway is
- * a separate Gradle module and cannot depend on backend classes, so the ~20 lines of TLS wiring are
- * intentionally duplicated rather than shared through a new module.
+ * Builds a {@link ClientHttpRequestFactory} whose JDK {@link HttpClient} trusts only a named SSL
+ * bundle's truststore, for the JWKS fetch from an internal Keycloak (REQ-SEC-024).
  *
- * <p>Hostname verification is intentionally left at the JDK default ({@code HTTPS}) — the
- * synchronous JDK {@link HttpClient} cannot disable it reliably per-client, so the pinned
- * certificate MUST carry {@code dns:keycloak} in its SAN. Returning {@code null} when the bundle is
- * absent lets the caller fall back to its default client (the JVM {@code cacerts}), which is what
- * the non-prod profiles need.
+ * <p>Hostname verification stays on, so the pinned certificate must carry {@code dns:keycloak} in
+ * its SAN.
  */
 public final class KeycloakTrustSupport {
 
@@ -55,22 +48,16 @@ public final class KeycloakTrustSupport {
    */
   public static final String KEYCLOAK_TRUST_BUNDLE = "keycloak-trust";
 
-  private KeycloakTrustSupport() {
-    // Utility holder — not instantiable.
-  }
+  private KeycloakTrustSupport() {}
 
   /**
-   * Builds a truststore-pinned {@link ClientHttpRequestFactory} from the named SSL bundle, or
-   * returns {@code null} when no such bundle is registered for the active profile (the caller then
-   * falls back to its default, JVM-trust-store-backed client). The truststore is read once here;
-   * callers are expected to cache the returned factory rather than rebuild it per request.
+   * Builds a truststore-pinned {@link ClientHttpRequestFactory} from the named SSL bundle; callers
+   * should cache the result.
    *
    * @param sslBundles the registered Spring SSL bundles
    * @param bundleName the name of the bundle whose truststore pins the accepted certificate
-   * @return a truststore-pinned request factory, or {@code null} to signal "bundle absent, use the
-   *     default client"
-   * @throws IllegalStateException if the bundle exists but a TLS context cannot be built from it (a
-   *     genuine misconfiguration that must fail fast rather than silently trust nothing)
+   * @return a truststore-pinned request factory, or {@code null} when the bundle is absent
+   * @throws IllegalStateException if the bundle exists but no TLS context can be built from it
    */
   @Nullable
   public static ClientHttpRequestFactory trustedRequestFactory(

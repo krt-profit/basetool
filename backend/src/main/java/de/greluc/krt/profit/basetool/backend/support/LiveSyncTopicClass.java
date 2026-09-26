@@ -27,23 +27,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The topic rooms the app's live-sync bridge admits, and what each one is allowed to carry
- * (ADR-0143).
+ * The topic rooms the app's live-sync bridge admits and the sections each may carry (ADR-0143).
  *
- * <p>This is the backend's half of a registry the frontend also holds ({@code
- * frontend/…/websocket/LiveSyncTopicClass}, ADR-0094). The two are deliberately <em>not</em> shared
- * code — the modules have no dependency on one another — and they are deliberately not independent
- * either: both ends publish onto the same Redis channel with the same payload, so a prefix or a
- * section key that exists on one side and not the other silently strands a screen on the old data.
- * {@code LiveSyncTopicRegistryParityTest} reads the frontend's source and fails the build when this
- * enum names a prefix or section the frontend does not.
- *
- * <p>Only the classes the app actually subscribes to are listed. The frontend's staff-only rooms
- * ({@code bank} without an id, {@code members}, {@code org-structure}) are absent on purpose: the
- * admin area is web-only permanently (app plan Q7), so admitting them here would open a room with
- * no reader.
- *
- * @see LiveSyncTopic the parsed form, which resolves a wire string onto one of these
+ * <p>Must stay in step with the frontend's {@code LiveSyncTopicClass}; {@code
+ * LiveSyncTopicRegistryParityTest} enforces it.
  */
 @RequiredArgsConstructor
 public enum LiveSyncTopicClass {
@@ -174,13 +161,9 @@ public enum LiveSyncTopicClass {
   private final @NotNull LiveSyncAuthorization authorization;
 
   /**
-   * Resolves a wire prefix onto a class.
+   * Resolves a wire prefix and the presence of an id onto a class.
    *
-   * <p>Both the prefix and whether an id is present have to match, which is what keeps the four
-   * colliding stems apart: {@code mission}/{@code missions}, {@code order}/{@code orders}, {@code
-   * refinery-order}/{@code refinery}, and {@code bank} with an id versus without one.
-   *
-   * @param prefix the wire prefix, the part before the first colon
+   * @param prefix the wire prefix before the first colon
    * @param withId whether the topic carried a resource id
    * @return the matching class, or {@code null} if no class admits that combination
    */
@@ -217,10 +200,6 @@ public enum LiveSyncTopicClass {
   /**
    * Returns the section keys a frame on this class may carry.
    *
-   * <p>Anything outside the set is dropped from an incoming frame rather than rejecting it: a newer
-   * peer naming a section this build does not know must not cost the receiver the sections it does
-   * know.
-   *
    * @return the immutable whitelist
    */
   @NotNull
@@ -229,19 +208,10 @@ public enum LiveSyncTopicClass {
   }
 
   /**
-   * Reduces a frame's raw section list to the keys this class admits.
+   * Reduces a frame's raw section list to the admitted keys: bounded by {@link
+   * #MAX_SECTIONS_PER_FRAME}, filtered and de-duplicated in order. Unknown keys are dropped.
    *
-   * <p>Applied on every path a frame can arrive by — a client publish, a peer replica's Redis
-   * message — and in that order: the raw list is first bounded by {@link #MAX_SECTIONS_PER_FRAME}
-   * so a crafted array cannot make the filter itself expensive, then filtered, then de-duplicated
-   * with its order kept so the wire form of one frame is stable.
-   *
-   * <p>Unknown keys are <em>dropped</em>, never fatal. A peer running a newer build naming a
-   * section this one has not heard of must still deliver the sections it does know: the failure
-   * mode of rejecting the frame is a screen that stays stale with nothing logged, which is strictly
-   * worse than refreshing one region too few.
-   *
-   * @param raw the sections as they arrived, untrusted and possibly null-bearing
+   * @param raw the sections as they arrived, untrusted and possibly containing nulls
    * @return the admitted keys, possibly empty
    */
   @NotNull

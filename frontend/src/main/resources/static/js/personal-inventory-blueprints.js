@@ -1,19 +1,3 @@
-/*
- * Personal Inventory — Blueprints sub-page logic (#327, Phase 5).
- *
- * Responsibilities:
- *  - Debounced type-ahead against /personal-inventory/blueprints/search, rendering
- *    products with an "already owned" marker (owned hits are not stageable).
- *  - Multi-select staging: tick several hits into a chip area, keep searching,
- *    then "Add selected" -> POST the staged keys to the batch proxy, toast the
- *    added/skipped counts, and reload to show the new owned rows.
- *  - Open/close KRT-styled edit-note and remove modals (no native confirm()/alert()).
- *
- * Wiring: uses the global `krtEvents.on` delegation helper and `data-trigger="bp-…"`
- * attributes (CSP-nonce-safe, no inline onclick). Translatable strings come from
- * window.krtBlueprintsI18n; endpoints from window.krtBlueprintsEndpoints (the
- * per-row URLs carry an `ID_PLACEHOLDER` placeholder the module substitutes).
- */
 (function () {
     'use strict';
 
@@ -30,7 +14,6 @@
     let deleteAllBtn = null;
     let debounceTimer = null;
 
-    // productKey -> display name of staged (not-yet-added) blueprints.
     const staged = new Map();
 
     function $(id) {
@@ -76,13 +59,9 @@
             }
         });
         if (addSelectedBtn) addSelectedBtn.addEventListener('click', addSelected);
-        // The edit/remove modals live outside the swapped #krt-bp-list fragment, so their forms
-        // persist and a direct submit binding survives every list re-render.
         if (editForm) editForm.addEventListener('submit', submitEditNote);
         if (deleteForm) deleteForm.addEventListener('submit', submitDeleteBp);
         if (deleteAllForm) deleteAllForm.addEventListener('submit', submitDeleteAll);
-        // After a list swap (batch add / import / remove), resync the header counts from the fresh
-        // rows (recipe.js separately re-inits the master/detail wiring on the same event).
         document.addEventListener('krt:swapped', function (e) {
             const c = e.detail && e.detail.container;
             if (c && c.id === 'krt-bp-list') {
@@ -94,18 +73,6 @@
         wireAdminMemberPersistence();
     }
 
-    /* ------------------------------------------------ admin member persistence */
-
-    // Admin page only (REQ-UI-017): the selected member is kept per browser so reopening
-    // /admin/personal-blueprints returns to the last-inspected member. The picker is a deliberate
-    // full-GET reload (data-trigger="submit-form", see wireAdminSwap above), so the URL always
-    // carries ?userSub= once a member is selected: an explicit param wins and is re-persisted,
-    // and a BARE load with a saved member does a one-time location.replace to ?userSub=<saved> —
-    // loop-safe because the target URL carries the param — so the SERVER seeds the remote-users
-    // combobox with the member's display label (which a client-side restore could not
-    // reconstruct). Guarded on the member picker form, which only the admin page renders, so the
-    // user blueprints page is untouched. NOTE: this requires the module to load on the BARE admin
-    // page too — admin/personal-blueprints.html loads it outside the selected-user block.
     const ADMIN_USER_PREF_KEY = 'admin_personal_blueprints_user';
 
     function wireAdminMemberPersistence() {
@@ -117,15 +84,10 @@
                 if (value) {
                     localStorage.setItem(ADMIN_USER_PREF_KEY, JSON.stringify({ userSub: value }));
                 } else {
-                    // Cleared selection = back to the server default (the bare picker).
                     localStorage.removeItem(ADMIN_USER_PREF_KEY);
                 }
-            } catch (_e) {
-                /* storage unavailable */
-            }
+            } catch (_e) {}
         }
-        // Persist the pick right away; the data-trigger="submit-form" navigation runs in the same
-        // synchronous change dispatch and the storage write lands before the page unloads.
         document.addEventListener('change', function (e) {
             const sel = e.target;
             if (sel.matches && sel.matches('form.krt-pi-userform [name="userSub"]')) {
@@ -153,13 +115,8 @@
     }
 
     /**
-     * Admin-page only: the owned-blueprint search filter re-renders just the #bp-results table in
-     * place (REQ-FE-002) instead of reloading the page. Guarded on #bp-results so it is a no-op on
-     * the user page (which has no such container) and without krtFetch (no-JS GET fallback). The
-     * submit is delegated on document so it survives the table being re-rendered inside the swap.
-     * The member <select> is intentionally NOT swapped here — switching the member changes the
-     * per-user endpoints embedded in the page's inline script, which a fragment swap cannot refresh,
-     * so it stays a full reload by design.
+     * Makes the admin page's owned-blueprint search filter re-render only the #bp-results table in
+     * place (REQ-FE-002); a no-op without #bp-results or krtFetch. The member select still reloads.
      */
     function wireAdminSwap() {
         if (!window.krtFetch || !document.getElementById('bp-results')) return;
@@ -171,8 +128,6 @@
             window.krtFetch.swap({ url, container: '#bp-results', history: true });
         });
     }
-
-    /* ----------------------------------------------------------------- search */
 
     function onSearchInput() {
         if (debounceTimer) clearTimeout(debounceTimer);
@@ -219,8 +174,6 @@
                 'krt-pi-typeahead-item krt-bp-result' +
                 (blocked ? ' krt-bp-result-owned' : '') +
                 (isStaged ? ' krt-bp-result-staged' : '');
-            // Optional pieces go through let + if (not a ternary), so every value the innerHTML
-            // sink sees is a literal or an escapeHtml / escapeAttr result (FE-SEC-05).
             let meta = escapeHtml(it.manufacturerName || '');
             if (blocked) {
                 meta = escapeHtml(window.krtI18nText(i18n().owned, 'krtBlueprintsI18n.owned'));
@@ -268,8 +221,6 @@
         });
     }
 
-    /* ---------------------------------------------------------------- staging */
-
     function toggleStaged(key, name) {
         if (!key) return;
         if (staged.has(key)) {
@@ -282,8 +233,6 @@
 
     function renderStaging() {
         if (!stagingListEl) return;
-        // Function-level accumulator (not declared inside the else): the lint rule only traces an
-        // accumulator declared in the same function scope as its innerHTML sink (FE-SEC-05).
         let html = '';
         if (staged.size === 0) {
             stagingListEl.innerHTML =
@@ -293,8 +242,6 @@
                 ) +
                 '</span>';
         } else {
-            // DS staging chip: the canonical squared .chip (chip--primary), not the bespoke
-            // .krt-bp-chip orange-border box. The inline remove × keeps its i18n accessible name.
             const removeLabel = window.krtI18nText(
                 i18n().chipRemove,
                 'krtBlueprintsI18n.chipRemove',
@@ -325,7 +272,6 @@
         if (addSelectedBtn) addSelectedBtn.disabled = staged.size === 0;
     }
 
-    // krtFetch conflict strings (REQ-FE-003) for the write paths below.
     function conflictObj() {
         const i = i18n();
         return {
@@ -337,8 +283,6 @@
         };
     }
 
-    // Re-render the #krt-bp-list collection card in place (REQ-FE-005) for the active server filter,
-    // without touching the URL again. recipe.js re-inits the master/detail wiring on krt:swapped.
     function reswapList() {
         if (!window.krtFetch) {
             return;
@@ -351,8 +295,6 @@
         });
     }
 
-    // Recompute the header subtitle + active tab-count from the rendered master rows so the
-    // "<n> Blueprints · <m> mit Notiz" facts never drift after an in-place note edit or a list swap.
     function recountAndSync() {
         const rows = document.querySelectorAll('#krt-bp-master-rows .master-row');
         let withNote = 0;
@@ -373,9 +315,6 @@
             subtitle.textContent =
                 total + ' ' + i.factsCount + ' · ' + withNote + ' ' + i.factsWithNote;
         }
-        // Keep the "delete all" control in step with the collection: hide it once nothing removable
-        // remains (a set of only non-removable defaults, or an empty set) so it never points at an
-        // empty clear. The button lives outside the swapped fragment, so JS owns its visibility.
         if (deleteAllBtn) {
             let removable = 0;
             rows.forEach(function (r) {
@@ -387,8 +326,6 @@
         }
     }
 
-    // Multi-select batch add -> krtFetch (REQ-FE-002), then re-render the list in place instead of
-    // the former AJAX-then-reload. The hand-rolled CSRF reader was dropped for krtCsrf (via krtFetch).
     function addSelected() {
         if (staged.size === 0 || !window.krtFetch) {
             return;
@@ -430,8 +367,6 @@
             });
     }
 
-    /* ----------------------------------------------------------------- modals */
-
     function resolveUrl(template, id) {
         const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(id));
         return window.safeSameOriginUrl ? window.safeSameOriginUrl(raw, raw) : raw;
@@ -467,8 +402,6 @@
         if (deleteModal) window.krtModal.close(deleteModal);
     }
 
-    // Delete-all confirm modal (REQ-INV-023): no per-row context, so the danger frame's server text
-    // (which names that defaults are kept) is shown as-is.
     function openDeleteAll() {
         if (deleteAllModal) window.krtModal.open(deleteAllModal);
     }
@@ -482,17 +415,10 @@
         if (el) el.value = value == null || value === 'null' ? '' : value;
     }
 
-    // Thymeleaf renders a null Instant attribute as the literal string "null";
-    // treat that (and blank) as "no timestamp" so the hidden field stays empty.
     function normalizeAcquired(value) {
         return !value || value === 'null' ? '' : value;
     }
 
-    /* ------------------------------------------------------------- in-place writes */
-
-    // Note edit -> krtFetch (REQ-FE-001/002): the twin returns the fresh blueprint, so the master
-    // row's note + version and the detail pane are patched in place (the selection and the loaded
-    // recipe survive). The classic POST→redirect stays the no-JS fallback.
     function submitEditNote(e) {
         e.preventDefault();
         if (!editForm || !window.krtFetch) {
@@ -530,9 +456,6 @@
             });
     }
 
-    // Patch the edited blueprint's master row (note + version + note-marker badge) and, if it is the
-    // active selection, the detail pane — then resync the header counts. Mirrors the trap note in
-    // #578 (data-version sync + recompute per-blueprint badges in the success handler).
     function patchBlueprintRow(dto) {
         if (!dto || !dto.id) {
             return;
@@ -552,8 +475,6 @@
             let marker = row.querySelector('.master-row-note');
             if (newNote.trim() !== '') {
                 if (!marker) {
-                    // The note pencil lives in the trailing .krt-bp-row-aside cluster (alongside the
-                    // craft badge); find-or-create it and insert the marker before the badge.
                     let aside = row.querySelector('.krt-bp-row-aside');
                     if (!aside) {
                         aside = document.createElement('span');
@@ -564,7 +485,6 @@
                     marker.className = 'master-row-note';
                     marker.setAttribute('aria-hidden', 'true');
                     marker.title = i18n().noteTitle || '';
-                    // Static sprite reference (no user data) — this constant is not an HTML sink.
                     marker.innerHTML = '<svg class="krt-icon"><use href="#krt-icon-edit"/></svg>';
                     aside.insertBefore(marker, aside.firstChild);
                 }
@@ -592,8 +512,6 @@
         recountAndSync();
     }
 
-    // Remove -> krtFetch (REQ-FE-001): on success re-render the list in place (resyncing counts and
-    // the empty state). The classic POST→redirect stays the no-JS fallback.
     function submitDeleteBp(e) {
         e.preventDefault();
         if (!deleteForm || !window.krtFetch) {
@@ -622,11 +540,6 @@
             });
     }
 
-    // Delete-all -> krtFetch.submitForm (REQ-FE-001/002, S10 #916): the FormData twin of write() owns
-    // the CSRF header + retry-on-403; on success we toast the removed count and re-render the list in
-    // place (reswapList resyncs the counts, the empty state, and — via recountAndSync — the
-    // delete-all button's own visibility). The form keeps its th:action/method=post so a script-less
-    // browser gets the native POST->redirect fallback.
     function submitDeleteAll(e) {
         e.preventDefault();
         if (!deleteAllForm) {

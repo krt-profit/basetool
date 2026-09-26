@@ -49,16 +49,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Full Thymeleaf render tests for the org-chart page. Renders {@code org-chart.html} together with
- * the {@code ocNode} person-node fragment through the real template engine, so a broken node
- * expression fails the build instead of only surfacing as a 500 at runtime (the pure-method {@link
- * OrgChartPageControllerTest} never touches the template).
- *
- * <p>Pins the empty-chart path: an unfilled Bereichsleiter or Staffelleiter seat must render its
- * vacant placeholder rather than invoking {@code ocNode} with a {@code null} node. That null-node
- * invocation is exactly what threw {@code EL1011E: ... positionType() on null context object} when
- * the {@code th:if} guard sat on the same element as {@code th:replace} (fragment inclusion runs
- * before the conditional, so the guard was dead code).
+ * Full Thymeleaf render tests for the org-chart page and its {@code ocNode} fragment, so a broken
+ * node expression fails the build. An unfilled Bereichsleiter or Staffelleiter seat must render its
+ * vacant placeholder instead of calling {@code ocNode} with a {@code null} node.
  */
 @SpringBootTest
 class OrgChartPageRenderTest {
@@ -81,8 +74,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void emptyChart_member_rendersVacantSeatInsteadOfInvokingNodeFragmentWithNull() throws Exception {
-    // Given: a completely empty chart — the Bereichsleiter seat (area.lead) is null. Pre-fix this
-    // rendered ocNode(null) and NPE'd; now the vacant placeholder must render and the page 200s.
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
@@ -92,7 +83,6 @@ class OrgChartPageRenderTest {
                 List.of(),
                 List.of()));
 
-    // When / Then
     String html =
         mockMvc
             .perform(get("/org-chart"))
@@ -112,9 +102,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void unledSquadron_admin_rendersVacantSquadronLeadAndEditorAffordance() throws Exception {
-    // Given: a profit-eligible Staffel with no Staffelleiter (sq.lead == null) — the second
-    // same-element guard that previously NPE'd. The admin view additionally renders the inline
-    // editor's add affordances (sec:authorize ADMIN).
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
@@ -135,7 +122,6 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
         .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
 
-    // When / Then
     String html =
         mockMvc
             .perform(get("/org-chart"))
@@ -160,10 +146,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void namedLeaderlessCommand_admin_rendersGroupHeaderVacantLeadAndChildren() throws Exception {
-    // Given: a named Kommando with a vacant Kommandoleiter but an already-attached Stv. + Ensign —
-    // the exact shape the decoupled command-group model introduces. Renders the group header
-    // (name), the vacant-leader placeholder + assign affordance, and the child person-nodes via
-    // ocNode. A broken expression in any of those new paths fails here instead of as a runtime 500.
     OrgChartNodeDto deputy =
         new OrgChartNodeDto(
             UUID.randomUUID(), "DEPUTY_COMMAND_LEAD", UUID.randomUUID(), "Deputy", null, 0, 0L);
@@ -214,12 +196,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances() throws Exception {
-    // Given: a Kommando that mirrors a kommando_group (kommandoGroupId set, epic #800 /
-    // REQ-ROLE-006) with its Kommandoleiter appointed under Organisation -> Leitung (an account).
-    // The whole Kommando subtree is Leitung-managed, so the chart renders it read-only: NONE of the
-    // rename / remove / vacate / add-child controls render, even for an admin — those would 400
-    // at the backend. (The per-node "managed under Leitung" marker was retired; read-only is
-    // signalled purely by the absent edit affordances in edit mode.)
     CommandChartDto command =
         new CommandChartDto(
             UUID.randomUUID(),
@@ -283,10 +259,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void chartBodyFragment_rendersTreeWithoutPageChrome() throws Exception {
-    // The in-place chart refresh (epic #571 / REQ-FE-005) swaps ?fragment=chartBody into the stable
-    // #oc-chart container. The fragment must render the tree + its add affordances but NOT the page
-    // chrome that lives outside the swap region (the edit toolbar and the assign modal) — otherwise
-    // an innerHTML swap would inject a duplicate toolbar/modal into the chart.
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
@@ -332,10 +304,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void olTier_admin_rendersRootMembersAndAddAffordance() throws Exception {
-    // Given: an Organisationsleitung tier with one member (epic #692 / REQ-ORG-026). The OL renders
-    // as its own ARIA tree — the OL root box (level 1) with its OL_MEMBER nodes (level 2) — plus
-    // the
-    // admin add-OL-member affordance, which needs the OL's org-unit id carried by OlChartDto.
     UUID olId = UUID.randomUUID();
     OrgChartNodeDto member =
         new OrgChartNodeDto(
@@ -373,10 +341,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void olTier_grandAdmiral_rendersAtTopWithTitle() throws Exception {
-    // Given: an OL with a Grand Admiral (REQ-ORG-021) split out of the members. The holder is an
-    // OL_MEMBER position surfaced via OlChartDto.grandAdmiral; the chart renders it above the
-    // member
-    // fan with the untranslated "Grand Admiral" title, while the plain member still shows.
     UUID olId = UUID.randomUUID();
     OrgChartNodeDto grandAdmiral =
         new OrgChartNodeDto(
@@ -411,13 +375,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void olTier_freeTextGrandAdmiral_rendersTitleAndNoAccountMarker() throws Exception {
-    // Given: a free-text Grand Admiral (REQ-ORG-021) — a typed name for a member without an
-    // account,
-    // like every other chart field. The backend surfaces it as a synthesized
-    // OlChartDto.grandAdmiral
-    // node (no userId, a displayName); the chart renders it at the top with the "Grand Admiral"
-    // title
-    // and the free-text (no-account) marker.
     UUID olId = UUID.randomUUID();
     OrgChartNodeDto freeTextGa =
         new OrgChartNodeDto(null, "OL_MEMBER", null, null, "Admiral Ohne Konto", 0, null);
@@ -452,10 +409,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void freeTextHolder_admin_rendersTypedNameAndNoAccountMarker_notVacant() throws Exception {
-    // Given: an OL member named on the chart who has no Basetool account yet (REQ-ORG-020) — userId
-    // null but a free-text displayName. The node must render the typed name through ocNode with the
-    // free-text marker class (not the dashed vacant placeholder), and the reassign control must
-    // carry the typed name so an admin can later swap it for an account without losing it.
     UUID olId = UUID.randomUUID();
     OrgChartNodeDto freeTextMember =
         new OrgChartNodeDto(UUID.randomUUID(), "OL_MEMBER", null, null, "Max Mustermann", 0, 0L);
@@ -491,11 +444,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void freeTextCommandLeader_admin_rendersTypedNameAndNoAccountMarker_notVacant() throws Exception {
-    // Given: a Kommando whose Kommandoleiter is a Kartell member with no Basetool account yet
-    // (REQ-ORG-020) — leaderUserId null but a free-text leaderDisplayName. Exercises the inline
-    // command-leader branch (cmd.leaderDisplayName != null), distinct from the ocNode path above:
-    // the leader node renders the typed name with the no-account marker (not the dashed vacant
-    // placeholder), and its reassign control carries the typed name for a later account swap.
     CommandChartDto command =
         new CommandChartDto(
             UUID.randomUUID(), "Alpha", 0L, 0, null, null, null, "Max Mustermann", null, List.of());
@@ -542,11 +490,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void bereichTier_admin_rendersDepartmentTintLeadershipAndUnits() throws Exception {
-    // Given: one Bereich tier carrying the PROFIT Bereichsfarbe, a Bereichsleiter (hero) and one
-    // Staffel (epic #692 / REQ-ORG-026). The tier renders as its own ARIA tree, tinted via the
-    // oc-dept--profit class, with the Staffel fanning out through the shared ocUnitFan fragment.
-    // The
-    // legacy area tier must stay hidden once a Bereich is populated.
     OrgChartNodeDto lead =
         new OrgChartNodeDto(
             UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Area Boss", null, 0, 0L);
@@ -600,10 +543,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void bereichStab_rendersOneRowPerRank_peersSideBySide() throws Exception {
-    // Given: a Bereich whose Stab holds one Koordinator and three Operatoren. Equals must read as
-    // equals: each rank fans out as its own horizontal row, the way the OL members and the
-    // Staffeln/SKs already do. They used to hang off one another in a single `.oc-v` spine, which
-    // drew the third Operator as reporting to the second.
     BereichChartDto bereich =
         bereichWithStab(
             List.of(stabNode("BEREICHSKOORDINATOR", "Koordinator Eins")),
@@ -629,9 +568,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void bereichStab_withoutKoordinatoren_drawsNoEmptyRow() throws Exception {
-    // A Bereich may hold Operatoren and no Koordinator. The empty rank must draw no row at all —
-    // an unguarded `<ul class="oc-fan">` would emit its own drop from the Bereichsleiter and leave
-    // a connector hanging into nothing.
     BereichChartDto bereich =
         bereichWithStab(List.of(), List.of(stabNode("BEREICHSOPERATOR", "Operator Solo")));
 
@@ -644,13 +580,12 @@ class OrgChartPageRenderTest {
   }
 
   /**
-   * Builds a chart node for a Stab seat, account-held so it renders as an ordinary node rather than
-   * a free-text placeholder.
+   * Builds an account-held chart node for a Stab seat.
    *
    * @param positionType the chart position type ({@code BEREICHSKOORDINATOR} / {@code
-   *     BEREICHSOPERATOR}).
-   * @param name the holder's effective name, asserted on by the callers.
-   * @return the node.
+   *     BEREICHSOPERATOR})
+   * @param name the holder's effective name
+   * @return the node
    */
   private static OrgChartNodeDto stabNode(String positionType, String name) {
     return new OrgChartNodeDto(
@@ -658,14 +593,12 @@ class OrgChartPageRenderTest {
   }
 
   /**
-   * Builds a single PROFIT Bereich carrying the given Stab and nothing else — no Staffel, no SK, no
-   * Kommando. That emptiness is load-bearing for {@link
-   * #bereichStab_rendersOneRowPerRank_peersSideBySide()}: it leaves the Stab as the only possible
-   * source of a {@code .oc-v} connector in the rendered page.
+   * Builds a single PROFIT Bereich carrying only the given Stab, so the Stab is the only source of
+   * a {@code .oc-v} connector on the page.
    *
-   * @param coordinators the Bereichskoordinatoren.
-   * @param operators the Bereichsoperatoren.
-   * @return the Bereich.
+   * @param coordinators the Bereichskoordinatoren
+   * @param operators the Bereichsoperatoren
+   * @return the Bereich
    */
   private static BereichChartDto bereichWithStab(
       List<OrgChartNodeDto> coordinators, List<OrgChartNodeDto> operators) {
@@ -683,12 +616,11 @@ class OrgChartPageRenderTest {
   }
 
   /**
-   * Renders {@code /org-chart} for a chart holding exactly {@code bereich} — no OL and an empty
-   * legacy area tier, so the Bereich subtree is the only thing on the page.
+   * Renders {@code /org-chart} for a chart holding only {@code bereich}.
    *
-   * @param bereich the single Bereich to render.
-   * @return the rendered HTML.
-   * @throws Exception if the request fails.
+   * @param bereich the single Bereich to render
+   * @return the rendered HTML
+   * @throws Exception if the request fails
    */
   private String renderChartWith(BereichChartDto bereich) throws Exception {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
@@ -710,13 +642,11 @@ class OrgChartPageRenderTest {
   }
 
   /**
-   * Counts non-overlapping occurrences of {@code needle} in {@code haystack} — the peer rows are
-   * asserted by count, because "rendered side by side" is a statement about how many rows exist,
-   * not about any one of them being present.
+   * Counts non-overlapping occurrences of {@code needle} in {@code haystack}.
    *
-   * @param haystack the rendered HTML.
-   * @param needle the literal to count.
-   * @return the number of occurrences.
+   * @param haystack the rendered HTML
+   * @param needle the literal to count
+   * @return the number of occurrences
    */
   private static int countOf(String haystack, String needle) {
     int count = 0;
@@ -731,8 +661,6 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void olWithBereiche_admin_rendersConnectorFanSideBySide() throws Exception {
-    // Given: an OL plus two Bereiche. The Bereiche must fan out side by side beneath the OL via the
-    // oc-fan--bereiche connector (epic #692) — each its own collapsible Bereich subtree.
     UUID olId = UUID.randomUUID();
     OrgChartNodeDto leadA =
         new OrgChartNodeDto(

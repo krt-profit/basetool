@@ -1,14 +1,3 @@
-// ---- Live multi-user sync — the mission list (REQ-FE-010 / REQ-FE-015, ADR-0094, #1235) --------
-// When anyone creates, core-edits (name / status / planned start) or deletes a mission, every other
-// viewer's list re-fetches its OWN filter/page in place over the shared /ws/sync `missions` room.
-// Only the opaque `list` key crosses the wire; each viewer re-pulls its own org-unit-scoped,
-// peer-redacted fragment, so a viewer outside the actor's scope simply re-renders the same rows.
-// MISSIONS_SECTIONS mirrors the server LiveSyncTopicClass.MISSIONS_LIST whitelist (the REQ-FE-010
-// three-mirror-points rule, build-enforced by LiveSyncSectionMapParityTest).
-//
-// The BROADCAST side is server-side (MissionWriteController.liveSyncLocalBus): create, update and
-// delete all redirect, so a client publish issued just before that navigation would race the socket
-// teardown. This module is therefore receive-only.
 const MISSIONS_SECTIONS = {
     list: { container: '#missions-results', fragmentValue: 'results' },
 };
@@ -21,8 +10,6 @@ const MISSIONS_SECTIONS = {
     const loadingIndicator = document.getElementById('missions-loading-indicator');
     const resetBtn = document.getElementById('missions-filter-reset');
 
-    // krtFetch (fragments/head.html) owns the fragment swap + the in-results pagination
-    // interception, so the whole list — filter, sort and paginate — stays in place.
     if (!resultsContainer || !window.krtFetch) return;
 
     let debounceTimer = null;
@@ -37,8 +24,6 @@ const MISSIONS_SECTIONS = {
         return params.toString();
     }
 
-    // pushHistory=false is the peer-driven path: a peer's change must not push a history entry, or
-    // a busy room would bury the user's own navigation under a stack of identical list URLs.
     function loadResults(pushHistory) {
         const query = buildQueryString();
         window.krtFetch.swap({
@@ -53,8 +38,6 @@ const MISSIONS_SECTIONS = {
         window.krtLiveSync.createReceiver({
             topic: 'missions',
             sections: MISSIONS_SECTIONS,
-            // Global room: the longer coalesce window (#1125) flattens the re-fetch herd when many
-            // viewers receive the same signal at once.
             coalesceMs: 1500,
             refresh() {
                 loadResults(false);
@@ -62,22 +45,15 @@ const MISSIONS_SECTIONS = {
         });
     }
 
-    // The filter form is absent for anonymous visitors; live sync above still applies.
     if (!form) return;
 
     function onFilterChange() {
         clearTimeout(debounceTimer);
-        // Wrapped rather than passed by reference so loadResults never receives a stray timer
-        // argument as its pushHistory flag — a user-driven filter change does push history.
         debounceTimer = setTimeout(function () {
             loadResults(true);
         }, 300);
     }
 
-    // Per-browser persistence of the "show past" toggle (REQ-UI-017): one JSON object under a
-    // single localStorage key. The search text and the start/end range inputs are deliberately
-    // NOT persisted. Absent key = no saved preference = the server-rendered default (unchecked).
-    // Guarded so privacy modes that deny storage degrade to the default instead of breaking.
     const FILTER_PREF_KEY = 'missions_filter';
 
     function showPastInput() {
@@ -96,9 +72,7 @@ const MISSIONS_SECTIONS = {
     function writeFilterPref(value) {
         try {
             localStorage.setItem(FILTER_PREF_KEY, JSON.stringify(value));
-        } catch (_e) {
-            /* storage unavailable */
-        }
+        } catch (_e) {}
     }
 
     function persistFilters() {
@@ -108,11 +82,6 @@ const MISSIONS_SECTIONS = {
         }
     }
 
-    // Restores the persisted toggle at init, driving the existing swap exactly once when the
-    // restored state differs from what the server rendered. An explicit showPast query param
-    // (deep link / back-nav — the swaps run history:true) wins over the stored state and is
-    // re-persisted; only a bare URL restores from storage. The checkbox is absent for anonymous
-    // visitors, in which case this is a no-op.
     function restoreFilters() {
         const input = showPastInput();
         if (!input) return;
@@ -135,7 +104,6 @@ const MISSIONS_SECTIONS = {
 
     const showPastToggle = showPastInput();
     if (showPastToggle) {
-        // Persist immediately on every toggle (the debounced re-fetch stays onFilterChange's job).
         showPastToggle.addEventListener('change', persistFilters);
     }
 
@@ -149,7 +117,7 @@ const MISSIONS_SECTIONS = {
             form.querySelectorAll('input[type="checkbox"]').forEach(function (el) {
                 el.checked = false;
             });
-            persistFilters(); // REQ-UI-017: a reset persists the cleared state
+            persistFilters();
             loadResults();
         });
     }

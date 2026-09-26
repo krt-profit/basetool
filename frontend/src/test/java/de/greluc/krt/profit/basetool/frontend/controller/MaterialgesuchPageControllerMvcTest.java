@@ -61,12 +61,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC render + proxy test for the Materialbörse Gesuche (requests) surface of {@link
- * MaterialboersePageController}. Renders the real Thymeleaf request board (catching any template
- * error) with a mocked backend, proves the server-side Markdown description is rendered into the
- * page, the min-quality / desired-quantity facts render, and proves the request-edit proxy relays a
- * backend optimistic-lock conflict as a 409 with the problem code so {@code krtFetch} can offer the
- * reload-confirm.
+ * Render and proxy tests for the Materialbörse Gesuche surface of {@link
+ * MaterialboersePageController}: the request board renders with the Markdown description and
+ * quality/quantity facts, and the request-edit proxy relays a lock conflict as 409 with its problem
+ * code.
  */
 @SpringBootTest
 class MaterialgesuchPageControllerMvcTest {
@@ -94,10 +92,6 @@ class MaterialgesuchPageControllerMvcTest {
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
     when(backendApiClient.get(contains("/material-requests?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of()));
-    // Detail lookup: match the concrete request id, NOT the broad "/material-requests/" prefix.
-    // The prefix also matches "/material-requests/counts", and Mockito's last-matching-stub-wins
-    // would then route the counts call here (returning a MaterialRequestDto), so loadRequestCounts
-    // would hit a swallowed ClassCastException and silently render 0/0 instead of the stub.
     when(backendApiClient.get(contains("/material-requests/" + request.id()), anyClass()))
         .thenReturn(request);
   }
@@ -140,19 +134,13 @@ class MaterialgesuchPageControllerMvcTest {
         .andExpect(content().string(containsString("<strong>Titanium</strong>")))
         .andExpect(content().string(containsString("squadron-badge")))
         .andExpect(content().string(containsString(">IRI<")))
-        // A material request carries its stated minimum quality as a fact.
         .andExpect(content().string(containsString("600")))
-        // The owner (mine) sees the edit CTA.
         .andExpect(content().string(containsString("data-mg-edit")))
-        // The "Alle Gesuche" tab shows the stubbed request count (1) — proving the request-counts
-        // lookup is honoured, not shadowed by the detail stub; every other tab-count renders 0.
         .andExpect(content().string(containsString("<span class=\"tab-count\">1</span>")))
-        // Symmetric guard to the offers-mode test: the requests view renders only the request
-        // board, never the offers board's own list wrapper on top of it.
         .andExpect(content().string(not(containsString("id=\"mb-listwrap\""))));
   }
 
-  /** A PIECE material request renders its desired amount in the piece unit, never SCU (#1182). */
+  /** A PIECE material request renders its desired amount in the piece unit, never SCU. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void page_pieceMaterialRequest_rendersPieceUnitNotScu() throws Exception {

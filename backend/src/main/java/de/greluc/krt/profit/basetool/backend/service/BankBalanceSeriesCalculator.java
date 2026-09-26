@@ -32,18 +32,11 @@ import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Derives the account balance-over-time series the detail page renders as an inline SVG line chart
- * (REQ-BANK-049) from a period's opening balance and its posting slices. It walks the ledger one
- * UTC calendar day at a time — starting at the balance <em>before</em> the period and adding each
- * day's net — so the value plotted at day {@code D} is the end-of-day-{@code D} balance and the
- * last point equals the balance at the period end. When the period spans more than {@link
- * #MAX_POINTS} days the daily series is evenly downsampled (every real sampled point stays an
- * actual end-of-day balance, and the final point is always kept) so the polyline stays a sane size
- * for any range up to "Gesamt".
+ * Derives an account's end-of-day balance series for the detail-page chart (REQ-BANK-049) from the
+ * opening balance and the period's posting slices, one UTC day at a time.
  *
- * <p>Pure computation only, mirroring {@link BankTrendCalculator}: it never touches the security
- * context or a repository, so it stays outside the {@code BankSecurityService}/org-unit-scope
- * concerns entirely and is trivially unit-testable.
+ * <p>Series longer than {@link #MAX_POINTS} are evenly downsampled, always keeping the final point.
+ * Pure computation, with no security context or repository access.
  */
 public final class BankBalanceSeriesCalculator {
 

@@ -1,14 +1,2 @@
-# Revisions to skip when running `git blame`.
-#
-# Devs opt in once per checkout:
-#   git config blame.ignoreRevsFile .git-blame-ignore-revs
-#
-# Only purely mechanical, no-logic-change commits belong in this file
-# (mass reformats, automated import re-orderings, EOL normalizations).
-# Adding a content-touching commit here would hide real authorship and
-# is forbidden.
 
-# build: bulk-reformat 767 Java sources with google-java-format
-# Spotless Phase 1 -- 4-space -> 2-space indent + google-java-format
-# normalization across backend/src and frontend/src. No logical changes.
 da3dfd301007cec80d3dfabb541e6e3701beb9ee

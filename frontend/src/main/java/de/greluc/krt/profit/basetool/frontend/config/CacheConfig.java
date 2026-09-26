@@ -29,27 +29,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Caffeine-backed {@link CacheManager} exposing one named cache per {@link CacheDomain}
- * (FE-CACHE-2).
+ * Caffeine-backed {@link CacheManager} with one named cache per {@link CacheDomain}, each with its
+ * own TTL ({@link CacheDomain#getTtl()}).
  *
- * <p>Slow-changing backend catalogues used to share a single {@code staticData} cache that any
- * admin mutation dropped wholesale — so a squadron toggle cold-started the 10&nbsp;000-row terminal
- * list, the material lists and every location list it never touched. Each catalogue now lives in
- * its domain's cache ({@code squadronCatalogue}, {@code orgUnitCatalogue}, {@code
- * materialCatalogue}, …) so a mutation evicts only the affected domain via {@code
- * BackendApiClient.evict(CacheDomain…)}. Routing is declarative: {@code getCached(CachedCatalog,
- * …)} is {@code @Cacheable} with a {@link
- * de.greluc.krt.profit.basetool.frontend.service.CatalogCacheResolver} that picks the domain cache
- * from the catalogue argument.
- *
- * <p>Each domain cache is registered with its <b>own</b> {@code expireAfterWrite} TTL (see {@link
- * CacheDomain#getTtl()}) — 6&nbsp;h for pure reference catalogues, 2&nbsp;h for the org-structure
- * catalogues and settings. The TTL is only a backstop: cacheability is eviction-gated
- * (REQ-DATA-007), so freshness comes from the per-mutation evict, not from the TTL. All caches keep
- * {@code maximumSize=1000} and {@code recordStats()} — Spring Boot binds Caffeine's
- * hit/miss/eviction/size counters as {@code cache_*} meters per {@code cache} label
- * (REQ-OBS-005/-006), so the monitoring hit-ratio / eviction / size panels light up per domain
- * automatically.
+ * <p>Freshness comes from per-domain eviction on mutation (REQ-DATA-007); the TTL is a backstop.
+ * All caches record stats for the {@code cache_*} meters (REQ-OBS-005/-006).
  */
 @Configuration
 @EnableCaching

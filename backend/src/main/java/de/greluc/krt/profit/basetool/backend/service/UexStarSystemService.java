@@ -32,12 +32,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Imports the UEX star-system catalog.
- *
- * <p>Lookup priority: UEX {@code id_system}, then by name (legacy migration path for systems that
- * pre-date the {@code id_system} column). Unknown systems are auto-created with a fallback name so
- * the universe sync stays self-healing. Per-field dirty checking minimizes write traffic — only
- * rows that actually changed get persisted.
+ * Imports the UEX star-system catalogue, matching by {@code id_system}, then by name, and creating
+ * unknown systems; only changed rows are written.
  */
 @Slf4j
 @Service
@@ -46,16 +42,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class UexStarSystemService {
 
   /**
-   * Cap for the upstream-supplied star-system name in log lines. UEX is a third party we do not
-   * control, so the value is untrusted free text and goes through {@link LogSafe} first; 64
-   * characters comfortably fit any real system name.
+   * Maximum length of an upstream star-system name in log lines, logged through {@link LogSafe}.
    */
   private static final int MAX_NAME_LOG_LENGTH = 64;
 
   private final UexClient uexClient;
   private final StarSystemRepository starSystemRepository;
 
-  /** Writes the rows in short isolated transactions after the fetch (BE-PERF-09). */
+  /** Writes the rows in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
 
   /**
@@ -79,8 +73,6 @@ public class UexStarSystemService {
       return;
     }
 
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch in chunk transactions of their own; a
-    // refused chunk is replayed row by row, so one bad row costs only itself.
     SyncChunkWriter.Outcome<UexStarSystemDto> outcome =
         chunkWriter.write(
             dtos,

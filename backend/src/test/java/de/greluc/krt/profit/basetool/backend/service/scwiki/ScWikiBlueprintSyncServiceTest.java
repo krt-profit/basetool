@@ -125,7 +125,6 @@ class ScWikiBlueprintSyncServiceTest {
 
   @Test
   void syncBlueprints_fallbackList_resolvesResourceToMaterialAndItemToGameItem() {
-    // No detail (fetchOne returns null) — exercises the flat-list fallback path.
     UUID resourceUuid = UUID.randomUUID();
     UUID itemUuid = UUID.randomUUID();
     UUID outputUuid = UUID.randomUUID();
@@ -177,7 +176,6 @@ class ScWikiBlueprintSyncServiceTest {
     UUID resourceUuid = UUID.randomUUID();
     UUID itemUuid = UUID.randomUUID();
 
-    // Minimal list row used only to enumerate the UUID; the detail carries the requirement groups.
     ScWikiBlueprintDto listDto =
         new ScWikiBlueprintDto(
             bpUuid,
@@ -343,7 +341,6 @@ class ScWikiBlueprintSyncServiceTest {
   @Test
   void syncBlueprints_shrinkingIngredientCount_dropsTrailingLines() {
     UUID bpUuid = UUID.randomUUID();
-    // Existing blueprint with 3 ingredient lines.
     Blueprint existing = new Blueprint();
     existing.setScwikiUuid(bpUuid);
     for (int i = 0; i < 3; i++) {
@@ -352,7 +349,6 @@ class ScWikiBlueprintSyncServiceTest {
       line.setKind(BlueprintIngredientKind.RESOURCE);
       existing.addIngredient(line);
     }
-    // Incoming DTO has only 1 ingredient (and no requirement groups → fallback path).
     ScWikiBlueprintIngredientDto one =
         new ScWikiBlueprintIngredientDto("Iron", "resource", UUID.randomUUID(), null, 1.0, null);
     ScWikiBlueprintDto dto =
@@ -395,15 +391,11 @@ class ScWikiBlueprintSyncServiceTest {
 
     verify(blueprintRepository, never()).markScwikiDeleted(any(), any());
     verify(blueprintRepository, never()).save(any());
-    // An empty Wiki response upserts no blueprints → 0 items (#1041 item 2, SyncZeroItems).
     assertEquals(0, written, "an empty Wiki response must report zero upserted blueprints");
   }
 
   @Test
   void syncBlueprints_notModified_reportsLiveCount_andSkipsDetailFetchAndSweep() {
-    // A 304 on the blueprint list upserts nothing (the per-UUID detail fetches never run), but is
-    // healthy — it must report the live blueprint count, NOT 0, so an all-304 run is not read as a
-    // zero-item outage (#1182).
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
         .thenReturn(ScWikiClient.FetchResult.unchanged());
     when(blueprintRepository.countLiveScwikiBlueprints()).thenReturn(1559L);
@@ -411,7 +403,6 @@ class ScWikiBlueprintSyncServiceTest {
     int written = service.syncBlueprints();
 
     assertEquals(1559, written, "a 304 (unchanged) list must report the live blueprint count");
-    // The 304 short-circuits before the per-UUID detail walk and the orphan sweep.
     verify(scWikiClient, never()).fetchOne(any(), any(), any());
     verify(blueprintRepository, never()).save(any());
     verify(blueprintRepository, never()).markScwikiDeleted(any(), any());
@@ -431,14 +422,11 @@ class ScWikiBlueprintSyncServiceTest {
     verify(blueprintRepository).markScwikiDeleted(any(), any());
   }
 
-  // ─── #327 curated CIG-mislabel output-name override (REQ-INV-047) ──────────
-
   private static final String ARMS_KEY = "BP_CRAFT_qrt_specialist_heavy_arms_01_01_13";
   private static final String HELMET_KEY = "BP_CRAFT_qrt_specialist_heavy_helmet_01_01_12";
 
   @Test
   void syncBlueprints_correctsBothSeededCigMislabels_inOneRun() {
-    // Given both confirmed mislabeled blueprints arrive with their known-wrong output names.
     ScWikiBlueprintDto arms =
         blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Helmet Jet");
     ScWikiBlueprintDto helmet =
@@ -448,11 +436,8 @@ class ScWikiBlueprintSyncServiceTest {
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When the sync runs.
     service.syncBlueprints();
 
-    // Then each blueprint is persisted with its in-game-correct name, and nothing is reported
-    // obsolete (the guards fired).
     ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
     verify(blueprintRepository, times(2)).save(saved.capture());
     assertEquals(2, saved.getAllValues().size());
@@ -472,7 +457,6 @@ class ScWikiBlueprintSyncServiceTest {
 
   @Test
   void syncBlueprints_correctionIsNormalizationInsensitive() {
-    // Given the wrong name arrives with different case and whitespace.
     ScWikiBlueprintDto dto =
         blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "  antium   HELMET jet ");
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
@@ -480,10 +464,8 @@ class ScWikiBlueprintSyncServiceTest {
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When the sync runs.
     service.syncBlueprints();
 
-    // Then the normalizer folds the differences and the correction still applies.
     ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
     verify(blueprintRepository).save(saved.capture());
     assertEquals("Antium Arms Maroon", saved.getValue().getOutputName());
@@ -491,7 +473,6 @@ class ScWikiBlueprintSyncServiceTest {
 
   @Test
   void syncBlueprints_passesThroughOutputName_whenIncomingIsNotTheWrongName() {
-    // Given CIG fixed the name (the feed now sends the in-game-correct name for the same key).
     ScWikiBlueprintDto dto =
         blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Arms Maroon");
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
@@ -499,10 +480,8 @@ class ScWikiBlueprintSyncServiceTest {
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When the sync runs.
     service.syncBlueprints();
 
-    // Then the upstream value is persisted unchanged (the guard did not fire).
     ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
     verify(blueprintRepository).save(saved.capture());
     assertEquals("Antium Arms Maroon", saved.getValue().getOutputName());
@@ -510,7 +489,6 @@ class ScWikiBlueprintSyncServiceTest {
 
   @Test
   void syncBlueprints_passesThroughOutputName_forUnrelatedKey() {
-    // Given an unrelated key whose name happens to equal a wrong name registered under another key.
     ScWikiBlueprintDto dto =
         blueprintWithKeyAndName(UUID.randomUUID(), "BP_CRAFT_unrelated_01", "Antium Helmet Jet");
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
@@ -518,10 +496,8 @@ class ScWikiBlueprintSyncServiceTest {
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When the sync runs.
     service.syncBlueprints();
 
-    // Then nothing is corrected and no obsolescence event is emitted (the key is not registered).
     ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
     verify(blueprintRepository).save(saved.capture());
     assertEquals("Antium Helmet Jet", saved.getValue().getOutputName());
@@ -532,8 +508,6 @@ class ScWikiBlueprintSyncServiceTest {
 
   @Test
   void syncBlueprints_emitsObsoleteEvent_whenOverrideKeySeenButWrongNameGone() {
-    // Given a registered override key is still in the feed but CIG changed its name away from the
-    // expected wrong name (here: to the already-correct name) — the guard no longer fires.
     ScWikiBlueprintDto dto =
         blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Arms Maroon");
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
@@ -541,10 +515,8 @@ class ScWikiBlueprintSyncServiceTest {
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When the sync runs.
     service.syncBlueprints();
 
-    // Then a BLUEPRINT_NAME_OVERRIDE_OBSOLETE event is emitted so an operator removes the entry.
     verify(syncReportService)
         .logScwikiEvent(
             any(),
@@ -557,8 +529,6 @@ class ScWikiBlueprintSyncServiceTest {
 
   @Test
   void syncBlueprints_detailMiss_preservesExistingRequirementGroupsAndSummary() {
-    // Given an existing blueprint that already carries good stat data (one requirement group + one
-    // summary property) captured on a previous successful detail fetch.
     UUID bpUuid = UUID.randomUUID();
     UUID outputUuid = UUID.randomUUID();
     UUID resourceUuid = UUID.randomUUID();
@@ -578,9 +548,6 @@ class ScWikiBlueprintSyncServiceTest {
     existingSummary.setBetterWhen("higher");
     existing.addSummaryProperty(existingSummary);
 
-    // The list row carries the flat ingredients but no requirement_groups; the detail fetch misses
-    // (fetchOne -> null), so the upsert must take the flat-list fallback, NOT
-    // applyRequirementGraph.
     ScWikiBlueprintIngredientDto resource =
         new ScWikiBlueprintIngredientDto("Agricium", "resource", resourceUuid, null, 0.36, null);
     ScWikiBlueprintDto listDto =
@@ -610,11 +577,8 @@ class ScWikiBlueprintSyncServiceTest {
     when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.of(agricium));
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When the sync runs against a transient detail miss.
     service.syncBlueprints();
 
-    // Then the previously captured group + summary survive untouched (the fallback must NOT clear
-    // them) while the flat ingredient list is reconciled.
     ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
     verify(blueprintRepository).save(saved.capture());
     Blueprint bp = saved.getValue();
@@ -633,8 +597,6 @@ class ScWikiBlueprintSyncServiceTest {
 
   @Test
   void syncBlueprints_resolvesResourceViaAliasTable_whenUuidMisses() {
-    // Given a RESOURCE line whose scwiki_uuid does not match any material, but the alias table maps
-    // its name to a material — the middle branch of resolveMaterial's uuid -> alias -> name chain.
     UUID resourceUuid = UUID.randomUUID();
     ScWikiBlueprintIngredientDto resource =
         new ScWikiBlueprintIngredientDto("Agricium", "resource", resourceUuid, null, 0.36, null);
@@ -649,10 +611,8 @@ class ScWikiBlueprintSyncServiceTest {
         .thenReturn(aliasMaterial);
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When the sync runs.
     service.syncBlueprints();
 
-    // Then the ingredient FK is linked via the alias table and no unresolved event is emitted.
     ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
     verify(blueprintRepository).save(saved.capture());
     BlueprintIngredient line = saved.getValue().getIngredients().get(0);
@@ -660,8 +620,6 @@ class ScWikiBlueprintSyncServiceTest {
     verify(syncReportService, never())
         .logScwikiEvent(any(), eq(SyncEventType.UNRESOLVED_INGREDIENT), any(), any(), any(), any());
   }
-
-  // ─── helpers ────────────────────────────────────────────────────────────
 
   private ScWikiBlueprintDto blueprintWithKeyAndName(UUID uuid, String key, String outputName) {
     return new ScWikiBlueprintDto(

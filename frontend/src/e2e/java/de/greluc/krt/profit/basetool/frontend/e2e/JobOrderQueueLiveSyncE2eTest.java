@@ -33,17 +33,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Live-sync coverage for the global job-order queue (#1102, REQ-FE-015 / ADR-0094): a viewer of the
- * {@code /orders} queue must gain a newly-created order IN PLACE, no manual reload — the {@code
- * queue} section key crossing the global {@code orders} room.
- *
- * <p>This drives the <b>server-side</b> publish path: an order create fans {@code orders/[queue]}
- * to every subscribed viewer straight from the frontend {@code JobOrderWriteController} rather than
- * from the creating client, which holds no queue subscription while it is on the create page. The
- * publish only fires for a create that goes through the <b>frontend</b> form — a backend-direct
- * seed would never reach the controller — so context A submits the real {@code /orders/create}
- * form, while context B is a passive queue viewer that must gain the new row without a reload. The
- * global {@code orders} room coalesces at ~1.5&nbsp;s, so the assertion carries a generous timeout.
+ * E2E live-sync coverage for the job-order queue (REQ-FE-015, ADR-0094): a passive {@code /orders}
+ * viewer gains a newly created order in place, via the server-side {@code orders/[queue]} publish
+ * of a frontend form create.
  */
 @Tag("e2e")
 class JobOrderQueueLiveSyncE2eTest {
@@ -92,15 +84,8 @@ class JobOrderQueueLiveSyncE2eTest {
   }
 
   /**
-   * A passive viewer on {@code /orders} that never reloads must gain a row when somebody else
-   * creates one, driven purely by the {@code orders/[queue]} change signal the frontend controller
-   * publishes server-side.
-   *
-   * <p>The creator used to be an anonymous guest, which made the server-side publish obviously
-   * necessary — a guest has no socket at all. Creating an order requires a login since ADR-0149, so
-   * the creator is now a second browser context of the same member; the point survives unchanged,
-   * because that context is sitting on {@code /orders/create} and is subscribed to no queue room. A
-   * session is not a socket.
+   * Creates an order from one browser context on {@code /orders/create} and asserts that a second
+   * context viewing {@code /orders} gains the row without reloading.
    */
   @Test
   void orderCreatePropagatesToTheQueueViewerLive() {
@@ -127,10 +112,8 @@ class JobOrderQueueLiveSyncE2eTest {
 
         int before = pageB.locator("#orders-results tr[data-id]").count();
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its `orders` subscribe is acked.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -138,10 +121,6 @@ class JobOrderQueueLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // Context A creates an order through the frontend form. The frontend
-        // JobOrderWriteController fans orders/[queue] to the room server-side, which is what B is
-        // waiting on: A is on the create page and holds no queue subscription of its own.
-        // Responsible = IRIDIUM (profit-eligible) so the row lands in B's queue.
         E2eSupport.navigate(pageA, baseUrl + "/orders/create");
         pageA.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         pageA.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
@@ -151,8 +130,6 @@ class JobOrderQueueLiveSyncE2eTest {
         E2eSupport.clickSubmitClearingFooter(pageA.getByTestId("order-submit"));
         pageA.waitForLoadState();
 
-        // The assertion under test: B's queue gains the new row in place (global room coalesces at
-        // ~1.5 s, so allow a generous window), without a full-page reload.
         pageB.waitForCondition(
             () -> pageB.locator("#orders-results tr[data-id]").count() == before + 1,
             new Page.WaitForConditionOptions().setTimeout(30_000));

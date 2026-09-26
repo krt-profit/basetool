@@ -46,12 +46,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 /**
- * Unit tests for {@link MaterialExternalAliasService}.
- *
- * <p>Coverage for the four behaviours that matter for the R3 sync's correctness: lookup chain uses
- * the case-insensitive alias resolver, create / update reject duplicates — including case-only
- * variants (REQ-REFINERY-010) — create / update reject a missing material, and update enforces the
- * optimistic-lock version.
+ * Unit tests for {@link MaterialExternalAliasService}: case-insensitive lookup, duplicate and
+ * missing-material rejection (REQ-REFINERY-010), and the optimistic-lock check on update.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExternalAliasServiceTest {
@@ -179,8 +175,6 @@ class MaterialExternalAliasServiceTest {
     verify(repository, never()).save(any());
   }
 
-  // covers REQ-REFINERY-010 — a case-only variant of an existing alias is a duplicate (409),
-  // matching the case-insensitive resolution lookup and the V146 unique index.
   @Test
   void create_throwsDuplicate_whenCaseVariantOfExistingAliasIsSubmitted() {
     MaterialExternalAliasWriteRequest request =
@@ -260,8 +254,6 @@ class MaterialExternalAliasServiceTest {
     verify(repository, never()).save(any());
   }
 
-  // covers REQ-REFINERY-010 — renaming an alias onto a case-variant of ANOTHER row's name is a
-  // duplicate (409); renaming a row onto a case-variant of ITSELF stays allowed.
   @Test
   void update_throwsDuplicate_whenCaseVariantOfAnotherRowExists() {
     MaterialExternalAlias existing = newAlias("Old Name");
@@ -284,8 +276,6 @@ class MaterialExternalAliasServiceTest {
     verify(repository, never()).save(any());
   }
 
-  // covers REQ-REFINERY-010 — recasing a row's own name (same id matched case-insensitively) is
-  // NOT a duplicate; admins may fix casing in place.
   @Test
   void update_allowsRecasingOwnName_withoutDuplicateError() {
     MaterialExternalAlias existing = newAlias("stileron (ore)");

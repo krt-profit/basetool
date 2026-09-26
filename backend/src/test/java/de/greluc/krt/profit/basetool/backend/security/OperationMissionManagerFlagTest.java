@@ -57,13 +57,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression guard for {@link
- * de.greluc.krt.profit.basetool.backend.controller.OperationController}'s
- * {@code @PreAuthorize("hasRole('MISSION_MANAGER')")} gates. Two grant paths exist for that role:
- * the Keycloak realm role and the {@code app_user.is_mission_manager} DB flag. The DB-flag path is
- * wired in {@link CustomJwtGrantedAuthoritiesConverter} and is not visible from the controller
- * annotations alone; this test pins the integration end-to-end so a refactor of the converter
- * cannot silently lock out DB-flag managers from the operation endpoints.
+ * Verifies that the DB mission-manager flag, resolved by {@link
+ * CustomJwtGrantedAuthoritiesConverter}, passes the {@code hasRole('MISSION_MANAGER')} gates of
+ * {@link de.greluc.krt.profit.basetool.backend.controller.OperationController}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -131,8 +127,6 @@ class OperationMissionManagerFlagTest {
 
   @Test
   void noFlagAndNoKeycloakRole_isRejectedFromCreateOperation() throws Exception {
-    // Negative control: same flow, but the user has neither the DB flag
-    // nor any role claim. @PreAuthorize must reject with 403.
     User plainUser = newUser("plain-member", false);
     Collection<GrantedAuthority> authorities = authoritiesFor(plainUser);
     assertTrue(
@@ -148,14 +142,11 @@ class OperationMissionManagerFlagTest {
         .andExpect(status().isForbidden());
   }
 
-  // ── helpers ────────────────────────────────────────────────────────────
-
   private User newUser(String username, boolean missionManager) {
     User u = new User();
     u.setId(UUID.randomUUID());
     u.setUsername(username);
     u = userRepository.save(u);
-    // Post-R9 D3 (V101): MissionManager flag + home Staffel both live on the membership row.
     OrgUnitMembership m = new OrgUnitMembership();
     m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
     m.setUser(u);
@@ -169,8 +160,6 @@ class OperationMissionManagerFlagTest {
     Operation op = new Operation();
     op.setName(name);
     op.setStatus(OperationStatus.PLANNED);
-    // V99 made owning_org_unit_id NOT NULL — anchor every test Operation to IRIDIUM so direct
-    // repository saves do not trip the constraint.
     op.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     return operationRepository.save(op);
   }
@@ -186,12 +175,7 @@ class OperationMissionManagerFlagTest {
     return resolved != null ? resolved : Collections.emptyList();
   }
 
-  /**
-   * Build the MockMvc JWT post-processor with the authorities we just resolved from the converter.
-   * Bypassing the converter on the MockMvc test JWT is the normal pattern in this codebase — the
-   * integration we are testing is "converter output + controller @PreAuthorize", so we call the
-   * converter explicitly and feed the result into the mocked JWT authentication.
-   */
+  /** Builds the MockMvc JWT post-processor carrying the authorities resolved by the converter. */
   private org.springframework.test.web.servlet.request.RequestPostProcessor jwtFor(
       User user, Collection<GrantedAuthority> authorities) {
     return jwt()

@@ -1,4 +1,3 @@
-# The desktop one-click ingest gateway.
 server {
   listen 8443 ssl ${EDGE_LISTEN_OPTS};
   listen [::]:8443 ssl ${EDGE_LISTEN_OPTS};
@@ -15,7 +14,6 @@ server {
   include /etc/nginx/edge/include/limits.conf;
   include /etc/nginx/edge/include/maintenance.conf;
 
-  # Ingest posts small JSON handoffs. Its own ceiling, far below the global one.
   client_max_body_size 2m;
 
   location /actuator { return 404; }
@@ -24,14 +22,6 @@ server {
     include /etc/nginx/edge/include/proxy.conf;
     include /etc/nginx/edge/include/upstream-tls.conf;
     proxy_ssl_name                ingest;
-    # A VARIABLE upstream, not a literal one. With a literal name nginx resolves it
-    # once at startup and caches the address forever, so a recreated container
-    # leaves the edge pointing at an address nobody answers on until the edge is
-    # restarted too. The variable form defers resolution to the resolver declared
-    # in nginx.conf and re-resolves on its TTL. $request_uri is appended because a
-    # proxy_pass carrying variables does not forward the request URI on its own; it
-    # is the RAW, still-encoded form, which is what the upstreams have always been
-    # given and what the allow-list deliberately does NOT match on.
     set $upstream_host ingest;
     proxy_pass https://$upstream_host:11262$request_uri;
   }

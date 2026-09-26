@@ -17,25 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Sync-reports admin page module (/admin/sync-reports), extracted verbatim from the former
- * inline script of admin/sync-reports.html (ADR-0069, follow-up to #924).
- *
- * In-place pager swap of the #sync-results table and the purge-old-reports confirm modal: the
- * confirm posts source/days as query params through window.krtFetch, toasts the localized count
- * and re-swaps the results in place; without krtFetch the native form submit runs (no-JS
- * fallback).
- *
- * The interpolated success-template + error strings stay inline in the page bootstrap as the
- * SYNC_MSG global this module reads.
- */
-
 /* global SYNC_MSG */
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Intercept the prev/next pager anchors inside #sync-results so paging swaps in place
-    // (REQ-FE-002). The table rows carry no per-element handlers, so nothing needs re-init on
-    // krt:swapped. Independent of the purge-modal wiring below (which may early-return).
     if (window.krtFetch) {
         window.krtFetch.bindSwap({ container: '#sync-results', history: true });
     }
@@ -79,8 +63,6 @@ document.addEventListener('DOMContentLoaded', function () {
             form.requestSubmit();
             return;
         }
-        // @RequestParam binds from the query string regardless of the JSON content-type that
-        // krtFetch sends, so pass source/days as query params and omit the body.
         const sourceValue = sourceInput ? sourceInput.value : '';
         const url =
             '/admin/sync-reports/delete-old?days=' +
@@ -97,9 +79,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (window.showFrontendSuccessToast) {
                     window.showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));
                 }
-                // Refresh the results table in place for the active tab. The "Gesamt"
-                // total sits outside the swap fragment and refreshes on the next
-                // navigation — acceptable for a rare maintenance purge.
                 if (window.krtFetch) {
                     window.krtFetch.swap({
                         url: window.location.pathname + window.location.search,

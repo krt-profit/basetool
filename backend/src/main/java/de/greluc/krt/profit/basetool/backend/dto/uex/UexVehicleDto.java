@@ -23,43 +23,26 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Inbound JSON record for UEX Corp's {@code /vehicles} endpoint. Mapped to the project's own {@code
- * ShipType} entity by {@code UexVehicleService}.
+ * Inbound JSON record for UEX Corp's {@code /vehicles} endpoint, mapped onto {@code ShipType} by
+ * {@code UexVehicleService}.
  *
- * <p>R2 expansion (SC_WIKI_SYNC_PLAN.md §6.5): the original three-field projection has been
- * replaced by the full UEX vehicle payload — integer id + in-game UUID + 36 {@code is_*} capability
- * flags + dimensions + fuel + urls. The hardened {@code UexVehicleService} uses {@code uuid} as the
- * primary join key (falling back to {@code id} then case-insensitive {@code name}) and writes every
- * column it carries onto {@code ship_type}. {@code uuid} is captured as a {@link String} for the
- * same reason as {@code UexItemDto} — UEX returns an empty string for ~31% of vehicles.
- *
- * <p><b>Bound to what UEX actually serves (REQ-DATA-015 / ADR-0148).</b> Eleven components were
- * removed on 2026-08-28 after a field-by-field comparison against the live endpoint: {@code
- * crew_min}, {@code crew_max}, {@code mass_total}, {@code vehicle_inventory}, {@code ore_capacity},
- * {@code max_medical_tier}, {@code health}, {@code shield_hp}, {@code url_wiki}, {@code
- * description} and {@code description_de} are not in the payload and never were during this
- * record's lifetime. Because the record is {@link JsonIgnoreProperties}{@code (ignoreUnknown =
- * true)} they decoded to {@code null}, and {@code UexVehicleService} wrote every one of them onto
- * {@code ship_type} — which not only left eight columns permanently empty but also cleared {@code
- * vehicle_inventory_scu} and {@code description_en} after each Wiki vehicle sync had filled them.
- * The crew range survives the removal: UEX serves it as the compact {@code crew} string ({@code
- * "1"}, {@code "1,2"}), which {@code UexValues.parseCrew} splits back into min / max.
+ * <p>Declares only the fields UEX actually serves (REQ-DATA-015). {@code uuid} is the primary join
+ * key, falling back to {@code id} and then the name; it is a {@link String} because UEX returns an
+ * empty string for uncatalogued vehicles.
  *
  * @param id UEX integer vehicle id (stable across runs)
- * @param uuid in-game RSI asset UUID — empty string for vehicles UEX has not catalogued yet
+ * @param uuid in-game RSI asset UUID; empty string for vehicles UEX has not catalogued yet
  * @param name short name, e.g. {@code "100i"}
  * @param nameFull full marketing name, e.g. {@code "Origin 100i"}
  * @param slug kebab-case URL slug
  * @param companyName denormalised manufacturer name
- * @param scu cargo SCU (legacy field kept for back-compat with the synthesized description)
- * @param crew legacy crew text field — kept for back-compat; new code reads {@code crewMin}/{@code
- *     crewMax}
+ * @param scu cargo capacity in SCU
+ * @param crew crew range as a compact string, e.g. {@code "1"} or {@code "1,2"}
  * @param mass hull mass (kg)
  * @param width metres
  * @param height metres
- * @param length metres ({@code length} reserved in SQL — entity column is {@code length_m})
- * @param padType landing pad size class ({@code "XS"} / {@code "S"} / {@code "M"} / {@code "L"} /
- *     {@code "XL"})
+ * @param length metres (entity column {@code length_m})
+ * @param padType landing pad size class ({@code "XS"} to {@code "XL"})
  * @param fuelQuantum quantum fuel capacity
  * @param fuelHydrogen hydrogen fuel capacity
  * @param containerSizes comma-separated SCU container sizes (e.g. {@code "1,2"})
@@ -74,7 +57,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param isCargo UEX flag
  * @param isCarrier UEX flag
  * @param isCivilian UEX flag
- * @param isConcept UEX flag — set on ship-sale-only concepts not yet flyable
+ * @param isConcept UEX flag; set on ship-sale-only concepts not yet flyable
  * @param isConstruction UEX flag
  * @param isDatarunner UEX flag
  * @param isDocking UEX flag
@@ -89,7 +72,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param isMilitary UEX flag
  * @param isMining UEX flag
  * @param isPassenger UEX flag
- * @param isQed UEX flag — quantum enforcement device
+ * @param isQed UEX flag; quantum enforcement device
  * @param isQuantumCapable UEX flag
  * @param isRacing UEX flag
  * @param isRefinery UEX flag
@@ -99,14 +82,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param isSalvage UEX flag
  * @param isScanning UEX flag
  * @param isScience UEX flag
- * @param isShowdownWinner UEX flag — marker for tournament-prize ships
+ * @param isShowdownWinner UEX flag; marks tournament-prize ships
  * @param isSpaceship UEX flag
- * @param isStarter UEX flag — set on starter-package eligible ships
+ * @param isStarter UEX flag; set on starter-package eligible ships
  * @param isStealth UEX flag
  * @param isTractorBeam UEX flag
- * @param idCompany UEX integer company id of the manufacturer — the stable key the vehicle sync
- *     resolves the manufacturer through, so a brand UEX splits across several company records still
- *     reunites on one manufacturer row (ADR-0023)
+ * @param idCompany UEX integer company id of the manufacturer; the stable key the manufacturer is
+ *     resolved through (ADR-0023)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record UexVehicleDto(

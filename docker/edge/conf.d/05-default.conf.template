@@ -1,29 +1,3 @@
-# =============================================================================
-# Default servers — the two catch-alls (ADR-0162)
-#
-# Port 8080 (published as :80) exists for exactly two reasons: serving the ACME
-# HTTP-01 challenge, and redirecting everything else to HTTPS. NPM did the
-# redirect through a per-host `force-ssl.conf` that built a $test string out of
-# four `if`s to decide whether an upstream had already handled TLS. There is no
-# upstream in front of this edge, so the honest form is one unconditional 308.
-#
-# 308 rather than NPM's 301: it preserves the method and body, so a POST that
-# arrives on :80 is replayed as a POST instead of being silently turned into a
-# GET.
-# =============================================================================
-
-# Liveness for the container HEALTHCHECK, on a listener of its own that NEVER
-# speaks PROXY protocol — and that is the whole reason it exists separately.
-#
-# It used to live on :8080 beside the redirect. Once a front end is configured
-# (ADR-0187) that listener becomes `proxy_protocol`, and such a listener REJECTS
-# a header-less connection: the HEALTHCHECK's own `wget http://127.0.0.1/healthz`
-# would be refused, the container would never go healthy, and `Notify=healthy`
-# would hold the entire stack down behind an edge that is in fact working.
-# A dedicated plain listener keeps the check honest in both modes.
-#
-# Bound to loopback, so nothing outside the container can reach it at all. The
-# allow-list stays as a second lock rather than as the only one.
 server {
   listen 127.0.0.1:8081;
   listen [::1]:8081;
@@ -53,9 +27,6 @@ server {
   }
 }
 
-# Unknown SNI. `ssl_reject_handshake` refuses at the TLS layer, so a scanner
-# probing by IP never gets a certificate and never learns a hostname — carried
-# over from NPM's fallback server, which did the same.
 server {
   listen 8443 ssl default_server ${EDGE_LISTEN_OPTS};
   listen [::]:8443 ssl default_server ${EDGE_LISTEN_OPTS};

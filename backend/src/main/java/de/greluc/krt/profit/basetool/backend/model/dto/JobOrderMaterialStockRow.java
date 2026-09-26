@@ -22,19 +22,13 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * Flat, internal projection of one job-order-linked inventory row, used to batch the per-(order,
- * material) stock sums of the paged job-order list into a single query (REQ-DATA-003). Instead of
- * firing one {@code SUM(amount)} aggregate per material bucket per order — an O(orders × materials)
- * fan-out on the most-visited orders page — the list path loads every linked row once via {@code
- * InventoryItemRepository.findMaterialStockRowsByJobOrderIds} and sums the buckets in memory,
- * applying each bucket's own quality floor. Carrying the raw {@code quality} (nullable) and {@code
- * amount} lets the caller reproduce the exact {@code (minQuality IS NULL OR quality >= minQuality)}
- * semantics of the original per-bucket query for any floor value, not just the GOOD/NONE pair.
+ * Internal projection of one job-order-linked inventory row, used to sum per-(order, material)
+ * stock in memory from a single query (REQ-DATA-003).
  *
  * @param jobOrderId the id of the job order the inventory row is linked to.
  * @param materialId the id of the row's material.
  * @param quality the row's quality grade, or {@code null} when ungraded.
- * @param amount the row's stocked amount (SCU); never {@code null} for a persisted row.
+ * @param amount the row's stocked amount (SCU); never {@code null}.
  */
 public record JobOrderMaterialStockRow(
     UUID jobOrderId, UUID materialId, Integer quality, Double amount) {}

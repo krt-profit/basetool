@@ -46,24 +46,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Appends rows to the immutable activity audit trail shared by the four audited areas
- * (REQ-AUDIT-001, ADR-0037). One row per audited mutation, written in the <em>same transaction</em>
- * as the business write — the {@code MANDATORY} propagation makes calling this outside a
- * transaction a programming error, and an audit insert failure rolls the mutation back (no silent
- * gaps).
+ * Appends rows to the immutable activity audit trail (REQ-AUDIT-001, ADR-0037), one per audited
+ * mutation, in the same transaction as the business write.
  *
- * <p>The actor is resolved from the current security context via {@link AuthHelperService} (never
- * {@code SecurityContextHolder} directly — ArchUnit-enforced) and snapshotted: the row stores both
- * the user id (FK {@code ON DELETE SET NULL}) and the effective-name handle so the trail survives
- * user deletion. The {@link AuditDomain} is derived from the event type itself, so the persisted
- * domain column and the event type can never disagree.
- *
- * <p>The row also records <em>which client</em> the mutation came through (REQ-AUDIT-005), because
- * the actor alone stops identifying the origin as soon as two clients can reach the same mutation:
- * a replayed access token acts with its member's authority, and without this the resulting rows are
- * indistinguishable from the same person working in the browser. The value is the token's {@code
- * azp} mapped through {@link ClientAttribution} — the same bounded vocabulary the request counter
- * labels with (REQ-OBS-018), so the metric and the trail can be read against each other.
+ * <p>Each row snapshots the actor (via {@link AuthHelperService}) so it survives user deletion,
+ * derives its {@link AuditDomain} from the event type, and records the originating client through
+ * {@link ClientAttribution} (REQ-AUDIT-005).
  */
 @Service
 @RequiredArgsConstructor
@@ -78,18 +66,15 @@ public class AuditService {
   private final MeterRegistry meterRegistry;
 
   /**
-   * Appends one audit event for the current caller within the surrounding business transaction. The
-   * domain is taken from {@code eventType.domain()}.
+   * Appends one audit event for the current caller within the surrounding transaction; the domain
+   * comes from {@code eventType.domain()}.
    *
-   * @param eventType what happened (its domain pins the row's area)
+   * @param eventType what happened; its domain pins the row's area
    * @param subjectId the primary affected aggregate's id, or {@code null} for aggregate-less events
-   * @param subjectLabel the affected aggregate's human-readable label snapshot, or {@code null}
+   * @param subjectLabel the affected aggregate's label snapshot, or {@code null}
    * @param targetUserId the affected user for user-centric events, or {@code null}
-   * @param details compact {@code key=value} details payload (no user free text), or {@code null} —
-   *     typically an {@link AuditDetails} composer, stringified via {@link CharSequence#toString()}
-   *     before persistence. Taking {@link CharSequence} (not {@code String}) makes the builder the
-   *     type-level entry point: a caller hands the composed {@code AuditDetails} directly rather
-   *     than hand-concatenating a string.
+   * @param details compact {@code key=value} payload without user free text, typically an {@link
+   *     AuditDetails}; or {@code null}
    * @return the persisted audit row
    */
   @Transactional(propagation = Propagation.MANDATORY)
@@ -108,27 +93,15 @@ public class AuditService {
             .domain(eventType.domain())
             .eventType(eventType)
             .actorUserId(actorId.orElse(null))
-            // Clamp to the actor_handle column width (255), symmetric with subjectLabel — an
-            // over-long effective name must never throw and roll back the business mutation.
             .actorHandle(truncate(actorHandle))
             .subjectId(subjectId)
             .subjectLabel(truncate(subjectLabel))
             .targetUserId(targetUserId)
-            // Persist the rendered payload; a null stays null (no details), any other CharSequence
-            // (an AuditDetails composer or a raw String) is stringified byte-identically.
             .details(details == null ? null : details.toString())
-            // Read at write time from the SAME authentication the actor came from, so the two
-            // halves of "who, through what" can never describe different requests. Always a
-            // value, never null: a caller with no token records `none`, which the row's `system`
-            // actor handle then distinguishes from the token-with-no-azp case (REQ-AUDIT-005).
             .clientId(
                 clientAttribution.labelOf(authHelperService.currentAuthentication().orElse(null)))
             .build();
     AuditEvent saved = auditEventRepository.save(event);
-    // Per-domain audited-mutation counter (REQ-OBS-011). The domain is the bounded AuditDomain
-    // derived from the event type — never subjectLabel/details, which can carry free text/PII.
-    // Incremented after a successful save; a later rollback in the same transaction is not undone
-    // (standard for a non-transactional counter), an accepted minor drift.
     meterRegistry
         .counter(MetricNames.AUDIT_EVENTS, MetricNames.TAG_DOMAIN, eventType.domain().name())
         .increment();
@@ -136,8 +109,7 @@ public class AuditService {
   }
 
   /**
-   * One filtered page of a single area's audit log for the admin viewer (REQ-AUDIT-001). The domain
-   * is the selected tab; the remaining filters are optional.
+   * Returns one filtered page of a single area's audit log for the admin viewer (REQ-AUDIT-001).
    *
    * @param domain the area to read
    * @param from period start (inclusive), or {@code null}
@@ -170,16 +142,13 @@ public class AuditService {
   }
 
   /**
-   * Purges one area's audit rows older than a cutoff — the admin retention delete (REQ-AUDIT-004) —
-   * and records the purge itself as an audit event so the deletion leaves a trace. The bulk delete
-   * runs first; the {@code *_AUDIT_PURGED} marker is written afterwards (its timestamp is newer
-   * than the cutoff, so it survives) and carries the deleted count and cutoff in its details. Write
-   * transaction on purpose: the marker insert ({@code record}, {@code MANDATORY}) runs inside it,
-   * so a failed marker rolls the delete back.
+   * Deletes one area's audit rows older than a cutoff (REQ-AUDIT-004) and records the purge as a
+   * {@code *_AUDIT_PURGED} event carrying the count and cutoff; a failed marker rolls the delete
+   * back.
    *
-   * @param domain the area to purge (the selected tab)
+   * @param domain the area to purge
    * @param before the exclusive cutoff; rows older than this are removed
-   * @return the number of audit rows deleted (excludes the purge marker itself)
+   * @return the number of audit rows deleted, excluding the purge marker
    */
   @Transactional
   public int purgeBefore(@NotNull AuditDomain domain, @NotNull Instant before) {

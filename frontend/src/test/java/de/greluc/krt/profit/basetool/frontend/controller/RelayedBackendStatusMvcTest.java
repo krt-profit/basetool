@@ -61,17 +61,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Pins that every proxy relay which forwards a backend refusal as {@code new
- * ResponseStatusException(e.getStatusCode(), …)} answers the caller with the backend's status, not
- * with {@code 500} (APPSEC-11, REQ-OBS-001).
+ * Tests that every proxy relay forwarding a backend refusal as a {@code ResponseStatusException}
+ * answers with the backend's status, not {@code 500} (REQ-OBS-001).
  *
- * <p>Before {@code GlobalExceptionHandler#handleResponseStatus} existed, the advice's {@code
- * Exception} catch-all ran ahead of Spring's own {@code ResponseStatusExceptionResolver}, so a
- * backend {@code 409} relayed by any of these fourteen call sites became a {@code 500} for the
- * browser and an {@code ERROR} line with a stack trace in the log — the unit tests around each
- * relay were green throughout, because they assert the thrown exception's status and never dispatch
- * it through the advice. This test does: each relay is mounted in a standalone {@link MockMvc}
- * together with the real advice, and {@link MockWebServer} plays the backend.
+ * <p>Each relay runs in a standalone {@link MockMvc} with the real advice, against a {@link
+ * MockWebServer} backend.
  */
 class RelayedBackendStatusMvcTest {
 

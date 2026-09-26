@@ -1,31 +1,6 @@
-# Ops-automation alerts driven by node_exporter textfile metrics written by deploy.sh, backup.sh,
-# restore-drill.sh and container-cleanup.sh (ADR-0072, renamed from docker-cleanup.sh by ADR-0194). The textfiles carry richer per-outcome detail
-# (per-outcome timestamps, durations, reclaimed bytes, per-artifact restore results) than the
-# systemd collector's unit-level success, and let alerts distinguish "failed" / "stale" / "never
-# ran" via absent()-guards. Textfile names are defined by the scripts.
-#
-# WHERE THE SCRIPT OUTPUT ACTUALLY LIVES — read this before triaging anything here. Do NOT reach for
-# `journalctl -u iri-<job>.service`: all four units set `StandardOutput=append:/var/log/iri-<job>.log`
-# AND `StandardError=append:...`, and `append:` REPLACES journald for those streams rather than
-# teeing to it. journald therefore keeps only systemd's own unit records (Starting / Succeeded /
-# Failed / the exit code) and not one line any of the scripts printed. Alloy tails the four files
-# into Loki (config.alloy), so the reasoning behind every alert below is queryable in
-# Grafana -> Explore -> Loki:
-#   deploy          {app="ops-deploy"}
-#   backup          {app="ops-backup"}
-#   cleanup         {app="ops-cleanup"}
-#   restore drill   {app="ops-restore-drill"}
-# Each description carries the query it needs, because that is what reaches the responder's mailbox
-# at 03:40. LogStreamSilent{stream="ops-deploy"} (meta.yml) guards the deploy tail, so a dead tailer
-# cannot make this reasoning silently unavailable again.
 groups:
   - name: ops-automation-critical
     rules:
-      # A rollback or a failure that is newer than the last success = a promoted release did not ship.
-      # The `or (… unless …)` arm (#1041 item 21) guards the fresh-host / wiped-textfile-dir case: with
-      # no last_success series the bare `>` comparison matches nothing, so a failing FIRST deploy would
-      # alert nothing — `X unless last_success` fires when X exists and last_success does not. Mirrors
-      # the absent()-guards on the backup/restore rules below.
       - alert: DeployRolledBack
         expr: >-
           basetool_deploy_last_rollback_timestamp > basetool_deploy_last_success_timestamp
@@ -48,26 +23,6 @@ groups:
           summary: "Deploy failed (newer than last success)"
           description: "The last deploy attempt failed and is newer than the last successful deploy (or failed with no successful deploy on record — a failing first install). deploy.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-deploy\"} |~ \"FATAL\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-deploy\"}` for the run around it. Not visible via `journalctl -u iri-deploy.service` (stdout/stderr are appended to /var/log/iri-deploy.log, not journald)."
 
-      # A container is running the CURRENT target image but is unhealthy, and
-      # deploy.sh's targeted restart could not bring it back — the runtime is
-      # broken on the deployed release. This is deliberately NOT a rollback (a
-      # wrong-release rollback fires DeployRolledBack above): rolling the stack
-      # back to the same image cannot fix a runtime fault, so deploy.sh restarts
-      # only the affected service and, when that will not stick, raises THIS
-      # signal instead of a false DeployRolledBack (ADR-0083, the 2026-07-09
-      # native-thread exhaustion incident). The heartbeat comparison self-clears
-      # the moment a tick observes the stack healthy again; the `unless` arm
-      # covers a first failure before any healthy tick was recorded. `for: 15m`
-      # rides out deploy.sh's own restart backoff so a single blip does not page.
-      #
-      # Since 2026-09-25 the same stamp also means a failed DRIFT RE-APPLY (a missing
-      # container or a wrong image under the deployed marker, re-applied and still not
-      # up): that run re-applies the release already deployed, so it has nothing to roll
-      # back to, and before the fix it "rolled back" to itself and fired DeployRolledBack.
-      # This signal and not DeployFailed, because DeployFailed means a promoted release
-      # did not ship and clears only on the next successful deploy — a stack that comes
-      # back on its own would have kept it firing — while this one clears on the next
-      # tick that finds the stack healthy.
       - alert: DeployHealthRestartFailing
         expr: >-
           basetool_deploy_last_health_restart_failed_timestamp > basetool_deploy_last_stack_healthy_timestamp
@@ -97,11 +52,6 @@ groups:
           summary: "Backup stale >26h or metric absent"
           description: "The nightly backup last succeeded more than 26 hours ago, or the backup metric is absent (never ran). backup.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-backup\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-backup\"}` for the run. A completely empty stream over the window means the unit never fired at all — check `systemctl list-timers iri-backup.timer`. Not visible via `journalctl -u iri-backup.service` (stdout/stderr are appended to /var/log/iri-backup.log)."
 
-      # EIGHT days, not 35 (corrected 2026-09-22, OPS-MON-05). The drill runs WEEKLY (REQ-OPS-011,
-      # Sunday 05:30), so 35 days let four consecutive drills fail -- a month of unverified backups --
-      # before anyone was told. Eight is one weekly interval plus a day of slack for a run that finishes
-      # late, so the FIRST Sunday that fails or does not run is reported the next day -- the same
-      # margin ContainerCleanupStaleOrMissing uses for its weekly job.
       - alert: RestoreDrillStaleOrMissing
         expr: (time() - basetool_restore_drill_last_success_timestamp) > 8 * 24 * 3600 or absent(basetool_restore_drill_last_success_timestamp)
         for: 1h
@@ -131,18 +81,6 @@ groups:
 
   - name: ops-automation-warning
     rules:
-      # The deployer's own heartbeat (OPS-MON-02, added 2026-09-22). deploy.sh stamps
-      # basetool_deploy_last_stack_healthy_timestamp on every tick that finds the stack at its target
-      # and healthy -- which on a quiet host is every five minutes. Every other deploy alert reads an
-      # OUTCOME a tick wrote; none of them can see ticks that stopped happening. A disabled timer, a
-      # lock that is never released, a pre-flight that aborts before the first metric write, a host
-      # whose textfile directory went read-only: each leaves the last outcome standing, and the last
-      # outcome was a success. An hour is twelve missed ticks.
-      #
-      # It also fires, correctly, while a tick deliberately skips -- a stateful-infra carve-out
-      # (DeployConfigBlocked pages that one) or a bad-digest backoff (DeployRolledBack) -- because in
-      # both the running stack is no longer being verified. `absent()` covers a host whose deployer
-      # never wrote the gauge at all.
       - alert: DeployHeartbeatStale
         expr: >-
           (time() - basetool_deploy_last_stack_healthy_timestamp) > 3600
@@ -154,12 +92,6 @@ groups:
           summary: "Deploy heartbeat stale >1h (no tick has verified the stack)"
           description: "No deploy tick has observed the stack at its target and healthy for over an hour, or the heartbeat metric is absent -- so the running stack is not being verified and no release can reach it. Check `systemctl list-timers iri-deploy.timer` and `systemctl status iri-deploy.service`, then `{app=\"ops-deploy\"}` in Grafana -> Explore -> Loki for the last tick's lines (a FATAL, a lock message, or nothing at all). A deliberate skip (a gated stateful-infra change, a backoff after a rollback) also stops the heartbeat; DeployConfigBlocked and DeployRolledBack name those."
 
-      # Opt-in: fires ONLY when an expiry has been recorded (the .expiry sidecar
-      # exists) and is <14d away. A token with no expiry (a classic PAT kept
-      # non-expiring by choice) simply has no .expiry file, emits no metric, and
-      # is intentionally NOT alerted on — deploy.sh's write_token_expiry_metric is
-      # a no-op then. (Do not re-add an `absent()` guard: it would false-warn
-      # forever on every host that runs a non-expiring token.)
       - alert: GhcrPullTokenExpiring
         expr: (basetool_ghcr_token_expiry_timestamp - time()) < 14 * 24 * 3600
         for: 1h
@@ -169,15 +101,6 @@ groups:
           summary: "GHCR pull token expiring <14d"
           description: "The production GHCR pull token's recorded expiry is under 14 days away — rotate it and update its .expiry file (docs/deployment.md → Token rotation). A lapsed token silently stops all deploys. If the expiry itself looks wrong, deploy.sh logs an unparseable sidecar as a WARN: `{app=\"ops-deploy\"} |~ \"expiry\"` in Grafana -> Explore -> Loki."
 
-      # Renamed from DockerCleanupStaleOrMissing / basetool_docker_cleanup_* with ADR-0194: the job goes
-      # through lib/container-runtime.sh instead of calling `docker`, because the rootless Podman host
-      # has no docker binary at all.
-      #
-      # The OLD metric name was accepted beside the new one for as long as the rename was crossing two
-      # delivery channels (the rules ride the config bundle, the scripts the Ansible role). Both Rocky
-      # hosts have run the role since the 2026-09-22 cutover and the Docker host is retired, which was
-      # the stated removal condition (arc42 §11.1); the second name went on 2026-09-22 (OPS-SIMP-02). A
-      # rule that accepts a name nothing writes is how a rename quietly never finishes.
       - alert: ContainerCleanupStaleOrMissing
         expr: |
           (time() - basetool_container_cleanup_last_success_timestamp) > 8 * 24 * 3600

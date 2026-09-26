@@ -36,17 +36,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow (BE-SIMP-03): the owner change on the Verwaltung tab is optimistically locked.
+ * Verifies that the owner change on the Verwaltung tab is optimistically locked via {@code
+ * ownershipVersion}: a change saves in place and moves the counter, and a change with a stale
+ * counter is refused with 409.
  *
- * <p>Before 2026-09-22 the page called the unversioned owner endpoint, so of two managers handing
- * the same Einsatz to different people the later one silently won. The page now carries the
- * mission's {@code ownershipVersion} on {@code #owner-row} and echoes it. This test proves the two
- * halves a user can see: a change goes through in place and moves the counter on the row (so a
- * second change from the same page does not 409 itself), and a change sent with a counter somebody
- * else has since moved is refused with a 409 and leaves the owner as it was.
- *
- * <p>Drive via UI, verify via API ({@link BackendSeeder}). The actor is {@code test-admin}, who may
- * change the owner of every mission through the role hierarchy.
+ * <p>Drives the UI and verifies via {@link BackendSeeder}, as {@code test-admin}.
  */
 @Tag("e2e")
 class MissionOwnerChangeE2eTest {
@@ -68,14 +62,11 @@ class MissionOwnerChangeE2eTest {
   private static String officerId;
 
   /**
-   * Launches the browser and, for the ephemeral stack, seeds a mission and two candidates.
+   * Launches the browser and, on the ephemeral stack, seeds a mission and two owner candidates.
    *
-   * <p>Only the admin actor is homed in IRIDIUM (the mission create is staffel-scoped). The two
-   * candidates are merely materialised as {@code app_user} rows by logging them in once: an owner
-   * change accepts any existing user, and the admin's unpinned picker searches every user. They are
-   * deliberately <em>not</em> passed to {@link BackendSeeder#ensureIridiumMembership}, which
-   * self-assigns through the ADMIN-only membership endpoint and 403s for a non-admin that has no
-   * Staffel yet — the {@code initializationError} this class shipped with on 2026-09-22.
+   * <p>Only the admin is homed in IRIDIUM; the candidates are materialised as {@code app_user} rows
+   * by logging in once, since {@link BackendSeeder#ensureIridiumMembership} fails for a non-admin
+   * without a Staffel.
    */
   @BeforeAll
   static void setUp() {
@@ -133,7 +124,6 @@ class MissionOwnerChangeE2eTest {
             page.evaluate("window.__krtNoReload === true"),
             "the owner change must update in place — no full-page reload");
 
-        // A second manager's page, opened before the change, still says 0.
         page.evaluate(
             "document.getElementById('owner-row').setAttribute('data-ownership-version', '0')");
         Response stale = changeOwner(page, officerId, OFFICER);

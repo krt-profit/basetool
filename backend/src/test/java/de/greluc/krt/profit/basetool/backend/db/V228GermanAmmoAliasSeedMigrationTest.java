@@ -42,14 +42,9 @@ import org.springframework.util.StreamUtils;
 
 /**
  * Verifies the V228 seed that maps the German ammo-capacity spelling onto the English catalogue
- * product (#1485, REQ-INV-021).
+ * product (REQ-INV-021).
  *
- * <p>The test executes the <b>actual migration file</b> read from the classpath rather than a
- * transcribed copy of its statement. A seed migration is otherwise untestable: it runs once against
- * an empty catalogue when the test schema is built, long before any fixture exists, so asserting on
- * "what the seed produced" would assert on nothing. Re-running the real file against fixtures tests
- * the shipped SQL and proves its idempotency in the same step — a transcribed copy would only prove
- * that the copy works.
+ * <p>Executes the shipped migration file against fixtures, which also proves its idempotency.
  */
 @SpringBootTest
 class V228GermanAmmoAliasSeedMigrationTest {
@@ -155,10 +150,8 @@ class V228GermanAmmoAliasSeedMigrationTest {
         .satisfies(
             row -> {
               assertThat(row.get("external_name")).isEqualTo("V228 S71 Rifle Magazine (30 Schuss)");
-              // Exactly BlueprintNameNormalizer's output, so the alias dereferences to the master.
               assertThat(row.get("product_key")).isEqualTo("v228 s71 rifle magazine (30 cap)");
               assertThat(row.get("product_name")).isEqualTo("V228 S71 Rifle Magazine (30 cap)");
-              // Not a new localisation source: BlueprintImportService looks up SCMDB only.
               assertThat(row.get("source_system")).isEqualTo("SCMDB");
               assertThat(row.get("created_by")).isEqualTo("system");
             });
@@ -166,7 +159,6 @@ class V228GermanAmmoAliasSeedMigrationTest {
 
   @Test
   void shouldHandleTheUppercaseCapSpellingTheEnglishCatalogueAlsoUses() {
-    // The English global.ini is itself inconsistent: both "(15 cap)" and "(15 Cap)" occur.
     insertBlueprint(UPPERCASE_CAP, "V228 P8-AR Rifle Magazine (15 Cap)", "v228-b", false);
 
     runMigration();
@@ -181,7 +173,6 @@ class V228GermanAmmoAliasSeedMigrationTest {
 
   @Test
   void shouldEmitOneAliasPerProductEvenWithSeveralCatalogueVariants() {
-    // Two wiki rows for the same product name must not violate the unique index on the alias.
     insertBlueprint(LOWERCASE_CAP, "V228 C54 SMG Magazine (50 cap)", "v228-a", false);
     insertBlueprint(SECOND_VARIANT, "V228 C54 SMG Magazine (50 cap)", "v228-c", false);
 
@@ -212,8 +203,6 @@ class V228GermanAmmoAliasSeedMigrationTest {
 
   @Test
   void shouldNeverOverwriteACuratedAliasForTheSameSpelling() {
-    // A user- or admin-resolved alias is the authority; the seed must yield to it (V176's
-    // case-folded unique index is what ON CONFLICT DO NOTHING keys on).
     insertBlueprint(LOWERCASE_CAP, "V228 Gallant Rifle Battery (45 cap)", "v228-a", false);
     jdbc.update(
         """

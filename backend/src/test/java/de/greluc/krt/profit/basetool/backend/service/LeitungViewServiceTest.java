@@ -55,12 +55,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
 /**
- * Mockito unit tests for {@link LeitungViewService} (epic #800, REQ-ROLE-004): the delegated view
- * returns exactly the units the caller's tier may appoint into. Pins the admin short-circuit (sees
- * everything without consulting the delegated authoriser), the pure-OL-member slice (every Bereich,
- * lead-appointment only), the Staffelleiter slice (own squadron, roster management), the SK slices
- * (the SK lead manages its roster, the Bereichsleiter appoints its lead, a plain SK member sees
- * nothing) and the empty view for a plain member.
+ * Unit tests for {@link LeitungViewService} (REQ-ROLE-004): the delegated view returns exactly the
+ * units the caller's tier may appoint into, everything for an admin and nothing for a plain member.
  */
 @ExtendWith(MockitoExtension.class)
 class LeitungViewServiceTest {
@@ -156,7 +152,6 @@ class LeitungViewServiceTest {
     assertEquals(1, view.specialCommands().size());
     assertTrue(view.specialCommands().getFirst().canAppointLead());
     assertTrue(view.specialCommands().getFirst().canManageRoster());
-    // The admin short-circuit decides every cap; the delegated authoriser is never consulted.
     verifyNoInteractions(roleSecurity);
     verifyNoInteractions(specialCommandSecurity);
   }
@@ -216,7 +211,6 @@ class LeitungViewServiceTest {
     assertTrue(sq.canManageRoster());
     assertFalse(sq.canAppointLead());
     assertEquals(2, sq.members().size());
-    // Leadership ranks float to the top of the roster.
     assertEquals(MembershipRole.STAFFELLEITER, sq.members().getFirst().role());
   }
 

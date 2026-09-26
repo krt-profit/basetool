@@ -70,11 +70,6 @@ public class SecurityHardeningIntegrationTest {
 
   @Test
   void testUserSearch_RoleLessAccount_Forbidden() throws Exception {
-    // The "regular user" here was ROLE_GUEST — the authority-less role every account with no realm
-    // role was mapped onto, and which V239 deleted. Its successor is the ROLE_NO_ROLE marker
-    // (REQ-SEC-053), and the case means the same thing it always did: an account below member
-    // reaches nothing. A MEMBER is on this endpoint's allow-list and always was, so substituting
-    // one would have quietly turned a refusal case into a passing 200.
     mockMvc
         .perform(
             get("/api/v1/users/search")
@@ -95,8 +90,6 @@ public class SecurityHardeningIntegrationTest {
 
   @Test
   void testInventoryAggregated_RoleLessAccount_Forbidden() throws Exception {
-    // Same substitution as above: ROLE_GUEST became the ROLE_NO_ROLE marker (REQ-SEC-053). The
-    // Lager admits every member, so this case is only a refusal while its caller is below one.
     mockMvc
         .perform(
             get("/api/v1/inventory/aggregated")
@@ -132,7 +125,6 @@ public class SecurityHardeningIntegrationTest {
 
   @Test
   void testMissionGet_Anonymous_Refused() throws Exception {
-    // Answered 200 until REQ-SEC-052. The mission list was the widest anonymous read the tool had.
     mockMvc.perform(get("/api/v1/missions")).andExpect(status().isUnauthorized());
   }
 

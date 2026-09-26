@@ -24,12 +24,10 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 
 /**
- * Write payload for editing an owned blueprint's mutable fields (#327). The product reference is
- * immutable; only the acquisition date and note can change. {@code version} carries the last seen
- * optimistic-lock version and is mandatory.
+ * Payload editing an owned blueprint's acquisition date and note; the product is immutable.
  *
- * @param acquiredAt optional in-game acquisition time (cleared when {@code null})
- * @param note optional free-form note (max 2000 chars; cleared when {@code null})
+ * @param acquiredAt optional in-game acquisition time; {@code null} clears it
+ * @param note optional free-form note, max 2000 chars; {@code null} clears it
  * @param version the expected optimistic-lock version
  */
 public record PersonalBlueprintUpdateRequest(

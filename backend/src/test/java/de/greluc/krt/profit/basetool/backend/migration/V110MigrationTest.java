@@ -52,7 +52,6 @@ class V110MigrationTest {
     assertEquals("character varying", types.get("kind"));
     assertEquals("character varying", types.get("source_systems"));
 
-    // UEX-sourced columns
     assertEquals("integer", types.get("uex_item_id"));
     assertEquals("character varying", types.get("uex_slug"));
     assertEquals("integer", types.get("uex_category_id"));
@@ -62,7 +61,6 @@ class V110MigrationTest {
     assertEquals("boolean", types.get("uex_is_commodity"));
     assertEquals("timestamp with time zone", types.get("uex_synced_at"));
 
-    // Wiki-sourced (R4) columns must exist but stay nullable
     assertEquals("character varying", types.get("scwiki_slug"));
     assertEquals("character varying", types.get("classification"));
     assertEquals("double precision", types.get("mass"));

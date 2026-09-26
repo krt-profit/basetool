@@ -37,7 +37,6 @@
     <th:block th:fragment="leitungSections">
         <th:block th:if="${leitung != null}">
 
-            <!--/* ============================ Organisationsleitung ============================ */-->
             <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.organisationsleitungen())}">
                 <h2 class="section-title" th:text="#{leitung.tier.ol}">Organisationsleitung</h2>
                 <div class="hud-box mt-2 leitung-unit" th:each="ol : ${leitung.organisationsleitungen()}" th:data-unit-id="${ol.id()}">
@@ -66,8 +65,6 @@
                                         <span class="chip chip--accent" th:if="${isGa}" th:text="#{leitung.grandAdmiral.badge}">Grand Admiral</span>
                                     </td>
                                     <td class="leitung-col-action">
-                                        <!--/* Grand Admiral toggle (REQ-ORG-021): promote any other OL member, or vacate the
-                                             current holder. Gated on canAppointLead (admin on the OL). */-->
                                         <button type="button" class="btn btn-quiet" th:if="${ol.canAppointLead() and !isGa}"
                                                 data-leitung-action="set-grand-admiral" th:data-unit-id="${ol.id()}" th:data-user-id="${m.userId()}"
                                                 th:title="#{leitung.grandAdmiral.set}" th:text="#{leitung.grandAdmiral.set}">Zum Grand Admiral</button>
@@ -87,7 +84,6 @@
                 </div>
             </section>
 
-            <!--/* ============================ Bereiche ============================ */-->
             <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.bereiche())}">
                 <h2 class="section-title" th:text="#{leitung.tier.bereiche}">Bereiche</h2>
                 <div class="hud-box mt-2 leitung-unit" th:each="b : ${leitung.bereiche()}" th:data-unit-id="${b.id()}">
@@ -126,7 +122,6 @@
                 </div>
             </section>
 
-            <!--/* ============================ Staffeln ============================ */-->
             <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.squadrons())}">
                 <h2 class="section-title" th:text="#{leitung.tier.squadrons}">Staffeln</h2>
                 <div class="hud-box mt-2 leitung-unit" th:each="s : ${leitung.squadrons()}"
@@ -135,7 +130,6 @@
                         <h3 class="leitung-unit-title" th:text="${s.name()}">Staffel</h3>
                     </div>
 
-                    <!--/* Kommandogruppen (Staffelleiter only) */-->
                     <div th:if="${s.canManageRoster()}">
                         <h4 class="leitung-subhead" th:text="#{leitung.groups.title}">Kommandogruppen</h4>
                         <div class="leitung-group-grid">
@@ -160,7 +154,6 @@
                         </div>
                     </div>
 
-                    <!--/* Member roster + rank assignment */-->
                     <h4 class="leitung-subhead" th:text="#{leitung.members.title}">Mitglieder</h4>
                     <p class="leitung-empty" th:if="${#lists.isEmpty(s.members())}" th:text="#{leitung.empty.squadronMembers}">Keine Mitglieder.</p>
                     <div class="table-responsive" th:if="${!#lists.isEmpty(s.members())}">
@@ -204,14 +197,11 @@
                 </div>
             </section>
 
-            <!--/* ============================ Spezialkommandos ============================ */-->
             <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.specialCommands())}">
                 <h2 class="section-title" th:text="#{leitung.tier.specialCommands}">Spezialkommandos</h2>
                 <div class="hud-box mt-2 leitung-unit" th:each="sk : ${leitung.specialCommands()}" th:data-unit-id="${sk.id()}">
                     <div class="leitung-unit-head">
                         <h3 class="leitung-unit-title" th:text="${sk.name()}">Spezialkommando</h3>
-                        <!--/* The SK's own lead (and admin) manages its members + Logistiker /
-                             Einsatzmanager flags on the SK member page, outside the admin area. */-->
                         <a class="btn btn-outline" th:if="${sk.canManageRoster()}"
                            th:href="@{/organisation/special-commands/{id}(id=${sk.id()})}"
                            th:text="#{leitung.sk.manageMembers}">Mitglieder verwalten</a>
@@ -223,8 +213,6 @@
                                 <tr>
                                     <th th:text="#{leitung.column.name}">Name</th>
                                     <th th:text="#{leitung.column.rank}">Rang</th>
-                                    <!--/* The lead toggle is the parent Bereichsleiter's (and admin's) only: an
-                                         SK lead sees the roster read-only here. */-->
                                     <th class="leitung-col-action" th:if="${sk.canAppointLead()}" th:text="#{leitung.column.action}">Aktion</th>
                                 </tr>
                             </thead>
@@ -255,14 +243,12 @@
     </div>
 </main>
 
-<!--/* Shared add-member modal (Bereich / OL): user picker + optional role */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='leitung-modal', titleKey='leitung.modal.title', variant='krt-modal--wide', titleId='leitung-modal-title', closeTrigger='', closeClass='leitung-modal-close', body=~{::leitung-modal-body})}">
     <th:block th:ref="leitung-modal-body">
         <div class="krt-modal-body">
             <p class="leitung-modal-unit" id="leitung-modal-unit"></p>
             <div class="form-group">
                 <label for="leitung-modal-user" th:text="#{leitung.modal.user}">Nutzer</label>
-                <!--/* Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. */-->
                 <select id="leitung-modal-user" data-krt-combobox="remote-users">
                     <option value="" th:text="#{leitung.modal.user.placeholder}">-- Bitte wählen --</option>
                 </select>
@@ -281,7 +267,6 @@
 
 <th:block th:replace="~{fragments/toast :: toast}"/>
 
-<!--/* i18n + rank-label dictionary for the page JS */-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     window.leitungI18n = {
         saved: /*[[#{notification.success.save}]]*/ 'Gespeichert.',

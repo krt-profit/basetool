@@ -37,16 +37,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Spezialkommando (SK) flow (UC-11): an admin manages an SK as a first-class OrgUnit, and the
- * documented limitation holds — a not-yet-profit-eligible SK cannot be the responsible (processing)
- * unit of a job order. Only profit-eligible org units process orders (V128), and a freshly created
- * SK is not profit-eligible by default, so naming it as the responsible unit returns HTTP 400.
+ * Spezialkommando (SK) flow (UC-11): an admin manages an SK as an OrgUnit, and a
+ * non-profit-eligible SK cannot be the responsible unit of a job order.
  *
  * <ul>
  *   <li>Lifecycle (UI): the admin creates an SK via {@code /admin/special-commands} and it appears
  *       in the list.
- *   <li>Member page (UI): the old {@code /admin/special-commands/{id}} URL redirects to the SK
- *       member page at {@code /organisation/special-commands/{id}}.
+ *   <li>Member page (UI): {@code /admin/special-commands/{id}} redirects to the SK member page at
+ *       {@code /organisation/special-commands/{id}}.
  *   <li>Limitation (API): naming a non-profit-eligible SK as a job order's responsible OrgUnit
  *       returns 400.
  * </ul>
@@ -106,9 +104,7 @@ class SpecialCommandE2eTest {
         E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
-        // A full reload would wipe this marker; the #582 in-place create leaves it intact.
         page.evaluate("window.__krtNoReload = true;");
-        // The create form lives in a modal opened by the "Neues Spezialkommando" button.
         page.locator("#add-sc-btn").click();
         page.locator("#sc-name").fill(SK_UI_NAME);
         page.locator("#sc-shorthand").fill("ESKU");
@@ -117,10 +113,6 @@ class SpecialCommandE2eTest {
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),
             "creating an SK must save in place without reloading the page");
-        // Re-load the list fresh (as the other create flows do); asserting on the post-submit page
-        // directly proved flaky. Match the new SK by its table row, not a bare text locator. Via
-        // the retry helper — WebKit can abort this post-submit GET (HTTP/2 INTERNAL_ERROR). See
-        // E2eSupport#navigate.
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
         assertThat(
@@ -134,12 +126,9 @@ class SpecialCommandE2eTest {
   }
 
   /**
-   * The admin soft-deletes (deactivates) a Spezialkommando from the list page: the per-row trash
-   * button opens the KRT confirmation modal (no native {@code confirm()}), confirming POSTs the
-   * deactivate, and the row drops out of the default active-only list while reappearing — flagged
-   * inactive — under {@code includeInactive=true}. Guards the pre-existing bug where the trash
-   * button was inert (no enclosing form, no script wiring), so the SK could never be deleted from
-   * the list UI. Ephemeral-stack only: it seeds a throwaway SK to delete.
+   * Verifies that the admin can deactivate an SK from the list page: the trash button opens the KRT
+   * confirmation modal, confirming POSTs the deactivation, and the row leaves the default list but
+   * reappears as inactive under {@code includeInactive=true}.
    */
   @Test
   void adminDeactivatesSpecialCommandFromTheList() {
@@ -154,11 +143,9 @@ class SpecialCommandE2eTest {
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
 
-        // Open the confirm modal from the seeded SK's row, then confirm the deactivate.
         Locator row =
             page.locator("tbody tr").filter(new Locator.FilterOptions().setHasText(SK_DELETE_NAME));
         assertThat(row).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        // A full reload would wipe this marker; the #582 in-place deactivate leaves it intact.
         page.evaluate("window.__krtNoReload = true;");
         row.locator(".delete-btn").click();
         assertThat(page.locator("#sc-delete-modal"))
@@ -169,7 +156,6 @@ class SpecialCommandE2eTest {
             page.evaluate("window.__krtNoReload === true"),
             "deactivating an SK must save in place without reloading the page");
 
-        // The active-only list no longer shows the SK.
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
         assertThat(
@@ -177,7 +163,6 @@ class SpecialCommandE2eTest {
                     .filter(new Locator.FilterOptions().setHasText(SK_DELETE_NAME)))
             .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
 
-        // includeInactive surfaces it again, flagged inactive — proving a soft-delete, not a purge.
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands?includeInactive=true");
         page.waitForLoadState();
         Locator inactiveRow =
@@ -194,11 +179,9 @@ class SpecialCommandE2eTest {
   }
 
   /**
-   * The SK member page moved out of the admin area to {@code /organisation/special-commands/{id}}
-   * (an SK's own lead manages its members too, and {@code /admin/**} stays admin-only): the old
-   * {@code /admin/special-commands/{id}} URL redirects there, and the page renders the member
-   * roster box with its add-member action. Ephemeral-stack only: it needs the SK seeded in {@link
-   * #setUp}.
+   * Verifies that {@code /admin/special-commands/{id}} redirects to the SK member page at {@code
+   * /organisation/special-commands/{id}}, which renders the member roster with its add-member
+   * action.
    */
   @Test
   void oldAdminDetailUrlRedirectsToTheMemberPage() {
@@ -251,11 +234,9 @@ class SpecialCommandE2eTest {
   }
 
   /**
-   * Submits an in-place SK write (#582): drops the {@code position: fixed} footer (the WebKit
-   * click-interception guard {@link E2eSupport#clickSubmitClearingFooter} also applies) and clicks
-   * the submit, blocking on the AJAX twin's {@code POST /admin/special-commands*} response. The
-   * write now re-swaps the SK-list fragment instead of navigating, so — unlike the classic flow —
-   * there is no post-submit document load to await; the caller re-loads the list itself afterwards.
+   * Submits an in-place SK write: hides the {@code position: fixed} footer, clicks the submit and
+   * waits for the {@code POST /admin/special-commands*} response. The list fragment is re-swapped
+   * rather than navigated, so the caller reloads the list itself.
    *
    * @param submit the submit control (in the create/edit or delete modal) to click
    */

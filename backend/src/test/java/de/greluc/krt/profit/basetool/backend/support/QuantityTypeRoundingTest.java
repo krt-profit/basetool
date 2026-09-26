@@ -42,7 +42,6 @@ class QuantityTypeRoundingTest {
 
   @Test
   void scuQuantityType_roundsToThreeDecimals() {
-    // 0.36 * 5 == 1.7999999999999998 in binary double; must clean to 1.8.
     assertThat(QuantityTypeRounding.roundForQuantityType(0.36 * 5, QuantityType.SCU))
         .isEqualTo(1.8);
   }

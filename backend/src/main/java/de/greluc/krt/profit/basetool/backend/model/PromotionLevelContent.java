@@ -52,17 +52,11 @@ import lombok.ToString;
 @Builder
 public class PromotionLevelContent extends AbstractEntity<UUID> {
 
-  // {@code onMethod_ = @__(@Override)} tells Lombok to attach a real {@code @Override} to the
-  // generated {@code getId()} so CodeQL recognises this method as the {@code Persistable.getId()}
-  // implementation.
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  // Excluded from {@code @ToString} because the LAZY parent association would either trigger a
-  // LazyInitializationException outside a Hibernate session or recurse back into this row through
-  // category.levelContents.
   @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "category_id", nullable = false)

@@ -28,38 +28,18 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Request DTO for a single entry in the store dialog of a refinery order.
+ * One entry of a refinery order's store dialog.
  *
- * <p>The amount ({@code amount}) is finally set by the user when storing and overrides the output
- * amount originally calculated by the refinery order (see {@code
- * RefineryOrderService#storeRefineryOrder}). Amount validation (decimal number, &gt;= 0, max. 3
- * decimal places) is uniformly applied across the project via {@link ValidQuantityAmount} / {@link
- * QuantityAware}.
- *
- * <p>The optional {@code note} is propagated directly to the resulting {@code InventoryItem} and
- * lets the user attach remarks already at the time of storage.
- *
- * <p>The optional {@code owningOrgUnitId} is the picker output that stamps the resulting {@code
- * InventoryItem}'s owning OrgUnit, resolved by {@code
- * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}. All four org-unit kinds (Staffel,
- * Spezialkommando, Bereich, Organisationsleitung) are accepted. A non-null pick is honoured when it
- * is one of the receiving user's ({@code userId}, else the order owner's) DIRECT memberships
- * <em>or</em> — this being one of the two create-on-behalf paths where caller and receiver differ —
- * an org unit the current caller may edit ({@code AccessGateService.canEditOrgUnit}, cascade-aware
- * — epic #692 Phase 4 / REQ-ORG-016); a pick that is neither is rejected with 400. It is required
- * only when that receiving user belongs to more than one OrgUnit and no active-context pin applies
- * (the §5.5.1 matrix's "&gt;1 + no output → 400" branch); for a single-membership or membershipless
- * receiver it may stay {@code null} and the resolver auto-stamps (or leaves the row ownerless). The
- * store dialog pre-fills it with the order's own owning OrgUnit, so a same-OrgUnit self-store needs
- * no manual choice.
- *
- * <p>The optional {@code personal} flag marks the resulting {@code InventoryItem} as the receiver's
- * private stock ({@code inventory_item.personal = true}) instead of shared squadron stock — the
- * same marker the Einbuchen dialog and the item-production book-in offer, so refinery output no
- * longer has to be stored shared and rebooked afterwards (REQ-INV-035). {@code null} means {@code
- * false}. A personal row never carries an allocation: combining it with {@code jobOrderId} is
- * rejected with HTTP 400, and the refinery order's automatic mission earmark is not applied (see
- * {@code RefineryOrderService#storeRefineryOrder}).
+ * <ul>
+ *   <li>{@code amount} is the stored quantity, validated via {@link ValidQuantityAmount} / {@link
+ *       QuantityAware}.
+ *   <li>{@code note} is copied to the resulting {@code InventoryItem}.
+ *   <li>{@code owningOrgUnitId} stamps the item's owning OrgUnit via {@code
+ *       OwnerScopeService.resolveOrgUnitForPickerOutputNullable}; an inadmissible pick is rejected
+ *       with 400.
+ *   <li>{@code personal} marks the item as the receiver's private stock (REQ-INV-035); {@code null}
+ *       means {@code false}, and combining it with {@code jobOrderId} is rejected with 400.
+ * </ul>
  */
 @ValidQuantityAmount
 public record RefineryOrderStoreItemDto(

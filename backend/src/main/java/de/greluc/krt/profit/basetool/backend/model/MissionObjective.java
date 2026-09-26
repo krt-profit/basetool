@@ -38,14 +38,11 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One classified goal (Ziel) of a mission. Goals form an ordered, reorderable list authored in the
- * Verwaltung tab and shown read-only on the mission overview, grouped by {@link #kind} (Hauptziel →
- * Nebenziel → Nicht-Ziel). Each goal carries a required {@link #title}, a {@link #kind}
- * classification, and an explicit {@link #orderIndex} that pins the position independently of
- * insertion order. The whole collection is guarded by the mission's manual {@code
- * objectivesVersion} section counter, so editing the goals never collides with a concurrent core /
- * schedule / flags / Ablauf edit of the same mission. Unlike an Ablauf step a goal carries no
- * {@code done} flag — it is a scope statement, not a progress item.
+ * One classified goal (Ziel) of a mission, held in an ordered, reorderable list and grouped on the
+ * overview by {@link #kind}.
+ *
+ * <p>{@link #orderIndex} pins the position; the collection is guarded by the mission's {@code
+ * objectivesVersion} section counter.
  */
 @Entity
 @Getter

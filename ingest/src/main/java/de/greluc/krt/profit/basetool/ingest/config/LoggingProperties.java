@@ -26,29 +26,18 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration for MDC correlation, slow-request detection and slow backend-relay
- * detection in the ingest gateway. Bound under {@code app.logging.*} through the canonical record
- * constructor; an invalid value fails the context start early. Module-local twin of the
- * backend/frontend {@code LoggingProperties} (REQ-OBS-001/-002), carried here so the gateway's
- * logging is configured through the same {@code APP_LOGGING_*} keys instead of hard-coded
- * constants.
+ * Configuration for MDC correlation and slow-request / slow-backend-relay detection in the ingest
+ * gateway ({@code app.logging}, REQ-OBS-001/-002). Has no {@code orgUnitId} key.
  *
- * <p>There is no {@code orgUnitId} key: the gateway relays drafts and owns no squadron-scoped data,
- * so that MDC field would be permanently empty (REQ-ORG-007 applies to the backend/frontend only).
- *
- * @param correlationIdHeader HTTP header used to accept an inbound correlation id, to echo the
- *     effective one back, and to relay it to the backend on the outbound import call
- * @param correlationIdMdcKey MDC key for the correlation id; must match the {@code
- *     %X{correlationId}} pattern in {@code logback-spring.xml}
- * @param userIdMdcKey MDC key for the JWT {@code sub} claim (intentionally never a name or e-mail —
- *     REQ-OBS-004)
- * @param slowRequestThresholdMs inbound requests slower than this are logged at WARN by {@code
- *     RequestLoggingFilter}
+ * @param correlationIdHeader HTTP header used to accept, echo and relay the correlation id
+ * @param correlationIdMdcKey MDC key for the correlation id; must match {@code %X{correlationId}}
+ *     in {@code logback-spring.xml}
+ * @param userIdMdcKey MDC key for the JWT {@code sub} claim, never a name or e-mail (REQ-OBS-004)
+ * @param slowRequestThresholdMs inbound requests slower than this are logged at WARN
  * @param slowBackendCallThresholdMs outbound backend relays slower than this get the {@code Slow
- *     backend call} marker from {@code BackendCallLoggingInterceptor}
- * @param structuredEnabled feature flag mirroring the backend/frontend key so the three modules
- *     share one configuration surface; the JSON appender itself is profile-gated in {@code
- *     logback-spring.xml}
+ *     backend call} marker
+ * @param structuredEnabled flag shared with the backend/frontend keys; the JSON appender itself is
+ *     profile-gated
  */
 @Validated
 @ConfigurationProperties(prefix = "app.logging")

@@ -23,20 +23,12 @@ package de.greluc.krt.profit.basetool.frontend.metrics;
  * Single source of truth for the frontend {@code basetool_*} business-metric names, tag keys and
  * bounded tag values (REQ-OBS-011).
  *
- * <p>Meter names use Micrometer's dotted convention; the Prometheus scrape renders each dot as an
- * underscore and appends the type suffix. Every tag value comes from a bounded, enumerable set
- * (REQ-OBS-006) — in particular the backend-client error {@code reason} is derived <em>locally</em>
- * from the failure branch, never from the backend's response body code, so an unexpected backend
- * code can never inflate the metric's cardinality.
+ * <p>Every tag value comes from a bounded set (REQ-OBS-006); the backend-client error {@code
+ * reason} is derived locally, never from the backend's response.
  */
 public final class MetricNames {
 
-  /**
-   * Gauge {@code basetool_mission_presence_missions} — live-sync topics with a live editor
-   * (frontend). Name legacy-pinned: presence is mission-only at ship time, so the value is
-   * unchanged and the existing dashboard panel keeps meaning (REQ-OBS-011 forbids a rename that
-   * breaks a dashboard).
-   */
+  /** Gauge {@code basetool_mission_presence_missions}: live-sync topics with a live editor. */
   public static final String MISSION_PRESENCE_MISSIONS = "basetool.mission.presence.missions";
 
   /**
@@ -46,61 +38,33 @@ public final class MetricNames {
   public static final String LIVESYNC_SUBSCRIPTIONS = "basetool.livesync.subscriptions";
 
   /**
-   * Gauge {@code basetool_livesync_peer_rooms} — tag {@code topic_class}; the number of live rooms
-   * of this class currently holding <b>two or more</b> subscribers, i.e. the rooms in which
-   * peer-sync can actually do anything (#1238).
+   * Gauge {@code basetool_livesync_peer_rooms}, tag {@code topic_class}: the number of live rooms
+   * holding two or more subscribers, i.e. where peer sync can relay anything.
    *
-   * <p>This is the honest denominator {@link #PRESENCE_RELAY_FRAMES} lacks. {@code
-   * LiveSyncWebSocketHandler#relayLocal} skips the originating session, so a room with a single
-   * viewer relays <b>zero</b> {@code changed} frames no matter how hard that viewer edits — a
-   * {@code changed} flatline is therefore the normal state of an unoccupied surface, not a defect
-   * signal, and reading one without this gauge is how a "peer sync is broken" alert would fire
-   * every time the squadron simply was not co-editing. Measured on prod over the 21 days to
-   * 2026-08-03, peak <em>concurrent</em> subscriptions per class ran from 15 ({@code mission}) down
-   * to 1 ({@code operation} — co-presence never occurred there at all), which is why the {@code
-   * changed}-flatline alert of #1238 stays deferred: only {@code mission} carries enough traffic to
-   * support one.
-   *
-   * <p>Counts rooms, not sockets — {@link #LIVESYNC_SUBSCRIPTIONS} sums sockets across all rooms of
-   * a class and therefore cannot distinguish two peers in one room (peer-sync live) from two
-   * separate single-viewer rooms (peer-sync inert).
+   * <p>Counts rooms, unlike {@link #LIVESYNC_SUBSCRIPTIONS}, which counts sockets.
    */
   public static final String LIVESYNC_PEER_ROOMS = "basetool.livesync.peer.rooms";
 
   /**
-   * Counter {@code basetool_livesync_subscribe_total} — tags {@code topic_class}, {@code outcome}
-   * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}) and {@code reason}; the verdict of a
-   * multiplexed {@code /ws/sync} subscribe-authorization check (REQ-FE-015, ADR-0094). A
-   * saturated-executor fail-open is instead counted as a {@link #DROPPED_AUTHORIZE_SATURATED} relay
-   * drop.
+   * Counter {@code basetool_livesync_subscribe_total}, tags {@code topic_class}, {@code outcome}
+   * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}) and {@code reason}: the verdict of a
+   * {@code /ws/sync} subscribe authorization (REQ-FE-015, ADR-0094).
    *
-   * <p>On a denial the {@code reason} tag separates the two very different paths that both land on
-   * {@code outcome=denied} today: an explicit backend authorization refusal ({@link
-   * #SUBSCRIBE_DENY_AUTHZ}) and a presence-enabled class failing <em>closed</em> on an
-   * indeterminate probe ({@link #SUBSCRIBE_DENY_INDETERMINATE}). Without the split, a backend or
-   * token outage reads exactly like users hitting permission boundaries. Micrometer requires a
-   * uniform tag-key set per meter name, so the {@code allowed} series carries the {@link
-   * #REASON_NONE} placeholder.
+   * <p>A denial's {@code reason} is {@link #SUBSCRIBE_DENY_AUTHZ} or {@link
+   * #SUBSCRIBE_DENY_INDETERMINATE}; the {@code allowed} series carries {@link #REASON_NONE}.
    */
   public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
 
   /**
-   * Counter {@code basetool_livesync_socket_rejected_total} — tag {@code reason} ({@link
-   * #SOCKET_REJECTED_USER_CAP}); a multiplexed {@code /ws/sync} socket refused at connect. Carries
-   * no {@code topic_class} — a rejected socket has bound no topic yet (F2 / #1243, ADR-0094).
+   * Counter {@code basetool_livesync_socket_rejected_total}, tag {@code reason}: a {@code /ws/sync}
+   * socket refused at connect (ADR-0094). Carries no {@code topic_class}.
    */
   public static final String LIVESYNC_SOCKET_REJECTED = "basetool.livesync.socket.rejected";
 
   /**
-   * Counter {@code basetool_livesync_invalid_topic_total} (unlabelled) — a multiplexed {@code
-   * /ws/sync} subscribe to an unknown / unparseable topic ({@code LiveSyncTopic.parse(...) == null}
-   * in {@code LiveSyncWebSocketHandler.handleSubscribe}). Carries <b>no</b> {@code topic_class} —
-   * the topic did not parse, so it belongs to no known class — for the same reason {@link
-   * #LIVESYNC_SOCKET_REJECTED} carries none: rather than inflate the bounded {@code topic_class}
-   * set with an {@code unknown} sentinel, a dedicated unlabelled meter keeps that set to the real
-   * classes (REQ-OBS-011 design call, #1239). A sustained stream is the signature of a
-   * client/server topic-vocabulary skew — a client subscribing to a topic this server no longer
-   * knows (REQ-FE-015, ADR-0094).
+   * Counter {@code basetool_livesync_invalid_topic_total} (unlabelled): a {@code /ws/sync}
+   * subscribe to an unknown or unparseable topic (REQ-FE-015, ADR-0094). A sustained rate indicates
+   * a client/server topic-vocabulary skew.
    */
   public static final String LIVESYNC_INVALID_TOPIC = "basetool.livesync.invalid.topic";
 
@@ -124,15 +88,9 @@ public final class MetricNames {
   public static final String LIVESYNC_REDIS_ERRORS = "basetool.livesync.redis.errors";
 
   /**
-   * Counter {@code basetool_livesync_presence_published_total} — tag {@code topic_class};
+   * Counter {@code basetool_livesync_presence_published_total}, tag {@code topic_class}:
    * editor-presence snapshots this instance gossiped to the cross-replica presence channel
-   * (ADR-0126, #1237).
-   *
-   * <p>A separate meter name from {@link #LIVESYNC_REDIS_PUBLISHED} on purpose. Presence gossip is
-   * <em>periodic</em> (one message per tracked topic per reaper tick) while the changed relay is
-   * <em>event-driven</em>, so folding them into one series — even under a distinguishing tag —
-   * would let the steady gossip floor swamp the changed-relay rate that the fan-out dashboard panel
-   * exists to show.
+   * (ADR-0126). Kept separate from {@link #LIVESYNC_REDIS_PUBLISHED}.
    */
   public static final String LIVESYNC_PRESENCE_PUBLISHED = "basetool.livesync.presence.published";
 
@@ -154,20 +112,8 @@ public final class MetricNames {
       "basetool.livesync.presence.remote.partitions";
 
   /**
-   * Timer {@code basetool_livesync_socket_lifetime_seconds} — how long each {@code /ws/sync} socket
-   * stayed open, recorded when it closes. Unlabelled (REQ-OBS-011): every room and user shares the
-   * one distribution.
-   *
-   * <p>Diagnostic, not alertable. It exists because the subsystem had no measure of how long a
-   * connection <em>lives</em>, and the edge proxy silently closing every idle socket at its 90 s
-   * {@code proxy_read_timeout} was therefore invisible from the inside — the subscribe counter
-   * rose, the session gauge held steady, and nothing said the same tabs were reconnecting all day.
-   * The {@code max} and the windowed mean ({@code rate(_sum) / rate(_count)}) collapsing toward a
-   * fixed value near a proxy timeout is the signature to look for.
-   *
-   * <p>No alert is wired on it deliberately: an ordinary page navigation also closes a socket after
-   * a few seconds, so no threshold separates "the proxy tore it down" from "the member clicked a
-   * link" — the same unsoundness that keeps a {@code changed}-frame flatline alert off the board.
+   * Timer {@code basetool_livesync_socket_lifetime_seconds} (unlabelled): how long each {@code
+   * /ws/sync} socket stayed open, recorded on close. Diagnostic only; no alert is wired on it.
    */
   public static final String LIVESYNC_SOCKET_LIFETIME = "basetool.livesync.socket.lifetime";
 
@@ -175,84 +121,45 @@ public final class MetricNames {
   public static final String ACTIVE_SESSIONS = "basetool.active.sessions";
 
   /**
-   * Counter {@code basetool_session_evicted_total} (unlabelled) — bumped when Spring Security's
-   * concurrent-session control expires a user's oldest session because the {@code maximumSessions}
-   * cap configured in {@code SecurityConfig} is already full. The eviction reaches the victim only
-   * as an unexplained logout on their next request and leaves no other trace, so a user genuinely
-   * cycling devices and a session registry that has stopped reaping stale Redis entries (the cap
-   * then filling with dead sessions and evicting live ones) are indistinguishable without this
-   * counter. Unlabelled — neither the principal name nor the session id may become a tag value
-   * (REQ-OBS-004).
+   * Counter {@code basetool_session_evicted_total} (unlabelled): a user's oldest session expired by
+   * concurrent-session control because the {@code maximumSessions} cap is full (REQ-OBS-004).
    */
   public static final String SESSION_EVICTED = "basetool.session.evicted";
 
   /**
-   * Counter {@code basetool_session_value_dropped_total} — tag {@code cause}; bumped every time a
-   * session value in Redis cannot be deserialized and is dropped by {@code
-   * FaultTolerantSessionSerializer}.
+   * Counter {@code basetool_session_value_dropped_total}, tag {@code cause}: a Redis session value
+   * that could not be deserialized and was dropped by {@code FaultTolerantSessionSerializer}.
    *
-   * <p>Exists because the fix for the 2026-09-02 outage made the fault survivable and therefore
-   * invisible. A dropped value is not written back, so a poisoned session keeps its poison for up
-   * to the 720-hour authenticated window and re-drops on every single request: the export from that
-   * day carries 496 identical WARN lines over three hours and no number anywhere. This counter is
-   * what shows the volume, and — after a deploy that stops a poison being written — whether the
-   * residue is actually draining as the affected sessions expire.
-   *
-   * <p>{@code cause} is the caught failure's root-cause <em>simple</em> class name mapped through a
-   * fixed allow-list, with everything else folded into {@code other}. Never the unresolved type id:
-   * that is parsed out of the corrupted payload and is unbounded — and, measured, can be the
-   * member's own data rather than a class name at all (REQ-OBS-006, REQ-OBS-004).
+   * <p>{@code cause} is the root-cause simple class name from a fixed allow-list, otherwise {@code
+   * other} (REQ-OBS-006, REQ-OBS-004).
    */
   public static final String SESSION_VALUE_DROPPED = "basetool.session.value.dropped";
 
   /**
-   * Counter {@code basetool_session_type_refused_total} — tag {@code mode} ({@code report} / {@code
-   * enforce}); bumped when a session value names a class outside {@code SessionTypeAllowList}
-   * (REQ-SEC-067).
+   * Counter {@code basetool_session_type_refused_total}, tag {@code mode} ({@code report} / {@code
+   * enforce}): a session value naming a class outside {@code SessionTypeAllowList} (REQ-SEC-067).
    *
-   * <p>Under {@code report} the value is read anyway and the counter says "enforcing would drop
-   * something": it rises once per class and deserialization slot per frontend lifetime, because
-   * Jackson caches the deserializer it resolved, so it answers whether a class occurs rather than
-   * how often. Under {@code enforce} the value is refused, the attribute is also counted on {@link
-   * #SESSION_VALUE_DROPPED}, and this counter rises on every refused read. The class name is
-   * logged, never tagged — a type id comes out of a stored payload and is unbounded (REQ-OBS-011).
+   * <p>Under {@code report} it rises once per class and slot per frontend lifetime; under {@code
+   * enforce} on every refused read. The class name is logged, never tagged.
    */
   public static final String SESSION_TYPE_REFUSED = "basetool.session.type.refused";
 
   /**
-   * Counter {@code basetool_session_unmappable_total} — tag {@code missing_key}; bumped every time
-   * a session hash in Redis is non-empty but lacks one of the three fields {@code
-   * RedisSessionMapper} requires, so {@code SessionAttributeDiagnosticMapper} answers {@code null}
-   * and the request is served as if it carried no session (REQ-SEC-063).
+   * Counter {@code basetool_session_unmappable_total}, tag {@code missing_key}: a non-empty Redis
+   * session hash lacking a field {@code RedisSessionMapper} requires, served as no session
+   * (REQ-SEC-063).
    *
-   * <p>The sibling of {@link #SESSION_VALUE_DROPPED}, and it exists for the same reason: a fault
-   * made survivable is a fault made invisible. Until 2026-09-16 this hash threw {@code
-   * IllegalStateException: creationTime key must not be null} straight out of Spring Session's
-   * filter — 286 HTTP 500s on 2026-09-14 alone, and no meter and no alert anywhere, because
-   * `LogbackErrorSpike` needs 0.2/s and the worst hour of it reached 0.045/s. Now that the read
-   * degrades to a signed-out member, this counter is the only thing standing between a graceful
-   * degradation and a silent one.
-   *
-   * <p>A steady near-zero rate is the expected shape — one half-written hash per session that lost
-   * its key. A rate that climbs means session hashes are being lost in volume ({@code Redis}
-   * restarting, an AOF truncation, a purge run against live traffic); a rate that jumps to the
-   * whole population means the wire format broke and every member is being signed out at once.
+   * <p>A steady near-zero rate is expected; a climb means session hashes are being lost in volume.
    */
   public static final String SESSION_UNMAPPABLE = "basetool.session.unmappable";
 
   /**
-   * Counter {@code basetool_client_error_total} — tag {@code kind} ({@link
-   * #CLIENT_ERROR_SCRIPT_ERROR} / {@link #CLIENT_ERROR_UNHANDLED_REJECTION} / {@link
-   * #CLIENT_ERROR_RESOURCE_ERROR} / {@link #CLIENT_ERROR_CSP_VIOLATION} / {@link
-   * #CLIENT_ERROR_I18N_MISSING}); browser-side failures reported by the client error beacon. A JS
-   * exception that kills a {@code krtFetch} handler produces no server-side signal whatsoever — the
-   * request that never happens cannot be counted — so a deploy that breaks the client half of a
-   * live-update surface is otherwise invisible until a user reports it.
+   * Counter {@code basetool_client_error_total}, tag {@code kind}: browser-side failures reported
+   * by the client error beacon.
    *
-   * <p>The {@code kind} tag is resolved <em>server-side</em> against the five literals below and
-   * the beacon's value is discarded when it matches none of them: the endpoint is reachable without
-   * a session, so echoing a client-supplied kind would be an unbounded, attacker-controlled label
-   * (REQ-OBS-006). The message, stack, script URL and user agent never reach a tag or a log line.
+   * <p>{@code kind} is resolved server-side against the five {@code CLIENT_ERROR_*} literals and
+   * discarded otherwise (REQ-OBS-006). Message, stack, script URL and user agent never reach a tag
+   * or log line.
    */
   public static final String CLIENT_ERROR = "basetool.client.error";
 
@@ -260,15 +167,15 @@ public final class MetricNames {
   public static final String BACKEND_CLIENT_ERRORS = "basetool.backend.client.errors";
 
   /**
-   * Gauge {@code basetool_notification_relay_connections} — open browser→backend SSE relays held by
-   * {@code NotificationPageController.stream()} on this instance (#1041 item 17).
+   * Gauge {@code basetool_notification_relay_connections}: open browser-to-backend SSE relays held
+   * by {@code NotificationPageController.stream()} on this instance.
    */
   public static final String NOTIFICATION_RELAY_CONNECTIONS =
       "basetool.notification.relay.connections";
 
   /**
-   * Gauge {@code basetool_presence_ws_sessions} — live live-sync WebSocket sessions summed across
-   * all topic rooms in {@code LiveSyncWebSocketHandler} (#1041 item 17, REQ-FE-015).
+   * Gauge {@code basetool_presence_ws_sessions}: live-sync WebSocket sessions summed across all
+   * topic rooms in {@code LiveSyncWebSocketHandler} (REQ-FE-015).
    */
   public static final String PRESENCE_WS_SESSIONS = "basetool.presence.ws.sessions";
 
@@ -281,38 +188,32 @@ public final class MetricNames {
   public static final String PRESENCE_RELAY_FRAMES = "basetool.presence.relay.frames";
 
   /**
-   * Counter {@code basetool_presence_relay_dropped_total} — tags {@code reason} ({@link
+   * Counter {@code basetool_presence_relay_dropped_total}, tags {@code reason} ({@link
    * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED} / {@link #DROPPED_TOPIC_CAP} / {@link
    * #DROPPED_TOPIC_THROTTLED} / {@link #DROPPED_AUTHORIZE_SATURATED} / {@link
-   * #DROPPED_SECTION_FILTERED}) and {@link #TAG_TOPIC_CLASS} at the drop branches of the relay
-   * (#1041 item 17, REQ-FE-015). Every drop branch counts here, so the reason set grows with the
-   * relay; the {@code topic_class} tag is the same bounded set the other relay counters use.
+   * #DROPPED_SECTION_FILTERED}) and {@link #TAG_TOPIC_CLASS}: every drop branch of the live-sync
+   * relay (REQ-FE-015).
    */
   public static final String PRESENCE_RELAY_DROPPED = "basetool.presence.relay.dropped";
 
   /**
-   * Counter {@code basetool_login_total} — tags {@code outcome} ({@link #OUTCOME_SUCCESS} / {@link
+   * Counter {@code basetool_login_total}, tags {@code outcome} ({@link #OUTCOME_SUCCESS} / {@link
    * #OUTCOME_FAILURE}) and {@code reason} (on failure {@link #LOGIN_REASON_INVALID_STATE} / {@link
    * #LOGIN_REASON_PROVIDER_ERROR} / {@link #LOGIN_REASON_OTHER}, else {@link #LOGIN_REASON_NONE}).
-   * The reason is mapped from the exception type, never the raw error string (#1041 item 18).
+   * The reason is mapped from the exception type.
    */
   public static final String LOGIN = "basetool.login";
 
   /**
-   * Counter {@code basetool_csrf_rejections_total} (unlabelled) — bumped by the access-denied
-   * handler on a CSRF-token rejection before it delegates the 403. {@code krtFetch}'s silent
-   * single-retry self-heal otherwise masks a systematic CSRF-wiring regression as intermittent
-   * failed writes (#1041 item 18).
+   * Counter {@code basetool_csrf_rejections_total} (unlabelled): a CSRF-token rejection counted by
+   * the access-denied handler before it answers 403.
    */
   public static final String CSRF_REJECTIONS = "basetool.csrf.rejections";
 
   /**
-   * Counter {@code basetool_bot_blocked_total} — tag {@code rule} ({@link #BOT_RULE_METHOD} /
-   * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION} / {@link
-   * #BOT_RULE_QUERY_STRING}). {@code BotProtectionFilter}'s four reject branches are otherwise
-   * {@code log.debug}-only (prod-invisible); the counter also surfaces a self-inflicted false
-   * positive when a new legit route matches a blocked prefix, or when the query-string rule starts
-   * rejecting traffic the app itself produces (#1041 item 19).
+   * Counter {@code basetool_bot_blocked_total}, tag {@code rule} ({@link #BOT_RULE_METHOD} / {@link
+   * #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION} / {@link #BOT_RULE_QUERY_STRING}):
+   * requests rejected by {@code BotProtectionFilter}.
    */
   public static final String BOT_BLOCKED = "basetool.bot.blocked";
 
@@ -325,11 +226,8 @@ public final class MetricNames {
   public static final String TAG_REASON = "reason";
 
   /**
-   * Tag key: the browser-error class on {@link #CLIENT_ERROR} ({@link #CLIENT_ERROR_SCRIPT_ERROR} /
-   * {@link #CLIENT_ERROR_UNHANDLED_REJECTION} / {@link #CLIENT_ERROR_RESOURCE_ERROR} / {@link
-   * #CLIENT_ERROR_CSP_VIOLATION} / {@link #CLIENT_ERROR_I18N_MISSING}). Resolved server-side
-   * against exactly those five literals — a beacon payload that matches none of them contributes no
-   * series at all (REQ-OBS-006).
+   * Tag key: the browser-error class on {@link #CLIENT_ERROR}, resolved server-side against the
+   * five {@code CLIENT_ERROR_*} literals; a non-matching payload yields no series (REQ-OBS-006).
    */
   public static final String TAG_KIND = "kind";
 
@@ -353,10 +251,8 @@ public final class MetricNames {
   public static final String TAG_MODE = "mode";
 
   /**
-   * Tag key: which required session-hash field was absent on {@link #SESSION_UNMAPPABLE} — {@code
-   * creationTime}, {@code lastAccessedTime}, {@code maxInactiveInterval}, or {@code other} when all
-   * three were present and the mapper refused the hash for some other reason. A closed set of four
-   * literals resolved from the hash itself, never from the upstream exception's message text.
+   * Tag key: which required session-hash field was absent on {@link #SESSION_UNMAPPABLE}: {@code
+   * creationTime}, {@code lastAccessedTime}, {@code maxInactiveInterval}, or {@code other}.
    */
   public static final String TAG_MISSING_KEY = "missing_key";
 
@@ -376,11 +272,9 @@ public final class MetricNames {
   public static final String OP_CONSUME = "consume";
 
   /**
-   * Redis fan-out operation: gossiping an editor-presence snapshot to peers (ADR-0126). A distinct
-   * value from {@link #OP_PUBLISH} so the {@code LiveSyncRedisFanoutBroken} alert keeps firing on
-   * the changed relay alone: a failed changed publish silently degrades <em>correctness</em> (a
-   * peer's view stays stale), while a failed presence gossip only costs a cosmetic dot — visible on
-   * the fan-out dashboard panel, not worth a page.
+   * Redis fan-out operation: gossiping an editor-presence snapshot to peers (ADR-0126). Distinct
+   * from {@link #OP_PUBLISH} so the {@code LiveSyncRedisFanoutBroken} alert covers only the changed
+   * relay.
    */
   public static final String OP_PRESENCE_PUBLISH = "presence_publish";
 
@@ -455,11 +349,7 @@ public final class MetricNames {
   /** Presence drop reason: a subscribe refused because the socket hit its per-session topic cap. */
   public static final String DROPPED_TOPIC_CAP = "topic_cap";
 
-  /**
-   * Presence drop reason: a {@code changed} frame rejected by the per-<em>topic</em> token bucket —
-   * the room's aggregate publish rate exceeded its bound regardless of the per-session limit (F2 /
-   * #1243).
-   */
+  /** Presence drop reason: a {@code changed} frame rejected by the per-topic token bucket. */
   public static final String DROPPED_TOPIC_THROTTLED = "topic_throttled";
 
   /**
@@ -470,11 +360,8 @@ public final class MetricNames {
 
   /**
    * Presence drop reason: a {@code changed} frame whose section keys were all rejected by the topic
-   * class's allowed-section whitelist, so nothing was relayed to the room. This is the exact
-   * signature of the REQ-FE-010 defect class — an acting client broadcasting a section key the
-   * relay's accept-list does not know leaves every peer stale, with no error on either side — and
-   * the drop is otherwise completely silent, which is why it is counted rather than logged. The
-   * rejected key is client-supplied and never becomes a tag value (REQ-OBS-006).
+   * class's allowed-section list, so nothing was relayed (REQ-FE-010). The rejected key never
+   * becomes a tag value.
    */
   public static final String DROPPED_SECTION_FILTERED = "section_filtered";
 
@@ -482,10 +369,8 @@ public final class MetricNames {
   public static final String OUTCOME_ALLOWED = "allowed";
 
   /**
-   * Live-sync subscribe outcome: the subscribe was refused. Covers both an explicit backend 403/404
-   * and a presence-enabled class failing closed on an indeterminate probe — the accompanying {@code
-   * reason} tag ({@link #SUBSCRIBE_DENY_AUTHZ} / {@link #SUBSCRIBE_DENY_INDETERMINATE}) is what
-   * tells the two apart.
+   * Live-sync subscribe outcome: the subscribe was refused; the {@code reason} tag ({@link
+   * #SUBSCRIBE_DENY_AUTHZ} / {@link #SUBSCRIBE_DENY_INDETERMINATE}) tells the cause.
    */
   public static final String OUTCOME_DENIED = "denied";
 
@@ -498,28 +383,18 @@ public final class MetricNames {
   public static final String SUBSCRIBE_DENY_AUTHZ = "authz";
 
   /**
-   * Subscribe-deny reason on {@link #LIVESYNC_SUBSCRIBE} with {@link #OUTCOME_DENIED}: the
-   * authorization outcome was indeterminate (no captured token, a transient 401/5xx/timeout, or a
-   * probe that threw) and the topic class is presence-enabled, so it failed <b>closed</b> rather
-   * than risk disclosing who is editing a resource the caller may not read. Not a permission
-   * verdict: a rising rate here is a backend/token availability problem, and lumping it into {@link
-   * #SUBSCRIBE_DENY_AUTHZ} would make an outage look like users hitting permission boundaries.
+   * Subscribe-deny reason: the authorization outcome was indeterminate (no token, a transient
+   * 401/5xx/timeout, or a failing probe) and the presence-enabled topic class failed closed. Not a
+   * permission verdict.
    */
   public static final String SUBSCRIBE_DENY_INDETERMINATE = "indeterminate";
 
   /**
-   * Socket-rejected reason ({@link #LIVESYNC_SOCKET_REJECTED}): a {@code /ws/sync} socket refused
-   * because the user already holds the maximum concurrent sockets (F2 / #1243).
+   * Socket-rejected reason: the user already holds the maximum concurrent {@code /ws/sync} sockets.
    */
   public static final String SOCKET_REJECTED_USER_CAP = "user_cap";
 
-  /**
-   * Socket-rejected reason ({@link #LIVESYNC_SOCKET_REJECTED}): a {@code /ws/sync} socket refused
-   * because its user has not accepted the Terms of Use in force (REQ-SEC-028). Distinct from {@link
-   * #SOCKET_REJECTED_USER_CAP} because it means something entirely different operationally — a
-   * sustained rate here is the shape of a wording rollout stalling, not of abuse, and it is the
-   * only signal that a consent gate is turning users' live sync off.
-   */
+  /** Socket-rejected reason: the user has not accepted the Terms of Use in force (REQ-SEC-028). */
   public static final String SOCKET_REJECTED_TERMS_GATE = "terms_gate";
 
   /** Reason: the backend returned a 4xx problem response. */
@@ -557,47 +432,25 @@ public final class MetricNames {
   public static final String CLIENT_ERROR_RESOURCE_ERROR = "resource_error";
 
   /**
-   * Browser error kind: a Content-Security-Policy violation, caught on the {@code
-   * securitypolicyviolation} event (FE-SEC-04). The CSP is enforcing with no {@code report-uri}, so
-   * a template that ships an inline script or style without the nonce — or a page that starts
-   * loading from a host the policy does not allow — was blocked by the browser without any server
-   * ever hearing of it. Only the violated directive and the blocked <em>origin</em> travel.
+   * Browser error kind: a Content-Security-Policy violation caught on the {@code
+   * securitypolicyviolation} event. Only the violated directive and the blocked origin are sent.
    */
   public static final String CLIENT_ERROR_CSP_VIOLATION = "csp_violation";
 
   /**
-   * Browser error kind: a script asked for a localized string its page did not provide, reported by
-   * {@code window.krtI18nText} (owner decision 2026-09-23). The script then renders the key name
-   * instead of a hardcoded default, and the message carries only that key name. A step in this kind
-   * after a deploy is a dictionary entry or {@code data-*} attribute that went missing.
+   * Browser error kind: a script asked {@code window.krtI18nText} for a localized string its page
+   * did not provide. The message carries only the key name.
    */
   public static final String CLIENT_ERROR_I18N_MISSING = "i18n_missing";
 
   /**
-   * Gauge {@code basetool_tracing_enabled} — {@code 1} while this module is configured to emit
+   * Gauge {@code basetool_tracing_enabled}: {@code 1} while this module is configured to emit
    * spans, {@code 0} while it is not.
    *
-   * <p><b>What it is for.</b> The trace pipeline had no alert at either end until 2026-09-20, and
-   * that is why a dead one went unnoticed: on the Podman host the application containers could not
-   * resolve {@code alloy}, every span was dropped in this module's own exporter, and both {@code
-   * otelcol_receiver_accepted_spans_total} and {@code tempo_distributor_spans_received_total} were
-   * <em>absent</em> rather than zero. An alert on that absence alone cannot be written, because
-   * absence is also what a deliberately switched-off tracing stack looks like — the same problem
-   * the backend's {@code basetool_scheduled_job_enabled} solves for a switched-off job, and the
-   * same solution.
-   *
-   * <p><b>Reported as 0 rather than omitted</b>, which is the one way this differs from the
-   * scheduled-job gauge. That one is absent when off because the bean does not exist; here the
-   * series is registered unconditionally, so {@code basetool_tracing_enabled == 0} says "off on
-   * purpose" while <em>absence</em> says "this module is not being scraped at all". An alert that
-   * has to read "tracing is on" positively needs the difference.
-   *
-   * <p>Untagged: the deployment-wide {@code application} tag already separates the three modules,
-   * and a second identity for the same fact would only invite them to disagree (REQ-OBS-011).
+   * <p>Always registered, so {@code 0} means off on purpose while absence means the module is not
+   * scraped. Untagged (REQ-OBS-011).
    */
   public static final String TRACING_ENABLED = "basetool.tracing.enabled";
 
-  private MetricNames() {
-    // Constants holder — not instantiable.
-  }
+  private MetricNames() {}
 }

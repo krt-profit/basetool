@@ -58,25 +58,18 @@ class JobOrderHandoverReportControllerTest {
 
   @InjectMocks private JobOrderController controller;
 
-  // -------------------------------------------------------------------------
-  // GET /{jobOrderId}/handovers/{handoverId}/report
-  // -------------------------------------------------------------------------
-
   @Test
   void downloadHandoverReport_shouldReturnPdfResponse_whenHandoverExists() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     UUID handoverId = UUID.randomUUID();
-    byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46}; // %PDF magic bytes
+    byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
 
     when(jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, null))
         .thenReturn(fakePdf);
 
-    // When
     ResponseEntity<byte[]> response =
         controller.downloadHandoverReport(jobOrderId, handoverId, null);
 
-    // Then
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertNotNull(response.getBody());
     assertEquals(fakePdf.length, response.getBody().length);
@@ -90,27 +83,20 @@ class JobOrderHandoverReportControllerTest {
 
   @Test
   void downloadHandoverReport_shouldPropagateNotFound_whenHandoverDoesNotExist() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     UUID handoverId = UUID.randomUUID();
 
     when(jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, null))
         .thenThrow(new NotFoundException("Handover not found"));
 
-    // When & Then
     NotFoundException ex =
         assertThrows(
             NotFoundException.class,
             () -> controller.downloadHandoverReport(jobOrderId, handoverId, null));
   }
 
-  // -------------------------------------------------------------------------
-  // POST /{jobOrderId}/handovers/report/preview
-  // -------------------------------------------------------------------------
-
   @Test
   void previewHandoverReport_shouldReturnPdfResponse_whenDtoIsValid() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
 
@@ -125,10 +111,8 @@ class JobOrderHandoverReportControllerTest {
 
     when(jobOrderHandoverReportService.generateHandoverReportPreview(dto)).thenReturn(fakePdf);
 
-    // When
     ResponseEntity<byte[]> response = controller.previewHandoverReport(jobOrderId, dto);
 
-    // Then
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertNotNull(response.getBody());
     assertEquals(fakePdf.length, response.getBody().length);
@@ -142,18 +126,13 @@ class JobOrderHandoverReportControllerTest {
 
   @Test
   void previewHandoverReport_shouldPropagateServiceException() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     HandoverReportPreviewRequestDto dto =
         new HandoverReportPreviewRequestDto("#1", LocalDateTime.now(), "Pilot", List.of());
 
-    // Service wraps unexpected failures in a plain RuntimeException; the
-    // GlobalExceptionHandler.handleAllExceptions fallback turns it into a localised
-    // RFC 7807 500 response with a correlation id at the HTTP boundary.
     when(jobOrderHandoverReportService.generateHandoverReportPreview(any()))
         .thenThrow(new RuntimeException("PDF generation failed"));
 
-    // When & Then
     RuntimeException ex =
         assertThrows(
             RuntimeException.class, () -> controller.previewHandoverReport(jobOrderId, dto));

@@ -53,7 +53,6 @@ class UexStarSystemServiceTest {
 
   @Test
   void shouldProcessStarSystemDtoAndCreateNewStarSystem() {
-    // Given
     UexStarSystemDto dto =
         UexStarSystemDto.builder()
             .id(1)
@@ -74,13 +73,10 @@ class UexStarSystemServiceTest {
     savedSystem.setIdSystem(1);
     savedSystem.setName("Stanton");
 
-    // Mock save for both the initial creation and the subsequent update
     when(starSystemRepository.save(any(StarSystem.class))).thenAnswer(i -> i.getArgument(0));
 
-    // When
     uexStarSystemService.fetchAndProcessStarSystems();
 
-    // Then
     ArgumentCaptor<StarSystem> systemCaptor = ArgumentCaptor.forClass(StarSystem.class);
     verify(starSystemRepository, atLeastOnce()).save(systemCaptor.capture());
 

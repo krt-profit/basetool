@@ -40,11 +40,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Pins the no-N+1 contract of the bank read surface (REQ-BANK-020, REQ-DATA-003) against the real
- * Testcontainers PostgreSQL: with ≥ 100 accounts seeded, the management dashboard and the paged
- * account list each issue a fixed handful of SQL statements — the count is bounded by the grouped
- * queries and does <em>not</em> grow with the account count (the property an N+1 would violate
- * regardless of total posting volume).
+ * Verifies against real Postgres that the bank dashboard and paged account list issue a fixed
+ * number of SQL statements regardless of account count (REQ-BANK-020, REQ-DATA-003).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -69,7 +66,6 @@ class BankReadNoNPlusOneTest {
 
   @Test
   void dashboardAndAccountListStayStatementBounded_independentOfAccountCount() {
-    // Given: many accounts, each with a posting (an N+1 read would scale with the account count)
     BankHolder holder = newHolder("vol-holder-" + UUID.randomUUID());
     UUID managerId = UUID.randomUUID();
     for (int i = 0; i < ACCOUNTS; i++) {
@@ -80,12 +76,10 @@ class BankReadNoNPlusOneTest {
     Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
     stats.setStatisticsEnabled(true);
 
-    // When: the management dashboard (every account) ...
     stats.clear();
     bankDashboardService.getDashboard(true, managerId);
     long dashboardStatements = stats.getPrepareStatementCount();
 
-    // ... and the paged management account list (no text/status/type filter — the full enum sets)
     stats.clear();
     bankAccountService.getAccounts(
         true,
@@ -96,7 +90,6 @@ class BankReadNoNPlusOneTest {
         PageRequest.of(0, 50));
     long listStatements = stats.getPrepareStatementCount();
 
-    // Then: a fixed handful of statements despite the 120 accounts (no per-account N+1)
     assertTrue(
         dashboardStatements <= STATEMENT_BOUND,
         () ->

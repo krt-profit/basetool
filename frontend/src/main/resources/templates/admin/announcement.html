@@ -43,7 +43,6 @@
         </form>
     </div>
 
-    <!--/* Delete Confirmation Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
         <th:block th:ref="delete-confirm-modal-body">
             <div class="krt-modal-body">

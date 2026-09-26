@@ -84,8 +84,6 @@ class LiveSyncTopicTest {
           .isNotNull()
           .extracting(LiveSyncTopic::topicClass)
           .isEqualTo(LiveSyncTopicClass.BANK_ACCOUNT);
-      // The staff surface is web-only; admitting the bare prefix would open a room with no reader
-      // and hand a bank employee a stream the app has nothing to do with.
       assertThat(LiveSyncTopic.parse("bank")).isNull();
     }
   }
@@ -124,8 +122,6 @@ class LiveSyncTopicTest {
         })
     @DisplayName("a short, padded or malformed id is refused")
     void malformedIdsAreRefused(String raw) {
-      // `1-1-1-1-1` is the one that matters: UUID.fromString accepts it and re-renders it padded,
-      // so without the round-trip check two different wire strings would key the same room.
       assertThat(LiveSyncTopic.parse(raw)).isNull();
     }
 
@@ -177,7 +173,6 @@ class LiveSyncTopicTest {
     @Test
     @DisplayName("unknown keys are dropped, known ones survive in order and without duplicates")
     void unknownSectionsAreDropped() {
-      // A newer peer naming a section this build does not know must not cost the sections it does.
       assertThat(
               LiveSyncTopicClass.MISSION.clipSections(
                   List.of("crew", "not-a-section", "crew", "finance")))
@@ -199,8 +194,6 @@ class LiveSyncTopicTest {
         flood.add("filler-" + i);
       }
       flood.add("stock");
-      // 'stock' sits past the cap, so it is never examined — the point of the bound is that the
-      // filter's cost cannot be driven by the sender.
       assertThat(LiveSyncTopicClass.INVENTORY_ALL.clipSections(flood)).isEmpty();
     }
 

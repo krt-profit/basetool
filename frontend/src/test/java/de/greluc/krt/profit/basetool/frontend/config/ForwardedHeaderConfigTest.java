@@ -29,12 +29,8 @@ import org.springframework.core.Ordered;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
 /**
- * Locks the ordering invariant behind the SEC-02 fix: the explicitly registered {@link
- * ForwardedHeaderFilter} MUST run strictly after {@link ClientIpContextFilter}, so the latter still
- * sees the raw (unconsumed) {@code X-Forwarded-For} chain. If a future change flips {@code
- * server.forward-headers-strategy} back to {@code framework} (re-introducing the auto-registered
- * filter at {@code Integer.MIN_VALUE}) or reorders these beans, the spoofing-resistant client-IP
- * resolution silently breaks — this test guards against that.
+ * Verifies that {@link ForwardedHeaderFilter} runs strictly after {@link ClientIpContextFilter}, so
+ * the latter still sees the raw {@code X-Forwarded-For} chain.
  */
 class ForwardedHeaderConfigTest {
 

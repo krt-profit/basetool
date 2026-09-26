@@ -121,7 +121,7 @@ class UexVehicleServiceUuidMatchTest {
     UexVehicleDto dto = vehicleDto(7, externalUuid.toString(), "100i");
     ShipType legacy = new ShipType();
     legacy.setId(UUID.randomUUID());
-    legacy.setName("100i"); // no external_uuid, no uex_vehicle_id yet
+    legacy.setName("100i");
     when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexVehicleId(7)).thenReturn(Optional.empty());
@@ -190,8 +190,8 @@ class UexVehicleServiceUuidMatchTest {
             "video",
             0,
             0,
-            1, // is_bomber
-            1, // is_cargo
+            1,
+            1,
             0,
             0,
             0,
@@ -206,7 +206,7 @@ class UexVehicleServiceUuidMatchTest {
             0,
             0,
             0,
-            1, // is_military
+            1,
             0,
             0,
             0,
@@ -220,11 +220,11 @@ class UexVehicleServiceUuidMatchTest {
             0,
             0,
             0,
-            1, // is_spaceship
+            1,
             0,
             0,
             0,
-            0); // id_company
+            0);
     when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexVehicleId(12)).thenReturn(Optional.empty());
@@ -247,13 +247,8 @@ class UexVehicleServiceUuidMatchTest {
     assertEquals(5_000_000.0, persisted.getMass());
     assertEquals(123.4, persisted.getWidth());
     assertEquals("L", persisted.getPadType());
-    // The crew range comes from UEX's compact `crew` string ("8"), not from crew_min / crew_max —
-    // fields the payload does not carry (REQ-DATA-015).
     assertEquals(8, persisted.getCrewMin());
     assertEquals(8, persisted.getCrewMax());
-    // And the fields UEX does not serve are LEFT ALONE rather than cleared: writing them nulled
-    // eight columns outright and undid the SC-Wiki vehicle sync's description / inventory fill on
-    // every run.
     assertNull(persisted.getDescriptionEn());
     assertNull(persisted.getDescriptionDe());
     assertNull(persisted.getVehicleInventoryScu());
@@ -279,8 +274,6 @@ class UexVehicleServiceUuidMatchTest {
 
     ArgumentCaptor<ShipType> saved = ArgumentCaptor.forClass(ShipType.class);
     verify(shipTypeRepository).save(saved.capture());
-    // vehicleDto() carries crew "1" — a single number, which UEX means as "exactly one", so both
-    // bounds are filled rather than leaving max null. UexValuesTest covers the "1,2" pair form.
     assertEquals(1, saved.getValue().getCrewMin());
     assertEquals(1, saved.getValue().getCrewMax());
   }
@@ -353,6 +346,6 @@ class UexVehicleServiceUuidMatchTest {
         0,
         0,
         0,
-        0); // id_company
+        0);
   }
 }

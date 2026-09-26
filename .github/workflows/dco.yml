@@ -1,40 +1,5 @@
 name: DCO
 
-# Verifies that every commit in a pull request carries a Signed-off-by
-# trailer whose name and email match the commit's author, certifying the
-# Developer Certificate of Origin version 1.1 (https://developercertificate.org/).
-#
-# The DCO sign-off is the per-commit attestation complement to the
-# one-time Contributor License Agreement signed via docs/cla-signatures.md.
-# Together they give the project a verifiable per-contribution chain of
-# custody plus a clean IP grant — see CONTRIBUTING.md > "Developer
-# Certificate of Origin (DCO) sign-off" for the full policy.
-#
-# Trigger model:
-#   - pull_request -> required check candidate; runs on every push to a
-#                     PR branch and on PR reopen / mark-ready.
-#
-# Exemptions, in order:
-#   1. Merge commits (parents >= 2) are skipped — they are produced by
-#      Git's auto-merge and introduce no new contribution.
-#   2. Commits authored by well-known bots (Dependabot, refreshVersions,
-#      GitHub Actions, Renovate) are skipped — bot PRs are reviewed and
-#      merged by maintainers under the maintainer's own DCO sign-off and
-#      do not represent new contributor IP.
-#
-# Bootstrapping note: the PR that introduces this workflow may itself
-# carry commits without sign-off (the policy did not exist when those
-# commits were authored). Two ways to land it cleanly:
-#   (a) `git rebase --signoff main` on the bootstrapping branch, then
-#       `git push --force-with-lease`; or
-#   (b) admin-merge once with this check overridden — pre-policy commits
-#       on main are explicitly grandfathered per CONTRIBUTING.md.
-#
-# Blocking is enforced via branch protection in repository settings:
-# the check name ("DCO / Verify Signed-off-by on every commit") must be
-# marked as a required status check against `main` AFTER this workflow
-# has run at least once on main so the check name is known to GitHub.
-
 on:
   pull_request:
     branches: [main]
@@ -56,12 +21,8 @@ jobs:
 
     steps:
       - name: Checkout PR with full history
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          # fetch-depth: 0 pulls the whole history so git log can walk
-          # the base..head range even when the PR diverged from main long
-          # ago. The default shallow checkout (depth 1) would make the
-          # `git log "${BASE_SHA}..${HEAD_SHA}"` walk silently empty.
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
@@ -74,9 +35,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Enumerate commits introduced by this PR (excludes commits
-          # already on base). Reverse so the failure messages read in
-          # chronological order, which is what reviewers expect.
           mapfile -t commits < <(git log --reverse --format='%H' "${BASE_SHA}..${HEAD_SHA}")
 
           if [[ ${#commits[@]} -eq 0 ]]; then
@@ -87,9 +45,6 @@ jobs:
           echo "Checking ${#commits[@]} commit(s) in ${BASE_SHA}..${HEAD_SHA}"
           echo
 
-          # Author-email patterns that are exempt from DCO sign-off.
-          # Bot PRs are reviewed and merged by maintainers under the
-          # maintainer's own sign-off; the bot does not own IP.
           bot_emails=(
             'dependabot[bot]@users.noreply.github.com'
             'github-actions[bot]@users.noreply.github.com'
@@ -107,15 +62,12 @@ jobs:
             author_email=$(git log -1 --format='%ae' "$sha")
             parents=$(git log -1 --format='%P' "$sha")
 
-            # Skip merge commits (Git's auto-merges produce them on rebase /
-            # merge-base operations and they introduce no new contribution).
             parent_count=$(echo "$parents" | wc -w)
             if [[ $parent_count -ge 2 ]]; then
               echo "::notice title=DCO::Skipped merge commit ${short} (${parent_count} parents): ${subject}"
               continue
             fi
 
-            # Skip well-known bot authors.
             is_bot=0
             for bot in "${bot_emails[@]}"; do
               if [[ "${author_email,,}" == "${bot,,}" ]]; then
@@ -126,10 +78,8 @@ jobs:
             done
             [[ $is_bot -eq 1 ]] && continue
 
-            # Collect every Signed-off-by trailer on this commit.
             mapfile -t signoffs < <(git log -1 --format='%(trailers:key=Signed-off-by,valueonly=true)' "$sha")
 
-            # Filter out any blank entries produced by the trailer format.
             filtered=()
             for so in "${signoffs[@]}"; do
               [[ -n "$so" ]] && filtered+=("$so")
@@ -144,10 +94,6 @@ jobs:
               continue
             fi
 
-            # The author's "Name <email>" must appear verbatim in at least
-            # one trailer. Case-insensitive on the email (RFC 5321 says
-            # the local-part is technically case-sensitive but in practice
-            # nobody relies on that, and git commit -s downcases nothing).
             expected_lc="${author_name,,} <${author_email,,}>"
             matched=0
             for so in "${filtered[@]}"; do

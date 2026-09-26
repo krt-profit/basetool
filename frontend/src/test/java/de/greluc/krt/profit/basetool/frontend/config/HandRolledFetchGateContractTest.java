@@ -31,34 +31,8 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time enforcement of the client half of the consent-gate contract (REQ-SEC-028) for the
- * background reads that bypass {@code krtFetch}, plus the self-disarm invariant of the two timers
- * driving them.
- *
- * <p>The server half is covered by {@link TermsAcceptanceGateFilterTest}: a request marked {@code
- * X-Requested-With} is refused with {@code 403} plus the consent-page header, an unmarked one is
- * redirected. Writes reach that contract through {@code krtFetch}, which makes both gate checks
- * centrally. A hand-rolled {@code fetch} does not — and nothing in Java relates a static asset to
- * the filter, so a module that skips the check keeps working right up until a wording change
- * deploys under an open tab, at which point it fails in a way no test and no error message names.
- *
- * <p>Two modules do their reads that way, and each got it wrong differently:
- *
- * <ul>
- *   <li>{@code p4k-import.js} sent no marker at all, so the gate answered its 3 s job poll with a
- *       {@code 302}; fetch followed it and {@code resp.ok} was <b>true</b> for the consent page, so
- *       a refusal was read as job data. Its timer is re-evaluated only after a successful parse, so
- *       the refusal also left it armed — one gated answer became an unbounded loop that re-fetched
- *       and re-rendered the consent page every tick for as long as the tab stayed open.
- *   <li>{@code notifications.js} sent the marker and handled the re-auth gate, but never asked
- *       about the consent one: the {@code 403} simply fell through its {@code res.ok} test, so the
- *       unread badge froze at its last value and the bell dropdown opened empty, on every tab in
- *       that state, with nothing on screen saying why.
- * </ul>
- *
- * <p>The properties that keep both shut are not expressible in Java, so they are pinned against the
- * shipped sources here — the technique of {@code PickerSearchLimitsParityTest} and {@code
- * LiveSyncSectionMapParityTest}.
+ * Verifies against the shipped JavaScript that the background reads bypassing {@code krtFetch}
+ * honour the consent-gate contract (REQ-SEC-028) and that their timers stop on a gated answer.
  */
 class HandRolledFetchGateContractTest {
 
@@ -81,11 +55,8 @@ class HandRolledFetchGateContractTest {
   private static final Pattern P4K_HEADERS_VALUE = Pattern.compile("headers:\\s*([^,\\n]+)");
 
   /**
-   * The spelling that carries the marker in {@code p4k-import.js}. Anything else — an inline object
-   * literal above all — silently drops the module back onto the redirect branch of both gates. The
-   * module's writes (upload, apply) left this list on 2026-09-22 when they moved onto {@code
-   * krtFetch} (FE-SEC-03), which sends the marker itself; the one hand-rolled {@code fetch} left is
-   * the job poll.
+   * The spelling that sends the {@code X-Requested-With} marker in {@code p4k-import.js}'s job
+   * poll.
    */
   private static final List<String> P4K_HEADERS_WITH_MARKER = List.of("ajaxHeaders()");
 
@@ -305,8 +276,7 @@ class HandRolledFetchGateContractTest {
   }
 
   /**
-   * Reads a classpath resource as UTF-8 text, failing the test if it is missing so a moved or
-   * renamed asset breaks this gate loudly instead of silently emptying the scanned text.
+   * Reads a classpath resource as UTF-8 text, failing the test if it is missing.
    *
    * @param resource the absolute classpath resource path
    * @return the resource content

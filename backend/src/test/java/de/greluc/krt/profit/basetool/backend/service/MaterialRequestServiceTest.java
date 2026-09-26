@@ -77,13 +77,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit coverage for the Materialbörse Gesuche domain's security-critical behaviour across the
- * read/write split (mirroring the offer suite, ADR-0116): the supplier-anonymity redaction (names
- * only for the owner) lives in {@link MaterialRequestBoardService} and is exercised via that
- * co-wired subject, while the owner-only write gates, the self-signal block, the optimistic-lock
- * guard, the kind-aware quantity validation and the fulfilment-signal notification live in {@link
- * MaterialRequestService}. The write service is co-wired to the real board service so a mutation's
- * redacted response goes through the identical projection.
+ * Unit tests for the material-request board: supplier redaction in {@link
+ * MaterialRequestBoardService}, and owner-only writes, the self-signal block, optimistic locking,
+ * quantity validation and the fulfilment notification in {@link MaterialRequestService}.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialRequestServiceTest {
@@ -102,15 +98,8 @@ class MaterialRequestServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialRequestService> selfProvider;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL board service is one of
-  // its arguments
   private MaterialRequestService service;
 
-  // Read/write split (ADR-0116): the board/detail/counts reads plus the supplier-anonymity
-  // redaction
-  // live in MaterialRequestBoardService, built from the same mocks and co-wired into the write
-  // service below so both the read paths and the write→read projection keep exercising the real
-  // logic.
   @InjectMocks private MaterialRequestBoardService boardService;
 
   private final UUID ownerId = UUID.randomUUID();
@@ -123,12 +112,6 @@ class MaterialRequestServiceTest {
   /** Builds a fresh owner + active material-request fixture before each test. */
   @BeforeEach
   void setUp() {
-    // The REAL co-built board service goes in through the constructor so the write->read
-    // projection runs the real redaction/DTO mapping.
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
     service =
         new MaterialRequestService(
             requestRepository,

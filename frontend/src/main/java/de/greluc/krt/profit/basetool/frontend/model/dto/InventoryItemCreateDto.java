@@ -23,25 +23,14 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code InventoryItemCreateDto} wire shape. Adding a field on one
- * side without the other surfaces only at render time in production — keep the two records aligned
- * field-for-field, in the same order (see auto-memory {@code
- * feedback_backend_frontend_dto_mirror}).
+ * Frontend mirror of the backend {@code InventoryItemCreateDto}; fields must match the backend
+ * record in name and order.
  *
- * <p>The trailing {@code owningOrgUnitId} field is the R5.d picker output: when non-null, the
- * backend stamps the new inventory row onto the picked org unit instead of the target user's home
- * Staffel. {@code null} preserves the legacy stamping path. The final {@code mergeStock} field is
- * the per-action stock-merge opt-in (REQ-INV-026): honoured only for an {@code SCU} material (a
- * {@code PIECE} book-in always merges); {@code null}/{@code false} keeps the row separate.
- *
- * <p>The trailing {@code jobOrderAllocations} / {@code missionAllocations} lists are the Variante-C
- * split-at-check-in payload (REQ-INV-027, R4): earmark parts of the new entry to several job orders
- * / missions with their own amounts. When non-empty they supersede the single {@code jobOrderId} /
- * {@code missionId}; {@code null}/empty falls back to the single scalar.
- *
- * <p>{@code gameItemId} is the V220 catalog discriminator (REQ-INV-029): exactly one of {@code
- * materialId} / {@code gameItemId} is set. The material-only Einbuchen form always sends {@code
- * null} until the item mode ships (PR 3).
+ * <p>Exactly one of {@code materialId} / {@code gameItemId} is set (REQ-INV-029). {@code
+ * owningOrgUnitId} overrides the owner's home Staffel when non-null. {@code mergeStock}
+ * (REQ-INV-026) is honoured only for an {@code SCU} material. Non-empty {@code jobOrderAllocations}
+ * / {@code missionAllocations} (REQ-INV-027) supersede the single {@code jobOrderId} / {@code
+ * missionId}.
  */
 public record InventoryItemCreateDto(
     UUID userId,

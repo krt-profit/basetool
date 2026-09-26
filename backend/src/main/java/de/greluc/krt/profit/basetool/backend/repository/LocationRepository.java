@@ -36,10 +36,8 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
 
   /**
    * Returns slim {@code LocationReferenceDto}s (id + name) for every non-hidden location, ordered
-   * by name. Used to populate location pickers without pulling the full Location aggregate. The
-   * list is deliberately complete — never silently bounded — because the catalogue is curated
-   * (admin-maintained plus UEX universe sync); pickers that must stay payload-bounded use {@link
-   * #searchReference(String, Pageable)} instead.
+   * by name, unbounded. Payload-bounded pickers use {@link #searchReference(String, Pageable)}
+   * instead.
    */
   @Query(
       """
@@ -49,11 +47,8 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   List<LocationReferenceDto> findAllReference();
 
   /**
-   * Live-search projection for the location pickers (REQ-FE-016): non-hidden locations whose name
-   * contains the (already LIKE-escaped) fragment, case-insensitively; a {@code null} fragment
-   * matches everything. Paged so the picker's server-side search stays payload-bounded while every
-   * location remains reachable by typing a narrower term — the deliberate alternative to a silent
-   * cap on the complete {@link #findAllReference()} list.
+   * Paged live search for the location pickers (REQ-FE-016): non-hidden locations whose name
+   * contains the LIKE-escaped fragment, case-insensitively.
    *
    * @param q the LIKE-escaped name fragment, or {@code null} for no filter
    * @param pageable page request (sorted by the whitelisted picker sort, typically name ascending)
@@ -95,31 +90,9 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   List<Location> findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
 
   /**
-   * Returns every non-hidden location whose city or space station hosts a live refinery terminal;
-   * the picker source when the user creates a refinery order, and the candidate set the screenshot
-   * import matches its location read against.
-   *
-   * <p>Keyed on the derived {@code hasRefineryTerminal} flag, NOT on UEX's parent-level {@code
-   * hasRefinery} claim this query used to read (REQ-REFINERY-020). The upstream claim disagrees
-   * with UEX's own terminal list in both directions — it misses MIC-L5, ARC-L4 and Patch City, and
-   * invents four People's Service Stations. {@code
-   * UexUniverseSyncService.reconcileRefineryTerminalFlags()} recomputes the derived flag from the
-   * live {@code type = 'refinery'} terminals at the end of every sweep.
-   *
-   * <p>The {@code hidden = false} predicate is as load bearing as the flag itself: an admin who
-   * hides a location expects it gone from every picker, and this query was the sole Location lookup
-   * that ignored the flag. Without it a hidden refinery stayed selectable here while vanishing from
-   * the storage pickers built on {@link #findAllReference()} / {@link #findByHiddenFalse(Pageable)}
-   * — the user could open a refinery order at a location they could then not book the yield into.
-   * The parentheses around the two terminal branches are equally load bearing: {@code AND} binds
-   * tighter than {@code OR}, so an unparenthesised predicate would filter the city branch only and
-   * leak every hidden station-backed refinery.
-   *
-   * <p>The create/update gate {@code RefineryOrderService.validateLocationHasRefinery} deliberately
-   * does <strong>not</strong> mirror this predicate. It stays keyed on the refinery flag alone, so
-   * it remains looser than the picker and an order created before its location was hidden can still
-   * be edited and saved (REQ-REFINERY-020 forbids a gate that is *stricter* than the picker, not
-   * one that is more permissive).
+   * Returns every non-hidden location whose city or space station hosts a live refinery terminal,
+   * keyed on the derived {@code hasRefineryTerminal} flag (REQ-REFINERY-020). Source for the
+   * refinery-order location picker and the screenshot import's location match.
    *
    * @return non-hidden locations hosting a live refinery terminal, never {@code null}
    */

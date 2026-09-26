@@ -22,16 +22,11 @@ package de.greluc.krt.profit.basetool.backend.model.projection;
 import java.util.UUID;
 
 /**
- * How many members and guests are registered for one mission.
- *
- * <p>A {@code MissionParticipant} row <em>is</em> the registration — there is no separate
- * accept/decline state — so the row count is the figure the mission list shows as "{n} angemeldet".
- * Produced by one grouped statement over a whole page of missions rather than by touching each
- * mission's lazy {@code participants} collection, which would be a per-mission SELECT
+ * The number of participants registered for one mission, computed in one grouped query per page
  * (REQ-DATA-003).
  *
  * @param missionId the mission the count belongs to
- * @param registered number of participant rows; a mission with none produces no row at all, so the
- *     caller supplies the zero
+ * @param registered number of participant rows; a mission with none produces no row, so the caller
+ *     supplies the zero
  */
 public record MissionParticipantCount(UUID missionId, long registered) {}

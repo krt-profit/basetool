@@ -23,11 +23,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * One Staffel column in the org chart: its Staffelleiter, up to four Kommandos, and the Ensigns
- * that report directly to the Staffelleiter (rather than into a Kommando). Always rendered even
- * when empty so admins can fill it in. The {@code canAdd*} flags are presentation hints derived
- * from the server-side limits (≤4 Kommandos, ≤4 Ensigns per Staffel) so the inline editor can hide
- * an exhausted "add" button; the service still enforces the limits authoritatively.
+ * One Staffel column in the org chart: its Staffelleiter, up to four Kommandos and the Ensigns
+ * reporting directly to the Staffelleiter; rendered even when empty.
  *
  * @param orgUnitId id of the owning Staffel.
  * @param name the Staffel's display name.

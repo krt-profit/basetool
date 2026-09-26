@@ -29,18 +29,9 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Enforces the hand-maintained cross-module mirror of {@code ObservationPrivacyFilter}. The filter
- * — which strips PII from Micrometer observation names — is deliberately copied verbatim into the
- * {@code backend}, {@code frontend} and {@code ingest} modules (ADR-0072: no shared library module
- * without owner sign-off) and kept in sync only by a Javadoc convention. This test makes the mirror
- * mechanical: it reads the three source files and asserts they are byte-identical apart from their
- * {@code package} declaration, so an edit to one copy that is not propagated to the others fails
- * the build instead of silently letting a module leak what the others redact.
- *
- * <p>Only {@code ObservationPrivacyFilter} is guarded here: the other cross-module twins ({@code
- * MonitoringScrapeProperties}, {@code NotificationStreamObservationPredicate}, {@code
- * StringNormalization}) carry legitimate per-module differences and are NOT byte-identical, so a
- * parity assertion would be wrong for them.
+ * Asserts that the {@code ObservationPrivacyFilter} copies in {@code backend}, {@code frontend} and
+ * {@code ingest} are byte-identical apart from their {@code package} line (ADR-0072), so an
+ * unpropagated edit fails the build.
  */
 class ObservationPrivacyFilterMirrorParityTest {
 

@@ -1,14 +1,3 @@
-# Alertmanager configuration TEMPLATE. Alertmanager 0.33.x (verified 2026-07). Epic #936, ADR-0072.
-#
-# Alertmanager does NOT expand environment variables, so this is a TEMPLATE: the operator renders
-# it with `envsubst` to /var/iri/monitoring/secrets/alertmanager.yml and runs `amtool check-config`
-# against the RENDERED file (monitoring/README.md -> "Re-rendering the Alertmanager config"). The
-# ${...} placeholders below are exported in the operator's shell for that render (SMTP credentials,
-# recipient, healthchecks.io ping URL, Discord webhook). Alert e-mails never contain user data.
-#
-# SMTP: 587 STARTTLS, smtp_require_tls enforced. The Watchdog alert (always firing) is routed to the
-# external heartbeat receiver — the dead-man's switch: if this stack or the host dies, the pings stop
-# and healthchecks.io alerts.
 global:
   resolve_timeout: 5m
   smtp_smarthost: '${SMTP_SMARTHOST}'
@@ -19,34 +8,11 @@ global:
 
 route:
   receiver: 'email'
-  # Group by alertname only. Grouping ALSO by `job` fanned TargetDown out into one e-mail per down
-  # scrape job, so a single outage that dropped several targets sent several mails; the alert already
-  # names the instance in its annotation, so `job` in the group key only splits notifications without
-  # adding routing signal. Batching per alertname collapses a multi-target TargetDown (and the
-  # per-container ContainerRestartLoop burst) into one mail.
   group_by: ['alertname']
   group_wait: 30s
   group_interval: 5m
-  # ONE MAIL PER EVENT. Alertmanager has no "acknowledged" state: a still-firing alert is re-sent
-  # every repeat_interval, forever. At the 4h this used to be, that is six identical mails a day —
-  # and for an alert that tests a STATE rather than an event (audit silence, a stale sync job, a
-  # queue over SLA) the state does not clear on its own, so it never stops. In August 2026
-  # AuditDomainSilenceAnomaly on the ROLE domain did exactly that for days. Re-notification is
-  # Alertmanager's substitute for an acknowledgement, and a single-operator setup does not need one:
-  # the mail is read the first time or not at all. 720h (30d) is "effectively never" without being
-  # infinite. `send_resolved: true` on the e-mail receiver keeps the pair complete — one mail when it
-  # starts, one when it clears — so silence between them means "still running", not "forgotten".
-  #
-  # If an alert genuinely needs muting before it resolves, that is what an Alertmanager SILENCE is
-  # for (time-boxed, per matcher, in the UI) — not a shorter repeat_interval.
-  #
-  # HARD CONSTRAINT: the notification log that remembers "already sent" is garbage-collected after
-  # `--data.retention` (default 120h). A repeat_interval above that silently degrades to the
-  # retention window, so docker-compose.monitoring.yml pins alertmanager to --data.retention=744h
-  # (31d) — one day of headroom over this value. Raise both together or neither.
   repeat_interval: 720h
   routes:
-    # The always-firing Watchdog goes only to the external heartbeat, never to e-mail.
     - matchers:
         - alertname = "Watchdog"
       receiver: 'heartbeat'
@@ -54,32 +20,17 @@ route:
       group_interval: 1m
       repeat_interval: 1m
       continue: false
-    # (#1041 item 9) Second channel: mirror every critical to Discord first, then fall through
-    # (continue: true) to the critical e-mail route below, so an SMTP outage never silently loses a
-    # critical alert.
-    #
-    # Discord KEEPS the hourly repeat while e-mail no longer does. That asymmetry is the point: a
-    # chat channel is where a still-open critical may keep nudging without costing anything, whereas
-    # the same nudge in a mailbox is what made the inbox unreadable. So the mailbox states the event
-    # and Discord carries the reminder.
     - matchers:
         - severity = "critical"
       receiver: 'discord'
       group_wait: 0s
       repeat_interval: 1h
       continue: true
-    # AlertmanagerNotificationsFailing is itself e-mail-routed and thus circular when SMTP is the
-    # failure — send it to Discord explicitly. It is a warning, so it never matches the critical route.
-    # Its repeat_interval is set here rather than inherited: this is a Discord route, so it follows
-    # the reminder rule above and must not silently follow the mailbox's 30d when that is retuned.
     - matchers:
         - alertname = "AlertmanagerNotificationsFailing"
       receiver: 'discord'
       repeat_interval: 1h
       continue: false
-    # Critical alerts page e-mail immediately (group_wait: 0s — no 30s batching delay), but do not
-    # re-mail: they inherit the root route's 720h, so a critical is one mail plus its resolved mail,
-    # same as a warning. The hourly nudging lives on the Discord route above (decided 2026-08-16).
     - matchers:
         - severity = "critical"
       receiver: 'email'
@@ -92,31 +43,18 @@ receivers:
       - to: '${ALERT_EMAIL_TO}'
         send_resolved: true
 
-  # Dead-man's switch: forwards the Watchdog to healthchecks.io. When Alertmanager/Prometheus/the
-  # host dies, these pings stop arriving and healthchecks.io fires its own external alert.
   - name: 'heartbeat'
     webhook_configs:
       - url: '${HEARTBEAT_URL}'
         send_resolved: false
 
-  # (#1041 item 9) Second human channel: native Discord webhook. The URL is a host .env secret
-  # (${DISCORD_WEBHOOK_URL}) rendered by envsubst at deploy time — never committed. If SMTP fails, a
-  # critical alert (and AlertmanagerNotificationsFailing itself) still reaches Discord. Alert
-  # annotations are PII-free (REQ-OBS-006/-007), so there is no privacy impact.
   - name: 'discord'
     discord_configs:
       - webhook_url: '${DISCORD_WEBHOOK_URL}'
         send_resolved: true
 
 inhibit_rules:
-  # (#1041 item 20) Root-cause suppression. The previous single rule required equal alertname AND job
-  # across severities — which never occurs (a critical and a warning never share an alertname), so it
-  # was a no-op: an app/exporter outage paged every derived warning separately, burying the cause.
 
-  # 1. An app scrape target being down suppresses that app's derived warnings. Both sides require a
-  #    non-empty application label (application=~".+") — otherwise Alertmanager's missing-label ==
-  #    missing-label equality would make an exporter TargetDown (which has no application label) inhibit
-  #    ALL application-less warnings.
   - source_matchers:
       - alertname = "TargetDown"
       - application =~ ".+"
@@ -125,28 +63,18 @@ inhibit_rules:
       - application =~ ".+"
     equal: ['application']
 
-  # 2. A failing liveness probe on an endpoint suppresses that endpoint's cert-expiry and edge-posture
-  #    alerts (they carry no signal while the endpoint is down), matched on the shared instance label.
   - source_matchers:
       - alertname = "BlackboxProbeFailed"
     target_matchers:
       - alertname =~ "CertificateExpiringSoon|Edge.*"
     equal: ['instance']
 
-  # 3. A critical disk-full alert suppresses the warning tier for the same mountpoint.
   - source_matchers:
       - alertname = "HostDiskCritical"
     target_matchers:
       - alertname = "HostDiskWarning"
     equal: ['mountpoint']
 
-  # 4. A restart-looping container suppresses its OWN resource-pressure warnings — a container that is
-  #    crash-looping trivially trips working-set / OOM / CPU-throttle / pids warnings as a SYMPTOM, and
-  #    those carry no independent signal while ContainerRestartLoop (critical) already pages. Joined on
-  #    `name` (present on every cAdvisor container series), so it only ever suppresses the SAME
-  #    container's warnings, never an unrelated one. During the 2026-07-15 cascade this collapses the
-  #    per-container ContainerMemoryHigh noise under the restart-loop page (that alert was named
-  #    ContainerWorkingSetHigh until 2026-08-02; historical incident notes still use the old name).
   - source_matchers:
       - alertname = "ContainerRestartLoop"
     target_matchers:
@@ -154,13 +82,6 @@ inhibit_rules:
       - alertname =~ "ContainerMemoryHigh|ContainerOomKilled|ContainerCpuThrottledHigh|ContainerPidsHigh"
     equal: ['name']
 
-  # 5. A down scrape target suppresses every warning derived from that same target's series — its
-  #    metrics are stale while it is down, so any warning keyed to it is noise. Joined on `instance`;
-  #    BOTH sides require instance=~".+" so a warning WITHOUT an instance label is never a target
-  #    (Alertmanager treats missing==missing as equal, which would otherwise let one TargetDown inhibit
-  #    every instance-less warning). This complements rule 1 (which joins on `application`, dropped by
-  #    the app warnings that aggregate with `sum by (application)` but keep `instance`), e.g. it mutes
-  #    KeycloakLoginErrorSpike (instance=keycloak:9000) when the keycloak scrape goes down.
   - source_matchers:
       - alertname = "TargetDown"
       - instance =~ ".+"

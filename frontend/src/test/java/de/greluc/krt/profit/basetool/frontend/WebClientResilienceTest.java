@@ -47,12 +47,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 @ActiveProfiles("test")
 @TestPropertySource(
     properties = {
-      // Tighten client timeouts to speed up tests
       "app.http.connect-timeout=200ms",
       "app.http.response-timeout=500ms",
       "app.http.read-timeout=500ms",
       "app.http.write-timeout=500ms",
-      // Resilience4j instances for our WebClient filter (instance name: backendApi)
       "resilience4j.retry.instances.backendApi.max-attempts=3",
       "resilience4j.retry.instances.backendApi.wait-duration=50ms",
       "resilience4j.circuitbreaker.instances.backendApi.sliding-window-size=2",
@@ -124,13 +122,11 @@ class WebClientResilienceTest {
     } catch (Exception ignored) {
     }
     int after = server.getRequestCount();
-    // 1 initial + 2 retries = 3 total attempts
     assertEquals(before + 3, after, "WebClient should have retried the request");
   }
 
   @Test
   void circuitBreaker_ShouldOpenAndShortCircuit_SubsequentCalls() {
-    // First two calls fail and should count towards the circuit breaker window
     for (int i = 0; i < 2; i++) {
       try {
         termsDocumentClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
@@ -139,7 +135,6 @@ class WebClientResilienceTest {
       }
     }
     int before = server.getRequestCount();
-    // Third call should be short-circuited by the open breaker → no new backend hit
     try {
       termsDocumentClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
       fail("Expected CallNotPermittedException");
@@ -154,40 +149,28 @@ class WebClientResilienceTest {
   }
 
   /**
-   * A 4xx client error (here a 429 rate-limit) must be treated as a per-call client signal, not a
-   * backend-health fault: it is neither retried nor recorded as a circuit-breaker failure. Pins the
-   * fix for the 2026-07-06 429 storm, where the shared {@code backendApi} breaker tripped OPEN on
-   * rate-limit responses and cascaded a partial throttle into a full "Fehler beim Laden" outage
-   * (ADR-0077). The breaker is reset first so an earlier test that tripped it on 5xx cannot mask
-   * the assertion.
+   * Verifies that a 4xx client error (here a 429) is neither retried nor recorded as a
+   * circuit-breaker failure (ADR-0077).
    */
   @Test
   void clientError4xx_IsNeitherRetriedNorTripsBreaker() {
     circuitBreakerRegistry.circuitBreaker("backendApi").reset();
 
-    // (a) A 4xx GET is not retried: exactly one backend hit, not the 1 + 1-retry a 5xx would incur.
     int beforeSingle = server.getRequestCount();
     try {
       termsDocumentClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
       fail("Expected 429 TooManyRequests");
     } catch (Exception ignored) {
-      // expected — the 429 surfaces as a WebClientResponseException, not a retry loop
     }
     assertEquals(
         beforeSingle + 1,
         server.getRequestCount(),
         "A 4xx must not be retried (one backend hit, not two)");
 
-    // (b) A burst of 4xx must NOT open the breaker: with the fix each 429 is a success, so the
-    // window never fills with failures and a subsequent call still reaches the backend instead of
-    // being short-circuited. (Without the fix, 8 recorded failures would open the 2-call test
-    // window
-    // and the final call would be short-circuited — beforeFinal + 0.)
     for (int i = 0; i < 8; i++) {
       try {
         termsDocumentClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
       } catch (Exception ignored) {
-        // each 429 is expected
       }
     }
     int beforeFinal = server.getRequestCount();
@@ -222,13 +205,9 @@ class WebClientResilienceTest {
   }
 
   /**
-   * Verifies that the unconditional {@code TimeLimiterOperator} in {@link
-   * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter} also fires on
-   * state-changing HTTP verbs. The reactive operator wraps every outbound call regardless of
-   * method, so a hanging upstream on POST/PUT/DELETE/PATCH must fail fast — symmetric to the
-   * GET-only {@link #timeLimiter_ShouldTimeoutSlowResponses()}. The {@code backendApi} circuit
-   * breaker is reset before each iteration so an earlier test that tripped it cannot short-circuit
-   * the call ahead of the time limiter and mask the timeout assertion.
+   * Verifies that the time limiter in {@link
+   * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter} also times out
+   * state-changing HTTP verbs.
    */
   @ParameterizedTest
   @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
@@ -245,8 +224,6 @@ class WebClientResilienceTest {
           .block();
       fail("Expected timeout for " + method + " due to slow response");
     } catch (Exception ignored) {
-      // Either TimeLimiter fires (TimeoutException) or the WebClient-level response timeout —
-      // both are acceptable fast-fail outcomes; the assertion below checks duration, not type.
     }
     long duration = System.currentTimeMillis() - start;
     int after = server.getRequestCount();
@@ -255,19 +232,10 @@ class WebClientResilienceTest {
   }
 
   /**
-   * Pins the idempotency verb-guard in {@link
-   * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter}: the {@code
-   * RetryOperator} is wired ONLY for the safe/idempotent verbs (GET/HEAD/OPTIONS/TRACE), so a
-   * state-changing POST/PUT/DELETE/PATCH that receives a 5xx must be attempted <b>exactly once</b>
-   * and never replayed. Contrast {@link #retry_ShouldPerformMultipleAttempts_On5xx()}, where the
-   * same 500 on a GET incurs {@code 1 initial + 2 retries = 3} backend hits.
-   *
-   * <p>Regression guard: if the verb-guard branch (WebClientConfig ~lines 349-357) is dropped or
-   * refactored to retry unconditionally, a write that receives a 500 <i>after</i> the backend
-   * already committed the mutation (a bank booking / transfer, a job order) would be silently
-   * double-submitted by the retry operator — a financial-correctness defect (double-charge /
-   * duplicate order). The {@code backendApi} breaker is reset per iteration so an earlier test that
-   * tripped it cannot short-circuit the call and mask the request count.
+   * Verifies that {@link
+   * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter} sends a
+   * state-changing request that receives a 5xx exactly once, since retries apply only to idempotent
+   * verbs.
    */
   @ParameterizedTest
   @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
@@ -283,7 +251,6 @@ class WebClientResilienceTest {
           .block();
       fail("Expected 5xx for " + method);
     } catch (Exception ignored) {
-      // The 500 surfaces as an error; a write verb must NOT be retried.
     }
     assertEquals(
         before + 1,

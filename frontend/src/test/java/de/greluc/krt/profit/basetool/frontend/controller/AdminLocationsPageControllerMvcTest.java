@@ -51,18 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression for the Thymeleaf 3.1 JS-inline truncation bug on {@code /admin/locations}.
- *
- * <p>Pre-fix, the template called {@code /*[[${locations.![name]}]]*&#47;} inside a {@code
- * th:inline="javascript"} script, which truncated the rest of the script body. The page-local
- * {@code filterTable} function lived after that expression and therefore was never defined — the
- * filter input above the locations table did nothing. The fix replaced the inline expression with a
- * sibling {@code <datalist id="locationNames-data">}. Post-ADR-0069 the page logic lives in the
- * extracted {@code locations.js} module (loaded via {@code th:src}) and the remaining interpolation
- * (the AJAX toast/conflict strings) sits in a small inline bootstrap right before it; this test
- * pins that the module's {@code th:src} tag — emitted AFTER that bootstrap — survives in the
- * rendered HTML (so a re-introduced inline-truncation bug that ate the bootstrap and dropped the
- * module tag is still caught) and the response ends with the closing {@code </html>} tag.
+ * Regression test for the Thymeleaf JS-inline truncation on {@code /admin/locations}: the {@code
+ * locations.js} module tag, emitted after the inline bootstrap, and the closing {@code </html>} tag
+ * must be present in the rendered page.
  */
 @SpringBootTest
 class AdminLocationsPageControllerMvcTest {
@@ -83,9 +74,8 @@ class AdminLocationsPageControllerMvcTest {
   }
 
   /**
-   * Asserts the extracted {@code locations.js} module tag (emitted AFTER the datalist and the
-   * interpolated bootstrap) appears in the rendered HTML — proof that the Thymeleaf inline
-   * truncation does not strike again.
+   * Asserts the {@code locations.js} module tag appears in the rendered HTML, proving the inline
+   * script was not truncated.
    */
   @Test
   @WithMockUser(roles = "ADMIN")
@@ -110,10 +100,6 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(content().string(containsString("</html>")));
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
-  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -132,9 +118,6 @@ class AdminLocationsPageControllerMvcTest {
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
-  // covers #582 — the toggle-visibility twin (X-Requested-With) flips the hidden flag off a
-  // freshly-read record and returns the persisted LocationDto so the page re-renders the row in
-  // place. The second get() returns the toggled record.
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibilityAjax_withHeader_returns200WithLocation() throws Exception {
@@ -155,8 +138,6 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(content().string(containsString("ARC-L1")));
   }
 
-  // covers #582 — a backend optimistic-lock conflict on the PUT is relayed as the backend status
-  // (409) so krtFetch offers the reload-confirm instead of reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibilityAjax_backendConflict_relays409() throws Exception {
@@ -176,8 +157,6 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(status().isConflict());
   }
 
-  // covers #582 — header routing: the same URL WITHOUT the header still hits the classic form
-  // handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibility_withoutHeader_redirects() throws Exception {

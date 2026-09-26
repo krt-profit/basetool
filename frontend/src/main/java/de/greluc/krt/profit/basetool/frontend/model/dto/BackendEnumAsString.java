@@ -26,22 +26,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a frontend DTO record component that intentionally mirrors a backend <em>enum</em> property
- * as a plain {@link String} (the raw enum name) rather than a typed Java enum.
+ * Marks a frontend DTO record component that deliberately mirrors a backend enum property as its
+ * {@link String} name.
  *
- * <p>The frontend hand-mirrors backend DTOs with no shared module and no code generation. It
- * deliberately demotes some backend enums to {@code String} so the enum name can feed an i18n
- * message key directly (e.g. {@code bank.account.type.ORG_UNIT}); a typed enum would fight that
- * key-construction rendering. Such a demotion is legitimate — but it must be a <b>choice</b>, not
- * silent drift.
- *
- * <p>{@code FrontendDtoContractTest} diffs every frontend DTO record against the committed {@code
- * backend/src/main/resources/api/openapi.json}: whenever the schema types a property as an enum but
- * the frontend component is a {@code String}, the test requires this annotation. An un-annotated
- * enum-to-String demotion fails the build, so a backend field that quietly gained or lost enum
- * typing can no longer slip through unnoticed as a runtime template miss.
- *
- * @see de.greluc.krt.profit.basetool.frontend.model.dto
+ * <p>{@code FrontendDtoContractTest} requires this annotation wherever {@code openapi.json} types a
+ * property as an enum but the frontend component is a {@code String}.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

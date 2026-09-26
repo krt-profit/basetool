@@ -23,14 +23,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Frontend-side projection of the {@code Terminal} payload returned by the backend.
+ * Frontend mirror of the backend {@code TerminalDto}.
  *
- * <p>Mirrors {@code de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto} exactly so the
- * frontend's WebClient can deserialise the JSON without a translation step. The two boolean flags
- * {@code hasLoadingDockOverridden} / {@code isAutoLoadOverridden} drive the admin override UI: when
- * {@code true}, the corresponding value column is admin-pinned and the next UEX sweep leaves it
- * alone. The {@code uex*} fields carry the most recent raw UEX-reported state for the terminal so
- * the admin page can display what UEX currently claims even while a pin is active.
+ * <p>The {@code hasLoadingDockOverridden} / {@code isAutoLoadOverridden} flags mark a value as
+ * admin-pinned, which the UEX sync leaves alone; the {@code uex*} fields show what UEX last
+ * reported.
  *
  * @param id terminal primary key
  * @param name canonical terminal name as supplied by UEX
@@ -43,10 +40,10 @@ import java.util.UUID;
  * @param isAutoLoad current effective "is auto-load" value
  * @param hasLoadingDockOverridden whether {@code hasLoadingDock} is admin-pinned
  * @param isAutoLoadOverridden whether {@code isAutoLoad} is admin-pinned
- * @param uexHasLoadingDock raw {@code hasLoadingDock} value from the most recent UEX sweep, or
- *     {@code null} when the terminal has not been synced yet
- * @param uexIsAutoLoad raw {@code isAutoLoad} value from the most recent UEX sweep, or {@code null}
- *     when the terminal has not been synced yet
+ * @param uexHasLoadingDock raw {@code hasLoadingDock} value from the latest UEX sync, or {@code
+ *     null} before the first sync
+ * @param uexIsAutoLoad raw {@code isAutoLoad} value from the latest UEX sync, or {@code null}
+ *     before the first sync
  * @param uexSyncedAt UTC instant of the last UEX sweep that touched the terminal, or {@code null}
  * @param hidden whether the terminal is hidden from regular dropdowns / lists
  */

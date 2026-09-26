@@ -38,12 +38,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the material-category reference table. Read is public; mutations are
- * ADMIN/OFFICER only.
+ * REST surface for the material-category reference table. Reads need authentication; mutations are
+ * ADMIN/OFFICER.
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
+ * gate takes precedence (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/api/v1/material-categories")
@@ -85,8 +84,6 @@ public class MaterialCategoryController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MaterialCategoryDto create(@RequestBody MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
-    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
-    // row.
     category.setId(null);
     category.setVersion(null);
     MaterialCategory saved = service.create(category);

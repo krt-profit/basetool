@@ -26,14 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * The list two filters read, tested once instead of twice.
- *
- * <p>{@link ApiCacheControlFilterTest} covers what the directive does to a response and {@code
- * StreamAwareShallowEtagHeaderFilterTest} covers what it does to the ETag buffer. What is left, and
- * belongs here, is the matching itself: which spellings of a path the list recognises, and which it
- * deliberately does not.
- */
+/** Tests which path spellings the shared no-store API scope list matches and which it does not. */
 class NoStoreApiScopesTest {
 
   @ParameterizedTest
@@ -59,8 +52,6 @@ class NoStoreApiScopesTest {
       })
   @DisplayName("every sensitive family is recognised, container path included")
   void sensitiveFamiliesMatch(String uri) {
-    // The container itself matters as much as its members: `/api/v1/bank/**` has to answer for
-    // `/api/v1/bank` too, or the family's own index would be the one path that escapes the rule.
     assertThat(NoStoreApiScopes.matches(uri)).isTrue();
   }
 
@@ -79,17 +70,12 @@ class NoStoreApiScopesTest {
       })
   @DisplayName("the shared boards and the catalogues stay out of it")
   void sharedSurfacesDoNotMatch(String uri) {
-    // The Materialboerse is the deliberate near-miss: an org-wide board carrying the same public
-    // callsign tuple the mission roster already serves, so it belongs in the revalidate bucket.
     assertThat(NoStoreApiScopes.matches(uri)).isFalse();
   }
 
   @Test
   @DisplayName("a percent-encoded spelling does not escape the family")
   void percentEncodedPathsStillMatch() {
-    // REQ-SEC-029. getRequestURI() is raw while Spring MVC routes on the decoded path, so a literal
-    // prefix test let `/api/v1/%62ank/accounts` reach the handler outside the stricter bucket.
-    // PathContainer.parsePath decodes each segment, which is why this answers true.
     assertThat(NoStoreApiScopes.matches("/api/v1/%62ank/accounts")).isTrue();
     assertThat(NoStoreApiScopes.matches("/api/v1/%75sers/me")).isTrue();
   }
@@ -97,12 +83,6 @@ class NoStoreApiScopesTest {
   @Test
   @DisplayName("a dot segment does NOT escape a family, because these patterns end in /**")
   void dotSegmentsStillMatch() {
-    // Worth pinning, because the neighbouring guard behaves the opposite way and the difference is
-    // the pattern shape rather than the code. StreamAwareShallowEtagHeaderFilter matches its two
-    // streaming endpoints EXACTLY, so `/api/v1/live-sync/./stream` slips past it; every pattern
-    // here ends in `/**`, which matches any segments at all -- a literal `.` among them. So the
-    // stricter of the two answers, `no-store`, is the one that survives an unnormalised spelling,
-    // which is the direction that matters (REQ-SEC-031).
     assertThat(NoStoreApiScopes.matches("/api/v1/bank/./accounts")).isTrue();
     assertThat(NoStoreApiScopes.matches("/api/v1/users/../users/me")).isTrue();
   }
@@ -110,20 +90,12 @@ class NoStoreApiScopesTest {
   @Test
   @DisplayName("a null URI answers false rather than throwing")
   void nullUriIsFalse() {
-    // Both callers hand this whatever getRequestURI() returned. Answering rather than throwing is
-    // what lets each of them treat "unknown" as "apply the ordinary path".
     assertThat(NoStoreApiScopes.matches((String) null)).isFalse();
   }
 
   @Test
   @DisplayName("the list cannot be quietly emptied")
   void theListHasAFloor() {
-    // Without this, deleting every pattern would leave both filters green: one would stop writing
-    // `no-store` and the other would stop skipping, and no case above would notice.
-    //
-    // The one place the exact count lives, deliberately. If you have just ADDED a family, this is
-    // the number to raise -- and adding the path to `sensitiveFamiliesMatch` above is the half that
-    // actually proves it works.
     assertThat(NoStoreApiScopes.size())
         .as(
             "the number of no-store families. Raise it here when you add one, and add the path to"

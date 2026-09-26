@@ -62,12 +62,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Mockito unit tests for {@link UserRegistrationService} — the registration approval lifecycle
- * (approve / reject / decide, the pending-queue read), the admin-driven {@link
- * UserRegistrationService#linkRegistrationToExistingAccount} merge (REQ-SEC-026), the reversal of
- * an erroneous rejection via {@link UserRegistrationService#reopenRegistration} (REQ-SEC-034), plus
- * the shared {@link UserRegistrationService#stampNewPendingRegistration} fail-safe PENDING
- * stamping, extracted out of {@code UserService} (audit Thema&nbsp;7, #1252).
+ * Mockito unit tests for {@link UserRegistrationService}: the approval lifecycle, the {@link
+ * UserRegistrationService#linkRegistrationToExistingAccount} merge (REQ-SEC-026), {@link
+ * UserRegistrationService#reopenRegistration} (REQ-SEC-034) and the fail-safe PENDING stamping of
+ * {@link UserRegistrationService#stampNewPendingRegistration}.
  */
 @ExtendWith(MockitoExtension.class)
 class UserRegistrationServiceTest {
@@ -128,8 +126,6 @@ class UserRegistrationServiceTest {
     assertEquals(ApprovalDecision.APPROVED, audit.getValue().getDecision());
     assertEquals(USER_ID, audit.getValue().getUserId());
     assertEquals(ADMIN_ID, audit.getValue().getDecidedById());
-    // REQ-NOTIF-014: an approval publishes the decision-mail event carrying the recipient's
-    // address + name and no reason.
     ArgumentCaptor<UserApprovalDecidedEvent> mail =
         ArgumentCaptor.forClass(UserApprovalDecidedEvent.class);
     verify(eventPublisher).publishEvent(mail.capture());
@@ -155,7 +151,6 @@ class UserRegistrationServiceTest {
     verify(userApprovalEventRepository).save(audit.capture());
     assertEquals(ApprovalDecision.REJECTED, audit.getValue().getDecision());
     assertEquals("not a real member", audit.getValue().getReason());
-    // REQ-NOTIF-014: a rejection publishes the decision-mail event carrying the admin's reason.
     ArgumentCaptor<UserApprovalDecidedEvent> mail =
         ArgumentCaptor.forClass(UserApprovalDecidedEvent.class);
     verify(eventPublisher).publishEvent(mail.capture());
@@ -174,14 +169,12 @@ class UserRegistrationServiceTest {
         () -> userRegistrationService.approveUser(USER_ID, 3L, ADMIN_ID));
 
     verify(userApprovalEventRepository, never()).save(any());
-    // No decision-mail event on a rejected (409) decision.
     verify(eventPublisher, never()).publishEvent(any());
     assertEquals(ApprovalStatus.PENDING, user.getApprovalStatus());
   }
 
   @Test
   void decide_onNonPendingUser_throwsConflict_andWritesNoAudit() {
-    // PR review #3: an already-ACTIVE member must not be reject-able into a lockout.
     User active = pendingUser(2L);
     active.setApprovalStatus(ApprovalStatus.ACTIVE);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(active));
@@ -191,7 +184,6 @@ class UserRegistrationServiceTest {
         () -> userRegistrationService.rejectUser(USER_ID, "oops", 2L, ADMIN_ID));
 
     verify(userApprovalEventRepository, never()).save(any());
-    // No decision-mail event when the decision itself conflicts (409).
     verify(eventPublisher, never()).publishEvent(any());
     assertEquals(ApprovalStatus.ACTIVE, active.getApprovalStatus());
   }
@@ -243,8 +235,6 @@ class UserRegistrationServiceTest {
 
     @Test
     void doesNotStamp_whenApprovalGateDisabled() {
-      // The e2e carve-out (APP_REGISTRATION_REQUIRE_APPROVAL=false): a brand-new non-admin keeps
-      // the ACTIVE entity default so the fixture seeder is not blocked on an interactive approval.
       ReflectionTestUtils.setField(userRegistrationService, "requireApproval", false);
       User user = new User();
       ApprovalStatus before = user.getApprovalStatus();
@@ -281,33 +271,18 @@ class UserRegistrationServiceTest {
           userRegistrationService.linkRegistrationToExistingAccount(
               USER_ID, TARGET_ID, 0L, ADMIN_ID);
 
-      // Keycloak side-effects: the identity is read from Keycloak, taken off the throwaway, moved
-      // onto the target, and the throwaway user deleted. The throwaway Keycloak user MUST be
-      // deleted LAST — after the DB merge (which itself FK-safely disposes the duplicate app_user)
-      // — so a rolled-back DB half leaves the pending identity intact for a clean retry.
       InOrder order = inOrder(keycloakService, userDeletionService);
-      // The unlink comes FIRST, and that ordering is the whole point: Keycloak lets one Discord
-      // snowflake sit on two users and then throws IllegalStateException on every login that
-      // resolves it, so the identity must never be on both at once. Asserted as an order, not as a
-      // call — an unlink after the link would restore exactly the state it exists to prevent.
       order.verify(keycloakService).unlinkDiscordIdentity(USER_ID);
       order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "examplehandle4711");
-      // #1827: the deletion runs with the presence probe WAIVED. It has to -- the throwaway
-      // Keycloak user is still there at this point, by the very ordering asserted here, so the
-      // enforced probe would refuse and roll the link back. Verifying the mode (and not just the
-      // call) is what stops the two designs silently contradicting each other again.
       order
           .verify(userDeletionService)
           .deleteUser(
               USER_ID,
               UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
       order.verify(keycloakService).deleteUser(USER_ID);
-      // The duplicate app_user is disposed FK-safely, its in-Keycloak guard cleared first.
       assertFalse(pending.isInKeycloak());
-      // The surviving account carries the Discord link + the captured nickname.
       assertEquals(SNOWFLAKE, result.getDiscordUserId());
       assertEquals("ExamplePilot", result.getDiscordGuildNickname());
-      // The LINKED audit is recorded against the surviving account.
       ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
       verify(userApprovalEventRepository).save(audit.capture());
       assertEquals(ApprovalDecision.LINKED, audit.getValue().getDecision());
@@ -317,9 +292,6 @@ class UserRegistrationServiceTest {
 
     @Test
     void linkRegistration_recoversViaLocalDiscordId_whenKeycloakUserAlreadyGone() {
-      // Recovery after a partial failure that already deleted the throwaway Keycloak user: Keycloak
-      // no longer knows the pending user, but its app_user row still carries the snowflake locally.
-      // The link must still complete off the local discord_user_id (the reported stranded case).
       User pending = pendingUser(0L);
       pending.setUsername("examplehandle4711");
       pending.setDiscordUserId(SNOWFLAKE);
@@ -334,8 +306,6 @@ class UserRegistrationServiceTest {
           userRegistrationService.linkRegistrationToExistingAccount(
               USER_ID, TARGET_ID, 0L, ADMIN_ID);
 
-      // The identity resolved from the local snowflake (username carried as the Discord handle) is
-      // linked onto the target, the throwaway user deleted, and the LINKED audit recorded.
       verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "examplehandle4711");
       verify(keycloakService).deleteUser(USER_ID);
       verify(userDeletionService)
@@ -383,8 +353,6 @@ class UserRegistrationServiceTest {
 
     @Test
     void linkRegistration_pendingHasNoDiscordIdentity_throwsConflict_andDoesNotWrite() {
-      // Neither Keycloak nor the local app_user carries a Discord identity (pendingUser leaves
-      // discord_user_id null), so the local fallback is empty too and there is nothing to link.
       User pending = pendingUser(0L);
       User target = activeTarget();
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
@@ -461,8 +429,6 @@ class UserRegistrationServiceTest {
           userRegistrationService.reopenRegistration(USER_ID, "rejected by mistake", 7L, ADMIN_ID);
 
       assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
-      // The stale decision stamp is cleared so the row is indistinguishable from a fresh pending
-      // registration; who rejected it and when survives in the audit table.
       assertNull(result.getApprovedAt());
       assertNull(result.getApprovedById());
       ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
@@ -475,8 +441,6 @@ class UserRegistrationServiceTest {
 
     @Test
     void reopenRegistration_publishesNoNotification() {
-      // A reopen is not a verdict, so it must not fire the approve/reject decision mail
-      // (REQ-NOTIF-014) nor the new-pending admin mail (REQ-NOTIF-012).
       User user = rejectedUser(0L);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.saveAndFlush(user)).thenReturn(user);
@@ -502,8 +466,6 @@ class UserRegistrationServiceTest {
 
     @Test
     void reopenRegistration_onActiveUser_throwsConflict_andLeavesAccessIntact() {
-      // The mirror of the decide(...) guard: an ACTIVE member pushed back into the queue would lose
-      // their authorities, so reopening one is refused.
       User active = pendingUser(2L);
       active.setApprovalStatus(ApprovalStatus.ACTIVE);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(active));
@@ -543,8 +505,6 @@ class UserRegistrationServiceTest {
 
     @Test
     void rejectedRegistration_canBeReopenedAndThenApproved() {
-      // The end-to-end recovery this feature exists for: a registration rejected in error walks
-      // REJECTED -> PENDING -> ACTIVE through supported admin actions only, leaving two audit rows.
       User user = rejectedUser(4L);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.saveAndFlush(user)).thenReturn(user);

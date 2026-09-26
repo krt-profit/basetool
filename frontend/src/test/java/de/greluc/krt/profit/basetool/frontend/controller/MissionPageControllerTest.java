@@ -46,40 +46,29 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 class MissionPageControllerTest {
 
-  // Real loader so the parallelized finance/refinery fetches actually run their suppliers (against
-  // the mocked BackendApiClient) on a worker thread, exactly as in production. Shared across the
-  // method-local controller instances; harmless when a test never reaches the member finance block.
   private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
 
   /**
-   * Builds a {@link FrontendAuthHelperService} mock whose {@link
-   * FrontendAuthHelperService#isAnonymous()} returns the requested value, so a {@link
-   * MissionWriteController} write handler resolves its {@code isPublic} flag to the branch the test
-   * exercises (guest → {@code true}, authenticated → {@code false}).
+   * Builds a {@link FrontendAuthHelperService} mock for injection into the {@link
+   * MissionWriteController} under test.
    *
-   * @param anonymous the value {@code isAnonymous()} should report
-   * @return a stubbed auth-helper mock for injection into the controller under test
+   * @param anonymous the anonymity flag the test case models
+   * @return an auth-helper mock for the controller under test
    */
   private static FrontendAuthHelperService authHelper(boolean unusedAnonymousFlag) {
-    // The flag is vestigial: FrontendAuthHelperService.isAnonymous() is gone with the caller it
-    // described (ADR-0159). Kept as a parameter so the call sites read unchanged; every one of them
-    // now gets the same member helper.
     return mock(FrontendAuthHelperService.class);
   }
 
   @Test
   void createMissionForm_ShouldInitializeModelCorrectly() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
             backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
     Model model = new ConcurrentModel();
 
-    // Act
     String viewName = controller.createMissionForm(model, null, null);
 
-    // Assert
     assertEquals("mission-detail", viewName);
     assertTrue(model.containsAttribute("isNew"));
     assertTrue((Boolean) model.getAttribute("isNew"));
@@ -98,9 +87,6 @@ class MissionPageControllerTest {
 
   @Test
   void addFormsToModel_fragmentRefetch_skipsUsersMeParticipantPrefill() {
-    // #1142: a fragment refetch (prefillParticipantUser=false) must NOT issue the uncached
-    // GET /api/v1/users/me that prefills the "join as me" participant form — the add-participant
-    // modal it feeds is rendered only by the full page. An empty ParticipantForm is still seeded.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
@@ -116,9 +102,6 @@ class MissionPageControllerTest {
 
   @Test
   void addFormsToModel_fullRender_prefillsUsersMeParticipantForm() {
-    // #1142: a full-page render (prefillParticipantUser=true) still fetches the caller's user
-    // record
-    // to prefill the "join as me" default.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(null);
     MissionPageController controller =
@@ -135,7 +118,6 @@ class MissionPageControllerTest {
 
   @Test
   void addParticipant_ShouldCallWebClient() {
-    // Arrange
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
@@ -148,7 +130,6 @@ class MissionPageControllerTest {
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
 
-    // Act
     String view =
         controller.addParticipant(
             id,
@@ -158,20 +139,13 @@ class MissionPageControllerTest {
             mock(RedirectAttributes.class),
             null);
 
-    // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .post(
-            eq("/api/v1/missions/" + id + "/participants/add"),
-            any(),
-            eq(Void.class)); // Should use public client for anon
+        .post(eq("/api/v1/missions/" + id + "/participants/add"), any(), eq(Void.class));
   }
 
   @Test
   void addParticipant_AmbiguousName_ShouldExposeLocalizedToast() {
-    // Backend returns 409 when the free-text participant name matches more than one
-    // registered member. The frontend must expose a dedicated localized toast key so
-    // users are guided to pick an entry from the autocomplete.
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
@@ -207,7 +181,6 @@ class MissionPageControllerTest {
 
   @Test
   void addParticipant_WithUserId_Authenticated_ShouldCallWebClient() {
-    // Arrange
     UUID id = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -222,7 +195,6 @@ class MissionPageControllerTest {
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
 
-    // Act
     String view =
         controller.addParticipant(
             id,
@@ -232,7 +204,6 @@ class MissionPageControllerTest {
             mock(RedirectAttributes.class),
             user);
 
-    // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .post(eq("/api/v1/missions/" + id + "/participants/add"), any(), eq(Void.class));
@@ -264,8 +235,6 @@ class MissionPageControllerTest {
 
   @Test
   void setPartyLead_Conflict_ShouldExposeLocalizedToast() {
-    // Backend returns 409 for an ambiguous free-text name or a stale partyLeadVersion; the
-    // frontend must surface the dedicated conflict toast key rather than the generic update error.
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
@@ -292,7 +261,6 @@ class MissionPageControllerTest {
 
   @Test
   void deleteParticipant_ShouldCallWebClient() {
-    // Arrange
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -307,11 +275,9 @@ class MissionPageControllerTest {
 
     when(backendApiClient.delete(anyString(), eq(Void.class))).thenReturn(null);
 
-    // Act
     String view =
         controller.deleteParticipant(id, participantId, user, mock(RedirectAttributes.class));
 
-    // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .delete(
@@ -321,7 +287,6 @@ class MissionPageControllerTest {
 
   @Test
   void deleteParticipant_Anonymous_ShouldCallPublicWebClient() {
-    // Arrange
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -335,11 +300,9 @@ class MissionPageControllerTest {
 
     when(backendApiClient.delete(anyString(), eq(Void.class))).thenReturn(null);
 
-    // Act
     String view =
         controller.deleteParticipant(id, participantId, null, mock(RedirectAttributes.class));
 
-    // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .delete(
@@ -349,7 +312,6 @@ class MissionPageControllerTest {
 
   @Test
   void updateParticipant_ShouldCallWebClient() {
-    // Arrange
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -364,7 +326,6 @@ class MissionPageControllerTest {
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
 
-    // Act
     String view =
         controller.updateParticipant(
             id,
@@ -376,7 +337,6 @@ class MissionPageControllerTest {
             mock(RedirectAttributes.class),
             user);
 
-    // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
@@ -387,7 +347,6 @@ class MissionPageControllerTest {
 
   @Test
   void updateParticipant_Anonymous_ShouldCallPublicWebClient() {
-    // Arrange
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -401,7 +360,6 @@ class MissionPageControllerTest {
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
 
-    // Act
     String view =
         controller.updateParticipant(
             id,
@@ -413,7 +371,6 @@ class MissionPageControllerTest {
             mock(RedirectAttributes.class),
             null);
 
-    // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
@@ -424,13 +381,12 @@ class MissionPageControllerTest {
 
   @Test
   void listMissions_ShowPastTrue_User_ShouldIncludeAllStatuses() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
             backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
     Model model = new ConcurrentModel();
-    OidcUser user = mock(OidcUser.class); // Mock authenticated user
+    OidcUser user = mock(OidcUser.class);
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
     when(backendApiClient.get(uriCaptor.capture(), anyTypeRef()))
@@ -438,10 +394,8 @@ class MissionPageControllerTest {
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
-    // Act
     controller.listMissions(null, null, null, null, true, null, null, null, model, user);
 
-    // Assert
     String uri = uriCaptor.getValue();
     assertTrue(uri.contains("status=COMPLETED"));
     assertTrue(uri.contains("status=CANCELLED"));
@@ -452,18 +406,11 @@ class MissionPageControllerTest {
     verify(backendApiClient).get(anyString(), anyTypeRef());
   }
 
-  // "showPast=true is ignored for a guest" stood here. The narrowing is gone with the caller
-  // (ADR-0159): every caller of the mission list holds a session, so the archive toggle means what
-  // it says. Keeping the case with a principal would have asserted the opposite of the truth.
-
   @Test
   void missionDetail_ShouldFetchMissionAndFilteredJobTypes() {
-    // Arrange
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
-    // Null principal -> public (isPublic=true) reads; since #906 Q10 the signal is
-    // authHelper.isAnonymous().
     MissionPageController controller =
         new MissionPageController(backendApiClient, authHelper, PARALLEL);
     Model model = new ConcurrentModel();
@@ -511,10 +458,8 @@ class MissionPageControllerTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
-    // Act
     String view = controller.missionDetail(id, model, null, null);
 
-    // Assert
     assertEquals("mission-detail", view);
     verify(backendApiClient).get(eq("/api/v1/missions/" + id), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_MISSION), anyTypeRef());
@@ -524,7 +469,6 @@ class MissionPageControllerTest {
 
   @Test
   void missionDetail_Guest_ShouldNotFetchFinanceOrRefineryOrders() {
-    // Arrange
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
@@ -581,10 +525,8 @@ class MissionPageControllerTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
-    // Act
     controller.missionDetail(id, model, null, null);
 
-    // Assert
     verify(backendApiClient, never()).get(contains("/finance-entries"), anyTypeRef());
     verify(backendApiClient, never()).get(contains("/refinery-orders"), anyTypeRef());
     verify(backendApiClient, never()).get(contains("/finance-entries"), anyClass());
@@ -592,23 +534,10 @@ class MissionPageControllerTest {
 
   @Test
   void missionDetail_Member_FetchesFinanceTrioViaParallelLoader() {
-    // For a member, the finance-summary / finance-entries page / refinery-orders trio is fetched
-    // via
-    // the ParallelPageLoader. Since ADR-0078 the summary strip reads its totals from the SQL
-    // aggregate (/finance-entries/summary) instead of the whole ledger, and the entries table is
-    // bounded to a page (size=200) instead of the old size=1000 load-all. This asserts all three
-    // independent reads still happen on the member path (it does not — and cannot deterministically
-    // —
-    // assert they overlap in time): the real PARALLEL loader runs each supplier against the mocked
-    // client, so verifying the three calls proves the parallel block issues them all (#2 /
-    // live-sync
-    // #755 amplifies this on peer fragment re-fetches).
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
     when(authHelper.isMemberOrAbove()).thenReturn(true);
-    // Null principal -> the mission fetch is a public (isPublic=true) read; since #906 Q10 that
-    // signal is authHelper.isAnonymous() rather than the principal parameter.
     MissionPageController controller =
         new MissionPageController(backendApiClient, authHelper, PARALLEL);
     Model model = new ConcurrentModel();

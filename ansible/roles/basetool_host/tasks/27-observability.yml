@@ -1,42 +1,4 @@
 ---
-# The half of the monitoring plane that is NOT a container.
-#
-# WHY THIS FILE EXISTS. `scripts/generate-quadlet.py` refuses to translate two of the thirteen
-# monitoring compose services and deletes two more, with its reasons recorded beside each:
-#
-#   node-exporter  -> host-service. It mounts /run/systemd/private for its systemd collector,
-#                     which a rootless container cannot reach, and it owns the textfile directory
-#                     deploy.sh and the cgroup collector write into.
-#   alloy          -> host-service. It mounts /var/log and carries group_add 4/473 to read
-#                     root:adm files. A rootless container's supplementary groups are NAMESPACE
-#                     groups, not host groups, so that read stops working.
-#   cadvisor       -> deleted. Rootless-Podman support closed as not planned upstream.
-#   socket-proxy   -> deleted. It exists only to hand cAdvisor and Alloy a GET-only view of the
-#                     Docker socket, and there is no Docker socket.
-#
-# The generator says "host service". Nothing made one. Measured 2026-09-18 on the testing host:
-# no node_exporter, no alloy, no timer for scripts/cgroup-container-metrics.py -- whose own
-# docstring says "the way the systemd timer runs it" about a unit that did not exist anywhere in
-# the repository. A host cut over in that state has no host metrics, ships no logs or traces, and
-# produces none of the eleven basetool_container_* series the six container alerts were normalised
-# onto. This file is that missing half.
-#
-# WHAT WAS MEASURED, because the decision to use packages rather than pinned tarballs rests on it
-# (2026-09-18, Rocky Linux 10.2, testing host):
-#
-#   node-exporter                1.12.1  EPEL 10          == the version docker-compose.monitoring.yml pins
-#   alloy                        1.19.2  rpm.grafana.com  == the version docker-compose.monitoring.yml pins
-#   prometheus-podman-exporter   1.20.0  EPEL 10
-#
-# Neither is in Rocky's own repositories. cosign is NOT installed this way and that is not an
-# inconsistency: it was queried against the same EPEL metadata and is genuinely absent, which is
-# why 15-cosign.yml downloads it against a pinned checksum instead.
-
-# The service user's uid, looked up HERE and not taken from an earlier file's register. This file
-# is tagged [observability, monitoring], so `--tags observability` -- the natural way to add the
-# monitoring half to a host that is already serving -- skips 22-deploy-user.yml and leaves the
-# variable undefined. The run then dies with "'basetool_host_service_uid' is undefined", which says
-# nothing about tags. The same trap, and the same fix, as 22-deploy-user.yml's own lookup.
 - name: Read the service user's uid
   ansible.builtin.getent:
     database: passwd
@@ -54,20 +16,12 @@
   ansible.builtin.set_fact:
     basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
 
-# --- the repositories the three packages come from -------------------------------------------
-
 - name: Enable EPEL
-  # EPEL is a Fedora-maintained repository for RHEL-compatible distributions, and it is where
-  # node-exporter and prometheus-podman-exporter live. `epel-release` carries the GPG key and the
-  # repository definition together, so the key is not fetched over the wire by this role.
   ansible.builtin.dnf:
     name: epel-release
     state: present
 
 - name: Add Grafana's package repository
-  # alloy is published by Grafana and by nobody else. gpgcheck AND repo_gpgcheck are both on: the
-  # first verifies each package, the second verifies the repository metadata that lists them, and a
-  # repository trusted for only the first can still be lied to about which versions exist.
   ansible.builtin.yum_repository:
     name: grafana
     description: Grafana OSS packages
@@ -78,13 +32,6 @@
     sslverify: true
     sslcacert: /etc/pki/tls/certs/ca-bundle.crt
     enabled: true
-    # Grafana's repository also carries `grafana` itself, which this deployment runs as a
-    # CONTAINER pinned by digest. Without this the next `dnf update` could install a second,
-    # host-level Grafana beside it, listening on the same port.
-    #
-    # `exclude`, not `excludepkgs`: dnf's own configuration calls the directive excludepkgs and the
-    # module rejects that name outright -- it writes `exclude=`, which dnf honours as the synonym.
-    # The run failed here first, which is the useful kind of failure: it named the parameter.
     exclude: grafana,grafana-enterprise
 
 - name: Install the host half of the monitoring plane
@@ -93,36 +40,7 @@
     state: present
   notify: Reload systemd for the observability units
 
-# --- the kernel switch node_exporter's pressure collector depends on ----------------------------
-#
-# node_exporter's `pressure` collector reads /proc/pressure, and Rocky builds its kernel with
-# CONFIG_PSI=y **and** CONFIG_PSI_DEFAULT_DISABLED=y -- so the file does not exist unless `psi=1`
-# is on the kernel command line. Measured on the production host 2026-09-22, hours after the
-# cutover: no /proc/pressure, and node_exporter emitting **zero** node_pressure_* series.
-#
-# What that costs is specific, and it is not cosmetic. Three alerts cannot fire --
-# HostMemoryPressureStalled, HostCpuPressure, HostIoPressure -- and five panels on dashboard
-# 01-host read "No data". The first of the three is the EARLIEST saturation signal this deployment
-# has: memory full-pressure rises while reclaim is still winning, before the OOM killer runs. On a
-# single host carrying both databases, Redis, Keycloak, three JVMs and the whole monitoring plane,
-# memory saturation is the DESIGNED failure mode -- the oom_score_adj sacrifice ordering exists
-# because it has already happened.
-#
-# The alert rule's own comment calls an absent /proc/pressure "safe", because the alert then stays
-# silent. That was written while the deployment ran on Ubuntu, where PSI is on by default. Silent
-# is not safe when the missing signal is the one that would have warned first, and an alert that
-# cannot fire reads as coverage -- the same defect REQ-OBS-014 names for the systemd collector
-# above.
-#
-# THIS DOES NOT REBOOT. The parameter takes effect at the next boot, and the role never takes a
-# serving host down on its own -- the same reasoning haproxy is enabled-but-not-started under in
-# 70-frontend.yml. The debug task below says so rather than leaving the operator to infer it from
-# a metric that is still missing.
-
 - name: Read the boot loader's kernel arguments
-  # grubby, not /proc/cmdline: the running kernel's command line does not show a parameter that has
-  # been written for the NEXT boot, so keying the update off it would re-run grubby on every play
-  # between the change and the reboot and report changed each time.
   ansible.builtin.command: grubby --info=DEFAULT
   register: basetool_host_grubby_default
   changed_when: false
@@ -146,33 +64,13 @@
     - basetool_host_enable_psi | bool
     - ansible_facts.cmdline.psi is not defined
 
-# --- node_exporter ----------------------------------------------------------------------------
-
 - name: Configure node_exporter
-  # The same collectors the compose service ran, minus `--path.rootfs=/host`: there is no /host
-  # here, this IS the host, and the flag would send every collector looking under a path that does
-  # not exist.
-  #
-  # `--collector.systemd` is the one worth reading twice. In production it produces NOTHING: the
-  # container runs as nobody and /run/systemd/private is mode 0600 root:root, so
-  # `node_systemd_unit_state` has zero series and the SystemdUnitFailed rule has never been able to
-  # fire (REQ-OBS-014 -- a dead alert reads as coverage, which is worse than no alert). The compose
-  # file carries a comment demanding this be verified rather than assumed. Verified here, on the
-  # host, 2026-09-18: 870 series and node_scrape_collector_success{collector="systemd"} = 1, still
-  # running as the unprivileged `prometheus` user. Moving the exporter onto the host fixes an alert
-  # that has been dead for months.
-  #
-  # AND ITS LIMIT, equally measured: the systemd collector reads the SYSTEM manager. iri-deploy,
-  # iri-backup and iri-restore-drill are system units and are covered (5 series each). The eight
-  # application units are `systemctl --user` units of the service user and are NOT (0 series). Their
-  # state comes from prometheus-podman-exporter below, which is one of the reasons it is installed.
   ansible.builtin.copy:
     dest: /etc/default/prometheus-node-exporter
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
       ARGS="{{ basetool_host_node_exporter_flags | join(' ') }}"
   notify: Restart node_exporter
 
@@ -185,16 +83,12 @@
     mode: "0755"
 
 - name: Give node_exporter the memory ceiling it had as a container
-  # Same pairing and the same reason as alloy's below; values in defaults/main.yml. node_exporter is
-  # the one process every host-level alert and the textfile collectors depend on, so an unbounded
-  # leak in it is the failure most worth capping -- and ContainerMemoryHigh now warns before it.
   ansible.builtin.copy:
     dest: /etc/systemd/system/prometheus-node-exporter.service.d/20-resources.conf
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
       [Service]
       MemoryMax={{ basetool_host_node_exporter_memory_max }}
       Environment=GOMEMLIMIT={{ basetool_host_node_exporter_gomemlimit }}
@@ -210,21 +104,6 @@
     daemon_reload: true
   when: not ansible_check_mode
 
-# --- the journal alloy reads --------------------------------------------------------------------
-#
-# `config.alloy`'s loki.source.journal names `path = "/var/log/journal"`, and on a host where that
-# directory does not exist systemd keeps the journal in RAM under /run/log/journal instead. Alloy
-# then tails a path that is not there, ships nothing, and reports no error -- it is `active`, its
-# own scrape target is up, and Loki simply never gains a container-stdout stream.
-#
-# Measured on the production host 2026-09-22, hours after the cutover: /var/log/journal absent,
-# `journalctl --disk-usage` 65 MB in /run, and Loki holding only the FILE-based streams (the
-# application JSON logs and the host's auth/audit logs). Every `<svc>-stdout`, `mon-*`,
-# `postgres-*`, `edge` and `ops-cleanup` stream was missing, including the edge access log that
-# check-conformance.py calls "the only record of a refused request's origin".
-#
-# Persistence is also what makes a journal survive the reboot after an incident, which is the one
-# time anybody reads it.
 - name: Give the host a persistent journal
   ansible.builtin.file:
     path: /var/log/journal
@@ -243,45 +122,20 @@
     mode: "0755"
 
 - name: Say so in journald's own configuration rather than relying on the directory alone
-  # Storage=auto (the default) means "persistent IF the directory exists", which is true here and
-  # would stop being true the moment somebody removed it. Storage=persistent makes journald create
-  # it instead -- the intent is then in the configuration and not in a filesystem side effect.
-  #
-  # The rate limit is raised deliberately. Under `journald` the container stdout of the whole stack
-  # arrives as journal entries, and the default 10000 messages per 30s per service is a bound the
-  # edge alone can reach during a crawl -- at which point journald DROPS them and says so once, in
-  # a line nobody reads. A dropped access-log line is a client address that never reaches Loki.
-  #
-  # And it is BOUNDED, in time as well as in size (OPS-PRIV-01, 2026-09-22). Under `LogDriver=journald`
-  # the edge's access log -- every client address -- lives in THIS journal before Alloy ships it, so
-  # the journal is a second store of the IP-bearing data REQ-OBS-010 allows for 31 days. Loki's
-  # compactor enforces those 31 days on its copy; journald enforced nothing on this one: it keeps
-  # entries until its size cap forces rotation, which at a quiet week is far longer than 31 days.
-  # MaxRetentionSec= deletes older entries whatever the size; SystemMaxUse= is stated rather than left
-  # to journald's 10 %-of-the-filesystem default, so the disk budget is a reviewed number. If the cap
-  # binds first, entries go sooner than 31 days, which is still inside the approved retention.
   ansible.builtin.copy:
     dest: /etc/systemd/journald.conf.d/50-basetool.conf
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
       [Journal]
       Storage=persistent
       RateLimitIntervalSec=30s
       RateLimitBurst=100000
-      # REQ-OBS-010: the IP-bearing edge log is in here too, and 31 days is its approved retention.
       MaxRetentionSec={{ basetool_host_journal_max_retention }}
       SystemMaxUse={{ basetool_host_journal_max_use }}
   notify: Reload systemd-journald
 
-# --- alloy ------------------------------------------------------------------------------------
-
-# The restart handler must not start a service the role deliberately left stopped, so it asks
-# whether alloy is ALREADY running rather than assuming either way. Through service_facts, not
-# `systemctl is-active`: the same reason 65-firewall.yml gives -- a hand-read command needs a
-# hand-written changed_when, and a hand-written changed_when on a command is a guess.
 - name: Read the service state
   ansible.builtin.service_facts:
 
@@ -291,21 +145,14 @@
       {{ ansible_facts.services['alloy.service'].state | default('') == 'running' }}
 
 - name: Point alloy at the configuration the release delivers
-  # The config arrives with the config bundle, like every other monitoring config, so it moves with
-  # the release instead of being provisioned separately. The package's own /etc/alloy/config.alloy
-  # is left on disk untouched and simply not used.
   ansible.builtin.copy:
     dest: /etc/sysconfig/alloy
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
       CONFIG_FILE="{{ basetool_host_root_dir }}/code/monitoring/alloy/config.alloy"
       CUSTOM_ARGS="--server.http.listen-addr={{ basetool_host_alloy_listen }}"
-      # Where the sink and the trace store are, for a process that is NOT on the container network.
-      # config.alloy falls back to the container names when these are unset, which is what keeps one
-      # file true for the Docker deployment as well. See the defaults for the port choice.
       IRI_ALLOY_LOKI_ENDPOINT="{{ basetool_host_alloy_loki_endpoint }}"
       IRI_ALLOY_TEMPO_ENDPOINT="{{ basetool_host_alloy_tempo_endpoint }}"
   notify: Restart alloy
@@ -319,18 +166,6 @@
     mode: "0755"
 
 - name: Give the host service the log-source view config.alloy is written for
-  # config.alloy is written for an alloy that runs as a CONTAINER, where the log directories arrive
-  # as bind mounts at /logs/<service> and /hostlog. As a host service none of those paths exist, and
-  # nothing says so: measured here on 2026-09-20 the service was active, the scrape target up, 112
-  # alloy_* series collected -- and loki_source_file_read_lines_total absent, with all ten
-  # LogStreamSilent instances firing. Recreating the container's view is what keeps ONE config file
-  # and ONE set of alert rules (which pin path="/hostlog/auth.log" and nine more) true in both
-  # shapes. The template explains each source and why some are optional.
-  #
-  # Note the side effect, which is systemd's and not ours: a file bind whose destination does not
-  # exist creates that destination, so /var/log/auth.log appears on the host as an empty file. It is
-  # the mount point for /var/log/secure, never written to, and harmless -- but it is visible, so it
-  # is named here rather than discovered later.
   ansible.builtin.template:
     src: alloy-log-sources.conf.j2
     dest: /etc/systemd/system/alloy.service.d/10-log-sources.conf
@@ -342,18 +177,12 @@
     - Restart alloy
 
 - name: Give alloy the memory ceiling it had as a container
-  # MemoryMax is the hard cgroup ceiling; GOMEMLIMIT is the Go runtime's soft target below it, which
-  # makes the collector reclaim and return memory BEFORE the kernel has to kill anything. The two go
-  # together or not at all: a MemoryMax without GOMEMLIMIT lets the heap grow to the ceiling and get
-  # OOM-killed, a GOMEMLIMIT without MemoryMax bounds nothing the kernel enforces. Values and the
-  # measurement behind them: defaults/main.yml.
   ansible.builtin.copy:
     dest: /etc/systemd/system/alloy.service.d/20-resources.conf
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
       [Service]
       MemoryMax={{ basetool_host_alloy_memory_max }}
       Environment=GOMEMLIMIT={{ basetool_host_alloy_gomemlimit }}
@@ -362,35 +191,17 @@
     - Restart alloy
 
 - name: Let the adm group read what RHEL writes root-only
-  # The whole log-shipping design rests on alloy's `adm` membership, and on Debian that is enough:
-  # rsyslog there writes auth.log as syslog:adm 0640. RHEL writes /var/log/secure as root:root 0640,
-  # so the group buys nothing and the SSH/sudo stream stays silently empty -- membership present,
-  # effect zero. This makes RHEL's rsyslog behave like Debian's instead of granting alloy a
-  # capability, which docker-compose.monitoring.yml's alloy comment explicitly argues against
-  # ("least privilege, no capability bypass").
-  #
-  # The include of /etc/rsyslog.d/*.conf sits at line 26 of rsyslog.conf, BEFORE the rules at 49-52,
-  # so these defaults are in force when the omfile actions are defined. Legacy directives on purpose:
-  # the modern `module(load="builtin:omfile" ...)` form would be a second load of a module the base
-  # config may already parameterise, and that is a fatal config error rather than an override.
   ansible.builtin.copy:
     dest: /etc/rsyslog.d/10-basetool-adm-readable.conf
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
-      # Files rsyslog creates are group-adm readable, so the log shipper can read them through its
-      # supplementary group instead of through a capability. Mirrors Debian's syslog:adm 0640.
       $FileGroup adm
       $FileCreateMode 0640
   notify: Reload rsyslog
 
 - name: Hand the existing auth log to adm as well
-  # The directive above only governs files rsyslog CREATES. The one already open keeps its old
-  # root:root until the next rotation, which is up to a week of a blind SSH stream on a host that
-  # was just provisioned. logrotate.conf uses a bare `create`, which reproduces the current owner,
-  # group and mode -- so setting it once here is also what makes it survive every later rotation.
   ansible.builtin.file:
     path: /var/log/secure
     group: adm
@@ -399,11 +210,6 @@
   failed_when: false
 
 - name: Make the audit log readable by the shipper, as config.alloy requires
-  # Not an invention: config.alloy's host_auditd block states the precondition verbatim -- "set
-  # `log_group = adm` in /etc/audit/auditd.conf and make /var/log/audit traversable (0750 root:adm);
-  # the default root:root 0600 is unreadable and the stream would stay silently empty". This is that
-  # precondition, provisioned. Without it the sshd_config / authorized_keys tamper watches ship
-  # nowhere, which is a security regression that presents as a healthy monitoring plane.
   ansible.builtin.lineinfile:
     path: /etc/audit/auditd.conf
     regexp: '^\s*log_group\s*='
@@ -415,27 +221,12 @@
   when: not ansible_check_mode
 
 - name: Stop systemd from putting the audit directory back
-  # /usr/lib/tmpfiles.d/audit.conf carries `d /var/log/audit 0700 root root`, and systemd-tmpfiles
-  # re-applies it every time it runs -- at boot, and whenever anything triggers --create. So a chmod
-  # here is undone on a schedule nobody is watching. Measured on the testing host on 2026-09-20: the
-  # directory was set to 0750 root:adm at 18:45 and was back to 0700 root:root by 20:01, with auditd
-  # not having restarted since the 16th. The shipper had stopped being able to traverse into it, and
-  # the only thing that said so was the readability assertion below.
-  #
-  # A file of the same name in /etc/tmpfiles.d REPLACES the one in /usr/lib entirely, which is the
-  # supported override and the only durable answer. auditd itself sets the LOG's group from
-  # log_group; it is the DIRECTORY that tmpfiles owns.
   ansible.builtin.copy:
     dest: /etc/tmpfiles.d/audit.conf
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role. Do not edit by hand.
-      # Overrides /usr/lib/tmpfiles.d/audit.conf, which pins this directory to 0700 root:root.
-      # The log shipper reads the auditd tamper watches through its supplementary `adm` group and
-      # needs to traverse the directory to reach the file (REQ-OBS-019). 0750 keeps it closed to
-      # everyone else.
       d /var/log/audit 0750 root adm - -
   register: basetool_host_auditd_tmpfiles
 
@@ -447,10 +238,6 @@
     - basetool_host_auditd_tmpfiles is changed
 
 - name: Hand the audit log itself to adm
-  # Unconditional, and that is the point. auditd applies log_group when it opens or rotates the log,
-  # so a file that predates the setting keeps its old group -- and gating this on "the config line
-  # changed" means it runs exactly once, on the host where it happened to be introduced. A `file:`
-  # task is idempotent and costs nothing on a host that is already right.
   ansible.builtin.file:
     path: /var/log/audit/audit.log
     group: adm
@@ -459,8 +246,6 @@
   failed_when: false
 
 - name: Tell the running auditd to re-read its configuration
-  # It cannot be restarted -- RefuseManualStop=yes on this unit, measured -- and it declares no
-  # ExecReload, so SIGHUP is the supported way.
   ansible.builtin.command: systemctl kill --signal=HUP auditd.service
   changed_when: true
   when:
@@ -468,12 +253,6 @@
     - basetool_host_auditd_group is changed
 
 - name: Confirm alloy can read what it is here to read
-  # The container needed `group_add: 4` and `473` to reach root:adm files such as auth.log, and a
-  # rootless container's supplementary groups are namespace groups, so that read was going to stop
-  # working -- the generator's stated reason for making this a host service. Measured 2026-09-18:
-  # the RPM already puts the alloy user in `adm` AND `systemd-journal`, so the host service reaches
-  # both the log files and the journal with no group hack at all. Asserted rather than assumed,
-  # because a future package revision could drop it and nothing else would notice.
   ansible.builtin.command: id -nG alloy
   register: basetool_host_alloy_groups
   changed_when: false
@@ -492,15 +271,6 @@
   when: not ansible_check_mode
 
 - name: Ask whether alloy can actually READ the security sources
-  # The assertion above was green on this host while alloy could read neither /var/log/secure nor
-  # audit.log: both are root:root, so membership in adm is necessary and not sufficient. A check
-  # that can only ever confirm the half that was already true is not a check. This one asks the
-  # question that matters -- can this user open this file -- and it is what proves the two tasks
-  # above had an effect rather than merely having run.
-  #
-  # Only the two host security logs are asserted. The application logs are created by the apps
-  # themselves and do not exist on a host that has not deployed yet, so requiring them here would
-  # fail provisioning for a reason that is not a fault.
   ansible.builtin.command: runuser -u alloy -- test -r {{ item }}
   loop:
     - /var/log/secure
@@ -523,8 +293,6 @@
       SIGHUP; both are handled above and both are silent when they fail.
   when: not ansible_check_mode
 
-# alloy is deliberately NOT started here. Its configuration comes from the config bundle, which
-# arrives with the first deploy; starting it now would fail on a file that is not there yet.
 - name: Enable alloy for the next boot, without starting it
   ansible.builtin.systemd_service:
     name: alloy.service
@@ -532,24 +300,7 @@
     daemon_reload: true
   when: not ansible_check_mode
 
-# --- prometheus-podman-exporter -----------------------------------------------------------------
-
 - name: Let the service user's systemd instance run the podman exporter
-  # A USER unit, not a system one, and the package ships both. The exporter talks to a podman
-  # socket, and the containers this deployment runs belong to the ROOTLESS service user -- a
-  # system-level exporter would talk to the root podman and report an empty host.
-  #
-  # Measured 2026-09-18 as a user unit of the service user: 423 series on :9882, covering exactly
-  # the families scripts/cgroup-container-metrics.py cannot produce --
-  # podman_container_started_seconds (for container_start_time_seconds) and the
-  # podman_container_net_* family (for container_network_*). container_memory_mapped_file has no
-  # equivalent HERE -- it comes back from the cgroup collector instead, as
-  # basetool_container_memory_mapped_file_bytes (memory.stat file_mapped), which the
-  # basetool:container:memory_mapped_file_bytes recording rule reads. (Corrected 2026-09-22: this
-  # comment used to say the series stayed retired.)
-  #
-  # It also covers what node_exporter's systemd collector cannot see: podman_container_health and
-  # podman_container_state for the eight application units.
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     scope: user
@@ -564,22 +315,6 @@
     - podman.socket
     - prometheus-podman-exporter.service
   when: not ansible_check_mode
-
-# --- the host-side metric collectors, and the timers their docstrings already described ---------
-#
-# TWO collectors, for two things a container cannot see from inside one:
-#
-#   cgroup-container-metrics.py   the eleven basetool_container_* series the container alerts were
-#                                 normalised onto, replacing cAdvisor.
-#   cert-expiry-metrics.py        the expiry of certificate FILES. Everything this deployment
-#                                 SERVES is probed by blackbox and covered by
-#                                 CertificateExpiringSoon; a probe can only see a certificate
-#                                 something is serving, and the internal CA is served by nothing.
-#                                 Measured on the testing host 2026-09-20: basetool-ca.crt -- the
-#                                 trust anchor for every verified upstream at the edge AND for the
-#                                 blackbox https_internal module -- had no coverage of any kind, so
-#                                 the one certificate whose expiry takes the whole deployment down
-#                                 at once was the one nothing watched.
 
 - name: Install the metric collectors and their units
   ansible.builtin.copy:
@@ -624,10 +359,6 @@
   when: not ansible_check_mode
 
 - name: Start the metric timers
-  # These ARE started, unlike the deploy and backup timers. They change nothing and take nothing
-  # down: one reads /sys/fs/cgroup, the other reads public certificate files, and each writes a
-  # single file into the textfile directory. A host that is provisioned but not yet deployed should
-  # still report its own container state and its own certificates.
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     enabled: true
@@ -644,28 +375,12 @@
   register: basetool_host_cert_metrics_file
 
 - name: Ask whether there is anything for it to read
-  # The other half of the guard below, and the half that was missing. The collector refuses to write
-  # a file when it finds no certificate -- deliberately, because an empty metrics file and a
-  # mistyped directory look identical to Prometheus. So on a host whose certs directory is still
-  # empty, "the metrics file does not exist" stays true no matter how often the unit runs, and a
-  # task conditioned on it alone reports `changed` on every single play. Measured on
-  # rocky-16gb-nbg1-1 2026-09-20: second run `changed=1`, this task, forever.
   ansible.builtin.find:
     paths: "{{ basetool_host_root_dir }}/monitoring/certs"
     patterns: "*.crt,*.pem,*.cer"
     file_type: file
   register: basetool_host_cert_files
 
-# The certificate timer's earliest trigger is OnBootSec=5min, which on an already-running host means
-# "not today" -- its first reading would wait until 03:40. That gap is indistinguishable from a
-# collector that is broken, and CertificateMetricsStale's absent() branch would sit on it for 36
-# hours. So the run takes the first reading itself.
-#
-# Conditional, and that is not a detail: the unit is a oneshot without RemainAfterExit, so an
-# unconditional `state: started` would run it on every play and report `changed` forever --
-# 25-scripts.yml's own comment names a task that churns forever as the thing to avoid, because
-# idempotence is what this role is judged on. It runs when the collector was just installed or
-# changed, and when it has never written at all.
 - name: Take the first certificate reading now
   ansible.builtin.systemd_service:
     name: iri-cert-expiry.service
@@ -676,10 +391,6 @@
     - basetool_host_collectors is changed or not basetool_host_cert_metrics_file.stat.exists
 
 - name: Read back what the collector wrote
-  # Proof rather than assumption. `systemd_service` reports success for a oneshot that exited 1,
-  # because the unit declares SuccessExitStatus=0 1 -- a host whose certificates are not provisioned
-  # yet must not fail the run. So the FILE is read, not the exit code: a unit that starts and writes
-  # nothing is exactly the failure this pair of files exists to make visible.
   ansible.builtin.slurp:
     src: "{{ basetool_host_root_dir }}/monitoring/textfile/certificates.prom"
   register: basetool_host_cert_metrics
@@ -687,17 +398,6 @@
   when: not ansible_check_mode
 
 - name: Say which certificates are now watched
-  # Counted from the exposition lines rather than read out of `basetool_certificate_files`: that
-  # name also appears in the `# HELP` and `# TYPE` lines above the sample, so a naive split lands on
-  # the help text. `match` anchors at the start of the line, which the comment lines fail.
-  #
-  # `splitlines()` and NOT `split('\n')`, measured 2026-09-20 and not a style preference. A YAML
-  # folded scalar passes `\n` through as two characters, and in a `msg:` Jinja does not turn them
-  # back into a newline -- the split finds no separator, returns the whole file as one item, and
-  # the count comes out 0. The identical expression inside `assert.that:` DOES split, because
-  # Ansible evaluates a conditional through a different path, so a folded-scalar assert will
-  # happily certify an expression that is broken in the message beside it. splitlines() needs no
-  # escape and behaves the same in both.
   ansible.builtin.debug:
     msg: >-
       {{ (basetool_host_cert_metrics.content | b64decode).splitlines() | select('match', 'basetool_certificate_expiry_timestamp_seconds') | list | length }}
@@ -708,9 +408,6 @@
     - basetool_host_cert_metrics.content is defined
 
 - name: Say so loudly when there was nothing to read
-  # NOT a failure: the role provisions hosts that have no certificates yet, and refusing here would
-  # make the monitoring half un-runnable before the TLS half exists. But it must be SAID, because
-  # the same silence is what a mistyped directory produces.
   ansible.builtin.debug:
     msg: >-
       No certificate metrics were written: {{ basetool_host_root_dir }}/monitoring/certs holds

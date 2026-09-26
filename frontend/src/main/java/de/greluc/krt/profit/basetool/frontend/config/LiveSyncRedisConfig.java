@@ -41,14 +41,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 /**
  * Wires the cross-replica Redis pub/sub fan-out behind the live-sync relay (ADR-0094).
  *
- * <p>Active only outside the {@code test} profile (which runs no Redis) and only while {@code
- * app.livesync.redis.enabled} is true (default). When absent, {@code LiveSyncWebSocketConfig} falls
- * back to the no-op fan-out and the relay is purely local (single-instance) — a Redis outage
- * degrades to exactly that, because the handler always relays locally before publishing.
- *
- * <p>The {@link RedisMessageListenerContainer} subscribes the {@link RedisLiveSyncFanout} to the
- * configured channel; Lettuce reconnects the subscription automatically after a Redis restart. The
- * instance id is a fresh per-JVM UUID so an instance skips its own looped-back publications.
+ * <p>Active outside the {@code test} profile while {@code app.livesync.redis.enabled} is true;
+ * otherwise the relay is local only. Each JVM gets a fresh instance id so it skips its own
+ * looped-back publications.
  */
 @Slf4j
 @Configuration
@@ -57,9 +52,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 public class LiveSyncRedisConfig {
 
   /**
-   * Builds the Redis fan-out bean. The handler is injected lazily through an {@link ObjectProvider}
-   * to break the construction cycle (the handler needs the fan-out to publish; the fan-out needs
-   * the handler to deliver on consume).
+   * Builds the Redis fan-out bean, taking the handler through an {@link ObjectProvider} to break
+   * the construction cycle between the two.
    *
    * @param redisTemplate the auto-configured string Redis template
    * @param handlerProvider lazy provider of the relay handler
@@ -90,15 +84,9 @@ public class LiveSyncRedisConfig {
   }
 
   /**
-   * Bounded dispatch executor for consumed {@code changed} messages (F3). Without an explicit
-   * executor a {@link RedisMessageListenerContainer} defaults to a {@code SimpleAsyncTaskExecutor}
-   * — a <b>new, unbounded thread per dispatched message</b> — so a cross-replica burst could spawn
-   * threads without limit (the native-thread-OOM shape). This caps concurrency and, when the queue
-   * is full, runs the dispatch on the container's own thread ({@link
-   * ThreadPoolExecutor.CallerRunsPolicy}) — backpressure, never an unbounded spawn and never a
-   * dropped frame (a dropped relay would leave a peer stale until the next change). Sized with
-   * generous headroom (F2/#1243) so cross-replica relay keeps up at ≥200 concurrent users without
-   * ever falling back to the container-thread backpressure that would slow peers' live updates.
+   * Bounded dispatch executor for consumed Redis messages. A full queue runs the dispatch on the
+   * container's own thread ({@link ThreadPoolExecutor.CallerRunsPolicy}), so messages are never
+   * dropped and threads never grow without bound.
    *
    * @return the bounded listener dispatch executor (shut down with the context)
    */
@@ -117,19 +105,12 @@ public class LiveSyncRedisConfig {
   }
 
   /**
-   * Subscribes the Redis fan-out to <b>both</b> of its channels — the {@code changed} relay
-   * (ADR-0094) and the editor-presence gossip (ADR-0126) — so this instance relays peer replicas'
-   * change signals to its local rooms and mirrors their presence dots. Consumed messages are
-   * dispatched on the bounded {@link #liveSyncRedisListenerExecutor()} rather than the default
-   * unbounded per-message executor (F3); both channels share that pool, which is sized with the
-   * headroom the changed relay alone needed and absorbs the far smaller presence stream (one small
-   * message per actively-edited topic per 10 s per replica) without further tuning.
+   * Subscribes the Redis fan-out to both the {@code changed} relay channel (ADR-0094) and the
+   * editor-presence channel (ADR-0126), dispatching on {@link #liveSyncRedisListenerExecutor()}.
    *
    * @param connectionFactory the auto-configured Redis connection factory
    * @param fanout the Redis fan-out (also the message listener for both channels)
-   * @param listenerExecutor the bounded dispatch executor — {@code @Qualifier}'d by bean name so an
-   *     added {@link ThreadPoolTaskExecutor} bean can never make this inject ambiguous (the failure
-   *     mode that took the backend's equivalent container down once the fan-out was enabled)
+   * @param listenerExecutor the bounded dispatch executor, qualified by bean name
    * @return the message-listener container
    */
   @NotNull

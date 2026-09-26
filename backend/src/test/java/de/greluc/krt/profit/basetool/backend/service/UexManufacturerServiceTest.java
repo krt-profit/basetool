@@ -44,20 +44,12 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
- * Unit tests for {@link UexManufacturerService}.
+ * Unit tests for {@link UexManufacturerService} (REQ-DATA-004): duplicate UEX companies of one
+ * brand merge onto one manufacturer, owned by the lowest company id, with the others registered as
+ * aliases; matching is alias id, then name, then abbreviation.
  *
- * <p>The sync merges the duplicate UEX company records of one brand onto a single manufacturer row
- * (ADR-0023 / REQ-DATA-004): the canonical company — the lowest {@code uex_company_id}, processed
- * first because the feed is sorted ascending — owns the row's identity, while every other company
- * of the brand resolves to that row, registers its id in the {@code manufacturer_uex_company} alias
- * table and only ORs the manufacturer-surface flags. Match chain: alias-by-id → name →
- * abbreviation.
- *
- * <p>Each company is upserted through the {@link #self} proxy so its write runs in a dedicated
- * {@code REQUIRES_NEW} transaction (REQ-DATA-004). The proxy is stubbed to return the
- * service-under-test so the real upsert logic executes; the transaction boundary itself is a no-op
- * under plain Mockito, which is exactly why the per-company {@code catch} resilience is
- * unit-testable here.
+ * <p>The {@link #self} proxy is stubbed to return the service under test, so per-company failure
+ * isolation is testable without transactions.
  */
 @ExtendWith(MockitoExtension.class)
 class UexManufacturerServiceTest {
@@ -74,8 +66,6 @@ class UexManufacturerServiceTest {
 
   @BeforeEach
   void wireSelfProxy() {
-    // self.getObject() must return the real instance so the per-company REQUIRES_NEW upsert runs
-    // its actual logic; lenient() because the empty-response test returns before the loop.
     lenient().when(self.getObject()).thenReturn(uexManufacturerService);
   }
 
@@ -123,7 +113,6 @@ class UexManufacturerServiceTest {
     assertTrue(casaba.getIsItemManufacturer());
     assertFalse(casaba.getIsVehicleManufacturer());
 
-    // Each company's id is mapped to its (own) manufacturer in the alias table.
     verify(aliasRepository, times(2)).save(any());
   }
 
@@ -152,7 +141,6 @@ class UexManufacturerServiceTest {
     verify(manufacturerRepository, never()).findByNameIgnoreCase(any());
     verify(manufacturerRepository, never())
         .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(any());
-    // alias id matches the row's canonical id, so this company owns the identity → full update.
     assertEquals("AEGS-New", existing.getAbbreviation());
     assertEquals("Aerospace-New", existing.getIndustry());
   }
@@ -170,7 +158,6 @@ class UexManufacturerServiceTest {
     Manufacturer legacy = new Manufacturer();
     legacy.setName("Aegis Dynamics");
     legacy.setAbbreviation("AEGS");
-    // legacy: no uexCompanyId yet (hand-seeded / pre-alias) — still unclaimed.
 
     when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
     when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
@@ -194,10 +181,6 @@ class UexManufacturerServiceTest {
 
   @Test
   void abbreviationFallback_adoptsUnclaimedLegacyShortNamedRow_insteadOfInsertingDuplicate() {
-    // UEX returns the full company name, but the legacy vehicle-manufacturer row was seeded with
-    // its short nickname as the name: local "Esperia" vs UEX name "Esperia Incorporation" /
-    // nickname "Esperia". Both the id (alias) and name lookups miss, so the abbreviation fallback
-    // adopts the legacy row rather than stranding it and inserting a parallel one.
     UexCompanyDto dto =
         UexCompanyDto.builder()
             .id(278)
@@ -210,7 +193,6 @@ class UexManufacturerServiceTest {
     Manufacturer legacy = new Manufacturer();
     legacy.setName("Esperia");
     legacy.setAbbreviation("Esperia");
-    // legacy: unclaimed (no uexCompanyId yet).
 
     when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
     when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("Esperia"))
@@ -230,10 +212,6 @@ class UexManufacturerServiceTest {
         "Esperia Incorporation", saved.getName(), "name is updated to the UEX-canonical full name");
   }
 
-  // covers REQ-DATA-004 / ADR-0023 — two distinct UEX companies that share an abbreviation are the
-  // SAME brand and MERGE onto one row: the lowest id stays canonical, the other becomes an alias
-  // and
-  // only widens the manufacturer-surface flags without hijacking the canonical identity.
   @Test
   void twoCompaniesSharingAbbreviation_mergeOntoOneRow_secondBecomesAlias() {
     UexCompanyDto canonical =
@@ -253,7 +231,6 @@ class UexManufacturerServiceTest {
             .isVehicleManufacturer(1)
             .build();
 
-    // Deliberately unsorted: the service must sort ascending so the lowest id (278) is canonical.
     when(uexClient.getCompanies()).thenReturn(fetched(List.of(duplicate, canonical)));
     Manufacturer[] row = new Manufacturer[1];
     when(manufacturerRepository.save(any()))
@@ -262,7 +239,6 @@ class UexManufacturerServiceTest {
               row[0] = inv.getArgument(0);
               return row[0];
             });
-    // The abbreviation fallback returns whatever the canonical company persisted earlier this run.
     when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("Esperia"))
         .thenAnswer(inv -> Optional.ofNullable(row[0]));
 
@@ -276,7 +252,6 @@ class UexManufacturerServiceTest {
     assertTrue(
         row[0].getIsVehicleManufacturer(), "vehicle flag is OR'd in from the duplicate (279)");
 
-    // Exactly two alias rows — both company ids point at the one surviving manufacturer.
     ArgumentCaptor<ManufacturerUexCompany> aliasCaptor =
         ArgumentCaptor.forClass(ManufacturerUexCompany.class);
     verify(aliasRepository, times(2)).save(aliasCaptor.capture());
@@ -287,24 +262,18 @@ class UexManufacturerServiceTest {
     assertEquals(Set.of(278, 279), aliasedIds);
   }
 
-  // covers REQ-DATA-004 — a single failing company must not poison the batch: its REQUIRES_NEW
-  // transaction rolls back alone and the loop continues, so the remaining companies still commit.
   @Test
   void oneCompanyUpsertFailing_doesNotAbortTheRestOfTheBatch() {
-    // Poison has the lower id, so it is processed first; the healthy company follows.
     UexCompanyDto poison =
         UexCompanyDto.builder().id(1).name("Esperia Incorporation").nickname("Esperia").build();
     UexCompanyDto healthy =
         UexCompanyDto.builder().id(2).name("Aegis Dynamics").nickname("AEGS").build();
 
     when(uexClient.getCompanies()).thenReturn(fetched(List.of(healthy, poison)));
-    // First save simulates a residual constraint violation (as the per-company tx would surface);
-    // the second company must still be saved.
     when(manufacturerRepository.save(any()))
         .thenThrow(new DataIntegrityViolationException("duplicate key"))
         .thenReturn(null);
 
-    // The sweep swallows the per-company failure instead of propagating it.
     assertDoesNotThrow(() -> uexManufacturerService.syncManufacturers());
 
     ArgumentCaptor<Manufacturer> captor = ArgumentCaptor.forClass(Manufacturer.class);

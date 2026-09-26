@@ -33,13 +33,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bean Validation contract tests for the {@code bookIn} requirement on {@link
- * JobOrderItemProductionCreateDto} (REQ-INV-032 flip): the transitional null-tolerant rollout
- * window closed when the production modal shipped its book-in section, so a payload without the
- * block — or without the block's required {@code locationId} — must surface as a 400 validation
- * error at the {@code @Valid} controller boundary, never reach {@code
- * JobOrderItemProductionService}. The former service-level "null bookIn = legacy no-op" test lives
- * on here as the validation-rejection contract.
+ * Bean Validation tests that {@link JobOrderItemProductionCreateDto} rejects a missing {@code
+ * bookIn} block or a missing {@code bookIn.locationId} (REQ-INV-032).
  */
 class JobOrderItemProductionCreateDtoValidationTest {
 
@@ -71,7 +66,6 @@ class JobOrderItemProductionCreateDtoValidationTest {
     return new JobOrderItemProductionCreateDto(1, 1L, List.of(), List.of(), bookIn);
   }
 
-  // covers REQ-INV-032 (missing bookIn -> 400 validation, the flipped rollout contract)
   @Test
   void missingBookIn_isRejected() {
     Set<ConstraintViolation<JobOrderItemProductionCreateDto>> violations =
@@ -82,7 +76,6 @@ class JobOrderItemProductionCreateDtoValidationTest {
         "a payload without a bookIn block must violate the @NotNull bookIn contract");
   }
 
-  // covers REQ-INV-032 (bookIn.locationId stays required inside the cascaded block)
   @Test
   void bookInWithoutLocation_isRejected() {
     Set<ConstraintViolation<JobOrderItemProductionCreateDto>> violations =
@@ -97,7 +90,6 @@ class JobOrderItemProductionCreateDtoValidationTest {
         "a bookIn block without a locationId must violate the cascaded @NotNull contract");
   }
 
-  // covers REQ-INV-032 (a complete bookIn block passes the boundary validation)
   @Test
   void completeBookIn_isAccepted() {
     Set<ConstraintViolation<JobOrderItemProductionCreateDto>> violations =

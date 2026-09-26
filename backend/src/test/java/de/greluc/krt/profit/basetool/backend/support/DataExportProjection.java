@@ -30,22 +30,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Reads an export section's {@code SELECT} statement: which aliases it yields, and which tables it
- * reads.
- *
- * <p><b>Deliberately a small parser rather than a real one.</b> Every statement in {@link
- * DataExportSections} is a flat {@code SELECT col, t.col, t.col AS alias FROM ...}, which is a
- * property worth keeping: a construct this cannot read is a construct that should not be added to a
- * projection whose whole job is to be reviewable by eye.
- *
- * <p><b>Why it is a shared class.</b> Two gates ask the same question of the same statements and
- * must not be able to answer it differently: {@code DataExportScrubCoverageTest} checks that every
- * selected person-name column is scrubbed or exempted, and {@code
- * DataExportPdfFieldLabelCoverageTest} checks that every selected column of a verbatim section has
- * a German PDF label. Two copies of a parser is two chances to disagree about what a statement
- * selects.
- *
- * <p>Test-tree only: nothing in {@code main} parses SQL.
+ * Reads an export section's flat {@code SELECT} statement: which aliases it yields and which tables
+ * it reads. Test-only, shared by {@code DataExportScrubCoverageTest} and {@code
+ * DataExportPdfFieldLabelCoverageTest} so both parse statements identically.
  */
 public final class DataExportProjection {
 

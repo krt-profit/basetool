@@ -34,16 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: create a Job Order through the UI and verify it appears in the order list.
- *
- * <p>Job Orders are cross-staffel (no OrgUnit-scope filter). The create form carries two org-unit
- * pickers: the responsible (processing) unit — restricted to profit-eligible org units — and the
- * requesting (customer) unit. IRIDIUM is opted into profit-eligibility once at stack bootstrap
- * ({@link E2eStackExtension}) so it offers in the responsible picker; {@link BackendSeeder} seeds
- * the IRIDIUM membership and one {@code isJobOrder=true} material in {@link #setUp()}. Uses the
- * {@code order-material-*} / {@code order-submit} hooks on the create form and {@code order-row} on
- * the index, with the reused authenticated session from {@link
- * E2eSupport#authenticatedStorageState}.
+ * Creates a job order through the UI and verifies it appears in the order list. IRIDIUM is made
+ * profit-eligible in {@link E2eStackExtension}; {@link BackendSeeder} seeds the membership and a
+ * job-order material in {@link #setUp()}.
  */
 @Tag("e2e")
 class JobOrderCreateE2eTest {
@@ -59,11 +52,8 @@ class JobOrderCreateE2eTest {
   private static Browser browser;
 
   /**
-   * Launches the browser and, for the ephemeral stack, seeds the membership and guarantees at least
-   * one {@code isJobOrder} material exists for the create-form dropdown. The specific id is not
-   * retained: the frontend caches the job-order material list ({@code getCached}), so in the shared
-   * stack the dropdown may show a material seeded by another test rather than this one — the test
-   * therefore selects whatever the dropdown offers.
+   * Launches the browser and seeds the membership and at least one {@code isJobOrder} material.
+   * Because the material list is cached, the test uses whatever material the dropdown offers.
    */
   @BeforeAll
   static void setUp() {
@@ -103,23 +93,14 @@ class JobOrderCreateE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
-        // Responsible (processing) unit — restricted to profit-eligible org units; IRIDIUM is opted
-        // in at stack bootstrap. Required, so it must be selected for the create to pass.
         page.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#handle").fill("E2E Contact");
-        // Select whatever material the (frontend-cached) searchable combobox offers — see setUp().
         E2eSupport.selectComboboxFirstOption(page.getByTestId("order-material-select"));
         page.getByTestId("order-material-amount").fill("100");
-        // Wait for the full post-submit redirect to settle before navigating, else WebKit aborts
-        // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
         E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-submit").click());
 
-        // The created order must appear in the list (fresh ephemeral DB => exactly one). The
-        // post-submit GET goes through the retry helper — WebKit can abort it (HTTP/2
-        // INTERNAL_ERROR) even after the redirect settled. See E2eSupport#navigate.
         E2eSupport.navigate(page, baseUrl + "/orders");
-        // 20 s, not the 5 s default: the post-submit list render is slow on WebKit under CI load.
         assertThat(page.getByTestId("order-row").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {

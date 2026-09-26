@@ -1,9 +1,3 @@
-# Shared log-rotation policy. Without these limits the default `json-file`
-# driver grows the per-container log file unbounded — at our request volume the
-# backend alone produces ~150 MB/day of JSON access logs, so a long-running
-# host would fill `/var/lib/docker/containers/` within weeks. Anchored here and
-# referenced via `logging: *default-logging` from every service template so a
-# future change (e.g. switch to `local` driver) is a single-line edit.
 x-logging: &default-logging
   driver: json-file
   options:
@@ -11,20 +5,9 @@ x-logging: &default-logging
     max-file: "5"
 
 x-db-backend: &db-backend-template
-  # Pinned by digest in addition to the `:18-alpine` tag so a silent upstream
-  # rebuild (Postgres or Alpine base) cannot land on the prod host between the
-  # `docker compose pull` on the deploy server and a subsequent compose-driven
-  # restart. Refresh by running `docker buildx imagetools inspect postgres:18-alpine`
-  # locally and updating the digest below — never via :latest.
   image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
   restart: unless-stopped
   logging: *default-logging
-  # Runtime-hardening baseline (REQ-OPS-014). The official postgres entrypoint boots as root to
-  # chown PGDATA and then drops to the `postgres` user via gosu, so it keeps the minimal caps that
-  # requires — CHOWN/DAC_OVERRIDE/FOWNER (chown the data dir) + SETUID/SETGID (gosu drops privileges).
-  # no-new-privileges still holds: gosu drops via the CAP_SETUID syscall, not a setuid binary, so
-  # lowering the uid is unaffected. A wrong cap set fails the container at start, which the deploy
-  # health-gate turns into a clean rollback — re-verify the set on every postgres image bump.
   security_opt:
     - no-new-privileges:true
   cap_drop: [ALL]
@@ -34,58 +17,6 @@ x-db-backend: &db-backend-template
     - FOWNER
     - SETGID
     - SETUID
-  # ======================== POSTGRES SIZING (measured, #937) ========================
-  # Re-tuned 2026-08-03 against a 7-day production baseline (issue #937, the data-driven
-  # follow-up to the CPX42 rescale). Every value below is derived from a measurement, not
-  # from a ratio applied to the container limit — which is what the previous revision did,
-  # and what produced flags several times larger than the data justifies.
-  #
-  # Measured over the 7 days ending 2026-08-03:
-  #
-  #   total database size            107.7 MB       <- the whole basetool DB
-  #   cache hit ratio                99.990 %
-  #   temp files written             0              <- work_mem never once overflowed
-  #   connections peak / avg         31 / 4.7       of max_connections=150
-  #   container working-set peak     295 MB         of the (then) 2048 MB limit
-  #
-  # shared_buffers 512MB -> 384MB. The old value was 4.75x the ENTIRE database; even the
-  # working set never reached it (295 MB total, so the 512 MB pool was not even fully
-  # faulted in). 384MB still holds the whole 107.7 MB database 3.6x over, so the 99.99 %
-  # hit ratio has enormous margin before it could degrade — the DB would have to quadruple
-  # first, which is the review trigger for this block.
-  #
-  # effective_cache_size 1365MB -> 1024MB. A planner estimate, never an allocation: it
-  # should describe how much of this DB the OS could plausibly keep cached. The host held
-  # >= 9.84 GiB MemAvailable across the whole window, so 1024MB (9.5x the database) keeps
-  # index plans winning over seq scans with room to spare.
-  #
-  # work_mem 8MB and maintenance_work_mem 64MB are DELIBERATELY UNCHANGED. `temp_files=0`
-  # over seven days is direct evidence that no query ever spilled to disk at 8MB — the
-  # setting is demonstrably sufficient, and lowering it would trade a proven-good value for
-  # a spill risk with nothing to gain (work_mem is allocated per sort node on demand, so an
-  # unused ceiling costs zero).
-  #
-  # max_connections stays 150. It is a slot ceiling, not an allocation, and it has to cover
-  # the backend's configured 100-slot Hikari pool (ADR-0078) plus postgres_exporter, Flyway
-  # and admin sessions even though the measured peak was only 31. Note the textbook
-  # `max_connections x work_mem` product (150 x 8MB = 1200 MB) is NOT the operative bound
-  # here and must not be used to size the container: it assumes every connection runs a
-  # sort that fills work_mem simultaneously, which is an analytics workload shape this OLTP
-  # app does not have — `temp_files=0` at a peak of 31 connections is the measurement that
-  # settles it. Size the container from the working-set peak instead (see deploy.resources).
-  #
-  # `log_error_verbosity=terse` keeps DETAIL lines — which quote row values — out of the log
-  # (REQ-OBS-004/-007); do NOT relax it. Its cost is that a rejected statement logs a bare
-  # `ERROR: ... at character N` with no `HINT`, and Postgres' default `%m [%p] ` prefix names
-  # no sender — so the app pool, postgres_exporter and an interactive `docker exec psql`
-  # forensics session all look identical and an operator cannot tell an application defect
-  # from a typo in an ad-hoc query. `%u@%d/%a` adds the session's
-  # user@database plus its `application_name` — the discriminator that actually matters, since
-  # every client sends a distinct one (`psql` ad-hoc, `PostgreSQL JDBC Driver` for the backend
-  # pool, `postgres_exporter` for the scraper) while they all share the POSTGRES_USER role.
-  # `%q` suppresses those fields for non-session processes, keeping startup/checkpointer lines
-  # clean. The prefix carries no row data, so the terse PII guarantee is untouched.
-  # =================================================================================
   command: >
     postgres
     -c shared_buffers=384MB
@@ -111,83 +42,19 @@ x-db-backend: &db-backend-template
     timeout: 5s
     retries: 5
   stop_grace_period: 60s
-  # =================== STACK RESOURCE BUDGET (measured, #937) ===================
-  # The host is a Hetzner CPX42: **8 vCPU / 16 GB RAM** (15.24 GiB MemTotal). This block is
-  # the reference budget for every service in this file and in
-  # docker-compose.monitoring.yml; the per-service blocks below only record their own
-  # deltas. Re-derived 2026-08-03 from a 7-day production baseline (#937) — the previous
-  # revision predated the rescale and still described a 4-vCPU / 8-GB host in places.
-  #
-  # Sum of limits after this pass: app 9216 MiB + monitoring 4368 MiB = **13 584 MiB
-  # (13.27 GiB)**, down from 14 352 MiB (14.02 GiB). That is back under ADR-0085's
-  # "keep the sum under ~14 GB" review trigger, with ~1.97 GiB left for the kernel, the
-  # Docker daemon and page cache. The 768 MiB returned came entirely from the two Postgres
-  # containers, which were sized for a dataset ~15x larger than the one that exists (see
-  # the POSTGRES SIZING block above). Nothing that is actually used was reduced.
-  #
-  # Measured context for that decision — over the 7 days ending 2026-08-03 the host never
-  # dropped below **9.84 GiB MemAvailable** and averaged **load15 0.36** (~4.5 % of 8 vCPU),
-  # with all containers together consuming **0.256 cores on average (3.2 % of the host)**.
-  # The stack is nowhere near saturation on either axis; the limits exist to bound a
-  # runaway, not to ration a contended resource.
-  #
-  # CPU limits are intentionally overcommitted (12.0 vCPU of quota on 8 physical vCPU)
-  # because they are per-container BURST ceilings, not reserved shares — the CFS scheduler
-  # arbitrates contention at run time, and an unused quota costs nothing. Several were
-  # RAISED in this pass: the baseline showed real CFS throttling in short bursts (7d-peak
-  # ratios of 77 % on ingest, 67 % on frontend, 53 % on keycloak) even though the 7-day
-  # AVERAGE throttle stayed under 0.73 % everywhere. Peaks that rare do not show up in a
-  # utilisation dashboard but they are exactly the post-deploy JIT-warmup and TLS-handshake
-  # moments where latency is user-visible, and widening a burst ceiling on a host running at
-  # 3.2 % CPU is free. Per-service throttle figures are in each block below.
-  #
-  # Without memory limits an in-container leak would let one service monopolise the host and
-  # OOM-kill its neighbours (Postgres in particular has historically been the casualty when
-  # a JVM heap runs away), so every service keeps one even where it is far above measured
-  # use.
-  #
-  # Method note, learned twice the hard way: size a container from `container_memory_rss`
-  # (anonymous — the OOM predictor), never from `container_memory_working_set_bytes`, which
-  # counts the service's own memory-mapped binary and reclaimable page cache. The one
-  # exception is Postgres: its `shared_buffers` is POSIX shared memory and lands in the
-  # cgroup's `cache` term, NOT in `rss`, so a DB container has to be read from its working
-  # set. Full method + queries: monitoring/README.md -> "Container memory sizing".
-  # ==============================================================================
-  #
-  # db-backend 2048M -> 1536M. Measured working-set peak **295 MB** (14 % of the old limit)
-  # against a **107.7 MB** database; `rss` alone read 6.96 %, the rest being the shared-buffer
-  # pool in `cache`. 1536M is 5.2x the measured peak and leaves the 384MB buffer pool plus a
-  # 100-connection Hikari burst comfortable room. Deliberately NOT cut further: the DB is the
-  # one service where an OOM-kill costs a recovery cycle rather than a restart, and Postgres
-  # is the historical casualty this whole limit scheme exists to protect.
   deploy:
     resources:
       limits:
         memory: 1536M
-        # 1.5 -> 4.0 (2026-09-13). The 7-day baseline this block used to quote (164 s total,
-        # 0.104 % average) read as "not a constraint" and was the wrong conclusion drawn from the
-        # right number. Re-measured under real use, db-backend took 161 s of throttling in 29 h —
-        # six times that rate — at an average of 0.024 cores, i.e. 1.6 % OF ITS OWN QUOTA. An
-        # average cannot see this: CFS enforces the quota inside each 100 ms period, so a burst of
-        # concurrent sub-millisecond queries exhausts 1.5 cores in milliseconds while utilisation
-        # stays flat. The severity is in the per-event figure — 161.1 s over 703 events is a
-        # **229 ms average stall**, the worst in the stack and more than two whole periods, which
-        # is plainly visible latency. Postgres forks a backend PER CONNECTION, so the natural
-        # concurrency here is the Hikari pool, not one process; 1.5 was always going to clip it.
-        # Read cpu.stat directly when judging this, never a utilisation panel.
         cpus: '4.0'
-        # Fork-bomb / runaway-backend ceiling. max_connections=150 caps live backends at ~150 +
-        # background workers, so 512 is generous headroom, not a tight limit.
         pids: 512
   volumes:
     - /var/iri/db-backend:/var/lib/postgresql/data
 
 x-db-keycloak: &db-keycloak-template
-  # Same digest pin policy as db-backend (see comment there).
   image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
   restart: unless-stopped
   logging: *default-logging
-  # Runtime-hardening baseline (REQ-OPS-014) — same cap set + rationale as db-backend.
   security_opt:
     - no-new-privileges:true
   cap_drop: [ALL]
@@ -197,29 +64,6 @@ x-db-keycloak: &db-keycloak-template
     - FOWNER
     - SETGID
     - SETUID
-  # Smaller tuning than db-backend, re-derived 2026-08-03 from the same 7-day baseline
-  # (#937 — see the POSTGRES SIZING block in x-db-backend for the full method). Keycloak's
-  # working set is realm config + user records + persistent user sessions (KC 26 persists
-  # sessions to the DB). Measured over that window:
-  #
-  #   total database size            39.4 MB
-  #   cache hit ratio                99.998 %
-  #   temp files written             0
-  #   connections peak / avg         20 / 3.0      of max_connections=120
-  #   container working-set peak     87 MB         of the (then) 768 MB limit
-  #
-  # shared_buffers 192MB -> 128MB (still 3.3x the entire 39.4 MB database) and
-  # effective_cache_size 512MB -> 384MB (a planner estimate, ~10x the database). Both were
-  # previously scaled by ratio alongside the container RAM for a "5000-account working set"
-  # that does not exist in bytes — Keycloak stores little per user, and the realm plus the
-  # persistent-session table together are under 40 MB.
-  #
-  # work_mem 4MB and maintenance_work_mem 32MB stay: `temp_files=0` over seven days is direct
-  # evidence 4MB never overflowed. max_connections stays 120 — Keycloak's own DB pool defaults
-  # to ~100, and the slot ceiling has to cover it plus postgres_exporter and admin sessions
-  # even though the measured peak was 20.
-  # Same terse-verbosity + `log_line_prefix` rationale as db-backend (see the comment there):
-  # `%q%u@%d/%a` makes every error line self-attributing without logging any row data.
   command: >
     postgres
     -c shared_buffers=128MB
@@ -241,213 +85,58 @@ x-db-keycloak: &db-keycloak-template
     timeout: 5s
     retries: 5
   stop_grace_period: 60s
-  # db-keycloak 768M -> 512M (#937). Measured working-set peak **87 MB** — 11 % of the old
-  # limit — against a 39.4 MB database; `rss` alone read 5.73 %. 512M is 5.9x the measured
-  # peak and holds the 128MB buffer pool plus a full 120-connection slot table with room to
-  # spare. Same "do not cut a database to the bone" reservation as db-backend applies, which
-  # is why this stops at 512M rather than the ~256M the measurement alone would allow.
   deploy:
     resources:
       limits:
         memory: 512M
-        # Throttle 7d: peak ratio 1.5 %, average 0.132 %, 23 s total — the lowest in the
-        # stack. Quota unchanged.
         cpus: '1.0'
         pids: 512
   volumes:
     - /var/iri/db-keycloak:/var/lib/postgresql/data
 
 x-keycloak: &keycloak-template
-  # Same digest pin policy as the Postgres images. Refresh with
-  # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7` and confirm which patch
-  # you actually got — the index digest alone does not say. Read it back from the image's own
-  # label, which is the only authority on that:
-  #   docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7 --format '{{json .Image}}'
-  #   -> .["linux/amd64"].config.Labels["org.opencontainers.image.version"]
-  #
-  # CORRECTION(2026-09-17): a TODO here claimed this pin "still resolves 26.7" and had to be
-  # refreshed to 26.7.3. That was wrong — ff4257d0 WAS 26.7.3, set by the 26.7.3 bump itself
-  # (e120d1d18); its label reads 26.7.3. The TODO was written from an environment that could
-  # not reach quay.io, i.e. from the tag in the pin rather than from the image, and the `:26.7`
-  # tag is exactly what cannot tell 26.7.2 from 26.7.3. Hence the label recipe above. Nothing
-  # was missing from production; the note was.
-  #
-  # Now 26.7.4 (label-verified, built 2026-09-16): six CVEs, and `:26.7` resolves here too.
   image: quay.io/keycloak/keycloak:26.7@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   restart: unless-stopped
   logging: *default-logging
-  # Runtime-hardening baseline (REQ-OPS-014). The Keycloak (Quarkus/ubi9) image already runs as the
-  # non-root uid 1000 and binds only high ports (18443/9000), so it needs NO capabilities — drop them
-  # all. `start` re-runs the provider build into 1000-owned dirs, so no cap is required for that
-  # either. Re-verify on every Keycloak image bump (a wrong set fails start → deploy health-gate
-  # rollback).
   security_opt:
     - no-new-privileges:true
   cap_drop: [ALL]
   stop_grace_period: 30s
-  # Quarkus-based Keycloak with local cache + JWT signing + the realm import is
-  # the second-biggest RAM consumer behind the backend. Raised 1536M -> 2560M for
-  # the 5000-account / 200-concurrent target: the image auto-sizes the JVM heap to
-  # ~70% of the container limit, so this lifts the heap from ~1.0 GB to ~1.75 GB —
-  # headroom for 5000 users, the persistent-session working set and 200 concurrent
-  # token/refresh flows. The role-indexed user sync (no more per-user Admin-API
-  # fan-out) removes the daily burst that previously pressured this heap.
-  #
-  # KEPT at 2560M in the #937 re-tuning pass, against a measured 7-day peak that is well
-  # under it: working set 922 MB (36 %), `rss` 32.7 %, heap 729 MB committed / 400 MB used
-  # of the ~1792 MB auto-heap, GC overhead peaking at 0.07 %. Two reasons not to reclaim it.
-  # First, the limit IS the heap knob here — the image derives the heap from ~70 % of the
-  # limit, so cutting the container also cuts the ceiling that absorbs a token/refresh burst,
-  # and that burst is precisely what the 5000-account target sized this for. Second, the
-  # baseline week carried no login storm; a heap ceiling is insurance against the peak, not
-  # the average, and the reclaimed capacity is not needed anywhere else (the stack now sits
-  # 1.97 GiB under the host budget without it).
   deploy:
     resources:
       limits:
         memory: 2560M
-        # 2.0 -> 3.0 (2026-09-13). 34.3 s over 216 events in 13 h — a **159 ms average stall**,
-        # second-worst in the stack after db-backend. The 7-day view called the average negligible
-        # and stopped there; the per-event figure is what matters, because every one of those
-        # stalls sits inside a token issuance or refresh and is therefore login latency a member
-        # feels directly. Same reasoning as backend: the ceiling is free on an idle host.
         cpus: '3.0'
-        # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Keycloak's
-        # working thread set, so it is a runaway ceiling rather than a limit hit under normal load.
         pids: 2048
   environment:
-    # The public BASE URL Keycloak stamps into issuer URLs, redirect validation and its own absolute
-    # links. Since ADR-0166 that is the web app's origin WITH the /auth path, because identity moved
-    # onto that origin so the installed web app's sign-in stays inside its manifest scope.
-    #
-    # THE PATH BELONGS IN BOTH OF THESE, and it is measured rather than reasoned. Keycloak 26.7 was
-    # run with the exact env below and the discovery document read back, three ways (2026-09-13):
-    #
-    #   KC_HOSTNAME                       KC_HTTP_RELATIVE_PATH   serves      advertised issuer
-    #   https://host                      /auth                   /auth       https://host/realms/…   BROKEN
-    #   https://host/auth                 /auth                   /auth       https://host/auth/…     CORRECT
-    #   https://host/auth                 (unset)                 /           —                       needs a
-    #                                                                                                 stripping proxy
-    #
-    # So the two are a PAIR after all: the hostname's path sets what Keycloak advertises, the
-    # relative path sets where it serves, and they do NOT double when they agree. Setting only the
-    # relative path produces a server that answers on /auth and hands out root links — a login that
-    # dies at the first redirect, with nothing wrong in any log. The reverse-proxy guide's three
-    # "alternatives" describe proxy shapes, not this; ours passes the prefix through unrewritten.
-    #
-    # Overridable so a non-production environment (the PVE testing stack) can run the SAME promoted
-    # config bundle under its own domain — including its own path, which must then match the edge's.
     KC_HOSTNAME: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}
-    # Kept, and it does nothing while KC_HOSTNAME is set: upstream states `hostname-strict` is
-    # IGNORED once `hostname` is configured — a fixed hostname already means no dynamic resolution
-    # from request headers, which is what strict mode buys. It stays so that clearing KC_HOSTNAME in
-    # some future environment cannot silently re-enable header-derived hostnames.
     KC_HOSTNAME_STRICT: "true"
-    # Where Keycloak actually SERVES. Must agree with the path in KC_HOSTNAME above and with the
-    # edge's `location /auth` — see docker/edge/include/upstream-keycloak.conf for why the edge
-    # passes the prefix through instead of rewriting it away.
     KC_HTTP_RELATIVE_PATH: /auth
-    # …but NOT the management interface. `http-relative-path` moves port 9000's endpoints with it
-    # unless `http-management-relative-path` says otherwise, which would have taken /health/ready
-    # (this file's healthcheck) and /metrics (Prometheus's `keycloak` job) to /auth/... and broken
-    # both silently at the next deploy. Pinning it to `/` confines the path change to the public
-    # surface, which is the only place that needs it, and leaves the monitoring plane untouched.
-    # Verified on 26.7 with the pinned image: :9000/health/ready answers 200 and
-    # :9000/auth/health/ready answers 404, which is the arrangement the healthcheck below expects.
     KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
     KC_HEALTH_ENABLED: "true"
-    # Keep the root log level at INFO but mute io.vertx.core.net.impl.ConnectionBase, which logs an
-    # empty-message ERROR (<missing-log-message>) on every abrupt client TCP reset (browser closed
-    # mid-request, scanner, keep-alive drop). These carry no diagnostic value yet surface at ERROR
-    # in Loki and can trip the ERROR-spike alerting. Format is `<root>,<category>:<level>`; applies
-    # to both the console and file handlers.
-    #
-    # `--log=console,file` above means Keycloak is shipped to Loki as TWO distinct streams, and both
-    # are masked in the shipper (username= / ipAddress=; monitoring/alloy/config.alloy):
-    #   app="keycloak"         — the file handler, /var/log/keycloak/keycloak.log, tailed by Alloy.
-    #                            This is the stream KeycloakErrorRateHigh evaluates, so the mute
-    #                            above is what keeps that alert off the TCP-reset noise.
-    #   app="keycloak-stdout"  — the container console via loki.source.docker (2026-08-02, ADR-0095
-    #                            pattern). Same lines as the file PLUS what the JVM and the kernel
-    #                            write outside Keycloak's log handler entirely: the OOM-kill preamble
-    #                            and `pthread_create failed (EAGAIN)`. Those never reach the file, so
-    #                            before this stream a Keycloak OOM/pids death left evidence only in
-    #                            the host json-file driver (5x10MB, SSH-only). No alert reads this
-    #                            stream — it is deliberately kept out of KeycloakErrorRateHigh's
-    #                            selector so the console copy cannot double-count the file's ERRORs.
     KC_LOG_LEVEL: "info,io.vertx.core.net.impl.ConnectionBase:off"
     KC_HTTP_ENABLED: "true"
     KC_HTTP_PORT: 18080
-    # Keystore password for the prod HTTPS connector. The `keycloak` (prod) service's command
-    # override enables `--https-*` and disables plain HTTP; Keycloak merges this env-supplied
-    # password with the CLI `--https-key-store-file`. Set in the shared template (not as a CLI arg)
-    # so the password never lands in the process arg list. Harmless for `keycloak-dev`, which keeps
-    # plain HTTP (start-dev) and configures no keystore file, so the value is simply unused there.
     KC_HTTPS_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     KC_DB: postgres
     KC_DB_URL: jdbc:postgresql://db-keycloak:15433/${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set in .env}
     KC_DB_USERNAME: ${KC_POSTGRES_USER:?KC_POSTGRES_USER must be set in .env}
     KC_DB_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD must be set in .env}
-    # Disable Keycloak 26.7's new default-ON asynchronous-commit optimization (#1207). The
-    # optimization skips the WAL-fsync wait for ephemeral entities (auth sessions / events), trading
-    # a little crash-durability for throughput; turning it off keeps the fully-synchronous behaviour
-    # we ran before the 26.7 upgrade. That durability preference is now the ONLY reason this is set.
-    #
-    # It originally had a second one, and 26.7.3 removed it. The AsyncCommitIntegrator used to probe
-    # `SELECT aurora_version()` on a bootstrap connection at every persistence-unit SessionFactory
-    # init to detect AWS Aurora (where `synchronous_commit=off` can drop transactions from logical
-    # decoding). The function exists only on Aurora, so on our stock PostgreSQL every startup logged
-    # `ERROR: function aurora_version() does not exist` into the db-keycloak log (surfaced in Loki as
-    # app=postgres-keycloak) — caught and benign, but it cluttered the DB error log and any
-    # log-error view/alert. Upstream keycloak#51792 / PR keycloak#51794 fixed that at the source in
-    # 26.7.3: the probe is now `SELECT to_regproc('pg_catalog.aurora_version') IS NOT NULL`, which
-    # stock PostgreSQL answers false without an ERROR. So re-enabling async commit no longer costs
-    # log hygiene — it is a plain throughput-vs-crash-durability call, and we still choose durability.
-    # Runtime SPI option, applies to keycloak (prod) + keycloak-dev via this shared template.
     KC_SPI_CONNECTIONS_JPA_QUARKUS_ASYNC_COMMIT: "false"
     KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?KC_BOOTSTRAP_ADMIN_USERNAME must be set in .env}
     KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?KC_BOOTSTRAP_ADMIN_PASSWORD must be set in .env}
-    # Optional (epic #720, REQ-DATA-018): the das-kartell guild id, read by the Discord federation
-    # SPI to capture each member's per-guild server nickname for the admin approval queue. The `:-`
-    # default makes it optional — when unset the SPI skips nickname capture (fail-open); it never
-    # affects the login. Put the value in .env (it is not a secret). The two Keycloak mappers that
-    # surface it are operator steps in docs/keycloak/DISCORD_KEYCLOAK_SETUP.md §3d.
     DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
-    # Optional (REQ-SEC-022, ADR-0051): the Discord first-login account-existence precheck. When the
-    # URL + shared secret are set, the SPI asks the backend over HTTPS whether a Basetool account
-    # already exists for an incoming Discord identity and, if so, denies the first-login with a
-    # "link your existing account instead" page. Entirely fail-open — the `:-` empty defaults keep it
-    # OFF unless configured, and any error fails open. HTTPS ONLY. The truststore that validates the
-    # backend's self-signed cert must be mounted into this container and KRT_BACKEND_TRUSTSTORE_PATH
-    # pointed at it; the mount + keytool steps are operator instructions in
-    # docs/keycloak/DISCORD_KEYCLOAK_SETUP.md §7. KRT_DISCORD_SPI_SHARED_SECRET must match the value
-    # set on the backend service.
     KRT_BACKEND_PRECHECK_URL: ${KRT_BACKEND_PRECHECK_URL:-}
     KRT_DISCORD_SPI_SHARED_SECRET: ${KRT_DISCORD_SPI_SHARED_SECRET:-}
     KRT_BACKEND_TRUSTSTORE_PATH: ${KRT_BACKEND_TRUSTSTORE_PATH:-}
     KRT_BACKEND_TRUSTSTORE_PASSWORD: ${KRT_BACKEND_TRUSTSTORE_PASSWORD:-}
-    # Monitoring plane (epic #936, REQ-OBS-005/-009). Prometheus scrapes the management endpoint on
-    # port 9000 (plain HTTP, isolated-network carve-out — REQ-OBS-008) and Keycloak pushes OTLP login
-    # spans to Alloy. All gates default OFF so keycloak-dev and the e2e stack stay inert; the prod .env
-    # sets KC_METRICS_ENABLED=true, KC_EVENT_METRICS_USER_ENABLED=true, KC_TRACING_ENABLED=true and the
-    # Alloy OTLP endpoint. The default event list covers the local login flow AND the Discord IdP
-    # broker path (the primary login route); the `realm,idp` tags stay bounded (REQ-OBS-006). The
-    # values only take effect once their gate is on, so listing them here is inert for dev. Only the
-    # prod keycloak service joins net-monitoring-scrape.
     KC_METRICS_ENABLED: ${KC_METRICS_ENABLED:-false}
     KC_EVENT_METRICS_USER_ENABLED: ${KC_EVENT_METRICS_USER_ENABLED:-false}
-    # Base event names only — Keycloak REJECTS error variants like `login_error` at startup ("Invalid
-    # value for option 'KC_EVENT_METRICS_USER_EVENTS'"). A failed login is the `login` event carrying the
-    # built-in `error` label on keycloak_user_events_total (that label is automatic, NOT a USER_TAGS value).
     KC_EVENT_METRICS_USER_EVENTS: ${KC_EVENT_METRICS_USER_EVENTS:-login,logout,register,code_to_token,refresh_token,identity_provider_login,identity_provider_first_login,identity_provider_post_login}
     KC_EVENT_METRICS_USER_TAGS: ${KC_EVENT_METRICS_USER_TAGS:-realm,idp}
     KC_TRACING_ENABLED: ${KC_TRACING_ENABLED:-false}
     KC_TRACING_ENDPOINT: ${KC_TRACING_ENDPOINT:-http://alloy:4317}
-  # The Keycloak Quarkus image is built on `ubi9-micro` and ships neither curl
-  # nor wget, so the readiness probe uses bash's `/dev/tcp` virtual filesystem to
-  # open a TCP connection to the management port and reads back the HTTP status
-  # line. `printf` (POSIX) replaces `echo -e` for predictable backslash handling.
   healthcheck:
     test:
       - CMD-SHELL
@@ -462,216 +151,49 @@ x-keycloak: &keycloak-template
   volumes:
     - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
     - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
-    # Custom Keycloak provider JARs (the Discord federation + first-login membership
-    # gate SPI, epic #720). The deploy step stages keycloak-spi-*.jar here, 0644 so the
-    # uid-1000 Keycloak image can read it (same lesson as the keystore). An empty or
-    # missing host dir is harmless — Keycloak simply finds no extra providers. The
-    # `start` command re-runs the provider build on every boot, so a staged JAR is
-    # picked up after a restart. See docs/keycloak/DISCORD_KEYCLOAK_SETUP.md.
     - /var/iri/code/keycloak/providers:/opt/keycloak/providers
     - /var/iri/keycloak/log:/var/log/keycloak
 
 x-backend: &backend-template
-  # Image lives in GHCR and is produced by .github/workflows/release-images.yml.
-  # `IRI_BASETOOL_VERSION` is the version pointer (default `stable`, which the
-  # promote.yml workflow updates atomically); the server's deploy.sh script
-  # writes a concrete version (e.g. `1.4.2`) into the host .env for explicit
-  # rollbacks. For local-iteration on the Dockerfile itself, use
-  # docker-compose.build.yml as an override to add `build:` back in.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
-  # Lets a non-production host resolve the PUBLIC Keycloak name to its own reverse proxy
-  # instead of chasing it out to the internet. The three apps load the OIDC metadata from
-  # KEYCLOAK_ISSUER_URI at startup, so that name has to resolve to something that answers —
-  # and on a host behind a NAT that does not hairpin, the public address does not.
-  # Format is Docker's own `name:ip`, e.g. `basetool.greluc.me:10.98.0.11`.
-  #
-  # THE NAME IS THE WEB HOST, not a `keycloak.` one. Since ADR-0166 Keycloak answers at
-  # `/auth` on the app origin and has no hostname, vhost or certificate of its own —
-  # `render-and-run.sh` says so where `EDGE_HOST_KEYCLOAK` used to be. This example still
-  # read `keycloak.basetool.greluc.me` and was the last straggler from that cutover, while
-  # `.env.example` had already been corrected — so the two contradicted each other, and this
-  # is the file somebody reads first.
-  #
-  # Following it would alias a retired name to the edge, which does not serve it: the
-  # handshake then fails with `tls: unrecognized name`, a TLS error that reads as a broken
-  # proxy and is a hostname that no longer exists. That failure was seen in the testing
-  # environment on 2026-09-16 — from a stale proxy entry, NOT from this comment, whose
-  # `.env` was already correct. Corrected here as a trap removed, not as a cause found.
-  # The default is a no-op: `localhost` already resolves to 127.0.0.1, so production —
-  # which sets nothing — gets an entry that changes nothing (REQ-OPS-022).
   extra_hosts:
     - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
-  # Reap orphaned zombie processes. The container runs the JVM as PID 1 (Dockerfile ENTRYPOINT
-  # `exec java`), and a bare JVM does NOT reap children reparented to it. The Docker HEALTHCHECK runs
-  # BusyBox `wget --no-check-certificate https://...` every 30s, and BusyBox wget forks an
-  # `ssl_client` helper for the TLS which it does not wait on; on exit that helper reparents to PID 1
-  # and, unreaped, lingers as a `<defunct>` zombie. One accumulates per 30s probe until the `pids`
-  # cgroup cap (2048, below) is exhausted and the JVM can no longer create an OS thread
-  # (`pthread_create failed (EAGAIN)` → native-thread OOM at ~17h uptime — the 2026-07-12 ingest
-  # incident; heap and jvm_threads_live stay healthy, so JvmThreadsHigh never catches it). `init:
-  # true` runs Docker's bundled tini as PID 1, which reaps these orphans. All three JVM app services
-  # (backend/frontend/ingest) share the wget-HTTPS probe, so all three carry this.
   init: true
   logging: *default-logging
-  # Runtime-hardening baseline (REQ-OPS-014). The image runs as the fixed non-root uid 10001 and
-  # binds only a high port (11261), so the JVM needs NO Linux capabilities — drop them all and forbid
-  # privilege escalation. Cheap, high-value defence-in-depth on the service that runs the most code.
   security_opt:
     - no-new-privileges:true
   cap_drop: [ALL]
   stop_grace_period: 30s
-  # File-descriptor ceiling (see the frontend template for the full rationale). The backend holds one
-  # long-lived notification-SSE emitter per subscribed viewer plus the Hikari pool, the Redis fan-out
-  # connection and the Keycloak-admin client — a few hundred fds at the ≥200-concurrent target.
-  # Pinned explicitly and generously (65536) rather than left to the inherited daemon default; the
-  # value only ever lowers a large default to a still-ample one, so it cannot fail the container start.
   ulimits:
     nofile:
       soft: 65536
       hard: 65536
-  # Biggest workload on the host: every API call goes through this JVM, Flyway
-  # runs at startup, and Hibernate caches L1/L2 + Caffeine caches live here.
-  # MaxRAMPercentage=57 (set further down in JAVA_TOOL_OPTIONS) maps to roughly
-  # 1167 MB heap inside the 2048M limit, leaving ~880 MB for Metaspace, the JIT
-  # code cache, native libs (openpdf, postgres jdbc), G1 auxiliary structures and
-  # a working buffer for the Tomcat thread pool.
-  #
-  # MaxRAMPercentage is 57, NOT 75 (lowered 2026-07-25, same sweep as the frontend). At 75 the heap
-  # ceiling was 1536 MB and this container's measured overhead (nonheap 230 + other native 208 = 438
-  # MB; see the JVM CONTAINER SIZING block in x-frontend) puts a fully-grown heap at 1974 MB = 96% of
-  # the limit — i.e. the heap ceiling could not physically fit under the 90% container-memory alert
-  # line (ContainerMemoryHigh; named ContainerWorkingSetHigh when this was written). Unlike the frontend this had NOT paged, and would not have soon: prod measures heapCommitted
-  # at only 670 MB (heapUsed 416) and a 1108 MB working set = 54% of the limit, so the ceiling was a
-  # latent trap, not an active one. 57% caps the heap at 1167 MB, satisfying `H + 438 <= 80% of 2048`
-  # (the cap is 1200 MB) for a 1605 MB worst case = 78%.
-  #
-  # This takes away no heap the service uses: 1167 MB is 1.7x the 670 MB it commits and 2.8x the
-  # 416 MB it uses, and still above the 1152 MB ceiling it ran on for months before 8d7ec8f5 (that
-  # bump was explicitly "precautionary", never a response to heap pressure). Note the limit is
-  # deliberately NOT reduced even though 2048 MB is generous against a measured 1108 MB peak —
-  # shrinking the busiest JVM's ceiling is a capacity decision for the repo owner, and ADR-0085's
-  # "sum of limits under ~14 GB" still holds without it.
-  #
-  # Re-measured 2026-08-03 (#937), 7-day peaks: heap 684 MB committed / 647 MB used against the
-  # 1167 MB ceiling, nonheap 224 MB committed, `rss` 55.6 % of the limit, GC overhead peaking at
-  # 0.14 % and averaging 0.007 %. The 57 % ratio derived above is confirmed correct and needs no
-  # change. The 2048M -> 1792M lever ADR-0085 identified (returns 256 MB at MaxRAMPercentage=55)
-  # remains deliberately UN-TAKEN: #937 returned 768 MiB from the two over-sized Postgres
-  # containers instead, which puts the stack back under the ~14 GB trigger without touching the
-  # busiest JVM's ceiling. It stays available if real headroom is ever needed.
   deploy:
     resources:
       limits:
         memory: 2048M
-        # 2.0 -> 3.0 (2026-09-13). 19.2 s over 418 events in 13 h, a 46 ms average stall. Far
-        # milder than db-backend's, but it lands on the same request path and therefore adds to
-        # the same user-visible latency. Quota is a burst ceiling, not a reservation, and the host
-        # averages ~3 % CPU — widening it costs nothing and removes a tax paid per request.
         cpus: '3.0'
-        # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Tomcat +
-        # Hikari + scheduler + GC/JIT threads, so it is a runaway ceiling, not a limit hit under load.
         pids: 2048
-  # Anchored so the dev-profile service can merge this map and override single keys. A service that
-  # merges `<<: *backend-template` and then declares its own `environment:` REPLACES this map wholly
-  # (YAML merge does not deep-merge), which is why backend-dev re-merges `*backend-env` explicitly.
   environment: &backend-env
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11261
     SPRING_DATASOURCE_URL: jdbc:postgresql://db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
-    # DERIVED from KC_HOSTNAME rather than restated beside it.
-    #
-    # This must resolve to the same issuer string Keycloak stamps into its tokens, and for as long
-    # as it was a second independent variable that was manual discipline — `.env.example` said so in
-    # so many words ("The two values below must agree"). The failure when they do not is the one
-    # ADR-0166 measured: Keycloak reports HEALTHY while backend, frontend and ingest die at start-up
-    # on "issuer does not match", which reads as a backend fault. The identity base URL was a
-    # literal on 36 lines across 19 files with nothing checking that any two agreed.
-    #
-    # `IRI_KEYCLOAK_HOSTNAME` is the one source now: set it alone and the issuer follows.
-    # `IRI_KEYCLOAK_ISSUER_URI` still overrides, so nothing that sets it today changes behaviour —
-    # verified against compose's nested interpolation for all three cases (neither set, hostname
-    # only, issuer overridden). The frontend and ingest templates below derive it the same way.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
-    # JWT audience enforcement (security review, audit L-1). REQUIRED for this prod-profile service
-    # since 2026-09-22 (APPSEC-08): the backend refuses to start under `prod` with it blank. The
-    # compose default stays empty so the dev and test stacks, which run the dev profile, stay off. The E2E suite is the exception
-    # and runs ENFORCED: its realm stamps aud=basetool-backend and E2eStackExtension sets this var,
-    # so the enforced code path is exercised on every e2e-labelled PR. Set
-    # IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend in the prod .env — ONLY after confirming the
-    # DEPLOYED realm stamps aud=basetool-backend on frontend tokens (the `extractor-ingest` default
-    # client scope does). The gateway's IRI_INGEST_EXPECTED_AUDIENCES is a SEPARATE decision with a
-    # DIFFERENT value (basetool-ingest, see the ingest service below) — do not set the two alike.
-    # Enabling it before that rejects every token and breaks the app. Setting the var back to empty
-    # is no longer a rollback under `prod` — the backend then refuses to start.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_BACKEND_EXPECTED_AUDIENCES:-}
-    # Which client may act for another member via X-Ingest-On-Behalf-Of (ADR-0129). Must be the
-    # ingest gateway's confidential client id. EMPTY MEANS NOBODY.
     APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS: ${IRI_INGEST_GATEWAY_CLIENT_IDS:-}
-    # Clients whose token deliberately carries an INCOMPLETE role set, so a login through them must
-    # not overwrite the stored roles (REQ-SEC-036). Default is the Android app, the only such client
-    # today. Forwarded because the CHANGELOG announced it as an optional environment variable while
-    # this allow-list did not carry it — so it could not in fact be set.
     APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS: ${APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS:-basetool-android}
-    # How long an assembled authority collection is reused before the authorization path is
-    # re-resolved from the database (REQ-SEC-056, ADR-0174). Default PT5M. This block is a CLOSED
-    # ALLOW-LIST with no `env_file:`, so without this line the variable never reaches the
-    # container whatever /var/iri/.env says — which is precisely the trap the frontend's
-    # APP_HTTP_* levers were added to escape. Validated at startup: positive and at most PT15M,
-    # because the TTL is also the window in which a revoked role stays effective on an
-    # already-issued token. Lower it to tighten revocation, raise it to cut database load.
     APP_SECURITY_AUTHORITIES_CACHE_TTL: ${IRI_AUTHORITIES_CACHE_TTL:-PT5M}
-    # Per-account budget for the export / statement / report / PDF endpoints (REQ-SEC-033
-    # carve-out, APPSEC-10, owner decision 2026-09-22). Forwarded for the same closed-allow-list
-    # reason as the line above; the defaults equal application.yml's (10 per minute). Validated at
-    # startup: a capacity below 1 refuses to start.
     APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY: ${APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY:-10}
     APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD: ${APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD:-1m}
-    # Internal admin / user-sync path: direct backend→Keycloak over the isolated
-    # net-backend-keycloak network, now TLS because the prod Keycloak serves HTTPS only. Trust is
-    # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
-    # (backend application-prod.yml); hostname verification stays ON, so the cert's SAN MUST include
-    # `dns:keycloak` (see the README keytool recipe). The dev/test stack overrides this back to
-    # http://keycloak:18080/auth in docker-compose.test.yml.
-    # THE /auth IS PART OF THE BASE URL (ADR-0166). `KC_HTTP_RELATIVE_PATH` moves Keycloak's WHOLE
-    # HTTP surface, `/realms/**` and `/admin/realms/**` alike, and this value is the base for both:
-    # KeycloakService POSTs the client-credentials token to `/realms/{realm}/protocol/openid-connect/
-    # token` and then pages `/admin/realms/{realm}/users`. Without the prefix the token POST 404s,
-    # so the daily UserSyncTask, the "Sync now" button, the Discord link back-fill and the deletion
-    # probe all fail — and `fetchUsers` swallows it and returns an empty list, so the sync fails
-    # SILENTLY until the fetch-failure alert fires.
     KEYCLOAK_ADMIN_URL: https://keycloak:18443/auth
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
-    # Optional split-horizon JWKS (REQ-SEC-024, ADR-0073): fetch the token-signing keys from the
-    # INTERNAL Keycloak over net-backend-keycloak and the `keycloak-trust` bundle instead of through
-    # the public edge; `iss` is still checked against the public issuer. Empty (the default) keeps
-    # the issuer-location decoder exactly as before. application-prod.yml has read
-    # KEYCLOAK_JWK_SET_URI all along, but nothing passed it, so the documented knob could not be
-    # turned. The production value is
-    # https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs. Backend only: the ingest
-    # gateway reads the same property but sits on no network that reaches Keycloak.
     KEYCLOAK_JWK_SET_URI: ${IRI_BACKEND_KEYCLOAK_JWK_SET_URI:-}
-    # Cadence of the periodic Keycloak->local user sync (ADR-0085). Forwarded for the same reason
-    # the retention sweeps below are: application.yml calls these "env-parameterised ... so the
-    # cadence is tunable without a rebuild", and `.env.example` offers both to an operator -- but a
-    # name this closed allow-list does not forward is not tunable at all, and the promise was
-    # silently untrue. Defaults are the property's own: 05:00 Europe/Berlin, once a day, off-peak.
-    # A 1-minute cadence was the accelerant behind the 2026-07-09 native-thread exhaustion
-    # incident, so lower this only deliberately; an invalid cron fails startup rather than
-    # disabling the sync silently.
     APP_KEYCLOAK_SYNC_CRON: ${APP_KEYCLOAK_SYNC_CRON:-0 0 5 * * *}
     APP_KEYCLOAK_SYNC_ZONE: ${APP_KEYCLOAK_SYNC_ZONE:-Europe/Berlin}
-    # Optional (REQ-SEC-022): shared secret guarding the internal /internal/discord/account-existence
-    # endpoint the Keycloak Discord SPI calls. Blank → the endpoint is disabled (503) and the SPI
-    # fails open. Must equal the KRT_DISCORD_SPI_SHARED_SECRET set on the keycloak service.
     KRT_DISCORD_SPI_SHARED_SECRET: ${KRT_DISCORD_SPI_SHARED_SECRET:-}
-    # Transactional e-mail (account approval/rejection notices — REQ-NOTIF-013/-014). app.mail is
-    # enabled by default; mail is only actually sent once SPRING_MAIL_HOST is set, so leaving these
-    # blank is a safe no-op. To send via Gmail, set in .env: SPRING_MAIL_HOST=smtp.gmail.com,
-    # SPRING_MAIL_PORT=587, SPRING_MAIL_USERNAME=<you>@gmail.com, SPRING_MAIL_PASSWORD=<16-char App
-    # Password>, APP_MAIL_FROM_ADDRESS=<you>@gmail.com (STARTTLS + auth come from application.yml).
     SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
     SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
     SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
@@ -679,183 +201,47 @@ x-backend: &backend-template
     APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-true}
     APP_MAIL_FROM_ADDRESS: ${APP_MAIL_FROM_ADDRESS:-no-reply@profit-base.online}
     APP_MAIL_FROM_NAME: ${APP_MAIL_FROM_NAME:-Profit Basetool}
-    # Redis for the cross-replica notification SSE fan-out (ADR-0094). Same secret the frontend /
-    # ingest already use for Spring Session / handoff staging. The connection is lazy and only
-    # opened when the fan-out is enabled (prod, application-prod.yml); a Redis outage degrades to
-    # local-only SSE + the polling fallback (REQ-NOTIF-006).
     REDIS_HOST: ${REDIS_HOST:-redis}
     REDIS_PORT: ${REDIS_PORT:-6379}
-    # Its own Redis ACL user once the owner has rolled the per-service users out (REQ-SEC-068,
-    # ADR-0207): publish/subscribe on two channels, no key. Unset, it is a password-only AUTH
-    # with the shared REDIS_PASSWORD, i.e. the `default` user, exactly as before.
     REDIS_USERNAME: ${REDIS_BACKEND_USERNAME:-}
     REDIS_PASSWORD: ${REDIS_BACKEND_PASSWORD:-${REDIS_PASSWORD:-}}
     APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:-true}
-    # The app's live-sync bridge (ADR-0143). Defaults ON here for the same reason the
-    # notification fan-out does: this file describes a stack that HAS a Redis, and the
-    # property's own default is off so a bare bootRun or a test slice without one still
-    # starts. Note the channel is the FRONTEND's -- the bridge works by both modules speaking
-    # on one wire, so overriding it severs web-to-app propagation while every signal stays green.
     APP_LIVE_SYNC_REDIS_FANOUT_ENABLED: ${APP_LIVE_SYNC_REDIS_FANOUT_ENABLED:-true}
-    # Access-log lines slower than this are escalated to WARN. README documents the lever for all
-    # three modules, so all three templates forward it or it is only a third true; 2000 is each
-    # module's own default. Its neighbour APP_LOGGING_STRUCTURED_ENABLED is deliberately NOT here:
-    # that one is profile-driven (false in the base config, true in application-prod.yml), and
-    # backend and backend-dev merge this one map, so any single default would hand the dev stack
-    # the prod value. This threshold is the same in every profile and carries no such risk.
     APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
-    # Which Android builds the server still serves (REQ-API-010). Passed through here because
-    # raising the floor is meant to be an env var and a restart -- an operator acting the moment a
-    # contract breaks cannot wait for a deploy, and a property the compose file does not forward is
-    # a property they cannot set at all. Default 0 = no floor, which is also the property's own
-    # default: a stack nobody has configured must not refuse every installed build.
     APP_ANDROID_MINIMUM_VERSION_CODE: ${APP_ANDROID_MINIMUM_VERSION_CODE:-0}
     APP_ANDROID_LATEST_VERSION_CODE: ${APP_ANDROID_LATEST_VERSION_CODE:-0}
     APP_ANDROID_RELEASES_URL: ${APP_ANDROID_RELEASES_URL:-https://github.com/krt-profit/basetool-android/releases/latest}
-    # The three scheduled retention sweeps (REQ-AUDIT-006, REQ-SEC-057, REQ-NOTIF-009). Forwarded
-    # for the reason this block's own comment gives further up: the map is a CLOSED ALLOW-LIST with
-    # no `env_file:`, so a lever not named here cannot be pulled from /var/iri/.env at all -- and
-    # each of these sweeps deletes rows irreversibly, on a schedule, with no undo. ADR-0179 and the
-    # CHANGELOG both tell an operator to set APP_AUDIT_RETENTION_ENABLED=false before deploying if
-    # the older audit history must be kept; until these lines existed that instruction silently did
-    # nothing, which is worse than no instruction at all.
-    #
-    # Every default below is the property's own default from application.yml, so forwarding them
-    # changes no behaviour by itself -- it only makes them settable. The run to think about is the
-    # FIRST one after a sweep is enabled: it removes everything already past the window in a single
-    # pass. That run is what the =false levers are for, and REQ-AUDIT-003's export is how to keep
-    # the audit rows instead.
     APP_AUDIT_RETENTION_ENABLED: ${APP_AUDIT_RETENTION_ENABLED:-true}
     APP_AUDIT_RETENTION_MAX_AGE: ${APP_AUDIT_RETENTION_MAX_AGE:-P730D}
     APP_AUDIT_RETENTION_INTERVAL: ${APP_AUDIT_RETENTION_INTERVAL:-PT24H}
-    # max-age doubles as the window in which an erroneous rejection can still be reopened
-    # (REQ-SEC-034), so shortening this shortens the recovery window too.
     APP_REGISTRATIONS_REJECTED_RETENTION_ENABLED: ${APP_REGISTRATIONS_REJECTED_RETENTION_ENABLED:-true}
     APP_REGISTRATIONS_REJECTED_RETENTION_MAX_AGE: ${APP_REGISTRATIONS_REJECTED_RETENTION_MAX_AGE:-P90D}
     APP_REGISTRATIONS_REJECTED_RETENTION_INTERVAL: ${APP_REGISTRATIONS_REJECTED_RETENTION_INTERVAL:-PT24H}
-    # Two windows in one sweep: a READ notification ages from readAt, an UNREAD one from createdAt.
-    # The unread window is new, so this sweep also has a destructive first run on a stack that has
-    # been carrying unread notifications older than it.
     APP_NOTIFICATIONS_RETENTION_ENABLED: ${APP_NOTIFICATIONS_RETENTION_ENABLED:-true}
     APP_NOTIFICATIONS_RETENTION_MAX_AGE: ${APP_NOTIFICATIONS_RETENTION_MAX_AGE:-P90D}
     APP_NOTIFICATIONS_RETENTION_UNREAD_MAX_AGE: ${APP_NOTIFICATIONS_RETENTION_UNREAD_MAX_AGE:-P180D}
     APP_NOTIFICATIONS_RETENTION_INTERVAL: ${APP_NOTIFICATIONS_RETENTION_INTERVAL:-PT24H}
-    # Monitoring plane (epic #936, REQ-OBS-005/-009). Every value defaults OFF/empty so dev, test,
-    # e2e and a prod host without the monitoring stack stay inert: /actuator/prometheus denies every
-    # request until MONITORING_SCRAPE_* is set, and tracing exports nothing until
-    # MONITORING_TRACING_ENABLED is true. The prod .env sets the real scrape credentials and
-    # MONITORING_TRACING_ENABLED=true (Phase-2 rollout); only the prod service joins
-    # net-monitoring-scrape, where Prometheus scrapes it over HTTPS and Alloy receives its OTLP spans.
     MONITORING_SCRAPE_USER: ${MONITORING_SCRAPE_USER:-}
     MONITORING_SCRAPE_PASSWORD: ${MONITORING_SCRAPE_PASSWORD:-}
     MONITORING_TRACING_ENABLED: ${MONITORING_TRACING_ENABLED:-false}
     MONITORING_OTLP_ENDPOINT: ${MONITORING_OTLP_ENDPOINT:-http://alloy:4318/v1/traces}
     MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
-    # The keystore lives on the host filesystem (bind-mounted below) and is
-    # explicitly NOT packaged into the GHCR image. Each service mounts its own
-    # (IRI_<SERVICE>_KEYSTORE_HOST_PATH, REQ-SEC-070); every one of them falls
-    # back to the shared IRI_KEYSTORE_HOST_PATH, which is what production mounts
-    # until the per-service rollout (docs/deployment.md, "Internal TLS").
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
-    # REQ-SEC-070 / ADR-0211: the INTERNAL truststore the prod SSL bundles pin -- its own mount
-    # (below), deliberately not the REQ-OPS-022 JVM truststore, which holds public anchors too. Until
-    # the per-service rollout that mount's source IS the shared keystore, so nothing changes.
     INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
     INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
-    # MaxRAMPercentage=57 (was 75) — see the heap-budget rationale in the deploy.resources comment
-    # above: at 75 a fully-grown heap plus the measured 438M overhead reached 96% of the limit.
-    # InitialRAMPercentage drops 50 -> 35 (717M): it must stay below the 57% max (1167M), and 717M sits
-    # just above the 670M this JVM actually commits, so startup no longer pre-commits ~350M of heap the
-    # service never touches. Keep Initial < Max on any change — an inverted pair fails the JVM start.
-    #
-    # -XX:+UseG1GC added 2026-09-15. REQ-OPS-028 / ADR-0175 made the collector flag mandatory on
-    # 2026-09-13 and listed this service as `-XX:+UseG1GC`, but e401742db only ever wrote the flag
-    # onto `frontend` and `ingest` — the backend was left on ergonomics, which happens to pick G1 at
-    # 2048M and would silently pick Serial the moment the limit dropped below 1792M. That is exactly
-    # the defect the requirement exists to prevent, so the flag is written out rather than inferred.
-    #
-    # -XX:+UseCompactObjectHeaders added 2026-09-15 (ADR-0180): 64-bit instead of 96-bit object
-    # headers. A product option since JDK 25 (JEP 519) and the default from JDK 27 (JEP 534), so this
-    # takes the heap saving on the LTS the stack already runs. It MUST match the flag on the AOT-cache
-    # training run in `docker/app/Dockerfile` — the cache records the setting and a mismatch makes the
-    # JVM reject it while starting normally (since 2026-09-23 the Loki rule JvmStartupCacheRejected
-    # says so; before that the startup saving was lost with no signal anywhere).
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/backend/log:/app/logs
-    # Production cert is on the host, never in the image. Default points at the
-    # repo-root `./keystore.p12` so a local developer can generate one there
-    # and `docker compose --profile dev up -d` works out of the box; the prod
-    # `.env` overrides this to `/var/iri/secrets/keystore.p12`. The path is
-    # resolved relative to the directory containing docker-compose.yml.
-    # This service's OWN key (REQ-SEC-070): unset it is the shared keystore, as it always was;
-    # after the rollout it is /var/iri/secrets/tls/backend.p12, a leaf only this service holds.
     - ${IRI_BACKEND_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
-    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
-    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
-    # trust store — NOT an SSL bundle, which only the app's own named clients consult. Where the
-    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
-    # and the health gate rolls the deploy back.
-    # Unset, this resolves to the SAME file as the keystore mount above, and with
-    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
     - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
-    # The INTERNAL truststore (REQ-SEC-070): what the backend-trust / keycloak-trust bundles pin.
-    # Unset it is the shared keystore -- exactly what they pinned before; after the rollout it is
-    # the CA-only /var/iri/secrets/tls/truststore.p12.
     - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
 
 x-redis: &redis-template
-  # Same digest pin policy as the Postgres images. Refresh with
-  # `docker buildx imagetools inspect redis:8-alpine`.
-  # Digest last refreshed 2026-09-13: refreshed to the current `8-alpine` build (2026 CVE batch).
   image: redis:8-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
-  # Persistence + memory policy for the Spring-Session / ingest-handoff store
-  # (REQ-OPS-018, ADR-0079).
-  #
-  # Durability is RDB + AOF (hybrid). M-7 had turned all persistence off
-  # (`--save "" --appendonly no`) on the premise that a Redis restart only drops
-  # Spring Sessions, silently rebuilt via a `prompt=none` Keycloak redirect. That
-  # premise no longer holds: the Spring Session now carries the OAuth2 refresh
-  # token behind a rolling 30-day login, and losing it forces a re-auth
-  # round-trip that is only silent while the browser still holds a live Keycloak
-  # SSO cookie -- worth persisting properly. AOF with `appendfsync everysec`
-  # costs ~1 fsync/s REGARDLESS of write volume and caps the worst-case loss at
-  # ~1s. (M-7 removed AOF because the pre-M-7 config ran the pathological
-  # `appendfsync always` -- one fsync per session write, ~200/s under load; the
-  # cheap `everysec` middle ground is what it should have dropped to instead of
-  # dropping AOF entirely.) RDB `--save "60 1"` keeps a compact, always-fresh
-  # snapshot (after 60s if >=1 key changed) for fast restart and to satisfy the
-  # RedisRdbStale probe; on restart Redis prefers the AOF. Both land on the
-  # /var/iri/redis bind mount. The session dataset is tiny (OidcUser /
-  # OAuth2AuthorizedClient + flash attributes), so both the AOF and the snapshot
-  # fork are negligible I/O.
-  #
-  # Memory: explicit `--maxmemory 384mb` (below the 512M cgroup, leaving
-  # copy-on-write fork + fragmentation headroom) with `--maxmemory-policy
-  # noeviction`. Raised from 192mb (cgroup 256M) for the 5000-account target: with
-  # the session cap at 10 per user (SecurityConfig) and the 30-day rolling login,
-  # the session-index dataset grows with the active-within-30-days population — a
-  # >3000-member org can hold thousands of OidcUser / OAuth2AuthorizedClient
-  # entries, and noeviction means the ceiling must never be reached. noeviction is
-  # MANDATORY for a session store -- evicting a session key is a silent logout --
-  # so at the ceiling Redis refuses NEW writes rather than dropping live sessions,
-  # and the kernel OOM-killer never has to nuke the whole process (which would drop
-  # the in-flight set and force an AOF/RDB reload). A defined maxmemory also makes
-  # the RedisMemoryHigh leading-indicator alert functional: it self-guards on
-  # redis_memory_max_bytes > 0 and was therefore inert while maxmemory was unset.
-  #
-  # `--notify-keyspace-events Egx` (REQ-SEC-068, ADR-0207): Spring Session needs the expired
-  # and deleted key events, and used to switch them on itself with CONFIG SET at every frontend
-  # start -- which needs the all-powerful `default` user. The server now carries the setting, so
-  # the frontend's own ACL user never needs CONFIG (TolerantKeyspaceNotificationsAction).
   command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: unless-stopped
   logging: *default-logging
-  # Runtime-hardening baseline (REQ-OPS-014). The official redis entrypoint boots as root to chown
-  # /data and then drops to the `redis` user via gosu, so it keeps the minimal caps that requires —
-  # CHOWN/DAC_OVERRIDE/FOWNER (chown the data dir) + SETUID/SETGID (privilege drop). no-new-privileges
-  # still holds (gosu drops via CAP_SETUID, not a setuid binary). Re-verify on every redis image bump.
   security_opt:
     - no-new-privileges:true
   cap_drop: [ALL]
@@ -866,41 +252,12 @@ x-redis: &redis-template
     - SETGID
     - SETUID
   stop_grace_period: 30s
-  # Only stores Spring sessions (OidcUser / OAuth2AuthorizedClient + flash
-  # attributes) + the short-lived ingest handoffs. The 512M cgroup sits above the
-  # 384mb Redis maxmemory ceiling (see the command comment) so a transient RDB /
-  # AOF-rewrite fork's copy-on-write pages have headroom above the data set. Raised
-  # from 256M with the maxmemory bump for the 5000-account session-index growth.
-  #
-  # #937 verdict (2026-08-03, 7-day baseline): both ceilings KEPT, deliberately, against a
-  # measurement that would allow far less — Redis used a peak of **7.07 MB of the 384 MiB
-  # maxmemory (1.8 %)** across **8191 keys**, with an all-time peak of 7.50 MB, an `rss` peak
-  # of 28.5 MB (5.6 % of the cgroup) and **zero evictions**. Extrapolating linearly to the
-  # 5000-account / cap-10-sessions target gives ~43 MB, still an order of magnitude under the
-  # ceiling. This is not dead capacity to reclaim: `maxmemory` is not an allocation (Redis
-  # grows lazily, and 28.5 MB is what it actually occupies), and under `noeviction` reaching
-  # the ceiling means REFUSED WRITES — a failed login, not a slow one. ADR-0079 bought that
-  # headroom on purpose; the measurement confirms the purchase, it does not invalidate it.
   deploy:
     resources:
       limits:
         memory: 512M
-        # 0.5 -> 1.0 (#937). Redis spent **545 s throttled over 7 days** — the second-highest
-        # absolute stall in the stack and a 0.661 % average, on a store whose command loop is
-        # SINGLE-THREADED: a throttled period there stalls every session read behind it, so it
-        # shows up as frontend latency rather than as Redis load. Actual use is 0.015 cores at
-        # peak, so this quota was never about capacity; the extra headroom absorbs the
-        # background AOF-rewrite / RDB-fork threads that push the cgroup over 0.5 in bursts.
         cpus: '1.0'
-        # Redis is effectively single-process (plus a few bg threads + a transient RDB fork); 512 is
-        # a fork-bomb ceiling with wide headroom.
         pids: 512
-  # Liveness without a credential (REQ-SEC-068, ADR-0207). An unauthenticated PING answers
-  # `NOAUTH` from a server that is up and enforcing authentication, and `PONG` from one that is not
-  # (dev without a password); either is a responsive event loop. It used to authenticate as
-  # `default`, which the per-service rollout switches off -- a probe that depends on the ACL state
-  # would restart Redis the moment the rollout completes. Whether authentication is ENFORCED is
-  # the conformance suite's `redis-requires-auth` check, not this probe's job.
   healthcheck:
     test: ["CMD-SHELL", "redis-cli ping 2>&1 | grep -q -e PONG -e NOAUTH"]
     interval: 5s
@@ -910,203 +267,40 @@ x-redis: &redis-template
     - /var/iri/redis:/data
 
 x-frontend: &frontend-template
-  # See x-backend above for the GHCR / IRI_BASETOOL_VERSION rationale. Local
-  # rebuilds happen via docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
-  # See the backend template — same reason, same no-op default (REQ-OPS-022).
   extra_hosts:
     - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
-  # Zombie-reaping init (tini) as PID 1 — see x-backend: the wget-HTTPS healthcheck forks an
-  # `ssl_client` TLS helper that reparents to the JVM (PID 1) and, unreaped, accumulates one
-  # `<defunct>` per 30s probe until the `pids` cap is exhausted (the 2026-07-12 native-thread-OOM).
   init: true
   logging: *default-logging
-  # Runtime-hardening baseline (REQ-OPS-014). Non-root uid 10001, high port (18081) only → no caps.
   security_opt:
     - no-new-privileges:true
   cap_drop: [ALL]
   stop_grace_period: 30s
-  # File-descriptor ceiling. Since the tool-wide live-sync epic (REQ-FE-015 / ADR-0094) the frontend
-  # holds many long-lived sockets per instance — one /ws/sync WebSocket per tab plus a browser→backend
-  # notification SSE relay per viewer — and each is an fd, on top of the inbound HTTP keep-alives and
-  # the WebClient pool. At the ≥200-concurrent target that is only ~2-3k fds, but the limit was
-  # previously left to inherit the daemon default; pin it explicitly and generously (65536, ~25× the
-  # expected peak) so a socket surge can never hit "too many open files" and silently drop live-sync
-  # connections. 65536 sits at/below any realistic dockerd hard limit, so it only ever lowers a large
-  # inherited default to a still-ample value — it cannot fail the container start by trying to raise.
   ulimits:
     nofile:
       soft: 65536
       hard: 65536
-  # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic.
-  # 1280 MB → ~640 MB heap with MaxRAMPercentage=50 covers Tomcat, the Spring
-  # Session client cache and the Caffeine-backed reference-data cache.
-  #
-  # ============================ JVM CONTAINER SIZING (reference) ============================
-  # This block is the reference derivation for all three Spring Boot JVMs. All three were
-  # re-budgeted 2026-07-25 after `ContainerWorkingSetHigh` fired on this container; the numbers
-  # below are MEASURED on prod (Prometheus, snapshot 2026-07-25T02:00Z while the alert was firing),
-  # not estimated — an earlier revision of this comment guessed them and guessed wrong.
-  #
-  #   svc       limit  heapCommit  heapUsed  nonheap  otherNative  workingSet  %limit
-  #   backend    2048         670       416      230          208        1108     54%
-  #   frontend   1024         529       482      180          226         935     91%   <- paged
-  #   ingest      512         248        61       76           13         337     66%
-  #
-  # Two things that comment used to get wrong, both worth remembering:
-  #
-  # 1. `working_set != heap + nonheap`. There is a THIRD term — `otherNative` above — that no JVM
-  #    metric reports: 226 MB on the frontend, i.e. more than its whole nonheap. It is NOT page cache
-  #    (cgroup memory.stat: file=13M) and NOT direct buffers (jvm_buffer_memory_used: 0.4M) and NOT
-  #    thread stacks (67 live threads); cgroup `anon` accounts for ~97% of the working set, so it is
-  #    JVM-internal native memory (G1 auxiliary structures sized off MAX heap, JIT scratch, glibc
-  #    malloc arenas). Budget it explicitly per service: `workingSet ~= heapCommitted + overhead`,
-  #    where overhead = nonheap + otherNative = 438 (backend) / 406 (frontend) / 89 (ingest) MB.
-  #
-  # 2. The frontend did NOT page because its heap grew into its ceiling. At the alert its heap had
-  #    committed 529 MB of a 742 MB ceiling and was never going to reach it. So lowering
-  #    MaxRAMPercentage alone could not have helped: the IRREDUCIBLE floor (heapUsed 482 + overhead
-  #    406) is 888 MB = 87% of a 1024 MB limit, already above the 90%-line's practical margin. No
-  #    heap percentage whatsoever fits this app under 90% in a 1024 MB box — solving for
-  #    `H + 406 <= 0.80 * 1024` gives H <= 413 MB, which is BELOW the 482 MB it demonstrably uses.
-  #    The frontend was simply undersized, and 8d7ec8f5's 768M -> 1024M bump was directionally right
-  #    but too small AND paired with a 75% ratio that let the ceiling outrun the box.
-  #
-  # Sizing rule: pick the limit L and ceiling H = MaxRAMPercentage x L so that H + overhead <= ~80% L,
-  # with H comfortably above the MEASURED heapCommitted. Never re-derive by re-applying a percentage:
-  # raising L alone is a no-op for the alert because H scales with it (that is the 8d7ec8f5 trap), and
-  # lowering the percentage alone cannot help when the floor already exceeds the target.
-  #
-  #   - backend  2048M unchanged, 75 -> 57  (H=1167 <= the 1200 cap; 1167+438 = 1605 = 78%)
-  #   - frontend 1024M -> 1280M,  75 -> 50  (this block; H=640 > 529 measured; 640+406 = 1046 = 82%)
-  #   - ingest    512M unchanged, 75 -> 60  (H=307 <= the 321 cap; 307+89 = 396 = 77%)
-  # Only the frontend needed more RAM (+256 MB); the other two are pure ratio corrections that cost
-  # nothing and, per the table above, take away no heap either service was actually using.
-  # Also keep InitialRAMPercentage BELOW MaxRAMPercentage — an inverted pair makes the JVM refuse to
-  # start — and near the measured heapCommitted so the container does not pre-commit dead memory.
-  # Keycloak is the same class but already lands ~80%: its image auto-sizes the heap to ~70% of the
-  # 2560M limit and Quarkus native memory is far smaller than a Spring Boot JVM's, so it needs no
-  # change. Re-measure with the snapshot queries in monitoring/README.md before any future change.
-  #
-  # RE-MEASURED 2026-08-03 (#937), 7-day peaks, confirming the derivation above holds:
-  #   backend    heap 684 committed / 647 used (ceiling 1167), nonheap 224, rss 55.6 % of limit
-  #   frontend   heap 493 committed / 472 used (ceiling  640), nonheap 183, rss 69.4 % of limit
-  #   ingest     heap 248 committed / 118 used (ceiling  307), nonheap  87, rss 69.9 % of limit
-  #   keycloak   heap 729 committed / 400 used (ceiling ~1792), nonheap 269, rss 32.7 % of limit
-  # GC overhead peaked at 0.19 % (frontend) and averaged <= 0.017 % everywhere — no JVM is heap
-  # constrained, and all three MaxRAMPercentage values stay exactly as PR #1419 derived them.
-  # NO JVM MEMORY LIMIT CHANGED in #937; the CPU quotas did (see each block).
-  #
-  # ---- 2026-09-13: every figure above was measured on the WRONG COLLECTOR --------------------
-  # The derivation above is sound about QUANTITY and its `otherNative` term is real. What it
-  # could not see is that the collector was a free variable. HotSpot picks G1 only on a
-  # "server-class machine" — at least 2 CPUs AND at least **1792 MB** — and with
-  # -XX:+UseContainerSupport the memory figure it reads is the CGROUP LIMIT, not the host's 16 GB.
-  # The frontend clears the CPU half and failed the memory half by 512 MB, so it had been running
-  # **SerialGC** for the entire life of this limit scheme (768M -> 1024M -> 1280M are all below
-  # 1792). Backend was on G1 only by the accident of its 2048M limit; Keycloak is the only module
-  # that ever said so, via -XX:+UseG1GC in its vendor image.
-  #
-  # What that cost, measured on prod over 12.9 h: Eden max 179 MB behind a **22.3 MB survivor
-  # space**, so anything surviving a young collection in quantity was promoted straight into
-  # Tenured, which only a single-threaded full compaction reclaims. Tenured stood at 298 MB of a
-  # 447 MB ceiling and had climbed since start; all **4** full GCs were CodeCache- or
-  # Metaspace-triggered and NOT ONE came from heap pressure. That is the curve that was read as a
-  # leak. It never was one — cgroup anon was 63 % of the limit with zero pressure events — but the
-  # 730 minor GCs averaged 13.4 ms each, single-threaded, on the tier that renders every page.
-  #
-  # Two changes, and the second is the one that matters:
-  #   - the limit goes 1280M -> 1792M, so ergonomics and intent agree instead of contradicting;
-  #   - **-XX:+UseG1GC is passed explicitly**, so the collector is a decision recorded in this file
-  #     rather than a side effect of a number, and a future limit reduction cannot silently undo
-  #     it. Never rely on the threshold alone (ADR-0175).
-  # At 1792M x 50 % the ceiling is 896 MB, comfortably above the 529 MB this JVM commits, and
-  # 896 + ~420 MB overhead = 73 % of the limit — inside the <= 80 % sizing rule with room for G1's
-  # larger native structures. Summed over every prod-profile service, the limits become
-  # **9792 MiB app + 4368 MiB monitoring = 14 160 MiB (13.83 GiB)**, still under ADR-0085's ~14 GB
-  # review trigger, and ~1.4 GiB under the 15.24 GiB the host has. (Counted from this file rather
-  # than carried forward: the "9216 MiB" quoted in the #937 block above no longer reconciles with
-  # what the services actually declare, so re-derive it instead of adding to it.)
-  #
-  # ---- 2026-09-15: every figure above was measured on the OLD OBJECT LAYOUT -------------------
-  # All three JVMs now run -XX:+UseCompactObjectHeaders (ADR-0180), which takes the object header
-  # from 96 to 64 bits. Upstream measures 22 % less heap and 15 % fewer collections on SPECjbb2015
-  # (JEP 519/534); how much a Spring Boot request tier with these object-graph shapes actually
-  # returns is NOT known from that and is NOT guessed here.
-  #
-  # NO LIMIT AND NO RATIO CHANGES WITH IT, deliberately. Every heapCommitted / heapUsed figure in
-  # this block was measured with 96-bit headers, so they are the BEFORE side of the comparison and
-  # cannot also justify a new budget. The two changes are made one at a time for exactly the reason
-  # the 2026-09-13 section exists: the last time a quantity and a layout moved together, the table
-  # compared numbers that were never comparable.
-  #
-  # Obligation, and it is part of this change rather than a nice-to-have: re-measure with the
-  # snapshot queries in monitoring/README.md once the images have run a full week on prod, then
-  # write the new table here. Only after that may the freed headroom be spent — and the first
-  # candidate is the 2048M -> 1792M backend lever ADR-0085 identified and #937 left un-taken. That
-  # lever puts the limit exactly ON HotSpot's 1792 MB threshold — which is why ADR-0175 moved the
-  # frontend to that number — and with -XX:+UseG1GC now written out on all three services, the
-  # collector no longer depends on which side of it a limit lands.
-  # ==========================================================================================
   deploy:
     resources:
       limits:
         memory: 1792M
-        # 1.0 -> 2.0 (#937). This container had the **worst absolute CFS stall in the entire
-        # stack: 1506 s throttled over 7 days** (0.725 % average, 66.7 % peak ratio) — about
-        # 25 minutes a week in which the user-facing SSR tier was stopped mid-period. Its
-        # 5m-averaged peak is only 0.18 cores, so this is NOT a capacity shortfall: Thymeleaf
-        # rendering plus the WebClient/Reactor pool plus JIT compilation burst above one core
-        # for tens of milliseconds at a time, and a 1.0 quota clips exactly those bursts.
-        # Widening the ceiling costs nothing on a host averaging 3.2 % CPU (quota is a burst
-        # ceiling, not a reservation) and removes a latency tax that lands on every page.
         cpus: '2.0'
-        # JVM thread ceiling — generous headroom (see the backend template).
         pids: 2048
-  # Anchored for frontend-dev to merge and override — see the note on x-backend's `environment`.
   environment: &frontend-env
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
-    # See the backend template for why this one is forwarded and structured-enabled is not.
     APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
-    # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
-    # ADR-0001 / REQ-SEC-069: set, the frontend logs in as a CONFIDENTIAL client (client secret +
-    # PKCE); empty, as the public client it has always been. Deliberately optional (`:-`, not `:?`):
-    # merging and deploying this changes nothing until the owner puts the secret into the host .env,
-    # and the order of that and the Keycloak switch does not matter (Keycloak ignores a secret sent
-    # by a client it still considers public) -- docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md.
     KEYCLOAK_FRONTEND_CLIENT_SECRET: ${KEYCLOAK_FRONTEND_CLIENT_SECRET:-}
     BACKEND_URL: https://backend:11261
-    # The frontend->backend transport levers (ADR-0161 8.1 / 8.5, REQ-API-011). Listed here because
-    # this block is a CLOSED ALLOW-LIST and there is no `env_file:` anywhere: a variable that is not
-    # named here does not reach the container, whatever the host .env says. Both defaults ship ON,
-    # so these are the rollback levers -- an operator meeting an HTTP/2 or CBOR regression sets
-    # APP_HTTP_BACKEND_PROTOCOL=HTTP11 or APP_HTTP_CODEC=JSON in /var/iri/.env and recreates the
-    # service. Until this line existed the container never saw either, and the only escape hatch was
-    # smuggling -Dapp.http.* through IRI_EXTRA_JAVA_OPTS, which no document mentions.
     APP_HTTP_BACKEND_PROTOCOL: ${APP_HTTP_BACKEND_PROTOCOL:-H2}
     APP_HTTP_MAX_CONCURRENT_STREAMS: ${APP_HTTP_MAX_CONCURRENT_STREAMS:-20}
     APP_HTTP_CODEC: ${APP_HTTP_CODEC:-CBOR}
-    # The data-export download's own response timeout. Named here for the same reason as the two
-    # above: the block is a closed allow-list, so a variable that is not listed does not reach the
-    # container however the host .env spells it. 120s ships as the default; an operator meeting a
-    # slow export raises it rather than editing the image.
     APP_HTTP_EXPORT_RESPONSE_TIMEOUT: ${APP_HTTP_EXPORT_RESPONSE_TIMEOUT:-120s}
-    # The session type allow-list (REQ-SEC-067, ADR-0206): off | report | enforce. `report` reads
-    # every session value exactly as before and only counts and logs a class outside the list
-    # (basetool_session_type_refused_total{mode="report"}); `enforce` refuses it, so that one
-    # attribute is dropped. Named here because this block is a closed allow-list: the owner flips
-    # production to `enforce` in the host .env once the report counter has stayed at zero.
     APP_SESSION_TYPE_ALLOW_LIST: ${APP_SESSION_TYPE_ALLOW_LIST:-report}
-    # Its own Redis ACL user once rolled out (REQ-SEC-068, ADR-0207): the session namespace, the
-    # live-sync channels and the handoff keys it consumes. Unset = the shared `default` user, as before.
     REDIS_USERNAME: ${REDIS_FRONTEND_USERNAME:-}
     REDIS_PASSWORD: ${REDIS_FRONTEND_PASSWORD:-${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}}
-    # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
-    # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
-    # real scrape credentials and enables tracing. Only the prod service joins net-monitoring-scrape.
     MONITORING_SCRAPE_USER: ${MONITORING_SCRAPE_USER:-}
     MONITORING_SCRAPE_PASSWORD: ${MONITORING_SCRAPE_PASSWORD:-}
     MONITORING_TRACING_ENABLED: ${MONITORING_TRACING_ENABLED:-false}
@@ -1114,229 +308,71 @@ x-frontend: &frontend-template
     MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
-    # REQ-SEC-070 / ADR-0211: the INTERNAL truststore the prod SSL bundles pin -- its own mount
-    # (below), deliberately not the REQ-OPS-022 JVM truststore, which holds public anchors too. Until
-    # the per-service rollout that mount's source IS the shared keystore, so nothing changes.
     INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
     INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
-    # REQ-SEC-070: also check that the backend's certificate names `backend`. On since the per-service
-    # certificates (docs/deployment.md, Internal TLS): the pinned CA vouches for every service, so the
-    # name is what tells the backend apart. `false` in the host .env turns it off again.
     INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-true}
-    # MaxRAMPercentage=50 at the 1792M limit → an 896M ceiling, comfortably above the 529M this JVM
-    # measurably commits on prod. InitialRAMPercentage drops 50 -> 35 (627M): it must stay BELOW the
-    # max (at an equal pair the JVM refuses to start or clamps), and sitting just above the measured
-    # commit avoids pre-committing dead memory. See the JVM CONTAINER SIZING block above for the
-    # measured derivation. (Corrected 2026-09-15: this comment still quoted the pre-ADR-0175 `1280M
-    # limit → 640M ceiling`, which the limit change in that same commit had already superseded.)
-    #
-    # -XX:+UseCompactObjectHeaders added 2026-09-15 (ADR-0180) — see the backend block for the full
-    # rationale. It MUST match the flag on the AOT-cache training run in `docker/app/Dockerfile`.
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/frontend/log:/app/logs
-    # This service's OWN key (REQ-SEC-070): unset it is the shared keystore, as it always was;
-    # after the rollout it is /var/iri/secrets/tls/frontend.p12, a leaf only this service holds.
     - ${IRI_FRONTEND_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
-    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
-    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
-    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
-    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
-    # and the health gate rolls the deploy back.
-    # Unset, this resolves to the SAME file as the keystore mount above, and with
-    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
     - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
-    # The INTERNAL truststore (REQ-SEC-070): what the backend-trust / keycloak-trust bundles pin.
-    # Unset it is the shared keystore -- exactly what they pinned before; after the rollout it is
-    # the CA-only /var/iri/secrets/tls/truststore.p12.
     - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
 
 x-ingest: &ingest-template
-  # The desktop one-click ingest gateway (epic #639, ADR-0018) — the ONLY new internet-reachable
-  # service. The edge terminates the public TLS and re-encrypts to this gateway over
-  # https://ingest:11262 against the shared self-signed cert, so
-  # like backend/frontend the gateway serves HTTPS. The bind-mounted keystore.p12 is used BOTH as the
-  # server keystore AND as the TRUSTSTORE that validates the backend's self-signed https://backend:11261
-  # cert (backend-trust bundle in application-prod.yml). It owns no database — it relays to the backend
-  # and stages a short-lived single-use handoff in the shared Redis. See x-backend for the GHCR /
-  # IRI_BASETOOL_VERSION rationale; local rebuilds use docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
   restart: always
-  # See the backend template — same reason, same no-op default (REQ-OPS-022).
   extra_hosts:
     - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
-  # Zombie-reaping init (tini) as PID 1 — see x-backend: the wget-HTTPS healthcheck forks an
-  # `ssl_client` TLS helper that reparents to the JVM (PID 1) and, unreaped, accumulates one
-  # `<defunct>` per 30s probe until the `pids: 2048` cap is exhausted. This gateway is where the
-  # 2026-07-12 native-thread-OOM incident first surfaced (longest continuous uptime of the three).
   init: true
   logging: *default-logging
-  # Runtime-hardening baseline (REQ-OPS-014). Non-root uid 10001, high port (11262) only → no caps.
-  # This is the only new internet-reachable service, so dropping caps + forbidding escalation here is
-  # the highest-value application of the baseline after npm.
   security_opt:
     - no-new-privileges:true
   cap_drop: [ALL]
   stop_grace_period: 30s
-  # Lightweight: a JWT-validating relay + Redis staging, no JPA, no business logic. 512 MB →
-  # ~307 MB heap with MaxRAMPercentage=60 covers Tomcat, the reactive WebClient and Lettuce.
-  #
-  # MaxRAMPercentage=60 (was 75, lowered 2026-07-25); the 512M limit is UNCHANGED. Measured on prod
-  # (see the JVM CONTAINER SIZING block in x-frontend): heapCommitted 248M, heapUsed only 61M, nonheap
-  # 76M, other native 13M, working set 337M = 66% of the limit. The old 75% ceiling (371M) was never
-  # REACHABLE — 371 + 89 overhead = 460M = 90% of the limit, exactly the alert line — so this service
-  # sat one traffic burst away from paging, and would have been OOM-killed before it could use the top
-  # of its own heap. It never fired only because a near-idle relay's G1 heap stays near
-  # InitialRAMPercentage rather than its ceiling. 60% (307M) satisfies `H + 89 <= 80% of 512` (the cap
-  # is 321M) and still sits far above the 248M actually committed, so it removes no usable capacity:
-  # worst case becomes 396M = 77%. This is the cheapest of the three fixes — a pure ratio correction,
-  # no extra RAM, and it is what keeps the stack inside ADR-0085's "sum of limits under ~14 GB".
-  #
-  # Re-measured 2026-08-03 (#937): heap 248M committed / only 118M used against the 307M ceiling,
-  # nonheap 87M, `rss` 69.9 % of the limit, GC overhead peaking at 0.05 %. The 60 % ratio holds and
-  # the memory limit is unchanged.
   deploy:
     resources:
       limits:
         memory: 512M
-        # 1.0 -> 1.5 (#937). Highest throttle RATIO in the stack — 76.7 % of CFS periods at the
-        # 7-day peak, 452 s total (0.245 % average) — against a measured 5m-averaged peak of just
-        # 0.10 cores. A relay that is idle most of the time and then does a TLS handshake, a JWT
-        # validation and a WebClient round-trip in one burst is the classic shape that a narrow
-        # quota clips: the work is short and parallel, not sustained. 1.5 buys that burst room at
-        # no cost (unused quota is not reserved) on the one service that is internet-reachable and
-        # where a stalled request is a failed desktop-extractor send.
         cpus: '1.5'
-        # JVM thread ceiling — generous headroom (see the backend template).
         pids: 2048
-  # Anchored for ingest-dev to merge and override — see the note on x-backend's `environment`.
   environment: &ingest-env
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11262
-    # See the backend template for why this one is forwarded and structured-enabled is not.
     APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
-    # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     BACKEND_URL: https://backend:11261
-    # Public frontend URL the extractor's browser is sent to (…?handoff=<id>). Override per
-    # deployment in .env; the local dev stack should point this at http://localhost:18081.
     FRONTEND_URL: ${IRI_FRONTEND_PUBLIC_URL:-https://profit-base.online}
-    # One-time browser handoff lifetime (REQ-INGEST-003). 30m by default: staging happens on Send,
-    # but opening the pre-filled page is a separate manual click afterwards, so a shorter window
-    # expired before pickup for slower users ("Import-Link abgelaufen"). Tune via .env if needed.
     APP_INGEST_HANDOFF_TTL: ${IRI_INGEST_HANDOFF_TTL:-PT30M}
-    # Per-IP ingest budget (REQ-INGEST-005), looser than the per-member 30/min on purpose: members
-    # behind one CGNAT / office NAT share a single public address. Requests per minute.
     APP_RATE_LIMIT_IP_CAPACITY: ${IRI_INGEST_RATE_LIMIT_IP_CAPACITY:-120}
     APP_RATE_LIMIT_IP_REFILL_TOKENS: ${IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS:-120}
     REDIS_HOST: redis
     REDIS_PORT: 6379
-    # Its own Redis ACL user once rolled out (REQ-SEC-068, ADR-0207): the ingest:* keys only.
-    # Unset = the shared `default` user, as before.
     REDIS_USERNAME: ${REDIS_INGEST_USERNAME:-}
     REDIS_PASSWORD: ${REDIS_INGEST_PASSWORD:-${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}}
-    # JWT audience enforcement (security review). Empty by default. Unlike the backend, the gateway
-    # is NOT part of the E2E stack (E2eStackExtension brings up no ingest service), so its enforced
-    # path has unit coverage only — SecurityConfigTest — and no end-to-end rehearsal. Enforce in
-    # prod by setting IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest — NOT basetool-backend, which is
-    # the backend's audience and which every frontend session token carries, so the check would pass
-    # for exactly the tokens this interface must refuse (ADR-0018 amendment 1, REQ-INGEST-011). Only
-    # after the realm stamps aud=basetool-ingest on the extractor's tokens via the
-    # `extractor-ingest-only` scope (docs/INGEST_KEYCLOAK_SETUP.md step 7a); enabling it earlier
-    # rejects every token and breaks the app. Unset the var to disable instantly.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
-    # Client-identity gate (REQ-INGEST-011): WHICH CLIENT SOFTWARE may drive the gateway. The user
-    # gate is unchanged — every member may ingest. THE INGEST INTERFACE IS RESTRICTED TO CLIENTS
-    # APPROVED BY THE BASETOOL DEVELOPER (@greluc): approval = a Keycloak client registration AND an
-    # entry in the allowlist below, two independent gates. Removing the allowlist entry revokes a
-    # client within one access-token lifespan, without a Keycloak change or a release.
-    #
-    # Everything defaults EMPTY, which makes each check INERT, so dev / e2e / an un-provisioned prod
-    # stay unaffected. The Keycloak-side scopes and mappers are an operator step that cannot ship in
-    # a PR (docs/INGEST_KEYCLOAK_SETUP.md step 7), so shipping these pre-enabled would reject every
-    # real extractor token on deploy. Roll out with IRI_INGEST_CLIENT_AUDIT_ONLY=true, watch
-    # basetool_ingest_client_rejected_total stay at zero, then enforce.
     APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS: ${IRI_INGEST_ALLOWED_CLIENT_IDS:-}
-    # ADR-0129. The gateway's own public origin, used ONLY as the DPoP `htu` comparison target.
-    # Spring compares htu byte-exactly against a URL Tomcat assembles from the proxy's forwarded
-    # headers; pinning it here removes the proxy from the comparison. Unset keeps the stock
-    # request-derived target — which is the trap this exists to avoid, so set it in prod.
     APP_INGEST_PUBLIC_BASE_URL: ${IRI_INGEST_PUBLIC_BASE_URL:-}
-    # The gateway's OWN Keycloak identity for the backend hop (ADR-0129). Empty disables it and the
-    # gateway refuses ingest writes with a named error rather than an opaque 401 from the backend.
     APP_INGEST_SERVICE_ACCOUNT_TOKEN_URI: ${IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI:-}
     APP_INGEST_SERVICE_ACCOUNT_CLIENT_ID: ${IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID:-}
     APP_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET: ${IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET:-}
-    # Must name a scope ONLY the extractor carries AND one that is emitted into the `scope` claim.
-    # The shipped `extractor-ingest` scope fails both (it is a default scope on basetool-frontend too
-    # AND carries include.in.token.scope=false), so setting it here would reject every caller
-    # including the real extractor — use `extractor-ingest-only` (runbook step 7a).
     APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE: ${IRI_INGEST_REQUIRED_SCOPE:-}
-    # Accepted payload `tool` provenance. BOTH extractor spellings are required: it emits
-    # `basetool-sc-extractor` on the refinery path but the display name `Basetool SC Extractor` on
-    # the blueprint path, so listing only the slug rejects every blueprint send (incident
-    # 2026-08-03). The comparison folds case; these two differ structurally.
     APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS: ${IRI_INGEST_ALLOWED_TOOLS:-}
     APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY: ${IRI_INGEST_CLIENT_AUDIT_ONLY:-false}
-    # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
-    # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
-    # real scrape credentials and enables tracing. Only the prod service joins net-monitoring-scrape.
     MONITORING_SCRAPE_USER: ${MONITORING_SCRAPE_USER:-}
     MONITORING_SCRAPE_PASSWORD: ${MONITORING_SCRAPE_PASSWORD:-}
     MONITORING_TRACING_ENABLED: ${MONITORING_TRACING_ENABLED:-false}
     MONITORING_OTLP_ENDPOINT: ${MONITORING_OTLP_ENDPOINT:-http://alloy:4318/v1/traces}
     MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
-    # Same keystore + password the other modules use. These bind BOTH the server connector
-    # (`server.ssl.*`, enabled in ingest application.yml so the gateway serves HTTPS on 11262) AND the
-    # `spring.ssl.bundle.backend-trust` truststore that validates the backend's self-signed cert. The
-    # edge re-encrypts to this connector and verifies it against the shared CA -- which NPM never
-    # did, and which is part of why it was replaced (ADR-0162).
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
-    # REQ-SEC-070 / ADR-0211: the INTERNAL truststore the prod SSL bundles pin -- its own mount
-    # (below), deliberately not the REQ-OPS-022 JVM truststore, which holds public anchors too. Until
-    # the per-service rollout that mount's source IS the shared keystore, so nothing changes.
     INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
     INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
-    # REQ-SEC-070: also check that the backend's certificate names `backend`. On since the per-service
-    # certificates (docs/deployment.md, Internal TLS): the pinned CA vouches for every service, so the
-    # name is what tells the backend apart. `false` in the host .env turns it off again.
     INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-true}
-    # MaxRAMPercentage=60 (was 75) — see the heap-budget rationale in the deploy.resources comment
-    # above. InitialRAMPercentage stays 50 (256M): still below the 60% max (307M) — keep Initial < Max,
-    # an inverted pair makes the JVM refuse to start — and it happens to match the 248M this service
-    # actually commits, so the container pre-commits almost exactly what it needs.
-    # -XX:+UseSerialGC is DELIBERATE here, unlike on the frontend (ADR-0175). At a 512M limit
-    # this JVM also falls below HotSpot's 1792 MB server-class threshold, so it was already
-    # running Serial — by accident. For a relay that served 7 requests in 13 h and is idle
-    # between bursts, Serial is the right collector on the merits: lower native overhead and no
-    # concurrent GC threads to schedule. Saying so explicitly turns an accident into a choice and
-    # stops a future limit change from silently switching the collector in either direction.
-    #
-    # -XX:+UseCompactObjectHeaders added 2026-09-15 (ADR-0180) — see the backend block for the full
-    # rationale. The saving is smallest here in absolute terms and the flag is still set, because the
-    # object layout is a property of the STACK and not of one service: three JVMs on one layout is
-    # one thing to reason about, and it is the layout JDK 27 will impose anyway. It MUST match the
-    # flag on the AOT-cache training run in `docker/app/Dockerfile`.
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseSerialGC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
-    # This service's OWN key (REQ-SEC-070): unset it is the shared keystore, as it always was;
-    # after the rollout it is /var/iri/secrets/tls/ingest.p12, a leaf only this service holds.
     - ${IRI_INGEST_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
-    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
-    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
-    # trust store — NOT the SSL bundle above, which only covers the backend relay client. Where the
-    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
-    # and the health gate rolls the deploy back.
-    # Unset, this resolves to the SAME file as the keystore mount above, and with
-    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
     - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
-    # The INTERNAL truststore (REQ-SEC-070): what the backend-trust / keycloak-trust bundles pin.
-    # Unset it is the shared keystore -- exactly what they pinned before; after the rollout it is
-    # the CA-only /var/iri/secrets/tls/truststore.p12.
     - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
-    # Log dir mounted like backend/frontend (host dir pre-chowned to uid 10001) so the gateway can
-    # write logs/ingest.{log,json} and Alloy can tail logs/ingest.json for Loki (REQ-OBS-007).
     - /var/iri/ingest/log:/app/logs
 
 services:
@@ -1344,81 +380,18 @@ services:
     <<: *redis-template
     profiles: ["prod"]
     container_name: redis
-    # Prod overrides the template command to add the monitoring ACL file (epic #936). The
-    # redis_exporter (monitoring stack) connects as a dedicated ACL user restricted to read-only
-    # monitoring commands (no key access), so the session store holding OAuth2 refresh tokens stays
-    # unreadable by that user. IMPORTANT (learned the hard way, 2026-07-10): once `--aclfile` is used,
-    # the ACL file is the source of truth for the `default` user too. If it OMITS a `default` entry,
-    # Redis resets `default` to `nopass ~* &* +@all` at load — silently OVERRIDING `--requirepass`, so
-    # the whole session store becomes readable/writable with NO auth on the internal net. Prod shipped
-    # exactly this until it was caught. The host-provisioned `users.acl` therefore MUST define
-    # `default` WITH a password (`user default on >…REDIS_PASSWORD… ~* &* +@all`) alongside the
-    # restricted `monitoring` user.
-    #
-    # `--requirepass` WAS here as “redundant belt-and-braces” and has been removed (2026-09-16).
-    # It is not belt-and-braces, it is inert — measured against redis:8-alpine, all three cases:
-    #   ACL with a `default` line, no --requirepass      → the ACL password authenticates, no-auth refused
-    #   ACL with a `default` line + --requirepass OTHER   → the ACL password still wins; OTHER is rejected
-    #   ACL WITHOUT a `default` line + --requirepass PW   → NO AUTH AT ALL (the 2026-07-10 incident)
-    # So it protected nothing in either direction, while putting the password on redis-server's
-    # argv where any process in the container can read it out of `ps`. The `default` line in the
-    # ACL file is the whole of the protection, which is why the runbook's
-    # `grep -c '^user default '` check is the one that matters.
-    #
-    # It also blocked the Podman migration: Quadlet's Exec= becomes argv and never passes through
-    # a shell, so `${REDIS_PASSWORD:?…}` would have reached redis-server literally and every client
-    # would have been refused (scripts/generate-quadlet.py refused to translate it).
-    # A missing/empty ACL file makes redis exit at startup, which the deploy health-gate turns into a
-    # clean rollback rather than a silent breakage. Untouched for redis-dev.
-    # ADR-0094 / ADR-0126: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub
-    # channels `basetool:livesync:changed` (frontend), `basetool:livesync:presence` (frontend,
-    # cross-instance editor-presence gossip, #1237) and `basetool:notify:published` (backend). Until
-    # 2026-09-23 the `default` user's `&*` grant covered all three and this comment promised that a
-    # new channel needed no ACL change. That is withdrawn (ADR-0207): each service's own user names
-    # its channels, so a new one IS an ACL change. The restricted `monitoring` user must never gain
-    # `&*`. Pub/sub adds no keys, so the 384mb noeviction budget (ADR-0079) is unaffected.
-    #
-    # REQ-SEC-068 / ADR-0207: the ACL file is rendered from scripts/redis-users.acl.tmpl by
-    # scripts/render-redis-acl.py (hashes, never passwords) and carries one user per service:
-    # basetool-frontend, basetool-backend, basetool-ingest, plus `admin` (the operator) and
-    # `monitoring`. The channel list above is therefore no longer covered by a wildcard for the
-    # applications: a new channel is a template change, rendered and ACL LOADed on the host.
     command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
-    # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed
-    # alongside the read-only ACL mount.
-    # (Updated 2026-09-23, REQ-SEC-068: the health probe no longer authenticates at all -- see
-    # the template's healthcheck. The Quadlet container still receives REDIS_PASSWORD, now for the
-    # operator's `redis-cli --user admin ACL LOAD` inside it; the history below is why it is
-    # declared the way it is.)
-    # The healthcheck authenticated, so the password had to reach redis-cli -- but the two
-    # deployments need it in different places, and for a while this file carried BOTH.
-    #
-    # Compose expands `${REDIS_PASSWORD:?}` in the healthcheck below on the HOST, at file-load
-    # time, so the running container never needs the name. Quadlet's HealthCmd= is expanded by a
-    # shell INSIDE the container, so it does. A service-level `environment:` was added here to
-    # satisfy Quadlet, and it took effect in the Docker deployment that is serving production
-    # today: the password became readable from /proc/1/environ by any process in the container and
-    # from `docker inspect redis`, for a deployment with no use for it. That is the same exposure
-    # class the --requirepass removal above was justified by removing, so it has been taken back
-    # out (2026-09-18).
-    #
-    # The Quadlet half is declared where only Quadlet reads it: QUADLET_ONLY_ENV in
-    # scripts/generate-quadlet.py, which puts it in quadlet/env.d/redis.env.tmpl and nowhere else.
     volumes:
       - /var/iri/redis:/data
       - ${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}:/etc/redis/users.acl:ro
     networks:
       - net-redis-frontend
       - net-redis-ingest
-      # The backend joins for the notification SSE cross-replica fan-out (ADR-0094).
       - net-redis-backend
 
   redis-dev:
     <<: *redis-template
     profiles: ["dev"]
-    # Per-project named volume — see the note on db-backend-dev. The prod `redis` service re-lists
-    # its data volume next to the read-only ACL mount; the dev service needs no ACL file at all,
-    # because only prod overrides the command to add `--aclfile`.
     volumes:
       - redis-dev-data:/data
     ports:
@@ -1444,16 +417,6 @@ services:
   db-backend-dev:
     <<: *db-backend-template
     profiles: ["dev"]
-    # A per-project NAMED volume, not the anchor's /var/iri/db-backend host bind. The bind is a fixed
-    # absolute path, so every worktree and every compose project on the machine wrote into the SAME
-    # cluster — and because `--volumes` only removes named volumes, the documented
-    # `down --volumes` teardown could not reset it. The practical failure is a confusing one: a stack
-    # started with a fresh .env.test hits `password authentication failed`, because PGDATA was
-    # initialised by an earlier stack with different credentials and initdb never re-runs on a
-    # non-empty directory. A named volume is scoped to the compose project, so two worktrees no
-    # longer share a database, and `down --volumes` genuinely resets it. Safe for Postgres (unlike
-    # the app log dirs, which use tmpfs): the image ships nothing at this path for Docker to seed the
-    # volume from, and the entrypoint chowns PGDATA as root before dropping to `postgres`.
     volumes:
       - db-backend-dev-data:/var/lib/postgresql/data
     ports:
@@ -1473,7 +436,6 @@ services:
   db-keycloak-dev:
     <<: *db-keycloak-template
     profiles: ["dev"]
-    # Per-project named volume — see the note on db-backend-dev.
     volumes:
       - db-keycloak-dev-data:/var/lib/postgresql/data
     ports:
@@ -1487,15 +449,6 @@ services:
     <<: *keycloak-template
     profiles: ["prod"]
     container_name: keycloak
-    # Prod serves HTTPS ONLY. The edge re-encrypts the public host to https://keycloak:18443 (upstream
-    # scheme https, upstream-cert verification OFF for the shared self-signed cert) and the backend
-    # admin client reaches the SAME connector over the internal net-backend-keycloak network. Plain
-    # HTTP is disabled (`--http-enabled=false`) so no cleartext Keycloak listener exists anywhere.
-    # The management/health interface (port 9000) is pinned to HTTP (`--http-management-scheme=http`)
-    # because the Quarkus image ships no TLS-capable CLI client (no curl/wget/openssl, only java) and
-    # the healthcheck talks plain HTTP via bash /dev/tcp — see the x-keycloak healthcheck. The
-    # keystore is the shared keystore.p12 (volume below); its password comes from the env
-    # KC_HTTPS_KEY_STORE_PASSWORD set in the template.
     command: >
       start
       --proxy-headers xforwarded
@@ -1506,22 +459,8 @@ services:
       --http-management-scheme=http
       --log=console,file
       --log-file=/var/log/keycloak/keycloak.log
-    # Re-list the template volumes (a service-level `volumes:` replaces the merged template value)
-    # and add the keystore bind mount. Kept off the shared template on purpose so the keystore stays
-    # a prod-only requirement and `keycloak-dev` (run keystore-free in the deps-only dev flow) is
-    # unaffected.
-    #
-    # Two differences from the template, both since 2026-09-22 (OPS-SEC-04):
-    #   * NO realm-export.json. Production runs `start` without `--import-realm`, so the file was
-    #     never read -- it was only a writable view of an operator secret inside the one container
-    #     whose job is authentication. The dev and e2e stacks import it and keep the template's line.
-    #   * `:ro` on the theme and the provider directory. Both are written by the deployer on the host
-    #     and only ever read by Keycloak; scripts/generate-quadlet.py now refuses any config-tree
-    #     mount without `:ro`.
     volumes:
       - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro
-      # Custom Keycloak provider JARs — see the x-keycloak template note. Re-listed
-      # here because a service-level `volumes:` replaces the merged template value.
       - /var/iri/code/keycloak/providers:/opt/keycloak/providers:ro
       - /var/iri/keycloak/log:/var/log/keycloak
       - ${IRI_KEYCLOAK_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
@@ -1532,8 +471,6 @@ services:
       - net-db-keycloak
       - net-proxy-keycloak
       - net-backend-keycloak
-      # Prometheus scrapes keycloak:9000/metrics (plain HTTP mgmt port) and Keycloak pushes OTLP login
-      # spans to Alloy here (epic #936). Only the prod keycloak joins the monitoring plane.
       - net-monitoring-scrape
 
   keycloak-dev:
@@ -1560,16 +497,6 @@ services:
     <<: *backend-template
     profiles: ["prod"]
     container_name: backend
-    # ADR-0134: in prod Actuator lives on the internal-only management port 11271 (see
-    # application-prod.yml), so the image's default HEALTHCHECK — which probes 11261 — would hit a
-    # 404 and keep the container unhealthy forever. Params mirror the Dockerfile. Only the prod
-    # service carries this override; backend-dev keeps the image default because the dev profile
-    # configures no management port.
-    #
-    # This override and the port move must be promoted TOGETHER (ADR-0049 lock-step): a new config
-    # bundle on an old image probes a port that does not exist yet, and the reverse probes a port
-    # that no longer serves health. Either way the health gate fails and the deploy rolls back
-    # cleanly rather than breaking silently.
     healthcheck:
       test:
         [
@@ -1596,38 +523,16 @@ services:
       - net-backend-frontend
       - net-backend-keycloak
       - net-backend-ingest
-      # ADR-0135: the ONLY net-proxy-* network the backend joins, so the edge can reach the connector
-      # for the public API vhost. Without it the vhost's forward target `backend` does not resolve
-      # and every allow-listed path answers 503 from the maintenance page (measured 2026-08-18).
       - net-proxy-api
-      # Notification SSE cross-replica fan-out (ADR-0094) — reaches the `redis` service.
       - net-redis-backend
-      # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
       - net-monitoring-scrape
 
   backend-dev:
     <<: *backend-template
     profiles: ["dev"]
-    # Run the `dev` SPRING profile, which the x-backend anchor pins to `prod`. Without this the
-    # dev stack loads application-prod.yml, which moves Actuator to the internal-only management
-    # port 11271 (ADR-0134) — and since the management-port HEALTHCHECK override lives on the PROD
-    # `backend` service only, this container keeps the image's 11261 probe, gets a 404 and never
-    # turns healthy. frontend-dev and ingest-dev both gate on `service_healthy` here, so the whole
-    # `--profile dev` stack stops at that point. SPRING_DATASOURCE_* is supplied as an ENVIRONMENT
-    # variable above and therefore still outranks the hardcoded URL in application-dev.yml, so the
-    # database stays the one POSTGRES_DB names.
     environment:
       <<: *backend-env
       SPRING_PROFILES_ACTIVE: dev
-    # Log to tmpfs, not to the anchor's /var/iri/backend/log production host layout. A developer
-    # machine has no such path, so Docker creates it root-owned; the container runs as uid 10001,
-    # Logback's appender gets "logs/backend.log (Permission denied)", and because that happens during
-    # Spring Boot's logging initialisation the container EXITS rather than degrading — the stack then
-    # reports an unhealthy service whose real cause is buried in an appender stack trace. A named
-    # volume does not fix it (Docker seeds one from the image, and the images ship those log files
-    # root-owned); tmpfs starts genuinely empty, needs no chown and disappears with the container.
-    # Same fix and same reasoning as docker-compose.test.yml (#1596). Prod is unaffected: the prod
-    # services keep the bind, and the host directory there is pre-chowned to 10001.
     volumes:
       - type: tmpfs
         target: /app/logs
@@ -1641,21 +546,6 @@ services:
         condition: service_healthy
       keycloak-dev:
         condition: service_healthy
-      # The x-backend anchor enables the notification Redis fan-out (ADR-0094) for every backend
-      # service, so the dev stack's backend opens the RedisMessageListenerContainer at boot — wait for
-      # redis-dev to be healthy first so the full `docker compose --profile dev up` starts cleanly
-      # instead of racing the fan-out connection (#1246).
-      #
-      # Corrected 2026-09-02: this note used to add that "prod's fan-out degrades gracefully on a
-      # Redis outage (REQ-NOTIF-006), so the prod `backend` service intentionally keeps no hard redis
-      # gate". That was true of the RUNNING fan-out and false of STARTUP — both fan-out containers
-      # subscribe during context refresh, and upstream rethrows that first failure out of
-      # SmartLifecycle#start(), which cancels the refresh. On 2026-09-02 07:07:09Z that crash-looped
-      # the prod backend for want of an optional dependency. Startup resilience now lives in
-      # ResilientRedisMessageListenerContainer rather than in a compose gate, deliberately: depends_on
-      # is not re-evaluated on a restart-policy restart, on `docker restart backend`, on
-      # `up -d --no-deps backend` (which scripts/deploy.sh itself runs on health recovery), or when
-      # redis is recreated under a running backend — and those are exactly the paths this happened on.
       redis-dev:
         condition: service_healthy
     networks:
@@ -1679,11 +569,6 @@ services:
     <<: *frontend-template
     profiles: ["prod"]
     container_name: frontend
-    # ADR-0090: in prod Actuator is served on the internal-only management port 18091 (see
-    # application-prod.yml), so override the image's default HEALTHCHECK (which probes 18081) to hit
-    # the readiness probe on the management port over localhost. Params mirror the Dockerfile. Only
-    # the prod service carries this override; frontend-dev keeps the image default (no management
-    # port in the dev profile).
     healthcheck:
       test:
         [
@@ -1712,21 +597,15 @@ services:
       - net-proxy-frontend
       - net-backend-keycloak
       - net-redis-frontend
-      # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
       - net-monitoring-scrape
 
   frontend-dev:
     <<: *frontend-template
     profiles: ["dev"]
-    # Same reason as backend-dev: the prod profile would move Actuator to 18091 (ADR-0090) and leave
-    # the image's 18081 probe answering 404. REDIS_HOST comes with it because only application-
-    # prod.yml hardcodes `redis` — application-dev.yml reads ${REDIS_HOST:localhost}, and inside the
-    # container `localhost` is the JVM itself, not the redis-dev service.
     environment:
       <<: *frontend-env
       SPRING_PROFILES_ACTIVE: dev
       REDIS_HOST: redis
-    # tmpfs logs — see the note on backend-dev.
     volumes:
       - type: tmpfs
         target: /app/logs
@@ -1760,11 +639,6 @@ services:
     <<: *ingest-template
     profiles: ["prod"]
     container_name: ingest
-    # ADR-0090: in prod Actuator is served on the internal-only management port 11272 (see
-    # application-prod.yml), so override the image's default HEALTHCHECK (which probes 11262) to hit
-    # the readiness probe on the management port over localhost. Params mirror the Dockerfile. Only
-    # the prod service carries this override; ingest-dev keeps the image default (no management port
-    # in the dev profile).
     healthcheck:
       test:
         [
@@ -1790,19 +664,14 @@ services:
       - net-proxy-ingest
       - net-backend-ingest
       - net-redis-ingest
-      # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
       - net-monitoring-scrape
 
   ingest-dev:
     <<: *ingest-template
     profiles: ["dev"]
-    # Same reason as backend-dev: the prod profile would move Actuator to 11272 (ADR-0090) and leave
-    # the image's 11262 probe answering 404. REDIS_HOST/BACKEND_URL/FRONTEND_URL already come from
-    # the anchor as environment variables, so they survive the profile switch unchanged.
     environment:
       <<: *ingest-env
       SPRING_PROFILES_ACTIVE: dev
-    # tmpfs logs — see the note on backend-dev.
     volumes:
       - type: tmpfs
         target: /app/logs
@@ -1827,57 +696,6 @@ services:
         aliases:
           - ingest
 
-# Every bridge network is pinned to a fixed /24 under 172.28.0.0/16 instead of
-# being left to Docker's dynamic address pool. This is deliberate, not cosmetic:
-# a `docker compose down` (or any network re-create) otherwise reassigns each
-# bridge a fresh subnet from the pool, so its gateway `.1` changes across
-# restarts.
-#
-# That gateway IP is load-bearing. The Keycloak Admin Console is exposed on the
-# public `/auth/admin` path on the web vhost but locked to an SSH tunnel via an
-# nginx `allow … / deny all` on the `/admin` location in the EDGE. Host-origin traffic
-# (the operator's `ssh -N -L 443:127.0.0.1:443 …` tunnel hitting the edge's published
-# 443 through the host loopback) is SNAT'd by Docker to the gateway of whichever
-# net-proxy-* bridge the published-port DNAT targets — so the allow-list matches
-# a Docker gateway, not the operator's real IP. External clients keep their real
-# source IP and stay blocked by `deny all`. With dynamic subnets that gateway
-# moved on every restart and silently locked the admin console out (the exact
-# breakage this pinning prevents). See docs/deployment.md → "Keycloak Admin
-# Console via SSH tunnel" for the matching `/admin` block, now in docker/edge/.
-#
-# 172.28.0.0/16 sits outside Docker's default bridge (172.17.0.0/16) and is a
-# single-purpose host, so collision risk is nil. The three edge-facing bridges
-# (net-proxy-frontend/-keycloak/-ingest) are grouped in .3/.4/.7 so the admin
-# allow-list is a short, explicit list of their gateways.
-# Data volumes for the DEV-profile stateful services only. The prod services deliberately keep their
-# /var/iri/* host binds: on the production host those paths are provisioned, pre-chowned and backed
-# up, and a named volume would move the database somewhere the backup does not look. Dev is the
-# opposite case — nothing backs a developer machine's throwaway stack up, and what it needs instead
-# is isolation between worktrees plus a teardown that actually tears down. Compose prefixes these
-# with the project name, so each project gets its own and `down --volumes` removes them.
-  # ===========================================================================
-  # edge — the public reverse proxy (ADR-0162)
-  #
-  # Replaced `npm`, which was kept under a `rollback` profile as the documented way back until
-  # 2026-09-16 and is now removed -- the edge had held long enough. Everything this container
-  # serves is configured from
-  # docker/edge/ in this repository: no admin UI, no SQLite, no generated files.
-  #
-  # The hardening is the point of the swap, so each line is load-bearing:
-  #   user 101:101        the image is the unprivileged build; the master runs as
-  #                       uid 101 too, not just the workers
-  #   cap_drop [ALL]      with NO cap_add. nginx listens on 8080/8443 INSIDE, so
-  #                       not even NET_BIND_SERVICE is needed. NPM needed seven.
-  #                       The `ports:` below publish 80/443 onto them for a
-  #                       Compose stack; the generated Quadlet unit ignores
-  #                       them and publishes 8080/8443 on loopback only, where
-  #                       haproxy on the host (which owns 80/443) forwards with
-  #                       PROXY protocol (ADR-0187).
-  #   read_only true      impossible with NPM, whose boot sed-edits its own
-  #                       configuration and pip-installs certbot plugins
-  #   no egress           its five networks are `internal: true`; ACME lives in
-  #                       its own container, so nothing here needs the internet
-  # ===========================================================================
   edge:
     profiles: ["prod"]
     image: nginxinc/nginx-unprivileged:1.31.6-alpine@sha256:e75f89810bf5bfbcf58a1cfb32a1a11de55b7623d732e67735d513b720d7436a
@@ -1886,32 +704,17 @@ services:
     logging: *default-logging
     user: "101:101"
     ports:
-      - "80:8080"      # HTTP: ACME challenge + 308 to HTTPS
-      - "443:8443"     # HTTPS: every vhost, selected by SNI
+      - "80:8080"
+      - "443:8443"
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
     read_only: true
-    # File-descriptor ceiling, same value and same reasoning as backend/frontend:
-    # pinned explicitly and generously rather than inherited from the daemon, and
-    # 65536 only ever LOWERS a large default to a still-ample one, so it cannot
-    # fail the container start by trying to raise.
-    #
-    # The edge was the one service without it, and it showed. Every start logged
-    #   [warn] 4096 worker_connections exceed open file resource limit: 1024
-    # — not cosmetic: a proxied request needs two descriptors, one to the client
-    # and one to the upstream, so a worker capped at 1024 could not come close to
-    # the 4096 connections it was configured for. `worker_rlimit_nofile` in
-    # docker/edge/nginx.conf asks for 16384 of this, which is 2 × the connection
-    # ceiling doubled again; it sits well under this limit, so nginx never has to
-    # raise past a hard limit and refuse.
     ulimits:
       nofile:
         soft: 65536
         hard: 65536
     tmpfs:
-      # nginx writes nowhere else. `noexec,nosuid` because nothing here is ever
-      # meant to be executed or to gain privileges.
       - /tmp:rw,noexec,nosuid,size=64m
       - /var/cache/nginx:rw,noexec,nosuid,size=64m
     deploy:
@@ -1920,98 +723,29 @@ services:
           memory: 192M
           cpus: '1.0'
           pids: 512
-    # Not nginx directly: the per-vhost blocks carry host names that differ per
-    # environment, and there is ONE promoted bundle for all of them. The script
-    # substitutes them from the variables below, writes the result into the
-    # tmpfs, and then `exec`s nginx — so nginx is still PID 1's child and signal
-    # handling is unchanged.
     command: ["/bin/sh", "/etc/nginx/edge/render-and-run.sh"]
     environment:
-      # The five vhost names. No defaults on purpose: an unset one would render
-      # `server_name ;`, and the script refuses to start rather than serve a
-      # half-configured edge. They live in the host `.env`, which is per-host and
-      # never travels in the bundle.
-      #
-      # The certificate directory is DERIVED from each name
-      # (`/etc/nginx/certs/<host>/`), so `acme` on production and a seeded
-      # certificate on a test host produce the same layout and this file needs no
-      # second variable per vhost.
       EDGE_HOST_FRONTEND: ${EDGE_HOST_FRONTEND:-}
       EDGE_HOST_INGEST: ${EDGE_HOST_INGEST:-}
       EDGE_HOST_GRAFANA: ${EDGE_HOST_GRAFANA:-}
       EDGE_HOST_API: ${EDGE_HOST_API:-}
-      # Optional, and empty here by design: the address of a PROXY-protocol front
-      # end (ADR-0187). Unset means the listeners stay plain and the edge trusts
-      # no header, which is what this Docker deployment does. Setting it switches
-      # every public listener to `proxy_protocol` AND restores the client address
-      # from it -- the two move together, and `render-and-run.sh` refuses a
-      # wildcard or a prefix, because the header asserts an address rather than
-      # proving one.
       EDGE_TRUSTED_PROXY: ${EDGE_TRUSTED_PROXY:-}
-      # Also optional and also empty by design: extra addresses admitted to the
-      # Keycloak admin console. The six container-bridge gateways in
-      # 10-frontend.conf.template are what $remote_addr is on a PLAIN listener;
-      # once EDGE_TRUSTED_PROXY is set, $remote_addr is what the front end
-      # asserts, and render-and-run.sh adds the host loopback -- the address the
-      # operator's `ssh -L 443:127.0.0.1:443` tunnel then arrives on. This is for
-      # anything beyond that, such as a jump host, and is held to the same rule:
-      # literal addresses, whitespace-separated, never a prefix.
       EDGE_ADMIN_ALLOW: ${EDGE_ADMIN_ALLOW:-}
-      # Verify Grafana's upstream certificate (REQ-OBS-008): `on` pins the certificate mounted at
-      # /etc/nginx/grafana-upstream.crt below. Off by default, so shipping it changes nothing; the
-      # owner switches it on after checking the certificate names `grafana` (docs/deployment.md).
       EDGE_GRAFANA_UPSTREAM_VERIFY: ${EDGE_GRAFANA_UPSTREAM_VERIFY:-off}
     healthcheck:
-      # The jc21 image shipped none, so the deploy pipeline's fail-on-unhealthy
-      # gate could never fire for the edge. /healthz proves nginx is accepting and
-      # routing rather than merely running.
-      #
-      # :8081, not :8080, and it is load-bearing rather than cosmetic. With a
-      # front end configured the public listeners speak `proxy_protocol`, and such
-      # a listener REJECTS a header-less connection -- this wget would be refused,
-      # the container would never go healthy, and the health gate would hold the
-      # whole stack down behind an edge that is in fact working. :8081 is a
-      # loopback-only listener that never speaks PROXY protocol, so the check
-      # behaves identically in both modes.
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
     volumes:
-      # ONE DIRECTORY mount, and deliberately not three file mounts.
-      #
-      # Docker creates a missing bind-mount source as a DIRECTORY, as root. On
-      # 2026-09-12 an apply ran before the config had landed, so
-      # docker/edge/nginx.conf became a root-owned directory inside a tree owned
-      # by `deploy` — which the rollback's rsync then could not remove, and every
-      # later apply died with "Are you trying to mount a directory onto a file".
-      # A stale placeholder like that is unrecoverable without a manual rm.
-      #
-      # A directory mount cannot produce that shape, and it drops the inode
-      # pinning that single-file mounts carry as well. The main config is selected
-      # with -c rather than by path, so /etc/nginx keeps the image's own
-      # mime.types underneath.
       - ./docker/edge:/etc/nginx/edge:ro
-      # Certificates, written by the acme container. READ-ONLY here: the process
-      # facing the internet can read the key it serves and change nothing.
       - edge-certs:/etc/nginx/certs:ro
-      # The ACME webroot, written by the acme container and served by the :8080
-      # default server. Also read-only.
       - edge-acme-webroot:/var/www/acme:ro
-      # The public half of the shared keystore, so upstream TLS can be VERIFIED
-      # rather than merely encrypted — NPM never verified anything. Same file
-      # Prometheus already validates the apps against.
       - ${IRI_UPSTREAM_CA_HOST_PATH:-/var/iri/monitoring/certs/basetool-ca.crt}:/etc/nginx/upstream-ca.crt:ro
-      # Grafana's own self-signed certificate -- the SAME file Grafana serves, so every host that
-      # runs Grafana has it -- as the anchor for the Grafana upstream only. Read only when
-      # EDGE_GRAFANA_UPSTREAM_VERIFY=on. A single-file mount pins the inode: after re-minting it,
-      # restart the edge as well as Grafana.
       - ${IRI_GRAFANA_UPSTREAM_CERT_HOST_PATH:-/var/iri/monitoring/certs/grafana.crt}:/etc/nginx/grafana-upstream.crt:ro
       - ./docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
     networks:
-      # Listed first: this is the leg the published ports land on. The other five
-      # are `internal: true` and carry upstream traffic only.
       - net-edge-ingress
       - net-proxy-frontend
       - net-proxy-keycloak
@@ -2019,58 +753,21 @@ services:
       - net-proxy-grafana
       - net-proxy-api
 
-  # ===========================================================================
-  # acme — certificate issuance and renewal, deliberately NOT in the edge
-  #
-  # This split is the structural half of ADR-0162. NPM's CVE-2026-40519 is an
-  # authenticated RCE that interpolates stored DNS-provider credentials into a
-  # shell command, and it is reachable because the process that terminates TLS is
-  # also the process that holds the ACME credentials and runs renewal hooks.
-  # Here they are two containers: this one may reach the internet and holds the
-  # account key; the edge holds neither and cannot egress at all.
-  #
-  # HTTP-01 over the shared webroot, so there is no DNS API token anywhere —
-  # nothing to interpolate even in principle.
-  #
-  # nginx re-reads certificates only on reload, so a renewal is applied by
-  # deploy.sh's reconcile, which force-recreates the edge when the certificate
-  # fingerprint changes. That is the same mechanism the monitoring configs use
-  # and needs no docker socket in this container.
-  # ===========================================================================
   acme:
     profiles: ["prod"]
     image: goacme/lego:v5.5.1@sha256:9c446e8ce05155f87475ce87392a5c55472a7ecd06e244752f762d2f4b162e8d
     container_name: acme
     restart: unless-stopped
     logging: *default-logging
-    # The loop lives in docker/acme/publish-loop.sh rather than in this block scalar. It was
-    # moved on 2026-09-16, byte-identical apart from compose's `$$` escaping becoming a single
-    # `$` -- verified: the original carried ZERO single-dollar references, so compose was
-    # interpolating nothing into it. Two reasons: a shell script inside YAML is invisible to
-    # shellcheck (which found an undocumented intentional word-split on its first run), and
-    # Quadlet's Exec= is a single line, so the migration cannot translate a multi-line command
-    # at all. The edge already works this way with render-and-run.sh.
     entrypoint: ["/bin/sh"]
     command: ["/etc/acme/publish-loop.sh"]
     environment:
       ACME_EMAIL: ${ACME_EMAIL:-}
-      # Empty means this environment manages no certificates (see the command
-      # above). The same five names the edge serves, in the same order — the
-      # first is the certificate's CN, the rest its SANs.
       ACME_HOSTS: ${ACME_HOSTS:-}
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
     cap_add:
-      # CHOWN, and only CHOWN. lego writes the certificates as root; the edge
-      # reads them as uid 101 and its master opens them at startup, so ownership
-      # has to be handed over. With everything dropped, `chown` fails with
-      # "Operation not permitted", `set -eu` ends the script and the container
-      # enters a restart loop — which takes the whole deploy down through
-      # `up --wait`, and says nothing about capabilities while doing it.
-      #
-      # This container listens on nothing and holds no inbound surface; the edge
-      # keeps its zero.
       - CHOWN
     deploy:
       resources:
@@ -2079,21 +776,14 @@ services:
           cpus: '0.5'
           pids: 128
     volumes:
-      - ./docker/acme:/etc/acme:ro   # the publish loop, read-only
+      - ./docker/acme:/etc/acme:ro
       - edge-acme-state:/data
       - edge-acme-webroot:/webroot
       - edge-certs:/certs
     networks:
-      # The ONLY network with egress in this pair — lego has to reach the ACME
-      # directory. It is not on any net-proxy-* network, so a compromise here
-      # reaches no application.
       - net-acme-egress
 
 volumes:
-  # Edge (ADR-0162). `edge-certs` is written by acme and mounted READ-ONLY by the
-  # edge; `edge-acme-webroot` carries the HTTP-01 challenge tokens the same way;
-  # `edge-acme-state` holds the ACME account key and never leaves the acme
-  # container.
   edge-certs:
   edge-acme-webroot:
   edge-acme-state:
@@ -2102,20 +792,6 @@ volumes:
   redis-dev-data:
 
 networks:
-  # Explicit `name:` (below and on net-redis-frontend) so the separate docker-compose.monitoring.yml
-  # project can reference these as `external` by a deterministic name: the postgres/redis exporters
-  # bridge into these existing data nets to reach the DBs/Redis, which keeps the databases OFF the
-  # broad monitoring-scrape net (no new lateral path such as keycloak→db-backend). The subnet/gateway
-  # are unchanged, so the SSH-tunnel admin allow-list (which matches net-proxy-* gateways) is
-  # unaffected.
-  #
-  # NOT `internal: true` here, deliberately -- and the same holds for net-db-keycloak and the three
-  # net-redis-* networks. In PRODUCTION all five are internal (no egress for the databases and
-  # Redis), but that is set by scripts/generate-quadlet.py (QUADLET_INTERNAL_NETWORKS), not here
-  # (ADR-0162, 2026-09-22 amendment, accepted by the owner). This file also runs the local stacks,
-  # where the -dev twins publish 127.0.0.1:15432 / :15433 / :6379 on these very networks for a
-  # developer's bootRun, and an internal network carries no DNAT: `internal: true` here would
-  # break every local database and Redis connection without an error at startup.
   net-db-backend:
     name: net-db-backend
     driver: bridge
@@ -2137,30 +813,6 @@ networks:
         - subnet: 172.28.2.0/24
           gateway: 172.28.2.1
 
-  # The acme container's only network. It has egress (lego must reach the ACME
-  # directory) and exactly one member, so a compromise there reaches no
-  # application: it is on none of the net-proxy-* networks and none of the data
-  # networks.
-
-  # The edge's INGRESS bridge, and the only non-internal network it touches
-  # (ADR-0162). It exists so the published :80/:443 have a DNAT target, because
-  # the five net-proxy-* networks are `internal: true` and an internal network
-  # carries no DNAT.
-  #
-  # It carries no egress either: masquerading is off, so an outbound packet leaves
-  # with a private source and dies at the first hop. Inbound DNAT is unaffected —
-  # verified on this exact shape.
-  #
-  # DUAL-STACK, and that is ADR-0112 rather than completeness. The published :443
-  # is bound on [::]:443 too; with an IPv4-only container Docker installs no
-  # ip6tables DNAT and the userland docker-proxy relays every IPv6 client through
-  # the bridge gateway, so nginx sees ONE address for all of them and the per-IP
-  # limiter collapses into a single bucket — the 2026-07-20 outage. The real IPv6
-  # subnet makes Docker install the kernel DNAT so the client address survives.
-  # The property moved here with the published ports; net-proxy-frontend no longer
-  # carries ingress and no longer needs it.
-  #
-  # Exactly one member: the edge. It adds no lateral reach.
   net-edge-ingress:
     driver: bridge
     enable_ipv6: true
@@ -2179,38 +831,8 @@ networks:
         - subnet: 172.28.14.0/24
           gateway: 172.28.14.1
   net-proxy-frontend:
-    # NO EGRESS (ADR-0162). `internal: true` removes the gateway and the NAT, so
-    # nothing on this bridge can reach the internet — and the edge, which is on the
-    # five net-proxy-* networks and nothing else except the ingress bridge below,
-    # therefore has no outbound path at all. It does not need one: ACME runs in its
-    # own container.
-    #
-    # This only works BECAUSE the published ports moved to net-edge-ingress.
-    # `internal: true` removes the inbound DNAT along with the outbound NAT, so a
-    # container that publishes a port on an internal network stays up and serves
-    # NOTHING — measured, twice: on the docker CLI and on the exact compose shape
-    # used here. Attached to an internal network plus a non-internal ingress
-    # bridge, the same container answers 200 and still reaches its upstreams over
-    # the internal side.
-    #
-    # The upstreams are untouched: none of them egresses through a net-proxy-*
-    # bridge, each sitting on three to seven networks and keeping a masqueraded
-    # one.
-    #
-    # Adding `internal` requires the network to be RECREATED -- a brief full-stack
-    # outage taken as a maintenance (docs/deployment.md -> "Network changes are
-    # installed, not applied"); no deploy tick does it on its own.
     internal: true
     driver: bridge
-    # Dual-stack (ADR-0112): the published :443 is bound on [::]:443 too, but with an
-    # IPv4-only container Docker installs no ip6tables DNAT, so the userland docker-proxy
-    # relays every IPv6 client through the bridge gateway and nginx sees 172.28.3.1 for all
-    # of them (dual-stack browsers prefer IPv6 -> the edge per-IP limiter collapses to one
-    # global bucket, the 2026-07-20 outage). A real IPv6 subnet makes Docker install the
-    # kernel DNAT ([::]:443 -> [edge-v6]:443) so the client IPv6 is preserved like IPv4 already
-    # is. A network change needs the network recreated -- a maintenance, not a deploy tick.
-    # The IPv4 gateway 172.28.3.1 is unchanged, so the Keycloak /admin SSH-tunnel allow-list
-    # is untouched.
     enable_ipv6: true
     ipam:
       config:
@@ -2219,7 +841,6 @@ networks:
         - subnet: fd00:28:3::/64
           gateway: fd00:28:3::1
   net-proxy-keycloak:
-    # NO EGRESS (ADR-0162) -- the same reasoning as net-proxy-frontend above.
     internal: true
     driver: bridge
     ipam:
@@ -2239,10 +860,7 @@ networks:
       config:
         - subnet: 172.28.6.0/24
           gateway: 172.28.6.1
-  # Ingest gateway (epic #639): proxy → ingest (the only new internet-facing edge),
-  # ingest → backend, ingest → redis. backend stays OFF net-proxy-ingest.
   net-proxy-ingest:
-    # NO EGRESS (ADR-0162) -- the same reasoning as net-proxy-frontend above.
     internal: true
     driver: bridge
     ipam:
@@ -2261,10 +879,6 @@ networks:
       config:
         - subnet: 172.28.9.0/24
           gateway: 172.28.9.1
-  # Backend ↔ Redis for the notification SSE cross-replica fan-out (ADR-0094). A dedicated network
-  # (like net-redis-ingest) rather than widening net-redis-frontend, so no new lateral path opens.
-  # Explicit `name:` for parity with the other pinned redis nets. Subnet continues the pinned
-  # 172.28.0.0/16 block (.12) — .10/.11 are already taken by net-monitoring-scrape/net-proxy-grafana.
   net-redis-backend:
     name: net-redis-backend
     driver: bridge
@@ -2272,17 +886,6 @@ networks:
       config:
         - subnet: 172.28.12.0/24
           gateway: 172.28.12.1
-  # Monitoring plane — scrape/OTLP boundary (epic #936, ADR-0072). This is the ONE monitoring network
-  # the app stack owns and creates: the three apps + the prod keycloak join it so Prometheus can scrape
-  # their metrics (HTTPS for the apps, keycloak:9000 plain HTTP) and Alloy can receive their OTLP spans.
-  # The separate `docker-compose.monitoring.yml` project references it as `external` under the fixed
-  # `name:` below (so the cross-project lookup does not depend on the compose project name). The other
-  # monitoring network (net-monitoring-core) has NO app-stack member and is therefore owned by the
-  # monitoring project itself — declaring it here would leave it uncreated
-  # (Compose only creates top-level networks a started service references). The DB/Redis exporters
-  # deliberately do NOT put the databases/redis on this network; they bridge into the existing
-  # net-db-*/net-redis-frontend nets instead, so no new lateral path (e.g. keycloak→db-backend) opens.
-  # Subnet continues the pinned 172.28.0.0/16 block (.10); the gateway is not load-bearing here.
   net-monitoring-scrape:
     name: net-monitoring-scrape
     driver: bridge
@@ -2290,13 +893,7 @@ networks:
       config:
         - subnet: 172.28.10.0/24
           gateway: 172.28.10.1
-  # Dedicated edge<->Grafana proxy net (epic #936): the edge re-encrypts the public
-  # grafana.profit-base.online host to grafana:3000 here so it never joins the closed
-  # net-monitoring-core. Grafana joins it from
-  # docker-compose.monitoring.yml (external ref by this fixed name). Subnet continues the pinned block
-  # (.11); the gateway is NOT load-bearing (net-proxy-grafana is not in the Keycloak-admin allow-list).
   net-proxy-grafana:
-    # NO EGRESS (ADR-0162) -- the same reasoning as net-proxy-frontend above.
     internal: true
     name: net-proxy-grafana
     driver: bridge
@@ -2304,30 +901,7 @@ networks:
       config:
         - subnet: 172.28.11.0/24
           gateway: 172.28.11.1
-  # edge <-> backend for the public API vhost `api.profit-base.online` (ADR-0135). A dedicated bridge
-  # rather than putting the backend on the existing net-proxy-frontend: that one carries the web
-  # vhost, and keeping the API path on its own network means the two can be reasoned about — and if
-  # it ever comes to it, severed — independently. The single new lateral path is edge -> backend,
-  # which is the entire point; frontend <-> backend already exists over net-backend-frontend.
-  #
-  # Dual-stack for the same reason net-proxy-frontend is (ADR-0112): with an IPv4-only bridge Docker
-  # installs no ip6tables DNAT, so the userland docker-proxy relays every IPv6 client through the
-  # bridge gateway and the app sees ONE address for all of them. That collapses the edge per-IP
-  # limiter (the 2026-07-20 outage) and would feed the same single address to the backend's
-  # client-IP attribution (REQ-SEC-011) — on a surface whose whole purpose is native clients on
-  # mobile networks, where IPv6 is the norm.
-  #
-  # Subnet continues the pinned 172.28.0.0/16 block (.13); .12 (net-redis-backend) was the last one
-  # taken. `app.rate-limit.trusted-proxies` already covers the whole /16 and needs no change. The
-  # new gateway 172.28.13.1 must be in the Keycloak /admin allow-list before this lands, or the
-  # SSH-tunnel admin route can break — see docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md, phase A.
-  #
-  # NOTE: adding a top-level network is a maintenance: containers cannot move onto a new bridge
-  # in place, and a stranded one loses name resolution (#974). Under Quadlet the new `.network`
-  # unit is installed by a deploy and the members are restarted onto it as a planned step
-  # (docs/deployment.md -> "Network changes are installed, not applied").
   net-proxy-api:
-    # NO EGRESS (ADR-0162) -- the same reasoning as net-proxy-frontend above.
     internal: true
     driver: bridge
     enable_ipv6: true

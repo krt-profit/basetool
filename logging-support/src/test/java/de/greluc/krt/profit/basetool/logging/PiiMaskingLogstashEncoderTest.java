@@ -31,11 +31,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins that the prod JSON sink of all three applications scrubs PII (e-mail / JWT / bearer token)
- * before it is written. Each module's JSON appender once used the stock {@code LogstashEncoder} and
- * was an unmasked log output (audit M-5, epic #936 Phase 1).
- */
+/** Tests that the prod JSON sink encoder scrubs e-mails, JWTs and bearer tokens before writing. */
 class PiiMaskingLogstashEncoderTest {
 
   private PiiMaskingLogstashEncoder encoder;
@@ -45,9 +41,6 @@ class PiiMaskingLogstashEncoderTest {
   @BeforeEach
   void setUp() {
     context = new LoggerContext();
-    // LogstashEncoder reads the MDC at encode time; an empty LoggerContext has no
-    // MDCAdapter set, which throws NPE inside MdcJsonProvider. Attach the standard
-    // logback MDC adapter so the encoder sees an empty-but-valid MDC.
     context.setMDCAdapter(new ch.qos.logback.classic.util.LogbackMDCAdapter());
     logger = context.getLogger(PiiMaskingLogstashEncoderTest.class);
     encoder = new PiiMaskingLogstashEncoder();
@@ -81,8 +74,6 @@ class PiiMaskingLogstashEncoderTest {
   @Test
   void shouldKeepJsonStructureIntact() {
     String json = encode("Email user@example.org used token=my-secret");
-    // The masker only inserts alphanumerics, so the surrounding JSON must still
-    // start with '{' and end with '}\n' (LogstashEncoder appends a trailing newline).
     String trimmed = json.trim();
     assertTrue(
         trimmed.startsWith("{") && trimmed.endsWith("}"),
@@ -93,7 +84,6 @@ class PiiMaskingLogstashEncoderTest {
 
   @Test
   void shouldHandBackTheEncodersOwnBytesWhenNothingIsMasked() {
-    // The PII-free event is the common one: re-encoding it would double the cost of every line.
     ILoggingEvent event =
         new LoggingEvent(
             PiiMaskingLogstashEncoderTest.class.getName(),

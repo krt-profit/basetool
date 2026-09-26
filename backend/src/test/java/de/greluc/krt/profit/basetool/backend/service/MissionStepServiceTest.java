@@ -84,8 +84,6 @@ class MissionStepServiceTest {
         new LinkedHashSet<>(List.of(step(step1Id, "Briefing", 0), step(step2Id, "Mining", 1))));
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    // Since #1147 enforceSectionVersion runs the DB-enforced conditional bump; default it to "1 row
-    // affected" (version matched) so happy paths pass. The stale-version test overrides it to 0.
     lenient()
         .when(missionRepository.bumpStepsVersionIfMatches(eq(missionId), anyLong()))
         .thenReturn(1);
@@ -107,15 +105,13 @@ class MissionStepServiceTest {
 
   @Test
   void addStep_appendsAtEnd_bumpsVersion_andRecordsAudit() {
-    // When
     Mission result = timelineService.addStep(missionId, "  Eskorte  ", "  TS 20:00 ", 3L);
 
-    // Then
     assertEquals(3, result.getSteps().size());
     MissionStep added = orderedSteps().get(2);
-    assertEquals("Eskorte", added.getTitle()); // trimmed
-    assertEquals("TS 20:00", added.getMeta()); // trimmed
-    assertEquals(2, added.getOrderIndex()); // appended after the two existing steps
+    assertEquals("Eskorte", added.getTitle());
+    assertEquals("TS 20:00", added.getMeta());
+    assertEquals(2, added.getOrderIndex());
     assertFalse(added.isDone());
     assertEquals(4L, result.getStepsVersion());
     verify(missionStepRepository).save(any(MissionStep.class));
@@ -158,13 +154,12 @@ class MissionStepServiceTest {
 
   @Test
   void deleteStep_removesAndRepacksOrderIndex_andRecordsAudit() {
-    // When the first step is removed, the remaining step must re-pack to orderIndex 0.
     Mission result = timelineService.deleteStep(missionId, step1Id, 3L);
 
     assertEquals(1, result.getSteps().size());
     MissionStep remaining = orderedSteps().get(0);
     assertEquals(step2Id, remaining.getId());
-    assertEquals(0, remaining.getOrderIndex()); // re-packed from 1 -> 0
+    assertEquals(0, remaining.getOrderIndex());
     assertEquals(4L, result.getStepsVersion());
     verify(auditService)
         .record(eq(AuditEventType.MISSION_STEP_REMOVED), eq(missionId), any(), isNull(), any());
@@ -178,7 +173,6 @@ class MissionStepServiceTest {
     assertEquals(step2Id, ordered.get(0).getId());
     assertEquals(step1Id, ordered.get(1).getId());
     assertEquals(4L, result.getStepsVersion());
-    // Exactly one reorder event, carrying only a count (never a title).
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(
@@ -210,7 +204,6 @@ class MissionStepServiceTest {
 
   @Test
   void stepMutations_neverLeakTheStepTitleIntoTheAuditDetails() {
-    // The title is user free text — REQ-AUDIT-001 forbids it (and any PII) in the details payload.
     timelineService.addStep(missionId, "TOP-SECRET RALLY POINT", "classified", 3L);
 
     ArgumentCaptor<String> label = ArgumentCaptor.forClass(String.class);
@@ -222,7 +215,7 @@ class MissionStepServiceTest {
             label.capture(),
             isNull(),
             details.capture());
-    assertEquals(mission.getName(), label.getValue()); // subject label is the mission name snapshot
+    assertEquals(mission.getName(), label.getValue());
     assertFalse(details.getValue().toString().contains("TOP-SECRET"));
     assertFalse(details.getValue().toString().contains("classified"));
   }

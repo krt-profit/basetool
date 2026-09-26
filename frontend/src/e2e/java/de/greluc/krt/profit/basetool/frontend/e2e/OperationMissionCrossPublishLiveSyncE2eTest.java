@@ -35,23 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the mission → operation cross-publish (#1241, REQ-FE-015 /
- * ADR-0094): a child mission's core edit made on the mission detail page must refresh the parent
- * operation's embedded missions table on another viewer of the <em>operation</em> page — without a
- * manual reload.
+ * Verifies the mission-to-operation cross-publish (REQ-FE-015, ADR-0094): renaming a child mission
+ * on its detail page refreshes the parent operation's missions table for another viewer without a
+ * reload.
  *
- * <p>This is the one cross-<em>surface</em> live-sync case: the {@code missions}/{@code finance}
- * sections of {@code operation:{id}} are never broadcast from the operation page itself; they are
- * cross-published from the mission page, which maps mission {@code overview → operation missions}
- * (and {@code finance → finance}) and publishes to {@code operation:{id}} without subscribing to
- * it. Context A (the mission page) is the publisher; context B (the operation page, subscribed to
- * {@code operation:{id}}) is the receiver whose missions table must update in place.
- *
- * <p>The deterministic pre-mutation wait is context B's {@code
- * window.krtLiveSync.subscribedTopics()} becoming non-empty — B is registered with the relay once
- * its {@code operation:{id}} subscribe is acked, so A's cross-published change frame cannot race
- * past it. Renaming the mission is the mutation chosen because the operation missions table renders
- * the mission's name, so the propagation is directly observable.
+ * <p>Waits for the operation page's {@code operation:{id}} subscription before mutating.
  */
 @Tag("e2e")
 class OperationMissionCrossPublishLiveSyncE2eTest {
@@ -119,26 +107,16 @@ class OperationMissionCrossPublishLiveSyncE2eTest {
       Page pageA = contextA.newPage();
       Page pageB = contextB.newPage();
       try {
-        // A lands on the mission Verwaltung tab where the core-edit #mission-form is interactable;
-        // B
-        // stays on the operation page, whose #op-missions-results table lists this mission.
         E2eSupport.navigate(pageA, baseUrl + "/missions/" + missionId + "?tab=verw");
         pageA.waitForLoadState();
         E2eSupport.navigate(pageB, baseUrl + "/operations/" + operationId);
         pageB.waitForLoadState();
-        // Surface B's missions tab so the table is visible (the receiver refreshes the container
-        // regardless, but the assertion reads a visible table).
         pageB.locator("#optab-missions").click();
 
-        // B starts with the original mission name (not the renamed one) in the missions table.
         assertThat(pageB.locator("#op-missions-results")).not().containsText(RENAMED);
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its operation:{id} subscribe is
-        // acked (subscribedTopics non-empty), so A's cross-published change frame cannot race past
-        // it.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -146,18 +124,11 @@ class OperationMissionCrossPublishLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // Context A renames the mission via the core-edit form and saves in place.
         pageA.locator("[data-testid='mission-name-input']").fill(RENAMED);
         pageA.locator("button[type='submit'][form='mission-form']").click();
-        // A's own sticky header updates in place (sanity: the mission core save succeeded and
-        // broadcast the overview section that the cross-publish keys off).
         assertThat(pageA.locator(".mission-head-title h1"))
             .containsText(RENAMED, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
 
-        // The assertion under test: context B — which did nothing — reflects the new mission name
-        // in
-        // the operation's embedded missions table, cross-published over /ws/sync and applied as an
-        // in-place missions-fragment swap.
         assertThat(pageB.locator("#op-missions-results"))
             .containsText(RENAMED, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
         assertEquals(

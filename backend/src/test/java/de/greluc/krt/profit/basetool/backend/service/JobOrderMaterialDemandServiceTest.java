@@ -70,7 +70,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * query is scoped and status-restricted, and that the coverage columns keep their distinct
  * meanings.
  */
-// covers REQ-ORDERS-034
 @ExtendWith(MockitoExtension.class)
 class JobOrderMaterialDemandServiceTest {
 
@@ -83,14 +82,11 @@ class JobOrderMaterialDemandServiceTest {
   @Mock private SquadronMapper squadronMapper;
 
   /**
-   * Real, not mocked (#1740): the two-kind normalisation moved out of this service into the shared
-   * resolver, and these cases assert exactly that a MATERIAL line and an ITEM order's
-   * blueprint-derived requirement fold into one bucket. A mocked resolver would assert only that
-   * the service delegates.
+   * Real, not mocked: these cases assert that a MATERIAL line and an ITEM order's blueprint-derived
+   * requirement fold into one bucket.
    */
   @InjectMocks private JobOrderMaterialRequirementResolver materialRequirementResolver;
 
-  // Constructed in setUp() so the REAL requirement resolver goes in through the constructor.
   private JobOrderMaterialDemandService service;
 
   /** Stubbed batched stock lookup; each test decides what a bucket has linked to it. */
@@ -101,11 +97,6 @@ class JobOrderMaterialDemandServiceTest {
 
   @BeforeEach
   void setUp() {
-    // @InjectMocks would leave the extracted resolver as a mock returning no buckets, so every
-    // demand row would come back empty (#1740) — hence the REAL resolver, passed through the
-    // constructor. It used to be patched in with ReflectionTestUtils.setField, but the field is
-    // `private final`: the mutation JEP 500 (JDK 26) warns about and a later release will refuse.
-    // Arg order matches the service's @RequiredArgsConstructor field order.
     service =
         new JobOrderMaterialDemandService(
             jobOrderRepository,
@@ -243,8 +234,6 @@ class JobOrderMaterialDemandServiceTest {
     assertThat(group.materials()).hasSize(1);
 
     MaterialDemandRowDto row = group.materials().get(0);
-    // A MATERIAL line's 650-floor and an ITEM requirement's GOOD land in the SAME bucket, which is
-    // the whole point of the aggregation - otherwise one material would show up twice.
     assertThat(row.qualityRequirement()).isEqualTo(QualityRequirement.GOOD);
     assertThat(row.requiredAmount()).isEqualTo(1000.0);
     assertThat(row.bookedAmount()).isEqualTo(150.0);
@@ -297,7 +286,6 @@ class JobOrderMaterialDemandServiceTest {
     verify(jobOrderRepository)
         .findScopedOrdersWithMaterialRequirements(
             statuses.capture(), eq(false), eq(activeOrgUnit), eq(memberships));
-    // Terminal orders carry no outstanding demand and must never reach the sums.
     assertThat(statuses.getValue())
         .containsExactlyInAnyOrder(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS);
   }
@@ -346,7 +334,6 @@ class JobOrderMaterialDemandServiceTest {
         service.getMaterialDemandOverview().groups().get(0).materials().get(0);
 
     assertThat(row.claimedAmount()).isEqualTo(300.0);
-    // 300 SCU are promised but not delivered, so 450 - not 150 - still has to be gathered.
     assertThat(row.outstandingAmount()).isEqualTo(450.0);
     assertThat(row.orders().get(0).claimedAmount()).isEqualTo(300.0);
   }
@@ -385,8 +372,6 @@ class JobOrderMaterialDemandServiceTest {
     MaterialDemandRowDto row =
         service.getMaterialDemandOverview().groups().get(0).materials().get(0);
 
-    // Rounded on the SUM (5.8 -> 6), not per contribution (2 + 3 = 5), so the total a user gathers
-    // against actually covers both orders.
     assertThat(row.requiredAmount()).isEqualTo(6.0);
   }
 }

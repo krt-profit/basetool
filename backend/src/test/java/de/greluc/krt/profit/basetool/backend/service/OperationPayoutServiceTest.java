@@ -88,31 +88,25 @@ class OperationPayoutServiceTest {
   @Mock private AuditService auditService;
 
   /**
-   * Self-proxy the payout toggle uses to open a fresh {@code REQUIRES_NEW} transaction per retry
-   * (#1111). In these unit tests it is stubbed to return the {@link #operationPayoutService} under
-   * test (or a spy of it) so the orchestrator delegates to the real / spied within-transaction
-   * body.
+   * Self-proxy used by the payout toggle for its {@code REQUIRES_NEW} retries, stubbed to return
+   * the {@link #operationPayoutService} under test or a spy of it.
    */
   @Mock private ObjectProvider<OperationPayoutService> self;
 
   @InjectMocks private OperationPayoutService operationPayoutService;
 
-  // --- getOperationPayouts -------------------------------------------------
-
   /**
-   * The payout calculator is the money-handling core of the operation flow. Its previous coverage
-   * was 0% — these tests exhaustively cover the branches:
+   * Branch tests of the payout calculation.
    *
    * <ol>
-   *   <li>Operation lookup (not-found path).
-   *   <li>Mission validity gate (null start, null end, end &lt;= start).
-   *   <li>Participant identity (user vs guest vs neither).
-   *   <li>Effective-window clamping (pStart &lt; actualStart, pEnd &gt; actualEnd, pEnd null falls
-   *       back to now()).
-   *   <li>DONATE preference precedence across multiple missions.
-   *   <li>Aggregation across missions for the same participant.
-   *   <li>Percentage math (total &gt; 0 vs total == 0 div-by-zero guard, two-decimal rounding).
-   *   <li>Output ordering (case-insensitive by participant name).
+   *   <li>Operation lookup (not found).
+   *   <li>Mission validity (null start, null end, end &lt;= start).
+   *   <li>Participant identity (user, guest, neither).
+   *   <li>Window clamping, including a null end falling back to now.
+   *   <li>DONATE precedence across missions.
+   *   <li>Aggregation across missions per participant.
+   *   <li>Percentage math, the zero-total guard and two-decimal rounding.
+   *   <li>Case-insensitive ordering by participant name.
    * </ol>
    */
   @Nested
@@ -205,15 +199,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void participantOfADeletedAccount_isListedAndSortsLast() {
-      // PRODUCTION DEFECT, 2026-09-08. `participantWithoutUserOrGuestName_isSkipped` above passes
-      // only because its fixture participant has no id: participantKey() then returns null and the
-      // row really is skipped. A PERSISTED participant has one, so the third branch fires and the
-      // row is keyed "deleted_<id>" -- with a null participantName, which OperationPayoutDto
-      // documents as the contract value the clients draw their deleted-user placeholder from.
-      //
-      // Sorting that list with String.CASE_INSENSITIVE_ORDER alone threw NPE, so ONE deleted
-      // account 500'd the whole payouts endpoint for every caller. The Operation screen builds its
-      // head from this read, so both clients showed an empty screen and no cause.
       Mission m = newMission(T0, T0_PLUS_60M);
       addUserParticipant(m, "alice", T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
       MissionParticipant deleted = new MissionParticipant();
@@ -240,7 +225,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void payoutsOfSeveralDeletedAccounts_doNotThrow() {
-      // Two of them, because nullsLast must also compare null against null.
       Mission m = newMission(T0, T0_PLUS_60M);
       for (int i = 0; i < 2; i++) {
         MissionParticipant deleted = new MissionParticipant();
@@ -258,11 +242,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void participantWithNullStartTime_appearsInResultWithZeroPercent() {
-      // The implementation registers `participantNames` / `preferences` BEFORE the
-      // start-time check, so a participant who is on the roster but never logged
-      // a start time is still listed in the payout breakdown (with 0%). This is
-      // deliberate: silently dropping such a row would make the UI lose track of
-      // someone who showed up but forgot to clock in.
       Mission m = newMission(T0, T0_PLUS_60M);
       addUserParticipant(m, "alice", null, T0_PLUS_60M, PayoutPreference.DONATE);
       stubOperation(Set.of(m));
@@ -320,9 +299,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void participantStartBeforeMissionStart_isClampedToMissionStart() {
-      // mission: [T0, T0+60m]; participant: [T0-60m, T0+30m]
-      // → effective: [T0, T0+30m] = 50% of the 60-minute mission window
-      // (but participant is also the only one, so 100% of recorded total)
       Mission m = newMission(T0, T0_PLUS_60M);
       addUserParticipant(
           m, "alice", T0.minus(60, ChronoUnit.MINUTES), T0_PLUS_30M, PayoutPreference.PAYOUT);
@@ -356,9 +332,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void participantWithNullEndTime_clampedToInstantNow() {
-      // Participant joined before mission ended and never logged an end time.
-      // Mission ended in the past, so pEnd defaults to now() but is then
-      // clamped down to actualEnd, producing a real positive duration.
       Mission m = newMission(T0, T0_PLUS_60M);
       addUserParticipant(m, "alice", T0_PLUS_30M, null, PayoutPreference.PAYOUT);
       stubOperation(Set.of(m));
@@ -389,7 +362,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void unequalDurations_produceProportionalPercentages() {
-      // alice: 60 minutes, bob: 30 minutes -> 60/(60+30) = 66.67%, 33.33%
       Mission m = newMission(T0, T0_PLUS_60M);
       addUserParticipant(m, "alice", T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
       addUserParticipant(m, "bob", T0, T0_PLUS_30M, PayoutPreference.PAYOUT);
@@ -414,8 +386,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void donatePreferenceOnAnyMission_overridesPayoutFromOtherMissions() {
-      // Two missions, same user. In mission #1 user says PAYOUT, in #2 DONATE.
-      // The aggregate must record DONATE (any DONATE locks the row).
       Mission m1 = newMission(T0, T0_PLUS_60M);
       Mission m2 = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
@@ -434,7 +404,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void payoutPreference_doesNotOverrideEarlierDonate() {
-      // Reverse of the above: DONATE seen first, PAYOUT later -> still DONATE.
       Mission m1 = newMission(T0, T0_PLUS_60M);
       Mission m2 = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
@@ -477,7 +446,6 @@ class OperationPayoutServiceTest {
 
       List<OperationPayoutDto> result = operationPayoutService.getOperationPayouts(OPERATION_ID);
 
-      // case-INSENSITIVE: "Alice" sorts before "bob" even though uppercase < lowercase in ASCII
       assertEquals(
           List.of("Alice", "bob", "charlie"),
           result.stream().map(OperationPayoutDto::participantName).toList());
@@ -485,9 +453,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void participantWithEndAtSameInstantAsEffectiveStart_isSkipped() {
-      // Edge case: effective window collapses to zero length -> no contribution.
-      // Verify by giving alice a zero-length window and another user a real one;
-      // alice must NOT appear in the result, bob's percentage must be 100%.
       Mission m = newMission(T0, T0_PLUS_60M);
       addUserParticipant(m, "alice", T0_PLUS_30M, T0_PLUS_30M, PayoutPreference.PAYOUT);
       addUserParticipant(m, "bob", T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
@@ -495,9 +460,6 @@ class OperationPayoutServiceTest {
 
       List<OperationPayoutDto> result = operationPayoutService.getOperationPayouts(OPERATION_ID);
 
-      // alice contributes zero duration -> totalDuration becomes bob's only.
-      // She still appears with 0% because the participant-name map captured her.
-      // bob: 100%, alice: 0%.
       assertEquals(2, result.size());
       OperationPayoutDto alice =
           result.stream()
@@ -512,8 +474,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void allParticipantsHaveZeroValidDuration_dividesByZeroSafely() {
-      // No mission produces any valid duration -> totalOperationValidDuration == 0
-      // -> every participant must get 0.0 (NOT NaN from dividing by zero).
       Mission m = newMission(T0, T0_PLUS_60M);
       addUserParticipant(m, "alice", T0_PLUS_30M, T0_PLUS_30M, PayoutPreference.PAYOUT);
       stubOperation(Set.of(m));
@@ -529,8 +489,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void userDisplayName_isPreferredOverUsername() {
-      // User.getEffectiveName() returns displayName when present, else username.
-      // The payout must use the effective name.
       Mission m = newMission(T0, T0_PLUS_60M);
       User u = newUser("alice");
       u.setDisplayName("Alice Liddell");
@@ -541,8 +499,6 @@ class OperationPayoutServiceTest {
 
       assertEquals("Alice Liddell", result.get(0).participantName());
     }
-
-    // ----- helpers ----------------------------------------------------
 
     private void stubOperation(Set<Mission> missions) {
       Operation op = new Operation();
@@ -583,28 +539,17 @@ class OperationPayoutServiceTest {
       mission.getParticipants().add(p);
     }
 
-    // suppress unused warning for the duration helper (kept for readability)
     @SuppressWarnings("unused")
     private static long minutes(int n) {
       return Duration.ofMinutes(n).toMillis();
     }
   }
 
-  // --- getOperationPayouts: amount / paid-out fields ------------------------
-
   /**
-   * Coverage for the money-side of the payout breakdown. The reimbursement-first model says: each
-   * participant's out-of-pocket expenses (mission EXPENSE entries owned by them + refinery orders'
-   * costs they own) are paid back from gross income, and the remaining {@code totalSum} is split
-   * per participation percentage among PAYOUT participants. DONATE participants keep their
-   * reimbursement (it is their own money returned) but contribute their share. Finally an in-game
-   * banking fee is deducted from every participant's gross payout, and the resulting net is rounded
-   * HALF_UP to whole aUEC, so {@code payoutAmount = round(personalExpenses + shareAmount -
-   * transferFee)}. The fee rate comes from the runtime-editable {@code operation.transfer_fee_rate}
-   * system setting and falls back to 0.5% when the row is missing — tests that don't stub {@code
-   * systemSettingService.getSettingValue(...)} therefore exercise the 0.5% fallback path, which is
-   * what the existing assertions are calibrated to. The combined paid-out fields are covered
-   * together because they share the same setup.
+   * Tests the money side of the payout breakdown: {@code payoutAmount = round(personalExpenses +
+   * shareAmount - transferFee)}, rounded HALF_UP to whole aUEC.
+   *
+   * <p>Without a stubbed {@code operation.transfer_fee_rate} the 0.5% fallback fee applies.
    */
   @Nested
   class GetOperationPayoutsAmountTests {
@@ -623,10 +568,6 @@ class OperationPayoutServiceTest {
       addUserParticipantWithUser(m, bob, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
       stubOperation(Set.of(m));
 
-      // INCOME 1000 not attributed to any single participant (entry.participant references one
-      // for audit/UI purposes, but the income amount accrues to the operation pool, not the
-      // attributed participant). We model that here by giving the entry a participant but
-      // INCOME type — the cost-attribution loop skips non-EXPENSE entries.
       MissionFinanceEntry income =
           newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("1000.00"));
       stubFinances(List.of(income), List.of());
@@ -637,9 +578,7 @@ class OperationPayoutServiceTest {
       OperationPayoutDto bobRow = byName(result, "bob");
       assertEquals(new BigDecimal("0.00"), aliceRow.personalExpenses());
       assertEquals(new BigDecimal("500.00"), aliceRow.shareAmount());
-      // 0.5% of 500.00 in-game banking fee deducted from the gross payout.
       assertEquals(new BigDecimal("2.50"), aliceRow.transferFee());
-      // 497.50 rounded HALF_UP to whole aUEC -> 498.
       assertEquals(new BigDecimal("498"), aliceRow.payoutAmount());
       assertEquals(new BigDecimal("0.00"), bobRow.personalExpenses());
       assertEquals(new BigDecimal("500.00"), bobRow.shareAmount());
@@ -649,10 +588,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void missionExpenseAttributedToParticipant_reimbursedOffTheTop_thenRemainderSplit() {
-      // Gross income 1000, alice paid 300 in mission expenses, totalSum = 700.
-      // Reimburse alice 300 first; split 700 evenly: alice 350, bob 350.
-      // Gross payouts: alice 650, bob 350. After 0.5% banking fee: alice 646.75, bob 348.25.
-      // After HALF_UP whole-aUEC rounding: alice 647, bob 348.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -681,17 +616,11 @@ class OperationPayoutServiceTest {
       assertEquals(new BigDecimal("0.00"), bobRow.personalExpenses());
       assertEquals(new BigDecimal("350.00"), bobRow.shareAmount());
       assertEquals(new BigDecimal("1.75"), bobRow.transferFee(), "0.5% of 350.00 gross");
-      // 348.25 rounded HALF_UP to whole aUEC -> 348.
       assertEquals(new BigDecimal("348"), bobRow.payoutAmount());
     }
 
     @Test
     void refineryOrderCosts_attributedToOwner_asReimbursement() {
-      // alice runs a refinery order: sales=2000, expenses=500, other=200, profit=1300.
-      // totalSum = 1300. alice gets reimbursed 700, then 50% of 1300 = 650.
-      // bob gets 50% of 1300 = 650. Gross payouts: alice 1350, bob 650.
-      // After 0.5% banking fee: alice 1343.25 (fee 6.75), bob 646.75 (fee 3.25).
-      // After HALF_UP whole-aUEC rounding: alice 1343, bob 647.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -724,12 +653,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void donateParticipantKeepsReimbursementButGetsZeroShare() {
-      // alice DONATE 50%, bob PAYOUT 50%. INCOME 1000, alice paid 300 expense.
-      // totalSum = 700. alice: reimbursement 300, share 0 (donating). bob: share 350.
-      // alice's share of 350 is donated to the org and not paid out. The 0.5% banking fee
-      // still applies to alice's reimbursement transfer (it is an in-game aUEC payout too).
-      // Gross payouts: alice 300 -> fee 1.50 -> net 298.50; bob 350 -> fee 1.75 -> net 348.25.
-      // After HALF_UP whole-aUEC rounding: alice 299, bob 348.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -762,8 +685,6 @@ class OperationPayoutServiceTest {
       assertEquals(new BigDecimal("299"), aliceRow.payoutAmount());
       assertEquals(new BigDecimal("1.75"), bobRow.transferFee());
       assertEquals(new BigDecimal("348"), bobRow.payoutAmount());
-      // Regression guard for "donations are NOT redistributed to PAYOUT users": bob's share is his
-      // own 50% of the FULL 700 pool (350), not boosted to 100% just because alice donated.
       assertEquals(
           new BigDecimal("350.00"),
           bobRow.shareAmount(),
@@ -776,8 +697,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void guestParticipantExpenses_areReimbursedToGuestKey() {
-      // Guests can incur mission expenses too — verify the participant_key match works for
-      // "guest_<name>" rows.
       Mission m = newMission(T0, T0_PLUS_60M);
       MissionParticipant guest = new MissionParticipant();
       guest.setMission(m);
@@ -799,8 +718,6 @@ class OperationPayoutServiceTest {
       OperationPayoutDto row = result.get(0);
       assertTrue(row.participantId().startsWith("guest_"));
       assertEquals(new BigDecimal("250.00"), row.personalExpenses());
-      // sole participant, 100% share. totalSum = 500 - 250 = 250. Gross payout 500, fee 2.50,
-      // net 497.50 -> HALF_UP whole aUEC -> 498.
       assertEquals(new BigDecimal("250.00"), row.shareAmount());
       assertEquals(new BigDecimal("2.50"), row.transferFee());
       assertEquals(new BigDecimal("498"), row.payoutAmount());
@@ -808,8 +725,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void refineryOrderWithNullCosts_isTreatedAsZeroExpense() {
-      // Legacy refinery orders may have null expenses / otherExpenses (V70 migration). They
-      // contribute null * 0 = 0 to the participant's reimbursement.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
@@ -830,15 +745,11 @@ class OperationPayoutServiceTest {
       assertEquals(new BigDecimal("0.00"), aliceRow.personalExpenses());
       assertEquals(new BigDecimal("1000.00"), aliceRow.shareAmount());
       assertEquals(new BigDecimal("5.00"), aliceRow.transferFee());
-      // 995.00 already a whole-aUEC value; setScale(0, HALF_UP) collapses to "995".
       assertEquals(new BigDecimal("995"), aliceRow.payoutAmount());
     }
 
     @Test
     void transferFee_isZero_whenGrossPayoutIsZero() {
-      // DONATE participant with no personal expenses receives nothing in-game (their share
-      // goes to the org), so the 0.5% banking fee on a zero transfer is also zero. Verifies
-      // that the fee row stays a tidy 0.00 instead of producing a phantom rounding artifact.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -864,9 +775,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_roundsHalfUp_onUnevenGross() {
-      // Verify HALF_UP rounding semantics. Single participant, gross = 333.33 (totalSum 333.33),
-      // 0.5% = 1.66665 -> 1.67 (HALF_UP). Net before final rounding = 331.66; rounded HALF_UP
-      // to whole aUEC -> 332.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       MissionParticipant aliceP =
@@ -887,9 +795,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_usesRateFromSystemSetting_whenPresent() {
-      // Admin raises the rate to 1% via /admin/settings. Single participant, gross 1000.
-      // Expected fee 10.00, net 990.00 — proves the resolver actually consults the setting
-      // rather than always returning the hardcoded fallback.
       when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("0.01"));
       Mission m = newMission(T0, T0_PLUS_60M);
@@ -910,8 +815,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_fallsBackToDefault_whenSettingIsBlank() {
-      // Operator accidentally cleared the value via the admin form. Resolver must degrade to
-      // 0.5% (not 0%, which would silently overpay every participant).
       when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("   "));
       Mission m = newMission(T0, T0_PLUS_60M);
@@ -932,8 +835,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_fallsBackToDefault_whenSettingIsUnparseable() {
-      // Someone hand-edited the DB to "five percent". Don't crash the payout view; fall back to
-      // 0.5% and emit a warn log (verified visually, not asserted here).
       when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("five percent"));
       Mission m = newMission(T0, T0_PLUS_60M);
@@ -954,9 +855,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_fallsBackToDefault_whenSettingIsOutOfRange() {
-      // Rate of 1 or above would zero out (or invert) every payout. Defensive fallback to 0.5%
-      // protects against fat-finger entries like "1" (meant as 1%, but stored as 100%) and
-      // negative values.
       when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("1.5"));
       Mission m = newMission(T0, T0_PLUS_60M);
@@ -977,8 +875,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_acceptsZeroRate_disablingTheFee() {
-      // Setting rate to "0" is a legitimate admin choice (e.g. testing without the fee on a
-      // staging stack). Must NOT trigger the >= 1 fallback because zero is on the valid edge.
       when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("0"));
       Mission m = newMission(T0, T0_PLUS_60M);
@@ -1002,7 +898,6 @@ class OperationPayoutServiceTest {
       Mission m = newMission(T0, T0_PLUS_60M);
       addUserParticipant(m, "alice", T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
       stubOperation(Set.of(m));
-      // payoutStatusRepository default-returns empty list -> no rows.
 
       OperationPayoutDto row = operationPayoutService.getOperationPayouts(OPERATION_ID).get(0);
 
@@ -1038,10 +933,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void summary_totalDonations_aggregatesEveryDonorsForgoneShare() {
-      // alice + carol DONATE, bob PAYOUT — all three present for the full window, so each is
-      // 33.33%.
-      // INCOME 900, no expenses → totalSum 900; each full share = 900 × 33.33% = 299.97 (2dp).
-      // totalDonations = alice 299.97 + carol 299.97 = 599.94 (the sum of the per-row donations).
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -1053,8 +944,6 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("900.00"))), List.of());
-      // A scope-visible reader sees the whole breakdown; the escape-only reduction is asserted in
-      // its own test below.
       when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
 
       OperationPayoutSummaryDto summary =
@@ -1090,13 +979,8 @@ class OperationPayoutServiceTest {
     }
 
     /**
-     * Audit MEDIUM-1: a caller who reached the operation only through the participant escape gets
-     * their own row and nothing else.
-     *
-     * <p>The escape is self-issuable - {@code POST /api/v1/missions/&#123;id&#125;/join} is open
-     * for every non-internal mission of every org unit - so honouring it with the full breakdown
-     * meant one request bought a foreign unit's entire payout table, callsigns and amounts
-     * included.
+     * A caller who reached the operation only through the participant escape sees only their own
+     * row.
      */
     @Test
     void summary_escapeOnlyCaller_seesOnlyTheirOwnRow() {
@@ -1119,8 +1003,6 @@ class OperationPayoutServiceTest {
       assertEquals(bob.getId().toString(), summary.payouts().get(0).participantId());
     }
 
-    // ----- helpers ---------------------------------------------------
-
     private void stubOperation(Set<Mission> missions) {
       Operation op = new Operation();
       op.setId(OPERATION_ID);
@@ -1130,9 +1012,6 @@ class OperationPayoutServiceTest {
     }
 
     private void stubFinances(List<MissionFinanceEntry> entries, List<RefineryOrder> orders) {
-      // Use lenient: not every test in this class verifies finance lookups, and Mockito's strict
-      // mode complains otherwise. The method is only called when the operation has missions, so
-      // these stubs match the actual lookups in the happy paths.
       when(financeEntryRepository.findAllByMissionIdIn(any())).thenReturn(entries);
       when(refineryOrderRepository.findByMissionIdIn(any())).thenReturn(orders);
     }
@@ -1188,8 +1067,6 @@ class OperationPayoutServiceTest {
     }
   }
 
-  // --- setPayoutStatus ------------------------------------------------------
-
   /**
    * Tests for the mission-manager paid-out toggle. The contract: materialize a fresh status row
    * when none exists, update in place otherwise, always refresh audit fields when paid_out=true,
@@ -1204,9 +1081,6 @@ class OperationPayoutServiceTest {
 
     @BeforeEach
     void delegateSelfToRealService() {
-      // setPayoutStatus now runs each attempt through self.getObject() so the retry gets a fresh
-      // REQUIRES_NEW transaction (#1111). In-process there is no proxy, so point self at the
-      // service under test — the orchestrator then invokes the real within-transaction body.
       when(self.getObject()).thenReturn(operationPayoutService);
     }
 
@@ -1228,8 +1102,6 @@ class OperationPayoutServiceTest {
       when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, key))
           .thenReturn(Optional.empty());
 
-      // The toggle validates the key against — and attaches the new status row to — the operation
-      // loaded via findWithMissionsAndParticipantsById (no separate getReferenceById, #1121).
       Operation op = stubOperationWithParticipant(alice);
 
       User actor = newUser("officer");
@@ -1317,8 +1189,6 @@ class OperationPayoutServiceTest {
     void throwsNotFound_whenParticipantKeyIsUnknownInTheOperation() {
       String unknownKey = "guest_someone-who-was-never-in-this-op";
 
-      // The participant set does NOT include this key; the toggle rejects it before it ever
-      // looks up or creates a status row (#1121).
       stubOperationWithParticipant(newUser("alice"));
 
       assertThrows(
@@ -1328,11 +1198,6 @@ class OperationPayoutServiceTest {
 
     @Test
     void recordsPayoutToggledAuditEvent_withPaidOutDetail_andNoParticipantName() {
-      // Operationen is an audited area (REQ-AUDIT-001): every payout toggle must emit an
-      // OPERATION_PAYOUT_TOGGLED event whose details carry exactly paidOut=<bool> — never the
-      // participant's name / any PII. Regression guard: if the auditService.record(...) call is
-      // dropped, its event type changed, or its payload starts leaking a name, the toggle silently
-      // stops appearing in the audit log (or leaks PII) with zero other test failure.
       User alice = newUser("alice");
       String key = alice.getId().toString();
 
@@ -1395,11 +1260,9 @@ class OperationPayoutServiceTest {
   }
 
   /**
-   * Tests the concurrency contract of the payout toggle (#1111): two leads ticking the same
-   * participant race on the unique constraint / {@code @Version}, and the loser must retry in a
-   * fresh transaction rather than 409 — so last-writer-wins actually holds. Drives the orchestrator
-   * ({@link OperationPayoutService#setPayoutStatus}) with a spied within-transaction body to
-   * simulate the race deterministically.
+   * Tests that the loser of a concurrent payout toggle in {@link
+   * OperationPayoutService#setPayoutStatus} retries in a fresh transaction, simulated with a spied
+   * transaction body.
    */
   @Nested
   class SetPayoutStatusConcurrencyTests {
@@ -1412,7 +1275,6 @@ class OperationPayoutServiceTest {
       OperationPayoutService spied = spy(operationPayoutService);
       when(self.getObject()).thenReturn(spied);
       OperationPayoutStatusDto expected = sampleStatusDto();
-      // First attempt loses the INSERT race (unique constraint), retry finds the row and wins.
       doThrow(
               new DataIntegrityViolationException(
                   "uk_operation_payout_status_operation_participant"))
@@ -1432,7 +1294,6 @@ class OperationPayoutServiceTest {
       OperationPayoutService spied = spy(operationPayoutService);
       when(self.getObject()).thenReturn(spied);
       OperationPayoutStatusDto expected = sampleStatusDto();
-      // First attempt loses the @Version race on the existing row, retry reloads and wins.
       doThrow(new ObjectOptimisticLockingFailureException(OperationPayoutStatus.class, null))
           .doReturn(expected)
           .when(spied)
@@ -1449,8 +1310,6 @@ class OperationPayoutServiceTest {
     void propagatesConflict_whenEveryAttemptLosesTheRace() {
       OperationPayoutService spied = spy(operationPayoutService);
       when(self.getObject()).thenReturn(spied);
-      // A pathological, never-winning race: the bounded retry gives up and surfaces the 409 so the
-      // proxy maps it to a conflict, never a 500.
       doThrow(new ObjectOptimisticLockingFailureException(OperationPayoutStatus.class, null))
           .when(spied)
           .setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
@@ -1458,7 +1317,6 @@ class OperationPayoutServiceTest {
       assertThrows(
           ObjectOptimisticLockingFailureException.class,
           () -> operationPayoutService.setPayoutStatus(OPERATION_ID, KEY, true));
-      // Exactly MAX_PAYOUT_TOGGLE_ATTEMPTS attempts (two swallowed + one propagating).
       verify(spied, times(3)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
     }
 
@@ -1467,11 +1325,6 @@ class OperationPayoutServiceTest {
       OperationPayoutService spied = spy(operationPayoutService);
       when(self.getObject()).thenReturn(spied);
       OperationPayoutStatusDto expected = sampleStatusDto();
-      // The first MAX_PAYOUT_TOGGLE_ATTEMPTS-1 attempts (both inside the retry loop) lose the race;
-      // only the final, out-of-loop attempt wins. This pins the success path of the unguarded final
-      // return: a loser that only wins on its very last retry must return the committed row, not
-      // null. The exhaustion test (all attempts throw) and the single-retry test (wins on
-      // attempt 2, in-loop) both leave this exact boundary uncovered.
       doThrow(new ObjectOptimisticLockingFailureException(OperationPayoutStatus.class, null))
           .doThrow(
               new DataIntegrityViolationException(
@@ -1492,13 +1345,6 @@ class OperationPayoutServiceTest {
     void deterministicNotFound_isAttemptedExactlyOnce_neverRetried() {
       OperationPayoutService spied = spy(operationPayoutService);
       when(self.getObject()).thenReturn(spied);
-      // A missing operation makes the within-transaction body throw NotFoundException, which is NOT
-      // in the retry catch clause (DataIntegrityViolationException | ObjectOptimisticLocking...).
-      // It must propagate on the FIRST attempt, never fed through the retry loop. Regression: if
-      // the catch were ever broadened (e.g. to RuntimeException), this deterministic failure would
-      // be re-attempted MAX_PAYOUT_TOGGLE_ATTEMPTS times — needlessly reloading the operation and
-      // re-running validation — yet assertThrows would still pass because the correct type
-      // surfaces on the last attempt, so the regression is invisible without this call-count pin.
       when(operationRepository.findWithMissionsAndParticipantsById(OPERATION_ID))
           .thenReturn(Optional.empty());
 

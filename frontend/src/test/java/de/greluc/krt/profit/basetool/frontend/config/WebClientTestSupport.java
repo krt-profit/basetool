@@ -35,13 +35,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 
 /**
- * The pieces every {@code WebClientConfig} test needs, in one place.
- *
- * <p>Three of them had grown their own copy of the same Reactor Netty HTTP/2 probe server and the
- * same {@code applicationProtocol(Channel)} walk, and two had grown their own copy of the
- * collaborator doubles {@code WebClientConfig}'s nine-argument constructor needs. That last one is
- * the expensive duplication: adding a collaborator meant hand-editing every copy, and a test that
- * fails to compile is a test nobody runs.
+ * Shared helpers for {@code WebClientConfig} tests: the configuration with its collaborator doubles
+ * and the ALPN protocol reader.
  */
 final class WebClientTestSupport {
 
@@ -49,11 +44,8 @@ final class WebClientTestSupport {
   private WebClientTestSupport() {}
 
   /**
-   * Builds the real {@link WebClientConfig} with light doubles for its collaborators.
-   *
-   * <p>The {@code test} profile is pinned so {@code connector(...)} takes the {@code
-   * InsecureTrustManagerFactory} path and never reads an SSL bundle — which is what lets these
-   * tests handshake against a local server with the committed test material and no setup.
+   * Builds the real {@link WebClientConfig} with light doubles for its collaborators, under the
+   * {@code test} profile so the connector trusts any certificate.
    *
    * @param protocol the wire protocol under test
    * @param codec the encoding under test
@@ -96,11 +88,8 @@ final class WebClientTestSupport {
   }
 
   /**
-   * Reads the negotiated ALPN protocol off whichever channel in the chain carries the TLS handler.
-   *
-   * <p>Under HTTP/2 a request is handled on a stream channel and the {@code SslHandler} lives on
-   * its parent; under HTTP/1.1 both are the same channel. Walking up rather than branching on the
-   * protocol keeps the reader out of the answer.
+   * Reads the negotiated ALPN protocol from whichever channel in the parent chain carries the TLS
+   * handler.
    *
    * @param channel the channel the request arrived on
    * @return the ALPN protocol, or {@code "none"} when the engine reports none

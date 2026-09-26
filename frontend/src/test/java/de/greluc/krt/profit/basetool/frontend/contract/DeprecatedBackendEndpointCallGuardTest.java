@@ -38,26 +38,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Fails the build when the web frontend calls a backend operation the backend has deprecated.
+ * Fails the build when the web frontend calls a backend operation marked {@code deprecated} in the
+ * committed {@code openapi.json}.
  *
- * <p><b>Why this exists.</b> The 17 legacy mission endpoints carried {@code @ApiDeprecation} with a
- * sunset of 2026-10-20 for months, and the frontend kept calling twelve of them — two of them live
- * JavaScript paths (the payout preference and the owner change) — while every check stayed green:
- * the {@code Deprecation} / {@code Sunset} headers are only ever read by a human, and nothing read
- * them. A deprecation nobody's build notices is a date on which something breaks (BE-SIMP-02).
- *
- * <p><b>How it decides.</b> The deprecated operations are read from the committed API document
- * ({@code backend/src/main/resources/api/openapi.json}, {@code deprecated: true} — which {@code
- * OpenApiDeprecationConfig} sets from {@code @ApiDeprecation}), so a new deprecation is guarded the
- * moment the document is regenerated, with no list to maintain here. Every {@code
- * backendApiClient.<verb>(…)} call in the frontend's main sources is parsed down to its path
- * template — string literals kept, every concatenated expression turned into a {@code {}} slot, the
- * query string dropped — and matched, verb included, against the deprecated templates.
- *
- * <p><b>What it cannot see.</b> A path built somewhere else and handed to the client as a variable
- * ({@code backendApiClient.get(url, …)}) has no literal to read and is skipped. That is why the
- * scan asserts a floor on the calls it did resolve: a parser that silently stopped recognising
- * calls would otherwise pass for the wrong reason.
+ * <p>Each {@code backendApiClient.<verb>(…)} call is reduced to a path template and matched, verb
+ * included, against the deprecated operations. Calls whose path is a variable are skipped, so a
+ * floor on resolved calls is asserted.
  */
 class DeprecatedBackendEndpointCallGuardTest {
 
@@ -101,8 +87,6 @@ class DeprecatedBackendEndpointCallGuardTest {
 
   @Test
   void theParserRecognisesAConcatenatedPathAndMatchesItAgainstATemplate() {
-    // The guard on the guard: a call written the way the controllers write them must come out as
-    // the template the document spells, or the test above compares strings that can never match.
     String source =
         """
         backendApiClient.put(
@@ -182,13 +166,12 @@ class DeprecatedBackendEndpointCallGuardTest {
   }
 
   /**
-   * Reads a call's first argument up to its top-level comma or closing parenthesis and renders it
-   * as a template: string literals verbatim, each other {@code +} operand as {@code {}}, anything
-   * after a {@code ?} dropped.
+   * Renders a call's first argument as a template: string literals verbatim, each other {@code +}
+   * operand as {@code {}}, anything after a {@code ?} dropped.
    *
    * @param source the Java source
    * @param start the index just after the call's opening parenthesis
-   * @return the template, or {@code null} when the argument contains no string literal at all
+   * @return the template, or {@code null} when the argument contains no string literal
    */
   private static String firstArgumentTemplate(String source, int start) {
     StringBuilder template = new StringBuilder();

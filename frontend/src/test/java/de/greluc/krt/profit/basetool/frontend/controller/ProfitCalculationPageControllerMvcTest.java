@@ -64,7 +64,6 @@ class ProfitCalculationPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void showProfitCalculationPage_ShouldSetDefaultShipId_WhenC2IsPresent() throws Exception {
-    // Given
     UUID c2Id = UUID.randomUUID();
     ShipTypeDto c2 = new ShipTypeDto(c2Id, "C2 Hercules Starlifter", null, "C2", 696, false);
     PageResponse<ShipTypeDto> shipTypes = new PageResponse<>(List.of(c2), 0, 10, 1, 1, List.of());
@@ -77,7 +76,6 @@ class ProfitCalculationPageControllerMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenReturn(terminals);
 
-    // When & Then
     mockMvc
         .perform(get("/materials/profit-calculation"))
         .andExpect(status().isOk())
@@ -90,7 +88,6 @@ class ProfitCalculationPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void showProfitCalculationPage_ShouldNotSetDefaultShipId_WhenC2IsMissing() throws Exception {
-    // Given
     ShipTypeDto titan =
         new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", null, "Titan", 8, false);
     PageResponse<ShipTypeDto> shipTypes =
@@ -104,7 +101,6 @@ class ProfitCalculationPageControllerMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenReturn(terminals);
 
-    // When & Then
     mockMvc
         .perform(get("/materials/profit-calculation"))
         .andExpect(status().isOk())
@@ -115,7 +111,6 @@ class ProfitCalculationPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void showProfitCalculationPage_ShouldFilterShipsWithZeroScu() throws Exception {
-    // Given
     UUID titanId = UUID.randomUUID();
     ShipTypeDto gladius =
         new ShipTypeDto(UUID.randomUUID(), "Aegis Gladius", null, "Gladius", 0, false);
@@ -133,7 +128,6 @@ class ProfitCalculationPageControllerMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenReturn(terminals);
 
-    // When & Then
     mockMvc
         .perform(get("/materials/profit-calculation"))
         .andExpect(status().isOk())

@@ -57,15 +57,12 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Admin page for curating the auto-granted default-blueprint set (REQ-INV-017). Renders the current
- * set, proxies the blueprint product type-ahead, and relays add / remove to the backend admin API
- * via {@link BackendApiClient}. ADMIN-gated at the class level; the grant-to-everyone side effect
- * of an add lives in the backend service.
+ * Admin page for curating the auto-granted default-blueprint set (REQ-INV-017): renders the set,
+ * proxies the product type-ahead and relays add and remove to the backend via {@link
+ * BackendApiClient}.
  *
- * <p>Both mutations are in-place (REQ-FE-001): {@code admin-default-blueprints.js} sends them
- * through {@code krtFetch} to the {@code X-Requested-With}-routed JSON twins and then re-renders
- * the list from the {@code fragment=rows} read, so no success path reloads the page. The classic
- * POST → redirect handlers stay as the fallback for a browser where {@code krtFetch} did not load.
+ * <p>Mutations run in place through JSON twins (REQ-FE-001); the POST-redirect handlers are the
+ * no-JS fallback.
  */
 @Controller
 @UsesLayoutModel
@@ -113,12 +110,9 @@ public class AdminDefaultBlueprintsPageController {
   }
 
   /**
-   * Re-renders only the list of current defaults, for the in-place refresh after an add or a remove
-   * (REQ-FE-001).
-   *
-   * <p><b>A failure is re-thrown, not swallowed</b>, unlike {@link #view}. Collapsing it to an
-   * empty list would paint "Keine Standard-Blueprints." over a set that still exists; a non-2xx
-   * lets {@code krtFetch.swap} leave the list already on screen and toast instead.
+   * Renders only the list of current defaults for the in-place refresh (REQ-FE-001). Unlike {@link
+   * #view}, a backend failure is re-thrown so the client keeps the list on screen and shows a
+   * toast.
    *
    * @param model Thymeleaf model populated with the current default set
    * @return the {@code rows} fragment of {@code admin/default-blueprints}
@@ -133,12 +127,10 @@ public class AdminDefaultBlueprintsPageController {
   }
 
   /**
-   * Type-ahead proxy backing the add bar. Relays the query to the backend blueprint product search
-   * (the same endpoint the personal-blueprint add uses); failures collapse to an empty list so the
-   * type-ahead never shows a stack trace.
+   * Type-ahead proxy for the add bar, relaying to the backend blueprint product search.
    *
    * @param q optional case-insensitive product-name substring
-   * @param limit optional result cap; defaults to 25 and is clamped to {@code [1, 200]}
+   * @param limit optional result cap; defaults to 25, clamped to {@code [1, 200]}
    * @return the matching products, or an empty list on any backend failure
    */
   @GetMapping("/search")
@@ -148,20 +140,11 @@ public class AdminDefaultBlueprintsPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
-      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
-      // exactly once across the frontend->backend hop; URLEncoder form-encoding (space -> '+')
-      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches.
       String uri = "/api/v1/blueprints/products/search?q={q}&limit=" + effectiveLimit;
       List<BlueprintProductDto> result =
           backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
-      // DEBUG, not WARN: this endpoint fires ONE REQUEST PER KEYSTROKE. With the backend down, a
-      // single admin typing a product name produces one line per character — a log-flood vector
-      // triggered accidentally by ordinary use, which REQ-OBS-001 puts at DEBUG. The outage itself
-      // is already carried by basetool_backend_client_errors_total and by the WebClient/resilience
-      // logging, so nothing is lost. The query is user-typed free text and goes through LogSafe so
-      // it cannot inject a forged log line (CWE-117).
       log.debug(
           "Default-blueprint product type-ahead failed for query='{}': {}",
           LogSafe.text(q, MAX_LOGGED_QUERY),
@@ -171,8 +154,8 @@ public class AdminDefaultBlueprintsPageController {
   }
 
   /**
-   * No-JS fallback of {@link #addAjax}: adds the staged products to the default set and reports the
-   * outcome as a flash toast after a redirect back to the page.
+   * No-JS fallback of {@link #addAjax}: adds the staged products and redirects back with a flash
+   * toast.
    *
    * @param productKeys the normalized product keys staged by the admin
    * @param redirectAttributes flash attributes carrier
@@ -196,15 +179,11 @@ public class AdminDefaultBlueprintsPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #add}, routed here ahead of it by the {@code X-Requested-With}
-   * header. Adds the staged products and answers with the per-key outcome rather than a redirect,
-   * so the page toasts, keeps only the failed keys staged, and re-renders the list in place.
-   *
-   * <p>Always {@code 200}: one key failing does not undo the keys before it, which the backend has
-   * already granted to every member, so the outcome is a mixed result rather than an error.
+   * In-place twin of {@link #add}: adds the staged products and returns the per-key outcome. Always
+   * {@code 200}, since earlier successful keys are not undone by a later failure.
    *
    * @param request the staged product keys; a {@code null} body or list adds nothing
-   * @return {@code 200} with the added / skipped counts and the keys that failed
+   * @return {@code 200} with the added and skipped counts and the failed keys
    */
   @ResponseBody
   @PostMapping(value = "/add", headers = "X-Requested-With=XMLHttpRequest")
@@ -215,7 +194,7 @@ public class AdminDefaultBlueprintsPageController {
 
   /**
    * No-JS fallback of {@link #removeAjax}: removes a product from the default set and redirects
-   * back with a flash toast. Users keep blueprints already granted to them.
+   * back with a flash toast. Already-granted blueprints stay with their users.
    *
    * @param id default-blueprint entry id
    * @param redirectAttributes flash attributes carrier
@@ -236,13 +215,10 @@ public class AdminDefaultBlueprintsPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #remove}, routed here ahead of it by the {@code
-   * X-Requested-With} header. On success the page re-renders the list in place; a backend failure
-   * (a {@code 404} for an entry another admin already removed, for instance) is relayed as {@code
-   * application/problem+json} so {@code krtFetch} toasts it. Users keep blueprints already granted
-   * to them.
+   * In-place twin of {@link #remove}; a backend failure is relayed as {@code
+   * application/problem+json}. Already-granted blueprints stay with their users.
    *
-   * @param id default-blueprint entry id; a malformed one is a {@code 400} before any backend call
+   * @param id default-blueprint entry id; a malformed one yields {@code 400}
    * @return {@code 200} on success, the relayed backend status on failure, {@code 500} on an
    *     unexpected error
    */
@@ -259,10 +235,9 @@ public class AdminDefaultBlueprintsPageController {
   }
 
   /**
-   * Relays one backend add per staged key, shared by both add handlers. Blank keys are dropped
-   * before any call; a key that is already a default (the backend's {@code 409}) counts as skipped
-   * rather than failed; any other failure is recorded against its key and the loop carries on, so
-   * one bad key never blocks the rest.
+   * Adds each staged key via the backend, shared by both add handlers. Blank keys are dropped, a
+   * backend {@code 409} counts as skipped, and other failures are recorded per key without stopping
+   * the loop.
    *
    * @param productKeys the staged keys, possibly {@code null}
    * @return the per-key outcome

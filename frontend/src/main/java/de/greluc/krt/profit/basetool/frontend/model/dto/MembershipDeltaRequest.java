@@ -24,14 +24,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta wire
- * shape. Lives in {@code PATCH /api/v1/users/{id}/memberships}. Two-part payload: the {@link
- * #staffeln} list (the caller's desired complete Staffel membership set, REQ-ORG-017 allows up to
- * two) plus a list of {@link SpecialCommandChange} records.
- *
- * <p>Wire contract is identical to the backend record field-for-field — per the {@code
- * feedback_backend_frontend_dto_mirror} rule. Any change here MUST land on the backend record in
- * the same commit (or vice versa).
+ * Frontend mirror of the backend membership-delta payload for {@code PATCH
+ * /api/v1/users/{id}/memberships}: the desired Staffel set plus a list of SK changes.
  *
  * @param staffeln desired complete Staffel membership set (0–2 entries), or {@code null} to leave
  *     the Staffel side untouched. A non-null list is reconciled by the backend against the current

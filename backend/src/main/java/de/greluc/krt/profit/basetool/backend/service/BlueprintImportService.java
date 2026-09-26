@@ -55,32 +55,16 @@ import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * SCMDB blueprint import engine (#327, Phase 4). Two steps:
+ * Imports a user's blueprints from an uploaded export (REQ-INV-014) in two steps.
  *
  * <ol>
- *   <li>{@link #previewImport(String, MultipartFile)} parses an uploaded blueprint export — the
- *       SCMDB log-watcher, the <a
- *       href="https://github.com/krt-profit/basetool-bp-extractor">Basetool Blueprint
- *       Extractor</a>, or the <a href="https://scmdb.net">scmdb.net</a> profile / tracking export
- *       (REQ-INV-014), all of which carry a {@code blueprints} array — de-duplicates by product
- *       name, and resolves each entry against the master product list through a fixed chain: first
- *       the scmdb.net structural {@code tag} match (REQ-INV-019), then normalized exact name match,
- *       then a curated {@code blueprint_external_alias} lookup, then dependency-free fuzzy
- *       suggestions — flagging names the caller already owns. Nothing is persisted.
- *   <li>{@link #applyImport(String, List)} takes the user's per-name resolutions, creates the
- *       missing {@code personal_blueprint} rows, and — for every manual pick (where the name did
- *       not already match by normalization) — learns a {@code blueprint_external_alias} so the next
- *       import auto-resolves it. Re-importing an already-owned blueprint never inserts a duplicate
- *       (also guarded by the {@code (owner_user_id, product_key)} unique constraint); it only pulls
- *       the stored acquisition time earlier when the import carries an earlier timestamp.
+ *   <li>{@link #previewImport(String, MultipartFile)} resolves each entry by structural tag, exact
+ *       name, alias, then fuzzy suggestion, without persisting anything.
+ *   <li>{@link #applyImport(String, List)} creates the chosen owned-blueprint rows and learns an
+ *       alias for every manual pick.
  * </ol>
  *
- * <p>The engine is {@code ownerUserId}-parameterised and never reads the security context, so the
- * Phase 7 admin surface can drive an import on behalf of a target user.
- *
- * <p>Apply is bulk-safe per the CLAUDE.md detach-clear rule: it issues no {@code @Modifying
- * clearAutomatically} query, so saving one new row never detaches the siblings created earlier in
- * the same transaction — there is no second {@code @Version} bump and thus no spurious 409.
+ * <p>Works on an explicit owner id and never reads the security context.
  */
 @Service
 @RequiredArgsConstructor
@@ -100,13 +84,10 @@ public class BlueprintImportService {
   private final GameItemRepository gameItemRepository;
 
   /**
-   * Parses an uploaded blueprint export (SCMDB log-watcher, Basetool Blueprint Extractor, or
-   * scmdb.net profile / tracking export) and previews how each unique blueprint resolves against
-   * the master product list for {@code ownerUserId} — scmdb.net entries first try their structural
-   * {@code tag}, then every entry falls through the name chain. No rows are persisted.
+   * Parses an uploaded export and previews how each unique blueprint resolves for {@code
+   * ownerUserId}. Nothing is persisted.
    *
-   * @param ownerUserId {@code app_user.id} the import is being previewed for (owned-flag
-   *     computation)
+   * @param ownerUserId the {@code app_user.id} the preview is for
    * @param file the uploaded blueprint export JSON
    * @return the preview with per-name rows and per-status counts
    * @throws BadRequestException if the file is empty, not valid JSON, or carries no blueprint array
@@ -119,15 +100,11 @@ public class BlueprintImportService {
 
     Map<String, ResolvedProduct> productByKey = productIndex();
     List<ResolvedProduct> allProducts = new ArrayList<>(productByKey.values());
-    // The structural tag index is only consulted for entries carrying a tag (scmdb.net). Build it
-    // lazily so the watcher / extractor / bare-array imports — which never carry a tag — pay no
-    // extra active-blueprint scan, exactly as before this source was added.
     Map<String, String> tagIndex =
         parsed.stream().anyMatch(e -> e.tag() != null)
             ? blueprintProductService.scwikiKeyToProductKeyIndex()
             : Map.of();
 
-    // First pass: resolve each name (without the owned check) and collect resolved keys.
     List<Resolution> resolutions = new ArrayList<>(parsed.size());
     Set<String> resolvedKeys = new HashSet<>();
     for (BlueprintExportParser.ParsedEntry entry : parsed) {
@@ -138,7 +115,6 @@ public class BlueprintImportService {
       }
     }
 
-    // Second pass: a single bulk lookup decides which resolved products are already owned.
     Set<String> ownedKeys = ownedKeys(ownerUserId, resolvedKeys);
 
     List<BlueprintImportEntryDto> entries = new ArrayList<>(resolutions.size());
@@ -159,9 +135,7 @@ public class BlueprintImportService {
         case SUGGESTED -> suggested++;
         case UNMATCHED -> unmatched++;
         case ALREADY_OWNED -> alreadyOwned++;
-        default -> {
-          /* exhaustive */
-        }
+        default -> {}
       }
       entries.add(
           new BlueprintImportEntryDto(
@@ -189,20 +163,14 @@ public class BlueprintImportService {
   }
 
   /**
-   * Applies the user's per-name resolutions: creates the missing owned-blueprint rows and learns an
-   * alias for every manual pick. Blank choices and product keys that no longer resolve are skipped.
-   * Repeated names / products within one request are de-duplicated, so re-submitting a preview is
-   * idempotent.
+   * Applies the per-name resolutions: creates missing owned-blueprint rows and learns an alias for
+   * every manual pick. Idempotent for a resubmitted preview.
    *
-   * <p>An already-owned blueprint is never duplicated (also guarded by the {@code (owner_user_id,
-   * product_key)} unique constraint); re-importing it only pulls the stored acquisition time
-   * earlier when the current import carries an earlier timestamp (a missing or later timestamp
-   * leaves it untouched). That earlier value is written by mutating the managed entity and relying
-   * on dirty-checking — no {@code save()} / {@code flush()} — per the CLAUDE.md concurrency rules.
+   * <p>An owned blueprint is never duplicated; its acquisition time is only moved earlier.
    *
-   * @param ownerUserId {@code app_user.id} the rows are created for
+   * @param ownerUserId the {@code app_user.id} the rows are created for
    * @param resolutions the per-name decisions (see {@link BlueprintImportApplyRequest})
-   * @return a summary of added / learned / skipped / already-owned counts
+   * @return the added, learned, skipped and already-owned counts
    */
   @Transactional
   @NotNull
@@ -239,11 +207,6 @@ public class BlueprintImportService {
 
       PersonalBlueprint existing = ownedByKey.get(product.productKey());
       if (existing != null) {
-        // Re-import of an already-owned blueprint: never insert a duplicate (also guarded by the
-        // (owner_user_id, product_key) unique constraint); only pull the acquisition time earlier
-        // when
-        // this import carries an earlier timestamp. Mutating the managed entity relies on
-        // dirty-checking — no save()/flush() — per the CLAUDE.md concurrency rules.
         if (isEarlierAcquiredAt(resolution.acquiredAt(), existing.getAcquiredAt())) {
           existing.setAcquiredAt(resolution.acquiredAt());
           acquiredAtUpdated++;
@@ -272,21 +235,13 @@ public class BlueprintImportService {
   }
 
   /**
-   * Persists a {@code blueprint_external_alias} for a manual resolution — one where the external
-   * name does not already normalize to the chosen product key — unless an alias for that name
-   * (case-insensitively) already exists or was just created in this request.
+   * Persists an alias for a manual resolution unless one already exists for that name,
+   * case-insensitively (REQ-INV-020).
    *
-   * <p>The duplicate guard folds case on both sides — the in-request seen-set keys on the
-   * lower-cased name and the DB check uses {@code findBySourceSystemAndExternalNameIgnoreCase} —
-   * matching the case-insensitive resolution lookup and the {@code (source_system,
-   * LOWER(external_name))} unique index (REQ-INV-020). This stops two case-only variants (which the
-   * tag match REQ-INV-019 can route here for differently-cased display names) from inserting two
-   * rows that the {@code Optional}-returning resolution lookup would then choke on.
-   *
-   * @param ownerUserId {@code app_user.id} stamped as the alias creator
-   * @param externalName the SCMDB / scmdb.net name being resolved (exact, trimmed)
+   * @param ownerUserId the {@code app_user.id} stamped as creator
+   * @param externalName the external name being resolved (trimmed)
    * @param product the chosen product
-   * @param aliasNamesSeen lower-cased external names already aliased in this request (mutated)
+   * @param aliasNamesSeen lower-cased names already aliased in this request (mutated)
    * @return {@code true} if a new alias row was persisted
    */
   private boolean learnAliasIfManual(
@@ -322,23 +277,14 @@ public class BlueprintImportService {
   }
 
   /**
-   * Resolves one parsed entry through the fixed chain (structural tag → exact name → alias →
-   * fuzzy), without the owned-flag check which the caller applies afterwards from a single bulk
-   * lookup.
+   * Resolves one entry by structural tag (REQ-INV-019), exact name, alias, then fuzzy match; the
+   * owned flag is applied later by the caller.
    *
-   * <p>The <strong>tag</strong> step (REQ-INV-019) runs first and only for the scmdb.net export,
-   * which uniquely carries the DataForge blueprint key: it short-circuits to a {@link
-   * BlueprintImportStatus#MATCHED} when the entry's {@code tag} maps (case-insensitively, and only
-   * when unambiguous) to a known product key, bypassing the name match entirely. This makes the
-   * scmdb.net import robust against the CIG-mislabeled {@code output_name}s the name match has to
-   * correct for (REQ-INV-047) and against cosmetic-variant name drift. For the watcher / extractor
-   * exports, which carry no {@code tag}, the step is a no-op and the name chain decides as before.
-   *
-   * @param entry the parsed external name + tag + acquisition suggestion
-   * @param productByKey master products indexed by normalized key
-   * @param allProducts master products as a list (fuzzy candidate set)
-   * @param tagIndex structural key (lower-cased {@code scwiki_key}) → normalized product key
-   * @return the resolution (status, resolved product, suggestions)
+   * @param entry the parsed name, tag and acquisition suggestion
+   * @param productByKey master products by normalized key
+   * @param allProducts master products as the fuzzy candidate set
+   * @param tagIndex lower-cased {@code scwiki_key} to normalized product key
+   * @return the resolution (status, product, suggestions)
    */
   @NotNull
   private Resolution resolve(
@@ -393,17 +339,12 @@ public class BlueprintImportService {
   }
 
   /**
-   * Resolves the scmdb.net structural {@code tag} (the DataForge blueprint key) to a master product
-   * (REQ-INV-019): the tag is matched case-insensitively against the {@code scwiki_key} index and,
-   * when it maps to a known product key, dereferenced to that product. Returns {@code null} when
-   * the entry carries no tag (watcher / extractor exports), when the tag is unknown or ambiguous
-   * (absent from the index — the index excludes ambiguous keys), or when the mapped product key no
-   * longer resolves to a master product, so the caller falls back to the name chain.
+   * Resolves a structural {@code tag} case-insensitively to a master product (REQ-INV-019).
    *
-   * @param tag the raw structural blueprint key from the upload, or {@code null}
-   * @param productByKey master products indexed by normalized product key
-   * @param tagIndex structural key (lower-cased {@code scwiki_key}) → normalized product key
-   * @return the resolved product, or {@code null} if the tag does not unambiguously resolve
+   * @param tag the raw structural blueprint key, or {@code null}
+   * @param productByKey master products by normalized key
+   * @param tagIndex lower-cased {@code scwiki_key} to normalized product key
+   * @return the product, or {@code null} when the tag is absent, unknown, ambiguous or unresolvable
    */
   @Nullable
   private ResolvedProduct resolveViaTag(
@@ -421,13 +362,11 @@ public class BlueprintImportService {
   }
 
   /**
-   * Looks up a curated SCMDB alias for the raw external name and dereferences it to a master
-   * product. Falls back to the alias's own name / output-item snapshot if the master no longer
-   * carries that product key (a renamed-away product), so a learned alias never silently regresses
-   * to unmatched.
+   * Resolves a curated alias for the external name to a master product, falling back to the alias's
+   * own snapshot when the product key is no longer in the master list.
    *
-   * @param externalName the raw external name from the upload
-   * @param productByKey master products indexed by normalized key
+   * @param externalName the raw external name
+   * @param productByKey master products by normalized key
    * @return the resolved product, or {@code null} if no alias exists
    */
   @Nullable
@@ -476,14 +415,11 @@ public class BlueprintImportService {
   }
 
   /**
-   * Loads the owner's existing blueprint rows for the given product keys, indexed by product key,
-   * via a single bulk lookup. Backs {@link #applyImport}'s duplicate skip and earliest-acquisition
-   * refresh; the returned entities are managed, so mutating one (e.g. its {@code acquiredAt}) is
-   * flushed by dirty-checking without an explicit {@code save()}.
+   * Loads the owner's managed blueprint rows for the given product keys in one query.
    *
-   * @param ownerUserId {@code app_user.id} of the owner
+   * @param ownerUserId the owner's {@code app_user.id}
    * @param keys the product keys to load
-   * @return owned rows indexed by product key (empty if {@code keys} is empty)
+   * @return owned rows by product key (empty if {@code keys} is empty)
    */
   @NotNull
   private Map<String, PersonalBlueprint> ownedByKey(
@@ -501,13 +437,11 @@ public class BlueprintImportService {
   }
 
   /**
-   * Decides whether an owned row's acquisition time should be pulled to an incoming import value:
-   * only when the incoming value is present and is either earlier than the stored one or fills a
-   * stored {@code null}. A {@code null} incoming never overwrites a stored value, so re-importing
-   * an export that lacks a timestamp can never erase a known acquisition time.
+   * Decides whether a stored acquisition time is replaced: only by a non-null incoming value that
+   * is earlier or fills a stored {@code null}.
    *
-   * @param incoming the acquisition instant from the current import, or {@code null}
-   * @param existing the instant currently stored on the owned row, or {@code null}
+   * @param incoming the imported acquisition instant, or {@code null}
+   * @param existing the stored instant, or {@code null}
    * @return {@code true} if {@code existing} should be replaced with {@code incoming}
    */
   private boolean isEarlierAcquiredAt(@Nullable Instant incoming, @Nullable Instant existing) {
@@ -546,13 +480,12 @@ public class BlueprintImportService {
   }
 
   /**
-   * Intermediate per-name resolution carried between the two preview passes. Mutable status is not
-   * needed — the owned-flag override is applied when building the response DTO.
+   * Per-name resolution carried between the two preview passes.
    *
-   * @param externalName the SCMDB name
+   * @param externalName the external name
    * @param status the chain outcome before the owned-flag override
    * @param product the resolved product, or {@code null}
-   * @param suggestedAcquiredAt acquisition suggestion from {@code ts}
+   * @param suggestedAcquiredAt the acquisition suggestion
    * @param suggestions fuzzy candidates (empty unless {@code status} is SUGGESTED)
    */
   private record Resolution(

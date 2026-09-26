@@ -45,9 +45,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for per-account grant management (epic #556, REQ-BANK-009): the flag matrix reads
- * and the create/patch/revoke mutations. Management-only as a whole (admins pass via the role
- * hierarchy); org-unit membership of the grantee is irrelevant in both directions (REQ-BANK-008).
+ * Management-only REST surface for per-account grants (REQ-BANK-009): the flag matrix and the
+ * create/patch/revoke mutations. The grantee's org-unit membership is irrelevant (REQ-BANK-008).
  */
 @RestController
 @RequestMapping("/api/v1/bank/grants")

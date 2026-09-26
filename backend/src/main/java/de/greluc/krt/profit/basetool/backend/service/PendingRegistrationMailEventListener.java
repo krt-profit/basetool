@@ -32,15 +32,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Sends the admin "new registration awaiting approval" e-mail after the registration transaction
  * commits (REQ-NOTIF-015).
  *
- * <p>Runs alongside {@code NotificationEventListener}: the same {@link
- * DiscordRegistrationPendingEvent} drives both the in-app admin notification (via its {@code
- * NotificationEvent} supertype, REQ-NOTIF-012) and — through this listener — the admin e-mail on a
- * second channel. Like the account-decision mail listener it fires only on {@link
- * TransactionPhase#AFTER_COMMIT} (a rolled-back registration mails nothing) and runs on the
- * dedicated {@link AsyncConfig#MAIL_EXECUTOR} so SMTP latency stays off the request thread and
- * cannot starve in-app notification creation. Any failure is swallowed and logged — the
- * registration already committed, and best-effort mail must never surface to the user or trigger a
- * rollback.
+ * <p>Listens {@link TransactionPhase#AFTER_COMMIT} on {@link AsyncConfig#MAIL_EXECUTOR}; any
+ * failure is logged and swallowed.
  */
 @Component
 @RequiredArgsConstructor

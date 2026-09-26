@@ -35,12 +35,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cached CRUD service for the {@code star_system} table.
+ * Cached CRUD service for the {@code star_system} table; UEX owns most rows, admins may manage
+ * systems UEX does not know.
  *
- * <p>UEX owns the bulk of this table; this service adds the admin-only create/update/delete API for
- * systems UEX doesn't know about yet (e.g. just-announced systems before they appear in the UEX
- * feed). Case-insensitive uniqueness on name is enforced explicitly via existence checks — a DB
- * unique index alone would surface as a generic 500 instead of a 409 with a localized message.
+ * <p>Case-insensitive name uniqueness is checked explicitly so a clash surfaces as 409.
  */
 @Service
 @RequiredArgsConstructor

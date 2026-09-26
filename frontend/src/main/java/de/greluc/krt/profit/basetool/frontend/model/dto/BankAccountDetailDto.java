@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.math.BigDecimal;
 
 /**
- * Frontend mirror of the account detail aggregate (K1 page): account, facts-strip numbers and the
- * caller's capabilities. Since ADR-0039 holders are decoupled from accounts, so there is no
- * per-account holder distribution any more (holder balances are global, shown in the holder menu).
+ * Frontend mirror of the account detail aggregate (K1 page): account, facts-strip figures and the
+ * caller's capabilities.
  *
  * @param account the account incl. balance
  * @param delta30d net change over the last 30 days (signed whole aUEC)

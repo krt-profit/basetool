@@ -56,21 +56,12 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Spring MVC controller for the inventory read pages ({@code /inventory}, {@code /inventory/my},
- * {@code /inventory/all}, and the {@code /inventory/input} create form).
+ * Controller for the inventory read pages ({@code /inventory}, {@code /inventory/my}, {@code
+ * /inventory/all}, the drilldowns and the {@code /inventory/input} form); writes live in {@link
+ * InventoryWriteController}.
  *
- * <p>Read views: aggregated (sum per catalog entry across the squadron), per-material and
- * per-game-item drilldowns, personal ({@code /my}), and admin-all ({@code /all}). The aggregated,
- * personal and admin views carry a Material ↔ Items switch (REQ-INV-030, {@code view=items}): the
- * material variant filters by material ids, min quality, job order and mission, the item variant by
- * gameItem ids and job order (item rows have no quality or mission dimension). All list endpoints
- * support a {@code fragment=true} flag that returns just the table fragment so AJAX filter changes
- * do not reload the page.
- *
- * <p>Since the #924 read/write controller split (L5) this class owns only the read (GET) half of
- * the area; every mutating {@code /inventory} endpoint (create, book-out consume/transfer/sell,
- * inline transfer, bulk checkout, association / note / delivered updates) lives in {@link
- * InventoryWriteController}, which delegates back here for inline validation-failure re-renders.
+ * <p>The aggregated, personal and admin views switch between Material and Items via {@code
+ * view=items} (REQ-INV-030) and can return only their table fragment for AJAX updates.
  */
 @Controller
 @UsesLayoutModel
@@ -209,18 +200,14 @@ public class InventoryPageController {
   private final org.springframework.security.access.hierarchicalroles.RoleHierarchy roleHierarchy;
 
   /**
-   * Renders the squadron-wide aggregated inventory view ({@code /inventory}). The {@code view}
-   * query parameter picks the catalog (REQ-INV-030): the default Material view keeps its fixed sort
-   * — material name asc, quality desc, amount desc, the order operators actually want — while
-   * {@code view=items} relays {@code catalog=ITEM} to the backend (whose default sort is game-item
-   * name asc, amount desc; there are no quality columns to sort by).
+   * Renders the squadron-wide aggregated inventory view ({@code /inventory}); {@code view=items}
+   * selects the game-item catalog (REQ-INV-030).
    *
    * @param view {@code "items"} for the game-item catalog, anything else (or absent) for material
    * @param page zero-based page index
    * @param size page size
-   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
-   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with the page, aggregated items and material catalog
+   * @param fragment {@code "results"} renders only the results + pagination fragment (REQ-FE-005)
+   * @param model model populated with the page, aggregated items and material catalog
    * @return the {@code inventory-index} view name, or its {@code inventoryResults} fragment
    *     selector
    */
@@ -243,8 +230,6 @@ public class InventoryPageController {
         uri.append("size=").append(size).append("&");
       }
       if (itemsView) {
-        // catalog=ITEM has its own backend sort whitelist (gameItem.name / amount) and default;
-        // the material sort spec would be rejected there, so it is simply not sent.
         uri.append("catalog=ITEM");
       } else {
         uri.append("sort=material.name,asc;quality,desc;amount,desc");
@@ -276,10 +261,8 @@ public class InventoryPageController {
   }
 
   /**
-   * Resolves the Lager view-switch query parameter (REQ-INV-030): {@code view=items} selects the
-   * game-item catalog, every other value — including absence — falls back to the material view, so
-   * existing bookmarks and the write controller's parameterless inline re-renders keep rendering
-   * the historical material tree.
+   * Resolves the Lager view switch (REQ-INV-030): {@code view=items} selects the game-item view,
+   * any other value or absence the material view.
    *
    * @param view the raw {@code view} query parameter, may be {@code null}
    * @return {@code true} when the items view was requested
@@ -289,24 +272,17 @@ public class InventoryPageController {
   }
 
   /**
-   * Renders the per-material drilldown ({@code /inventory/material/{materialId}}) listing the
-   * individual inventory rows for the given material, paginated server-side (REQ-INV-033) so a
-   * material with many rows stays fully reachable page by page instead of being silently capped
-   * (ADR-0104 — the page previously fetched a single {@code size=1000} slice and hid everything
-   * beyond it). The material catalog behind the "Anderes Material" switcher renders outside the
-   * results fragment, so it is fetched on the full render only; a pager click or a live-sync peer
-   * refresh re-fetches just the items page. The drilldown offers no inline job-order re-assignment
-   * (that moved onto the Lager stack-entry allocation chips, REQ-INV-027), so it loads no job-order
-   * catalog.
+   * Renders the per-material drilldown, server-side paginated (REQ-INV-033). The material switcher
+   * catalog is loaded on full renders only.
    *
    * @param materialId material id to drill into
    * @param page zero-based page index; {@code null} or negative falls back to the first page
    * @param size requested page size; values outside {@link #DRILLDOWN_PAGE_SIZES} snap back to
    *     {@link #DRILLDOWN_DEFAULT_PAGE_SIZE}
-   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
-   *     in-place AJAX pager swap (REQ-FE-005) or a live-sync peer refresh (REQ-FE-010, #1309)
-   * @param model Thymeleaf model populated with the items page, the pagination attributes and (on
-   *     the full render) the material catalog
+   * @param fragment {@code "results"} renders only the results + pagination fragment (REQ-FE-005,
+   *     REQ-FE-010)
+   * @param model model populated with the items page, the pagination attributes and, on full
+   *     renders, the material catalog
    * @return the {@code inventory-material} view name, or its {@code inventoryMaterialResults}
    *     fragment selector
    */
@@ -340,10 +316,6 @@ public class InventoryPageController {
     model.addAttribute("items", items);
     model.addAttribute("pageSizes", DRILLDOWN_PAGE_SIZES);
     model.addAttribute("selectedMaterialId", materialId);
-    // REQ-FE-005/REQ-FE-010 (#1309): the pager and the live-sync receiver re-fetch just the results
-    // fragment, which needs no catalog — the material switcher is full-render-only (the
-    // REQ-DATA-012
-    // fragment-gating rule), so the fragment path skips its cached material lookup.
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "inventory-material :: inventoryMaterialResults";
     }
@@ -352,24 +324,17 @@ public class InventoryPageController {
   }
 
   /**
-   * Renders the per-game-item drilldown ({@code /inventory/game-item/{gameItemId}}, REQ-INV-030) —
-   * the item sibling of {@link #viewMaterialInventory}: the individual non-personal stock rows of
-   * the given game item, with no quality column. Paginated server-side (REQ-INV-033) exactly like
-   * the material drilldown, so an item with many rows stays fully reachable page by page instead of
-   * being silently capped (ADR-0104 — the page previously fetched a single {@code size=1000}
-   * slice). Unlike the material page it deliberately loads no navigate catalog (the item catalog is
-   * thousands of entries; a preload is off the table and the remote search picker ships with the
-   * Einbuchen pass, design §6.6). The item's display name is taken from the first row of the
-   * current page's {@code gameItem} reference.
+   * Renders the per-game-item drilldown (REQ-INV-030), server-side paginated (REQ-INV-033), without
+   * a quality column or navigation catalog. The display name comes from the first row's {@code
+   * gameItem}.
    *
    * @param gameItemId game item to drill into
    * @param page zero-based page index; {@code null} or negative falls back to the first page
    * @param size requested page size; values outside {@link #DRILLDOWN_PAGE_SIZES} snap back to
    *     {@link #DRILLDOWN_DEFAULT_PAGE_SIZE}
-   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
-   *     in-place AJAX pager swap (REQ-FE-005) or the live-sync in-place swap (REQ-FE-015)
-   * @param model Thymeleaf model populated with the rows, the pagination attributes and the
-   *     resolved item display name
+   * @param fragment {@code "results"} renders only the results + pagination fragment (REQ-FE-005,
+   *     REQ-FE-015)
+   * @param model model populated with the rows, the pagination attributes and the item display name
    * @return the {@code inventory-game-item} view name, or its {@code inventoryGameItemResults}
    *     fragment selector
    */
@@ -420,21 +385,13 @@ public class InventoryPageController {
   }
 
   /**
-   * Fetches one page of a drilldown's rows, re-fetching the last page once if the requested page
-   * overran the end (REQ-INV-033). A stale deep-link / bookmark or a peer's stock reduction (the
-   * page index rides in the URL and the live-sync receiver re-fetches it verbatim) can leave the
-   * URL pointing past the last page; the backend then returns an empty out-of-range page whose
-   * {@code totalPages == 1} hides the whole pager, stranding the viewer on an empty table even
-   * though rows still exist on page 0. Clamping to the last page hands back real rows and a usable
-   * pager. The extra round-trip is paid only in that rare overrun case; an in-range or
-   * genuinely-empty ({@code totalElements == 0}) result returns after the single fetch.
+   * Fetches one page of a drilldown's rows, re-fetching the last page once when the requested page
+   * lies past the end of a non-empty result (REQ-INV-033).
    *
-   * @param baseUri the drilldown backend URI up to (but excluding) the {@code ?page/size} query —
-   *     e.g. {@code /api/v1/inventory/material/{id}}
-   * @param requestedPage the caller's already-non-negative page index
-   * @param size the resolved (whitelisted) page size
-   * @return the resolved page — the last page when the request overran a non-empty result — or
-   *     {@code null} when the backend yields no page
+   * @param baseUri the drilldown backend URI without the {@code ?page/size} query
+   * @param requestedPage the caller's non-negative page index
+   * @param size the whitelisted page size
+   * @return the resolved page, or {@code null} when the backend yields no page
    */
   private PageResponse<InventoryItemDto> fetchDrilldownPage(
       @NotNull String baseUri, int requestedPage, int size) {
@@ -454,21 +411,10 @@ public class InventoryPageController {
   }
 
   /**
-   * JSON proxy for the {@code remote-game-items} combobox source (design §6.6, REQ-FE-016): looks
-   * up bookable game items — the output of at least one active blueprint — by a free-text term and
-   * unwraps the backend page into a flat list. Relays with the <em>token-carrying</em> {@link
-   * BackendApiClient#get} (never {@code getPublic}): the backend {@code
-   * /api/v1/inventory/item-catalog} sits under the role-gated {@code /api/v1/inventory/**}
-   * umbrella, unlike the deliberately anonymous {@code /orders/item-search} sibling (design §5.3).
-   * The page size is {@link PickerSearch#PAGE_SIZE}, sorted by {@code name} (the backend's sole
-   * whitelisted sort field). It used to be exactly the combobox's {@link PickerSearch#RENDER_CAP},
-   * which made the cap silent: the component decides on the hint with {@code matches.length >
-   * maxResults}, so a page that stops <em>at</em> the render cap can never trip it and the 51st
-   * match vanished unannounced. An empty list on backend failure keeps the picker on "no matches"
-   * instead of surfacing the error.
+   * JSON proxy for the {@code remote-game-items} combobox (REQ-FE-016): searches bookable game
+   * items by name via the authenticated client and returns a flat list, empty on backend failure.
    *
-   * @param q the case-insensitive item-name search term; {@code null}/blank matches all (the
-   *     combobox's browse-mode empty fetch)
+   * @param q the case-insensitive item-name search term; {@code null}/blank matches all
    * @return up to {@link PickerSearch#PAGE_SIZE} matching bookable game-item references, never
    *     {@code null}
    */
@@ -476,13 +422,6 @@ public class InventoryPageController {
   @org.springframework.web.bind.annotation.ResponseBody
   public List<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
       itemSearch(@RequestParam(required = false) String q) {
-    // Build the URI with only the fixed (safe) paging params via UriComponentsBuilder so a crafted
-    // `&` in the term cannot inject extra query parameters (the L-1 hardening), and pass the
-    // free-text `q` as a WebClient URI-template variable ({q}) so it is percent-encoded exactly
-    // once across the frontend->backend hop. Baking the pre-encoded toUriString() value into
-    // get(String) would let the WebClient encode it a second time (space -> %2520), so a multi-word
-    // item search reached the backend mangled and matched nothing (the #371 re-encoding trap). A
-    // null/blank term is normalised to the empty match-all filter.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/item-catalog")
             .queryParam("size", PickerSearch.PAGE_SIZE)
@@ -499,16 +438,9 @@ public class InventoryPageController {
   }
 
   /**
-   * Renders the personal inventory list ({@code /inventory/my}). Filters are URL-driven so a user
-   * can share a filtered link. {@code fragment=true} returns just the table fragment for AJAX
-   * filter changes. The {@code view} parameter switches between the Material tree (default) and the
-   * game-item tree (REQ-INV-030, {@code view=items}): the items view relays {@code catalog=ITEM}
-   * plus the {@code gameItemIds} / {@code jobOrderIds} / personal-flag filters (there is no quality
-   * or mission dimension on item rows) and populates its gameItem filter only from items that
-   * currently have stock in the caller's scope — never the full catalog. The {@code locationIds}
-   * filter (REQ-INV-040) applies to <em>both</em> views and its options are built the same
-   * in-scope-only way. In both views the Umbuchen modal's target-location picker searches locations
-   * server-side (remote-locations combobox), so no locations catalog is added to the model.
+   * Renders the personal inventory list ({@code /inventory/my}) with URL-driven filters. {@code
+   * view=items} shows the game-item tree (REQ-INV-030); filter options list only items and
+   * locations in stock in the caller's scope (REQ-INV-040).
    *
    * @param view {@code "items"} for the game-item view, anything else (or absent) for material
    * @param materialIds optional material id filter (multi; material view only)
@@ -517,13 +449,11 @@ public class InventoryPageController {
    * @param missionIds optional mission id filter (multi; material view only)
    * @param gameItemIds optional game-item id filter (multi; items view only)
    * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040)
-   * @param personalOnly when true, show only the caller's personal entries ({@code personal =
-   *     true})
-   * @param nonPersonalOnly when true, show only the caller's non-personal (shared) entries ({@code
-   *     personal = false}); mutually exclusive with {@code personalOnly}
+   * @param personalOnly when true, show only the caller's personal entries
+   * @param nonPersonalOnly when true, show only the caller's shared entries; mutually exclusive
+   *     with {@code personalOnly}
    * @param fragment when true, return the {@code inventoryTableFragment} fragment
-   * @param model Thymeleaf model populated with grouped items, filter source catalogs and the
-   *     auth-derived UX flags
+   * @param model model populated with grouped items, filter catalogs and auth-derived UX flags
    * @return either the full {@code inventory-my} view or its table fragment
    */
   @NotNull
@@ -626,14 +556,8 @@ public class InventoryPageController {
     }
 
     model.addAttribute("groupedItems", groupedItems);
-    // keeping empty items list to not break any existing template iteration if any
     model.addAttribute("items", new ArrayList<>());
     model.addAttribute("materials", fetchMaterials());
-    // The Umbuchen target-location picker (inventory-my.html) searches locations on demand
-    // (remote-locations combobox -> /catalog/location-search), so no locations catalog is
-    // preloaded here; the modal-opening JS seeds the row's current location itself. The filter
-    // multi-select below is a different thing: it offers only the locations that actually hold
-    // stock in the caller's scope (REQ-INV-040), taken from the grouped result's own stack keys.
     model.addAttribute(
         "locations",
         resolveLocationFilterOptions(
@@ -676,19 +600,8 @@ public class InventoryPageController {
   }
 
   /**
-   * Ids of every one of the caller's own inventory entries matching the current {@code
-   * /inventory/my} filter — the JSON companion of {@link #viewMyInventory} that backs the "Alle
-   * markieren" (select-all) button (REQ-INV-034). The grouped tree lazy-loads and paginates each
-   * stack, so a client-side "check every visible box" would silently miss collapsed stacks and
-   * later pages; this proxy relays the same filter + view to the backend's {@code
-   * /api/v1/inventory/my-inventory/entry-ids} so the browser can select the complete filtered view
-   * in one call and drive a bulk check-out over it. Owner-scoped by the backend from the JWT.
-   *
-   * <p>The {@code view} switch mirrors {@link #viewMyInventory}: the items view relays {@code
-   * catalog=ITEM} with the {@code gameItemIds} / {@code jobOrderIds} / personal-flag filters (no
-   * quality or mission dimension), the material view relays the material / min-quality / job-order
-   * / mission / personal filters. The free-text-free, id-only params are appended via {@link
-   * org.springframework.web.util.UriComponentsBuilder} so no re-encoding trap applies.
+   * Returns the ids of every own inventory entry matching the current {@code /inventory/my} filter
+   * and view, backing "Alle markieren" (REQ-INV-034).
    *
    * @param view {@code "items"} for the game-item view, anything else (or absent) for material
    * @param materialIds optional material id filter (multi; material view only)
@@ -696,9 +609,7 @@ public class InventoryPageController {
    * @param jobOrderIds optional job-order id filter (multi; both views)
    * @param missionIds optional mission id filter (multi; material view only)
    * @param gameItemIds optional game-item id filter (multi; items view only)
-   * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040) — the
-   *     select-all set must match the location-filtered table exactly, or "Alle markieren" would
-   *     reach past what the user can see
+   * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040)
    * @param personalOnly when true, restrict to the caller's personal entries
    * @param nonPersonalOnly when true, restrict to the caller's shared entries (mutually exclusive
    *     with {@code personalOnly})
@@ -743,11 +654,8 @@ public class InventoryPageController {
   }
 
   /**
-   * Fetches one grouped item-inventory result ({@code catalog=ITEM}, REQ-INV-030) from the given
-   * backend grouped endpoint, relaying the item view's filter dimensions (gameItems, locations, job
-   * orders and — on {@code /my} — the personal flags). Quality and mission filters do not exist for
-   * item rows and are never sent; the location filter does apply, because an item stack carries a
-   * location like a material stack does (REQ-INV-040).
+   * Fetches one grouped item-inventory result ({@code catalog=ITEM}, REQ-INV-030) with the item
+   * view's filters; quality and mission filters are never sent.
    *
    * @param basePath the backend grouped path ({@code …/my-inventory/grouped} or {@code
    *     …/all/grouped})
@@ -781,9 +689,7 @@ public class InventoryPageController {
   }
 
   /**
-   * Appends one repeated id query parameter per element, skipping a {@code null} or empty list so
-   * an inactive filter adds nothing to the URI. Ids are UUIDs, so no free text reaches the query
-   * string and the re-encoding trap of the {@code q=} search relays cannot apply here.
+   * Appends one repeated query parameter per id; a {@code null} or empty list appends nothing.
    *
    * @param uriBuilder the builder collecting the backend request URI
    * @param name the query-parameter name to repeat
@@ -802,10 +708,8 @@ public class InventoryPageController {
   }
 
   /**
-   * Fetches one grouped material-inventory result from the given backend grouped endpoint, relaying
-   * the material view's filter dimensions. Shared by both Lager pages' table read and by the
-   * unfiltered re-read that {@link #resolveLocationFilterOptions} needs, so the filter surface
-   * cannot drift between the two.
+   * Fetches one grouped material-inventory result with the material view's filters; used for both
+   * the table read and the unfiltered read behind {@link #resolveLocationFilterOptions}.
    *
    * @param basePath the backend grouped path ({@code …/my-inventory/grouped} or {@code
    *     …/all/grouped})
@@ -846,8 +750,7 @@ public class InventoryPageController {
   }
 
   /**
-   * Whether any material-view filter dimension is currently narrowing the grouped result. Drives
-   * the one extra unfiltered read behind the location filter options (REQ-INV-040).
+   * Whether any material-view filter dimension narrows the grouped result.
    *
    * @param materialIds the active material filter, if any
    * @param locationIds the active location filter, if any
@@ -873,8 +776,7 @@ public class InventoryPageController {
   }
 
   /**
-   * Item-view sibling of {@link #anyMaterialFilterActive} — the item tree has no quality floor and
-   * no mission dimension (REQ-INV-031).
+   * Item-view sibling of {@link #anyMaterialFilterActive}, without quality and mission dimensions.
    *
    * @param gameItemIds the active game-item filter, if any
    * @param locationIds the active location filter, if any
@@ -904,21 +806,12 @@ public class InventoryPageController {
   }
 
   /**
-   * Resolves a Lager page's location filter options (REQ-INV-040) — only the locations that
-   * currently carry stock in the viewer's scope, never the location catalog. The catalog is the
-   * whole universe, which is why every location <em>picker</em> on these pages searches server-side
-   * instead of rendering a list; a filter multi-select cannot search, so it is built from the
-   * grouped result's own stack keys, exactly like the gameItem options of REQ-INV-030.
-   *
-   * <p>When a filter is active the displayed groups are a narrowed subset, so one extra unfiltered
-   * grouped call restores the full option list. That matters most for the location filter itself:
-   * deriving the options from a location-filtered result would leave the dropdown holding only the
-   * locations already picked, and the user could never widen the selection again. Fragment renders
-   * need no options (the filter form lives outside the swapped container), and a failed lookup
-   * degrades to the displayed groups' locations.
+   * Resolves the location filter options (REQ-INV-040): only locations with stock in the viewer's
+   * scope. With an active filter, one extra unfiltered read supplies the full option list; fragment
+   * renders need none, and a failed read falls back to the displayed groups.
    *
    * @param groupedItems the (possibly filtered) grouped result already fetched for the table
-   * @param fragment whether this render is the table-fragment swap (options unused there)
+   * @param fragment whether this render is the table-fragment swap
    * @param anyFilterActive whether any filter dimension is narrowing the fetched result
    * @param unfilteredFetch supplies the unfiltered grouped result for this page and view
    * @return the distinct in-scope locations to offer, ordered by name
@@ -954,17 +847,13 @@ public class InventoryPageController {
   }
 
   /**
-   * Resolves the item view's gameItem filter options — only gameItems that currently have stock
-   * rows in the viewer's scope, never the full catalog (REQ-INV-030, design §6.1: the grouped
-   * query's key set). For an unfiltered render the already-fetched grouped result IS that key set;
-   * when the full page is (deep-link) rendered with active filters, the displayed groups are a
-   * narrowed subset, so one extra unfiltered grouped call restores the complete option list.
-   * Fragment renders never need options (the filter form lives outside the swapped container), and
-   * a failed lookup degrades to the displayed groups' keys.
+   * Resolves the item view's gameItem filter options (REQ-INV-030): only items with stock in the
+   * viewer's scope. With an active filter, one extra unfiltered read supplies the full option list;
+   * fragment renders need none, and a failed read falls back to the displayed groups.
    *
    * @param basePath the backend grouped path the page's table was fetched from
    * @param groupedItems the (possibly filtered) grouped result already fetched for the table
-   * @param fragment whether this render is the table-fragment swap (options unused there)
+   * @param fragment whether this render is the table-fragment swap
    * @param gameItemIds the active gameItem filter, if any
    * @param jobOrderIds the active job-order filter, if any
    * @param personalFlagActive whether a personal/non-personal narrowing flag is active
@@ -1002,12 +891,8 @@ public class InventoryPageController {
   }
 
   /**
-   * Renders the squadron-wide inventory list ({@code /inventory/all}). Same shape as {@link
-   * #viewMyInventory} but the backend endpoint scopes to all users (gated by role at the backend).
-   * {@code view=items} renders the game-item tree (REQ-INV-030) with the {@code gameItemIds} /
-   * {@code jobOrderIds} filters; the personal flags stay a {@code /my}-only dimension (the global
-   * Lager is non-personal by definition). Like {@code /my}, the Umbuchen target-location picker
-   * searches server-side, so no locations catalog is added to the model.
+   * Renders the squadron-wide inventory list ({@code /inventory/all}), like {@link
+   * #viewMyInventory} but over all users in scope and without the personal flags.
    *
    * @param view {@code "items"} for the game-item view, anything else (or absent) for material
    * @param materialIds optional material id filter (multi; material view only)
@@ -1130,15 +1015,8 @@ public class InventoryPageController {
     model.addAttribute("selectedMinQuality", minQuality);
     model.addAttribute("selectedJobOrderIds", jobOrderIds);
     model.addAttribute("selectedMissionIds", missionIds);
-    // The Umbuchen target-location picker (inventory-admin.html) searches locations on demand
-    // (remote-locations combobox -> /catalog/location-search), so no locations catalog is
-    // preloaded here; the modal-opening JS seeds the row's current location itself.
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
-    // #1193: the /all book-out/transfer target-user picker (inventory-admin.html) now searches
-    // users
-    // on demand (remote-users combobox -> /users/search), so the preloaded users list is no longer
-    // populated here. fetchUsers() is still used by the /my view's picker below.
     model.addAttribute("authUserId", currentAuthName());
     model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
 
@@ -1149,25 +1027,18 @@ public class InventoryPageController {
   }
 
   /**
-   * Lazily renders one page of a personal-Lager stack's individual entries — the AJAX drill-down
-   * behind a collapsed stack on {@code /inventory/my}. The append-only Lager keeps every
-   * contribution as its own row, so the grouped view never inlines them; the browser expands a
-   * stack and this endpoint fetches that stack's entries oldest-first, paginated, from the
-   * backend's {@code /api/v1/inventory/my-inventory/stack/entries}. The stack is addressed by the
-   * stock-identity query params the grouped {@link InventoryStackDto} already exposes (a {@code
-   * null} owning-org-unit selects the rows where that pool is itself absent). Since Variante C
-   * (REQ-INV-027) the job-order / mission link is no longer part of the stock identity — it lives
-   * per leaf entry as allocation chips — so it is not a stack-key param. Returns the {@code
-   * stackEntries} HTML fragment that replaces the stack's entries container.
+   * Renders one page of a personal Lager stack's entries, oldest first, as the AJAX drill-down on
+   * {@code /inventory/my}. The stack is addressed by its stock-identity params; a {@code null}
+   * owning org unit selects rows without one.
    *
-   * @param materialId the stack's material (from the enclosing group)
+   * @param materialId the stack's material
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
    * @param personal whether the stack holds the caller's private stock
    * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
    * @param page zero-based page index, or {@code null} for the first page
    * @param size page size, or {@code null} for the backend default
-   * @param model Thymeleaf model populated with the entries page and association catalogs
+   * @param model model populated with the entries page and association catalogs
    * @return the {@code inventory-my :: stackEntries} fragment view name
    */
   @NotNull
@@ -1205,24 +1076,16 @@ public class InventoryPageController {
   }
 
   /**
-   * Item-view sibling of {@link #viewMyStackEntries} (REQ-INV-030): lazily renders one page of a
-   * personal game-item stack's entries. The stack is addressed by {@code gameItemId} instead of
-   * {@code materialId}+{@code quality} — item stacks carry no quality dimension (REQ-INV-029) — and
-   * the proxy relays {@code catalog=ITEM} to the backend's {@code
-   * /api/v1/inventory/my-inventory/stack/entries}. Renders the same {@code stackEntriesMy}
-   * fragment, whose rows branch per row kind (an item entry renders without quality or mission
-   * split and with whole amounts). No mission catalog is loaded (item rows cannot carry mission
-   * allocations, REQ-INV-031), but the {@code releasedItemIds} lookup runs exactly like the
-   * material sibling so the item leaf's "Für Börse freigeben" toggle renders its checked / "Auf
-   * Börse" state (stock-backed item offers, REQ-MARKET-002/014).
+   * Item-view sibling of {@link #viewMyStackEntries} (REQ-INV-030): renders one page of a personal
+   * game-item stack's entries, addressed by {@code gameItemId}, without a mission catalog.
    *
-   * @param gameItemId the stack's game item (from the enclosing group)
+   * @param gameItemId the stack's game item
    * @param locationId the stack's storage location
    * @param personal whether the stack holds the caller's private stock
    * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
    * @param page zero-based page index, or {@code null} for the first page
    * @param size page size, or {@code null} for the backend default
-   * @param model Thymeleaf model populated with the entries page and the job-order catalog
+   * @param model model populated with the entries page and the job-order catalog
    * @return the {@code fragments/inventory-stack-entries :: stackEntriesMy} fragment view name
    */
   @NotNull
@@ -1257,10 +1120,8 @@ public class InventoryPageController {
   }
 
   /**
-   * Adds the {@code releasedItemIds} model attribute — the subset of the just-loaded Mein-Lager
-   * leaf rows that currently carry an active Materialbörse offer — so the leaf template renders the
-   * "Für Börse" checkbox as checked / "Auf Börse". Best-effort: a Materialbörse backend failure
-   * leaves the set empty (the checkboxes simply render unchecked) rather than breaking the Lager.
+   * Adds {@code releasedItemIds}, the loaded leaf rows with an active Materialbörse offer; left
+   * empty on backend failure.
    *
    * @param model the model already populated with the {@code entries} leaf list.
    */
@@ -1292,22 +1153,17 @@ public class InventoryPageController {
   }
 
   /**
-   * Squadron-wide variant of {@link #viewMyStackEntries} — the AJAX drill-down behind a collapsed
-   * stack on {@code /inventory/all}. A global stack is per-owner, so the stack key carries the
-   * owning {@code userId} in addition to the other stock-identity dimensions; the backend
-   * re-applies the same org-unit scope predicate as the grouped view, so the drill-down can never
-   * widen visibility beyond the caller's slice. The global Lager is non-personal by definition, so
-   * there is no {@code personal} param. Returns the {@code stackEntries} HTML fragment for the
-   * admin page.
+   * Squadron-wide variant of {@link #viewMyStackEntries} for {@code /inventory/all}; the stack key
+   * includes the owning {@code userId}, and the backend applies the same scope as the grouped view.
    *
-   * @param materialId the stack's material (from the enclosing group)
+   * @param materialId the stack's material
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
    * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
    * @param page zero-based page index, or {@code null} for the first page
    * @param size page size, or {@code null} for the backend default
-   * @param model Thymeleaf model populated with the entries page and association catalogs
+   * @param model model populated with the entries page and association catalogs
    * @return the {@code inventory-admin :: stackEntries} fragment view name
    */
   @NotNull
@@ -1344,20 +1200,16 @@ public class InventoryPageController {
   }
 
   /**
-   * Item-view sibling of {@link #viewAllStackEntries} (REQ-INV-030): lazily renders one page of a
-   * squadron-wide game-item stack's entries. A global stack is per-owner, so the key carries the
-   * owning {@code userId}; the stack itself is addressed by {@code gameItemId} (no quality
-   * dimension, REQ-INV-029) and the proxy relays {@code catalog=ITEM} to the backend's {@code
-   * /api/v1/inventory/all/stack/entries}. Renders the same per-row-kind-branching {@code
-   * stackEntriesAdmin} fragment; no mission catalog is loaded (REQ-INV-031).
+   * Item-view sibling of {@link #viewAllStackEntries} (REQ-INV-030): renders one page of a
+   * squadron-wide game-item stack's entries, without a mission catalog.
    *
-   * @param gameItemId the stack's game item (from the enclosing group)
+   * @param gameItemId the stack's game item
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
    * @param page zero-based page index, or {@code null} for the first page
    * @param size page size, or {@code null} for the backend default
-   * @param model Thymeleaf model populated with the entries page and the job-order catalog
+   * @param model model populated with the entries page and the job-order catalog
    * @return the {@code fragments/inventory-stack-entries :: stackEntriesAdmin} fragment view name
    */
   @NotNull
@@ -1391,18 +1243,14 @@ public class InventoryPageController {
   }
 
   /**
-   * Shared backend call + model population for the stack-entries drill-down endpoints. Fetches the
-   * paginated entries page from the given backend URI and the job-order / mission catalogs the
-   * per-entry association dropdowns render. A backend failure degrades to an empty entries list
-   * plus an {@code error} flag so the fragment still renders a (empty) container instead of
-   * throwing.
+   * Fetches a stack-entries page and the job-order / mission catalogs into the model; a backend
+   * failure yields an empty list plus an {@code error} flag.
    *
    * @param uri the fully-built backend stack-entries URI (path + query)
-   * @param model the Thymeleaf model to populate with {@code entries}, {@code entriesPage}, {@code
-   *     jobOrders} and {@code missions}
-   * @param includeMissions whether to load the mission catalog — {@code true} on the material
-   *     endpoints (mission allocation chips), {@code false} on the item endpoints, where mission
-   *     allocations are rejected (REQ-INV-031) and the model gets an empty list instead
+   * @param model the model to populate with {@code entries}, {@code entriesPage}, {@code jobOrders}
+   *     and {@code missions}
+   * @param includeMissions whether to load the mission catalog; {@code false} yields an empty list
+   *     (REQ-INV-031)
    */
   private void fetchStackEntriesIntoModel(
       @NotNull String uri, Model model, boolean includeMissions) {
@@ -1417,10 +1265,6 @@ public class InventoryPageController {
         (p != null && p.content() != null) ? new ArrayList<>(p.content()) : new ArrayList<>();
     model.addAttribute("entries", entries);
     model.addAttribute("entriesPage", p);
-    // Both catalog modes label their allocation popover with the outstanding need (REQ-INV-039),
-    // so the needs are always requested here. `includeMissions` stays the material-mode gate for
-    // the mission dimension alone (an item row carries none, REQ-INV-031). Only one of the two
-    // lookups can produce a label for a given row; the other is an empty map rather than a branch.
     List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> stackJobOrders =
         fetchActiveJobOrders(true);
     model.addAttribute("jobOrders", stackJobOrders);
@@ -1434,13 +1278,12 @@ public class InventoryPageController {
   }
 
   /**
-   * Renders the inventory create form ({@code /inventory/input}). The {@code source=admin} mode
-   * seeds {@code isGlobal=true} so the admin can pick a target user from the user dropdown;
-   * otherwise the form creates a personal entry owned by the caller.
+   * Renders the inventory create form; {@code source=admin} seeds {@code isGlobal=true} so the
+   * admin can pick a target user, otherwise the entry is the caller's own.
    *
    * @param source optional origin marker ({@code admin}, {@code my}, {@code aggregated}) used to
    *     pick the post-save redirect target
-   * @param model Thymeleaf model populated with the form and dropdown catalogs
+   * @param model model populated with the form and dropdown catalogs
    * @return the {@code inventory-input} view name
    */
   @NotNull
@@ -1460,16 +1303,7 @@ public class InventoryPageController {
       form = (InventoryForm) model.getAttribute("inventoryForm");
     }
 
-    // The input form's catalog lookups are independent; fetch them concurrently (missions, job
-    // orders and the owner picker are uncached round-trips) and apply on the request thread. Each
-    // helper swallows its own failure and returns an empty list, so join() never throws and the
-    // page
-    // degrades exactly as the serial version did.
     final InventoryForm boundForm = form;
-    // #1193: the admin "assign to user" picker (inventory-input.html, shown when isGlobal) now
-    // searches users on demand (remote-users combobox -> /users/search), so the preloaded roster is
-    // no longer fetched here. Only the currently-chosen target user is seeded (edit-mode label), so
-    // a re-render after a validation/backend error still shows — and keeps — the picked user.
     var materialsFuture = parallelPageLoader.loadAsync(this::fetchMaterials);
     var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
     var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
@@ -1490,11 +1324,6 @@ public class InventoryPageController {
     List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> inputJobOrders =
         jobOrdersFuture.join();
     model.addAttribute("jobOrders", inputJobOrders);
-    // REQ-INV-039: the per-order need figures ride into the page as one JSON blob rather than as an
-    // attribute per <option>, because the allocation rows are CLONED from a <template> — a figure
-    // duplicated onto every clone would have to be rewritten on every clone when a peer's booking
-    // moves it. The live-sync refresh re-reads the identical shape from /inventory/order-needs, so
-    // the page script decodes one format and never has to reconcile two.
     model.addAttribute("jobOrderNeedsJson", writeOrderNeedsJson(orderNeeds(inputJobOrders)));
     model.addAttribute("ownerOptions", ownerFuture.join());
     model.addAttribute("selectedUser", selectedUserFuture.join());
@@ -1502,22 +1331,10 @@ public class InventoryPageController {
   }
 
   /**
-   * Re-reads the active-order catalog with its per-material need figures as JSON, for the Einbuchen
-   * form's live-sync refresh (REQ-INV-039, REQ-FE-010).
+   * Returns the active-order catalog with its per-material needs as JSON, for the Einbuchen form's
+   * live-sync relabelling of its order options (REQ-INV-039, REQ-FE-010).
    *
-   * <p>This exists as a frontend route rather than the page calling {@code /api/v1/orders/lookup}
-   * directly because a page script fetching an {@code /api/v1} path on the <em>frontend</em> origin
-   * gets a 404 — the backend API is not served here. It relays through the same authenticated
-   * client the page render uses, so the caller's order visibility is identical to the one that
-   * produced the options in the first place.
-   *
-   * <p>The receiver re-labels the picker options in place from this payload instead of swapping a
-   * fragment: the order options live in a {@code <template>} and every allocation row the member
-   * has already added holds a clone, which no fragment swap would reach — and a swap would discard
-   * a picked order and a typed amount mid-composition.
-   *
-   * @return the active orders with their needs; an empty list when the lookup fails, which leaves
-   *     the already-rendered labels standing rather than blanking them
+   * @return the active orders with their needs; an empty list when the lookup fails
    */
   @NotNull
   @ResponseBody
@@ -1527,18 +1344,11 @@ public class InventoryPageController {
   }
 
   /**
-   * Flattens the order catalog's needs into the {@code "<orderId>|<materialId>"} lookup the
-   * allocation popover's option loop reads (REQ-INV-039).
-   *
-   * <p>A flat string key rather than a nested map because Thymeleaf resolves {@code
-   * map.get(order.id + '|' + entry.material.id)} in one expression, where a nested lookup would
-   * need a null-safe intermediate per option. Buckets of the same material at different quality
-   * levels are summed: what the order still needs of that material is their total, and the popover
-   * — unlike the check-in form — is not choosing a grade, so it has no floor to weigh them against.
+   * Flattens the order needs into an outstanding-amount map keyed {@code "<orderId>|<materialId>"}
+   * for the allocation popover (REQ-INV-039). Quality buckets of one material are summed.
    *
    * @param orders the loaded order catalog, already carrying its needs.
-   * @return outstanding amount by {@code orderId|materialId}; entries only where something is still
-   *     needed, so a fully covered bucket renders no suffix rather than a "0" one.
+   * @return outstanding amount by {@code orderId|materialId}; only entries still needed.
    */
   @NotNull
   private static Map<String, Double> orderNeedAmounts(
@@ -1562,14 +1372,8 @@ public class InventoryPageController {
   }
 
   /**
-   * Reduces the order catalog to the shape the pickers actually render: two order-id-keyed maps,
-   * one per catalog dimension, under a single envelope.
-   *
-   * <p>One envelope rather than two payloads, because the check-in form switches between Material
-   * and Item mode in place (REQ-INV-029) and has to relabel either without a second fetch — and
-   * because the live-sync refresh then re-reads exactly the shape the page was rendered with.
-   * Orders that need nothing in a dimension are dropped from that map rather than mapped to an
-   * empty list, so the payload carries only what can produce a label.
+   * Reduces the order catalog to one envelope of order-id-keyed material and game-item needs;
+   * orders needing nothing in a dimension are omitted from that map.
    *
    * @param orders the loaded order catalog, already carrying its needs.
    * @return {@code {"materials": {orderId: [...]}, "gameItems": {orderId: [...]}}}, never {@code
@@ -1600,17 +1404,11 @@ public class InventoryPageController {
   }
 
   /**
-   * The item sibling of {@link #orderNeedAmounts}: outstanding whole units by {@code
-   * "<orderId>|<gameItemId>"}, for the game-item stack entries' allocation popover (REQ-INV-039).
-   *
-   * <p>Kept separate from the material lookup although the key shape is identical. A game item and
-   * a material cannot collide on a UUID, so merging them would work — and would let a template
-   * silently read the wrong dimension's figure, which is worse than a missing one, because the two
-   * are different calculations.
+   * Item sibling of {@link #orderNeedAmounts}: outstanding whole units keyed {@code
+   * "<orderId>|<gameItemId>"} (REQ-INV-039).
    *
    * @param orders the loaded order catalog, already carrying its needs.
-   * @return outstanding whole units by {@code orderId|gameItemId}; entries only where something is
-   *     still needed, so a covered game item renders no suffix rather than a "0" one.
+   * @return outstanding whole units by {@code orderId|gameItemId}; only entries still needed.
    */
   @NotNull
   private static Map<String, Integer> orderGameItemNeedAmounts(
@@ -1636,10 +1434,6 @@ public class InventoryPageController {
   /**
    * Serialises the need map for the page's {@code data-order-needs} attribute.
    *
-   * <p>A serialisation failure yields {@code "{}"} rather than propagating: the figures are a
-   * convenience on a form whose actual job is booking stock in, so an unlabelled picker is the
-   * correct degradation and a 500 is not.
-   *
    * @param needs the needs by order id.
    * @return the JSON object, or {@code "{}"} when it cannot be written.
    */
@@ -1653,14 +1447,11 @@ public class InventoryPageController {
   }
 
   /**
-   * Resolves the admin-chosen target user for the inventory-input "assign to user" picker's
-   * edit-mode seed (#1193): the picker now searches server-side rather than preloading the roster,
-   * so only the currently-selected user's option is rendered and needs a display name. Returns
-   * {@code null} when the form is not a global entry, has no chosen user, or the lookup fails
-   * (leaving the picker on its "own entry" placeholder).
+   * Resolves the admin-chosen target user for the input form's user-picker seed option.
    *
    * @param form the inbound inventory form; may be {@code null} before binding.
-   * @return the selected user DTO for the seed option, or {@code null}.
+   * @return the selected user DTO, or {@code null} when not a global entry, none chosen, or the
+   *     lookup fails.
    */
   @Nullable
   private de.greluc.krt.profit.basetool.frontend.model.dto.UserDto fetchSelectedInputUser(
@@ -1673,7 +1464,6 @@ public class InventoryPageController {
           "/api/v1/users/" + form.getUserId(),
           de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
     } catch (Exception e) {
-      // REQ-OBS-004: log the id only, never the resolved name.
       log.warn(
           "Failed to resolve selected user {} for inventory-input picker seed",
           form.getUserId(),
@@ -1683,26 +1473,14 @@ public class InventoryPageController {
   }
 
   /**
-   * Resolves the {@link OrgUnitMembershipOptionDto} list that drives the R5.d owner-picker fragment
-   * on the inventory-input form. The target user is:
+   * Resolves the owner-picker options on the inventory-input form from the memberships of the
+   * form's {@code userId} for an admin global entry, otherwise of the caller.
    *
-   * <ul>
-   *   <li>The form's {@code userId} when the admin is creating a global entry for another user (the
-   *       picker reflects the chosen user's memberships).
-   *   <li>The calling user otherwise (a self-entry — picker reflects the caller's own memberships).
-   * </ul>
-   *
-   * <p>Falling back to an empty list when the lookup fails keeps the page renderable: the fragment
-   * collapses to a hidden state when its option list is empty, so a transient backend hiccup does
-   * not break the rest of the form.
-   *
-   * @param form the inbound inventory form (may be {@code null} on first GET before binding).
-   * @return picker options or empty list; never {@code null}.
+   * @param form the inbound inventory form (may be {@code null} before binding).
+   * @return picker options, or an empty list on failure; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(InventoryForm form) {
     if (form != null && Boolean.TRUE.equals(form.getIsGlobal()) && form.getUserId() != null) {
-      // Admin creating a global entry for ANOTHER user → that user's DIRECT memberships (their own
-      // stock). The create-on-behalf cascade is the caller's reach, not a third-party owner's.
       try {
         List<OrgUnitMembershipOptionDto> options =
             backendApiClient.get(
@@ -1714,9 +1492,6 @@ public class InventoryPageController {
         return List.of();
       }
     }
-    // Self-entry → the caller's pickable org units: direct memberships plus their cascading
-    // leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs), epic #692 Phase 5.
-    // Unchanged for an ordinary member. Resolved server-side for the caller.
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
@@ -1785,14 +1560,8 @@ public class InventoryPageController {
    * Loads the active-order catalog, optionally with each order's outstanding per-material need
    * (REQ-INV-039).
    *
-   * <p>The needs are asked for only by the two surfaces that render them — the Einbuchen form's
-   * allocation rows and the per-entry allocation popover — because folding an ITEM order's
-   * blueprint-derived requirements costs a read the filter dropdowns on the Lager pages, which use
-   * this catalog only for their order checkboxes, would otherwise pay on every page load.
-   *
    * @param withNeeds whether to request the per-material need figures
-   * @return the active orders the caller may see; empty (never {@code null}) when the lookup fails,
-   *     so a picker degrades to unlabelled options rather than the page failing
+   * @return the active orders the caller may see; empty (never {@code null}) when the lookup fails
    */
   @NotNull
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>
@@ -1836,15 +1605,8 @@ public class InventoryPageController {
   }
 
   /**
-   * Whether the caller reaches {@code LOGISTICIAN} — the gate on writing to another member's row.
-   *
-   * <p><strong>Resolved, not enumerated.</strong> This used to list {@code LOGISTICIAN || OFFICER
-   * || ADMIN} by hand against the raw authority set. That was correct only for as long as the list
-   * stayed complete: the hierarchy already says {@code ADMIN > LOGISTICIAN} and {@code OFFICER >
-   * LOGISTICIAN} (declared once in {@code SecurityConfig#roleHierarchy}, mirroring the backend), so
-   * a third role placed above Logistician would have been silently missed here while every {@code
-   * sec:authorize} in the templates picked it up. Asking the hierarchy makes this agree with them
-   * by construction (ADR-0151).
+   * Whether the caller holds {@code LOGISTICIAN} or a role above it, resolved through the role
+   * hierarchy (ADR-0151).
    *
    * @return {@code true} iff the caller holds Logistician or a role above it.
    */

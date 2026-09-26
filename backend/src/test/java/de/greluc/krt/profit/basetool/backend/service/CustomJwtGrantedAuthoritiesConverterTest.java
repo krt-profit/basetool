@@ -68,10 +68,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Mockito unit tests for {@link CustomJwtGrantedAuthoritiesConverter}, focused on the epic #692 /
- * REQ-ORG-015 cascade: a Bereichsleitung / OL leadership membership must mint officer-equivalent
- * flat roles ({@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER}) plus contextual authorities
- * for every org unit the leadership reaches downward, and a plain member must be unaffected.
+ * Unit tests for {@link CustomJwtGrantedAuthoritiesConverter}'s leadership cascade (REQ-ORG-015):
+ * Bereichsleitung and OL memberships mint officer-equivalent flat and downward contextual
+ * authorities.
  */
 @ExtendWith(MockitoExtension.class)
 class CustomJwtGrantedAuthoritiesConverterTest {
@@ -85,12 +84,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   private final List<String> gatewayClientIds = new ArrayList<>();
 
   /**
-   * A real instance, not a mock: the default empty allowlist is the state most of these tests need
-   * — no caller is a gateway, so the machine-identity carve-out never fires and each case exercises
-   * the ordinary member path it was written for (ADR-0129).
-   *
-   * <p>A spy rather than a plain field so the two carve-out tests can set an allowlist on it and
-   * drive the other branch.
+   * A real, spied instance with an empty gateway allowlist by default, so the machine-identity
+   * carve-out only fires where a test sets one (ADR-0129).
    */
   @Spy
   private final IngestGatewayProperties ingestGatewayProperties =
@@ -120,21 +115,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   private static final UUID DESCENDANT_SK_ID = UUID.randomUUID();
 
   /**
-   * A configured gateway is a machine: exactly one marker authority, and no registration.
-   *
-   * <p>The carve-out shipped untested, which is how the defect it fixes reached production in the
-   * first place. Both halves are asserted, because each fails differently:
-   *
-   * <ul>
-   *   <li>The authority set is {@code ROLE_INGEST_GATEWAY} and <em>nothing else</em>. A named
-   *       authority rather than an empty set, so a misconfiguration reads as "authenticated as a
-   *       machine" instead of "not authenticated" — and nothing extra, so the gateway's own bearer
-   *       can reach no member surface.
-   *   <li>{@code userReconciliationService} is never touched. That is the actual production
-   *       failure: the gateway's first call created an {@code app_user} row for itself, stamped it
-   *       PENDING, granted the default blueprints, notified the admins, and then 403'd its own
-   *       account. Asserting only the authorities would still pass while all of that happened.
-   * </ul>
+   * A configured gateway gets only {@code ROLE_INGEST_GATEWAY} and is never registered as a user.
    */
   @Test
   void grantsAConfiguredGatewayTheMachineAuthorityAndNeverRegistersIt() {
@@ -170,16 +151,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     verify(userReconciliationService).syncUser(jwt);
   }
 
-  /**
-   * REQ-SEC-036 - the request is authorised by the roles the TOKEN carried, not by the row's.
-   *
-   * <p>The two are the same set for every client whose claim is complete. They differ for a
-   * partial-scope client, and this is the case that makes the split worth its cost: because that
-   * path deliberately no longer overwrites the stored roles, the row an administrator's app request
-   * loads still holds {@code Admin}. Reading the roles back off it here would hand the app exactly
-   * the authority its Keycloak client scope was configured to withhold - a guard that made the
-   * problem worse than the defect it replaced.
-   */
+  /** The request is authorised by the token's roles, not the stored ones (REQ-SEC-036). */
   @Test
   void authorisesWithTheEffectiveRolesRatherThanTheStoredOnes() {
     User admin = userWithNoRoles();
@@ -241,8 +213,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void convert_sameToken_memoisesAuthorities_assemblesOnce() {
-    // #1141: two calls with the SAME token (same sub + issuedAt) must resolve the authorities once
-    // and serve the second from the cache — no second syncUser / membership read.
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt()).thenReturn(Instant.ofEpochSecond(1_700_000_000L));
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
@@ -258,8 +228,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void convert_freshlyIssuedToken_missesCache_reassembles() {
-    // A token WITHOUT a session id (a client-credentials grant has none) falls back to the
-    // pre-BE-PERF-08 key: a new issuedAt is a new key, so the authorities are re-read (#1141).
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt())
         .thenReturn(Instant.ofEpochSecond(1_700_000_000L), Instant.ofEpochSecond(1_700_000_300L));
@@ -274,8 +242,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void convert_tokenWithoutIssuedAt_bypassesCache() {
-    // An unkeyable token (missing issuedAt) must never be cached — always recompute, never risk
-    // serving a stale result under a degenerate key (#1141).
     when(jwt.getSubject()).thenReturn("sub-1");
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
@@ -304,11 +270,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   }
 
   /**
-   * The guarantee the session key must not cost: a realm role granted or revoked in Keycloak takes
-   * effect on the next refreshed token, exactly as it did while {@code issuedAt} was in the key.
-   * The refreshed token carries the new role list, the claims fingerprint differs, and the
-   * authorities are re-assembled — here the revocation is observable in the result, not only in the
-   * call count.
+   * A refreshed token with changed realm roles misses the cache and its authorities reflect the
+   * change immediately.
    */
   @Test
   void convert_refreshedTokenWithChangedRoles_missesAndReflectsTheChangeImmediately() {
@@ -475,10 +438,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
-    // Officer-equivalent flat roles (back-compat for role-only @PreAuthorize gates).
     assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
     assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    // Contextual authorities for every cascaded unit, both roles.
     for (UUID reached : List.of(BEREICH_ID, DESCENDANT_STAFFEL_ID, DESCENDANT_SK_ID)) {
       assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", reached)));
       assertTrue(authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", reached)));
@@ -492,7 +453,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
     ol.setRole(MembershipRole.OL_MEMBER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(ol));
-    // The cascade service resolves OL reach to the concrete union of every org unit.
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
         .thenReturn(Set.of(olId, BEREICH_ID, DESCENDANT_STAFFEL_ID));
 
@@ -506,12 +466,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade() {
-    // REQ-ROLE-002: a squadron leadership rank confers officer-equivalent reach over its OWN
-    // squadron only, exactly as SK_LEAD does — the flat back-compat roles plus the own-unit
-    // contextual authorities, but NO downward cascade and no contextual authority for any foreign
-    // unit. The cascade service yields nothing for a squadron rank (verified in
-    // OrgUnitCascadeService
-    // tests), so the only reach is the own-squadron contextual minted by the per-row loop.
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     UUID squadronId = UUID.randomUUID();
     OrgUnitMembership lead = membership(squadronId, OrgUnitKind.SQUADRON);
@@ -521,13 +475,10 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
-    // Officer-equivalent flat roles, exactly as SK_LEAD (back-compat for role-only @PreAuthorize).
     assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
     assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    // Own-squadron contextual authorities (minted by the per-row loop, not the cascade).
     assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", squadronId)));
     assertTrue(authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", squadronId)));
-    // ...and NOTHING for any other unit — no downward cascade, no cross-unit contextual reach.
     UUID foreignUnit = UUID.randomUUID();
     assertFalse(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", foreignUnit)));
     assertFalse(
@@ -536,11 +487,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void pendingRegistration_getsOnlyPendingApprovalAndNeverConsultsMembership() {
-    // REQ-SEC-017: a PENDING registration is granted NO authorities except ROLE_PENDING_APPROVAL —
-    // the entire assembly is short-circuited, so membership/cascade are never consulted, and
-    // neither the deleted ROLE_GUEST nor the ROLE_NO_ROLE marker that replaced it is carried. The
-    // order matters: PENDING is answered before the role check, so a pending registration is told
-    // it is pending rather than that it holds no role.
     User pending = userWithNoRoles();
     pending.setApprovalStatus(ApprovalStatus.PENDING);
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(pending));
@@ -556,7 +502,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void rejectedRegistration_getsOnlyPendingApprovalAuthority() {
-    // A REJECTED account is treated like PENDING — no authorities, routed to the waiting page.
     User rejected = userWithNoRoles();
     rejected.setApprovalStatus(ApprovalStatus.REJECTED);
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(rejected));
@@ -572,7 +517,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void memberlessUser_getsNoMembershipDerivedAuthorities() {
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
-    // No memberships → the converter short-circuits before consulting the cascade.
     lenient().when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
@@ -583,10 +527,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void convert_retriesOnOptimisticLockThenSucceeds() {
-    // Concurrency invariant: a transient ObjectOptimisticLockingFailureException from concurrent
-    // first-time logins by the same sub must NOT fail the authentication — the retry loop re-runs
-    // syncUser and the second attempt succeeds, so the authorities resolve normally. A regression
-    // that rethrew immediately (no retry) would deny a legitimate concurrent login.
     when(userReconciliationService.syncUser(jwt))
         .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID))
         .thenReturn(ReconciledUser.of(userWithNoRoles()));
@@ -600,12 +540,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void convert_exhaustsRetries_throwsAuthenticationServiceException() {
-    // After MAX_SYNC_ATTEMPTS (3) consecutive optimistic-lock failures the converter must reject
-    // the
-    // authentication with AuthenticationServiceException rather than fall through with null/empty
-    // authorities (which would silently treat the caller as unauthenticated). Exactly three
-    // attempts
-    // are made before giving up.
     when(userReconciliationService.syncUser(jwt))
         .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID));
 

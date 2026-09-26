@@ -66,15 +66,9 @@ class LiveSyncTopicTest {
     assertThat(order.resourceId()).isEqualTo(id);
     assertThat(order.canonical()).isEqualTo("order:" + id);
 
-    // The near-identical `order`/`orders` stem must NOT collide: a scoped `order:{id}` is the
-    // detail
-    // room, while the bare `orders` is the global staff-queue room — distinct classes, keyed apart
-    // by
-    // prefix and the presence of the id segment.
     LiveSyncTopic queue = LiveSyncTopic.parse("orders");
     assertThat(queue).isNotNull();
     assertThat(queue.topicClass()).isEqualTo(LiveSyncTopicClass.ORDERS_QUEUE);
-    // The `order` detail room is scoped, so the bare prefix (no id) is rejected.
     assertThat(LiveSyncTopic.parse("order")).isNull();
   }
 
@@ -90,15 +84,11 @@ class LiveSyncTopicTest {
 
   @Test
   void parse_rejectsGlobalOrdersQueueTopicCarryingAnId() {
-    // `orders` is a global room; a prefixed id violates its scope.
     assertThat(LiveSyncTopic.parse("orders:" + UUID.randomUUID())).isNull();
   }
 
   @Test
   void parse_acceptsGlobalMissionsListTopic_andDistinguishesItFromTheMissionDetailRoom() {
-    // #1235: the `mission`/`missions` stem repeats the `order`/`orders` shape and must not collide
-    // — a bare `missions` is the global list room, `mission:{id}` the per-mission detail room.
-    // A silent collision here would route mission-detail presence frames into the list room.
     UUID id = UUID.randomUUID();
 
     LiveSyncTopic list = LiveSyncTopic.parse("missions");
@@ -112,14 +102,12 @@ class LiveSyncTopicTest {
     assertThat(detail.topicClass()).isEqualTo(LiveSyncTopicClass.MISSION);
     assertThat(detail.resourceId()).isEqualTo(id);
 
-    // `missions` is global (an id violates its scope); `mission` is scoped (the bare prefix does).
     assertThat(LiveSyncTopic.parse("missions:" + id)).isNull();
     assertThat(LiveSyncTopic.parse("mission")).isNull();
   }
 
   @Test
   void parse_acceptsGlobalRefineryTopic_andRejectsAnIdOnIt() {
-    // #1235: the refinery-order queue room is a bare-prefix global room.
     LiveSyncTopic topic = LiveSyncTopic.parse("refinery");
 
     assertThat(topic).isNotNull();
@@ -131,7 +119,6 @@ class LiveSyncTopicTest {
 
   @Test
   void parse_acceptsGlobalMembersTopic_andRejectsAnIdOnIt() {
-    // #1235: the Mitgliederverwaltung roster room ("Rollen") is a bare-prefix global room.
     LiveSyncTopic topic = LiveSyncTopic.parse("members");
 
     assertThat(topic).isNotNull();
@@ -143,9 +130,6 @@ class LiveSyncTopicTest {
 
   @Test
   void parse_acceptsGlobalOrgStructureTopic_andRejectsAnIdOnIt() {
-    // #1235: the hyphenated prefix shared by the admin editor and the Organigramm. The hyphen is
-    // load-bearing — LiveSyncTopic matches prefixes exactly, so a rename would silently 404 the
-    // room rather than fall back to a neighbouring class.
     LiveSyncTopic topic = LiveSyncTopic.parse("org-structure");
 
     assertThat(topic).isNotNull();
@@ -157,17 +141,11 @@ class LiveSyncTopicTest {
 
   @Test
   void membersTopic_isTheOnlyNewClassGatedByALocalAdminRoleCheck() {
-    // #1235: the roster room mirrors the page's class-level ADMIN gate with a backend-free local
-    // check, while the other three new rooms are authenticated-only on purpose — the missions and
-    // refinery lists are isAuthenticated(), and org-structure must admit the members who can see
-    // the Organigramm. Pinning this stops a later "tighten it up" from silently cutting members
-    // off from their own chart.
     assertThat(LiveSyncTopicClass.MEMBERS.requiredAnyRole()).containsExactly("ROLE_ADMIN");
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.requiredAnyRole()).isNull();
     assertThat(LiveSyncTopicClass.REFINERY.requiredAnyRole()).isNull();
     assertThat(LiveSyncTopicClass.ORG_STRUCTURE.requiredAnyRole()).isNull();
 
-    // None of the four probes the backend, and none carries presence (only `mission` does).
     for (LiveSyncTopicClass added :
         List.of(
             LiveSyncTopicClass.MISSIONS_LIST,
@@ -183,7 +161,6 @@ class LiveSyncTopicTest {
 
   @Test
   void parse_acceptsGlobalInventoryTopic() {
-    // #1307: the shared-Lager room is a bare-prefix global room (like `orders` / `materialboard`).
     LiveSyncTopic topic = LiveSyncTopic.parse("inventory");
 
     assertThat(topic).isNotNull();
@@ -194,7 +171,6 @@ class LiveSyncTopicTest {
 
   @Test
   void parse_rejectsGlobalInventoryTopicCarryingAnId() {
-    // `inventory` is a global room; a prefixed id violates its scope.
     assertThat(LiveSyncTopic.parse("inventory:" + UUID.randomUUID())).isNull();
   }
 
@@ -202,8 +178,6 @@ class LiveSyncTopicTest {
   void parse_distinguishesTheSharedBankPrefixByScope() {
     UUID id = UUID.randomUUID();
 
-    // `bank:{id}` is the per-account room; the bare `bank` is the staff room — the SAME prefix,
-    // split by the presence of the id segment (the scope-aware classForPrefix fix).
     LiveSyncTopic account = LiveSyncTopic.parse("bank:" + id);
     assertThat(account).isNotNull();
     assertThat(account.topicClass()).isEqualTo(LiveSyncTopicClass.BANK_ACCOUNT);
@@ -216,7 +190,6 @@ class LiveSyncTopicTest {
     assertThat(staff.resourceId()).isNull();
     assertThat(staff.canonical()).isEqualTo("bank");
 
-    // `bank:` with an empty id is a malformed scoped topic, not a fallback to the staff room.
     assertThat(LiveSyncTopic.parse("bank:")).isNull();
   }
 
@@ -226,7 +199,6 @@ class LiveSyncTopicTest {
     assertThat(topic).isNotNull();
     assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.ORGUNIT_BANK);
     assertThat(topic.resourceId()).isNull();
-    // A global room; a prefixed id violates its scope.
     assertThat(LiveSyncTopic.parse("orgunit-bank:" + UUID.randomUUID())).isNull();
   }
 
@@ -237,15 +209,11 @@ class LiveSyncTopicTest {
     assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.MATERIALBOARD);
     assertThat(topic.resourceId()).isNull();
     assertThat(topic.canonical()).isEqualTo("materialboard");
-    // A global room; a prefixed id violates its scope.
     assertThat(LiveSyncTopic.parse("materialboard:" + UUID.randomUUID())).isNull();
   }
 
   @Test
   void parse_keepsTheScopedRefineryOrderRoomAndTheGlobalRefineryQueueApart() {
-    // #1238 sits next to #1235's global refinery queue, so the two must never collapse into one
-    // another. The scoped detail room took the distinct `refinery-order` stem rather than reusing
-    // `refinery`, which makes each of the four spellings below resolve exactly one way.
     UUID id = UUID.randomUUID();
 
     LiveSyncTopic detail = LiveSyncTopic.parse("refinery-order:" + id);
@@ -259,12 +227,9 @@ class LiveSyncTopicTest {
     assertThat(queue.topicClass()).isEqualTo(LiveSyncTopicClass.REFINERY);
     assertThat(queue.resourceId()).isNull();
 
-    // The scoped class needs its id, and the global one rejects a prefixed id (no scoped class uses
-    // the bare `refinery` prefix) — so neither spelling can ever land in the other's room.
     assertThat(LiveSyncTopic.parse("refinery-order")).isNull();
     assertThat(LiveSyncTopic.parse("refinery:" + id)).isNull();
 
-    // The labels are the part that keeps them apart on the ops dashboard (REQ-OBS-011).
     assertThat(LiveSyncTopicClass.REFINERY_ORDER.metricLabel()).isEqualTo("refinery_order");
     assertThat(LiveSyncTopicClass.REFINERY.metricLabel()).isEqualTo("refinery_queue");
   }
@@ -309,8 +274,6 @@ class LiveSyncTopicTest {
       assertThat(topicClass.prefix()).as("prefix of %s", topicClass).isNotBlank();
       assertThat(topicClass.metricLabel()).as("metric label of %s", topicClass).isNotBlank();
     }
-    // Metric labels must be unique so the bounded topic_class dimension never collides
-    // (REQ-OBS-011).
     long distinctLabels =
         java.util.Arrays.stream(classes).map(LiveSyncTopicClass::metricLabel).distinct().count();
     assertThat(distinctLabels).isEqualTo(classes.length);
@@ -318,9 +281,6 @@ class LiveSyncTopicTest {
 
   @Test
   void orderRoomsCarryDistinctlyNamedMetricLabels() {
-    // The per-order detail room and the global orders queue share the order/orders wire stem but
-    // must surface as clearly distinct `topic_class` series on the ops dashboard — not `order` vs
-    // `orders`, which read as one accidental duplicate. Pin the disambiguated labels.
     assertThat(LiveSyncTopicClass.ORDER.metricLabel()).isEqualTo("order_detail");
     assertThat(LiveSyncTopicClass.ORDERS_QUEUE.metricLabel()).isEqualTo("orders_queue");
   }

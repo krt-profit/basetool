@@ -1,29 +1,6 @@
-/*
- * Personal Inventory frontend logic.
- *
- * Responsibilities:
- *  - Open/close create/edit modal, prefill fields from row dataset.
- *  - Open/close KRT-styled delete confirmation modal (no native confirm()).
- *  - Provide a debounced typeahead against /personal-inventory/uex-search,
- *    rendering combined CITY + SPACE_STATION results and writing the chosen
- *    UEX id and type into the hidden form fields.
- *
- * Wiring: this module uses the global `krtEvents.on` event-delegation helper
- * (see static/js/event-delegation.js) to bind logical actions declared in the
- * template as `data-trigger="pi-…"` attributes — no inline `onclick="…"` is
- * required, which is what lets the CSP forbid `script-src-attr 'unsafe-inline'`.
- *
- * The module purposely avoids any inline alert()/confirm()/prompt() calls
- * (KRT corporate design rule) and reads its translatable strings from
- * window.krtPersonalInventoryI18n which the Thymeleaf template populates.
- */
 (function () {
     'use strict';
 
-    // Result cap requested from /personal-inventory/uex-search (mirrors the backend clamp). When a
-    // response fills the cap — realistically only the empty-query "browse everything" mode — the
-    // list is (potentially) truncated and renderResults appends a refine-your-search hint instead
-    // of pretending the catalog ends there (REQ-FE-016 no-silent-truncation rule, ADR-0100).
     const SEARCH_LIMIT = 2000;
 
     let modal = null;
@@ -62,7 +39,6 @@
                 }
             });
         }
-        // ESC closes any open modal.
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') {
                 closeModal();
@@ -74,16 +50,6 @@
         wireAdminMemberPersistence();
     }
 
-    // ------------------------------------------------ admin member persistence
-
-    // Admin page only (REQ-UI-017): the selected member is kept per browser so reopening
-    // /admin/personal-inventory returns to the last-inspected member. An explicit ?userSub= in the
-    // address bar (kept in sync by the history:true member swap below) wins and is re-persisted; a
-    // BARE load with a saved member does a one-time location.replace to ?userSub=<saved> — loop-
-    // safe because the target URL carries the param — so the SERVER seeds the remote-users
-    // combobox with the member's display label (which a client-side restore could not
-    // reconstruct). The q text filter is deliberately NOT persisted. Guarded on the member picker
-    // form, which only the admin page renders, so the user page is untouched.
     const ADMIN_USER_PREF_KEY = 'admin_personal_inventory_user';
 
     function wireAdminMemberPersistence() {
@@ -95,15 +61,10 @@
                 if (value) {
                     localStorage.setItem(ADMIN_USER_PREF_KEY, JSON.stringify({ userSub: value }));
                 } else {
-                    // Cleared selection = back to the server default (the bare picker).
                     localStorage.removeItem(ADMIN_USER_PREF_KEY);
                 }
-            } catch (_e) {
-                /* storage unavailable */
-            }
+            } catch (_e) {}
         }
-        // Persist every member change right away; the in-place swap of #pi-results is wired
-        // separately (wireFilterSwap above) and both listeners see the same change event.
         document.addEventListener('change', function (e) {
             const sel = e.target;
             if (sel.matches && sel.matches('form.krt-pi-userform [name="userSub"]')) {
@@ -130,15 +91,6 @@
         }
     }
 
-    // --------------------------------------------------------- in-place writes
-
-    // The create/edit modal form and the delete form submit through krtFetch (REQ-FE-001/002)
-    // instead of a classic POST→redirect: on success the modal closes and the #pi-results list is
-    // re-rendered in place via the existing fragment swap, preserving the active filter. The header
-    // count resyncs from the swapped #pi-total-meta marker (see syncCounts). The classic POST
-    // handlers stay the no-JS fallback (the AJAX twins are gated on X-Requested-With, which krtFetch
-    // always sends). Listeners are delegated on document; the forms live outside #pi-results, so a
-    // filter swap never detaches them.
     function wireWriteSubmits() {
         if (!window.krtFetch) {
             return;
@@ -165,8 +117,6 @@
         };
     }
 
-    // Re-render only the #pi-results list for the active filter (mirrors the address-bar query the
-    // filter swap keeps in sync), without touching the URL again.
     function reswapResults() {
         window.krtFetch.swap({
             url: window.location.pathname + window.location.search,
@@ -273,16 +223,6 @@
             });
     }
 
-    // ----------------------------------------------------------- filter swap
-
-    // The search filter (and, on the admin variant, the member <select>) re-render only the
-    // #pi-results block in place (REQ-FE-002) instead of reloading the page. Listeners are
-    // DELEGATED on document so they survive the filter form / table being re-rendered inside the
-    // swapped fragment — the admin page nests the filter form INSIDE the swap target, so a direct
-    // binding would be lost after the first swap. The row edit/delete buttons are krtEvents-
-    // delegated and the modals live outside the container, so swapped-in rows stay live with no
-    // re-init. After each swap the header counts are resynced from the hidden total the fragment
-    // carries (user page only). Without krtFetch (JS disabled) the GET forms reload as before.
     function wireFilterSwap() {
         if (!window.krtFetch || !document.getElementById('pi-results')) {
             return;
@@ -321,13 +261,8 @@
                 swapFromForm(formEl);
             }, 300);
         });
-        // Admin variant: selecting a member swaps in their inventory in place, replacing the
-        // legacy data-trigger="submit-form" full reload (removed from that <select>).
         document.addEventListener('change', function (e) {
             const sel = e.target;
-            // Match the member control by name (not tag): the global searchable-combobox enhancer
-            // replaces the <select> with a hidden <input name="userSub">, which is what dispatches
-            // the change once enhanced; the plain <select> still matches before enhancement / no-JS.
             if (!sel.matches || !sel.matches('form.krt-pi-userform [name="userSub"]')) {
                 return;
             }
@@ -341,9 +276,6 @@
         });
     }
 
-    // Mirrors the freshly filtered total (carried by the #pi-total-meta marker inside the swapped
-    // fragment) into the header subtitle ("<n> Eintraege") and the active tab's count badge, so the
-    // counts never drift from the visible list after a filter swap.
     function syncCounts(root) {
         const meta = (root || document).querySelector('#pi-total-meta');
         if (!meta) {
@@ -505,9 +437,6 @@
             html += '</span></button>';
         });
         if (items.length >= SEARCH_LIMIT) {
-            // The response filled the requested cap, so more locations likely exist beyond it —
-            // say so instead of silently ending the list (REQ-FE-016). Typing any query narrows
-            // the result far below the cap, so every location stays reachable.
             html +=
                 '<div class="krt-pi-typeahead-more">' +
                 escapeHtml(
@@ -531,11 +460,8 @@
     }
 
     /**
-     * Sanitizes the quantity input to ensure only positive integers (>= 1).
-     * Strips any non-digit characters (e.g. '-', '.', 'e') that some browsers
-     * still allow in <input type="number"> and clamps the lower bound to 1.
-     * The upper bound is intentionally not enforced here; backend @Min(1)
-     * remains the authoritative validator.
+     * Restricts the quantity input to a positive integer by stripping non-digit characters and
+     * clamping it to at least 1; no upper bound is enforced.
      */
     function sanitizeQuantity(input) {
         if (!input) return;
@@ -545,7 +471,6 @@
             if (raw !== '') input.value = '';
             return;
         }
-        // Strip leading zeros (but keep a single zero if user is mid-typing).
         digitsOnly = digitsOnly.replace(/^0+/, '');
         let n = parseInt(digitsOnly, 10);
         if (isNaN(n) || n < 1) n = 1;
@@ -558,15 +483,6 @@
         init();
     }
 
-    // Delegated event bindings via the global event-delegation helper. The
-    // matching `data-trigger="pi-…"` attributes are set on the buttons / inputs
-    // in personal-inventory.html. Using delegated listeners (rather than
-    // querySelectorAll + addEventListener per node) keeps the wiring working for
-    // table rows that are re-rendered by Thymeleaf on form errors without
-    // requiring a re-bind. The legacy `window.krtPersonalInventory.x(this)`
-    // global is intentionally removed — every template entry point now goes
-    // through `data-trigger` so the CSP can later drop
-    // `script-src-attr 'unsafe-inline'`.
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'pi-open-create', openCreate);
         window.krtEvents.on('click', 'pi-open-edit', openEdit);

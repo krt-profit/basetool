@@ -17,19 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Locations admin page module (/admin/locations), extracted verbatim from the two former inline
- * scripts of admin/locations.html (ADR-0069, follow-up to #924).
- *
- * The location-name autocomplete (via the shared krtAutocomplete), the client-side name filterTable,
- * and the in-place visibility / home-location toggles (#582): each toggle posts via window.krtFetch
- * and re-renders both row buttons from the authoritative LocationDto response, so the page never
- * reloads; the classic POST->redirect forms stay the no-JS fallback.
- *
- * The interpolated toast/conflict strings stay inline in the page bootstrap as the LOCATION_MSG /
- * LOCATION_CONFLICT globals this module reads.
- */
-
 /* global krtAutocomplete, LOCATION_MSG, LOCATION_CONFLICT */
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -48,7 +35,7 @@ function filterTable(tableId, query) {
     const table = document.getElementById(tableId);
     const tr = table.getElementsByTagName('tr');
     for (let i = 1; i < tr.length; i++) {
-        const td = tr[i].getElementsByTagName('td')[0]; // Name is in the first column
+        const td = tr[i].getElementsByTagName('td')[0];
         if (td) {
             const txtValue = td.textContent || td.innerText;
             if (txtValue.toUpperCase().indexOf(filter) > -1) {
@@ -60,19 +47,11 @@ function filterTable(tableId, query) {
     }
 }
 
-// Publish filterTable as a window global for the shared filter-table common-handler
-// (common-handlers.js calls window.filterTable(tableId, value) on the search box input).
 window.filterTable = filterTable;
 
-document.addEventListener('DOMContentLoaded', function () {
-    // Scripts removed as modals are no longer used
-});
+document.addEventListener('DOMContentLoaded', function () {});
 
 document.addEventListener('DOMContentLoaded', function () {
-    // The response is the full LocationDto, so both toggle buttons in the row are re-rendered
-    // from the authoritative state regardless of which one was clicked. data-label-on is the
-    // label shown when the flag is TRUE, data-label-off when FALSE; btn-secondary tracks the
-    // flag with the per-button polarity passed as secondaryWhen.
     function patchButton(btn, flagValue, secondaryWhen) {
         if (!btn) {
             return;

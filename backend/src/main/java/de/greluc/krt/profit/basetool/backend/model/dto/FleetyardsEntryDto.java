@@ -23,46 +23,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Internal DTO for parsing a single entry from a Fleetyards hangar JSON export (see {@code
- * https://fleetyards.net}). A Fleetyards export is a flat array of vehicle records carrying the RSI
- * ship code, manufacturer codes, a kebab-case slug and a handful of per-ship flags (wanted,
- * flagship, public, nameVisible, saleNotify) plus {@code groups}/{@code modules}/{@code upgrades}
- * arrays. The import flow consumes only the three fields declared below; everything else is layout
- * or store metadata it does not need.
+ * One vehicle entry of a Fleetyards hangar JSON export; only the fields the import consumes are
+ * mapped, unknown fields are ignored.
  *
- * <p>{@code @JsonIgnoreProperties(ignoreUnknown = true)} keeps Jackson tolerant towards the many
- * unconsumed fields and any forward-compatible additions in a future Fleetyards release so a new
- * field does not break our parse step.
- *
- * <p>Format example (single entry):
- *
- * <pre>
- * {
- *   "name":             "A1 Spirit",
- *   "slug":             "crus-a1-spirit",
- *   "shipCode":         "crus_spirit_a1",
- *   "manufacturerName": "Crusader Industries",
- *   "manufacturerCode": "CRUS",
- *   "shipName":         "Koto",
- *   "wanted":           false,
- *   "flagship":         false,
- *   "public":           true,
- *   "nameVisible":      true,
- *   "saleNotify":       false,
- *   "groups":           [],
- *   "modules":          [],
- *   "upgrades":         []
- * }
- * </pre>
- *
- * @param name the ship-model name (e.g. {@code "A1 Spirit"}), the primary key fed into the name
- *     matcher
- * @param shipName the user's custom ship name (e.g. {@code "Koto"}), or {@code null}/blank when the
- *     ship was never individually named; carried as the imported ship's individual name when it is
- *     not merely an echo of {@code name}
- * @param slug Fleetyards' manufacturer-prefixed kebab-case slug (e.g. {@code "crus-a1-spirit"}),
- *     used as the slug-fallback match key against {@code ShipType.uexSlug} / {@code
- *     ShipType.scwikiSlug} when the name stages miss
+ * @param name the ship-model name (e.g. {@code "A1 Spirit"}), the primary match key
+ * @param shipName the user's custom ship name, or {@code null}/blank when unnamed
+ * @param slug the kebab-case slug (e.g. {@code "crus-a1-spirit"}), the fallback match key
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record FleetyardsEntryDto(

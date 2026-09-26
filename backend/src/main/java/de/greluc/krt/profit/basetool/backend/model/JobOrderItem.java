@@ -42,15 +42,12 @@ import lombok.Setter;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One ordered finished-item line of an {@link JobOrderType#ITEM} {@link JobOrder}. Captures which
- * {@link GameItem} is requested, in which quantity ({@link #amount} whole units), produced via the
- * {@link #blueprint} the requester chose for this line (relevant when an item has more than one
- * blueprint). The derived material requirements are snapshotted into {@link #materials} at creation
- * time; {@link #manufacturedAmount} tracks how many units have been produced (consuming linked
- * stock) and {@link #deliveredAmount} tracks fulfilment via item handovers, holding the invariant
- * {@code 0 <= deliveredAmount <= manufacturedAmount <= amount} (a unit can only be delivered once
- * it has been manufactured). When the line was adopted from another line's blueprint sub-assembly
- * suggestion, {@link #parentItem} records that provenance.
+ * One ordered finished-item line of an {@link JobOrderType#ITEM} {@link JobOrder}: the requested
+ * {@link GameItem}, its whole-unit {@link #amount} and the chosen {@link #blueprint}.
+ *
+ * <p>Material requirements are snapshotted into {@link #materials} at creation; progress holds
+ * {@code 0 <= deliveredAmount <= manufacturedAmount <= amount}. {@link #parentItem} records the
+ * line it was adopted from as a sub-assembly suggestion.
  */
 @Entity
 @Getter
@@ -104,9 +101,8 @@ public class JobOrderItem extends AbstractEntity<UUID> {
   private Integer manufacturedAmount = 0;
 
   /**
-   * The parent line this one was adopted from when accepting a blueprint sub-assembly suggestion,
-   * or {@code null} for a directly-added line. Informational provenance only; cleared (set to null)
-   * rather than cascaded when the parent line is removed.
+   * The line this one was adopted from as a blueprint sub-assembly suggestion, or {@code null} for
+   * a directly-added line. Informational only; set to {@code null} when the parent line is removed.
    */
   @Nullable
   @ManyToOne(fetch = FetchType.LAZY)

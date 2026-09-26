@@ -68,15 +68,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Coverage for {@link MissionService} lifecycle / ownership methods that the existing focused test
- * files don't reach: {@code deleteMission}, {@code removeParticipant}, {@code updateMissionOwner},
- * {@code removeMissionFrequency}, and {@code findAllActiveReference}.
- *
- * <p>{@code deleteMission} performs two manual collection detachments (refinery orders,
- * sub-missions) before deleting the mission row — exactly the kind of multi-step transaction
- * CLAUDE.md flags as bug-prone; since Variante C (REQ-INV-027) the inventory earmarks cascade via
- * the mission-allocation FK instead of a manual null-out. {@code updateMissionOwner} is
- * privilege-escalation surface. None of these had dedicated tests before this PR.
+ * Tests the lifecycle and ownership methods of {@link MissionService}: {@code deleteMission},
+ * {@code removeParticipant}, {@code updateMissionOwner}, {@code removeMissionFrequency} and {@code
+ * findAllActiveReference}.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionServiceLifecycleTest {
@@ -101,21 +95,10 @@ class MissionServiceLifecycleTest {
   @Mock private AuditService auditService;
 
   @InjectMocks private MissionParticipantService missionParticipantService;
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL participant sub-service
-  // is one of its arguments
   private MissionService service;
 
   @BeforeEach
   void wireExtractedParticipantService() {
-    // MissionService delegates the participant methods to the extracted MissionParticipantService
-    // (L1 step 2, #920). Wire a real instance (built from this class's mocks) into the CUT via
-    // reflection, since Mockito does not inject one @InjectMocks target into another.
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     service =
         new MissionService(
             missionRepository,
@@ -129,18 +112,13 @@ class MissionServiceLifecycleTest {
             ownerScopeService,
             authHelperService,
             auditService,
-            null, // missionTimelineService
+            null,
             missionParticipantService,
-            null // missionStructureService
-            );
+            null);
   }
 
   private static final UUID MISSION_ID = UUID.randomUUID();
   private static final UUID USER_ID = UUID.randomUUID();
-
-  // ---------------------------------------------------------------
-  // deleteMission — three detach paths + happy / not-found
-  // ---------------------------------------------------------------
 
   @Nested
   class DeleteMissionTests {
@@ -155,10 +133,6 @@ class MissionServiceLifecycleTest {
 
     @Test
     void recordsAudit_onDelete() {
-      // Variante C (REQ-INV-027): a mission's inventory earmarks live in the mission-allocation
-      // table with an ON DELETE CASCADE FK, so deleteMission no longer manually detaches inventory
-      // rows — it just deletes and records the audit. (Refinery orders + sub-missions are still
-      // detached in memory; covered below.)
       Mission mission = newMission();
 
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
@@ -210,8 +184,6 @@ class MissionServiceLifecycleTest {
 
     @Test
     void detachesRefineryOrdersAndSubMissions_inOneCall() {
-      // Combined scenario: refinery orders + sub-missions are detached in memory before delete.
-      // Inventory earmarks are NOT (Variante C: they cascade via the mission-allocation FK).
       Mission mission = newMission();
       RefineryOrder order = new RefineryOrder();
       order.setMission(mission);
@@ -232,8 +204,6 @@ class MissionServiceLifecycleTest {
 
     @Test
     void missionWithEmptyCollections_isStillDeleted() {
-      // Mission entity initializes Sets to empty (not null). Verify the
-      // empty-collection branches are exercised and the delete still happens.
       Mission mission = newMission();
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
 
@@ -242,10 +212,6 @@ class MissionServiceLifecycleTest {
       verify(missionRepository).delete(mission);
     }
   }
-
-  // ---------------------------------------------------------------
-  // removeParticipant — set removal + crew cleanup
-  // ---------------------------------------------------------------
 
   @Nested
   class RemoveParticipantTests {
@@ -277,13 +243,11 @@ class MissionServiceLifecycleTest {
       MissionParticipant participant = newParticipant(participantId);
       mission.getParticipants().add(participant);
 
-      // Add crew references in TWO different units to verify both get cleaned.
       MissionUnit unitA = new MissionUnit();
       unitA.setId(UUID.randomUUID());
       MissionCrew crewA = new MissionCrew();
       crewA.setParticipant(participant);
       unitA.getCrew().add(crewA);
-      // Also add a foreign crew that must NOT be removed.
       MissionCrew foreignCrew = new MissionCrew();
       MissionParticipant foreignParticipant = newParticipant(UUID.randomUUID());
       foreignCrew.setParticipant(foreignParticipant);
@@ -317,9 +281,6 @@ class MissionServiceLifecycleTest {
 
     @Test
     void crewWithNullParticipant_isNotTouched() {
-      // Defensive: a crew row with no participant (e.g. a guest seat) must
-      // survive the removal pass — the predicate `crew.getParticipant() != null`
-      // guards this path.
       UUID participantId = UUID.randomUUID();
       Mission mission = newMission();
       MissionParticipant participant = newParticipant(participantId);
@@ -341,10 +302,6 @@ class MissionServiceLifecycleTest {
           "crew with null participant must survive (would NPE otherwise)");
     }
   }
-
-  // ---------------------------------------------------------------
-  // removeMissionFrequency
-  // ---------------------------------------------------------------
 
   @Nested
   class RemoveMissionFrequencyTests {
@@ -386,9 +343,6 @@ class MissionServiceLifecycleTest {
 
     @Test
     void frequencyWithNullId_doesNotMatchByIdEqualityCheck() {
-      // Defensive: a frequency with null id (e.g. before persistence) must
-      // not accidentally match the lookup. The removal predicate guards this
-      // via `f.getId() != null`.
       Mission mission = newMission();
       MissionFrequency unsaved = new MissionFrequency();
       unsaved.setId(null);
@@ -405,10 +359,6 @@ class MissionServiceLifecycleTest {
           "the null-id frequency must NOT have been removed by mistake");
     }
   }
-
-  // ---------------------------------------------------------------
-  // updateMissionOwner — explicit upsert of MissionOwnership
-  // ---------------------------------------------------------------
 
   @Nested
   class UpdateMissionOwnerTests {
@@ -435,8 +385,6 @@ class MissionServiceLifecycleTest {
 
     @Test
     void happyPath_setsOwnerAndUpsertsOwnership_newOwnership() {
-      // No existing MissionOwnership row -> the orElseGet branch creates one, for the owner being
-      // replaced, and then moves it to the new one.
       Mission mission = newMission();
       User user = newUser(USER_ID);
 
@@ -463,8 +411,6 @@ class MissionServiceLifecycleTest {
 
     @Test
     void happyPath_existingOwnership_isMutatedInPlace() {
-      // Existing MissionOwnership row -> the orElseGet branch is skipped and the existing row's
-      // owner is updated once the echo matched its version.
       Mission mission = newMission();
       User newOwner = newUser(USER_ID);
       User oldOwner = newUser(UUID.randomUUID());
@@ -495,10 +441,6 @@ class MissionServiceLifecycleTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // findAllActiveReference — straight delegation
-  // ---------------------------------------------------------------
-
   @Test
   void findAllActiveReference_delegatesToRepository() {
     when(ownerScopeService.currentScopePredicate())
@@ -522,8 +464,6 @@ class MissionServiceLifecycleTest {
             eq(java.util.Set.of()),
             org.mockito.ArgumentMatchers.anyBoolean(),
             cutoffCaptor.capture());
-    // The COMPLETED / CANCELLED visibility window is the last three months; allow a small skew for
-    // the clock tick between the service computing the cut-off and this assertion.
     java.time.Instant expected =
         java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMonths(3).toInstant();
     long skewMinutes =
@@ -555,10 +495,6 @@ class MissionServiceLifecycleTest {
             any(java.time.Instant.class));
   }
 
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
-
   private Mission newMission() {
     Mission m = new Mission();
     m.setId(MISSION_ID);
@@ -586,6 +522,5 @@ class MissionServiceLifecycleTest {
   }
 
   @SuppressWarnings("unused")
-  private static final Set<UUID> UNUSED =
-      Set.of(); // keeps the Set import alive (used by HashSet generic inference only)
+  private static final Set<UUID> UNUSED = Set.of();
 }

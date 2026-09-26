@@ -1,24 +1,6 @@
-/*
- * Shared styles for the promotion admin pages (rank-requirements + topics).
- *
- * Why a dedicated file? Both admin templates carried identical copies of the
- * modal-overlay/modal-box/form-row/form-hint blocks in their inline \3c style>
- * sections. Keeping them inline forced edits to be made twice and made the
- * page templates harder to scan. The styles here are scoped via the class
- * names themselves; we do not rely on a wrapper selector so existing pages
- * can adopt the classes incrementally.
- *
- * Naming follows the pre-existing per-page convention so the migration was
- * a pure delete-from-inline + link-this-file change.
- */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    /* ============================================================
-   FORM CONTROLS (used inside the modals above)
-   ============================================================ */
-    /* .form-group spacing comes from the central definition in styles.css */
     .form-input {
         width: 100%;
         background: var(--color-gray-4);
@@ -29,9 +11,6 @@
         box-sizing: border-box;
     }
 
-    /* On a text or number input the base text-input rule in styles.css has always set the background
-   and the font size: its (0,1,1) beat `.form-input` (0,1,0). The page layer now outranks it, so
-   the outcome is restated here (FE-MOD-02). Selects and textareas keep `.form-input`'s values. */
     input.form-input:is([type='text'], [type='number']) {
         background-color: var(--color-surface-input);
         font-size: var(--fs-body);
@@ -67,36 +46,17 @@
         }
     }
 
-    /* ============================================================
-   SHARED ADMIN PATTERNS
-   ============================================================ */
-    /*
- * Compact button used inside per-row action stacks and the rank-group
- * action bar. Visually denser than a default .btn (smaller padding +
- * font size) but still honours the Styleguide 44px touch-target rule.
- */
     .pa-btn-tiny {
         padding: 0.35rem 0.7rem;
         font-size: 0.75rem;
         min-height: 44px;
     }
 
-    /*
- * "Dirty" state highlight on inputs/textareas that the admin has edited
- * but not yet persisted. Implemented on the topics page where every
- * level-content textarea is editable in place. Border colour matches the
- * brand orange so the visual "you have unsaved work here" cue is loud
- * without being alarming.
- */
     .pa-dirty {
         border-color: var(--color-primary);
         background: rgb(231 126 35 / 5%);
     }
 
-    /*
- * Filter input pattern in the rank-requirements toolbar. Same visual
- * language as the search field on /promotion/manage.
- */
     .pa-toolbar {
         display: flex;
         gap: 0.75rem;
@@ -115,11 +75,6 @@
         flex: 1;
     }
 
-    /*
- * Sticky action column on the rank-requirements sub-table. The
- * Bearbeiten/Löschen pair must stay accessible even when the
- * description column pushes the table wider than the viewport.
- */
     .pa-rank-subtable {
         position: relative;
     }
@@ -131,10 +86,6 @@
         box-shadow: -2px 0 4px rgb(0 0 0 / 40%);
     }
 
-    /*
- * Up/down sort buttons used on the topics admin page in place of the
- * raw "sortOrder" number input.
- */
     .pa-sort-controls {
         display: inline-flex;
         flex-direction: column;
@@ -153,23 +104,6 @@
         line-height: 1;
     }
 
-    /*
- * Touch classes: the dense floor, not the full 44px.
- *
- * 1.8rem x 1.1rem is 28.8 x 17.6px, which is under WCAG 2.5.8 AA's 24px minimum and not merely
- * under this design system's — rendered four times on /promotion/admin/topics, a swept route. It
- * is the same control shape as `.demand-sort-btn`, and a repeated dense in-row control like
- * `.matrix-flag` and `.bank-row-toggle`, so it takes `--touch-target-dense` (32px): two stacked
- * 44px buttons would be an 88px column in a table cell.
- *
- * The sweep did not find it because promotion-admin-topics.html:157 gates the sort controls behind
- * `th:if="${#lists.size(topics) gt 1}"` — an under-seeded stack hides them. It is declared here
- * rather than in styles.css because `.pa-sort-controls .pa-sort-btn` is two classes and this file
- * loads after styles.css.
- *
- * No list to keep in step: TouchClassLayoutE2eTest's `floorFor()` reads the dense set out of
- * the CSSOM, so declaring the token here is what grants the exemption.
- */
     @media (width <= 1024px) {
         .pa-sort-controls .pa-sort-btn {
             min-height: var(--touch-target-dense);
@@ -187,10 +121,6 @@
         cursor: not-allowed;
     }
 
-    /*
- * Topics page: collapsible category card. The <details>/<summary> pair
- * gives us a native, accessible toggle; we only restyle the markers.
- */
     .pa-category-card {
         margin-top: 0.75rem;
     }
@@ -232,11 +162,6 @@
         background: var(--color-bg-dark-gray);
     }
 
-    /*
- * Level-content row inside a category card. Three rows per category
- * (Stufe A/B/C). Compact, so admins can keep all three on screen at
- * once when the category is expanded.
- */
     .pa-level-row {
         display: flex;
         align-items: flex-start;
@@ -271,10 +196,6 @@
         align-self: flex-start;
     }
 
-    /*
- * Save-all banner shown at the top of the topics page while at least one
- * textarea is dirty. Mirrors the manage page's queue-indicator visual.
- */
     .pa-save-all-banner {
         display: none;
         align-items: center;

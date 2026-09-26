@@ -20,10 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Severity grading of an {@link ImportIssueDto} on a refinery screenshot import draft (#434, plan
- * §7.5). Drives the visual treatment in the review UI (danger / warning / info styling) — the
- * backend never blocks a draft response on severity; even a {@link #BLOCKING} issue returns 200
- * with the draft so the user sees <em>why</em> nothing could be pre-filled.
+ * Severity grading of an {@link ImportIssueDto}, driving its styling in the review UI.
+ *
+ * <p>Never blocks the response: even a {@link #BLOCKING} issue returns 200 with the draft.
  */
 public enum ImportIssueSeverity {
 

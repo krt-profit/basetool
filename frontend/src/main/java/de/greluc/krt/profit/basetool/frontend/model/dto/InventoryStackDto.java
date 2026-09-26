@@ -20,20 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Frontend mirror of one display stack: append-only inventory rows that share a stock identity
- * (owner, location, quality, personal flag, owning org-unit pool) collapsed into a single row for
- * the Lager view. Since Variante C (REQ-INV-027) the job-order / mission link is no longer part of
- * the stock identity — it lives per entry as quantity-allocation chips on the leaf rows — so it is
- * not part of this stack key. The aggregate figures describe the collapsed row.
+ * Frontend mirror of one Lager display stack: inventory rows sharing owner, location, quality,
+ * personal flag and owning org-unit pool, collapsed into one row (REQ-INV-027).
  *
- * <p>The individual entries are <em>not</em> inlined. A stack grows unboundedly as contributions
- * accumulate, so the entries are loaded lazily and paginated on expand: the page renders the
- * collapsed stack row and fetches its entries via {@code GET /inventory/{my|all}/stack/entries}
- * (proxying the backend's {@code /api/v1/inventory/{my-inventory|all}/stack/entries}). The lazy
- * fetch is keyed off exactly the stock-identity fields this record exposes — {@code user.id()},
- * {@code location.id()}, {@code quality}, {@code personal} and {@code owningSquadron.id()} (plus
- * the enclosing group's {@code material.id()}) — so the browser can request a stack's entries
- * without any opaque token.
+ * <p>Entries are not inlined; they are fetched lazily and paged via {@code GET
+ * /inventory/{my|all}/stack/entries}, keyed by this record's identity fields plus the group's
+ * material.
  *
  * @param user the owning user shared by every entry
  * @param location the storage location shared by every entry

@@ -29,12 +29,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The served-version policy the forced-update gate keys on (REQ-API-010).
- *
- * <p>The endpoint has no branches worth mocking a web layer for — its anonymity is asserted where
- * anonymity is decided, in {@code ApiVhostAnonymousSurfaceTest}, and its response shape is frozen
- * in {@code ExternalContractTest}. What is left, and what actually decides whether members can use
- * the app, are the property defaults: a server nobody has configured must answer "no floor".
+ * Tests the served-version policy of the forced-update gate (REQ-API-010), chiefly that an
+ * unconfigured server answers "no floor".
  */
 class AppVersionPolicyControllerTest {
 
@@ -43,9 +39,6 @@ class AppVersionPolicyControllerTest {
   void unconfiguredServerStatesNoFloor() {
     AppVersionPolicyDto policy = policyOf(BoundProperties.defaults(AndroidClientProperties.class));
 
-    // The whole point of the default. A non-zero floor here would mean that the first deployment
-    // carrying this code refuses every installed build, and the members it refuses are exactly the
-    // ones who cannot be told why by any other channel.
     assertThat(policy.minimumVersionCode()).isZero();
     assertThat(policy.latestVersionCode()).isZero();
     assertThat(policy.releasesUrl()).contains("basetool-android/releases");
@@ -61,8 +54,6 @@ class AppVersionPolicyControllerTest {
 
     AppVersionPolicyDto policy = policyOf(properties);
 
-    // A client on 9 is behind the newest build and above the floor: it must be offered an update,
-    // never blocked. Collapsing these two into one number is the mistake this pins.
     assertThat(policy.minimumVersionCode()).isEqualTo(7);
     assertThat(policy.latestVersionCode()).isEqualTo(11);
   }

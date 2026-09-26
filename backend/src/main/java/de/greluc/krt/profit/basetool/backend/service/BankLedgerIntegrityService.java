@@ -31,18 +31,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Verifies the bank's two append-only ledgers' invariants (REQ-BANK-020, ADR-0039/0052): no
- * negative account balance (the holder dimension is intentionally allowed to be negative,
- * REQ-BANK-006, so it is <strong>not</strong> checked), every {@code TRANSFER} account leg pair and
- * every {@code TRANSFER}/{@code HOLDER_TRANSFER} holder leg pair nets to {@code -transfer_fee}
- * (zero when fee-free — a fee-bearing customer-facing {@code TRANSFER} loses the fee to the game,
- * while the internal {@code HOLDER_TRANSFER} Umbuchung is fee-free, ADR-0052; historical ADR-0041
- * fee-bearing Umbuchung rows still satisfy the same {@code -transfer_fee} check), every {@code
- * REVERSAL} is the negated mirror of its original on both ledgers (ADR-0010/0039), and every
- * audited transaction carries its audit row (REQ-BANK-012; {@code WIPE_RESET} is summarized once,
- * not per row). Pure reads — it never mutates the ledger. Violations are reported as {@code ERROR}
- * log lines (carrying the correlation id of the run) so monitoring can alert; the returned {@link
- * IntegrityReport} lets tests and callers inspect the findings.
+ * Verifies the invariants of the two append-only bank ledgers (REQ-BANK-020, ADR-0052): no negative
+ * account balance, every transfer's account and holder legs net to {@code -transfer_fee}, every
+ * {@code REVERSAL} mirrors its original on both ledgers, and every audited transaction has its
+ * audit row (REQ-BANK-012).
+ *
+ * <p>Read-only. Violations are logged at {@code ERROR} and returned as an {@link IntegrityReport};
+ * holder balances may be negative and are not checked.
  */
 @Service
 @RequiredArgsConstructor

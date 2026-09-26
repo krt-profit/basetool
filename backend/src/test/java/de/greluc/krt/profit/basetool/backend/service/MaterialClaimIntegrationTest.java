@@ -52,11 +52,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * End-to-end coverage of {@link MaterialClaimService} against the real Postgres test container: the
- * upsert persists and updates in place (one row per bucket+squadron), overclaim is rejected, and
- * the Phase-2 reassignment de-escalation withdraws claims via {@link
- * JobOrderService#reassignResponsibleOrgUnit}. Runs as an ADMIN so the service permission matrix
- * short-circuits to "allowed" and the test focuses on the invariants + reconciliation.
+ * Integration tests of {@link MaterialClaimService} against Postgres: in-place upsert, overclaim
+ * rejection, and claim withdrawal on {@link JobOrderService#reassignResponsibleOrgUnit}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -128,7 +125,6 @@ class MaterialClaimIntegrationTest {
     assertThat(afterFirst.claimedAmount()).isEqualTo(6.0);
     assertThat(afterFirst.openRemaining()).isEqualTo(4.0);
 
-    // Re-posting the same squadron's claim updates in place rather than inserting a duplicate.
     materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 8.0));
     ClaimBucketDto afterUpdate = onlyBucket(f.orderId());
     assertThat(afterUpdate.claimedAmount()).isEqualTo(8.0);
@@ -142,7 +138,6 @@ class MaterialClaimIntegrationTest {
     Fixture f = seed();
     materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 8.0));
 
-    // Squadron B requesting 5 would total 13 > the required 10.
     assertThatThrownBy(
             () ->
                 materialClaimService.upsertClaim(
@@ -152,9 +147,6 @@ class MaterialClaimIntegrationTest {
 
   @Test
   void nonProfitSquadron_cannotClaim() {
-    // Only profit-eligible squadrons may sign up: a squadron the admin has not marked
-    // profit-eligible is rejected with a 400 and no claim row is written, even though the order is
-    // an open SK order with an unclaimed bucket and the caller is an admin.
     Fixture f = seed();
     UUID nonProfitSquadronId =
         transactionTemplate.execute(
@@ -163,7 +155,6 @@ class MaterialClaimIntegrationTest {
               Squadron sq = new Squadron();
               sq.setName("NonProfit-" + tag);
               sq.setShorthand("N" + tag);
-              // profit-eligible defaults to false — left unset on purpose.
               return squadronRepository.save(sq).getId();
             });
 
@@ -182,9 +173,6 @@ class MaterialClaimIntegrationTest {
     assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(f.orderId()))
         .isNotEmpty();
 
-    // Reassign the SK order down to a (profit-eligible) squadron — the order becomes private, so
-    // its
-    // public claims are withdrawn by the reconciliation hook.
     jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId());
 
     assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(f.orderId())).isEmpty();
@@ -192,8 +180,6 @@ class MaterialClaimIntegrationTest {
 
   @Test
   void getJobOrderById_skOrder_embedsClaimsAndOpenAmountOnMaterialRows() {
-    // Phase 5 (#345): the order-detail DTO of a public SK order carries the per-bucket claims +
-    // open-remaining on each material row.
     Fixture f = seed();
     materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 6.0));
 
@@ -207,8 +193,6 @@ class MaterialClaimIntegrationTest {
 
   @Test
   void getJobOrderById_privateOrder_leavesClaimFieldsEmpty() {
-    // After de-escalation the order is private (squadron-responsible): no claim columns, so the DTO
-    // carries an empty claim list and a null open-amount.
     Fixture f = seed();
     jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId());
 
@@ -221,10 +205,6 @@ class MaterialClaimIntegrationTest {
 
   @Test
   void updateJobOrder_droppingABucket_withdrawsOrphanClaimsWithoutConflict() {
-    // Phase 7 (#347) end-to-end: editing an SK order to remove a material bucket auto-withdraws
-    // that
-    // bucket's claim (orphan reconciliation) while the surviving bucket's claim stays — and the
-    // delete never collides with the order's @Version (claims are an independent aggregate).
     record Setup(UUID orderId, UUID matA, UUID matB, UUID sqA, UUID sqB) {}
     Setup s =
         transactionTemplate.execute(
@@ -275,7 +255,6 @@ class MaterialClaimIntegrationTest {
     assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(s.orderId()))
         .hasSize(2);
 
-    // Edit the order to keep only material A (drops material B's bucket).
     CreateJobOrderDto update =
         new CreateJobOrderDto(
             null,

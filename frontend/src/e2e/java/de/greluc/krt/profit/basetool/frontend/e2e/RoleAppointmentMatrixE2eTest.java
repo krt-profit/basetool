@@ -28,33 +28,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end appointment matrix for the delegated role ladder (epic #800, issue #809) — the
- * defence-in-depth slice that drives the {@code OrgRoleManagementSecurityService} verdicts through
- * the real stack, complementing the unit matrix ({@code OrgRoleManagementSecurityServiceTest}) and
- * the real-DB silo proof ({@code OrgHierarchyMigrationTest}). It asserts, against authenticated
- * HTTP calls as the appointing principal:
+ * End-to-end appointment matrix for the delegated role ladder, driving the {@code
+ * OrgRoleManagementSecurityService} verdicts through the real stack.
+ *
+ * <p>It asserts:
  *
  * <ul>
- *   <li><b>Own-Bereich ladder:</b> a Bereichsleiter may appoint a Koordinator <em>in their own
- *       Bereich</em> (one rung below them).
- *   <li><b>No foreign reach (cross-Bereich silo):</b> the same Bereichsleiter is denied an
- *       appointment in a foreign Bereich.
- *   <li><b>No self / superior tier:</b> a Bereichsleiter may not appoint another Bereichsleiter
- *       (only the OL appoints that tier) — the structurally-impossible self-promotion.
- *   <li><b>Plain members appoint nothing</b> on either the Bereich endpoint or the squadron-rank
- *       endpoint.
- *   <li><b>REQ-ORG-017 silo:</b> even an admin cannot give a Staffel member a silo-leadership rank
- *       (the service guard rejects it before the V165/V187 trigger would).
- *   <li><b>Mirror (REQ-ROLE-006):</b> a successful appointment projects the account-linked seat
- *       onto the descriptive org chart.
+ *   <li>a Bereichsleiter may appoint a Koordinator in their own Bereich;
+ *   <li>the same Bereichsleiter is denied in a foreign Bereich;
+ *   <li>a Bereichsleiter may not appoint another Bereichsleiter;
+ *   <li>plain members appoint nothing on the Bereich or the squadron-rank endpoint;
+ *   <li>even an admin cannot give a Staffel member a silo-leadership rank (REQ-ORG-017);
+ *   <li>a successful appointment is mirrored onto the org chart (REQ-ROLE-006).
  * </ul>
  *
- * <p><b>Fixtures.</b> Two dedicated realm users own their appointment shapes here so no shared-user
- * membership leaks across the sequentially-run stack (the #692 Phase-7 lesson): {@code
- * test-appoint-bl} is made Bereichsleiter of this suite's Bereich A, and {@code test-appoint-tgt}
- * is the Staffel-less appointment target. {@code test-member} is only ever an appointment target
- * that is <em>rejected</em> (the REQ-ORG-017 case), so its shape is never mutated — it is merely
- * ensured to hold an IRIDIUM Staffel membership so the silo guard has something to trip on.
+ * <p>The dedicated users {@code test-appoint-bl} and {@code test-appoint-tgt} own the mutated
+ * membership shapes; {@code test-member} is only ever a rejected target.
  */
 @Tag("e2e")
 class RoleAppointmentMatrixE2eTest {
@@ -92,10 +81,8 @@ class RoleAppointmentMatrixE2eTest {
     }
     seeder = new BackendSeeder();
 
-    blUserId = seeder.getUserId(BL_USER, BL_PASSWORD); // Staffel-less; becomes BL of A below
-    tgtUserId = seeder.getUserId(TGT_USER, TGT_PASSWORD); // Staffel-less appointment target
-    // test-member must hold a Staffel membership so the REQ-ORG-017 silo guard has something to
-    // reject; the appointment that targets it is denied, so its shape is never actually mutated.
+    blUserId = seeder.getUserId(BL_USER, BL_PASSWORD);
+    tgtUserId = seeder.getUserId(TGT_USER, TGT_PASSWORD);
     seeder.ensureIridiumMembership(MEMBER_USER, MEMBER_PASSWORD);
     memberUserId = seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD);
 
@@ -136,13 +123,9 @@ class RoleAppointmentMatrixE2eTest {
   }
 
   /**
-   * Squadron-rank gate denial: a plain Staffel member holds no rung on the squadron-rank endpoint
-   * either (they are neither the parent Bereichsleiter for a Staffelleiter appointment nor the
-   * squadron's Staffelleiter for a Kommando rank), so the delegated gate denies with 403 — a
-   * topology-independent denial that does not depend on which Bereich a squadron sits under. The
-   * body carries a {@code version} because {@code AssignSquadronRankRequest} requires it
-   * ({@code @NotNull}); any value reaches the {@code @PreAuthorize} gate, which denies before the
-   * service (and thus before the optimistic-lock check) ever runs.
+   * Verifies that a plain Staffel member is denied (403) on the squadron-rank endpoint. The body
+   * carries a {@code version} only because the request DTO requires one; the {@code @PreAuthorize}
+   * gate denies first.
    */
   @Test
   void plainMemberCannotAssignSquadronRank() {

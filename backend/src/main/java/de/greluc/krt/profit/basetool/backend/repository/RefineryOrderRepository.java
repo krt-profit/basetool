@@ -42,14 +42,8 @@ import org.springframework.stereotype.Repository;
 public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UUID> {
 
   /**
-   * Loads one refinery order with everything its detail DTO reads: the four to-one associations and
-   * the goods with their input and output materials.
-   *
-   * <p>The to-ones were EAGER until BE-PERF-11 and loaded in the same statement; lazy, they would
-   * each cost a statement on the detail read and on every mutator that re-reads the order. One
-   * collection ({@code goods}) is fetch-joined, which is safe for a single row — the
-   * cartesian-product and in-memory-pagination hazards only apply to two sibling collections or to
-   * a paged query.
+   * Loads one refinery order with everything its detail DTO reads: the to-one associations and the
+   * goods with their input and output materials.
    *
    * @param id the order id
    * @return the order with its detail graph loaded, or empty when none exists
@@ -108,17 +102,12 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   List<RefineryOrder> findByMissionIdAndOwnerId(UUID missionId, UUID ownerId);
 
   /**
-   * Org-unit-scoped variant of {@link #findByMissionId(UUID)}: returns only the refinery orders
-   * linked to {@code missionId} that fall within the caller's effective scope, encoded as the
-   * standard {@code isAdminAllScope} / {@code activeOrgUnitId} / {@code memberOrgUnitIds} triple
-   * (see {@link de.greluc.krt.profit.basetool.backend.service.ScopePredicate}). Refinery is a
-   * strict-staffel aggregate with no cross-squadron escape clause, so an order owned by a foreign
-   * org unit is never returned - even when the linked mission is itself publicly visible.
+   * Org-unit-scoped variant of {@link #findByMissionId(UUID)}: returns only the mission's refinery
+   * orders within the caller's scope triple (see {@link
+   * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}).
    *
-   * <p>This closes the BAC-004 cross-org-unit leak on the mission-scoped refinery endpoint {@code
-   * GET /api/v1/refinery-orders/mission/{missionId}}, where a logistician of one squadron could
-   * otherwise read another squadron's refinery financials by enumerating that squadron's public
-   * missions. Eagerly fetches the configured relations via {@code @EntityGraph}.
+   * <p>Refinery is strict-staffel, so an order of a foreign org unit is never returned, even when
+   * the mission itself is public.
    */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   @Query(
@@ -139,16 +128,11 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
 
   /**
    * Aggregates the refinery profit/loss of several missions into one {@code (missionId, profitSum)}
-   * row per mission in ONE grouped query, so the operation finance roll-up folds refinery profit
-   * into each mission's total without materializing every refinery-order row across every child
-   * mission. Each order contributes {@code oreSales − expenses − otherExpenses} (legacy null fields
-   * coalesced to 0, identical to the in-memory roll-up it replaces). Backs the operation finance
-   * summary (the operation-side ADR-0078 gap, #1121). A mission with no refinery order yields no
-   * row and the caller treats it as zero profit.
+   * row per mission in a single grouped query. Each order contributes {@code oreSales − expenses −
+   * otherExpenses} (null fields as 0); a mission without refinery orders yields no row.
    *
-   * @param missionIds the missions to aggregate (typically an operation's child missions)
-   * @return one profit aggregate per mission that has at least one refinery order; the sum may be
-   *     {@code null}
+   * @param missionIds the missions to aggregate, typically an operation's child missions
+   * @return one aggregate per mission with at least one refinery order; the sum may be {@code null}
    */
   @Query(
       "select new de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate("
@@ -183,21 +167,12 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
 
   /**
    * Org-unit-scoped variant of {@link #findByOwnerId(UUID, Pageable)} for the cross-user oversight
-   * endpoint {@code GET /api/v1/refinery-orders/users/{userId}}: returns only the target user's
-   * refinery orders whose {@code owningOrgUnit} falls within the caller's effective scope, encoded
-   * as the standard {@code isAdminAllScope} / {@code activeOrgUnitId} / {@code memberOrgUnitIds}
-   * triple (see {@link de.greluc.krt.profit.basetool.backend.service.ScopePredicate}). Refinery is
-   * a strict-staffel aggregate with no cross-squadron escape clause, so an order stamped to an org
-   * unit outside the caller's scope is never returned.
+   * endpoint: returns only the target user's refinery orders whose {@code owningOrgUnit} falls
+   * within the caller's scope (see {@link
+   * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}).
    *
-   * <p>This closes finding SEC-01: the per-user {@code @PreAuthorize} gate {@code
-   * canViewUserRefineryOrders} only checks that the caller shares <em>any one</em> of the target
-   * user's (up to two, REQ-ORG-017) org units, but the pre-fix path then read the <em>unscoped</em>
-   * {@link #findByOwnerId(UUID, Pageable)} and returned every order the target owned — including
-   * rows stamped to a foreign org unit the caller has no scope over. Mirrors the BAC-004 {@link
-   * #findByMissionIdScoped} hardening so the list can never return a row the per-order {@code
-   * canSeeRefineryOrder} gate would individually deny. Eagerly fetches the configured relations via
-   * {@code @EntityGraph}.
+   * <p>Refinery is strict-staffel, so the list never returns an order the per-order {@code
+   * canSeeRefineryOrder} gate would deny.
    *
    * @param ownerId the target user whose orders to list; never {@code null}
    * @param isAdminAllScope {@code true} for an admin with no active pin (sees every order)
@@ -219,12 +194,9 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       Pageable pageable);
 
   /**
-   * Loads the caller's own refinery orders in the given statuses with their {@code goods} (and each
-   * good's {@code outputMaterial}) eagerly fetched, for the blueprint craftability calculation
-   * (#781). Strictly owner-scoped ({@code ownerId}), never org-unit-scoped — craftability folds in
-   * only the caller's <em>own</em> not-yet-completed refinery yield. Callers pass {@code OPEN} +
-   * {@code IN_PROGRESS} ("not yet completed or cancelled"). The {@code outputMaterial} is part of
-   * the graph so the units→SCU conversion in the service reads the quantity type without an N+1.
+   * Loads the caller's own refinery orders in the given statuses with their goods and each good's
+   * {@code outputMaterial}, for the blueprint craftability calculation. Strictly owner-scoped,
+   * never org-unit-scoped.
    *
    * @param ownerId the owning user; never {@code null}
    * @param statuses the statuses to include (typically {@code OPEN}, {@code IN_PROGRESS})

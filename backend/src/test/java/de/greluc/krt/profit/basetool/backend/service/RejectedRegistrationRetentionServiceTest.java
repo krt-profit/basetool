@@ -48,12 +48,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.ObjectProvider;
 
 /**
- * Mockito unit tests for {@link RejectedRegistrationRetentionService} — the scheduled purge of
- * registrations refused past the retention window (REQ-SEC-057).
- *
- * <p>The three properties worth pinning down are the ordering (database half before the external
- * Keycloak write), the in-transaction re-check that protects a concurrently reopened registration,
- * and the per-row failure isolation that keeps one bad row from costing the whole sweep.
+ * Unit tests for {@link RejectedRegistrationRetentionService} (REQ-SEC-057): the database purge
+ * precedes the Keycloak write, a concurrently reopened registration is spared, and one failing row
+ * does not abort the sweep.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -82,7 +79,6 @@ class RejectedRegistrationRetentionServiceTest {
     return user;
   }
 
-  // covers REQ-SEC-057 — a registration refused past the window is purged locally and in Keycloak
   @Test
   void purgesARejectedRegistrationPastTheWindow() {
     UUID id = UUID.randomUUID();
@@ -98,8 +94,6 @@ class RejectedRegistrationRetentionServiceTest {
     verify(keycloakService).deleteUser(id);
   }
 
-  // covers REQ-SEC-057 — UserDeletionService refuses an account its cached flag still claims is in
-  // Keycloak, and a rejection deliberately leaves the Keycloak user in place
   @Test
   void clearsTheCachedKeycloakFlagBeforeDelegating() {
     UUID id = UUID.randomUUID();
@@ -114,8 +108,6 @@ class RejectedRegistrationRetentionServiceTest {
     assertThat(saved.getValue().isInKeycloak()).isFalse();
   }
 
-  // covers REQ-SEC-057 — the database half commits FIRST so a rolled-back purge leaves the Keycloak
-  // user intact for a clean retry, never an account gone with its app_user row surviving
   @Test
   void deletesTheKeycloakUserOnlyAfterTheDatabaseHalf() {
     UUID id = UUID.randomUUID();
@@ -130,8 +122,6 @@ class RejectedRegistrationRetentionServiceTest {
     inOrder.verify(keycloakService).deleteUser(id);
   }
 
-  // covers REQ-SEC-057 / REQ-SEC-034 — a registration reopened between the candidate query and the
-  // transaction must survive; the reopen clears approvedAt and returns the row to PENDING
   @Test
   void skipsARegistrationReopenedAfterTheCandidateQuery() {
     UUID id = UUID.randomUUID();
@@ -146,7 +136,6 @@ class RejectedRegistrationRetentionServiceTest {
     verify(keycloakService, never()).deleteUser(any());
   }
 
-  // covers REQ-SEC-057 — a rejection re-decided inside the window is not past the cutoff any more
   @Test
   void skipsARejectionThatIsNoLongerPastTheCutoff() {
     UUID id = UUID.randomUUID();
@@ -159,7 +148,6 @@ class RejectedRegistrationRetentionServiceTest {
     verifyNoInteractions(userDeletionService);
   }
 
-  // covers REQ-SEC-057 — one unpurgeable row must not cost the rest of the sweep
   @Test
   void onePurgeFailureDoesNotAbortTheRun() {
     UUID failing = UUID.randomUUID();
@@ -178,12 +166,10 @@ class RejectedRegistrationRetentionServiceTest {
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isEqualTo(1);
 
-    // The failing row keeps its Keycloak user — its data is untouched and the next run retries it.
     verify(keycloakService, never()).deleteUser(failing);
     verify(keycloakService).deleteUser(ok);
   }
 
-  // covers REQ-SEC-057 — an unreachable Keycloak must not undo or mask the committed local purge
   @Test
   void aFailingKeycloakDeleteStillCountsTheCommittedPurge() {
     UUID id = UUID.randomUUID();
@@ -197,7 +183,6 @@ class RejectedRegistrationRetentionServiceTest {
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isEqualTo(1);
   }
 
-  // covers REQ-SEC-057 — nothing to do is the common case and must stay free of side effects
   @Test
   void doesNothingWhenNoRegistrationQualifies() {
     when(userRepository.findRejectedDecidedBefore(CUTOFF)).thenReturn(List.of());

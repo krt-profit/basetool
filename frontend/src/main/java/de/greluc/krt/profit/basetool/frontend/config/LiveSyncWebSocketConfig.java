@@ -45,47 +45,23 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Wires the live-sync WebSocket endpoint (REQ-FE-015, ADR-0094).
  *
- * <p>Registers the shared {@link LiveSyncWebSocketHandler} on the multiplexed {@code /ws/sync} path
- * (the {@link LiveSyncSyncHandshakeInterceptor} captures the OAuth2 token + pin for per-subscribe
- * authorization). The one-release legacy per-surface aliases {@code
- * /ws/missions/{missionId}/presence} and {@code /ws/materialboerse/board} were removed in #1236 —
- * every peer-synced surface now rides {@code /ws/sync} (mission presence via its {@code
- * mission:{id}} topic room, the board via {@code materialboard}). The subscribe-authorization
- * probes run on a dedicated bounded {@link #liveSyncSubscribeAuthExecutor()} thread pool so the
- * WebSocket container threads never block on a backend read.
- *
- * <p>The handshake is gated by an explicit {@code setAllowedOriginPatterns} list (driven by {@code
- * app.websocket.allowed-origin-patterns}) — {@code setAllowedOriginPatterns("*")} would leave the
- * door open for Cross-Site WebSocket Hijacking even though the Spring Security chain in {@code
- * SecurityConfig} already requires authentication: the browser would still ship the victim's
- * session cookie on the upgrade, and the handshake would succeed as the victim for an attacker page
- * on a third-party origin (audit finding H-7). Default falls back to the production hostname plus
- * localhost variants for dev.
- *
- * <p>The handler is constructed directly here (not component-scanned) so it is given its own plain
- * Jackson 3 {@link JsonMapper} rather than an auto-wired bean and so Spring triggers its
- * {@code @PreDestroy} on shutdown.
+ * <p>Registers {@link LiveSyncWebSocketHandler} on {@code /ws/sync}, with {@link
+ * LiveSyncSyncHandshakeInterceptor} capturing the OAuth2 token and pin for per-subscribe
+ * authorization, which runs on {@link #liveSyncSubscribeAuthExecutor()}. The handshake accepts only
+ * the origins in {@code app.websocket.allowed-origin-patterns}, to prevent cross-site WebSocket
+ * hijacking.
  */
 @Configuration
 @EnableWebSocket
 public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
 
   /**
-   * Subscribe-authorization executor sizing: {@value} worker threads. Each probe is a single short
-   * backend read; sized with generous headroom (F2/#1243) so a deploy-time reconnect storm at ≥200
-   * concurrent users (~600 subscribes spread over the client's 1–30 s reconnect jitter) stays well
-   * within this pool plus its queue and never saturates — saturation is an indeterminate verdict
-   * that would fail a presence-class subscribe <em>closed</em> (F1), so keeping the pool from ever
-   * filling is what stops a legitimate mission viewer being briefly denied their presence dots
-   * (ADR-0094 capacity model).
+   * Subscribe-authorization executor size: {@value} worker threads, sized so a reconnect storm does
+   * not saturate the pool (ADR-0094).
    */
   private static final int SUBSCRIBE_AUTH_THREADS = 16;
 
-  /**
-   * Bounded queue depth for pending subscribe-authorization probes before saturation is reached.
-   * Sized well above a full reconnect-storm's worth of queued probes so it is not reached at ≥200
-   * concurrent users (F2/#1243).
-   */
+  /** Bounded queue depth for pending subscribe-authorization probes. */
   private static final int SUBSCRIBE_AUTH_QUEUE = 2000;
 
   private final LiveSyncPresenceService presenceService;
@@ -96,12 +72,8 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
   private final List<String> allowedOriginPatterns;
 
   /**
-   * Constructor injection of the shared presence store, the Micrometer registry, the fan-out seam,
-   * the multiplexed subscribe authorizer, the authorized-client store (read at the {@code /ws/sync}
-   * handshake to capture the OAuth2 token) and the WebSocket origin allowlist. The fan-out is
-   * injected lazily via an {@link ObjectProvider} so a Redis binding (when present) is used and the
-   * no-op fallback is created only when none is registered — order-independent, no
-   * {@code @ConditionalOnMissingBean} and no self-referential cycle.
+   * Creates the configuration; the fan-out is resolved lazily so a Redis binding is used when
+   * present and the no-op fallback otherwise.
    *
    * @param presenceService in-memory editor-presence store
    * @param meterRegistry registry the handler binds its gauges and relay counters to
@@ -109,8 +81,8 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
    * @param subscriptionAuthorizer authorizes a multiplexed {@code /ws/sync} subscribe
    * @param authorizedClientRepository authorized-client store read at the {@code /ws/sync}
    *     handshake
-   * @param allowedOriginPatterns origin patterns accepted on the WebSocket handshake; sourced from
-   *     {@code app.websocket.allowed-origin-patterns} with a production default
+   * @param allowedOriginPatterns origin patterns accepted on the WebSocket handshake, from {@code
+   *     app.websocket.allowed-origin-patterns}
    */
   public LiveSyncWebSocketConfig(
       LiveSyncPresenceService presenceService,
@@ -155,10 +127,8 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
   }
 
   /**
-   * Builds the singleton {@link LiveSyncWebSocketHandler}. Declared as a bean so Spring triggers
-   * its {@code @PreDestroy} on shutdown and so the Redis fan-out can inject it for consume-side
-   * delivery. Uses the registered {@link LiveSyncFanout} if one exists (the Redis binding), else a
-   * fresh {@link NoopLiveSyncFanout} (single-instance).
+   * Builds the singleton {@link LiveSyncWebSocketHandler} with the registered {@link
+   * LiveSyncFanout}, or a fresh {@link NoopLiveSyncFanout} when none exists.
    *
    * @return the handler bean
    */

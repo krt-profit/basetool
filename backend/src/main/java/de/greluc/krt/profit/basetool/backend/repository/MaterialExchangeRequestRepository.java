@@ -37,30 +37,12 @@ public interface MaterialExchangeRequestRepository
     extends JpaRepository<MaterialExchangeRequest, UUID> {
 
   /**
-   * The Materialbörse Gesuche board query — every {@code ACTIVE} request, optionally narrowed to
-   * the caller's own requests (the "Meine Gesuche" tab) and by the toolbar filters. The board is
-   * org-wide (no OrgUnit scope filter, mirroring the offer board): every active request is visible
-   * to every member.
+   * Materialbörse Gesuche board query: every {@code ACTIVE} material or item request org-wide,
+   * optionally narrowed to the caller's own requests and by the toolbar filters (REQ-MARKET-015).
    *
-   * <p>The board carries both request kinds (REQ-MARKET-015). Because an item request has a {@code
-   * NULL} {@code requested_material_id}, the material / owner / org-unit associations are joined
-   * with an explicit {@code LEFT JOIN FETCH} (an implicit path join would be an inner join and
-   * would silently drop item requests) — this both eager-loads them so the list renders without an
-   * N+1 and exposes the aliases the filters and the sort need. The desired quantity spans both
-   * branches via a {@code CASE}: {@code CASE WHEN r.requestedAmount IS NOT NULL THEN
-   * r.requestedAmount ELSE r.itemQuantity END} — a material request uses its SCU amount, an item
-   * request its whole-piece quantity. Unlike an offer there is <b>no stock to clamp against</b> (a
-   * request has no backing Lager row), so the expression is a plain branch, not a {@code LEAST}. It
-   * is duplicated <b>byte-for-byte</b> at three sites — the main-query {@code WHERE} min-amount
-   * filter, the {@code menge} {@code ORDER BY}, and the {@code countQuery} {@code WHERE} — and the
-   * three must stay in sync. The material/item name is {@code COALESCE}-d likewise.
-   *
-   * <p>The min-quality filter matches requests whose stated {@code minQuality} is at least the
-   * floor; a non-zero floor therefore excludes requests that state no minimum quality (mirroring
-   * how the offer board's non-zero quality filter excludes item offers, which have no quality). All
-   * fetched associations are single-valued {@code @ManyToOne}, so pagination stays a DB {@code
-   * LIMIT}. The sort is embedded (driven by {@code sortKey}) rather than carried on the {@link
-   * Pageable}, so the caller passes an unsorted page request.
+   * <p>The desired quantity is the SCU amount for a material request and the piece count for an
+   * item request; the {@code CASE} computing it appears three times in the query and must stay
+   * identical. The sort is embedded, so {@code pageable} must be unsorted.
    *
    * @param viewerId the caller's user id — used only when {@code onlyMine} is {@code true}.
    * @param onlyMine {@code true} for the "Meine Gesuche" tab, {@code false} for "Alle Gesuche".
@@ -72,7 +54,7 @@ public interface MaterialExchangeRequestRepository
    *     an item request), or {@code null} for no amount filter.
    * @param sortKey the whitelisted sort key — {@code menge} / {@code mat} / {@code neu}, else
    *     quality (the default); must be non-null.
-   * @param pageable the (unsorted) page request — the ORDER BY is embedded in the query.
+   * @param pageable the unsorted page request.
    * @return the matching page of active requests, never {@code null}.
    */
   @Query(

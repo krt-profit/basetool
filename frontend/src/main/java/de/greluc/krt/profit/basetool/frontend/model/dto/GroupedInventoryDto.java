@@ -22,11 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the per-catalog-entry Lager roll-up. Each group breaks down into {@link
- * InventoryStackDto} stacks (one per stock identity), which in turn hold the individual append-only
- * entries, so the UI renders Material/Item → Stack → Entries. Catalog-discriminated since V220
- * (REQ-INV-029): a material group carries {@code material} with the quality aggregates, a game-item
- * group carries {@code gameItem} with {@code null} quality aggregates.
+ * Frontend mirror of the per-catalog-entry Lager roll-up, broken down into {@link
+ * InventoryStackDto} stacks. A material group carries {@code material} and quality aggregates; a
+ * game-item group carries {@code gameItem} with {@code null} quality aggregates (REQ-INV-029).
  */
 public record GroupedInventoryDto(
     MaterialReferenceDto material,

@@ -4,79 +4,28 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
-# Reclaims unused container resources on the production host: stopped containers, unused images
-# and unused networks. Anything still in use, and anything inside its step's `until=` window, is
-# left alone. Volumes are never pruned (ADR-0194).
-#
-# Scheduled by iri-container-cleanup.timer (Saturday 02:00 UTC).
-#
-# WHY THIS IS NOT THE OLD docker-cleanup.sh WITH A NEW NAME
-# ---------------------------------------------------------
-# It replaces `scripts/docker-cleanup.sh`, which called `docker` directly and was the only
-# operational script that did not go through `lib/container-runtime.sh`. On the rootless Podman host
-# there is no `docker` binary at all (the Ansible role installs `podman` and not `podman-docker`),
-# so the weekly run failed at its first command while the timer stayed enabled -- measured on the
-# migration target 2026-09-21.
-#
-# Two of the five steps could NOT be translated command-for-command, and a mechanical rename would
-# have been worse than the broken job it replaced:
-#
-#   * `volume prune` - Docker's, without `--all`, removes ONLY anonymous volumes. Podman has no such
-#     distinction: `podman volume prune` is documented as "Volumes that are not currently owned by a
-#     container will be removed. Note all data will be destroyed", and its only filter is `label=`.
-#     Measured on the target the same day, `podman volume ls --filter dangling=true` listed
-#     `edge-certs` and `edge-acme-state` -- the edge's TLS material and the ACME account, which are
-#     in no snapshot and were carried across by hand. They are "dangling" whenever the stack is
-#     down, which is exactly when a maintenance job runs. So on Podman this step is SKIPPED, and the
-#     leak it used to paper over was fixed at its source instead: `rt_rm_force` now removes a
-#     container's anonymous volume with the container (ADR-0194).
-#
-#   * `builder prune` - on Podman `builder prune` is an alias for `image prune` ("Remove unused
-#     images"). Running both would be the same step twice, not a build-cache sweep. Podman builds
-#     nothing on this host anyway; the images arrive pre-built and signed.
-#
-# Both Docker-only steps were removed outright on 2026-09-22 with the Docker runtime
-# (OPS-SIMP-01, ADR-0194 amended): the job now runs the three steps Podman has.
-#
-# USAGE
-#   scripts/container-cleanup.sh              # reclaim
-#   scripts/container-cleanup.sh --dry-run    # show the plan and the current usage, remove nothing
-#   scripts/container-cleanup.sh --help
-#
 set -euo pipefail
 
-# `sudo -u <service user>` keeps the CALLER's working directory, and the service user cannot
-# traverse root's or the deploy account's home. Without this every RT_CLI call on a rootless host
-# dies with "cannot chdir to /root: Permission denied" -- an error that names a directory having
-# nothing to do with the command.
 cd /
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
-# shellcheck disable=SC1091  # repo-lint runs shellcheck without -x, so it cannot follow this
+# shellcheck disable=SC1091
 . "${SCRIPT_DIR}/lib/common.sh"
 # shellcheck source=lib/container-runtime.sh
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/lib/container-runtime.sh"
 
-# --- Configuration (every value overridable by environment) -----------------
-# `until=` values take Go duration strings: 24h, 168h, 336h, 720h ...
-IMAGE_UNTIL="${IRI_CLEANUP_IMAGE_UNTIL:-336h}"       # 14 days - the rollback buffer
+IMAGE_UNTIL="${IRI_CLEANUP_IMAGE_UNTIL:-336h}"
 CONTAINER_UNTIL="${IRI_CLEANUP_CONTAINER_UNTIL:-24h}"
 NETWORK_UNTIL="${IRI_CLEANUP_NETWORK_UNTIL:-24h}"
 LOCKFILE="${IRI_CLEANUP_LOCKFILE:-/var/lock/iri-container-cleanup.lock}"
 
-# Monitoring textfile metrics (epic #936). The textfile carries richer per-outcome detail (last
-# success, duration, reclaimed bytes) than the systemd collector's unit-level success, and is what
-# the "container-cleanup stale >8d or absent" warning reads via
-# basetool_container_cleanup_last_success_timestamp.
 START_EPOCH="$(date +%s)"
 
 DRY_RUN=false
 
-# --- Arguments --------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)
@@ -111,11 +60,6 @@ USAGE
   esac
 done
 
-# --- Helpers ----------------------------------------------------------------
-# log and write_textfile are lib/common.sh's.
-
-# Runs one prune step, or prints it under --dry-run. A failing step must NOT abort the run: a
-# briefly-held reference can block a single prune without the other steps needing to be skipped.
 run_prune() {
   local label="$1"
   shift
@@ -131,7 +75,6 @@ run_prune() {
   fi
 }
 
-# Converts a go-units size ("1.5GB", "512MB", "0B") to whole bytes.
 to_bytes() {
   awk -v s="$1" 'BEGIN{
     if (s=="") { print 0; exit }
@@ -151,7 +94,6 @@ to_bytes() {
   }'
 }
 
-# Sum of the Size column of `<cli> system df`, in bytes. Best effort: 0 on any failure.
 df_total_bytes() {
   local total=0 line b
   while IFS= read -r line; do
@@ -161,8 +103,6 @@ df_total_bytes() {
   printf '%d' "${total}"
 }
 
-# Writes the textfile metric atomically (.tmp then mv) so the collector never reads a half-written
-# file.
 write_cleanup_metrics() {
   local reclaimed="$1" now dur
   now="$(date +%s)"
@@ -180,23 +120,16 @@ write_cleanup_metrics() {
   } | write_textfile container_cleanup.prom || true
 }
 
-# --- Lock: one cleanup run at a time ----------------------------------------
 exec 200>"${LOCKFILE}"
 flock -n 200 || {
   log "[ERROR] a cleanup run is already in progress (lock: ${LOCKFILE}). Aborting."
   exit 1
 }
 
-# --- Precondition: a reachable container runtime -----------------------------
 rt_detect
-# Pruning while the stack is still coming up races the creation of the containers it would spare.
 rt_wait_for_startup
 log "runtime: ${RT_BACKEND} (${RT_CLI})"
 
-# RT_CLI can be a whole invocation -- `sudo -n -u <service user> podman` on a rootless host -- so it
-# has to be word-split before it can be PASSED AS ARGUMENTS to run_prune. Splitting it once into an
-# array keeps every call site quotable; leaving it unquoted there would be SC2086, and quoting it
-# would look for a binary literally named "sudo -n -u iri podman".
 read -r -a RT_CLI_ARGV <<< "${RT_CLI}"
 
 echo "================================================================"
@@ -208,8 +141,6 @@ log "disk usage BEFORE:"
 ${RT_CLI} system df || true
 BEFORE_BYTES="$(df_total_bytes)"
 
-# --- Steps ------------------------------------------------------------------
-# Order: containers first (it releases image references), then images, then networks.
 run_prune "stopped containers" \
   "${RT_CLI_ARGV[@]}" container prune --force --filter "until=${CONTAINER_UNTIL}"
 
@@ -219,17 +150,10 @@ run_prune "unused images" \
 run_prune "unused networks" \
   "${RT_CLI_ARGV[@]}" network prune --force --filter "until=${NETWORK_UNTIL}"
 
-# No volume step, on purpose -- see the header. podman volume prune would take edge-certs and
-# edge-acme-state with it whenever the stack is down, and offers no way to say "anonymous only". The
-# leak such a step used to absorb is fixed where it is made: rt_rm_force removes a container's
-# anonymous volume with it.
-
 echo "----------------------------------------------------------------"
 log "disk usage AFTER:"
 ${RT_CLI} system df || true
 
-# Monitoring signal, on a real run only. reclaimed = freed bytes per `system df`, best effort and
-# never negative.
 if [[ "${DRY_RUN}" != "true" ]]; then
   AFTER_BYTES="$(df_total_bytes)"
   RECLAIMED=$(( BEFORE_BYTES - AFTER_BYTES ))

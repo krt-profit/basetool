@@ -20,42 +20,16 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Discriminator for {@link OrgUnit}: which concrete kind of tenant a row in the {@code org_unit}
- * table represents.
+ * Discriminator for {@link OrgUnit}: which kind of tenant a row in the {@code org_unit} table
+ * represents.
  *
- * <p>The enum values match the string literals that Flyway migration V94 (CHECK constraint), V95
- * (denormalised {@code kind} column on {@code org_unit_membership} kept in sync by the {@code
- * sync_org_unit_membership_kind} trigger), and the Hibernate {@code @DiscriminatorValue} on the
- * {@link OrgUnit} hierarchy all rely on. Changing or reordering the names here without coordinating
- * a Flyway migration would silently mis-map existing rows — keep this enum and the database CHECK /
- * trigger / discriminator strings synchronised.
- *
- * <p>Rationale for the four kinds:
- *
- * <ul>
- *   <li>{@link #SQUADRON} — the original "Staffel" tenant boundary that has driven the
- *       multi-tenancy work since Phase 1 (see {@code docs/archive/MULTI_SQUADRON_PLAN.md}). A user
- *       belongs to at most one Squadron. Squadrons may run the promotion subsystem.
- *   <li>{@link #SPECIAL_COMMAND} — added by the Spezialkommando extension (R2.a, see {@code
- *       docs/archive/SPEZIALKOMMANDO_PLAN.md}). A user may belong to any number of Special Commands
- *       in addition to (or instead of) a Squadron. Special Commands never carry the promotion
- *       subsystem; this invariant is enforced at the database layer via the {@code
- *       chk_org_unit_promotion_only_squadron} CHECK constraint and additionally in the {@link
- *       SpecialCommand} entity defaults.
- *   <li>{@link #BEREICH} and {@link #ORGANISATIONSLEITUNG} — the two hierarchy levels above them
- *       (epic #692, ADR-0025): a Bereich groups Staffeln and SKs, the Organisationsleitung sits on
- *       top. Neither carries promotion.
- * </ul>
- *
- * <p>The living description of the tenancy model is {@code docs/specs/org-unit-tenancy.md}.
+ * <p>The names are referenced literally by database CHECK constraints, triggers and the
+ * {@code @DiscriminatorValue}s, so a rename needs a coordinated migration. Only {@link #SQUADRON}
+ * may carry the promotion subsystem.
  */
 public enum OrgUnitKind {
 
-  /**
-   * The classic squadron tenant — Staffel in the German domain language. Mapped to {@code
-   * org_unit.kind = 'SQUADRON'} via {@code @DiscriminatorValue} on {@link Squadron}. The legacy
-   * {@code squadron} table it once mirrored was dropped in V105.
-   */
+  /** The squadron (Staffel) tenant; a user belongs to at most one. */
   SQUADRON,
 
   /**
@@ -67,23 +41,14 @@ public enum OrgUnitKind {
   SPECIAL_COMMAND,
 
   /**
-   * The Bereich (area / division) tenant — one level <em>above</em> Staffeln and Spezialkommandos
-   * in the Kartell hierarchy (epic #692, REQ-ORG-014, ADR-0025). Mapped to {@code org_unit.kind =
-   * 'BEREICH'} via {@code @DiscriminatorValue} on {@link Bereich}. A Bereich groups several
-   * Staffeln and SKs (its children via {@code org_unit.parent_org_unit_id}, set in a later phase)
-   * and is run by its Bereichsleitung (the {@code is_bereichsleiter} / {@code
-   * is_bereichskoordinator} / {@code is_bereichsoperator} membership flags). Permanently barred
-   * from promotion by {@code chk_org_unit_promotion_only_squadron} (only {@code SQUADRON} may carry
-   * it), like SK.
+   * The Bereich tenant, one level above Staffeln and Spezialkommandos (REQ-ORG-014), mapped to
+   * {@link Bereich}; groups its child units and never carries promotion.
    */
   BEREICH,
 
   /**
-   * The Organisationsleitung (OL) tenant — the top of the Kartell hierarchy, above every Bereich
-   * (epic #692, REQ-ORG-014, ADR-0025). Mapped to {@code org_unit.kind = 'ORGANISATIONSLEITUNG'}
-   * via {@code @DiscriminatorValue} on {@link Organisationsleitung}. Its members carry the {@code
-   * is_ol_member} membership flag and (per REQ-ORG-015) reach every org unit, without admin rights.
-   * Has no parent ({@code chk_org_unit_ol_has_no_parent}) and never carries promotion.
+   * The Organisationsleitung tenant at the top of the hierarchy (REQ-ORG-014), mapped to {@link
+   * Organisationsleitung}; has no parent and never carries promotion.
    */
   ORGANISATIONSLEITUNG
 }

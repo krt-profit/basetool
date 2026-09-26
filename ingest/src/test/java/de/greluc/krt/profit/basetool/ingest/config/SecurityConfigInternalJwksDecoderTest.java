@@ -43,14 +43,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 /**
- * Regression guard for REQ-SEC-024 on the ingest gateway: the opt-in internal-JWKS decoder must
- * accept every asymmetric JWS algorithm the realm can be configured to sign with — not just RS256.
- *
- * <p>{@link NimbusJwtDecoder#withJwkSetUri(String)} defaults its accepted algorithm set to RS256
- * only, so {@code SecurityConfig#buildDecoder} widens it to the full {@code SignatureAlgorithm}
- * set. This test serves a JWKS with an EC key and decodes an ES256 token: without the widening the
- * decode would fail with {@code BadJwtException}, which would 401 every {@code /v1/**} call once an
- * operator enables internal JWKS on a realm that signs with PS256/ES256.
+ * The opt-in internal-JWKS decoder accepts every asymmetric JWS algorithm, not only RS256
+ * (REQ-SEC-024); verified by decoding an ES256 token against an EC JWKS.
  */
 class SecurityConfigInternalJwksDecoderTest {
 
@@ -89,9 +83,6 @@ class SecurityConfigInternalJwksDecoderTest {
     signedJwt.sign(new ECDSASigner(ecJwk));
     String token = signedJwt.serialize();
 
-    // No keycloak-trust bundle registered -> buildDecoder falls back to the default client and
-    // fetches the plain-HTTP MockWebServer JWKS; the assertion is purely about the accepted alg
-    // set.
     NimbusJwtDecoder decoder =
         SecurityConfig.buildDecoder(
             "https://keycloak.example/realms/iri", jwkSetUri, new DefaultSslBundleRegistry());

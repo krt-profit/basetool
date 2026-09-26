@@ -22,20 +22,15 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One hit of the admin Personensuche: a place where the searched name appears (REQ-SEC-060).
- *
- * <p>The snippet is the matched column, clipped. It is the entry itself rather than a summary,
- * because the admin has to judge whether this occurrence is the person who made the request - two
- * members can share a spelling, and a handle is not a unique key.
+ * One hit of the admin person search: a place where the searched name appears (REQ-SEC-060).
  *
  * @param area the bounded area label, rendered via {@code admin.personSearch.area.*}
- * @param table the physical table the hit came from, shown so a rectification can be applied
- *     precisely and so a report to the requester can name the surface
+ * @param table the physical table of the hit
  * @param column the matched column
- * @param rowId the row identity as text, for the link; {@code null} when the row has no id column
- * @param snippet the matched text, clipped to a readable length
- * @param linkKind the bounded route key the frontend turns into a link, or {@code null} when the
- *     row has no page of its own and the hit is informational
+ * @param rowId the row identity as text, or {@code null} when the row has no id column
+ * @param snippet the matched text, clipped
+ * @param linkKind the bounded route key for the frontend link, or {@code null} when the row has no
+ *     page
  */
 public record PersonSearchHitDto(
     String area,

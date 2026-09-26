@@ -30,16 +30,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed regression tests for {@link BlueprintRepository}'s admin-page list queries.
- * These run the real SQL against PostgreSQL so the empty-search path can never silently regress to
- * the {@code function lower(bytea) does not exist} failure that broke {@code GET
- * /api/v1/blueprints} whenever the admin opened the page without a filter: a {@code null} named
- * parameter inlined into {@code LOWER(CONCAT(...))} makes PostgreSQL type the bind as {@code
- * bytea}. The queries are split so the no-filter load ({@link
- * BlueprintRepository#findByScwikiDeletedAtIsNull(Pageable)}) never passes a string-function
- * argument and the search load ({@link BlueprintRepository#searchActive(String, Pageable)}) only
- * ever receives a non-null term. An empty table is sufficient: PostgreSQL resolves every function
- * signature at plan time, so a grammar regression throws before any row is read.
+ * Runs {@link BlueprintRepository}'s admin list queries against PostgreSQL to ensure the no-filter
+ * path ({@link BlueprintRepository#findByScwikiDeletedAtIsNull(Pageable)}) and the search path
+ * ({@link BlueprintRepository#searchActive(String, Pageable)}) plan without a {@code lower(bytea)}
+ * error.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -59,12 +53,8 @@ class BlueprintRepositoryTest {
     assertNotNull(page);
   }
 
-  // covers REQ-INV-029 (item-catalog picker query: both search shapes plan against Postgres)
   @Test
   void findItemsWithActiveBlueprint_executesAgainstPostgresForBothSearchShapes() {
-    // The Lager item-catalog query shares the LOWER(CONCAT(...)) grammar, so the empty-string
-    // no-filter shape and the term shape both need the plan-time smoke test — the service binds
-    // "" (never null) for "no filter" for exactly the bytea reason documented on the class.
     assertNotNull(blueprintRepository.findItemsWithActiveBlueprint("", PageRequest.of(0, 25)));
     assertNotNull(blueprintRepository.findItemsWithActiveBlueprint("drive", PageRequest.of(0, 25)));
   }

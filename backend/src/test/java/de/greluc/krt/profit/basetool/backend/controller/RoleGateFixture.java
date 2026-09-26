@@ -32,11 +32,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
- * Shared fixture for the controller tests that pin a role-driven branch decided through {@link
- * AuthHelperService} (BE-SIMP-07). The four controllers once read {@code "ROLE_ADMIN"} straight off
- * the injected {@code Authentication}; they now ask the helper, which consults the real role
- * hierarchy. The tests prove the switch changed nothing by running every caller shape in {@link
- * #callers()} through the controller and comparing against the rule the raw check encoded.
+ * Shared fixture for controller tests that verify a role branch decided through {@link
+ * AuthHelperService} against the raw authority check it replaces, for every caller in {@link
+ * #callers()}.
  */
 final class RoleGateFixture {
 
@@ -100,8 +98,8 @@ final class RoleGateFixture {
   }
 
   /**
-   * Whether {@code caller} carries {@code authority} directly — the exact predicate the removed
-   * {@code authentication.getAuthorities().stream().anyMatch(...)} checks evaluated.
+   * Whether {@code caller} carries one of {@code authorities} directly, the raw authority-match
+   * predicate.
    *
    * @param caller an authority from {@link #callers()}, {@link #ANONYMOUS} or {@link #NONE}
    * @param authorities the authorities the raw check accepted

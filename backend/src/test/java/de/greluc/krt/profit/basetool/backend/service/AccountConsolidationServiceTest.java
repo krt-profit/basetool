@@ -51,13 +51,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit tests for {@link AccountConsolidationService} — folding a duplicate account into the one the
- * member keeps (REQ-SEC-055, #1828).
+ * Unit tests for {@link AccountConsolidationService}, which folds a duplicate account into the kept
+ * one (REQ-SEC-055).
  *
- * <p>The orchestration is the interesting part rather than the data move: {@link
- * UserAccountMergeService} already owns and tests which rows follow the member, so what these cases
- * pin down is the ordering the unique {@code discord_user_id} forces, the Keycloak writes going out
- * in the sequence that makes a retry safe, and the guards that refuse rather than guess.
+ * <p>Covers the step ordering, the Keycloak write sequence and the refusal guards; the row moves
+ * belong to {@link UserAccountMergeService}.
  */
 @ExtendWith(MockitoExtension.class)
 class AccountConsolidationServiceTest {
@@ -121,9 +119,6 @@ class AccountConsolidationServiceTest {
 
     User result = service.consolidate(DUPLICATE_ID, TARGET_ID, 0L, ADMIN_ID);
 
-    // The identity is linked onto the survivor first, the duplicate's app_user row goes next, and
-    // its Keycloak user LAST. That last step being last is what makes a retry safe: a rolled-back
-    // database half leaves the Keycloak user intact for a clean re-read.
     InOrder order = inOrder(keycloakService, userAccountMergeService, userDeletionService);
     order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "duplicate");
     order.verify(userAccountMergeService).merge(DUPLICATE_ID, TARGET_ID, ADMIN_ID);
@@ -134,9 +129,7 @@ class AccountConsolidationServiceTest {
             UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
     order.verify(keycloakService).deleteUser(DUPLICATE_ID);
 
-    // The duplicate's in-Keycloak guard is cleared before the FK-safe purge runs.
     assertFalse(duplicate.isInKeycloak());
-    // The survivor ends up carrying the link and the captured nickname.
     assertEquals(SNOWFLAKE, result.getDiscordUserId());
     assertEquals("SquadNick", result.getDiscordGuildNickname());
 
@@ -282,9 +275,8 @@ class AccountConsolidationServiceTest {
   }
 
   /**
-   * Retry after a partial failure that already removed the duplicate's row: the merge and the purge
-   * are skipped and the survivor is simply stamped, so a second attempt completes instead of
-   * throwing on a row that is no longer there.
+   * When the duplicate's row is already gone, the merge and purge are skipped and the survivor is
+   * only stamped.
    */
   @Test
   void completeConsolidation_whenTheDuplicateRowIsAlreadyGone_justStampsTheSurvivor() {

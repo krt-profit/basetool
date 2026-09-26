@@ -62,9 +62,8 @@ public class PromotionLevelContentService {
   private final AuditService auditService;
 
   /**
-   * Returns a paginated slice of every {@link PromotionLevelContentResponse} across all categories.
-   * The controller validates the caller-supplied sort against {@link #SORTABLE_FIELDS} before this
-   * method is invoked.
+   * Pages every level content across all categories; the sort is validated against {@link
+   * #SORTABLE_FIELDS} by the controller.
    *
    * @param pageable Spring Data paging and sorting parameters
    * @return a page of level contents
@@ -79,9 +78,8 @@ public class PromotionLevelContentService {
   }
 
   /**
-   * Returns every {@link PromotionLevelContentResponse} for the given category ordered by {@link
-   * de.greluc.krt.profit.basetool.backend.model.PromotionLevel}, used by the promotion UI to render
-   * the rank-progression table without pagination.
+   * Returns every level content of the given category, ordered by {@link
+   * de.greluc.krt.profit.basetool.backend.model.PromotionLevel}.
    *
    * @param categoryId identifier of the parent category
    * @return the category's level contents in display order
@@ -114,8 +112,8 @@ public class PromotionLevelContentService {
   }
 
   /**
-   * Persists a new {@link PromotionLevelContent} attached to the category referenced by the
-   * request. Restricted to ADMIN or OFFICER callers via {@link PreAuthorize}.
+   * Persists a new {@link PromotionLevelContent} attached to the requested category; ADMIN or
+   * OFFICER only.
    *
    * @param request validated payload describing the new level content
    * @return the persisted level content in response form
@@ -144,17 +142,13 @@ public class PromotionLevelContentService {
   }
 
   /**
-   * Updates the level content identified by {@code id} and rebinds it to the category referenced by
-   * the request. The caller-supplied {@code version} is compared against the loaded entity and a
-   * mismatch produces an {@link ObjectOptimisticLockingFailureException} that surfaces as HTTP 409.
+   * Updates a level content and rebinds it to the requested category.
    *
    * @param id identifier of the level content to update
-   * @param request validated payload with the new field values and the previously fetched {@code
-   *     version}
+   * @param request validated payload with the new field values and the expected {@code version}
    * @return the updated level content in response form
    * @throws NotFoundException if the level content or referenced category does not exist
-   * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
-   *     matches the persisted entity
+   * @throws ObjectOptimisticLockingFailureException if the {@code version} is stale
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
@@ -171,9 +165,6 @@ public class PromotionLevelContentService {
     assertCallerMayEditCategory(category);
     mapper.updateEntity(entity, request);
     entity.setCategory(category);
-    // saveAndFlush so the flushed @Version reaches the response — the level-content textarea writes
-    // the returned version back onto its data-lc-version attribute in place (no re-swap, unlike the
-    // category/topic paths), so a stale save() version 409s the next consecutive edit.
     PromotionLevelContent saved = repository.saveAndFlush(entity);
     auditService.record(
         AuditEventType.PROMOTION_LEVEL_CONTENT_UPDATED,

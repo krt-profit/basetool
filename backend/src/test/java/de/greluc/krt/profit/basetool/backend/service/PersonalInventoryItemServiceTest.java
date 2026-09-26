@@ -63,10 +63,7 @@ class PersonalInventoryItemServiceTest {
 
   @Mock private PersonalInventoryItemRepository repository;
 
-  /**
-   * Use the real MapStruct-generated mapper – its behavior is part of the service's contract (e.g.,
-   * snapshot vs. ownerUserId propagation) and we do not want a stub to mask wiring mistakes.
-   */
+  /** The real MapStruct mapper, because its behavior is part of the service's contract. */
   @Spy
   private PersonalInventoryItemMapper mapper = Mappers.getMapper(PersonalInventoryItemMapper.class);
 
@@ -94,19 +91,14 @@ class PersonalInventoryItemServiceTest {
     portOlisar.setStarSystemName("Stanton");
   }
 
-  // -------------------------------------------------------------------- listOwn
-
   @Test
   void listOwnShouldQueryRepositoryWithOwnerUserIdFilter() {
-    // Given
     Pageable pageable = PageRequest.of(0, 10);
     when(repository.findAllByOwnerUserId(eq(OWNER), eq(pageable)))
         .thenReturn(new PageImpl<>(List.of(sample(OWNER, 1L))));
 
-    // When
     Page<PersonalInventoryItemResponse> result = service.listOwn(OWNER, null, pageable);
 
-    // Then
     assertEquals(1, result.getTotalElements());
     verify(repository).findAllByOwnerUserId(OWNER, pageable);
     verify(repository, never()).findAll(any(Pageable.class));
@@ -125,11 +117,8 @@ class PersonalInventoryItemServiceTest {
     verify(repository, never()).findAllByOwnerUserId(any(), any());
   }
 
-  // -------------------------------------------------------------------- createOwn
-
   @Test
   void createOwnShouldStampOwnerUserIdFromAuthAndResolveSnapshotFromUex() {
-    // Given
     when(cityRepository.findByIdCity(42)).thenReturn(Optional.of(lorville));
     when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -137,10 +126,8 @@ class PersonalInventoryItemServiceTest {
         new PersonalInventoryItemCreateRequest(
             "Medkit", "first aid", 42, PersonalInventoryLocationType.CITY, 3);
 
-    // When
     PersonalInventoryItemResponse result = service.createOwn(OWNER, req);
 
-    // Then
     ArgumentCaptor<PersonalInventoryItem> captor =
         ArgumentCaptor.forClass(PersonalInventoryItem.class);
     verify(repository).save(captor.capture());
@@ -154,7 +141,6 @@ class PersonalInventoryItemServiceTest {
         persisted.getLocationNameSnapshot(),
         "snapshot must be denormalized from the local UEX mirror");
     assertEquals(3, result.quantity());
-    // REQ-AUDIT-001: a personal-inventory create records exactly one PERSONAL_INVENTORY_CREATED.
     verify(auditService)
         .record(
             eq(
@@ -178,8 +164,6 @@ class PersonalInventoryItemServiceTest {
     verify(repository, never()).save(any());
   }
 
-  // -------------------------------------------------------------------- updateOwn
-
   @Test
   void updateOwnShouldUseOwnerScopedLookupAndApplyChanges() {
     UUID id = UUID.randomUUID();
@@ -196,10 +180,8 @@ class PersonalInventoryItemServiceTest {
         new PersonalInventoryItemUpdateRequest(
             "Renamed", "note", 42, PersonalInventoryLocationType.CITY, 5, 7L);
 
-    // When
     PersonalInventoryItemResponse result = service.updateOwn(OWNER, id, req);
 
-    // Then – no UEX lookup needed because the location did not change
     verify(cityRepository, never()).findByIdCity(any());
     verify(spaceStationRepository, never()).findByIdSpaceStation(any());
     assertEquals("Renamed", result.name());
@@ -215,7 +197,7 @@ class PersonalInventoryItemServiceTest {
 
     PersonalInventoryItemUpdateRequest staleReq =
         new PersonalInventoryItemUpdateRequest(
-            "x", null, 42, PersonalInventoryLocationType.CITY, 1, /* stale */ 4L);
+            "x", null, 42, PersonalInventoryLocationType.CITY, 1, 4L);
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -249,12 +231,9 @@ class PersonalInventoryItemServiceTest {
     verify(spaceStationRepository).findByIdSpaceStation(99);
   }
 
-  // ------------------------------------------------------ DATA ISOLATION
-
   @Test
   void anotherUserMustNotSeeForeignItem() {
     UUID id = UUID.randomUUID();
-    // The repository correctly returns empty when filtered by the wrong owner.
     when(repository.findByIdAndOwnerUserId(id, OTHER)).thenReturn(Optional.empty());
 
     assertThrows(NotFoundException.class, () -> service.getOwn(OTHER, id));
@@ -282,8 +261,6 @@ class PersonalInventoryItemServiceTest {
     verify(repository, never()).delete(any());
   }
 
-  // ------------------------------------------------------ ADMIN PATH
-
   @Test
   void adminUpdateForUserDoesNotEnforceOwnerScope() {
     UUID id = UUID.randomUUID();
@@ -303,11 +280,8 @@ class PersonalInventoryItemServiceTest {
     PersonalInventoryItemResponse result = service.updateForUser(id, req);
 
     assertEquals("Admin Touched", result.name());
-    // Owner sub on the entity is preserved, even though the admin is a different user.
     assertEquals(OWNER, foreign.getOwnerUserId());
   }
-
-  // ------------------------------------------------------ UEX search
 
   @Test
   void searchLocationsShouldMergeAndCapResults() {
@@ -321,8 +295,6 @@ class PersonalInventoryItemServiceTest {
     assertEquals(1, filtered.size());
     assertEquals(PersonalInventoryLocationType.SPACE_STATION, filtered.get(0).type());
   }
-
-  // ------------------------------------------------------ helpers
 
   private static PersonalInventoryItem sample(UUID ownerUserId, long version) {
     PersonalInventoryItem e =

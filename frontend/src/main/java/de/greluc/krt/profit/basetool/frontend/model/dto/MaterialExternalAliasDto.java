@@ -23,13 +23,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code MaterialExternalAliasDto}. Lives in the frontend module so
- * {@code AdminMaterialAliasesPageController} can deserialise the REST response without pulling in
- * the backend module (the two modules are isolated by Gradle).
- *
- * <p>Fields and types must stay in lockstep with {@code
- * de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasDto} — any change on the
- * backend side requires a matching change here in the same commit (mirror-DTO rule).
+ * Frontend mirror of the backend {@code MaterialExternalAliasDto}; fields must match {@code
+ * de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasDto}.
  *
  * @param id alias UUID
  * @param version optimistic-lock token
@@ -42,7 +37,7 @@ import java.util.UUID;
  * @param externalUuid optional external UUID
  * @param externalCode optional external short code
  * @param note free-form provenance note
- * @param createdBy {@code "system"} for V108 seeds, JWT {@code sub} otherwise
+ * @param createdBy {@code "system"} for seeded rows, JWT {@code sub} otherwise
  * @param createdAt row creation timestamp
  * @param updatedAt row last-update timestamp
  */

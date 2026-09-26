@@ -18,38 +18,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Notification bell + always-on unread badge (epic #622, REQ-NOTIF-005/006).
- *
- * - Lazily loads the recent notifications into the bell dropdown on open.
- * - Marks read / deletes individual notifications and the bulk actions with no page reload via
- *   window.krtFetch (CSRF + 403-retry handled centrally). Deleting a single notification is
- *   low-stakes and fires immediately (no confirmation); only the bulk clear-read confirms through
- *   the non-native window.showKrtConfirm dialog.
- * - Keeps the unread badge fresh from the server (the single source of truth) after every mutation
- *   and on a background poll, paused while the tab is hidden. The poll backs off to a slow keepalive
- *   while the SSE push stream is connected and speeds back up the moment it drops; the slow cadence
- *   is kept frequent enough to remain the REQ-SEC-012 re-auth safety net (the poll path — not the
- *   refresh-incapable SSE relay — is what drives token refresh / 401 re-login detection). A liveness
- *   watchdog catches a half-open stream (one that stays "connected" but stops delivering, so it never
- *   fires `error`): if no SSE traffic arrives within the liveness window the poll falls back to the
- *   fast cadence even without an `error`. Per-item DOM is patched in place so the same handlers drive
- *   both the dropdown and the full /notifications page.
- *
- * i18n strings are read from data-* attributes injected by Thymeleaf so this static file carries no
- * hardcoded user-facing text.
- */
 (function () {
-    // Fast cadence: SSE is down, so the poll is the primary "is there anything new?" mechanism.
     const POLL_INTERVAL_FAST_MS = 60000;
-    // Slow cadence: SSE is connected and pushes updates in real time, so the poll is only a backstop
-    // — but stays frequent enough to remain the REQ-SEC-012 re-auth keepalive (the poll path is what
-    // refreshes the token / detects a poisoned session; the SSE relay is deliberately refresh-incapable).
     const POLL_INTERVAL_SLOW_MS = 300000;
-    // Liveness window: if no SSE traffic (named `heartbeat` or `notification`) arrives within this
-    // time while we believe the stream is healthy, treat it as half-open (TCP up, stream dead — such
-    // a connection never fires `error`) and fall back to the fast poll. ~3x the backend heartbeat
-    // (PT20S default) so a single dropped beat doesn't trip it. Keep in step with that interval.
     const SSE_LIVENESS_TIMEOUT_MS = 60000;
     const bell = document.getElementById('notification-bell');
     const i18n = readMessages();
@@ -59,7 +30,6 @@
     /** @type {number | null} */
     let sseWatchdogTimer = null;
 
-    // Read the localized strings the templates expose so this static JS stays text-free.
     function readMessages() {
         const holder = document.getElementById('notification-i18n');
         const data = holder ? holder.dataset : {};
@@ -89,22 +59,11 @@
     }
 
     /**
-     * Reads the JSON payload of one of this module's three hand-rolled GETs, or resolves to
-     * `fallback` when the answer is not that payload. The writes go through krtFetch, which makes
-     * these checks itself; these reads are the ones that have to make them here.
+     * Reads the JSON payload of one of this module's GETs, or resolves to `fallback` when the
+     * answer is not that payload.
      *
-     * Two gates can go up mid-session, and both must navigate rather than fail quietly. A poisoned
-     * or expired session answers 401 + X-Reauthenticate (REQ-SEC-012). A newly deployed Terms-of-Use
-     * wording answers 403 + X-Terms-Acceptance-Required (REQ-SEC-028) — precisely for the tab that
-     * was already open when it deployed, which is when the whole feature first does anything. The
-     * consent check used to be missing here, and the symptom was a badge frozen at its last value
-     * and a dropdown that opened empty, with nothing on screen saying why. It lives in one place now
-     * so the three reads cannot drift back apart one at a time.
-     *
-     * `res.ok` is not the test either. fetch follows redirects transparently, so any
-     * redirect-to-HTML answer arrives as a 200 whose body is a whole document — rejecting
-     * `res.redirected` keeps that out of the JSON parse rather than letting a login page or a
-     * consent page be read as a payload.
+     * The re-auth (REQ-SEC-012) and consent (REQ-SEC-028) gates navigate the page; a redirected
+     * answer is never parsed.
      *
      * @param {Response} res the response to read
      * @param {any} fallback the value to resolve to when the answer is not the payload
@@ -112,17 +71,12 @@
      */
     function readJson(res, fallback) {
         if (res.status === 401) {
-            // The session is gone (logout in another tab, expiry, a renamed session cookie after a
-            // deploy). The stream cannot find that out for itself — see startSse — so it is told
-            // here, before the re-auth helper takes the window (or declines to, inside its loop guard).
             stopSse();
         }
         if (window.krtReauth && window.krtReauth.check(res)) {
             return fallback;
         }
         if (window.krtTermsGate && window.krtTermsGate.check(res)) {
-            // The consent page is already loading over this one: stop the badge poll so the
-            // departing page cannot keep asking the endpoint that just refused it.
             stopPolling();
             return fallback;
         }
@@ -131,8 +85,6 @@
         }
         return res.json();
     }
-
-    // ---- unread badge -------------------------------------------------------
 
     function setBadge(count) {
         const badge = document.getElementById('notification-badge');
@@ -151,8 +103,6 @@
     function refreshUnreadCount() {
         return fetch('/notifications/unread-count', csrfRequestInit())
             .then(function (res) {
-                // Both gates navigate rather than let the badge silently report its last value
-                // forever (REQ-SEC-012 / REQ-SEC-028) — see readJson.
                 return readJson(res, null);
             })
             .then(function (data) {
@@ -160,12 +110,8 @@
                     setBadge(Number(data.count));
                 }
             })
-            .catch(function () {
-                /* a transient count refresh failure must never break the page */
-            });
+            .catch(function () {});
     }
-
-    // ---- dropdown -----------------------------------------------------------
 
     function buildItem(item) {
         const li = document.createElement('li');
@@ -291,8 +237,6 @@
         }
     }
 
-    // ---- mutations (no reload) ---------------------------------------------
-
     function eachItem(id, fn) {
         const nodes = document.querySelectorAll('[data-notif-id="' + cssEscape(id) + '"]');
         Array.prototype.forEach.call(nodes, fn);
@@ -355,9 +299,6 @@
             .finally(refreshUnreadCount);
     }
 
-    // Deleting a single notification is low-stakes and reversible-in-spirit (the message is just
-    // gone from the inbox), so it fires immediately with no confirmation hurdle — unlike the bulk
-    // clear-read below, which still confirms. The success toast is the only feedback.
     function doDelete(id, submitter) {
         if (!window.krtFetch) {
             return;
@@ -416,12 +357,6 @@
         });
     }
 
-    // ---- inbox page load-more (REQ-NOTIF-019) --------------------------------
-
-    // The /notifications page renders only the newest 50; the load-more button appends the next
-    // server page in place so the older tail stays reachable instead of being silently cut off.
-    // Items arrive as the same localized view DTOs the dropdown uses, so buildItem() renders them
-    // identically to the server-rendered rows and the delegated mark-read/delete handlers apply.
     function loadMorePage(btn) {
         const list = document.getElementById('notification-page-list');
         if (!list || btn.disabled) {
@@ -438,11 +373,6 @@
                     return;
                 }
                 data.items.forEach(function (item) {
-                    // A notification arriving since page 0 shifts rows down, so an offset fetch can
-                    // re-return a row already shown — skip those to avoid duplicates. (The reverse,
-                    // a delete shifting an unseen row up past the offset, is the inherent limit of
-                    // offset pagination and is out of scope for REQ-NOTIF-019; a manual reload
-                    // recovers it, as it does for every offset-paginated list in the app.)
                     if (!list.querySelector('[data-notif-id="' + cssEscape(item.id) + '"]')) {
                         list.appendChild(buildItem(item));
                     }
@@ -458,15 +388,12 @@
                     }
                 }
             })
-            .catch(function () {
-                /* leave the button usable so the user can retry a transient failure */
-            })
+            .catch(function () {})
             .finally(function () {
                 btn.disabled = false;
             });
     }
 
-    // Keep the "showing X of Y" hint truthful after each appended page.
     function updatePageHint(list, total) {
         const hint = document.querySelector('[data-notif-hint]');
         if (!hint) {
@@ -492,8 +419,6 @@
             action();
         }
     }
-
-    // ---- wiring -------------------------------------------------------------
 
     function onDocumentClick(event) {
         const markReadBtn = event.target.closest('[data-notif-mark-read]');
@@ -531,7 +456,6 @@
             toggleDropdown();
             return;
         }
-        // Click outside the bell closes the dropdown.
         if (bell && !event.target.closest('#notification-bell')) {
             closeDropdown();
         }
@@ -555,8 +479,6 @@
         }
     }
 
-    // Re-arm the poll timer at the cadence implied by the current SSE health. No-op while the tab is
-    // hidden (the timer is stopped; onVisibilityChange restarts it at the right cadence on return).
     function restartPolling() {
         if (!pollTimer) {
             return;
@@ -565,8 +487,6 @@
         startPolling();
     }
 
-    // (Re)start the SSE liveness window. Called on every proof of life (open / heartbeat /
-    // notification); if it ever elapses, the stream is half-open and we demote to the fast poll.
     function bumpSseWatchdog() {
         if (sseWatchdogTimer) {
             window.clearTimeout(sseWatchdogTimer);
@@ -581,16 +501,11 @@
         }
     }
 
-    // The liveness window elapsed with no SSE traffic: the stream is half-open (still "connected"
-    // but dead, so it never fired `error`). Demote to the fast poll so re-auth detection and unread
-    // updates fall back to the poll path (REQ-SEC-012). A later proof-of-life event re-promotes.
     function onSseWatchdogTimeout() {
         sseWatchdogTimer = null;
         markSseUnhealthy();
     }
 
-    // Proof of life (connection open or any received event): re-arm the watchdog, and on the
-    // false→true flip back the poll off to the slow keepalive. Re-promotes after a half-open demote.
     function markSseHealthy() {
         bumpSseWatchdog();
         if (!sseHealthy) {
@@ -599,10 +514,6 @@
         }
     }
 
-    // The stream is (or went) unhealthy: stop the watchdog and, on the true→false flip, fall back to
-    // the fast poll plus a one-shot catch-up. The catch-up is skipped while the tab is hidden, where
-    // polling is paused and onVisibilityChange refreshes on return. Guarded so the repeated `error`
-    // events of a reconnect storm don't churn the timer or hammer the count endpoint.
     function markSseUnhealthy() {
         clearSseWatchdog();
         if (sseHealthy) {
@@ -620,49 +531,30 @@
         } else {
             startPolling();
             refreshUnreadCount();
-            // A stream can silently die while the tab is backgrounded (and timers are throttled, so
-            // the watchdog may not have fired). Re-arm the liveness window so a now-dead "healthy"
-            // stream self-corrects to the fast poll within SSE_LIVENESS_TIMEOUT_MS of return.
             if (sseHealthy) {
                 bumpSseWatchdog();
             }
         }
     }
 
-    // Best-effort real-time push (REQ-NOTIF-010): refresh immediately when the server pushes a
-    // "notification" event. Reconnection is managed here rather than left to the native EventSource
-    // auto-reconnect so it can be JITTERED: after a frontend redeploy every open tab's stream errors
-    // at the same instant, and the browser's fixed ~3 s auto-reconnect would resynchronise them into
-    // one thundering herd that collapses onto the shared per-IP rate-limit bucket / the SSE relay
-    // pool (#1130 / #1110). The polling fallback above is the guaranteed correctness path, so SSE
-    // never needs to be reliable.
     const SSE_RECONNECT_BASE_MS = 3000;
-    // Consecutive refused connects double the reconnect delay up to 2^3 x the base (24–48 s), so a
-    // stream the server keeps refusing is retried at a walking pace rather than every few seconds.
     const SSE_MAX_BACKOFF_STEPS = 3;
     /** @type {EventSource | null} */
     let sseSource = null;
     /** @type {number | null} */
     let sseReconnectTimer = null;
     let sseStopped = false;
-    // Connects refused in a row (an `error` before any `open`); reset by the next `open`.
     let sseRefusals = 0;
 
     function scheduleSseReconnect() {
-        // One pending reconnect at a time; never reconnect after a `reauth` handoff (the page is
-        // redirecting to the login flow).
         if (sseReconnectTimer !== null || sseStopped) {
             return;
         }
-        // Full jitter in [base, 2*base): spreads reconnects across a window instead of firing every
-        // tab on the same tick, matching the decorrelation the mission-presence reconnect uses. The
-        // base grows with consecutive refusals (see SSE_MAX_BACKOFF_STEPS).
         const base =
             SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(sseRefusals, SSE_MAX_BACKOFF_STEPS));
         const delay = base + Math.floor(Math.random() * base);
         sseReconnectTimer = window.setTimeout(function () {
             sseReconnectTimer = null;
-            // The session probe of a refused connect may have stopped the stream while this waited.
             if (!sseStopped) {
                 startSse();
             }
@@ -670,9 +562,8 @@
     }
 
     /**
-     * Stops the push stream for good on this page: no open source, no pending reconnect. Called
-     * when a read learns that the session is gone, because the stream itself cannot (see startSse).
-     * The badge poll stays; it is what hands the window to the login.
+     * Stops the push stream for good on this page, closing the source and cancelling any pending
+     * reconnect; the badge poll keeps running.
      */
     function stopSse() {
         sseStopped = true;
@@ -683,9 +574,7 @@
         if (sseSource !== null) {
             try {
                 sseSource.close();
-            } catch (_error) {
-                /* already closed */
-            }
+            } catch (_error) {}
             sseSource = null;
         }
         clearSseWatchdog();
@@ -698,59 +587,39 @@
         ) {
             return;
         }
-        // Tear down any prior stream so this module owns the reconnect policy (a lingering native
-        // auto-reconnect would race the jittered one).
         if (sseSource !== null) {
             try {
                 sseSource.close();
-            } catch (_error) {
-                /* already closed */
-            }
+            } catch (_error) {}
             sseSource = null;
         }
         try {
             const source = new EventSource('/notifications/stream');
             sseSource = source;
             let opened = false;
-            // Connection established → push is live: mark healthy (backs the poll off to the slow
-            // keepalive on the flip) and arm the liveness watchdog.
             source.addEventListener('open', function () {
                 opened = true;
                 sseRefusals = 0;
                 markSseHealthy();
             });
-            // Stream dropped → fall back to the fast poll and reconnect ourselves after a jittered
-            // delay. Close the source first so the browser does not ALSO auto-reconnect on its fixed
-            // cadence. The reconnect-storm and tab-hidden guards live in markSseUnhealthy.
             source.addEventListener('error', function () {
                 markSseUnhealthy();
                 try {
                     source.close();
-                } catch (_error) {
-                    /* already closed */
-                }
+                } catch (_error) {}
                 if (sseSource === source) {
                     sseSource = null;
                 }
                 if (!opened) {
-                    // Refused before it ever opened. An EventSource reads no status, so a 401 from
-                    // a session that has ended looks exactly like a network blip, and a tab would
-                    // reconnect against it every few seconds for as long as it stayed open — hidden
-                    // tabs too, where the badge poll is paused. The badge read can see the status:
-                    // on a 401 readJson stops this stream and hands the window to the login.
                     sseRefusals += 1;
                     refreshUnreadCount();
                 }
                 scheduleSseReconnect();
             });
-            // Named keepalive (REQ-NOTIF-010): pure proof of life. Resets the liveness watchdog and
-            // re-promotes to the slow cadence if a half-open stall had demoted us. The payload is
-            // irrelevant — only its arrival matters.
             source.addEventListener('heartbeat', function () {
                 markSseHealthy();
             });
             source.addEventListener('notification', function () {
-                // A delivered notification is also proof the stream is live.
                 markSseHealthy();
                 refreshUnreadCount();
                 const dropdown = document.getElementById('notification-dropdown');
@@ -758,9 +627,6 @@
                     loadDropdown();
                 }
             });
-            // The server pushes a `reauth` event when the stream's session lost its OAuth2 token,
-            // then closes the stream: redirect to the Keycloak login flow instead of reconnecting
-            // against a dead session (REQ-SEC-012).
             source.addEventListener('reauth', function (event) {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
@@ -771,11 +637,6 @@
                     window.krtReauth.redirect(event && event.data ? event.data : null);
                 }
             });
-            // The consent gate answers a stream that has no accepted Terms of Use with a single
-            // `terms-gate` event naming the consent page, then closes it (REQ-SEC-028). Without this
-            // the stream would just error and reconnect on the jittered timer below — forever, since
-            // consent cannot be given from a background request. Same shape as `reauth`: stop
-            // reconnecting, then navigate.
             source.addEventListener('terms-gate', function (event) {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
@@ -784,9 +645,7 @@
                 }
                 try {
                     source.close();
-                } catch (_error) {
-                    /* already closed */
-                }
+                } catch (_error) {}
                 if (sseSource === source) {
                     sseSource = null;
                 }
@@ -794,10 +653,6 @@
                     window.krtTermsGate.redirect(event && event.data ? event.data : null);
                 }
             });
-            // #1156: the server retires the OLDEST of this user's streams with a `replaced` event
-            // once they exceed the per-user cap (too many tabs/devices). Yield the live channel to
-            // the newer tab: stop reconnecting on THIS stream and fall back to the polling path here
-            // (the count endpoint still keeps this tab correct). Unlike `reauth` there is no redirect.
             source.addEventListener('replaced', function () {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
@@ -807,24 +662,17 @@
                 markSseUnhealthy();
                 try {
                     source.close();
-                } catch (_error) {
-                    /* already closed */
-                }
+                } catch (_error) {}
                 if (sseSource === source) {
                     sseSource = null;
                 }
             });
-        } catch (_error) {
-            /* SSE unavailable; the polling fallback remains */
-        }
+        } catch (_error) {}
     }
 
     document.addEventListener('click', onDocumentClick);
     document.addEventListener('visibilitychange', onVisibilityChange);
 
-    // Per-item buttons and the page-level mark-all / clear-read controls exist on the
-    // /notifications page even when the bell is absent on a given render, so wiring is
-    // unconditional; the badge poll only starts when a badge is present.
     startPolling();
     startSse();
 })();

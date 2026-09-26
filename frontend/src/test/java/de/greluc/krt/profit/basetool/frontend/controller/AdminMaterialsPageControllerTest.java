@@ -46,7 +46,6 @@ class AdminMaterialsPageControllerTest {
 
   @Test
   void updateMaterialAjax_ShouldUpdateAndReturnMaterial() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
 
@@ -67,25 +66,19 @@ class AdminMaterialsPageControllerTest {
     MaterialUpdateAjaxRequest request =
         new MaterialUpdateAjaxRequest("QUANTITY_TYPE", null, null, "PIECE", null, null, null, 1L);
 
-    // Act
     ResponseEntity<MaterialDto> response = controller.updateMaterialAjax(matId, request);
 
-    // Assert
     assertEquals(200, response.getStatusCode().value());
     assertEquals(updatedMaterial, response.getBody());
-    // A QUANTITY_TYPE edit formerly slipped past the updateType guard and never evicted (F5); the
-    // fix evicts the MATERIAL domain unconditionally on every material edit.
     verify(backendApiClient).evict(CacheDomain.MATERIAL);
   }
 
   @Test
   void listMaterials_ShouldSortListsAscendingByName() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
 
-    // Data for Materials
     List<MaterialDto> materials = new ArrayList<>();
     materials.add(
         new MaterialDto(
@@ -181,10 +174,8 @@ class AdminMaterialsPageControllerTest {
             anyTypeRef()))
         .thenReturn(materialsPage);
 
-    // Act
     controller.listMaterials(model);
 
-    // Assert
     List<MaterialDto> sortedMaterials = (List<MaterialDto>) model.getAttribute("materials");
     assertEquals(5, sortedMaterials.size());
     assertEquals("Alpha", sortedMaterials.get(0).name());
@@ -203,10 +194,8 @@ class AdminMaterialsPageControllerTest {
     assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
   }
 
-  // covers REQ-ADMIN-001 — materials beyond the first backend page stay visible and editable
   @Test
   void listMaterials_concatenatesAllBackendPages() {
-    // Arrange — two backend pages of one material each
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -251,10 +240,8 @@ class AdminMaterialsPageControllerTest {
     when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(second), 1, 1000, 2, 2, List.of("name,asc")));
 
-    // Act
     controller.listMaterials(model);
 
-    // Assert — both pages land in the rendered list
     List<MaterialDto> sortedMaterials = (List<MaterialDto>) model.getAttribute("materials");
     assertEquals(2, sortedMaterials.size(), "the second backend page must not be dropped");
     assertEquals("Agricium", sortedMaterials.get(0).name());
@@ -264,7 +251,6 @@ class AdminMaterialsPageControllerTest {
 
   @Test
   void createMaterialAjax_success_returnsBackendDto() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
 
@@ -293,10 +279,8 @@ class AdminMaterialsPageControllerTest {
     when(backendApiClient.post(eq("/api/v1/materials"), eq(req), eq(MaterialDto.class)))
         .thenReturn(created);
 
-    // Act
     ResponseEntity<MaterialDto> response = controller.createMaterialAjax(req);
 
-    // Assert
     assertEquals(200, response.getStatusCode().value());
     assertEquals(created, response.getBody());
     verify(backendApiClient).evict(CacheDomain.MATERIAL);
@@ -304,7 +288,6 @@ class AdminMaterialsPageControllerTest {
 
   @Test
   void createMaterialAjax_backendValidationFailure_propagatesStatus() {
-    // Arrange — backend returns 400 (validation), client throws BackendServiceException
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
 
@@ -315,10 +298,8 @@ class AdminMaterialsPageControllerTest {
     when(backendApiClient.post(eq("/api/v1/materials"), eq(req), eq(MaterialDto.class)))
         .thenThrow(new BackendServiceException("backend rejected", null, 400));
 
-    // Act
     ResponseEntity<MaterialDto> response = controller.createMaterialAjax(req);
 
-    // Assert — 400 propagates so the JS layer can show a problem-detail toast
     assertEquals(400, response.getStatusCode().value());
     verify(backendApiClient, org.mockito.Mockito.never()).evict(CacheDomain.MATERIAL);
   }

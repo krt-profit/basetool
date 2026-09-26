@@ -41,23 +41,12 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * A squadron's <em>claim</em> ("Eintragung") for a partial quantity of one material bucket on a
- * public Spezialkommando job order — the way profit squadrons sign up to deliver part of an SK
- * order's material requirement (Job-Order rework #340, Phase 4 / #344).
+ * A squadron's claim ("Eintragung") for part of one material bucket {@code (jobOrder, material,
+ * qualityRequirement)} on a public Spezialkommando job order.
  *
- * <p>The claim is keyed on the aggregated bucket {@code (jobOrder, material, qualityRequirement)}
- * so it works uniformly for both order kinds: a {@code MATERIAL} order's required amount per bucket
- * is Σ {@link JobOrderMaterial#getAmount()} (with the bucket derived from {@code minQuality}), an
- * {@code ITEM} order's is Σ {@link JobOrderItemMaterial#getRequiredQuantity()}. A partial-unique
- * constraint enforces <b>one claim per {@code (bucket, claimingOrgUnit)}</b> — a squadron raising
- * its stake updates its existing row rather than inserting a duplicate.
- *
- * <p>Claims are <b>signal-only</b>: they record intent, never move inventory. They live as an
- * independent aggregate (no mapped collection on {@link JobOrder}) so mutating a claim never bumps
- * the parent order's {@code @Version}; the reconciliation hooks in {@code JobOrderService} delete
- * them through {@code MaterialClaimRepository} rather than through a JPA cascade. Invariants
- * (SK-only, no overclaim Σ ≤ required, terminal-status freeze) are enforced in {@code
- * MaterialClaimService}, not here.
+ * <p>One claim per bucket and claiming org unit. Claims are signal-only and never move inventory;
+ * they form an independent aggregate, so changing one never bumps the order's {@code @Version}.
+ * Invariants are enforced in {@code MaterialClaimService}.
  */
 @Entity
 @Getter
@@ -117,9 +106,7 @@ public class MaterialClaim extends AbstractEntity<UUID> {
 
   /**
    * Rounds the claimed {@code amount} to SCU scale (three decimals, {@code HALF_UP}) on insert and
-   * update, so an SCU claim never stores more than three decimals (the service enforces {@code > 0}
-   * and the {@code PIECE}-integer rule separately). Unconditional — a no-op for whole {@code PIECE}
-   * amounts — to avoid lazy-loading {@link #material} on every flush.
+   * update; a no-op for whole {@code PIECE} amounts.
    *
    * @see InventoryItem#roundToScuScale(Double)
    */
@@ -130,14 +117,10 @@ public class MaterialClaim extends AbstractEntity<UUID> {
   }
 
   /**
-   * Renders the claim using only safe scalar identifiers — its own id, the {@code
-   * qualityRequirement}, the {@code amount}, and the (null-safe) ids of the associated entities.
-   * Deliberately does <b>not</b> call {@code toString()} on the {@code @ManyToOne} associations:
-   * those are {@code FetchType.LAZY}, so dereferencing them in a log line could trigger a lazy load
-   * (or fail outside a session), and the audit user must never surface as a name/email. Reading
-   * only the foreign-key id off a lazy proxy does not initialise it.
+   * Renders the claim from scalar fields and associated ids only, so logging it never triggers a
+   * lazy load or exposes a user's name or e-mail.
    *
-   * @return a stable, PII-free single-line representation of this claim.
+   * @return a PII-free single-line representation
    */
   @NotNull
   @Override

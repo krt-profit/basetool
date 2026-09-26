@@ -23,32 +23,26 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 /**
- * One item record from the P4K catalog ({@code EntityClassDefinition} under {@code entities/scitem}
- * / {@code legacyitems}). Reconciled against the local {@code game_item} table by {@link #guid} (=
- * {@code external_uuid}) first, then a unique case-insensitive {@link #className}, then a unique
+ * One item record from the P4K catalog, matched to {@code game_item} by {@link #guid} ({@code
+ * external_uuid}) first, then a unique case-insensitive {@link #className}, then a unique
  * case-insensitive {@link #name}.
  *
- * <p>{@code @JsonIgnoreProperties(ignoreUnknown = true)} keeps the parse tolerant of catalog
- * additions. Any field may be {@code null} when the source DCB / localization did not resolve it.
+ * <p>Any field may be {@code null} when the source did not resolve it.
  *
  * @param guid DataForge {@code __ref} GUID (string form of {@code game_item.external_uuid})
  * @param className RSI engine class name; matches {@code game_item.class_name}
  * @param path source DCB record path (forensic; not persisted)
- * @param type item type token from {@code AttachDef} (forensic; not persisted)
+ * @param type item type token (forensic; not persisted)
  * @param subType item sub-type token (forensic; not persisted)
- * @param size component size tier (forensic; not persisted — {@code game_item.size_class} is left
- *     as the UEX/Wiki value)
+ * @param size component size tier (forensic; not persisted)
  * @param grade item grade marker (forensic; not persisted)
- * @param mass mass in kg, enriched into {@code game_item.mass} when currently null
- * @param manufacturerGuid manufacturer {@code __ref} GUID, resolved against the manufacturer index
- *     and enriched into {@code game_item.manufacturer} when currently null
+ * @param mass mass in kg, filled into {@code game_item.mass} when null
+ * @param manufacturerGuid manufacturer GUID, filled into {@code game_item.manufacturer} when null
  * @param tags raw item tag tokens (forensic; not persisted)
  * @param name English display name; matches {@code game_item.name}
  * @param nameDe German display name, or {@code null}
- * @param desc English description, enriched into {@code game_item.description_en} when currently
- *     null
- * @param descDe German description, enriched into {@code game_item.description_de} when currently
- *     null
+ * @param desc English description, filled into {@code game_item.description_en} when null
+ * @param descDe German description, filled into {@code game_item.description_de} when null
  * @param nameKey raw {@code @LOC} name localization key (forensic; not persisted)
  * @param descKey raw {@code @LOC} description localization key (forensic; not persisted)
  * @param displayType {@code SCItemPurchasableParams.displayType} (forensic; not persisted)

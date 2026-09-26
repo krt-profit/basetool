@@ -73,20 +73,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Runs the frontend's real Redis work under its own ACL user, against the committed ACL template
- * with {@code default} switched off — the state production reaches at the end of the per-service
- * rollout (REQ-SEC-068, ADR-0207).
+ * Runs the frontend's Redis work under its own ACL user against the committed ACL template with
+ * {@code default} disabled (REQ-SEC-068, ADR-0207), checking both what it may and may not do.
  *
- * <p>What it proves, in the order a member meets it: Spring Session stores, indexes, renames and
- * deletes a session and hears its created and deleted events; the keyspace-notification startup
- * step survives a user that may not run {@code CONFIG}; live sync publishes and receives on both
- * channels; a staged handoff is consumed; the session count is scanned and the health indicator's
- * {@code INFO} answers. And what it refuses: the gateway's index keys, any foreign key, {@code
- * CONFIG}, {@code KEYS}, {@code FLUSHALL}, the backend's notification channel.
- *
- * <p>{@link #theAclMatrixHoldsForEveryUser} is the {@code ACL DRYRUN} table for all five users, and
- * {@link #theCommittedE2eAclIsTheTemplate} keeps {@code docker/test-redis/users.acl} — what the E2E
- * stack loads — equal to the template, so the Playwright suite runs these same rules.
+ * <p>{@link #theCommittedE2eAclIsTheTemplate} keeps {@code docker/test-redis/users.acl} equal to
+ * the template.
  */
 @Testcontainers
 class RedisAclFrontendIntegrationTest {
@@ -147,8 +138,6 @@ class RedisAclFrontendIntegrationTest {
             deleted.countDown();
           }
         });
-    // Subscribed exactly as Spring Session's own configuration subscribes the repository: two
-    // keyspace-event channels and the created-event PATTERN, which the ACL has to spell literally.
     RedisMessageListenerContainer listener = listenerContainer(factory);
     listener.addMessageListener(
         repository,
@@ -189,7 +178,6 @@ class RedisAclFrontendIntegrationTest {
     try (RedisConnection connection = factory.getConnection()) {
       new TolerantKeyspaceNotificationsAction().configure(connection);
     }
-    // And the server really carries the setting the frontend no longer applies itself.
     LettuceConnectionFactory admin = connect(RedisAclTemplate.ADMIN_USER, "REDIS_PASSWORD");
     try (RedisConnection connection = admin.getConnection()) {
       Properties config = connection.serverCommands().getConfig("notify-keyspace-events");
@@ -201,10 +189,8 @@ class RedisAclFrontendIntegrationTest {
   }
 
   /**
-   * The 2026-09-25 production finding, end to end against the real ACL: the startup step the
-   * frontend picks for its own user moves {@code INFO}'s {@code acl_access_denied_cmd} — the
-   * counter behind {@code redis_acl_access_denied_cmd_total} and {@code RedisAclDenials} — not at
-   * all, while the {@code CONFIG} step of before moves it on every start.
+   * Verifies that the startup step chosen for the frontend's ACL user does not increase Redis'
+   * {@code acl_access_denied_cmd} counter, while the {@code CONFIG} step does.
    */
   @Test
   void theStartupStepPickedForTheFrontendUserIsNeverRefused() {
@@ -347,8 +333,6 @@ class RedisAclFrontendIntegrationTest {
 
   @Test
   void beforeTheRolloutAPasswordOnlyAuthIsExactlyTodaysDefaultUser() {
-    // The merged-but-not-rolled-out state: every app still has an EMPTY REDIS_USERNAME and the
-    // shared REDIS_PASSWORD, and `default` is on. That must be a password-only AUTH that works.
     StringRedisTemplate admin = template(connect(RedisAclTemplate.ADMIN_USER, "REDIS_PASSWORD"));
     admin.execute(
         (org.springframework.data.redis.core.RedisCallback<Object>)
@@ -485,11 +469,11 @@ class RedisAclFrontendIntegrationTest {
   }
 
   /**
-   * Connects with no username at all — a password-only {@code AUTH}, which is what an application
-   * with an empty {@code REDIS_USERNAME} sends.
+   * Connects with a password-only {@code AUTH}, as an application with an empty {@code
+   * REDIS_USERNAME} does.
    *
-   * @param password the password.
-   * @return a started connection factory, destroyed after the test.
+   * @param password the password
+   * @return a started connection factory, destroyed after the test
    */
   private LettuceConnectionFactory connectWithoutUsername(String password) {
     return connectWithUsername(null, password);
@@ -543,11 +527,10 @@ class RedisAclFrontendIntegrationTest {
   }
 
   /**
-   * Waits until a listener container's subscriptions are live, failing when they never are — an ACL
-   * that refuses a channel shows up here, not as a missing message five seconds later.
+   * Waits until a listener container's subscriptions are live, failing when they never are.
    *
-   * @param container the container.
-   * @throws InterruptedException when interrupted while waiting.
+   * @param container the container
+   * @throws InterruptedException when interrupted while waiting
    */
   private static void waitUntilListening(RedisMessageListenerContainer container)
       throws InterruptedException {
@@ -569,10 +552,6 @@ class RedisAclFrontendIntegrationTest {
     RedisSerializer<Object> serializer =
         new FaultTolerantSessionSerializer(
             new GenericJacksonJsonRedisSerializer(
-                // The session TYPE allow-list is REQ-SEC-067's subject and has its own suite; this
-                // one is about Redis PERMISSIONS, so it reads with the validator production ships
-                // by
-                // default rather than letting a type refusal masquerade as an ACL failure.
                 RedisSessionConfig.buildSessionJsonMapper(
                     RedisAclFrontendIntegrationTest.class.getClassLoader(),
                     SessionTypeAllowList.validatorBuilder(
@@ -586,8 +565,6 @@ class RedisAclFrontendIntegrationTest {
     template.setConnectionFactory(factory);
     template.afterPropertiesSet();
     RedisIndexedSessionRepository repository = new RedisIndexedSessionRepository(template);
-    // What @EnableRedisIndexedHttpSession does with the session serializer bean: the pub/sub path
-    // (the created event's payload) reads with the default serializer, not the template's.
     repository.setDefaultSerializer(serializer);
     repository.setDefaultMaxInactiveInterval(Duration.ofMinutes(30));
     repository.setRedisKeyNamespace("basetool:session");

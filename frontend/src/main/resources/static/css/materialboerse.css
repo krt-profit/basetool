@@ -12,7 +12,6 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    /* ---- page head + primary CTA ---- */
     .mb-head {
         display: flex;
         align-items: flex-start;
@@ -29,8 +28,6 @@
         gap: 10px;
         flex-wrap: wrap;
     }
-    /* Small "Item" marker distinguishing a blueprint-product offer from a material offer on the
-   board (REQ-MARKET-012). Composition only — reuses design-system tokens, square corners. */
     .mb-kind-tag {
         display: inline-block;
         font-size: 9px;
@@ -43,7 +40,6 @@
         vertical-align: middle;
     }
 
-    /* ---- toolbar (tabs + search + filters) ---- */
     .mb-toolbar {
         background: var(--color-bg-dark-gray);
         border: 1px solid var(--color-gray-3);
@@ -63,7 +59,6 @@
         min-width: 0;
         padding: 0 6px;
     }
-    /* Search moved onto the filter row (right-aligned via the auto margin). */
     .mb-search {
         display: flex;
         align-items: center;
@@ -114,27 +109,13 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* ---- master-detail layout ---- */
     .mb-md {
         grid-template-columns: 320px 1fr;
         gap: 14px;
         align-items: start;
         margin-top: 0;
     }
-    /*
- * The offer list scrolls internally and stretches down to just above the fixed
- * footer (`.krt-footer` in styles.css, `position: fixed; bottom: 0`) instead of
- * stopping at a short fixed cap — mirrors the pattern used for the matrix in
- * materials-overview.css. `--krt-footer-height` is published by sidebar.html JS
- * (falls back to 5rem before DOMContentLoaded); the extra ~22rem reserves the
- * sticky header, the page head + CTA row and the toolbar (tabs + filters) that
- * sit above the list at top-of-page scroll, and leaves a small gap between the
- * list's bottom edge and the footer for visual separation. `max(...)` floors the
- * height so the list never collapses on very short viewports.
- */
     .mb-mlist {
-        /* The viewport term and its `dvh` fallback are `--krt-panel-viewport-rest` in styles.css;
-       22rem is this panel's own reserve for the chrome above it. */
         max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 22rem));
         overflow-y: auto;
         border: none;
@@ -143,8 +124,6 @@
         .mb-md {
             grid-template-columns: 1fr;
         }
-        /* Narrow screens collapse to list -> detail navigation: the list shows first,
-       selecting a row reveals the detail (has-sel) with a "Liste" back button. */
         .mb-md .mb-detailpane {
             display: none;
         }
@@ -156,14 +135,6 @@
         }
     }
 
-    /* ---- master row (2-line composition inside .master-row) ---- */
-    /* The rows are native <button>s, so we must strip the UA button chrome (the
-   buttonface fill and the beveled 3-sided border) that would otherwise paint a
-   light "overlay" over unselected rows and white borders around every entry —
-   the .master-row.is-active fill only masked it on the selected row (#1184).
-   Mirrors the reset on personal-inventory's .master-row buttons: keep the base
-   .master-row border-bottom hairline, reserve a transparent 3px left border so
-   the .is-active / .mb-mine accent never shifts the layout. */
     .mb-mrow {
         display: flex;
         align-items: center;
@@ -227,7 +198,6 @@
         flex: none;
     }
 
-    /* ---- detail pane ---- */
     .mb-detailpane {
         min-height: 300px;
         padding: 0;
@@ -340,10 +310,6 @@
         flex-wrap: wrap;
     }
 
-    /* ---- release / edit modal composition ---- */
-    /* Material/Item kind radio above the release picker (REQ-MARKET-002): a slim two-chip segmented
-   row that narrows the combobox below to one row kind. The chosen chip lights up in the brand
-   accent; the native radio stays for keyboard/AT, tinted to match. */
     .mb-modal-kind {
         display: flex;
         gap: 8px;
@@ -381,24 +347,15 @@
     .mb-modal-facts {
         margin-bottom: 14px;
     }
-    /* The request modal's subject-facts strip (data-mg-subject-facts) is edit-only: materialgesuch-modal.js
-   sets `hidden` on it in create mode. The `hidden` attribute must win over the .facts-bar flex display
-   (the UA [hidden] rule loses to a class, the same trap the .mb-modal-qty guard covers), otherwise the
-   empty "Gesucht —" placeholder leaks into the create/search modal. The offer facts bar never carries
-   `hidden`, so it is unaffected. */
     .mb-modal-facts[hidden] {
         display: none;
     }
-    /* Item-offer quantity field (item mode only, REQ-MARKET-012). */
     .mb-modal-qty {
         display: flex;
         flex-direction: column;
         gap: 5px;
         margin-bottom: 14px;
     }
-    /* The hidden attribute must win over the flex display (the UA [hidden] rule loses to a class), so
-   the item-quantity field stays hidden during a material release/edit — where materialboerse-release.js
-   sets `hidden` on it (mode !== 'item'). Without this the block leaked into every material release. */
     .mb-modal-qty[hidden] {
         display: none;
     }
@@ -411,7 +368,6 @@
         font-size: 11px;
         color: var(--color-danger-text);
     }
-    /* Partial-offer amount field (material offer, ADR-0086). */
     .mb-modal-amount {
         margin-bottom: 14px;
     }
@@ -474,7 +430,6 @@
         height: 13px;
     }
 
-    /* ---- Mein-Lager "Für Börse freigeben" leaf toggle ---- */
     .inv-boerse-toggle {
         display: inline-flex;
         align-items: center;
@@ -491,10 +446,6 @@
         font-size: 10px;
     }
 
-    /* ===================== Gesuche (requests) mode =====================
-   The board is one page with two modes (Angebote / Gesuche). The head shows one CTA pair per mode;
-   the inactive group is hidden by the [hidden] attribute (the guard must beat the inline-flex
-   display, the same UA-loses-to-a-class trap the .mb-modal-qty guard covers). */
     .mb-cta-group {
         display: inline-flex;
         align-items: center;
@@ -504,7 +455,6 @@
     .mb-cta-group[hidden] {
         display: none;
     }
-    /* Desired-quantity unit label in the request modal (mirrors .mb-modal-amount-unit). */
     .mb-modal-qty-unit {
         font-size: 11px;
         color: var(--color-gray-2-text);

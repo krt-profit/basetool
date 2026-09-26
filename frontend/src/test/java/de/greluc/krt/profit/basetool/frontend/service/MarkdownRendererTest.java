@@ -36,13 +36,10 @@ class MarkdownRendererTest {
 
   @Test
   void shouldRenderBasicMarkdownToHtml() {
-    // Given
     String markdown = "**fett** und *kursiv*\n\n- eins\n- zwei";
 
-    // When
     String html = renderer.render(markdown);
 
-    // Then
     assertTrue(html.contains("<strong>fett</strong>"), "bold must render");
     assertTrue(html.contains("<em>kursiv</em>"), "italics must render");
     assertTrue(html.contains("<li>eins</li>"), "list items must render");
@@ -50,13 +47,10 @@ class MarkdownRendererTest {
 
   @Test
   void shouldEscapeRawHtmlInSource() {
-    // Given
     String markdown = "Hallo <script>alert('xss')</script> <img src=x onerror=alert(1)>";
 
-    // When
     String html = renderer.render(markdown);
 
-    // Then
     assertFalse(html.contains("<script>"), "raw script tags must be escaped");
     assertFalse(html.contains("<img"), "raw img tags must be escaped");
     assertTrue(html.contains("&lt;script&gt;"), "escaped form must remain visible as text");
@@ -64,26 +58,20 @@ class MarkdownRendererTest {
 
   @Test
   void shouldStripDangerousLinkProtocols() {
-    // Given
     String markdown = "[klick mich](javascript:alert('xss')) und [ok](https://example.org)";
 
-    // When
     String html = renderer.render(markdown);
 
-    // Then
     assertFalse(html.contains("javascript:"), "javascript: URLs must be stripped");
     assertTrue(html.contains("href=\"https://example.org\""), "https links must survive");
   }
 
   @Test
   void shouldRenderSoftBreaksAsLineBreaks() {
-    // Given: a single newline inside a paragraph (the common "Enter once" case in the textarea).
     String markdown = "Zeile eins\nZeile zwei";
 
-    // When
     String html = renderer.render(markdown);
 
-    // Then
     assertTrue(html.contains("<br />"), "soft breaks must become visible line breaks");
   }
 

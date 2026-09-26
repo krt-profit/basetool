@@ -29,23 +29,15 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published right after a member registers interest in a Materialbörse offer (#1187,
- * REQ-MARKET-011). It is directed at the offer's owner (the Anbieter) so they learn about the
- * interested party without having to poll the board: the {@code EVENT_RECIPIENT} selector resolves
- * to {@link #contextRecipientUserId()} (the owner), while the registering member is the {@link
- * #actorSub()} (excluded when the rule sets {@code excludeActor} — harmless here since a member can
- * never register interest in their own offer, so actor and recipient are always distinct).
+ * Domain event published when a member registers interest in a Materialbörse offer
+ * (REQ-MARKET-011), directed at the offer's owner via {@link #contextRecipientUserId()}.
  *
- * <p>Carries only immutable scalars (ids and pre-resolved display strings) so the after-commit
- * listener never touches the managed offer/interest entities. The interessent's name is carried as
- * a render parameter: this is a permitted disclosure because the notification reaches only the
- * owner (REQ-MARKET-006's interessenten anonymity is owner-only), and only the opaque {@code type}
- * + {@code params} — never a rendered string — are stored (REQ-NOTIF-001).
+ * <p>Carries only immutable scalars; the interested member's name is disclosed to the owner only.
  *
- * @param offerId the offer whose interest was registered (also the notification's loose entity id)
+ * @param offerId the offer (also the notification's loose entity id)
  * @param materialName the offered material's name, for rendering
  * @param interestedUserName the registering member's effective name, for rendering (owner-only)
- * @param ownerUserId the offer owner's sub — the directed recipient
+ * @param ownerUserId the offer owner's sub; the directed recipient
  * @param actorSub the registering member's sub
  */
 public record MaterialExchangeInterestRegisteredEvent(

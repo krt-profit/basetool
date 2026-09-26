@@ -101,21 +101,16 @@ class SyncCoordinatorTest {
     holder.start();
     assertTrue(holding.await(5, TimeUnit.SECONDS), "holder thread must acquire the gate first");
 
-    // A second sync of the other kind is started while the holder still occupies the gate. It must
-    // NOT run immediately, but must NOT be dropped either: it waits for the holder to finish.
     AtomicBoolean secondRan = new AtomicBoolean(false);
     Thread waiter =
         new Thread(
             () -> coordinator.runExclusively("SC Wiki", () -> secondRan.set(true)), "gate-waiter");
     waiter.start();
 
-    // Give the waiter a moment to enter tryLock; it must still be blocked (holder not released
-    // yet).
     Thread.sleep(200);
     assertFalse(secondRan.get(), "the waiting sync must not run while the gate is held");
     assertTrue(waiter.isAlive(), "the waiting sync must still be queued, not dropped");
 
-    // Releasing the holder lets the queued sync proceed.
     release.countDown();
     waiter.join(5_000);
     holder.join(5_000);
@@ -125,7 +120,6 @@ class SyncCoordinatorTest {
   @Test
   void runExclusively_skipsTask_whenWaitCapElapsesBecauseHolderIsStuck()
       throws InterruptedException {
-    // Tiny wait cap so the "holder is stuck" safety net trips quickly in the test.
     SyncCoordinator coordinator = new SyncCoordinator(100);
     CountDownLatch holding = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
@@ -147,8 +141,6 @@ class SyncCoordinatorTest {
     holder.start();
     assertTrue(holding.await(5, TimeUnit.SECONDS), "holder thread must acquire the gate first");
 
-    // The holder never releases within the cap → the contended call gives up rather than blocking
-    // its executor thread indefinitely.
     AtomicBoolean secondRan = new AtomicBoolean(false);
     boolean result = coordinator.runExclusively("SC Wiki", () -> secondRan.set(true));
 

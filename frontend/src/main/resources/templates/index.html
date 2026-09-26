@@ -30,9 +30,6 @@
         </div>
     </div>
 
-
-    <!--/* Information / announcement: spans the full width and is only as tall as its content —
-         minimal (just the header) when collapsed, expanding to the text height when open. */-->
     <div sec:authorize="isAuthenticated()" class="hud-box mt-2" th:if="${announcement}" id="info-section">
         <div class="krtm-display-flex-justify-content-space-between-a-a0eb" id="info-header" data-trigger="index-toggle-info">
              <div class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
@@ -46,19 +43,12 @@
         </div>
 
         <div id="info-body" class="mt-1" th:classappend="${!unreadAnnouncement} ? 'krtm-hidden' : ''">
-            <!--/* th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
-                 link protocols. Bean call bound via th:with — th:utext is a restricted expression
-                 context in Thymeleaf 3.1 where @bean references are forbidden (cf. @moneyFormat). */-->
             <div id="info-content" class="markdown-content"
                  th:with="announcementHtml=${@markdown.render(announcement.content)}"
                  th:utext="${announcementHtml}"></div>
         </div>
     </div>
 
-    <!--/* Upcoming missions: every mission whose planned start is within the next 7 days, rendered as
-         tiles with the nearest planned start first (REQ-MISSION-012). Each tile carries the same
-         fields as the former "next mission" card; the description is clamped to three lines and the
-         full text lives on the mission detail page. */-->
     <section class="mt-2">
         <h2 th:text="#{home.upcoming.title}">Einsätze der nächsten 7 Tage</h2>
 
@@ -69,10 +59,6 @@
                      <strong th:text="#{mission.owningOrgUnit} + ':'">Verantwortliche Einheit:</strong> <span th:text="${mission.owningSquadron != null ? mission.owningSquadron.name : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
                      <th:block sec:authorize="isAuthenticated()" th:if="${mission.description != null and !#strings.isEmpty(mission.description)}">
                          <strong class="mission-tile__desc-label" th:text="#{mission.description} + ':'">Beschreibung:</strong>
-                         <!--/* th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
-                              link protocols. Bean call bound via th:with — th:utext is a restricted expression
-                              context in Thymeleaf 3.1 where @bean references are forbidden (cf. @moneyFormat).
-                              The rendered markdown is clamped to three lines via .mission-tile__desc. */-->
                          <div class="markdown-content mission-tile__desc"
                               th:with="descriptionHtml=${@markdown.render(mission.description)}"
                               th:utext="${descriptionHtml}">Desc</div>
@@ -87,12 +73,6 @@
                 </div>
                 <div sec:authorize="isAuthenticated()" class="mission-tile__actions">
                     <a th:href="@{/missions/{id}(id=${mission.id})}" class="btn btn--cta" th:text="#{mission.open_mission}">Einsatz öffnen</a>
-                    <!--/* Own-unit chip pinned to the bottom-right of the tile (REQ-MISSION-012):
-                         kept out of the top of the flow (right of the CTA via margin-left:auto) so a
-                         chip never adds a row above the body and every tile's body text starts at the
-                         same height, with or without the chip. myOrgUnitIds is empty for a member
-                         with no membership, so the chip never shows for them; it implies an
-                         authenticated viewer either way, which this isAuthenticated() block is. */-->
                     <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}" class="chip chip--primary mission-tile__badge" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
                 </div>
             </div>
@@ -101,10 +81,6 @@
         <p th:if="${#lists.isEmpty(upcomingMissions)}" th:text="#{home.upcoming.empty}">Keine Einsätze in den nächsten 7 Tagen.</p>
     </section>
 
-    <!--/* Star Citizen Fan Kit compliance band, moved off the global footer (REQ-UI-018).
-         Section 2b of the Fan Kit Guidelines sanctions the home page as a placement, so
-         this is the one surface that must always carry it — never drop the include
-         without putting the band back on an always-visible navigation area. */-->
     <th:block th:replace="~{fragments/fankit :: band}" />
 
 </main>

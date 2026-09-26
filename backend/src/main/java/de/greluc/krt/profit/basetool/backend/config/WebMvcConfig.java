@@ -30,13 +30,9 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Registers MVC interceptors and the project's custom handler-method argument resolvers. Attaches
- * {@link DeprecationInterceptor} so deprecated endpoints emit the {@code Deprecation}/{@code
- * Sunset}/{@code Link} response headers documented in CLAUDE.md, and wires {@link
- * CurrentUserArgumentResolver} / {@link UserZoneArgumentResolver} so controllers can bind the JWT
- * user id ({@code @CurrentUserId}) and the {@code X-User-Time-Zone} header ({@code @UserZone})
- * declaratively. Kept as a dedicated configuration class so future interceptor or resolver
- * additions land here rather than scattered across feature configs.
+ * Registers the {@link DeprecationInterceptor}, which emits the {@code Deprecation}/{@code
+ * Sunset}/{@code Link} headers on deprecated endpoints, and the {@link CurrentUserArgumentResolver}
+ * and {@link UserZoneArgumentResolver} behind {@code @CurrentUserId} and {@code @UserZone}.
  */
 @Configuration
 @RequiredArgsConstructor

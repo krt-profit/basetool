@@ -24,16 +24,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 
 /**
- * One ingredient line inside a {@link ScWikiBlueprintDto} (SC_WIKI_SYNC_PLAN.md §3.3). The {@code
- * kind} discriminator selects which reference / quantity field is populated:
+ * One ingredient line of a {@link ScWikiBlueprintDto}; {@code kind} selects the populated fields.
  *
  * <ul>
  *   <li>{@code "resource"} → {@link #resourceTypeUuid} + {@link #quantityScu}
  *   <li>{@code "item"} → {@link #itemUuid} + {@link #quantity}
  * </ul>
  *
- * <p>Per §3.4 #3, {@link #resourceTypeUuid} is the stable cross-sync key for a RESOURCE line —
- * trust it over any embedded {@code link.uuid}.
+ * <p>{@link #resourceTypeUuid} is the stable key of a resource line, trusted over any embedded
+ * {@code link.uuid}.
  *
  * @param name display name of the ingredient
  * @param kind {@code "resource"} or {@code "item"} (case-insensitive)

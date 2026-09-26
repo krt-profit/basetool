@@ -44,7 +44,6 @@ class ItemCollectionPageControllerTest {
 
   @Test
   void viewItemCollection_shouldPopulateModelAndReturnTemplate() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -58,10 +57,8 @@ class ItemCollectionPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(locations);
 
-    // When
     String viewName = controller.viewItemCollection(jobOrderId, null, model);
 
-    // Then
     assertEquals("item-collection", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
     assertEquals(groups, model.getAttribute("itemStock"));
@@ -70,7 +67,6 @@ class ItemCollectionPageControllerTest {
 
   @Test
   void viewItemCollection_shouldReturnFragment_whenFragmentIsResults() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -80,17 +76,14 @@ class ItemCollectionPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
 
-    // When — the live-sync receiver (REQ-FE-010) re-fetches ?fragment=results to swap the table.
     String viewName = controller.viewItemCollection(jobOrderId, "results", model);
 
-    // Then — only the collectionResults fragment is rendered, with the model still populated.
     assertEquals("item-collection :: collectionResults", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
   }
 
   @Test
   void viewItemCollection_shouldHandleBackendErrorForItemStock() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -101,10 +94,8 @@ class ItemCollectionPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
 
-    // When
     String viewName = controller.viewItemCollection(jobOrderId, null, model);
 
-    // Then — the page still renders with an empty stock list rather than failing outright.
     assertEquals("item-collection", viewName);
     List<?> itemStock = (List<?>) model.getAttribute("itemStock");
     assertNotNull(itemStock);
@@ -113,7 +104,6 @@ class ItemCollectionPageControllerTest {
 
   @Test
   void viewItemCollection_shouldHandleBackendErrorForLocations() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -123,10 +113,8 @@ class ItemCollectionPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
 
-    // When
     String viewName = controller.viewItemCollection(jobOrderId, null, model);
 
-    // Then
     assertEquals("item-collection", viewName);
     List<?> locations = (List<?>) model.getAttribute("locations");
     assertNotNull(locations);

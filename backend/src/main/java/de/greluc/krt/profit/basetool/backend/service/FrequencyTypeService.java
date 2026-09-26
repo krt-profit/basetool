@@ -36,13 +36,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD plus drag-and-drop reorder for the {@code frequency_type} reference table.
- *
- * <p>Frequency types model the radio-channel categories used on a mission. Soft-delete via {@code
- * active=false}. The reorder endpoint persists a new {@code sort_index} per id; the admin UI uses
- * drag-and-drop and posts the full new ordering. Read methods are cached against {@link
- * CacheConfig#FREQUENCY_TYPES_CACHE}; every mutator (create / update / delete / activate / reorder)
- * evicts the whole cache so the next read observes the new state.
+ * CRUD and drag-and-drop reorder for the {@code frequency_type} reference table (radio-channel
+ * categories). Soft-deletes via {@code active=false}; reads are cached in {@link
+ * CacheConfig#FREQUENCY_TYPES_CACHE}, which every mutator evicts.
  */
 @Service
 @RequiredArgsConstructor

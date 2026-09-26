@@ -45,14 +45,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * Spring MVC controller for the home page.
- *
- * <p>Renders {@code /} for both guests and authenticated users. The page shows the missions whose
- * planned start falls within the next seven days as a tile grid (a guest-visible search, nearest
- * start first) plus, for authenticated users, the current user record and the active announcement
- * with an unread flag. The first authenticated render in a session also surfaces a transient
- * login-notification toast (session attribute {@code welcomeMessageShown} prevents the toast from
- * re-appearing on every refresh).
+ * Controller for {@code /}: the landing page for anonymous visitors and the dashboard (upcoming
+ * missions, announcement, once-per-session welcome toast) for members.
  */
 @Controller
 @UsesLayoutModel
@@ -78,26 +72,8 @@ public class HomeController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders {@code /} — the landing page for a visitor with no session, the dashboard for a member.
-   *
-   * <p><strong>The anonymous branch returns before anything happens.</strong> No backend call, no
-   * model attribute, no session. Both matter and both used to be violated on every single hit:
-   *
-   * <ul>
-   *   <li>The seven-day mission grid was fetched and rendered for anyone who asked — name, unit,
-   *       status, meeting point, times. That was the largest anonymous read the tool had, and
-   *       REQ-SEC-052 closes it.
-   *   <li>A session was minted <em>twice over</em>. This method declared an {@link HttpSession}
-   *       parameter, which Spring resolves with {@code getSession(true)} whether or not the body
-   *       uses it; and {@code SafeCsrfAdvice} forced the deferred CSRF token on every render, which
-   *       the default {@code HttpSessionCsrfTokenRepository} saves into a fresh session before any
-   *       template runs. Every crawler hit cost two sessions in Redis. The parameter is gone — the
-   *       session is now taken explicitly, inside the authenticated branch — and the advice returns
-   *       null for an unauthenticated request.
-   * </ul>
-   *
-   * <p>For a member it is unchanged: the upcoming missions, the {@code /me} record, the
-   * announcement with its unread flag, and the once-per-session welcome toast.
+   * Renders {@code /}. For an anonymous visitor it returns the landing page without any backend
+   * call, model attribute or session (REQ-SEC-052); for a member it renders the dashboard.
    *
    * @param model Thymeleaf model populated with mission, announcement, username and toast flags
    * @param principal authenticated OIDC user, or {@code null} for an anonymous visitor
@@ -113,10 +89,6 @@ public class HomeController {
     if (principal == null) {
       return "landing";
     }
-    // Fetch the missions starting within the next seven days, nearest planned start first
-    // (REQ-MISSION-012). Replaces the former single "next mission" banner with a tile grid. Uses
-    // the broad mission-list scope (the viewer's own org units PLUS every unit's organisation-wide
-    // missions) via /api/v1/missions/search. The first tile is the soonest upcoming mission.
     try {
       Instant now = Instant.now();
       Instant horizon = now.plus(7, ChronoUnit.DAYS);
@@ -134,9 +106,6 @@ public class HomeController {
               : List.of();
       model.addAttribute("upcomingMissions", upcomingMissions);
     } catch (BackendServiceException e) {
-      // REQ-OBS-001: the BackendApiClient boundary already logged this (4xx WARN / 5xx ERROR /
-      // circuit-open DEBUG). This is the first page after a login, so a routine backend restart
-      // must not re-log at ERROR on every load and trip LogbackErrorSpike.
       log.debug("Could not fetch upcoming missions", e);
       model.addAttribute("upcomingMissions", List.of());
       model.addAttribute("error", "error.mission.fetch");
@@ -146,8 +115,6 @@ public class HomeController {
       model.addAttribute("error", "error.mission.fetch");
     }
 
-    // Default to no own-unit ids so the tile grid can flag the viewer's own-unit missions with a
-    // "Meine Einheit" chip (REQ-MISSION-012); populated below for authenticated users.
     model.addAttribute("myOrgUnitIds", Set.of());
 
     model.addAttribute("username", principal.getPreferredUsername());
@@ -165,13 +132,6 @@ public class HomeController {
               "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
       model.addAttribute("currentUser", currentUser);
 
-      // Collect the viewer's own org-unit ids so the tile grid can flag own-unit missions with a
-      // "Meine Einheit" chip (REQ-MISSION-012). These are the caller's DIRECT memberships across
-      // every kind (Staffel / SK / Bereich / OL), with no leadership cascade. The
-      // /me/org-unit-ids endpoint is the authoritative kind-agnostic source; the Staffel ids from
-      // the already-fetched /me record are unioned in as a fallback so a transient failure of
-      // that
-      // call still flags own-Staffel missions.
       Set<UUID> myOrgUnitIds = new HashSet<>();
       if (currentUser.squadrons() != null) {
         for (SquadronReferenceDto su : currentUser.squadrons()) {
@@ -198,7 +158,6 @@ public class HomeController {
       }
       model.addAttribute("myOrgUnitIds", myOrgUnitIds);
 
-      // Fetch Public Announcement
       Map<String, Object> announcement =
           backendApiClient.get("/api/v1/announcement", ANNOUNCEMENT_MAP_TYPE);
       model.addAttribute("announcement", announcement);
@@ -213,8 +172,6 @@ public class HomeController {
       }
       model.addAttribute("unreadAnnouncement", unread);
     } catch (BackendServiceException e) {
-      // Fail-soft: the tiles/announcement are optional. The boundary already logged the backend
-      // error; keep a DEBUG breadcrumb (correlationId is in the MDC) rather than swallowing it.
       log.debug("Could not load home user/announcement context", e);
     } catch (Exception e) {
       log.warn("Unexpected failure building home context", e);
@@ -223,9 +180,8 @@ public class HomeController {
   }
 
   /**
-   * Marks the given announcement as read for the current user by delegating to {@code PUT
-   * /api/v1/users/me/read-announcement/{id}}. Backend failures are logged but swallowed — a failed
-   * mark-as-read must not block navigation back to the home page.
+   * Marks the given announcement as read for the current user; backend failures are logged and
+   * swallowed.
    *
    * @param id announcement id to mark as read
    * @return redirect back to {@code /}
@@ -243,12 +199,8 @@ public class HomeController {
   }
 
   /**
-   * AJAX variant of {@link #markAnnouncementAsRead}: marks the announcement read and answers with a
-   * bare 200 so the home page removes the "mark read" control in place (epic #571, REQ-FE-005)
-   * instead of reloading. Selected over the redirect handler only when the request carries {@code
-   * X-Requested-With: XMLHttpRequest}; a script-disabled browser still posts the HTML form and
-   * lands on the redirect handler, which stays the no-JS fallback. A backend failure answers 502
-   * (the client leaves the control in place) — a failed mark-as-read must never break the page.
+   * AJAX variant of {@link #markAnnouncementAsRead}, selected by {@code X-Requested-With:
+   * XMLHttpRequest}, so the page removes the control in place (REQ-FE-005).
    *
    * @param id announcement id to mark as read
    * @return {@code 200} on success, {@code 502} on a backend failure

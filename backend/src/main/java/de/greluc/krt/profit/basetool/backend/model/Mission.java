@@ -53,27 +53,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
- * Mission JPA entity.
+ * Mission JPA entity, edited section by section (REQ-ORG-018).
  *
- * <p><strong>Fine-grained concurrency model (REQ-ORG-018, #1112/#1114/#1147).</strong> A mission is
- * edited section-by-section (core / schedule / flags / party-lead / owning-org-unit / Ablauf steps
- * / goals), and an edit to one section must never 409 a concurrent edit to another. To achieve
- * that, <em>every</em> mutable business column and association is {@code @OptimisticLock(excluded =
- * true)}, so touching it does NOT bump the inherited row {@link AbstractEntity#getVersion()}; each
- * section instead carries its own plain {@code *Version} counter which is bumped through an atomic,
- * DB-enforced conditional {@code UPDATE … WHERE id = ? AND xVersion = ?} (see {@code
- * MissionRepository.bump*VersionIfMatches} and {@code
- * MissionSectionVersions.enforceSectionVersion}). Because the section writes only ever dirty the
- * columns they own, the class is {@code @DynamicUpdate}: Hibernate narrows each flush {@code
- * UPDATE} to the actually-dirtied columns, so two concurrent section writers never clobber each
- * other's untouched columns with a stale full-row snapshot (the silent lost update a non-dynamic
- * full-row UPDATE would cause once the scalars are excluded).
- *
- * <p>With every mutable column excluded, the row {@code @Version} no longer moves on a section
- * edit; it now guards exactly one path — the legacy full-replace {@code
- * MissionService.updateMission} ({@code PUT /missions/{id}}), which force-increments it (JPA {@code
- * OPTIMISTIC_FORCE_INCREMENT}) so two concurrent whole-mission overwrites still surface a 409
- * against each other.
+ * <p>Every mutable column is excluded from the row {@code @Version}; each section has its own
+ * counter bumped by an atomic conditional {@code UPDATE}, and {@code @DynamicUpdate} limits each
+ * flush to dirtied columns. The row version guards only the full-replace {@code
+ * MissionService.updateMission}, which force-increments it.
  */
 @Entity
 @DynamicUpdate
@@ -90,10 +75,6 @@ import org.jetbrains.annotations.UnmodifiableView;
       "steps",
       "objectives"
     })
-// Batch-fetch lazy proxies of this entity so a page of InventoryJobOrderAllocation /
-// InventoryMissionAllocation rows initialises its to-one references in bounded batches
-// instead of one-by-one (the allocation N+1, REQ-DATA-003). @BatchSize is invalid on a
-// @ManyToOne field in Hibernate 6, so it goes on the target entity class.
 @BatchSize(size = 100)
 public class Mission extends AbstractEntity<UUID> {
 
@@ -101,11 +82,6 @@ public class Mission extends AbstractEntity<UUID> {
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
-
-  // The core/schedule/flags business scalars below are all @OptimisticLock(excluded = true): a
-  // section edit dirties only its own columns and must NOT bump the row @Version (which would 409 a
-  // concurrent edit to an unrelated section). Their per-section counters + @DynamicUpdate provide
-  // the real concurrency guard instead — see the class Javadoc (#1114).
 
   @OptimisticLock(excluded = true)
   private String name;
@@ -127,7 +103,7 @@ public class Mission extends AbstractEntity<UUID> {
   private String calendarLink;
 
   @OptimisticLock(excluded = true)
-  private String status; // e.g., PLANNED, ACTIVE, COMPLETED
+  private String status;
 
   @OptimisticLock(excluded = true)
   private Instant meetingTime;
@@ -149,11 +125,8 @@ public class Mission extends AbstractEntity<UUID> {
   private Boolean isInternal = false;
 
   /**
-   * Section-scoped optimistic-lock counter for the {@code core} patch endpoint (name, description,
-   * calendar link, status, operation). Independent of {@link AbstractEntity#getVersion()} so that
-   * concurrent edits on {@code schedule} and {@code flags} do not produce spurious 409 conflicts.
-   * Marked {@code @OptimisticLock(excluded = true)} so bumping it does not in turn bump the global
-   * {@link AbstractEntity#getVersion()}.
+   * Section counter for the {@code core} patch endpoint (name, description, calendar link, status,
+   * operation), independent of {@link AbstractEntity#getVersion()}.
    */
   @Column(name = "core_version", nullable = false)
   @OptimisticLock(excluded = true)
@@ -207,11 +180,9 @@ public class Mission extends AbstractEntity<UUID> {
   private Long objectivesVersion = 0L;
 
   /**
-   * Section-scoped optimistic-lock counter for the owning-org-unit reassignment endpoint ({@link
-   * #owningOrgUnit}). Independent of the global {@link AbstractEntity#getVersion()} and marked
-   * {@code @OptimisticLock(excluded = true)} so re-homing the mission to a different org unit never
-   * invalidates another user's open core / schedule / flags form on the same mission. Two managers
-   * racing on the assignment surface a 409 against each other via this counter (REQ-ORG-018).
+   * Section counter for reassigning {@link #owningOrgUnit}, independent of {@link
+   * AbstractEntity#getVersion()} so a re-homing never conflicts with other section edits
+   * (REQ-ORG-018).
    */
   @Column(name = "owning_org_unit_version", nullable = false)
   @OptimisticLock(excluded = true)
@@ -235,15 +206,9 @@ public class Mission extends AbstractEntity<UUID> {
   private Set<MissionFinanceEntry> financeEntries = new HashSet<>();
 
   /**
-   * Ordered, reorderable "Ablauf" (procedure timeline) steps. Loaded by ascending {@link
-   * MissionStep#getOrderIndex()} into a {@link LinkedHashSet} so iteration (and the mapped DTO
-   * list) preserves the checklist order. Excluded from the global optimistic-lock; the dedicated
-   * {@link #stepsVersion} guards concurrent edits instead.
-   *
-   * <p>The Lombok getter is suppressed ({@link AccessLevel#NONE}) in favour of the hand-written
-   * {@link #getSteps()}, which hands out an unmodifiable view so callers cannot mutate the managed
-   * collection through the getter; structural changes go through {@link #addStep(MissionStep)} /
-   * {@link #removeStep(UUID)}.
+   * Ablauf (procedure timeline) steps in ascending {@link MissionStep#getOrderIndex()} order,
+   * guarded by {@link #stepsVersion}. Read through {@link #getSteps()}; changed through {@link
+   * #addStep(MissionStep)} / {@link #removeStep(UUID)}.
    */
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("orderIndex ASC")
@@ -252,15 +217,8 @@ public class Mission extends AbstractEntity<UUID> {
   private Set<MissionStep> steps = new LinkedHashSet<>();
 
   /**
-   * Ordered, reorderable mission goals (Ziele). Loaded by ascending {@link
-   * MissionObjective#getOrderIndex()} into a {@link LinkedHashSet} so iteration (and the mapped DTO
-   * list) preserves the authored order; the overview regroups them by {@link MissionObjectiveKind}.
-   * Excluded from the global optimistic-lock; the dedicated {@link #objectivesVersion} guards
-   * concurrent edits instead.
-   *
-   * <p>The Lombok getter is suppressed ({@link AccessLevel#NONE}) in favour of the hand-written
-   * {@link #getObjectives()}, which hands out an unmodifiable view so callers cannot mutate the
-   * managed collection through the getter; structural changes go through {@link
+   * Mission goals (Ziele) in ascending {@link MissionObjective#getOrderIndex()} order, guarded by
+   * {@link #objectivesVersion}. Read through {@link #getObjectives()}; changed through {@link
    * #addObjective(MissionObjective)} / {@link #removeObjective(UUID)}.
    */
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -295,30 +253,19 @@ public class Mission extends AbstractEntity<UUID> {
   private User owner;
 
   /**
-   * Optimistic-lock counter of the owner change: the {@code version} of this mission's {@link
-   * MissionOwnership} companion row, or {@code 0} while the owner has never been changed (the
-   * companion row is only created by the first change). It is what {@code PUT
-   * /api/v1/missions/{id}/owner} compares the client's echo against, and what the mission detail
-   * hands to the client so it has something to echo.
+   * Version of this mission's {@link MissionOwnership} row, or {@code 0} before the first owner
+   * change; the optimistic-lock echo for {@code PUT /api/v1/missions/{id}/owner}.
    *
-   * <p>A read-only {@code @Formula}: the counter itself lives on {@code mission_ownership}, where
-   * its JPA {@code @Version} bumps it, so this column is never written through the mission. The
-   * subquery hits the unique {@code uk_mission_ownership_mission} index, which keeps a page of
-   * missions at one statement rather than one per row. Because a formula is only read when the
-   * mission is loaded, the owner change writes the fresh value back onto the managed entity through
-   * the setter ({@code MissionService.updateMissionOwner}) so the response it maps carries the
-   * counter the change just produced, not the one the mission was loaded with.
+   * <p>Read-only {@code @Formula}; the owner change writes the new value back through the setter so
+   * its response carries the fresh counter.
    */
   @Formula("coalesce((select mo.version from mission_ownership mo where mo.mission_id = id), 0)")
   @OptimisticLock(excluded = true)
   private Long ownershipVersion = 0L;
 
   /**
-   * Optional party lead (Partyleiter) of this mission, as a linked registered user. Mutually
-   * exclusive with {@link #partyLeadGuestName}: a registered party lead clears the guest handle and
-   * vice versa. {@code null} when no party lead is assigned or when the lead is an unregistered
-   * person captured via {@link #partyLeadGuestName}. Excluded from the global optimistic-lock; the
-   * dedicated {@link #partyLeadVersion} guards concurrent edits instead.
+   * Optional registered party lead (Partyleiter), mutually exclusive with {@link
+   * #partyLeadGuestName}; guarded by {@link #partyLeadVersion}.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "party_lead_user_id")
@@ -343,33 +290,16 @@ public class Mission extends AbstractEntity<UUID> {
   private Set<User> managers = new HashSet<>();
 
   /**
-   * Org-unit owner of this mission, or {@code null} for an <em>ownerless leadership mission</em>.
-   * Set at creation time from the caller's active org-unit context (via {@code
-   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}). Since REQ-ORG-018 it is no longer
-   * immutable: the Verwaltung tab exposes a reassignment control that re-homes the mission to a
-   * different org unit (or to ownerless) through the dedicated {@code
-   * MissionService.updateOwningOrgUnit} endpoint, guarded by {@link #owningOrgUnitVersion} and the
-   * caller's assignable-org-unit scope. The change retroactively re-scopes read/write visibility
-   * per the gates below — see ADR-0050. Gates read/write access together with {@link #isInternal}:
+   * Org-unit owner of this mission, or {@code null} for an ownerless leadership mission.
+   * Reassignable via {@code MissionService.updateOwningOrgUnit}, guarded by {@link
+   * #owningOrgUnitVersion} (ADR-0050).
    *
    * <ul>
-   *   <li><b>Org-owned</b> (non-null): non-internal missions are visible across org units, internal
-   *       ones are restricted to the owning org unit and admins.
-   *   <li><b>Ownerless</b> (null): created by a user who belongs to no OrgUnit but is allowed to
-   *       plan org-wide missions (organisation leadership / "Bereichsleitung", which sits above
-   *       every Staffel and SK). Such a mission is attributable through its {@link #owner}. A
-   *       non-internal ownerless mission is visible to everyone (the public default); an internal
-   *       one is visible to organisation members-or-above. Editing follows the usual
-   *       mission-management gate (elevated roles, owner, co-managers, admins), minus the
-   *       squadron-scope narrowing. See {@code OwnerScopeService.canSeeMission} / {@code
-   *       canEditMission}.
+   *   <li>Org-owned: non-internal missions are visible to all org units, internal ones only to the
+   *       owning org unit and admins.
+   *   <li>Ownerless: attributable through {@link #owner}; visible to everyone, or to organisation
+   *       members and above when {@link #isInternal}.
    * </ul>
-   *
-   * <p>R9 Step 2 dropped the legacy {@code owningSquadron} mirror field together with the
-   * {@code @PrePersist} / {@code @PreUpdate} / {@code @PostLoad} {@code syncOwnerFields()}
-   * lifecycle hook; V100 drops the matching {@code owning_squadron_id} column. V99 first tightened
-   * the new column to NOT NULL; V144 relaxed it again so an ownerless mission can persist
-   * (mirroring the V132 relaxation for ship / refinery order / inventory item).
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")
@@ -377,12 +307,10 @@ public class Mission extends AbstractEntity<UUID> {
   private OrgUnit owningOrgUnit;
 
   /**
-   * Returns the Ablauf steps as an unmodifiable view ordered by {@code orderIndex}. Reads (DTO
-   * mapping, index lookups, reorder validation) iterate this view; callers that need to add or
-   * remove a step use {@link #addStep(MissionStep)} / {@link #removeStep(UUID)} so the managed
-   * collection is never mutated through the getter.
+   * Returns the Ablauf steps ordered by {@code orderIndex}; mutations go through {@link
+   * #addStep(MissionStep)} / {@link #removeStep(UUID)}.
    *
-   * @return an unmodifiable view of the mission's procedure-timeline steps
+   * @return an unmodifiable view of the mission's steps
    */
   @NotNull
   @UnmodifiableView
@@ -413,10 +341,8 @@ public class Mission extends AbstractEntity<UUID> {
   }
 
   /**
-   * Returns the mission goals as an unmodifiable view ordered by {@code orderIndex}. Reads (DTO
-   * mapping, index lookups, reorder validation) iterate this view; callers that need to add or
-   * remove a goal use {@link #addObjective(MissionObjective)} / {@link #removeObjective(UUID)} so
-   * the managed collection is never mutated through the getter.
+   * Returns the mission goals ordered by {@code orderIndex}; mutations go through {@link
+   * #addObjective(MissionObjective)} / {@link #removeObjective(UUID)}.
    *
    * @return an unmodifiable view of the mission's goals
    */

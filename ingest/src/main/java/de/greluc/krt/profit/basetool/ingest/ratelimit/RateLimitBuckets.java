@@ -28,28 +28,22 @@ import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Factory for the bounded token-bucket maps the ingest rate limiters key on (REQ-INGEST-005).
+ * Factory for the token buckets and bounded bucket maps of the ingest rate limiters
+ * (REQ-INGEST-005).
  *
- * <p>An unbounded {@code ConcurrentHashMap} keyed on caller identity (source IP or JWT subject) is
- * itself a denial-of-service vector: an attacker who rotates the key on every request grows the map
- * without limit until the gateway exhausts heap (security audit INGEST-RATELIMIT-1). This factory
- * returns an access-ordered LRU map capped at {@code maxEntries}, so the least-recently-seen bucket
- * is evicted once the cap is reached and memory stays bounded regardless of key churn. The map is
- * wrapped in {@link Collections#synchronizedMap} so its {@code computeIfAbsent} is atomic under the
- * map's own monitor — the limiters call it concurrently from request threads.
+ * <p>Bucket maps are synchronized, access-ordered LRU maps capped in size, so key rotation cannot
+ * exhaust memory.
  */
 public final class RateLimitBuckets {
 
-  private RateLimitBuckets() {
-    // utility
-  }
+  private RateLimitBuckets() {}
 
   /**
    * Builds a thread-safe, access-ordered LRU map of token buckets with a hard upper bound on the
    * number of tracked keys.
    *
-   * @param maxEntries the maximum number of distinct keys (IPs / subjects) tracked at once; the
-   *     least-recently-used entry is evicted when a new key would exceed this bound.
+   * @param maxEntries the maximum number of distinct keys tracked at once; the least-recently-used
+   *     entry is evicted beyond it.
    * @return a synchronized bounded map suitable for {@code computeIfAbsent} bucket lookup.
    */
   public static Map<String, Bucket> boundedLru(int maxEntries) {
@@ -57,9 +51,7 @@ public final class RateLimitBuckets {
   }
 
   /**
-   * Builds one greedy-refill token bucket — the single factory both ingest limiters use, so the
-   * per-IP and the per-subject bucket cannot drift apart in shape and differ only in the budget
-   * they are handed.
+   * Builds a greedy-refill token bucket, used by both ingest limiters.
    *
    * @param capacity the maximum burst the bucket admits; must be positive
    * @param refillTokens the tokens added back every {@code refillPeriod}; must be positive

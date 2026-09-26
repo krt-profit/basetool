@@ -48,14 +48,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for {@link AdminNotificationRulePageController} (REQ-NOTIF-007).
- *
- * <p>Pins the option lists the page puts on the model (the editor's single source for every {@code
- * <option>}), that every selector kind — including {@code ACCOUNT_RESPONSIBLE}, which the
- * hand-written dropdown lacked — is offered, and the {@code fragment=rules} branch the page swaps
- * into {@code #rules-host} after a create, update or delete instead of reloading (REQ-FE-001): the
- * fragment carries the table and nothing of the page around it, and a stray fragment value still
- * renders the whole page.
+ * MVC render test for {@link AdminNotificationRulePageController} (REQ-NOTIF-007): the model's
+ * option lists offer every selector kind, and the {@code fragment=rules} swap renders only the
+ * rules table while an unknown fragment value renders the whole page (REQ-FE-001).
  */
 @SpringBootTest
 class AdminNotificationRulePageControllerMvcTest {

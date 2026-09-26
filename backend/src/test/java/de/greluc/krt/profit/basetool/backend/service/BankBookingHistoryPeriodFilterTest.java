@@ -41,14 +41,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Pins the period-filtered booking-history query (REQ-BANK-051) against the real Testcontainers
- * PostgreSQL. The {@code (:from IS NULL OR ...)} guard on the temporal bounds must be {@code
- * CAST(:from AS timestamp)}-wrapped: PostgreSQL cannot infer the data type of a bare bind parameter
- * in an {@code IS NULL} position, so an uncast form fails at query-plan time with <em>"could not
- * determine data type of parameter"</em> — a 500 on <b>every</b> detail-page history load
- * regardless of the runtime bound values, which the mock-based service unit tests could not see.
- * This test executes the query on Postgres with concrete non-null bounds so a regression throws
- * here instead of only in the e2e suite.
+ * Integration test for the period-filtered booking-history query against real Postgres
+ * (REQ-BANK-051), verifying the cast temporal bounds plan with non-null values.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -61,7 +55,6 @@ class BankBookingHistoryPeriodFilterTest {
 
   @Test
   void periodFilteredHistoryRunsOnPostgresAndFiltersByWindow() {
-    // Given: a fresh account with a single deposit booked "now"
     BankHolder holder = newHolder("period-holder-" + UUID.randomUUID());
     BankAccount account = newAccount("Period Konto " + UUID.randomUUID());
     bankLedgerService.bookDeposit(
@@ -69,8 +62,6 @@ class BankBookingHistoryPeriodFilterTest {
     Instant now = Instant.now();
     Instant ninetyDaysAgo = now.minus(Duration.ofDays(90));
 
-    // When / Then: the default last-90-days window (both bounds non-null) — the exact call that
-    // regressed to a 500 — must execute on Postgres and return the freshly booked posting.
     Page<BankBookingDto> windowed =
         bankAccountService.getBookings(
             account.getId(), PageRequest.of(0, 50), ninetyDaysAgo, now.plusSeconds(60));
@@ -79,7 +70,6 @@ class BankBookingHistoryPeriodFilterTest {
         windowed.getTotalElements(),
         "the last-90-days window includes a deposit booked moments ago");
 
-    // A window entirely in the past excludes the just-booked deposit (the filter actually bites).
     Page<BankBookingDto> pastWindow =
         bankAccountService.getBookings(
             account.getId(),
@@ -89,7 +79,6 @@ class BankBookingHistoryPeriodFilterTest {
     assertEquals(
         0, pastWindow.getTotalElements(), "a bygone window excludes the just-booked deposit");
 
-    // The unbounded (null, null) path — "whole history" — still pages everything.
     Page<BankBookingDto> unbounded =
         bankAccountService.getBookings(account.getId(), PageRequest.of(0, 50), null, null);
     assertEquals(

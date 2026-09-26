@@ -23,12 +23,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Mission Unit payload. {@code responsibleUser} is the explicit
- * responsible person as a PII-free reference tuple (callsign/rank only — safe for the
- * guest-redacted mission views, which forward units unchanged); when {@code null} the UI falls back
- * to the assigned ship's owner. {@code note} is the unit's free-text planning note. {@code version}
- * is the unit's {@code @Version}, surfaced so the edit form can echo it back on the next save and
- * the optimistic-lock check can reject a stale full-form overwrite (#1131).
+ * Data transfer record carrying a mission unit. {@code responsibleUser} is a PII-free reference
+ * (callsign/rank only); when {@code null} the UI falls back to the assigned ship's owner. {@code
+ * version} is the unit's optimistic-lock version, echoed back by the edit form.
  */
 public record MissionUnitDto(
     UUID id,

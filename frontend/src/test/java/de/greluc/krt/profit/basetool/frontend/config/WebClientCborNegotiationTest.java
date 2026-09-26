@@ -39,14 +39,8 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * What the frontend actually asks the backend for, and what it still sends (ADR-0161 §8.5).
- *
- * <p>{@code ApiCborNegotiationTest} proves the backend answers CBOR when asked. The half that lives
- * here is the asking — and one thing that must <em>not</em> have changed with it. Spring registers
- * the JSON encoder ahead of the CBOR one, so {@code bodyValue} keeps writing JSON request bodies
- * without being told to; that is a property of a framework ordering rather than of anything in this
- * repository, so it is asserted rather than relied on. A write path that silently turned binary
- * would reach every {@code consumes = APPLICATION_JSON_VALUE} endpoint as a 415.
+ * Verifies that the frontend requests CBOR from the backend while still writing JSON request bodies
+ * (ADR-0161).
  */
 class WebClientCborNegotiationTest {
 
@@ -77,9 +71,6 @@ class WebClientCborNegotiationTest {
 
     RecordedRequest request = server.takeRequest();
 
-    // The order IS the negotiation: Spring serves the first acceptable type it has a converter
-    // for. JSON second is not a formality -- it is what keeps a response the backend types itself
-    // (an RFC 7807 problem, a PDF export) readable.
     assertThat(request.getHeader("Accept")).isEqualTo("application/cbor, application/json");
   }
 
@@ -95,8 +86,6 @@ class WebClientCborNegotiationTest {
         .bodyToMono(String.class)
         .block(Duration.ofSeconds(10));
 
-    // Byte for byte the header this client sent before 2026-09-10, which is what makes
-    // `app.http.codec=JSON` a way back rather than a different third behaviour.
     assertThat(server.takeRequest().getHeader("Accept")).isEqualTo("application/json");
   }
 
@@ -120,16 +109,7 @@ class WebClientCborNegotiationTest {
   }
 
   /**
-   * Builds the real {@code webClient} bean for a given codec.
-   *
-   * <p>The collaborator doubles live in {@link WebClientTestSupport} rather than here: {@code
-   * WebClientConfig} takes nine constructor arguments, and a second hand-maintained copy of them
-   * meant every future collaborator forced an edit in two places, with a compile error as the only
-   * warning.
-   *
-   * <p>Real Resilience4j registries rather than mocks: the bean wraps every exchange in the {@code
-   * backendApi} chain, and a mocked registry would have to reproduce four operators to get one
-   * request through. Their defaults let a single fast local call pass untouched.
+   * Builds the real {@code webClient} bean for a given codec, with real Resilience4j registries.
    *
    * @param codec the setting under test
    * @return the built client

@@ -57,15 +57,10 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Pins the no-N+1 contract of the embedded {@code UserDto} projection (REQ-DATA-003, BE-PERF-01)
- * against the real Testcontainers PostgreSQL: mapping a mission's roster or a page of users costs
- * the <em>same</em> number of SQL statements whether it holds a handful of users or dozens. Before
- * the batch primer each mapped user cost up to three statements (its Staffel memberships and two
- * squadron loads), so the count grew linearly with the roster.
+ * Verifies against real PostgreSQL that mapping a mission roster or a page of users issues the same
+ * number of SQL statements regardless of size (REQ-DATA-003).
  *
- * <p>Runs inside one rolled-back test transaction, as the {@code @Transactional(readOnly = true)}
- * controller handlers do, with a fresh persistence context before each measurement, and with a
- * servlet request bound so the mapper's request memo is live exactly as in production.
+ * <p>Runs in one rolled-back read-only transaction with a bound servlet request, as in production.
  */
 @SpringBootTest
 @ActiveProfiles("test")

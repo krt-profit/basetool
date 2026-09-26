@@ -1,101 +1,24 @@
-// Security override on the ROOT buildscript classpath, where `app.cash.licensee` is loaded (`apply
-// false` below): licensee 1.14.1 -> maven-model-builder 3.9.11 pins plexus-utils 3.6.0, which
-// carries CVE-2025-67030 (Expand.extractFile directory traversal, Dependabot alert #13). The
-// subprojects' classloaders delegate to this one first, so the root's version is the one every
-// module's licensee task runs with -- and every subproject classpath already asks for 3.6.1 through
-// the CycloneDX and Spring Boot plugins. Build-time only; the dependency-submission workflow
-// reports every build classpath, which is how Dependabot saw it. The version, the reasoning and
-// the removal condition live on `plexusUtils` in the version catalog.
 buildscript { dependencies { constraints { classpath(libs.plexus.utils) } } }
 
 plugins {
   id("idea")
-  // `base` gives the root project the `check` lifecycle task that Spotless's
-  // `isEnforceCheck` hooks `spotlessCheck` into (see the root Spotless block).
   id("base")
   alias(libs.plugins.owasp.dependencycheck)
-  // Pulled in with `apply false` so the PitestPluginExtension type is on the
-  // root build script's classpath for the `subprojects { plugins.withId(...) }`
-  // configuration block below. Each subproject still applies the plugin itself.
-  // Version comes from the `gradle/libs.versions.toml` catalog (single source of truth).
   alias(libs.plugins.pitest) apply false
-  // Applied at the root (NOT `apply false`) so the root project gets its own
-  // Spotless instance for the repo-wide non-Java formats configured below. The
-  // type stays on the classpath for the strongly-typed `subprojects {}` block,
-  // which configures the per-module Java formatting. Applying via the plugins DSL
-  // (rather than an imperative `apply(...)` in the script body) keeps task
-  // registration in the right phase.
   alias(libs.plugins.spotless)
-  // `apply false`, like pitest above: puts `LicenseeExtension` / `LicenseeTask` on this script's
-  // classpath for the shared licence gate in `subprojects {}` below. Each shipped module applies
-  // the plugin itself.
   alias(libs.plugins.licensee) apply false
-  // `apply false`, for the same reason: `SpotBugsTask` and the CycloneDX task types for the shared
-  // `spotbugsMain` registration and SBOM settings in `subprojects {}` below (BLD-SIMP-06).
   alias(libs.plugins.spotbugs.base) apply false
   alias(libs.plugins.cyclonedx.bom) apply false
 }
 
-// Repositories are declared once, in settings.gradle.kts (`dependencyResolutionManagement`).
 allprojects {
   group = "de.greluc.krt.profit.basetool"
   version = "0.0.1-SNAPSHOT"
 }
 
-// ---------------------------------------------------------------------------
-// Root-level Spotless — formats the non-Java file types that NO other linter in
-// this repo already covers: the Gradle Kotlin DSL, JSON, YAML, Markdown and the
-// `.properties` bundles. Java stays configured per-subproject below
-// (google-java-format + GPLv3 header); HTML / CSS / JS keep their dedicated Node
-// linters in the frontend module (HTMLHint / Stylelint / ESLint). Applied at the
-// ROOT (the subproject blocks below cannot reach the root build scripts or the
-// repo-wide docs), with `base` so `spotlessCheck` is wired into `./gradlew check`.
-//
-// Deliberately NOT covered because formatting would be harmful or pointless:
-//   - Flyway migrations (there is no `sql { }` block): reformatting changes the
-//     migration checksum Flyway validates against -> schema-validation failure.
-//   - Generated artifacts: the backend and ingest `openapi.json` (each regenerated
-//     by its module's OpenApiGeneratorTest) and the CycloneDX SBOMs.
-//   - `CHANGELOG.md`: the release workflow parses the `[Unreleased]` section, so
-//     a reflow could break it.
-//   - Vendored / build output: `node_modules`, `.gradle`, `build`, `.claude`.
-//   - Tool-managed: the Gradle wrapper, and a local `versions.properties` that
-//     `-PrefreshVersions` recreates (gitignored, see settings.gradle.kts).
-//
-// YAML and `.properties` get whitespace/newline hygiene ONLY (not a parse-and-
-// re-serialise) so heavily-commented YAML (workflows, `application.yml`,
-// compose) keeps its comments and the i18n bundles keep any intentional trailing
-// space and their `\uXXXX` escapes.
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   isEnforceCheck = true
-  // LF, stated rather than derived. The default (`GIT_ATTRIBUTES_FAST_ALLSAME`) reads the line
-  // ending out of .gitattributes through a provider that walks the project directory, and under the
-  // configuration cache that walk hashes whatever lies there -- on Windows it died on Gradle's own
-  // locked `.gradle/<version>/checksums/checksums.lock` (measured 2026-09-23, BLD-PERF-04). The
-  // answer it derived was LF for every format below anyway: .gitattributes pins `eol=lf` on
-  // `*.kts`, `*.json`, `*.yml`/`*.yaml`, `*.md`, `*.properties` and `*.java`.
   lineEndings = com.diffplug.spotless.LineEnding.UNIX
-  // Trees Spotless must not touch: generated, vendored, or fetched. The last two are both
-  // ansible's — `ansible-galaxy install` drops a few thousand upstream files into
-  // `ansible/collections/`, and ansible-lint caches a second copy under `ansible/.ansible/`. Both
-  // are gitignored (ADR-0188), and formatting somebody else's collection is slow and wrong.
-  //
-  // `ansible/.ansible/**` is not a tidiness entry: without it `:spotlessYaml` does not merely
-  // waste time, it FAILS the build outright on a file CI never sees —
-  //
-  //     Cannot access input property 'target' of task ':spotlessYaml' …
-  //     Unsupported file type for …/setup_snap/tasks/D-Fedora.yml
-  //
-  // — so the whole pre-push gate is unrunnable on any workstation that has ever run ansible-lint.
-  // Measured 2026-09-20. `targetExclude` is evaluated after Gradle snapshots the inputs, which is
-  // why the failure came from the snapshot rather than from the formatter.
-  //
-  // Hence `sources(...)` below: the vendored trees are excluded IN the file tree each target is
-  // built from, so the walk prunes them instead of snapshotting them first (2026-09-23). It is not
-  // only about speed. With the configuration cache on, `:spotlessYaml` ran concurrently with
-  // `:frontend:processResources` and died walking `frontend/build/resources/main/META-INF/...` as
-  // that task rewrote it ("Could not read path"), a red build for a file no formatter wanted.
-  // `targetExclude` stays for the handful of in-tree files each format deliberately skips.
   val vendored =
     arrayOf(
       "**/build/**",
@@ -114,28 +37,19 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
 
   kotlinGradle {
     target(sources("**/*.gradle.kts"))
-    // ktfmt (Google style = 2-space, matching the root build script) is a pure
-    // formatter, so `spotlessApply` output always satisfies `spotlessCheck` — no
-    // unfixable lint rule can wedge CI the way ktlint's max-line-length would on
-    // these long-comment build scripts.
     ktfmt().googleStyle()
   }
 
   json {
     target(sources("**/*.json"))
     targetExclude(
-      // Test/e2e fixtures may be asserted verbatim — never reflow them.
       "**/src/test/**",
       "**/src/e2e/**",
-      // Generated by the per-module OpenApiGeneratorTest; hand-formatting fights the generator.
       "backend/src/main/resources/api/openapi.json",
       "ingest/src/main/resources/api/openapi.json",
-      // CycloneDX SBOMs (auto-generated, churn on every build).
       "**/docs/*-bom.json",
-      // npm-managed.
       "**/package.json",
       "**/package-lock.json",
-      // Local, git-ignored tooling config.
       "**/*.local.json",
     )
     gson().indentWithSpaces(2)
@@ -147,34 +61,6 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
     endWithNewline()
   }
 
-  // Markdown: whitespace hygiene, and deliberately NOT a reflow.
-  //
-  // This was Spotless's `flexmark` extension until 2026-09-16. It was removed after its
-  // ledger was actually added up over six months: 26 commits whose entire content was
-  // Markdown reformatting, 5473 lines rewritten by them, two CI failures, and four files
-  // excluded — each for a different flexmark defect, one of them because flexmark's output
-  // on it is **not idempotent** so it could never converge.
-  //
-  // The dominant behaviour was table-cell re-padding: widen one cell and every row of the
-  // table is rewritten. `docs/adr/README.md` once moved 170 lines in and 170 out for that,
-  // which buries the real change, conflicts with any concurrent edit of the same table, and
-  // renders identically either way — cell padding is insignificant in GFM.
-  //
-  // Nothing checked is lost. flexmark never linted: no link check, no structure check, no
-  // heading-level check — this repository has none of those, before or after. What it did
-  // provide and is kept here is the same treatment `format("yaml")` above gets.
-  //
-  // The four exclusions stay, but two of them had flexmark-specific reasons that no longer
-  // apply and are restated for what is actually true now:
-  //   * CHANGELOG.md / CHANGELOG-ARCHIVE.md — the release workflow parses their structure,
-  //     and the historical entries stay byte-stable.
-  //   * LICENSE.md — verbatim upstream GPL text. Not ours to reformat, whitespace included.
-  //     (Was: "flexmark cannot converge on it", which is now moot.)
-  //   * CLAUDE.md — editors re-save it as CRLF on Windows, and with `core.autocrlf=true` +
-  //     `*.md text eol=lf` (.gitattributes) that working-tree copy reads as clean to git
-  //     until Spotless rewrites it to LF, flipping it to "modified" with an empty diff on
-  //     every run. That is caused by Spotless TOUCHING the file at all, not by the reflow,
-  //     so dropping flexmark does not fix it and the exclusion is still needed.
   format("markdown") {
     target(sources("**/*.md"))
     targetExclude("CHANGELOG.md", "CHANGELOG-ARCHIVE.md", "LICENSE.md", "CLAUDE.md")
@@ -184,34 +70,11 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
 
   format("properties") {
     target(sources("**/*.properties"))
-    // No trimTrailingWhitespace(): an i18n value may legitimately end in a space.
     targetExclude("versions.properties", "**/gradle-wrapper.properties")
     endWithNewline()
   }
 }
 
-// ---------------------------------------------------------------------------
-// Third-party licence policy (REQ-UI-021, ADR-0197) — ONE decision, read in two places.
-//
-// The Basetool is GPL-3.0-only and its images are published to GHCR, which is distribution, so
-// every library that ships inside them must be one we may redistribute under GPL-3.0-only. The
-// Licensee plugin enforces that per shipped module (the `plugins.withId("app.cash.licensee")`
-// block below, wired into `check`); `:frontend:generateOssLicenses` turns the same reports into
-// the „Open-Source-Lizenzen“ page. Both read the two tables here, so the gate and the page cannot
-// disagree about what a licence is.
-//
-// `ossAllowedLicenses` — the SPDX identifiers that may ship. Only what is GPL-3.0-compatible AND
-// actually present, the same rule the Android app's allow-list follows. Deliberately ABSENT:
-// `EPL-2.0` on its own (no GPL Secondary License designated — AspectJ was exactly that, and was
-// excluded rather than allowed), `EPL-1.0`, `GPL-2.0-only` without an exception, `Apache-1.1`,
-// `CDDL-*`, `SSPL-1.0`, `BSD-4-Clause`. A POM that offers several licences needs only ONE of them
-// here: Maven reads a list of licences as a choice, and so does Licensee. That is how logback
-// (EPL-2.0 OR LGPL-2.1) and the Jakarta APIs (EPL-2.0 OR GPL-2.0 WITH Classpath-exception) pass
-// without EPL-2.0 being allowed.
-//   * `LGPL-2.1-only` — §3 lets the recipient apply the GPL (v2 or later) instead.
-//   * `MPL-2.0` — GPL is a designated Secondary License of MPL-2.0 (§3.3).
-//   * `GPL-2.0-with-classpath-exception` — the exception permits linking independent modules
-//     under any licence; the library itself stays GPL-2.0, and its source is its upstream repo.
 val ossAllowedLicenses =
   listOf(
     "Apache-2.0",
@@ -225,16 +88,8 @@ val ossAllowedLicenses =
     "MPL-2.0",
   )
 
-// `ossLicenseUrlAliases` — licence URLs a POM uses that Licensee cannot map to an SPDX identifier
-// by itself, each with the identifier its text actually is (read from the linked text or the
-// licence file inside the jar, 2026-09-22). The gate allows the URL when its identifier is on the
-// list above; the page files the component under that identifier instead of under whatever the POM
-// happened to call it. A URL whose identifier is NOT allowed (the EPL-2.0 spellings) is here only
-// so the page names it correctly for a component that also offers an allowed alternative.
 val ossLicenseUrlAliases =
   mapOf(
-    // Eclipse Distribution License 1.0 is the BSD-3-Clause text (Eclipse says so; SPDX has no
-    // separate identifier for it). jakarta.activation/xml.bind, jaxb-*, istack, angus-*.
     "http://www.eclipse.org/org/documents/edl-v10.php" to "BSD-3-Clause",
     "http://www.eclipse.org/legal/epl-2.0" to "EPL-2.0",
     "https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.txt" to "EPL-2.0",
@@ -243,7 +98,6 @@ val ossLicenseUrlAliases =
     "https://repository.jboss.org/licenses/apache-2.0.txt" to "Apache-2.0",
     "http://www.apache.org/licenses/" to "Apache-2.0",
     "https://opensource.org/license/mit" to "MIT",
-    // logstash-logback-encoder's second licence entry points at SLF4J's MIT page.
     "http://www.slf4j.org/license.html" to "MIT",
     "https://github.com/redis/lettuce/blob/main/LICENSE" to "MIT",
     "https://github.com/redis/redis-authx-core/blob/master/LICENSE" to "MIT",
@@ -253,13 +107,6 @@ val ossLicenseUrlAliases =
     "https://www.mozilla.org/en-US/MPL/2.0/" to "MPL-2.0",
   )
 
-// Components whose POM names no usable licence at all, with the identifier their shipped licence
-// file states. Keyed WITHOUT the version so the page keeps the correction across bumps; the gate
-// (below) has to name the exact version, because Licensee allows by full coordinate only.
-//   * Spring Session 4.1.1 ships `<license><name>Broadcom Foundation License</name>` with no URL —
-//     a metadata slip: `META-INF/LICENSE.txt` inside both jars, and the upstream repository, are
-//     Apache-2.0. When a Spring Boot bump moves Spring Session, `:frontend:licensee` fails naming
-//     the new version; re-check the jar's LICENSE.txt and move the version below.
 val ossLicenseCoordinateOverrides =
   mapOf(
     "org.springframework.session:spring-session-core" to ("4.1.1" to "Apache-2.0"),
@@ -273,32 +120,12 @@ extra["ossLicenseCoordinateOverrides"] =
     versionAndId.second
   }
 
-// Shared conventions for every module. Each block below hangs off a plugin id, so a module opts in
-// by applying the plugin and gets the one shared setup; module scripts carry only what is genuinely
-// theirs. Until audit item BLD-SIMP-06 (2026-09-23) the toolchain, Lombok/JetBrains wiring,
-// `spotbugsMain` and the SBOM settings were copied into up to six module scripts each, and the
-// copies had already started to differ in their comments.
 subprojects {
   plugins.withId("java") {
-    // One toolchain for every module. keycloak-spi additionally emits `--release 21` bytecode for
-    // the Keycloak JVM; that is its own script's business.
     extensions.configure<JavaPluginExtension> {
       toolchain { languageVersion = JavaLanguageVersion.of(25) }
     }
 
-    // Lombok and the JetBrains annotations on `main` AND `test`, compile-only on each, so
-    // neither reaches a runtime classpath, an image or an SBOM (ADR-0192). Gradle's
-    // `testCompileOnly` does not extend `compileOnly`, and `testAnnotationProcessor` does not
-    // extend `annotationProcessor`, which is why all four configurations are named. The
-    // frontend's `e2e` source set adds its own three lines, because that source set is the
-    // frontend's alone.
-    //
-    // The Lombok VERSION: every module that imports the Spring Boot BOM
-    // (io.spring.dependency-management) takes the Boot-managed one, and a module without it --
-    // keycloak-spi, which is deliberately no Boot module -- takes the catalog pin, which the
-    // catalog keeps equal to the Boot version because `lombok.config` is one shared file. Chosen
-    // through a provider so the decision is made once all of the module's plugins are applied,
-    // not at whatever point this block runs.
     val lombok = provider {
       if (pluginManager.hasPlugin("io.spring.dependency-management")) "org.projectlombok:lombok"
       else "org.projectlombok:lombok:${libs.versions.lombok.get()}"
@@ -309,21 +136,6 @@ subprojects {
       dependencies.add(it, libs.jetbrains.annotations)
     }
 
-    // Mockito 5+ on JDK 24+ has to be attached as a Java agent: letting the inline mock-maker
-    // self-attach prints a warning today and is slated to fail outright. This is Mockito's own
-    // recipe -- a dedicated, non-transitive `mockitoAgent` configuration -- plus one change: the
-    // argument goes through a `CommandLineArgumentProvider` instead of `jvmArgs(...)`.
-    //
-    // Until audit item BLD-PERF-10 the jar was found with `classpath.find { … }` while CONFIGURING
-    // the task, which resolved the whole test runtime classpath of every module at configuration
-    // time, and its ABSOLUTE path went into `jvmArgs` -- an @Input, so the task's cache key changed
-    // with the Gradle user home and no CI entry could ever be reused by another machine or
-    // worktree. The provider below is not an input at all; the jar's CONTENT is still part of the
-    // key through the test runtime classpath, where the same mockito-core sits.
-    //
-    // A module declares the dependency in its own script (`mockitoAgent(...)`), because only it
-    // knows where its Mockito version comes from; a module that declares none (test-support) gets
-    // no agent. `-Xshare:off` avoids the AppCDS warning a -javaagent otherwise triggers.
     val mockitoAgent =
       configurations.register("mockitoAgent") {
         isCanBeConsumed = false
@@ -340,12 +152,6 @@ subprojects {
       )
     }
 
-    // No shipped jar may carry the `test` profile (audit item SEC-17). Until 2026-09-23 each
-    // application kept `application-test.yml` in `src/main/resources`, so every production jar and
-    // image carried it: a Testcontainers JDBC URL, disabled TLS, test passwords and a readiness
-    // group narrowed for tests, one `SPRING_PROFILES_ACTIVE=test` away from being live. The files
-    // now live in `src/test/resources`; this check makes the jar task itself fail if one comes
-    // back, so the guard runs wherever a jar is built -- CI, the release images, a laptop.
     tasks
       .withType<Jar>()
       .matching { it.name == "jar" || it.name == "bootJar" }
@@ -375,36 +181,10 @@ subprojects {
     tasks.withType<Test>().configureEach {
       useJUnitPlatform()
       jvmArgs("--enable-native-access=ALL-UNNAMED")
-      // Test heap, PER MODULE. Every @SpringBootTest spins its own ApplicationContext, so the
-      // backend suite blows past the JVM 512 MiB default with a Java heap-space OOM at ~250 tests
-      // in. History: 512m -> 1.5 GiB -> 2 GiB when the monitoring-instrumentation contexts (#936)
-      // and the Mission/JobOrder service-split test classes (#948/#949) landed together -> 3 GiB
-      // when the logging-audit suite added 71 backend test methods and the contexts tipped over
-      // again (an OOM inside a bean creation, surfacing as "failed to load ApplicationContext" on
-      // whichever @SpringBootTest happened to run at the moment the heap ran out).
-      //
-      // This is a per-module map rather than one shared number BECAUSE the total is what actually
-      // binds. `org.gradle.parallel=true` plus a single `./gradlew build` in CI lets the module
-      // test JVMs run CONCURRENTLY, so a uniform bump multiplies by three: 3 x 3 GiB alongside the
-      // 2 GiB Gradle daemon would oversubscribe the 7 GiB github-hosted runner and trade a JVM heap
-      // error for an OS-level kill, which is far harder to read. Giving the backend what it needs
-      // and handing back what the small ingest suite never used keeps the concurrent peak at the
-      // 6 GiB it already was. Re-derive this when a module's suite grows, and check the SUM.
       maxHeapSize =
         mapOf("backend" to "3072m", "frontend" to "2048m", "ingest" to "1024m")[project.name]
           ?: "1024m"
       systemProperty("spring.profiles.active", "test")
-      // Deliberately NOT setting `maxParallelForks > 1` here even though the
-      // M-1 audit recommended it. A trial run with (cores / 2) destabilised
-      // `WebClientResilienceTest.timeLimiter_ShouldTimeoutSlowResponses` — the
-      // test asserts that a slow upstream times out within ~2 s, and under
-      // forked CPU contention the JVM scheduler delay alone ate the budget.
-      // Cross-module parallel (`org.gradle.parallel=true` in gradle.properties)
-      // already runs the modules' test tasks concurrently, which is most of
-      // the win; revisit per-module forking once
-      // the timing-sensitive resilience tests get refactored onto virtual time
-      // (e.g. StepVerifier.withVirtualTime) so they no longer race against
-      // wall-clock GC pauses.
     }
 
     tasks.withType<JavaCompile>().configureEach {
@@ -413,97 +193,26 @@ subprojects {
     }
   }
 
-  // BootRun comes from the Spring Boot plugin. We avoid a hard reference to the
-  // BootRun class (which would require this script to have the Spring Boot
-  // plugin on its classpath) by configuring through `JavaExec` — BootRun is a
-  // JavaExec subclass, so jvmArgs/systemProperty are available.
   plugins.withId("org.springframework.boot") {
     tasks.named<JavaExec>("bootRun") {
       jvmArgs("--enable-native-access=ALL-UNNAMED")
       systemProperty("spring.profiles.active", "dev")
     }
 
-    // Security override for a Spring-Boot-BOM-managed transitive. The Boot 4.1.1 BOM pins the
-    // embedded Tomcat to 11.0.24, and the Tomcat 11.0.25 advisory (2026-08-25) puts TEN CVEs on
-    // that version, nine of them at or above the `failBuildOnCVSS = 7.0` gate below: CVE-2026-65637
-    // (9.8, input validation — the incomplete-fix follow-up to CVE-2026-32990), CVE-2026-65905
-    // (9.8, DIGEST authenticator capture-replay), CVE-2026-65182 (9.1, security-constraint bypass
-    // when a longer path is declared before a more restrictive sub-path), CVE-2026-68525 (9.1, FORM
-    // auth bypassing a method-specific constraint), CVE-2026-65183 (8.1, unix-domain-socket
-    // TOCTOU),
-    // CVE-2026-66422 (8.1, `security-role-ref` used as a Realm role alias), CVE-2026-68569 (8.1,
-    // DataSourceRealm principal lookup failing open under CLIENT-CERT/SPNEGO), CVE-2026-65927 (7.5,
-    // rewrite `[N]` off-by-one) and CVE-2026-68763 (7.5, HTTP/2 reset-stream allocation leak); plus
-    // the sub-gate CVE-2026-73180 (6.8) and CVE-2026-66299 (WebSocket chat example). All ten are
-    // fixed in 11.0.25, which is the latest 11.0.x on Maven Central and stays on the line the Boot
-    // 4.1 BOM expects, so no 11.1.x jump. Boot has no 4.1.2 to bump to — 4.1.1 is the current
-    // stable and 4.2.0-M1 is a milestone — so the override is the only path. Tomcat is on the
-    // backend, frontend AND ingest runtime classpaths (embedded servlet container), so this is a
-    // shipped-code exposure, not a build-time one, and it is fixed by upgrading rather than
-    // suppressed. Discovered by the weekly scheduled scan, run 33392506709.
-    //
-    // Overriding the Boot BOM property is the conflict-free mechanism: it belongs right HERE (NOT
-    // in gradle.properties, whose value is loaded first and would be silently overridden, and not
-    // as a plain Gradle constraint), because io.spring.dependency-management emits every managed
-    // version as a `{strictly ...}` constraint, so a competing constraint collides instead of
-    // winning. Remove once the Boot BOM ships >= 11.0.25; the OWASP `dependencyCheckAggregate` gate
-    // keeps the presence and the absence of the override honest either way.
-    //
-    // This block previously carried two further overrides — PostgreSQL 42.7.13 (CVE-2026-54291
-    // SCRAM channel-binding downgrade) and Netty 4.2.17.Final (CVE-2026-56820 OCSP CertificateID,
-    // CVE-2026-56819 HTTP/2 leak, CVE-2026-55833 SPDY decode DoS) — dropped with the 4.1.0 ->
-    // 4.1.1 bump because the 4.1.1 BOM manages exactly those versions itself. It still does, so the
-    // PostgreSQL override stays gone; netty needs pinning again below, for a later CVE.
     extra["tomcat.version"] = "11.0.25"
 
-    // Netty is pinned again, on the same mechanism and for the same reason as Tomcat above. The
-    // Boot 4.1.1 BOM manages 4.2.17.Final, and CVE-2026-89044 (CVSS 6.5, CWE-444, published
-    // 2026-09-10) affects 4.2.13.Final through 4.2.17.Final: `HttpObjectDecoder` does not validate
-    // the FINAL transfer coding, so `Transfer-Encoding: chunked, xchunked` or a header split across
-    // lines is decoded as chunked and a request can be smuggled. Fixed in 4.2.18.Final (NVD CPE
-    // range `versionEndExcluding 4.2.18`, GHSA-hcvj-94mj-jp5c), a patch release on the line the
-    // Boot
-    // 4.1 BOM expects. It is under the 7.0 gate, so the scan reported it without failing - but
-    // netty
-    // is on the backend, frontend AND ingest runtime classpaths (Reactor Netty under WebClient), so
-    // it ships and is upgraded rather than suppressed. The property moves the whole `netty-bom`
-    // family at once, which is what the finding spans (39 jars, native classifiers included).
-    // Remove once the Boot BOM manages >= 4.2.18.Final.
     extra["netty.version"] = "4.2.18.Final"
   }
 
-  // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
-  // reports after every test run so CI / SonarQube / IDEs can consume the
-  // data without re-running tests. Each subproject that opts in via
-  // `plugins { jacoco }` automatically picks up this configuration.
   plugins.withId("jacoco") {
     tasks.withType<Test>().configureEach { finalizedBy(tasks.named("jacocoTestReport")) }
 
-    // Generated / untestable code excluded from BOTH the coverage report and
-    // the coverage gate so the ratio reflects hand-written logic only:
-    //  - MapStruct *MapperImpl: its `@Generated` is
-    //    `javax.annotation.processing.Generated` (SOURCE retention), invisible
-    //    to JaCoCo's bytecode-time annotation filter, so it must be removed by
-    //    class pattern. The `*Mapper` interface is NOT excluded — it carries
-    //    default methods / comparators / `computeProfit(...)` that we test.
-    //  - The one-line Spring Boot `*Application` `SpringApplication.run(...)`
-    //    stub, which has no meaningful unit test.
-    // (Lombok-generated members are auto-excluded because lombok.config sets
-    // `lombok.addLombokGeneratedAnnotation = true`, and JaCoCo 0.8.2+ skips any
-    // CLASS/RUNTIME `@Generated`.)
     val generatedClassExcludes =
       listOf("**/*MapperImpl.class", "**/*MapperImpl\$*.class", "**/*Application.class")
     fun filterGenerated(classes: FileCollection): FileCollection =
       files(classes.files.map { dir -> fileTree(dir) { exclude(generatedClassExcludes) } })
 
     tasks.named<JacocoReport>("jacocoTestReport") {
-      // L-1: only generate the JaCoCo report when actually running in CI.
-      // Locally a developer running `./gradlew :backend:test` from the IDE pays
-      // the JaCoCo instrumentation overhead twice (test-runtime + the report
-      // task) for output nobody looks at — Codecov / SonarQube only consume it
-      // from CI runs. The `CI` env var is set by GitHub Actions by default,
-      // GitLab CI, CircleCI, Drone and every other major runner; setting it
-      // locally via `CI=true ./gradlew test` opts in explicitly when needed.
       onlyIf { System.getenv("CI") != null }
       reports {
         xml.required.set(true)
@@ -513,20 +222,6 @@ subprojects {
       classDirectories.setFrom(filterGenerated(classDirectories))
     }
 
-    // Coverage ratchet, wired into `check`. A module-specific floor (set a few
-    // points below the measured baseline — backend ~87% instr / ~71% branch,
-    // frontend ~65% / ~52%, ingest ~98% / ~93%) fails the build on a real
-    // coverage regression without flapping on small fluctuations. Tighten these
-    // minimums upward over time. Uses the same generated-code excludes as the
-    // report so the denominator matches; runs on the test exec data that `check`
-    // already produces (so no extra test run). Unlike the report it is NOT gated
-    // on `CI`, so a regression fails fast on a local `./gradlew check` too.
-    // `ingest` sits far above the other two because the gateway is small and
-    // almost entirely branch logic (filters, relay, problem mapping) — the
-    // generic 0.50/0.40 fallback it used before was no gate at all there.
-    // `keycloak-spi` joined on 2026-09-22 (KC-CI-01) at a measured ~70% instr / ~64% branch; the
-    // untested remainder is mostly the Keycloak-session plumbing (brokered-context deserialisation,
-    // the IdP's live profile call) that only a running Keycloak exercises.
     val instructionFloor =
       mapOf(
         "backend" to "0.82",
@@ -563,31 +258,6 @@ subprojects {
     tasks.named("check").configure { dependsOn(tasks.named("jacocoTestCoverageVerification")) }
   }
 
-  // Pitest mutation testing (info.solidsoft.pitest). Runs on demand via
-  // `./gradlew :<module>:pitest` — intentionally NOT wired into `check`
-  // because a full mutation run takes O(minutes) per service and is far too
-  // slow for the standard PR-build path. Scope defaults to the business-logic
-  // service layer (`...basetool.<module>.service.*`); DTOs, mappers,
-  // repositories and config classes are excluded because mutating them rarely
-  // catches real test-suite gaps. Reports land under
-  // `<module>/build/reports/pitest/index.html`.
-  //
-  // Tuning notes:
-  // - `threads = 4` keeps a single-developer laptop responsive while still
-  //   parallelising mutation runs across test classes.
-  // - JVM args mirror the regular Test task (`--enable-native-access` plus
-  //   `-Xshare:off -javaagent:<mockito-core>` so Mockito 5+ self-attaches in
-  //   PIT's isolated minion processes; without that the green-suite
-  //   prerequisite fails before any mutation is generated).
-  // - Spring-context tests DO run under PIT: the minions start their contexts like any other JVM,
-  //   provided they get the `test` profile (below) -- which is what the three @SpringBootTest
-  //   classes without their own @ActiveProfiles("test") were missing (audit item CI-03). This note
-  //   used to say they "rely on a Spring context that PIT's minion does not start" and advised
-  //   renaming them to `*IntegrationTest`; neither was true -- `targetTests` is `service.*Test`,
-  //   which matches `*IntegrationTest` too. `pitest.yml` fails the run when no mutations.xml is
-  //   written or PIT reports PitHelpError, so a red coverage phase can no longer hide behind the
-  //   step's `continue-on-error`. Tighten `mutationThreshold` / `coverageThreshold` once a few
-  //   weekly runs have produced a baseline.
   plugins.withId("info.solidsoft.pitest") {
     extensions.configure<info.solidsoft.gradle.pitest.PitestPluginExtension>("pitest") {
       junit5PluginVersion.set(libs.versions.pitestJunit5.get())
@@ -597,22 +267,6 @@ subprojects {
       outputFormats.set(listOf("HTML", "XML"))
       timestampedReports.set(false)
 
-      // Build the same JVM-arg list the regular Test task uses, so Mockito 5+
-      // can self-attach as a Java agent inside PIT's isolated minions and the
-      // native-access warning is silenced. The mockito-core path is resolved
-      // lazily from the module's `mockitoAgent` configuration.
-      //
-      // `-Dspring.profiles.active=test` too, for the same reason: it is the other half of what the
-      // Test task sets (`systemProperty("spring.profiles.active", "test")` above), and PIT's
-      // minions inherit neither. Without it every @SpringBootTest that does not carry its own
-      // @ActiveProfiles("test") boots on the DEFAULT profile, finds no `jdbc:tc:` datasource and
-      // fails -- which is exactly what `FirstLoginAuthoritiesIntegrationTest`,
-      // `MissionManagerIntegrationTest` and `SquadronServiceTest` did under PIT for the eight weeks
-      // before 2026-09-22: "10 tests did not pass without mutation", PitHelpError, no
-      // mutations.xml, and a job shown green by `continue-on-error` (audit item CI-03). They pass
-      // under `./gradlew test` because the Test task supplies the profile.
-      // The agent jar comes from the same `mockitoAgent` configuration the Test tasks use (see the
-      // `plugins.withId("java")` block above), resolved only when PIT actually asks for its args.
       val mockitoAgent = configurations.named("mockitoAgent")
       jvmArgs.set(
         provider {
@@ -628,34 +282,6 @@ subprojects {
     }
   }
 
-  // Checkstyle (Gradle core plugin). Uses the Google Java Style config
-  // (`config/checkstyle/google_checks.xml`, a byte-for-byte copy of the file
-  // shipped in the Checkstyle 14.1.0 release tag) which enforces 2-space
-  // indents, 100-char lines, Google-style imports, naming conventions,
-  // Javadoc on public API, etc. The copy is deliberately unmodified: no
-  // Spotless format targets `.xml`, so it stays diffable against upstream and
-  // a refresh is a straight overwrite rather than a merge.
-  //
-  // That copy does NOT follow `toolVersion`, and nothing fails when the two
-  // drift: an older config on a newer tool simply runs, silently skipping
-  // every rule added since it was copied. It was 13.6.0 against a 14.1.0 tool
-  // from `712f22d75` (2026-09-13) until this refresh, which cost six rules the
-  // 14.1.0 config adds plus `GoogleMethodName`, the replacement upstream made
-  // for the hand-rolled `MethodName` regex -- four of them check classes that
-  // do not exist in 13.6.0 at all. So re-copy it from the
-  // matching release tag in the same commit that bumps `checkstyle` in
-  // `gradle/libs.versions.toml`:
-  //
-  // https://github.com/checkstyle/checkstyle/blob/checkstyle-<version>/src/main/resources/google_checks.xml
-  //
-  // Phase 4 (this configuration): the gate is now STRICT.
-  // `ignoreFailures = false` + `maxWarnings = 0` mean any new Checkstyle
-  // warning or error fails `./gradlew check` — regressions are caught at
-  // CI / PR time instead of accumulating silently. Reports land under
-  // `<subproject>/build/reports/checkstyle/{main,test}.html`. The test
-  // source set scan is disabled — test code intentionally uses different
-  // conventions (long method names with underscores, longer lines for
-  // BDD-style assertions) that Google's style flags as noise.
   plugins.withId("checkstyle") {
     extensions.configure<CheckstyleExtension>("checkstyle") {
       toolVersion = libs.versions.checkstyle.get()
@@ -666,46 +292,14 @@ subprojects {
     tasks.matching { it.name == "checkstyleTest" }.configureEach { enabled = false }
   }
 
-  // Spotless (com.diffplug.spotless). Auto-formats Java sources with
-  // google-java-format — same 2-space indent / 100-char width / Google import
-  // order that `config/checkstyle/google_checks.xml` enforces. Applying
-  // Spotless therefore resolves the bulk of Checkstyle's Indentation,
-  // LineLength, CustomImportOrder, AvoidStarImport, EmptyLineSeparator,
-  // OperatorWrap and WhitespaceAround warnings in a single pass.
-  //
-  // Phase 4 (this configuration): `enforceCheck = true` wires `spotlessCheck`
-  // into `./gradlew check` so any unformatted file fails the build. Run
-  // `./gradlew spotlessApply` locally before pushing to auto-fix; CI then
-  // re-runs `spotlessCheck` to verify the diff is clean.
   plugins.withId("com.diffplug.spotless") {
     extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension>("spotless") {
       isEnforceCheck = true
-      // LF, stated rather than derived from .gitattributes -- the root Spotless block says why.
       lineEndings = com.diffplug.spotless.LineEnding.UNIX
       java {
-        // google-java-format is pinned to a version that supports JDK 25.
-        // Older google-java-format (the default bundled by earlier Spotless
-        // releases) reflects against
-        // `com.sun.tools.javac.util.Log$DeferredDiagnosticHandler.getDiagnostics()` —
-        // the return type of that method changed in JDK 25 (Queue -> Deque) and the
-        // reflection lookup explodes with `NoSuchMethodError`. CI runs JDK 25 Temurin
-        // (see `.github/workflows/ci.yml`), so without an explicit pin the spotless
-        // task fails 767 files with `google-java-format(java.lang.NoSuchMethodError)`.
-        // The catalog pins a JDK-25-compatible google-java-format (>= 1.35.0).
-        // Generated sources are excluded, not formatted. `frontend` adds the openapi-generator's
-        // output to its test source set (ADR-0161 8.2), which puts it in `allJava` and therefore in
-        // Spotless's default target -- and a formatter that rewrites generated code turns every
-        // regeneration into a diff and every generator upgrade into a formatting failure nobody in
-        // this repository can fix. Same reasoning the root block already applies to `openapi.json`
-        // and the SBOMs.
         targetExclude("**/build/generated/**")
         googleJavaFormat(libs.versions.googleJavaFormat.get()).reflowLongStrings()
         removeUnusedImports()
-        // GPLv3 file header, enforced on every Java source (main + test + e2e).
-        // The project is GPL-3.0-only (LICENSE.md is the GPLv3 text); the SPDX
-        // tag makes that machine-readable. Fixed year (no `$YEAR` token) so
-        // `spotlessCheck` never churns the header across calendar years. Run
-        // `./gradlew spotlessApply` to (re)stamp.
         licenseHeader(
           """
           /*
@@ -734,48 +328,6 @@ subprojects {
     }
   }
 
-  // CycloneDX SBOM generation is a RELEASE-ONLY concern, deliberately kept out of
-  // the everyday build. The cyclonedx-gradle plugin (3.x) wires each SBOM output
-  // file as an artifact `builtBy(cyclonedxDirectBom)`, which pulls the task into
-  // `assemble` (hence `build`); out of the box a plain `./gradlew build` therefore
-  // regenerates the committed `<module>/docs/*-bom.*` on every run and churns the
-  // working tree for output nobody consumes outside a release. The SBOMs are
-  // produced only by the release-prepare workflow (which commits the refreshed
-  // copies) and on demand via `./gradlew :<module>:cyclonedxBom`. So gate both
-  // tasks on whether a cyclonedx task was explicitly named on the command line:
-  // when it was not, `enabled = false` makes them SKIP — a disabled task never
-  // runs its action, so an ordinary build leaves the committed SBOMs untouched —
-  // while an explicit `cyclonedxBom` / `cyclonedxDirectBom` invocation (release or
-  // manual) re-enables them. `enabled` has a single writer here, so the guarantee
-  // holds regardless of plugin/Gradle configuration order.
-  //
-  // The output convention is shared by all four shipped modules (backend, frontend, ingest,
-  // keycloak-spi): `<module>/docs/<module>-bom.{json,xml}`, committed, refreshed by
-  // release-prepare.yml and attached to the GitHub Release (REQ-OPS-025).
-  //
-  // The SBOM is restricted to the shipped runtime classpath so the signed BOM reflects only what
-  // actually ships in the bootJar / image / provider JAR -- not build- or test-scoped components
-  // (test, checkstyle, spotbugs, annotationProcessor, compileOnly), which otherwise inflate the BOM
-  // with tooling that never runs in production and produce false-positive CVE hits for downstream
-  // scanners. The dependency scan runs in `cyclonedxDirectBom` (cyclonedx-gradle 3.x), and
-  // `includeConfigs` is an allow-list of configuration-name regexes. For keycloak-spi that list is
-  // EMPTY by design -- every Keycloak SPI is `compileOnly` because Keycloak provides it -- and the
-  // empty BOM becomes a tripwire the day someone writes `implementation` there.
-  //
-  // NEVER UP-TO-DATE, NEVER FROM-CACHE (REQ-OPS-025, 2026-09-23). cyclonedx-gradle 3.4.1 marks
-  // `cyclonedxDirectBom` `@CacheableTask`, and the only input it declares for the dependency graph
-  // is `resolvedDependencies` -- the artifact FILES of the resolved components. A project
-  // dependency has no artifact file there (its component carries no hashes in the BOM), so adding
-  // or removing `implementation(project(":logging-support"))` left every input unchanged: the task
-  // reported UP-TO-DATE, or was served FROM-CACHE out of the build cache CI restores, and the SBOM
-  // silently kept the previous component list. Measured on `:ingest` both ways -- dependency
-  // removed, BOM still listed it; dependency added back, BOM still did not -- until
-  // `--rerun-tasks`. The same blind spot covers a changed dependency EDGE between unchanged jars
-  // and anything else the plugin reads at execution time. Declaring the graph as an extra input
-  // would close only the gap we know of, so both tasks are untracked instead: generation takes a
-  // few seconds and runs only when a `cyclonedx*` task is named, and a release artifact must be
-  // computed from the live graph every time, not reused. `verifyCyclonedxBom` below then proves
-  // the result, independently of how the BOM was produced.
   plugins.withId("org.cyclonedx.bom") {
     val sbomExplicitlyRequested =
       gradle.startParameter.taskNames.any { it.substringAfterLast(':').startsWith("cyclonedx") }
@@ -800,17 +352,6 @@ subprojects {
         finalizedBy("verifyCyclonedxBom")
       }
 
-    // The regression guard: the components the written BOM lists must be EXACTLY the components
-    // of the resolved `runtimeClasspath` graph -- every external module at its resolved version
-    // and every project dependency (`logging-support` in the three applications) -- in both
-    // directions. A BOM missing one understates what ships; one listing a component that is no
-    // longer on the classpath was not rebuilt. Runs as a finalizer of every `cyclonedxBom`, so the
-    // release-prepare workflow and every manual regeneration check themselves, and the CI step in
-    // ci.yml runs it on every PR. keycloak-spi's empty BOM stays correct as long as its
-    // `runtimeClasspath` stays empty.
-    //
-    // Configuration-cache safe: the expected set is a provider over the resolution result's root
-    // component, and the action captures only that provider and the BOM file.
     val expectedComponents =
       configurations
         .named("runtimeClasspath")
@@ -869,18 +410,6 @@ subprojects {
     }
   }
 
-  // SpotBugs + FindSecBugs on the main source set, identical in every shipped module. The `-base`
-  // variant of the plugin creates no tasks, so `spotbugsMain` is registered here and wired into
-  // `check`. BLOCKING (`ignoreFailures = false`): a HIGH-confidence finding (the FindSecBugs taint
-  // detectors for SQLi / path traversal / SSRF / weak crypto / XXE included) fails the build; this
-  // complements CodeQL with the same class of analysis on every local `check`. A module adds only
-  // what is its own -- the backend's JPA-entity exclude filter, for one.
-  //
-  // XML reporter ONLY -- do NOT also enable HTML. SpotBugs 4.9.8 has a multi-output ordering bug:
-  // with both reporters configured the plugin passes `-html` before `-xml`, and in that order
-  // SpotBugs writes a report with ZERO analysed classes, i.e. the gate silently scans nothing
-  // (verified: html+xml -> total_classes=0; xml-only -> total_classes=768). Re-add an HTML report
-  // only once SpotBugs fixes the ordering.
   plugins.withId("com.github.spotbugs-base") {
     dependencies.add("spotbugsPlugins", libs.findsecbugs.plugin)
     val main = project.extensions.getByType<SourceSetContainer>().named("main")
@@ -904,15 +433,6 @@ subprojects {
     tasks.named("check").configure { dependsOn(spotbugsMain) }
   }
 
-  // The third-party licence gate (REQ-UI-021, ADR-0197), from the policy tables above. The plugin
-  // wires `licensee` into `check`, so a dependency under a licence that is not on the list fails
-  // the build of the module that would ship it. `unusedAction(IGNORE)`: the list is shared by four
-  // modules and keycloak-spi ships no runtime dependency at all, so "allowed but unused" is the
-  // normal state of most entries in most modules and says nothing.
-  //
-  // Each module also exports its report as `build/licensee-export/<module>.json` through the
-  // consumable `ossLicenseReportElements` configuration — the one way `:frontend` reads another
-  // module's report without reaching into its build directory.
   plugins.withId("app.cash.licensee") {
     configure<app.cash.licensee.LicenseeExtension> {
       ossAllowedLicenses.forEach { allow(it) }
@@ -929,8 +449,6 @@ subprojects {
     }
 
     val licenseeReport = tasks.named<app.cash.licensee.LicenseeTask>("licensee")
-    // A local, because `rename {}` runs at EXECUTION time, where `project` inside a task's
-    // configuration block is `Task.project` -- which the configuration cache refuses.
     val moduleName = project.name
     val exportLicenseeReport =
       tasks.register<Copy>("exportLicenseeReport") {
@@ -950,51 +468,13 @@ subprojects {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Terms-of-Use version, derived from the text itself (REQ-SEC-028).
-//
-// The acceptance gate must re-prompt whenever the terms CHANGE, and the only way
-// that cannot go stale is to derive the version from the wording rather than from
-// a number someone remembers to bump. So: hash every `terms.*` entry of the German
-// bundle (the authoritative wording) and use the digest as the version.
-//
-// The result is COMMITTED to `backend/src/main/resources/terms-version.properties`
-// rather than generated into the build directory, and this task is deliberately NOT
-// wired into `processResources`. Both follow the `openapi.json` precedent in this
-// repo, and both exist because of a real failure: generating it at build time made
-// the BACKEND build read a FRONTEND source file, and the backend Docker image copies
-// only `frontend/build.gradle.kts` (for layer caching) — so the image build died with
-// "Input file does not exist" while every local build was green. A committed artifact
-// needs no cross-module build-time dependency at all.
-//
-// Drift is caught by `TermsVersionParityTest`, which re-derives the digest from the
-// bundle and fails the build when the committed file disagrees. Regenerate with:
-//     ./gradlew generateTermsVersion
-//
-// `terms.last_updated` is deliberately INSIDE the hash: the date is part of the
-// document, and bumping it is itself an announcement that the terms changed.
 tasks.register("generateTermsVersion") {
   description = "Regenerates the committed Terms-of-Use version from the German message bundle."
-  // Backend-owned since the document became an API resource: the digest has to hash the text
-  // that is actually SERVED. Left pointing at the frontend it would have kept hashing a bundle
-  // no longer carrying the terms, producing a stable version for wording that had changed --
-  // a gate that never re-prompts, with nothing to show it had stopped working.
   val bundle = rootProject.file("backend/src/main/resources/messages_de.properties")
   val target = rootProject.file("backend/src/main/resources/terms-version.properties")
-  // The escape hatch for a purely cosmetic edit (a typo, a reflow): pinning the
-  // version leaves every existing acceptance valid instead of re-prompting the
-  // whole squadron — which, with the gate also covering ingest, would otherwise
-  // stop the desktop extractor for everyone until they log into the web UI.
   val override = providers.gradleProperty("termsVersion").filter { it.isNotBlank() }
   val targetForLog = target.relativeTo(rootDir).path
   outputs.upToDateWhen { false }
-  // The digest is computed INSIDE the action, not in a script-level function the action calls
-  // (audit item BLD-PERF-04): a task action that calls back into the build script captures the
-  // script object, which the configuration cache cannot serialise.
-  //
-  // What it computes: every `terms.*` entry of the bundle, sorted, joined and SHA-256'd, truncated
-  // to 16 hex characters. `TermsVersionParityTest` re-derives exactly this in Java and fails the
-  // build when the committed file disagrees, so a change here must change that test with it.
   doLast {
     val version =
       override.orNull
@@ -1006,12 +486,6 @@ tasks.register("generateTermsVersion") {
               .sorted()
               .joinToString(separator = "\n")
           check(clauses.isNotEmpty()) { "No terms.* entries found in ${bundle.path}" }
-          // A `.properties` value may be continued onto the next line with a trailing backslash,
-          // and such a continuation line starts with neither `terms.` nor contains `=` — so the
-          // filter above would skip it and editing that part of a clause would NOT change the
-          // version. That silently defeats the one property this whole design exists for. No
-          // terms.* entry uses a continuation today, so this guard is a tripwire for the day
-          // someone wraps a long clause, not a fix for a live bug.
           check(clauses.lines().none { it.endsWith("\\") }) {
             "A terms.* entry in ${bundle.path} uses a backslash line continuation. The digest " +
               "only sees the first line, so edits to the rest would not re-prompt anyone. Put " +
@@ -1023,96 +497,24 @@ tasks.register("generateTermsVersion") {
             .substring(0, 16)
         }
     target.parentFile.mkdirs()
-    // A literal LF, not System.lineSeparator(): Spotless normalises .properties to LF, so a CRLF
-    // written here leaves every Windows run of this task with a red spotlessPropertiesCheck for a
-    // file whose CONTENT is correct — a "format violation" reported against the one artifact
-    // nobody edits by hand, and the build's only hint is to run a 25-minute spotlessApply.
     target.writeText("basetool.terms.version=" + version + "\n", Charsets.UTF_8)
     logger.lifecycle("Terms-of-Use version: $version -> $targetForLog")
   }
 }
 
-// OWASP Dependency-Check (org.owasp.dependencycheck) 13.0.0. Aggregates over
-// all subprojects via `./gradlew dependencyCheckAggregate`. CVSS gate now fails
-// the build on findings with CVSS 7.0 or higher (audit finding L-8: previously
-// the gate was wide open at CVSS 11 — triage-only). 7.0 covers the OWASP "HIGH"
-// severity band; CRITICAL (>= 9.0) is included by definition. The plugin's
-// first invocation downloads the NVD feed (~500 MB cached under
-// `~/.gradle/dependency-check-data`) and takes 5-15 minutes; subsequent runs
-// are seconds. Set `-PnvdApiKey=<key>` (CI: `NVD_API_KEY` repo secret) to
-// bypass the public NVD rate limit — register a free key at
-// https://nvd.nist.gov/developers/request-an-api-key.
 dependencyCheck {
   failBuildOnCVSS = 7.0f
   formats = listOf("HTML", "SARIF")
   outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
-  // Suppression file for findings that are either CPE confusion (the NVD
-  // matcher attributes a CVE to a different product that shares a token with
-  // ours) or sit on a build-time-only classpath that never reaches the
-  // deployed Spring Boot fat JAR. Each entry carries a `<notes>` block
-  // explaining the reason - real production CVEs are NEVER suppressed, they
-  // are fixed by upgrading the dependency.
   suppressionFile = rootProject.file("config/owasp/dependency-check-suppressions.xml").absolutePath
-  // Treat the on-disk NVD copy as valid for a full ISO-week. The
-  // `.github/workflows/dependency-check.yml` actions/cache entry is keyed on
-  // the ISO week as well and the weekly cron re-warms it, so within a week we
-  // reuse the local DB and skip every NVD API call. Only the first run of
-  // each week actually contacts the NVD endpoint, which is what keeps the
-  // workflow inside the 5-req/30-s public rate limit when `NVD_API_KEY` is
-  // unset. The plugin default of 4 hours forced an update on essentially
-  // every invocation, which on github-hosted runners (shared IP pool with
-  // every other CI job on github.com refreshing on Monday morning) led to
-  // 429s mid-transaction and a corrupt H2 DB — see run 25933803540.
-  // Bound every outbound HTTP call the engine makes. WITHOUT these the scan stalls indefinitely:
-  // dependency-check queries NVD, the NPM Audit API, Maven Central, OSS Index and RetireJS, and a
-  // socket that stops responding is simply waited on forever - then retried, up to the
-  // `nvd.maxRetryCount` below. The task prints "Checking for updates and analyzing dependencies for
-  // vulnerabilities" and NOTHING after it, so the run looks busy rather than stuck and only ends
-  // when the CI job timeout kills it.
-  //
-  // That is what 24 runs between 2026-08-19 and 2026-09-04 were doing: 14 on `main`, 10 on feature
-  // branches, all cancelled at the job ceiling with zero output. It is not a cold-cache cost - a
-  // COLD run finishes in 8-14 minutes (run 31309086034 on `main`, 8m29s; run 33845554721 on a PR,
-  // 13m48s) and a warm one in under a minute. Exactly one of the stalled runs died with a message
-  // instead of hanging, and it names the mechanism: run 33847146815,
-  // `DownloadFailedException: ... 'https://registry.npmjs.org/-/npm/v1/security/audits';
-  // Read timed out` -> `SocketTimeoutException`. That one connection happened to carry a timeout;
-  // the rest do not.
-  //
-  // With a read timeout the same stall surfaces as an error in minutes, the engine disables the
-  // affected analyzer and continues, and the scan still reaches its SARIF upload - which is what
-  // actually keeps the Security tab honest. 120s is deliberately generous: the NVD paging calls are
-  // slow but they do respond, so this must not fire on a healthy sync.
-  //
-  // Kotlin DSL note: `connectionTimeout = ...` does NOT compile. Both setters are overloaded
-  // (Object / Number / Duration) and Kotlin cannot resolve the `=` assignment against them, failing
-  // with "No applicable 'assign' function found for '=' overload". Call the setter explicitly.
   setConnectionTimeout(java.time.Duration.ofSeconds(30))
   setReadTimeout(java.time.Duration.ofSeconds(120))
   nvd.validForHours = 168
-  // Retries are deliberately NOT set here: the inherited default is what this wants. The previous
-  // `nvd.maxRetryCount = 20` carried the comment "bump retries above the default of 10", and that
-  // default is wrong - `dependencycheck.properties` inside dependency-check-core 13.0.0 ships
-  // `nvd.api.max.retry.count=30`, and the Gradle plugin declares no convention of its own
-  // (`ConfiguredTask` only forwards a non-null value). So the setting LOWERED the retry budget from
-  // 30 to 20 while claiming to raise it, weakening exactly the 429-burst tolerance it was written
-  // for. Dropping the line restores 30.
   val resolvedNvdApiKey = (project.findProperty("nvdApiKey") as String?)?.takeIf { it.isNotBlank() }
   if (resolvedNvdApiKey != null) {
     nvd.apiKey = resolvedNvdApiKey
-    // 0 is the shipped default, and it does NOT mean unthrottled: the client enforces NVD's own
-    // authenticated budget itself - `nvd.api.requestsperthirtysecondswithapikey=50`, documented in
-    // dependency-check-core as "the client used will not let you exceed these values", i.e. one
-    // request per 600 ms. The previous 2000 was a second throttle stacked on that one. NVD held
-    // 389 984 CVEs on 2026-09-11, which is 195 requests at the 2000-per-page maximum, so the extra
-    // sleep cost ~6.5 minutes of a cold rebuild where the limiter alone spends ~2.
     nvd.delay = 0
   } else {
-    // Public NVD limit is 5 req/30 s; 16 s between calls keeps us at
-    // ~3.75 req/30 s with headroom for runner-pool contention on the same
-    // source IP. Register and configure an API key (see header comment) to
-    // drop this delay and make the first-of-week run finish in minutes
-    // instead of tens of minutes.
     nvd.delay = 16000
   }
 }

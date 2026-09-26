@@ -25,14 +25,9 @@ import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Single-instance {@link LiveSyncFanout}: publishing is a no-op because the handler's local relay
- * is the whole story when the frontend runs as one replica (ADR-0094).
- *
- * <p>Instantiated as the fallback in {@code LiveSyncWebSocketConfig} via {@code
- * fanoutProvider.getIfAvailable(NoopLiveSyncFanout::new)}, so a registered {@link LiveSyncFanout}
- * bean (the Redis binding, when enabled) is used and this no-op is created only when none is — the
- * {@code test} profile, which loads no Redis, keeps a working, dependency-free fan-out. Keeping the
- * seam uniform means the handler's call path is identical whether or not Redis is wired.
+ * Single-instance {@link LiveSyncFanout} whose publishing is a no-op, since the handler's local
+ * relay suffices for one replica (ADR-0094). Used when no other {@link LiveSyncFanout} bean is
+ * registered.
  */
 public class NoopLiveSyncFanout implements LiveSyncFanout {
 
@@ -44,9 +39,7 @@ public class NoopLiveSyncFanout implements LiveSyncFanout {
    * @param sections the section keys (unused)
    */
   @Override
-  public void publish(@NotNull String canonicalTopic, @NotNull List<String> sections) {
-    // Single-instance: nothing to fan out.
-  }
+  public void publish(@NotNull String canonicalTopic, @NotNull List<String> sections) {}
 
   /**
    * No-op: with one replica the local presence store is already the complete picture, so there is
@@ -58,7 +51,5 @@ public class NoopLiveSyncFanout implements LiveSyncFanout {
   @Override
   public void publishPresence(
       @NotNull String canonicalTopic,
-      @NotNull Map<String, List<LiveSyncPresenceService.PresenceEditor>> sections) {
-    // Single-instance: the local presence store is the whole truth.
-  }
+      @NotNull Map<String, List<LiveSyncPresenceService.PresenceEditor>> sections) {}
 }

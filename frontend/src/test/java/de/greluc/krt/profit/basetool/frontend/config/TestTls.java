@@ -26,21 +26,10 @@ import java.security.KeyStore;
 import javax.net.ssl.KeyManagerFactory;
 
 /**
- * The committed test-stack TLS material, loaded for tests that need a real TLS server.
+ * Loads the committed test-stack TLS material for tests that need a real TLS server (ADR-0139).
  *
- * <p><b>This is not an exception to "never use production credentials in tests" — it is an
- * application of it</b> (ADR-0139). {@code docker/test-tls/basetool-test-backend.p12} was built to
- * be published: the CA key that signed it was destroyed at generation time, the server key can only
- * serve loopback and docker-network names, and the subject of both certificates says {@code NOT FOR
- * PRODUCTION}. It is the test stack's backend leaf -- one of the per-service leaves the test CA
- * signed, the same shape production has (REQ-SEC-070). Production keeps its own keystore,
- * bind-mounted at runtime, and {@code .gitignore} refuses the exact name {@code keystore.p12} so
- * the two cannot be confused.
- *
- * <p>Using it here rather than generating a throwaway certificate per test run is deliberate:
- * Netty's {@code SelfSignedCertificate} is deprecated and its replacement lives in an artefact this
- * project does not depend on, and a self-generated key would be one more piece of key material
- * appearing in a worktree for no gain.
+ * <p>{@code docker/test-tls/basetool-test-backend.p12} is a published throwaway, never a production
+ * credential.
  */
 final class TestTls {
 
@@ -53,14 +42,8 @@ final class TestTls {
   /**
    * Builds a {@link KeyManagerFactory} over the test keystore's server key.
    *
-   * <p>The backend's keystore carries two aliases — {@code basetool} (the server key and its chain)
-   * and {@code ca} (the anchor, certificate only) — and the factory selects the one that actually
-   * has a key, so no alias needs naming here.
-   *
-   * @return a factory a TLS server can be built from, initialised with the test server key.
-   * @throws IllegalStateException if the material cannot be found or read, which means the working
-   *     directory assumption below no longer holds and the test would otherwise fail with a
-   *     handshake error that says nothing about the cause.
+   * @return a factory initialised with the test server key
+   * @throws IllegalStateException if the material cannot be found or read
    */
   static KeyManagerFactory serverKeyManagerFactory() {
     Path keystore = repoRoot().resolve("docker/test-tls/basetool-test-backend.p12");
@@ -81,14 +64,11 @@ final class TestTls {
   }
 
   /**
-   * Walks up from the working directory until the repository root is found.
+   * Walks up from the working directory to the repository root, marked by {@code
+   * settings.gradle.kts}.
    *
-   * <p>Gradle runs {@code :frontend:test} with {@code frontend/} as the working directory and an
-   * IDE may not, so neither a relative {@code ../docker} nor an absolute path is safe. The marker
-   * is {@code settings.gradle.kts}, the same anchor {@code ExternalContractTest} uses.
-   *
-   * @return the repository root.
-   * @throws IllegalStateException when no ancestor carries the marker.
+   * @return the repository root
+   * @throws IllegalStateException when no ancestor carries the marker
    */
   private static Path repoRoot() {
     Path current = Path.of("").toAbsolutePath();

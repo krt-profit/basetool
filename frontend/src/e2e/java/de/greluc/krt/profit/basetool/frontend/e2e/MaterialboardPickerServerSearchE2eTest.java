@@ -36,24 +36,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the Materialbörse "Material anbieten" item picker filtering <em>in the client</em>
- * instead of on the server (REQ-MARKET-002).
- *
- * <p>The backend picker query ({@code findReleasableForUser}) already filters by a material-name
- * fragment and caps the result at 50 rows ordered by material name. The first cut of {@code
- * materialboerse-release.js} loaded that capped list once with an empty query and then filtered it
- * <em>client-side</em> as the user typed — so a material whose rows fall past the alphabetical cap
- * (a user reported "Savrilium" — late alphabet — while "Iron"/"Construction" worked) never appeared
- * in the picker, the item could never be selected, and the release silently no-op'd with no error.
- *
- * <p>The fix debounces a fresh server query per keystroke, so this asserts that typing in the
- * picker issues a {@code /materialboerse/releasable-items?q=…} request — the exact behaviour a
- * regression back to client-side filtering would remove. It does not need a 50+ item seed to
- * reproduce the cap: proving the query goes to the server is what guards the reachability
- * guarantee.
- *
- * <p>The actor is {@code test-admin} (seeded IRIDIUM membership → KRT_MEMBER, the role the board
- * requires).
+ * E2E regression test: typing in the Materialbörse "Material anbieten" picker must query the server
+ * ({@code /materialboerse/releasable-items?q=…}) rather than filter a capped list client-side
+ * (REQ-MARKET-002).
  */
 @Tag("e2e")
 class MaterialboardPickerServerSearchE2eTest {
@@ -113,9 +98,6 @@ class MaterialboardPickerServerSearchE2eTest {
         assertThat(page.locator("#mb-modal [data-mb-picker-input]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Typing must trigger a server query carrying the fragment; the debounced fetch fires
-        // within
-        // ~200 ms, well inside waitForRequest's default budget.
         Request search =
             page.waitForRequest(
                 request ->

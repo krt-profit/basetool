@@ -20,19 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Catalogue of findings a sync run can record into {@link ExternalSyncReport}, per
- * SC_WIKI_SYNC_PLAN.md §8.8.
- *
- * <p>Each value is emitted by a specific sync (noted per-constant); the {@code event_type} column
- * stores the enum name. Optimistic-lock conflicts between a sync write and a concurrent admin edit
- * are intentionally <b>not</b> recorded here: the per-row handler logs and skips the row, which
- * re-syncs on the next cycle. The {@code §5.4} "retry-once" budget was never needed — each
- * scheduler runs single-threaded on its own {@code @Async} executor, so an intra-run race on the
- * same row cannot occur.
+ * Findings a sync run can record into {@link ExternalSyncReport}; the {@code event_type} column
+ * stores the enum name. Optimistic-lock conflicts with admin edits are not recorded: the row is
+ * skipped and re-synced on the next run.
  */
 public enum SyncEventType {
 
-  /** Wiki commodity sync: a row was dropped by the §8.9 hard-junk name filter. */
+  /** Wiki commodity sync: a row was dropped by the hard-junk name filter. */
   SKIP_JUNK,
 
   /**
@@ -40,7 +34,7 @@ public enum SyncEventType {
    */
   CREATED_WIKI_ONLY,
 
-  /** UEX item sync (R2+): an item had no Wiki cross-reference. */
+  /** UEX item sync: an item had no Wiki cross-reference. */
   CREATED_UEX_ONLY,
 
   /**
@@ -65,8 +59,8 @@ public enum SyncEventType {
   MANUFACTURER_MISMATCH,
 
   /**
-   * Wiki manufacturer reconciliation (R6): a Wiki manufacturer was linked to an existing UEX
-   * manufacturer row for the first time — {@code scwiki_uuid} / {@code scwiki_code} were stamped.
+   * Wiki manufacturer reconciliation: a Wiki manufacturer was first linked to an existing UEX
+   * manufacturer row, stamping {@code scwiki_uuid} / {@code scwiki_code}.
    */
   MANUFACTURER_LINKED,
 
@@ -77,37 +71,29 @@ public enum SyncEventType {
   BACKFILL_AMBIGUOUS,
 
   /**
-   * Wiki item full backfill (Weg 2): a Wiki item with no existing UUID match was merged into a
-   * uuid-less {@code UEX_ONLY} row found by exact {@code uex_slug} / name, backfilling that row's
-   * {@code external_uuid} and flipping {@code UEX_ONLY → BOTH} instead of inserting a duplicate
-   * {@code WIKI_ONLY} row.
+   * Wiki item backfill: a Wiki item with no UUID match was merged into a uuid-less {@code UEX_ONLY}
+   * row found by exact {@code uex_slug} / name, setting its {@code external_uuid} and flipping it
+   * to {@code BOTH} instead of inserting a duplicate.
    */
   LINKED_VIA_NAME,
 
   /**
-   * Any sync (UEX or SC Wiki): a once-per-run summary line whose {@code detail} carries the run's
-   * tallies (rows visited / created / updated / soft-deleted). Emitted unconditionally so a run is
-   * always visible on the admin sync-report page even when it produced no other findings — the UEX
-   * item sync is the first emitter.
+   * Any sync: a once-per-run summary whose {@code detail} carries the run's tallies (visited /
+   * created / updated / soft-deleted), emitted even when the run produced no other findings.
    */
   SYNC_RUN_SUMMARY,
 
   /**
-   * KRT P4K Reader catalog import: a brand-new row was seeded from the game's DataForge catalog for
-   * a record that matched no existing UEX / SC-Wiki row (and passed the importer's real-record
-   * filter). Inserted as {@code source_systems = P4K} (items / ships / materials) so it is clearly
-   * attributable and reviewable; the game DCB is the upstream source the live game itself reads.
+   * KRT P4K Reader catalog import: a new row was seeded from the game's DataForge catalog for a
+   * record matching no existing UEX / SC Wiki row, marked {@code source_systems = P4K}.
    */
   CREATED_FROM_P4K,
 
   /**
-   * Wiki blueprint sync (#327): a curated {@code blueprint.output_name} correction (see {@code
-   * BlueprintOutputNameOverrides}) is registered for a {@code scwiki_key} that the feed still
-   * carries this run, but its {@code expectedWrongName} no longer matches the incoming name — so
-   * the guarded override did <em>not</em> fire. That means CIG (and the SC Wiki mirror) changed the
-   * upstream name, the override is obsolete, and an operator should delete its entry. Emitted once
-   * per obsolete override per run; the {@code detail} carries the key, the now-current upstream
-   * name, and the name the override expected.
+   * Wiki blueprint sync: a curated {@code blueprint.output_name} override (see {@code
+   * BlueprintOutputNameOverrides}) did not fire because its {@code expectedWrongName} no longer
+   * matches the upstream name, so the override is obsolete and should be removed. Emitted once per
+   * obsolete override per run; {@code detail} carries the key, the current and the expected name.
    */
   BLUEPRINT_NAME_OVERRIDE_OBSOLETE
 }

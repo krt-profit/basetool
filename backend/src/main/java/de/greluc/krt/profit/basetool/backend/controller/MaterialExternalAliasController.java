@@ -49,14 +49,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin-only CRUD for the curated cross-reference table that maps external commodity names (from
- * UEX or SC Wiki) onto local {@link de.greluc.krt.profit.basetool.backend.model.Material} rows.
+ * Admin-only CRUD for the table mapping external commodity names (UEX, SC Wiki) onto local {@link
+ * de.greluc.krt.profit.basetool.backend.model.Material} rows.
  *
- * <p>Class-level {@code @PreAuthorize("hasRole('ADMIN')")} gates every endpoint — the table is pure
- * reference data managed by admins; non-admins should never see or change it. The R3 SC Wiki
- * commodity sync reads the table through {@link
- * MaterialExternalAliasService#resolveMaterialByAlias} (service-layer, not HTTP), so no public read
- * endpoint is needed.
+ * <p>Lookups go through {@link MaterialExternalAliasService#resolveMaterialByAlias}, not HTTP.
  */
 @RestController
 @RequestMapping("/api/v1/material-external-aliases")
@@ -69,14 +65,8 @@ public class MaterialExternalAliasController {
   private final MaterialExternalAliasMapper mapper;
 
   /**
-   * Returns every alias sorted by external name. Drives the admin table view.
-   *
-   * <p><b>Intentional deviation from the {@code Pageable} + {@code PageResponse} list
-   * convention:</b> {@code material_external_alias} is a small, hand-curated reference table (a few
-   * seed rows plus occasional admin additions) that the admin UI renders in full on one page.
-   * Paginating it would add an empty wrapper and a sort-field whitelist for no benefit, so the
-   * endpoint returns the whole list. Add pagination only if the table ever grows large enough to
-   * need it.
+   * Returns every alias sorted by external name, unpaged because the table is small and
+   * hand-curated.
    *
    * @return list of alias DTOs
    */
@@ -106,9 +96,8 @@ public class MaterialExternalAliasController {
   }
 
   /**
-   * Creates a new alias. The service validates that the referenced material exists and that the
-   * {@code (sourceSystem, externalName)} pair is unique — compared case-insensitively, matching the
-   * resolution lookup (REQ-REFINERY-010).
+   * Creates a new alias; the referenced material must exist and {@code (sourceSystem,
+   * externalName)} must be unique case-insensitively (REQ-REFINERY-010).
    *
    * @param request validated create payload
    * @return the persisted alias, 201 Created
@@ -130,9 +119,8 @@ public class MaterialExternalAliasController {
   }
 
   /**
-   * Updates an existing alias. Optimistic-lock token on the request body must match the row's
-   * current version or Hibernate raises a {@link
-   * org.springframework.orm.ObjectOptimisticLockingFailureException} → 409.
+   * Updates an existing alias; a stale version raises {@link
+   * org.springframework.orm.ObjectOptimisticLockingFailureException} (409).
    *
    * @param id alias UUID
    * @param request validated update payload (carries the expected version)

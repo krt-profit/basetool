@@ -82,7 +82,6 @@ class UexUniverseSyncServiceTest {
 
   @Test
   void shouldSyncCitiesSuccessfully() {
-    // Given
     UexCityDto cityDto = UexCityDto.builder().id(1).name("Lorville").isAvailableLive(1).build();
 
     when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto)));
@@ -101,47 +100,35 @@ class UexUniverseSyncServiceTest {
     when(locationRepository.findByCityId(any())).thenReturn(Optional.of(mockLocation));
     when(locationRepository.save(any())).thenReturn(mockLocation);
 
-    // When
     service.syncCities();
 
-    // Then
     verify(uexClient, times(1)).getCities();
-    verify(cityRepository, times(2))
-        .save(any(City.class)); // 1 for save new entity, 1 for update entity
+    verify(cityRepository, times(2)).save(any(City.class));
   }
 
   @Test
   void shouldSkipSyncIfNoData() {
-    // Given
     when(uexClient.getCities()).thenReturn(fetched(List.of()));
 
-    // When
     service.syncCities();
 
-    // Then
     verify(uexClient, times(1)).getCities();
     verify(cityRepository, never()).save(any());
   }
 
-  // ─── syncCities — additional cases ──────────────────────────────────────
-
   @Test
   void syncCities_skipsDtoWithoutId() {
-    // Given
     UexCityDto noId = UexCityDto.builder().name("Unknown").build();
     when(uexClient.getCities()).thenReturn(fetched(List.of(noId)));
 
-    // When
     service.syncCities();
 
-    // Then
     verify(cityRepository, never()).save(any());
     verify(locationRepository, never()).save(any());
   }
 
   @Test
   void syncCities_doesNotMaterialiseLocation_whenCityNotAvailableLive() {
-    // Given — a city flagged as not live; no location row must be touched
     UexCityDto offline = UexCityDto.builder().id(2).name("Old Lorville").isAvailableLive(0).build();
     when(uexClient.getCities()).thenReturn(fetched(List.of(offline)));
     when(cityRepository.findByIdCity(2)).thenReturn(Optional.empty());
@@ -154,17 +141,14 @@ class UexUniverseSyncServiceTest {
               return c;
             });
 
-    // When
     service.syncCities();
 
-    // Then
     verify(cityRepository, atLeastOnce()).save(any(City.class));
     verifyNoInteractions(locationRepository);
   }
 
   @Test
   void syncCities_linksByName_whenIdCityIsNewButNameMatches() {
-    // Given an existing City with the same name but no idCity
     City existing = new City();
     existing.setId(UUID.randomUUID());
     existing.setName("Area18");
@@ -175,16 +159,12 @@ class UexUniverseSyncServiceTest {
     when(cityRepository.findByName("Area18")).thenReturn(Optional.of(existing));
     when(cityRepository.save(any(City.class))).thenAnswer(i -> i.getArgument(0));
 
-    // When
     service.syncCities();
 
-    // Then — idCity was backfilled on the existing entity
     ArgumentCaptor<City> cap = ArgumentCaptor.forClass(City.class);
     verify(cityRepository, atLeastOnce()).save(cap.capture());
     assertEquals(7, cap.getValue().getIdCity());
   }
-
-  // ─── syncFactions ───────────────────────────────────────────────────────
 
   @Test
   void syncFactions_upsertsNewFaction() {
@@ -208,8 +188,6 @@ class UexUniverseSyncServiceTest {
     Faction saved = cap.getValue();
     assertEquals(1, saved.getIdFaction());
     assertEquals("UEE", saved.getName());
-    // UEX's /factions payload carries neither `code` nor `is_available_live` (REQ-DATA-015), so
-    // the sync must leave both columns alone rather than writing a null / a fabricated `false`.
     assertNull(saved.getCode());
     assertNull(saved.getIsAvailableLive());
     assertFalse(saved.getIsPiracy());
@@ -232,8 +210,6 @@ class UexUniverseSyncServiceTest {
     service.syncFactions();
     verifyNoInteractions(factionRepository);
   }
-
-  // ─── syncJurisdictions ──────────────────────────────────────────────────
 
   @Test
   void syncJurisdictions_upsertsNewJurisdiction() {
@@ -266,8 +242,6 @@ class UexUniverseSyncServiceTest {
     service.syncJurisdictions();
     verifyNoInteractions(jurisdictionRepository);
   }
-
-  // ─── syncMoons ──────────────────────────────────────────────────────────
 
   @Test
   void syncMoons_upsertsNewMoon() {
@@ -305,8 +279,6 @@ class UexUniverseSyncServiceTest {
     verifyNoInteractions(moonRepository);
   }
 
-  // ─── syncOrbits ─────────────────────────────────────────────────────────
-
   @Test
   void syncOrbits_upsertsNewOrbit() {
     UexOrbitDto dto =
@@ -338,8 +310,6 @@ class UexUniverseSyncServiceTest {
     verifyNoInteractions(orbitRepository);
   }
 
-  // ─── syncOutposts ───────────────────────────────────────────────────────
-
   @Test
   void syncOutposts_upsertsNewOutpost() {
     UexOutpostDto dto =
@@ -370,8 +340,6 @@ class UexUniverseSyncServiceTest {
     service.syncOutposts();
     verifyNoInteractions(outpostRepository);
   }
-
-  // ─── syncPlanets ────────────────────────────────────────────────────────
 
   @Test
   void syncPlanets_upsertsNewPlanet() {
@@ -407,8 +375,6 @@ class UexUniverseSyncServiceTest {
     verifyNoInteractions(planetRepository);
   }
 
-  // ─── syncPois ───────────────────────────────────────────────────────────
-
   @Test
   void syncPois_upsertsNewPoi() {
     UexPoiDto dto =
@@ -432,11 +398,8 @@ class UexUniverseSyncServiceTest {
     verifyNoInteractions(poiRepository);
   }
 
-  // ─── syncSpaceStations ──────────────────────────────────────────────────
-
   @Test
   void syncSpaceStations_upsertsAndMaterializesLocation_whenAvailableLive() {
-    // Given a live space station
     UexSpaceStationDto dto =
         UexSpaceStationDto.builder()
             .id(70)
@@ -459,10 +422,8 @@ class UexUniverseSyncServiceTest {
     when(locationRepository.findByName("Port Olisar")).thenReturn(Optional.empty());
     when(locationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-    // When
     service.syncSpaceStations();
 
-    // Then
     verify(spaceStationRepository, atLeastOnce()).save(any(SpaceStation.class));
     verify(locationRepository, atLeastOnce()).save(any());
   }
@@ -499,8 +460,6 @@ class UexUniverseSyncServiceTest {
     verifyNoInteractions(spaceStationRepository, locationRepository);
   }
 
-  // ─── syncTerminals ──────────────────────────────────────────────────────
-
   @Test
   void syncTerminals_upsertsNewTerminal() {
     UexTerminalDto dto =
@@ -534,15 +493,6 @@ class UexUniverseSyncServiceTest {
     service.syncTerminals();
     verifyNoInteractions(terminalRepository);
   }
-
-  // ─── Override-respect tests ─────────────────────────────────────────────
-  //
-  // Each test below pins the override flag on an existing entity to TRUE, feeds
-  // the sync the *opposite* boolean from UEX, and verifies the persisted entity
-  // still carries the admin-pinned value. The other (non-overridden) flag is
-  // expected to track UEX. This is the regression guard for the bug the
-  // override feature was built to fix: UEX silently clobbering admin
-  // corrections every hour.
 
   @Test
   void syncCities_respectsLoadingDockOverride() {
@@ -666,10 +616,7 @@ class UexUniverseSyncServiceTest {
 
     ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
     verify(terminalRepository, atLeastOnce()).save(cap.capture());
-    // The effective column keeps the admin pin …
     assertTrue(cap.getValue().getHasLoadingDock(), "Admin-pinned hasLoadingDock must survive sync");
-    // … but the raw UEX mirror column tracks what UEX actually said this sweep, so the
-    // admin UI can render "UEX: Nein" next to an admin-pinned "Yes" button.
     assertFalse(
         cap.getValue().getUexHasLoadingDock(),
         "Raw UEX mirror column must be written even when the override is active");
@@ -707,10 +654,6 @@ class UexUniverseSyncServiceTest {
 
   @Test
   void syncTerminals_stampsUexSyncedAt_andMirrorsRawValues() {
-    // Sweep must write the raw mirror columns + the per-row timestamp on every visit,
-    // independently of any override flag. The admin terminals page reads these three
-    // fields verbatim, so a regression that gates them behind an override would silently
-    // blank the "UEX: …" chip and the "Letzter UEX-Sync" header for the next sweep.
     java.time.Instant before = java.time.Instant.now();
 
     UexTerminalDto dto =
@@ -733,9 +676,6 @@ class UexUniverseSyncServiceTest {
 
   @Test
   void syncTerminals_recordsNullUexMirror_whenUpstreamFieldsAreNull() {
-    // Defensive: UEX has historically dropped fields rather than emit a default. The
-    // raw mirror column is allowed to go to NULL so the admin UI can show "—" instead
-    // of inferring a false value that was never reported.
     UexTerminalDto dto = UexTerminalDto.builder().id(82).name("Empty Terminal").build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
     when(terminalRepository.findByIdTerminal(82)).thenReturn(Optional.empty());

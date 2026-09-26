@@ -122,7 +122,6 @@ class BankPageControllerTest {
 
   @Test
   void dashboard_ShouldScaleSparklineIntoPolylinePoints() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -135,20 +134,15 @@ class BankPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(dashboard);
 
-    // When
     String view = controller.dashboard(null, null, null, model);
 
-    // Then
     assertEquals("bank-dashboard", view);
     List<BankDashboardViewAssembler.BankDashboardCardView> cards =
         (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
     assertEquals(1, cards.size());
-    // Rising series: first point at the padded bottom (y=24), last at the padded top (y=2).
     assertEquals("0.0,24.0 96.0,2.0", cards.get(0).sparklinePoints());
     assertFalse(cards.get(0).flat());
-    // #1193 follow-up: the dashboard's booking-modal counterparty picker is server-side searched
-    // (remote-bank-users), so the full-page render must NOT preload the all-users roster.
     verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
     assertNull(
         model.getAttribute("users"), "no user roster is preloaded for the counterparty picker");
@@ -156,7 +150,6 @@ class BankPageControllerTest {
 
   @Test
   void dashboard_ShouldRenderFlatSeriesAsMidLine() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -166,10 +159,8 @@ class BankPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(dashboard);
 
-    // When
     controller.dashboard(null, null, null, model);
 
-    // Then
     List<BankDashboardViewAssembler.BankDashboardCardView> cards =
         (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
@@ -179,17 +170,14 @@ class BankPageControllerTest {
 
   @Test
   void dashboard_ShouldHandleEmptySparklineAndNullDashboard() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(new BankDashboardDto(false, List.of(dashboardAccount(List.of())), null));
 
-    // When
     controller.dashboard(null, null, null, model);
 
-    // Then
     List<BankDashboardViewAssembler.BankDashboardCardView> cards =
         (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
@@ -199,7 +187,6 @@ class BankPageControllerTest {
 
   @Test
   void dashboard_ShouldSortCardsAlphabeticallyByName() {
-    // Given — backend returns cards ordered by account number, names out of alphabetical order.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -214,10 +201,8 @@ class BankPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(dashboard);
 
-    // When
     controller.dashboard(null, null, null, model);
 
-    // Then — cards are ordered case-insensitively by account name, not by account number.
     List<BankDashboardViewAssembler.BankDashboardCardView> cards =
         (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
@@ -228,7 +213,6 @@ class BankPageControllerTest {
 
   @Test
   void dashboard_byBereich_groupsAccountsWithColouredHeadersInOrder() {
-    // Given — one account of each grouping-relevant shape, out of display order.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -248,11 +232,8 @@ class BankPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(dashboard);
 
-    // When
     String view = controller.dashboard("card", "bereich", null, model);
 
-    // Then — groups render in the fixed order: KRT rubric, Bereich groups, Sonderkonten, Ohne
-    // Bereich, Geschlossen; each Bereich group leads with its AREA account and is colour-classed.
     assertEquals("bank-dashboard", view);
     assertEquals("bereich", model.getAttribute("group"));
     List<BankDashboardViewAssembler.BankDashboardGroupView> groups =
@@ -274,17 +255,14 @@ class BankPageControllerTest {
 
   @Test
   void dashboard_tableFragment_resolvesGridFragmentAndCarriesNoGroupsInAlphaMode() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(new BankDashboardDto(true, List.of(), null));
 
-    // When
     String view = controller.dashboard("table", "alpha", "bankGrid", model);
 
-    // Then — the toggle swap re-renders only the switchable grid; alphabetical mode has no groups.
     assertEquals("bank-dashboard :: bankGrid", view);
     assertEquals("table", model.getAttribute("layout"));
     assertEquals("alpha", model.getAttribute("group"));
@@ -293,7 +271,6 @@ class BankPageControllerTest {
 
   @Test
   void accountDetail_ShouldNotPreloadTransferTargetRoster_AndFiltersActiveHolders() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -336,12 +313,8 @@ class BankPageControllerTest {
             eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))
         .thenReturn(new BankTransferFeeRateDto(new BigDecimal("0.005")));
 
-    // When
     String view = controller.accountDetail(accountId, null, null, null, null, null, null, model);
 
-    // Then: the transfer-destination picker is a server-side account-search combobox now
-    // (remote-bank-accounts, REQ-FE-017/ADR-0106), so NO transfer-target roster is preloaded and no
-    // account list is fetched; active holders still exclude the deactivated one (ADR-0039).
     assertEquals("bank-account-detail", view);
     assertNull(
         model.getAttribute("transferTargets"),
@@ -355,17 +328,12 @@ class BankPageControllerTest {
     List<BankHolderDto> holders = (List<BankHolderDto>) model.getAttribute("holders");
     assertNotNull(holders);
     assertEquals(2, holders.size(), "the full registry is offered for the payer/source selects");
-    // paginationBaseUrl now carries the booking-history period so paging keeps the filter
-    // (REQ-BANK-051).
     assertTrue(
         model
             .getAttribute("paginationBaseUrl")
             .toString()
             .startsWith("/bank/accounts/" + accountId + "?from="));
-    // The transfer-fee rate feeds the withdraw/transfer modals' live fee preview (REQ-BANK-033).
     assertEquals(new BigDecimal("0.005"), model.getAttribute("transferFeeRate"));
-    // #1193 follow-up: the deposit/withdrawal counterparty picker is a server-side searchable
-    // combobox now (remote-bank-users), so the detail render must NOT preload the all-users roster.
     verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
     assertNull(
         model.getAttribute("users"), "no user roster is preloaded for the counterparty picker");
@@ -373,7 +341,6 @@ class BankPageControllerTest {
 
   @Test
   void accountDetail_ShouldHandleEmptyListsOnZeroBalance() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -399,22 +366,14 @@ class BankPageControllerTest {
         .thenReturn(detail);
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
-    // When
     controller.accountDetail(accountId, -3, null, null, null, null, null, model);
 
-    // Then — the transfer destination searches on demand (no roster attribute); holders degrade to
-    // an empty list.
     assertNull(model.getAttribute("transferTargets"));
     assertEquals(List.of(), model.getAttribute("activeHolders"));
   }
 
-  // covers REQ-FE-002 — an AJAX swap request (fragment=bookings) renders only the booking-history
-  // fragment and fetches ONLY the transactions page: the account-detail, holders and accounts
-  // round-trips the full page does are skipped, and the model carries just bookings +
-  // paginationBaseUrl.
   @Test
   void accountDetail_fragmentBookings_rendersOnlyBookingsFragment_andSkipsOtherFetches() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -423,10 +382,8 @@ class BankPageControllerTest {
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
     when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
 
-    // When
     String view = controller.accountDetail(accountId, 2, null, null, null, null, "bookings", model);
 
-    // Then
     assertEquals("bank-account-detail :: bookings", view);
     assertEquals(bookings, model.getAttribute("bookings"));
     assertTrue(
@@ -434,19 +391,13 @@ class BankPageControllerTest {
             .getAttribute("paginationBaseUrl")
             .toString()
             .startsWith("/bank/accounts/" + accountId + "?from="));
-    // The fragment path must not load the account detail, holder registry or accounts list.
     verify(backendApiClient, never())
         .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
     verify(backendApiClient, never()).get(eq("/api/v1/bank/holders"), anyTypeRef());
   }
 
-  // covers REQ-FE-005 (#579) — an in-place money-write re-render (fragment=accountBody) returns the
-  // whole account body fragment with the SAME full model the page builds (detail, holders,
-  // transferTargets, distributionPercents, bookings) so balance, distribution AND the modals'
-  // distribution-derived holder selects all refresh from one swap.
   @Test
   void accountDetail_fragmentAccountBody_rendersBodyFragment_withFullModel() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -481,16 +432,10 @@ class BankPageControllerTest {
                 new BankHolderDto(
                     holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
 
-    // When
     String view =
         controller.accountDetail(accountId, null, null, null, null, null, "accountBody", model);
 
-    // Then
     assertEquals("bank-account-detail :: accountBody", view);
-    // The accountBody fragment needs the FULL model (unlike the bookings-only fragment): detail,
-    // the holder registry for the modals' selects and bookings must all be present. The transfer
-    // destination is a server-side account-search combobox now (remote-bank-accounts), so no
-    // transfer-target roster is preloaded.
     assertNotNull(model.getAttribute("detail"));
     assertNotNull(model.getAttribute("activeHolders"));
     assertNotNull(model.getAttribute("holders"));
@@ -498,11 +443,8 @@ class BankPageControllerTest {
     assertNotNull(model.getAttribute("bookings"));
   }
 
-  // covers REQ-BANK-032 — the holder detail page loads the holder header and the first history
-  // page, exposing them plus the holder-scoped pagination base url to the template.
   @Test
   void holderDetail_ShouldLoadHolderAndFirstHistoryPage() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -516,22 +458,16 @@ class BankPageControllerTest {
         .thenReturn(holder);
     when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
 
-    // When
     String view = controller.holderDetail(holderId, null, null, model);
 
-    // Then
     assertEquals("bank-holder-detail", view);
     assertEquals(holder, model.getAttribute("holder"));
     assertEquals(bookings, model.getAttribute("bookings"));
     assertEquals("/bank/holders/" + holderId, model.getAttribute("paginationBaseUrl"));
   }
 
-  // covers REQ-FE-002 — the holder-history pager swap (fragment=holderBookings) renders only the
-  // history fragment and fetches ONLY the transactions page; the holder header round-trip is
-  // skipped.
   @Test
   void holderDetail_fragmentHolderBookings_rendersOnlyFragment_andSkipsHeaderFetch() {
-    // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -540,10 +476,8 @@ class BankPageControllerTest {
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
     when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
 
-    // When
     String view = controller.holderDetail(holderId, 2, "holderBookings", model);
 
-    // Then
     assertEquals("bank-holder-detail :: holderBookings", view);
     assertEquals(bookings, model.getAttribute("bookings"));
     assertEquals("/bank/holders/" + holderId, model.getAttribute("paginationBaseUrl"));

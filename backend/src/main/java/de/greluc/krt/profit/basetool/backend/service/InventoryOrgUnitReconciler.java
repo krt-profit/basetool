@@ -35,28 +35,16 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Keeps an inventory entry's {@code owning_org_unit} stamp consistent with its owner's org-unit
- * membership. It reacts to the two boundary transitions the product owner chose to auto-sync:
+ * Keeps the {@code owning_org_unit} stamp of a user's shared inventory in line with their org-unit
+ * membership.
  *
  * <ul>
- *   <li><b>First membership gained</b> (membershipless → member of exactly one org unit): the
- *       owner's ownerless-personal shared rows ({@code personal = false}, {@code owning_org_unit IS
- *       NULL}) adopt that org unit so they surface in its Lager-View.
- *   <li><b>Last membership lost</b> (member → membershipless): the owner's org-stamped shared rows
- *       fall back to ownerless-personal ({@code owning_org_unit = NULL}), owner-visible only.
+ *   <li>First membership gained: ownerless shared rows adopt that org unit.
+ *   <li>Last membership lost: org-stamped shared rows fall back to {@code NULL}.
  * </ul>
  *
- * <p>Both transitions <em>only re-stamp</em> {@code owning_org_unit}; they never merge rows. Two
- * rows that become identical after a re-stamp (for example stock from two org units both demoted to
- * {@code NULL}) stay separate — inventory is append-only and the Lager view collapses same-identity
- * rows for display (group-on-read, see {@code InventoryItemService.aggregateInventoryItems}).
- * Private inventory ({@code personal = true}) is never touched: it is owner-only regardless of org
- * unit.
- *
- * <p>Every method requires an already-open transaction ({@link Propagation#MANDATORY}) because it
- * runs as part of the membership-mutation transaction in {@link OrgUnitMembershipService}, so the
- * re-stamp commits atomically with the membership change and a rollback there also rolls back the
- * inventory re-stamp.
+ * <p>Rows are only re-stamped, never merged; private stock is never touched. Every method requires
+ * an open transaction ({@link Propagation#MANDATORY}) from {@link OrgUnitMembershipService}.
  */
 @Slf4j
 @Service
@@ -67,12 +55,11 @@ public class InventoryOrgUnitReconciler {
   private final AuditService auditService;
 
   /**
-   * Reacts to a user gaining their <em>first</em> org-unit membership by promoting their
-   * ownerless-personal shared inventory ({@code owning_org_unit IS NULL}) to {@code firstOrgUnit},
-   * so it appears in that org unit's Lager-View.
+   * Moves the user's ownerless shared inventory into their first org unit so it appears in its
+   * Lager view.
    *
-   * @param userId the owner whose shared inventory to promote; never {@code null}.
-   * @param firstOrgUnit the single org unit the user just joined; never {@code null}.
+   * @param userId the owner whose shared inventory to promote; never {@code null}
+   * @param firstOrgUnit the org unit the user just joined; never {@code null}
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void onUserGainedFirstOrgUnit(@NotNull UUID userId, @NotNull OrgUnit firstOrgUnit) {
@@ -90,12 +77,10 @@ public class InventoryOrgUnitReconciler {
   }
 
   /**
-   * Reacts to a user losing their <em>last</em> org-unit membership by demoting their org-stamped
-   * shared inventory back to ownerless-personal ({@code owning_org_unit = NULL}), visible only to
-   * the owner. Rows that become identical after the demotion stay separate; the Lager view groups
-   * them for display (group-on-read).
+   * Resets the user's org-stamped shared inventory to ownerless ({@code owning_org_unit = NULL}),
+   * visible only to the owner.
    *
-   * @param userId the owner whose shared inventory to demote; never {@code null}.
+   * @param userId the owner whose shared inventory to demote; never {@code null}
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void onUserLostLastOrgUnit(@NotNull UUID userId) {
@@ -111,18 +96,13 @@ public class InventoryOrgUnitReconciler {
   }
 
   /**
-   * Re-stamps the user's non-personal inventory in place: when {@code demoteAllToNull} is {@code
-   * true} every org-stamped row drops to {@code NULL}; otherwise every {@code NULL}-org row adopts
-   * {@code newOrgForOwnerlessRows}. Rows are never merged — append-only inventory keeps every row
-   * and the Lager view collapses same-identity rows for display. Relies on Hibernate dirty checking
-   * for the changed rows, so no explicit {@code save} is needed.
+   * Re-stamps the user's non-personal inventory in place via dirty checking, without merging rows.
    *
-   * @param userId the owner whose inventory to reconcile.
-   * @param newOrgForOwnerlessRows the org unit to stamp on {@code NULL}-org rows (ignored when
-   *     demoting).
-   * @param demoteAllToNull {@code true} to clear every org stamp, {@code false} to promote only the
-   *     {@code NULL}-org rows.
-   * @return the number of rows actually re-stamped (0 when nothing changed)
+   * @param userId the owner whose inventory to reconcile
+   * @param newOrgForOwnerlessRows the org unit for {@code NULL}-org rows (ignored when demoting)
+   * @param demoteAllToNull {@code true} to clear every org stamp, {@code false} to promote only
+   *     {@code NULL}-org rows
+   * @return the number of rows re-stamped
    */
   private int restamp(
       UUID userId, @Nullable OrgUnit newOrgForOwnerlessRows, boolean demoteAllToNull) {

@@ -47,14 +47,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Pins the holder live-display-name resolution (REQ-BANK-003) against the real Testcontainers
- * PostgreSQL: every bank surface shows the linked user's <em>current</em> effective name — display
- * name preferred, username only as fallback — rather than the {@code handle} snapshot frozen at
- * registration, and falls back to the snapshot only once the user is deleted. Covers both the
- * interactive registry read ({@link BankHolderService#getHolders()}) and a historical surface (the
- * account statement PDF, fed by the live holder-leg projection), so the {@code CASE} resolution in
- * the JPQL projections and the entity-level {@link BankHolder#getDisplayName()} are exercised on a
- * real database, not just mocked.
+ * Integration tests against real Postgres verifying that bank surfaces show a holder's current
+ * effective name, falling back to the stored handle once the user is deleted (REQ-BANK-003).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -72,7 +66,6 @@ class BankHolderLiveDisplayNameTest {
   void getHolders_prefersLiveDisplayName_reflectsRenames_andFallsBackToSnapshotForDeletedUser() {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
 
-    // Alice starts without a display name; her holder's snapshot is therefore the username.
     String aliceUsername = "alice-un-" + suffix;
     User alice = newUser(aliceUsername, null);
     BankHolder aliceHolder = newHolder(alice, alice.getEffectiveName());
@@ -81,7 +74,6 @@ class BankHolderLiveDisplayNameTest {
         handleOf(aliceHolder.getId()),
         "with no display name the registry shows the username");
 
-    // Renaming Alice must be reflected live — the row no longer shows the frozen snapshot.
     String aliceDisplay = "alice-disp-" + suffix;
     alice.setDisplayName(aliceDisplay);
     userRepository.save(alice);
@@ -90,7 +82,6 @@ class BankHolderLiveDisplayNameTest {
         handleOf(aliceHolder.getId()),
         "the registry reflects the user's current display name, not the registration snapshot");
 
-    // Bob has a display name from the start: it is preferred over the username.
     User bob = newUser("bob-un-" + suffix, "bob-disp-" + suffix);
     BankHolder bobHolder = newHolder(bob, bob.getEffectiveName());
     assertEquals(
@@ -98,7 +89,6 @@ class BankHolderLiveDisplayNameTest {
         handleOf(bobHolder.getId()),
         "the display name is preferred over the username");
 
-    // A holder whose user is gone keeps showing the deletion-proof snapshot.
     String ghostSnapshot = "ghost-snap-" + suffix;
     BankHolder ghostHolder = newHolder(null, ghostSnapshot);
     assertEquals(
@@ -110,7 +100,6 @@ class BankHolderLiveDisplayNameTest {
   @Test
   void statement_showsLiveDisplayName_notTheRegistrationSnapshot() throws IOException {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
-    // Carol's holder snapshot is the username; she gets a display name afterwards.
     String carolUsername = "cu-" + suffix;
     String carolDisplay = "cd-" + suffix;
     User carol = newUser(carolUsername, null);
@@ -147,9 +136,6 @@ class BankHolderLiveDisplayNameTest {
     user.setDisplayName(display);
     userRepository.save(user);
 
-    // getHolder() loads the row via findById and resolves the name through the lazy user proxy
-    // inside its read transaction — the holder-detail header must show the current display name
-    // (this also guards against a regression that drops the surrounding read transaction).
     assertEquals(display, bankHolderService.getHolder(holder.getId()).handle());
   }
 
@@ -163,8 +149,6 @@ class BankHolderLiveDisplayNameTest {
     user.setDisplayName(display);
     userRepository.save(user);
 
-    // A non-zero global balance so the holder appears in the report's HALTERBESTAND GESAMT section
-    // (fed by the live holderTotals() CASE projection).
     BankAccount account = newAccount("Live Name Report Konto " + UUID.randomUUID());
     bankLedgerService.bookDeposit(
         new BankDepositRequest(account.getId(), holder.getId(), new BigDecimal("500"), null));

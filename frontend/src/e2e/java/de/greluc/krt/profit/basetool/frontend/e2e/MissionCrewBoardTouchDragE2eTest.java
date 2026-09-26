@@ -37,23 +37,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: on a touch device a mission participant can be dragged from the "Ohne Einheit"
- * pool into a unit by pressing and holding the row (#1936, REQ-MISSION-005).
+ * Verifies that on a touch device a participant can be dragged from the "Ohne Einheit" pool into a
+ * unit by press-and-hold (REQ-MISSION-005).
  *
- * <p>Regression coverage for the reported defect: no mobile browser synthesises {@code dragstart}
- * from touch input, so the crew board's whole drag half was inert on a phone and the long press
- * raised the browser's own context menu instead. The board therefore carries a second,
- * pointer-based drag for touch and pen, plus the CSS that keeps the browser's long-press behaviour
- * out of the way.
- *
- * <p><b>What this proves and what it cannot.</b> The gesture is driven with synthetic {@code
- * PointerEvent}s, which exercise the board's own state machine end to end — hold, activation, the
- * {@code elementFromPoint} hit-test, the drop, and the backend write it triggers. What no automated
- * browser test can reach is the platform behaviour underneath: that Android really does withhold
- * its context menu and that the page really stops scrolling under the finger. The CSS half is
- * asserted as computed style and the board's own {@code preventDefault} as a cancelled event, which
- * is the closest a headless engine gets; the platform's reaction to them still needs a human with a
- * phone.
+ * <p>Synthetic {@code PointerEvent}s drive the board's own drag logic end to end; the platform's
+ * native long-press and scroll behaviour is asserted only indirectly, as computed style and a
+ * cancelled event.
  */
 @Tag("e2e")
 class MissionCrewBoardTouchDragE2eTest {
@@ -67,7 +56,7 @@ class MissionCrewBoardTouchDragE2eTest {
   /** The unit the held participant is dropped into. */
   private static final String UNIT = "E2E Touch Drag Unit";
 
-  /** Phone class of REQ-UI-009, the class the reported defect was seen on. */
+  /** Phone viewport width of REQ-UI-009. */
   private static final int PHONE_WIDTH = 375;
 
   private static final int PHONE_HEIGHT = 812;
@@ -97,8 +86,6 @@ class MissionCrewBoardTouchDragE2eTest {
       String userId = seeder.getUserId(USERNAME, PASSWORD);
       missionId = seeder.createMission(USERNAME, PASSWORD, "E2E Touch Drag Mission", true);
       seeder.addRegisteredParticipant(USERNAME, PASSWORD, missionId, userId);
-      // A unit's responsible person is a separate field from its crew, so the participant stays
-      // in the pool and the unit's drop zone starts empty — which is the state under test.
       seeder.addUnitWithResponsible(USERNAME, PASSWORD, missionId, UNIT, userId);
     }
   }
@@ -126,8 +113,6 @@ class MissionCrewBoardTouchDragE2eTest {
           assertThat(page.locator("#board-pool .person-row")).hasCount(1);
           assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(0);
 
-          // Press and hold the pool row. The board arms its drag after 320 ms of a stationary
-          // finger; until then the same gesture is a scroll.
           page.evaluate(
               """
               () => {
@@ -141,8 +126,6 @@ class MissionCrewBoardTouchDragE2eTest {
               """);
           page.waitForTimeout(HOLD_WAIT_MS);
 
-          // ...then drag onto the unit zone and release there. The hint box is targeted rather
-          // than the zone's own centre because it is always inside the zone and always painted.
           page.evaluate(
               """
               () => {
@@ -160,8 +143,6 @@ class MissionCrewBoardTouchDragE2eTest {
               }
               """);
 
-          // The drop writes crew and re-renders the pane in place (no reload), so both counts
-          // flip. Web-first assertions carry their own wait for that swap.
           assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(1);
           assertThat(page.locator("#board-pool .person-row")).hasCount(0);
         });
@@ -191,17 +172,11 @@ class MissionCrewBoardTouchDragE2eTest {
                         };
                       }
                       """);
-          // Asserted by substring, not equality: the load-bearing part is that the row concedes
-          // vertical panning (a swipe still scrolls the board) while giving up the rest, and
-          // engines are free to serialise the shorthand's remainder differently.
           assertTrue(
               String.valueOf(style.get("touchAction")).contains("pan-y"),
               "row touch-action keeps vertical panning, was: " + style.get("touchAction"));
           assertEquals("none", style.get("userSelect"), "row user-select");
 
-          // The board cancels the platform's context menu for as long as a touch press on a row
-          // is live. Dispatched here in the same order the platform produces it: the press first,
-          // the menu on top of it.
           Object prevented =
               page.evaluate(
                   """
@@ -240,8 +215,6 @@ class MissionCrewBoardTouchDragE2eTest {
                 .setIgnoreHTTPSErrors(true)
                 .setStorageStatePath(storageState)
                 .setViewportSize(PHONE_WIDTH, PHONE_HEIGHT)
-                // isMobile is deliberately not set: Firefox rejects it outright, and nothing here
-                // depends on the meta viewport being honoured.
                 .setHasTouch(true))) {
       Page page = context.newPage();
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");

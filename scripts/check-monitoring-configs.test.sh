@@ -4,21 +4,6 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
-# Regression tests for scripts/check-monitoring-configs.sh.
-#
-# Copies monitoring/ and docker-compose.monitoring.yml into a throwaway directory, breaks ONE
-# configuration at a time, and asserts that the checker fails and names the check that caught it.
-# A validation step that was never seen failing is a claim, not a check -- `alloy validate` is the
-# standing example: it exits 0 on a broken file, so a gate on its exit code passes everything.
-#
-# Needs docker (the checks run the components' own images), python3 with PyYAML, and envsubst.
-#
-# Usage:
-#   scripts/check-monitoring-configs.test.sh
-#
-# The fixtures are BROKEN ON PURPOSE. The last case runs the checker against the repository's own
-# files, so a checker reduced to "exit 0" -- or one that stopped finding the files -- cannot pass.
 
 set -euo pipefail
 
@@ -31,8 +16,6 @@ tests_failed=0
 LAST_OUTPUT=""
 LAST_STATUS=0
 
-# Prints the root of a fresh copy of the monitoring configuration. Readable by the images' users
-# (nobody, loki), as the repository checkout is.
 fixture() {
   local root
   root="$(mktemp -d)"
@@ -64,8 +47,6 @@ record() {
   fi
 }
 
-# expect_only_failure <check name> <description>: the run failed, the named check failed, and no
-# OTHER check did -- so each fixture proves its own check, not a neighbour's.
 expect_only_failure() {
   local name="$1" desc="$2" other bad=0
   if [[ "$LAST_STATUS" -eq 0 || "$LAST_OUTPUT" != *"::error title=monitoring-configs::${name} failed"* ]]; then
@@ -83,14 +64,12 @@ expect_only_failure() {
 
 echo "check-monitoring-configs self-tests"
 
-# 1. prometheus.yml with a key Prometheus does not know.
 root="$(fixture)"
 printf '\nno_such_top_level_key: true\n' >> "${root}/monitoring/prometheus/prometheus.yml"
 run_checker "$root"
 expect_only_failure "prometheus: promtool check config" "an unknown key in prometheus.yml fails promtool"
 rm -rf "$root"
 
-# 2. prometheus.yml is valid, but a rule file it loads is not -- check config must follow rule_files.
 root="$(fixture)"
 printf 'groups:\n  - name: broken\n    rules:\n      - alert: Broken\n        expr: up ==\n' \
   > "${root}/monitoring/prometheus/alerts/zz-broken.yml"
@@ -98,7 +77,6 @@ run_checker "$root"
 expect_only_failure "prometheus: promtool check config" "a broken rule file under alerts/ fails check config"
 rm -rf "$root"
 
-# 3. Alertmanager route naming a receiver that does not exist.
 root="$(fixture)"
 sed -i 's/^\(  receiver:\) .*/\1 no-such-receiver/' "${root}/monitoring/alertmanager/alertmanager.yml.tmpl"
 run_checker "$root"
@@ -106,7 +84,6 @@ expect_only_failure "alertmanager: amtool check-config (rendered template)" \
   "a route to an undefined receiver fails amtool"
 rm -rf "$root"
 
-# 4. A placeholder the documented render does not set -- it would render empty on the host.
 root="$(fixture)"
 typo="\${SMTP_FROM_TYPO}"
 sed -i "s|^\(  smtp_from:\) .*|\1 '${typo}'|" "${root}/monitoring/alertmanager/alertmanager.yml.tmpl"
@@ -120,16 +97,12 @@ else
 fi
 rm -rf "$root"
 
-# 5. Alloy config that is not in canonical format.
 root="$(fixture)"
 sed -i '0,/^\([a-z]\)/s//    \1/' "${root}/monitoring/alloy/config.alloy"
 run_checker "$root"
 expect_only_failure "alloy: fmt --test" "a mis-indented config.alloy fails alloy fmt --test"
 rm -rf "$root"
 
-# 6. Alloy config forwarding to a component that does not exist: `alloy validate` prints an error
-# and EXITS 0 -- this is the case a gate on its exit code would pass. The edit keeps the file
-# canonically formatted, so only validate may catch it.
 root="$(fixture)"
 sed -i '0,/forward_to = \[loki\.write\.default\.receiver\]/s//forward_to = [loki.write.no_such_writer.receiver]/' \
   "${root}/monitoring/alloy/config.alloy"
@@ -137,21 +110,18 @@ run_checker "$root"
 expect_only_failure "alloy: validate (empty output)" "an unknown Alloy component fails validate despite exit 0"
 rm -rf "$root"
 
-# 7. Loki config with a key Loki does not know.
 root="$(fixture)"
 printf '\nno_such_top_level_key: true\n' >> "${root}/monitoring/loki/loki-config.yml"
 run_checker "$root"
 expect_only_failure "loki: -verify-config" "an unknown key in loki-config.yml fails -verify-config"
 rm -rf "$root"
 
-# 8. An image pin without a digest is refused before anything runs against it.
 root="$(fixture)"
 sed -i 's|\(image: grafana/loki:[^@]*\)@sha256:[0-9a-f]*|\1|' "${root}/docker-compose.monitoring.yml"
 run_checker "$root"
 expect_only_failure "loki: -verify-config" "a tag-only image pin is refused"
 rm -rf "$root"
 
-# 9. The repository itself.
 set +e
 LAST_OUTPUT="$(bash "$CHECKER" 2>&1)"
 LAST_STATUS=$?

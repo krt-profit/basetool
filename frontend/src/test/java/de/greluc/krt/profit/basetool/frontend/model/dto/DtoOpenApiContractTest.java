@@ -47,20 +47,9 @@ import tools.jackson.databind.json.JsonMapper;
  * Contract test pinning the frontend DTO mirror records against the backend's committed OpenAPI
  * document ({@code backend/src/main/resources/api/openapi.json}).
  *
- * <p>The frontend hand-mirrors every backend response DTO as its own record and decodes the
- * WebClient JSON straight into it. When a backend DTO field is renamed or removed, the build stays
- * green in both modules — the mismatch only surfaces at render time in production as a {@code 500}
- * (the field silently deserialises to {@code null}, or a downstream template dereferences a name
- * the payload no longer carries). This test closes that gap at CI time: for every frontend record
- * in {@code model.dto} whose simple name matches an OpenAPI schema, it asserts that each record
- * component exists as a property of that schema.
- *
- * <p>Direction is deliberate — the check is {@code frontend components ⊆ schema properties}: a
- * field the API no longer emits fails the build (the drift bug), while a field the API newly adds
- * does not (the frontend may legitimately ignore it). Records with no same-named schema (request
- * bodies, frontend-only view models) are skipped, as are schemas without a {@code properties}
- * object (enums, {@code allOf} compositions). A floor on the number of matched records guards
- * against the name-matching silently degrading to "nothing checked".
+ * <p>For every record in {@code model.dto} with a same-named schema, each component must exist as a
+ * schema property; new API fields are allowed. Records without a schema and schemas without {@code
+ * properties} are skipped, and a floor on matched records guards against checking nothing.
  */
 class DtoOpenApiContractTest {
 
@@ -82,14 +71,8 @@ class DtoOpenApiContractTest {
   private static final int MIN_MATCHED_ENUMS = 1;
 
   /**
-   * Known PRE-EXISTING mirror drifts: a frontend record component the backend OpenAPI schema does
-   * not declare (so it always deserialises to {@code null}). Entries are allowlisted so the gate
-   * stays green and BLOCKING for any *new* drift; each is tech-debt to resolve — remove the dead
-   * field from the mirror, or have the backend emit it — and this map must shrink, never grow.
-   *
-   * <p>Now empty: the three drifts recorded when the test was introduced ({@code
-   * MaterialDto.idCommodity}, {@code MissionCrewDto.version}, {@code RefineryGoodDto.version}) have
-   * been resolved by dropping the dead fields from the frontend mirrors.
+   * Allowlist of known mirror drifts (frontend components the schema does not declare); currently
+   * empty, and it must never grow.
    */
   private static final Map<String, Set<String>> KNOWN_PREEXISTING_DRIFT = Map.of();
 
@@ -112,8 +95,6 @@ class DtoOpenApiContractTest {
       JsonNode schema = schemas.path(record.getSimpleName());
       JsonNode properties = schema.path("properties");
       if (schema.isMissingNode() || properties.isMissingNode() || !properties.isObject()) {
-        // No same-named schema, or a schema without a flat property map (enum / allOf). Nothing to
-        // assert against — these are intentionally out of scope (see class Javadoc).
         continue;
       }
       matched++;
@@ -140,19 +121,9 @@ class DtoOpenApiContractTest {
   }
 
   /**
-   * Builds one dynamic test per matched frontend mirror enum, asserting the mirror declares every
-   * constant the backend OpenAPI schema can emit for that enum.
-   *
-   * <p>This complements {@link #frontendDtoComponentsExistInOpenApiSchema()} (which only checks
-   * record <em>field names</em> and deliberately skips enum schemas): an enum value the backend can
-   * send but the frontend mirror lacks is strictly worse than a missing field — Jackson rejects the
-   * unknown constant and the <em>entire</em> response fails to deserialise (a hard {@code 500}, not
-   * a silent {@code null}). This is exactly the {@code OrgUnitKind} drift that broke {@code
-   * /organisation/leitung} once the Leitung view began emitting {@code BEREICH} / {@code
-   * ORGANISATIONSLEITUNG}.
-   *
-   * <p>Direction is {@code schema.enum ⊆ mirror constants}: a value the API emits but the mirror
-   * lacks fails the build; a mirror-only extra constant is harmless and ignored.
+   * Builds one dynamic test per matched frontend mirror enum, asserting it declares every constant
+   * the backend OpenAPI schema can emit, since an unknown constant fails deserialization of the
+   * whole response. Extra mirror-only constants are ignored.
    *
    * @return the per-enum coverage checks followed by the match-count guard
    * @throws IOException never (wrapped); see {@link #loadSchemas()}
@@ -166,15 +137,6 @@ class DtoOpenApiContractTest {
 
     for (Class<?> type : frontendDtoEnums()) {
       Set<String> mirror = enumConstantNames(type);
-      // SpringDoc inlines enum types into each using property (no shared component schema), so
-      // match
-      // by value rather than by name: the backend enum this mirror reflects is an inline enum set
-      // that contains every mirror constant. Prefer an EXACT match first — a complete mirror of a
-      // small backend enum whose values happen to be a subset of a larger one (e.g.
-      // InventoryAllocationDimension {JOB_ORDER, MISSION} ⊂ AuditDomain) must bind to its own enum,
-      // not the superset — then fall back to the largest superset, so an INCOMPLETE mirror of a
-      // bigger enum still fails the coverage assert. No superset ⇒ the mirror reflects no emitted
-      // enum (request-only / frontend-only view model) ⇒ nothing to assert against.
       Set<String> backend =
           backendEnums.stream()
               .filter(mirror::equals)
@@ -278,13 +240,11 @@ class DtoOpenApiContractTest {
   }
 
   /**
-   * Walks the whole OpenAPI document and collects the value set of every inline string {@code enum}
-   * array — SpringDoc inlines enum types into each using property rather than emitting a shared
-   * component schema, so this is how a mirror enum is matched to the backend enum it reflects.
+   * Collects the value set of every inline string {@code enum} in the OpenAPI document, since
+   * SpringDoc inlines enums instead of emitting shared component schemas.
    *
    * @param root the OpenAPI document root
-   * @return one set per inline string enum found (duplicates retained; matching dedupes by
-   *     superset)
+   * @return one set per inline string enum found, duplicates retained
    */
   private static List<Set<String>> collectStringEnums(JsonNode root) {
     List<Set<String>> sink = new ArrayList<>();
@@ -316,10 +276,9 @@ class DtoOpenApiContractTest {
   }
 
   /**
-   * Resolves the JSON property name a record component serialises to: the {@code @JsonProperty}
-   * value on the backing field when present and non-empty, otherwise the component's own name. Read
-   * package-agnostically (by annotation simple name) so it holds whether the annotation comes from
-   * Jackson 2 or Jackson 3.
+   * Resolves a record component's JSON property name: the non-empty {@code @JsonProperty} value on
+   * its field, matched by annotation simple name so Jackson 2 and 3 both work, else the component
+   * name.
    *
    * @param record the declaring record class
    * @param component the record component
@@ -337,7 +296,6 @@ class DtoOpenApiContractTest {
         }
       }
     } catch (ReflectiveOperationException ignored) {
-      // Fall through to the component name.
     }
     return component.getName();
   }
@@ -393,9 +351,8 @@ class DtoOpenApiContractTest {
   }
 
   /**
-   * Loads {@code components.schemas} from the backend's committed OpenAPI document, located by
-   * walking up from the working directory so the test is robust to whether Gradle runs it from the
-   * module or the root directory.
+   * Loads {@code components.schemas} from the backend's committed OpenAPI document, found by
+   * walking up from the working directory.
    *
    * @return the {@code components.schemas} node
    * @throws IOException if the spec cannot be read

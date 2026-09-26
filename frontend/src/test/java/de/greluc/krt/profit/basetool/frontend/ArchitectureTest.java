@@ -41,14 +41,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 /**
- * ArchUnit tests that enforce CLAUDE.md's "frontend never talks to PostgreSQL or Keycloak Admin API
- * directly" rule mechanically.
- *
- * <p>The frontend is supposed to be a thin Thymeleaf renderer that delegates every data access to
- * the backend via {@code BackendApiClient}; any drift towards "let me just open a JDBC connection
- * for this one widget" is exactly the kind of subtle architecture rot that's hard to spot in PR
- * review but trivial for a static check. The third rule is REQ-SEC-052's half of the same idea: a
- * controller whose only protection lives in a URL matcher two folders away.
+ * ArchUnit tests enforcing that the frontend never accesses PostgreSQL or the Keycloak Admin API
+ * directly, and that every controller carries its own gate (REQ-SEC-052).
  */
 class ArchitectureTest {
 
@@ -59,11 +53,6 @@ class ArchitectureTest {
 
   @Test
   void frontendShouldNotDependOnSpringDataJpa() {
-    // No code under `de.greluc.krt.profit.basetool.frontend.*` may reference any class
-    // from `org.springframework.data.jpa..` — that includes JpaRepository,
-    // EntityManager helpers, etc. The frontend module deliberately does not pull
-    // the spring-boot-starter-data-jpa dependency, so this check is a belt-and-
-    // suspenders guard against accidentally adding it on a hot fix.
     noClasses()
         .that()
         .resideInAPackage("de.greluc.krt.profit.basetool.frontend..")
@@ -78,9 +67,6 @@ class ArchitectureTest {
 
   @Test
   void frontendShouldNotUseJdbcDirectly() {
-    // Sibling rule to JpaRepository: the frontend must not open JDBC connections of
-    // its own either. `java.sql.Connection`/`Statement`/`PreparedStatement` are
-    // forbidden imports.
     noClasses()
         .that()
         .resideInAPackage("de.greluc.krt.profit.basetool.frontend..")
@@ -103,20 +89,8 @@ class ArchitectureTest {
   }
 
   /**
-   * REQ-SEC-052: no controller is protected <em>only</em> by a URL matcher two folders away.
-   *
-   * <p>The members-only change moved thirteen handlers out from under a {@code permitAll} rule and
-   * gave their classes a {@code @PreAuthorize("isAuthenticated()")} floor. {@code
-   * ProfileController} was missed — its three {@code isAnonymous()} guards went with the anonymous
-   * caller and nothing took their place, leaving one class in the set covered by the catch-all
-   * alone. Nothing failed, which is the point: a gap in defence in depth is invisible until the
-   * layer above it regresses.
-   *
-   * <p>The bar here is deliberately the floor and not per-handler coverage: a controller must carry
-   * at least one {@code @PreAuthorize}, on the class or on a handler. Demanding one on every method
-   * would fail on the thirty-odd controllers that gate the handlers that need a role and let the
-   * class floor cover the rest, which is a legitimate shape. What this catches is a controller with
-   * no gate anywhere — exactly the shape that was found.
+   * Verifies that every controller carries at least one {@code @PreAuthorize}, on the class or a
+   * handler, unless it is public by design (REQ-SEC-052).
    */
   @Test
   void everyControllerCarriesAGateOfItsOwn() {
@@ -151,24 +125,10 @@ class ArchitectureTest {
   }
 
   /**
-   * The controllers that answer without a session, one public path each: the landing page, the four
-   * legal pages (the licence notice of REQ-UI-021 among them), the Android App Links descriptor the
-   * platform fetches with no session at all (REQ-SEC-038), and the web app manifest a browser reads
-   * on the landing page before anyone has signed in (REQ-UI-020, ADR-0164). They are exactly the
-   * frontend {@code permitAll} entries that are served by a controller rather than by the
-   * static-asset handlers, and REQ-SEC-052 enumerates them.
-   *
-   * <p>Both descriptors are on this list for the same reason rather than as an exception: a
-   * {@code @PreAuthorize} on either would answer the platform with a redirect into OAuth, which is
-   * precisely the failure they were written to prevent. Neither exposes data — the manifest carries
-   * three localised strings, two colours and the path of an already-public icon.
+   * Verifies that every view controller opts into the layout model via {@code @UsesLayoutModel}.
    */
   @Test
   void everyViewControllerOptsIntoTheLayoutModel() {
-    // The five layout advices in `frontend.config` select on @UsesLayoutModel. A @Controller
-    // renders Thymeleaf views, so it needs the model they contribute; forgetting the marker
-    // produces a page with no org-unit context, capability flags, app title, unread count or
-    // CSRF metas rather than a compile error, so it is pinned here instead.
     List<String> unmarked =
         CLASSES.stream()
             .filter(c -> c.isAnnotatedWith(Controller.class))
@@ -184,9 +144,6 @@ class ArchitectureTest {
 
   @Test
   void noRestControllerOptsIntoTheLayoutModel() {
-    // The inverse half. A @RestController serialises through Jackson and can never read a model
-    // attribute, so marking one only buys back the backend round trips the advices cost — three
-    // of the five reach the backend. LayoutModelScopeMvcTest pins the runtime half of this.
     List<String> marked =
         CLASSES.stream()
             .filter(c -> c.isAnnotatedWith(RestController.class))
@@ -201,16 +158,9 @@ class ArchitectureTest {
   }
 
   /**
-   * Ratchet on the body-writing handlers that live inside layout controllers (FE-PERF-01).
-   *
-   * <p>{@code @ControllerAdvice} selects per controller <em>type</em>, so a {@code ResponseBody}
-   * handler in a {@code @UsesLayoutModel} class is offered the layout model although it can never
-   * render it. {@code LayoutContextLoader} now spares such a handler the backend read at runtime —
-   * unless it reads a {@code ModelAttribute} parameter — so these handlers are no longer a cost,
-   * but each one still runs the layout advices and still depends on that runtime test staying
-   * right. The count may therefore only fall: a new JSON endpoint belongs in a
-   * {@code @RestController}, which the advices never see. When a change moves handlers out, lower
-   * {@link #BODY_HANDLERS_IN_LAYOUT_CONTROLLERS} to the new count in the same change.
+   * Ratchet ensuring the number of body-writing handlers inside {@code @UsesLayoutModel}
+   * controllers never exceeds {@link #BODY_HANDLERS_IN_LAYOUT_CONTROLLERS} (FE-PERF-01). New JSON
+   * endpoints belong in a {@code @RestController}.
    */
   @Test
   void bodyWritingHandlersInLayoutControllersOnlyEverDecrease() {
@@ -236,9 +186,8 @@ class ArchitectureTest {
   }
 
   /**
-   * The number of body-writing handlers inside {@code @UsesLayoutModel} controllers when the
-   * ratchet was introduced (2026-09-23: 217, less the two catalog picker searches moved into a
-   * {@code RestController} the same day). It may only be lowered.
+   * The maximum number of body-writing handlers inside {@code @UsesLayoutModel} controllers; lower
+   * it when handlers move out, never raise it.
    */
   private static final long BODY_HANDLERS_IN_LAYOUT_CONTROLLERS = 215L;
 
@@ -258,14 +207,8 @@ class ArchitectureTest {
   }
 
   /**
-   * The controllers that carry no {@code @PreAuthorize}, each because it must answer without a
-   * session.
-   *
-   * <p>{@code AppLinkController} is the Android App Link's web-side fallback (REQ-SEC-038). It is
-   * reached only when the link did not resolve to the app, which happens to a device whose domain
-   * verification is in the sticky failed state and to any desktop browser — in both cases the
-   * member is mid-login and may hold no session at all. A gate here would redirect into the OAuth2
-   * entry point, which is the loop the route exists to break.
+   * The controllers that carry no {@code @PreAuthorize} because they must answer without a session,
+   * such as {@code AppLinkController}, the Android App Link's web-side fallback (REQ-SEC-038).
    */
   private static final Set<String> PUBLIC_BY_DESIGN =
       Set.of(

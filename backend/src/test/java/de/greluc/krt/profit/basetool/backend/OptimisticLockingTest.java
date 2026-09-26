@@ -57,28 +57,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Exercises {@link HangarService#updateShip} under real concurrent contention to verify that the
- * {@code @Version}-based optimistic-locking guard holds end to end (service-layer pre-check + JPA
- * UPDATE-WHERE-VERSION fallback).
+ * Exercises {@link HangarService#updateShip} under real concurrency: a seeded ship is updated by
+ * several threads with the same stale version, released together by a {@link CountDownLatch};
+ * exactly one wins and the rest get {@link ObjectOptimisticLockingFailureException}.
  *
- * <p>The previous incarnation of this test fetched the first row from {@code
- * shipRepository.findAll()} and updated it, then asserted only that the result was non-null — but
- * the test database (Postgres Testcontainer with Flyway-managed schema only) contains no ships, so
- * the {@code findAll()} stream resolved to {@code null} and the entire body became dead code: the
- * test always passed without ever invoking the service.
- *
- * <p>This rewrite seeds a real Ship + owner + type, then launches several worker threads that each
- * request the same update with the same stale version. A {@link CountDownLatch} barrier holds them
- * until every thread has built its DTO so the simultaneous-update race is genuine. Exactly one
- * thread must win and every other one must observe an {@link
- * ObjectOptimisticLockingFailureException} — surfaced either by the explicit version check at the
- * top of {@code updateShip} or by Hibernate's UPDATE-rows-affected-zero fallback on commit,
- * depending on which thread got to the {@code findById} first.
- *
- * <p>Intentionally <em>not</em> {@code @Transactional}: a test-managed transaction would be
- * invisible to the worker threads (each running in its own session), and the seed Ship would never
- * be readable. Per-test row-leakage into the Testcontainer Postgres is acceptable because the
- * container lives only for the duration of the Gradle run.
+ * <p>Not {@code @Transactional}, so the worker threads can see the seeded rows.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -111,10 +94,6 @@ class OptimisticLockingTest {
 
   @AfterEach
   void cleanupSeedRows() {
-    // Without an outer @Transactional we keep the rows alive across the test;
-    // siblings like ShipTypeTest assume `shipTypeRepository.findAll().get(0)`
-    // returns *their* row, so we explicitly remove our seed entities in
-    // reverse FK order (Ship -> ShipType + Membership + User) to keep them isolated.
     if (shipId != null) {
       shipRepository.deleteById(shipId);
     }
@@ -135,7 +114,6 @@ class OptimisticLockingTest {
     owner.setUsername("oltest-" + owner.getId());
     userRepository.save(owner);
     ownerId = owner.getId();
-    // Post-R9 D3 (V101): the user's Staffel link lives only in org_unit_membership.
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(owner.getId(), Squadron.IRIDIUM_ID));
     membership.setUser(owner);

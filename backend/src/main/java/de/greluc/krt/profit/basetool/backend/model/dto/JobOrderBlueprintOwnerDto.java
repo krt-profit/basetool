@@ -22,21 +22,15 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * One member row of the item job-order blueprint-coverage view: a member of the responsible org
- * unit who owns the blueprint for at least one of the order's required items, together with the
- * display names of exactly those required products they own.
+ * One member row of the item job-order blueprint-coverage view: a member owning the blueprint for
+ * at least one of the order's required items. Carries the display name only, never account
+ * identifiers.
  *
- * <p>Carries the member's display name only — never the Keycloak {@code sub} or e-mail — mirroring
- * {@link BlueprintOverviewOwnerDto}, so the view cannot leak account identifiers. The owned-product
- * list is restricted to the order's required products: a member's other blueprints are not exposed.
- *
- * @param ownerName the member's effective display name (display name, or username fallback)
- * @param ownedProductNames the display names of the order's required products this member owns the
- *     blueprint for, sorted case-insensitively; never {@code null} and never empty (members owning
- *     none of the required blueprints are omitted from the view entirely)
- * @param orgUnitMember {@code true} when this owner is a member of the order's responsible org
- *     unit; {@code false} when they appear only because they opted into global blueprint sharing
- *     (REQ-INV-018), so the UI can mark them with a discreet "not a unit member" hint
+ * @param ownerName the member's effective display name
+ * @param ownedProductNames the order's required products this member owns the blueprint for, sorted
+ *     case-insensitively; never empty
+ * @param orgUnitMember {@code false} when the owner appears only through global blueprint sharing
+ *     (REQ-INV-018)
  */
 public record JobOrderBlueprintOwnerDto(
     String ownerName, List<String> ownedProductNames, boolean orgUnitMember) {}

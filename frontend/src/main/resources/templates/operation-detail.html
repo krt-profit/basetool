@@ -24,7 +24,6 @@
 </header>
 
 <div class="page-wrapper">
-    <!--/* Sticky head (title + status pill + back), facts bar, tab nav — mirrors the mission shell. */-->
     <div class="mission-head-sticky" id="operation-head-sticky">
         <div class="mission-head">
             <div class="mission-head-title">
@@ -52,11 +51,7 @@
 
     <div class="tab-panes">
 
-        <!--/* ================= Tab 1: Übersicht ================= */-->
         <section id="pane-op-ueb" class="tab-pane" role="tabpanel" aria-labelledby="optab-ueb">
-            <!--/* AJAX live-sync fragment (REQ-FE-015): a peer's core save re-renders this block in
-                 place; the hidden #operation-head-meta span repaints the sticky header (title +
-                 status pill) that lives outside the fragment. */-->
             <div id="op-overview-results">
             <th:block th:fragment="overviewSection">
             <span id="operation-head-meta" hidden
@@ -126,7 +121,6 @@
             </div>
             <details class="hud-details krtm-margin-top-12px-4bb9" th:if="${!#strings.isEmpty(operation.description)}">
                 <summary><span th:text="#{operation.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
-                <!--/* th:utext is safe: @markdown escapes raw HTML and strips unsafe link protocols. */-->
                 <div class="markdown-content krtm-margin-top-10px-e5a6"
                      th:with="descriptionHtml=${@markdown.render(operation.description)}"
                      th:utext="${descriptionHtml}">Beschreibung</div>
@@ -135,7 +129,6 @@
             </div>
         </section>
 
-        <!--/* ================= Tab 2: Einsätze ================= */-->
         <section id="pane-op-missions" class="tab-pane" role="tabpanel" aria-labelledby="optab-missions">
             <div class="kpanel">
                 <div class="kpanel-head">
@@ -143,8 +136,6 @@
                     <a th:if="${canEdit}" th:href="@{/missions/new(operationId=${operation.id})}" class="btn btn--cta btn-xs2"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{operation.mission.add}">Einsatz hinzuf&uuml;gen</span></a>
                 </div>
                 <div class="kpanel-body">
-                    <!--/* AJAX swap target (REQ-FE-002): the embedded missions pager re-renders only this
-                         block via krtFetch (fragment=missions); the no-JS page-btn links reload the page. */-->
                     <div id="op-missions-results">
                     <th:block th:fragment="missions">
                     <div class="table-responsive">
@@ -175,12 +166,8 @@
             </div>
         </section>
 
-        <!--/* ================= Tab 3: Auszahlung ================= */-->
         <section id="pane-op-payout" class="tab-pane" role="tabpanel" aria-labelledby="optab-payout"
                  th:attr="data-operation-id=${operation.id}, data-can-unset-paid-out=${canUnsetPaidOut}">
-            <!--/* AJAX live-sync fragment (REQ-FE-015): a peer's paid-out toggle re-renders this block
-                 in place. data-operation-id / data-can-unset-paid-out stay on the outer section so
-                 they survive the swap. */-->
             <div id="op-payout-results">
             <th:block th:fragment="payoutSection">
             <div th:if="${operation.payoutPreliminary != null and operation.payoutPreliminary}"
@@ -204,9 +191,6 @@
                             </thead>
                             <tbody>
                                 <tr th:each="payout : ${operationPayouts}" th:attr="data-participant-id=${payout.participantId}">
-                                    <!--/* A null name means the account was deleted: a guest always
-                                         carries a guest name and a linked user always an effective
-                                         name, so this is unambiguous. */-->
                                     <td th:text="${payout.participantName != null ? payout.participantName : #messages.msg('mission.participant.deleted')}" class="payout-user-cell">User</td>
                                     <td th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'POINT', 2, 'COMMA')} + ' %'" sec:authorize="isAuthenticated()" class="payout-percentage-cell">0,00%</td>
                                     <td class="payout-preference-cell">
@@ -250,11 +234,7 @@
             </div>
         </section>
 
-        <!--/* ================= Tab 4: Finanzen ================= */-->
         <section id="pane-op-fin" class="tab-pane" role="tabpanel" aria-labelledby="optab-fin" sec:authorize="isAuthenticated()">
-            <!--/* AJAX live-sync fragment (REQ-FE-015): re-renders the operation finance roll-up in
-                 place. The nested financeDetail fragment below emits nothing on a section render (its
-                 guards are unset) and is still served on its own lazy per-mission GET. */-->
             <div id="op-finance-results">
             <th:block th:fragment="financeSection">
             <div class="sumstrip" th:if="${operationFinance != null}">
@@ -262,10 +242,6 @@
                 <div class="sum"><div class="sk" th:text="#{operation.finances.donations}">Gespendet</div><div class="sv donate" th:text="${operationDonationTotal != null ? #numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT') : '0'}">0</div><div class="sd">aUEC</div></div>
             </div>
             <th:block th:if="${operationFinance != null and operationFinance.missions != null and !operationFinance.missions.isEmpty()}">
-                <!--/* #1121: each mission's per-entry breakdown loads lazily on first expand via
-                     GET /operations/{id}/finance/{missionId} (injected into .op-finance-detail-body
-                     by operation-detail.js), so the full render no longer materializes every finance
-                     entry / refinery order across every child mission. */-->
                 <details class="hud-details krtm-margin-top-12px-4bb9" th:each="msnFin : ${operationFinance.missions}"
                          th:attr="data-op-finance-mission=${msnFin.missionId}">
                     <summary>
@@ -282,10 +258,6 @@
             </th:block>
             <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Missionen vorhanden.</p>
 
-            <!--/* Lazy per-mission finance breakdown fragment (#1121): rendered only for the AJAX
-                 GET /operations/{id}/finance/{missionId} request. Both inner guards are false on the
-                 full page render (financeDetail + financeDetailError unset), so this th:block emits
-                 nothing inline. */-->
             <th:block th:fragment="financeDetail">
                 <p th:if="${financeDetailError != null}" class="desc krtm-padding-top-8px-color-var-color-danger-text-81d0"
                    th:text="#{operation.finance.detail.error}">Details konnten nicht geladen werden.</p>
@@ -326,7 +298,6 @@
             </div>
         </section>
 
-        <!--/* ================= Tab 5: Verwaltung (editor-only) ================= */-->
         <section id="pane-op-verw" class="tab-pane" role="tabpanel" aria-labelledby="optab-verw">
             <div class="kpanel">
                 <div class="kpanel-head" th:text="#{operation.details}">Details</div>
@@ -349,10 +320,6 @@
                             </div>
                         </div>
 
-                        <!--/* Markdown description editor: Bearbeiten / Vorschau + formatting toolbar.
-                             The textarea stays the form field (name=description); the preview renders
-                             server-side via POST /operations/markdown-preview so it matches the saved
-                             output exactly. */-->
                         <div class="form-group" id="op-md-editor">
                             <div class="krtm-display-flex-justify-content-space-between-a-77e2">
                                 <label for="op-desc" class="krtm-margin-0-2a0c" th:text="#{operation.description}">Beschreibung</label>
@@ -382,21 +349,14 @@
             </div>
         </section>
 
-        <!--/* Section-sized inline error returned when an AJAX fragment (overview/payout/finance) fails
-             to load, so one flaky peer-refresh never injects a redirect into a swap target. Held in an
-             inert <template> (mirrors mission-detail / orders-detail) so it never shows in the normal
-             full-page render: it is a direct child of .tab-panes and is not a .tab-pane, so the page
-             CSS — which only hides .tab-pane — left it painting a stray red line under every tab. The
-             fragment selector still extracts the inner <p>, which krtFetch.swap then injects. */-->
         <template>
             <p th:fragment="fragmentError" class="desc krtm-color-danger"
                th:text="#{operation.section.refresh.error}">Abschnitt konnte nicht geladen werden.</p>
         </template>
 
-    </div> <!--/* End tab-panes */-->
-</div> <!--/* End page-wrapper */-->
+    </div>
+</div>
 
-<!--/* Delete Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-operation-modal', titleKey='general.confirm', variant='krt-modal--danger', body=~{::delete-operation-modal-body})}">
     <th:block th:ref="delete-operation-modal-body">
         <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
@@ -412,7 +372,6 @@
 </th:block>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    /*<![CDATA[*/
     window.operationId = /*[[${operation.id.toString()}]]*/ null;
 
     const OPS_DETAIL_MSG = {
@@ -428,7 +387,6 @@
         conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?',
         livesyncUpdates: /*[[#{livesync.updates_available}]]*/ 'Aktualisierungen verfuegbar',
         sectionRefreshError: /*[[#{operation.section.refresh.error}]]*/ 'Abschnitt konnte nicht geladen werden.',
-        // The placeholder text the notes editor's link button inserts when nothing is selected.
         linkText: /*[[#{operation.notes.link.text}]]*/ 'Text'
     };
 
@@ -436,7 +394,6 @@
     const MSG_PAYOUT_PAID_FORBIDDEN = /*[[#{operation.payout.paid.forbidden}]]*/ 'Keine Berechtigung.';
     const MSG_PAYOUT_PAID_UNSET_LOCKED = /*[[#{operation.payout.paid.unset.locked}]]*/ 'Nur Offiziere und Admins koennen den Bezahlt-Status zuruecksetzen.';
     const OPS_FINANCE_DETAIL_ERROR = /*[[#{operation.finance.detail.error}]]*/ 'Details konnten nicht geladen werden.';
-    /*]]>*/
 </script>
 <script th:src="@{/js/operation-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

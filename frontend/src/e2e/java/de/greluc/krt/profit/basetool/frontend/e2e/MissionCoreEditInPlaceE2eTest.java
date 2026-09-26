@@ -37,14 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow (#589): the mission core-edit form (Verwaltung tab) saves in place. Proves the
- * three things the carve-out's Definition of Done requires: a save updates with no full-page reload
- * (the {@code window.__krtNoReload} guard), a second consecutive save does not 409 (the
- * four-version writeback), and a server-side validation failure renders inline without a
- * navigation.
+ * Verifies that the mission core-edit form (Verwaltung tab) saves in place: no full-page reload, no
+ * 409 on a second consecutive save, and inline rendering of a server-side validation failure.
  *
- * <p>Drive via UI, verify via API ({@link BackendSeeder}). The actor is {@code test-admin}, who can
- * edit every mission through the role hierarchy.
+ * <p>Drives the UI and verifies via {@link BackendSeeder}, as {@code test-admin}.
  */
 @Tag("e2e")
 class MissionCoreEditInPlaceE2eTest {
@@ -105,8 +101,6 @@ class MissionCoreEditInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=verw");
         page.waitForLoadState();
 
-        // First save: edit the name, mark the window, submit, and await the in-place AJAX POST
-        // (no navigation). The marker surviving proves there was no full reload.
         page.locator("[data-testid='mission-name-input']").fill(firstName);
         page.evaluate("window.__krtNoReload = true;");
         page.waitForResponse(
@@ -121,9 +115,6 @@ class MissionCoreEditInPlaceE2eTest {
                 + " marker");
         assertEquals(firstName, missionName(), "the first edit must persist");
 
-        // Second save on the same form, without reloading the page: this only succeeds if the
-        // twin wrote the four fresh versions back into the hidden inputs (otherwise the stale
-        // coreVersion 409s).
         page.locator("[data-testid='mission-name-input']").fill(secondName);
         page.waitForResponse(
             response ->
@@ -160,8 +151,6 @@ class MissionCoreEditInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=verw");
         page.waitForLoadState();
 
-        // http:// is a valid URL (passes the input's type=url check) but fails the https-only
-        // @Pattern server-side, so the submit reaches the AJAX twin and comes back 422.
         page.locator("input[name='calendarLink']").fill("http://example.com/not-https");
         page.evaluate("window.__krtNoReload = true;");
         page.waitForResponse(
@@ -170,7 +159,6 @@ class MissionCoreEditInPlaceE2eTest {
                     && "POST".equals(response.request().method()),
             () -> page.locator("button[form='mission-form'][type='submit']").click());
 
-        // The inline field error appears in place, and no navigation happened.
         assertThat(page.locator(".field-error[data-error-for='calendarLink']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertEquals(
@@ -179,7 +167,6 @@ class MissionCoreEditInPlaceE2eTest {
             "the validation error must render inline — no full-page reload cleared the window"
                 + " marker");
 
-        // Fixing the link to a valid https value and re-saving clears the inline error.
         page.locator("input[name='calendarLink']").fill("https://example.com/ok");
         page.waitForResponse(
             response ->

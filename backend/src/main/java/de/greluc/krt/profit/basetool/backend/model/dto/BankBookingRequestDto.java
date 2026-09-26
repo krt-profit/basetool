@@ -28,10 +28,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Wire shape of a {@link de.greluc.krt.profit.basetool.backend.model.BankBookingRequest} (epic #666
- * F2). Serves both the requester's own "my requests" list (REQ-BANK-022) and the bank-staff
- * confirmation queue (REQ-BANK-023) — the surfacing endpoints, not this DTO, enforce that a
- * requester only ever sees their own rows and a staffer only the accounts they may see.
+ * Wire shape of a {@link de.greluc.krt.profit.basetool.backend.model.BankBookingRequest}, used by
+ * the requester's own list (REQ-BANK-022) and the bank-staff confirmation queue (REQ-BANK-023).
+ * Visibility is enforced by the endpoints, not by this DTO.
  *
  * @param id the request id
  * @param accountId the target org-unit account id
@@ -43,16 +42,14 @@ import org.jetbrains.annotations.Nullable;
  * @param type deposit or withdrawal
  * @param amount the requested whole-aUEC amount
  * @param note the requester's optional note, or {@code null}
- * @param justification the requester's optional justification (Begr&uuml;ndung) for a {@code
- *     WITHDRAWAL} / {@code TRANSFER} (REQ-BANK-045), or {@code null}
- * @param staffNote the confirming bank employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054),
- *     snapshotted on the request at confirmation; {@code null} while the request is pending, on a
- *     rejected/cancelled one and when the employee recorded none
+ * @param justification the requester's Begr&uuml;ndung for a {@code WITHDRAWAL} / {@code TRANSFER}
+ *     (REQ-BANK-045), or {@code null}
+ * @param staffNote the confirming employee's note (REQ-BANK-054), or {@code null} unless confirmed
+ *     with one
  * @param status the lifecycle state (PENDING / CONFIRMED / REJECTED / CANCELLED)
- * @param requesterHandle the requesting officer/lead's effective-name snapshot
+ * @param requesterHandle the requester's effective-name snapshot
  * @param holderId the holder recorded at confirmation, or {@code null} while not confirmed
- * @param holderHandle the recorded holder's display name (live effective name, snapshot fallback
- *     when the user is gone, REQ-BANK-003), or {@code null} while not confirmed
+ * @param holderHandle the recorded holder's display name, or {@code null} while not confirmed
  * @param resultingTransactionId the booked ledger transaction id, or {@code null} while not
  *     confirmed
  * @param deciderHandle the deciding bank employee's handle, or {@code null} while pending/cancelled
@@ -61,29 +58,22 @@ import org.jetbrains.annotations.Nullable;
  * @param createdAt when the request was raised
  * @param targetAccountId the destination account id for a {@code TRANSFER}, or {@code null}
  * @param targetAccountNo the destination account's number for a {@code TRANSFER}, or {@code null}
- * @param requiresOwnerApproval whether the requested amount exceeded the requester's approval
- *     limit, so confirmation needs the responsible-holder approval attestation (REQ-BANK-041)
- * @param applicableLimit the requester's resolved approval limit at creation, or {@code null} =
- *     unlimited
- * @param requiredApprover which approver class a flagged request needs (REQ-BANK-041/-046) — {@code
- *     RESPONSIBLE_HOLDER} / {@code BANK_MANAGEMENT} / {@code ORGANISATIONSLEITUNG} as an enum name,
- *     or {@code null} when the request needs no approval
- * @param ownerApprovalGranted whether the responsible holder has granted in-app approval (pre-fills
- *     the bank employee's confirmation checkbox)
- * @param ownerApprovalGrantedByHandle the responsible holder's handle who granted approval, or
+ * @param requiresOwnerApproval whether the amount exceeded the requester's approval limit
+ *     (REQ-BANK-041)
+ * @param applicableLimit the requester's approval limit at creation, or {@code null} = unlimited
+ * @param requiredApprover the approver class a flagged request needs as an enum name, or {@code
+ *     null} when no approval is needed
+ * @param ownerApprovalGranted whether the responsible holder has granted in-app approval
+ * @param ownerApprovalGrantedByHandle the approving responsible holder's handle, or {@code null}
+ * @param splitEnabled whether a deposit is split across the squadron accounts (REQ-BANK-044)
+ * @param splitPercent the whole percent (1–100) split across squadron accounts, or {@code null}
+ * @param counterpartyUserId the Empf&auml;nger named on a {@code WITHDRAWAL} (REQ-BANK-055), or
  *     {@code null}
- * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
- *     confirmation (REQ-BANK-044)
- * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
- *     null} when not a split
- * @param counterpartyUserId the Empf&auml;nger the requester named on a {@code WITHDRAWAL}
- *     (REQ-BANK-055), or {@code null} — then confirmation derives the requester (REQ-BANK-044).
- *     Carried so the edit modal can pre-select the picker
- * @param counterpartyHandle deletion-proof name snapshot of {@code counterpartyUserId}, the value
- *     the request lists actually display; {@code null} exactly when no Empf&auml;nger is named
+ * @param counterpartyHandle name snapshot of {@code counterpartyUserId}; {@code null} exactly when
+ *     no Empf&auml;nger is named
  * @param counterpartyOrgUnitId the named Empf&auml;nger's chosen org unit, or {@code null}
  * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
- * @param version the optimistic-locking version the client echoes on cancel/confirm/reject
+ * @param version the optimistic-locking version echoed on cancel/confirm/reject
  */
 public record BankBookingRequestDto(
     UUID id,
@@ -123,14 +113,8 @@ public record BankBookingRequestDto(
     Long version) {
 
   /**
-   * This request with {@link #staffNote} blanked — the requester-facing projection (REQ-BANK-054).
-   *
-   * <p>The "Notiz Bankmitarbeiter" is a bank-<em>internal</em> remark about processing the request
-   * and is redacted from the member audience exactly like the Halter columns of the org-unit
-   * booking history. The requester's own "Meine Anträge" list is that audience; the responsible
-   * holder's "Fremde Anträge" list is <strong>not</strong> and keeps the note, because approving is
-   * the decision the note exists to inform. A responsible holder who raised the request themselves
-   * therefore sees it only under the approver lens — deliberate, not a rendering bug.
+   * Returns this request with {@link #staffNote} blanked, the requester-facing projection
+   * (REQ-BANK-054).
    *
    * @return {@code this} when no staff note is set, else a copy with the note removed
    */

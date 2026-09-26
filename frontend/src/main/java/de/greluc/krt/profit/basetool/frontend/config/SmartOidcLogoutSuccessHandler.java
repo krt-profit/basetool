@@ -32,17 +32,9 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
 
 /**
- * Smart OIDC logout handler that avoids sending a logout request to Keycloak when the user's OIDC
- * session has already expired.
- *
- * <p>If the {@link Authentication} contains a valid {@link OidcUser} with an ID token, the standard
- * {@link OidcClientInitiatedLogoutSuccessHandler} is used to properly end the Keycloak session via
- * the OIDC end-session endpoint. This is the normal path.
- *
- * <p>If the authentication is missing, not an OIDC token, or the ID token is absent (i.e. the
- * Keycloak session has already expired), the handler skips the Keycloak endpoint call entirely and
- * redirects directly to the post-logout URL (login page). This prevents the recurring {@code
- * LOGOUT_ERROR session_expired} warnings in Keycloak.
+ * OIDC logout handler that ends the Keycloak session through the end-session endpoint only when the
+ * {@link Authentication} holds an {@link OidcUser} with an ID token; otherwise it redirects
+ * straight to the post-logout URL.
  */
 @Slf4j
 public class SmartOidcLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler {
@@ -50,12 +42,12 @@ public class SmartOidcLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler
   private final OidcClientInitiatedLogoutSuccessHandler oidcHandler;
 
   /**
-   * Performs smart oidc logout success handler.
+   * Creates the handler.
    *
    * @param clientRegistrationRepository Keycloak client registry for resolving the end-session
    *     endpoint URL
-   * @param postLogoutRedirectUri target URL to redirect to after a successful logout (may contain
-   *     the {@code {baseUrl}} placeholder)
+   * @param postLogoutRedirectUri target URL after logout; may contain the {@code {baseUrl}}
+   *     placeholder
    */
   public SmartOidcLogoutSuccessHandler(
       @NotNull ClientRegistrationRepository clientRegistrationRepository,

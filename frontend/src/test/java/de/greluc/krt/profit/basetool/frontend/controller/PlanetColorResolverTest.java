@@ -82,13 +82,8 @@ class PlanetColorResolverTest {
 
   @Test
   void hashFallbackDiscriminatesAcrossSystems() {
-    // Same planet name in two different systems should land in (typically) different buckets.
-    // We don't assert strict inequality for every hash combo, but at least verify the
-    // (system, planet) tuple - not just planet - participates in the hash.
     String inA = PlanetColorResolver.cssClassFor("SystemA", "Unknown");
     String inB = PlanetColorResolver.cssClassFor("SystemB", "Unknown");
-    // For the chosen names the buckets do differ; if a future palette resize collides, swap the
-    // sentinel system names rather than weakening the test.
     assertNotEquals(inA, inB);
   }
 

@@ -47,8 +47,6 @@ class UserSyncTaskTest {
 
   @Mock private UserSyncService userSyncService;
 
-  // A real TaskMetrics (spied) so the wrapper genuinely runs the sync body; a mock would no-op it
-  // and defeat the delegation assertion below.
   @Spy private TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
 
   @InjectMocks private UserSyncTask userSyncTask;
@@ -67,7 +65,6 @@ class UserSyncTaskTest {
   void syncUsers_swallowsAServiceFailureSoTheSchedulerThreadSurvives() {
     when(userSyncService.syncFromKeycloak()).thenThrow(new RuntimeException("boom"));
 
-    // recordCounting's catch-record-swallow contract must keep the scheduled trigger from throwing.
     assertDoesNotThrow(userSyncTask::syncUsers);
 
     verify(userSyncService).syncFromKeycloak();

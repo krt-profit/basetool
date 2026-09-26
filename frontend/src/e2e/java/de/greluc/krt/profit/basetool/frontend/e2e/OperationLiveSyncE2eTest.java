@@ -35,21 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the operation detail page (#1115, REQ-FE-015 / ADR-0094): a
- * core-data save one viewer makes on the Verwaltung tab must appear on another viewer's sticky
- * header without a manual reload — the {@code overview} section key crossing the {@code
- * operation:{id}} room.
+ * Verifies that a core-data save on an operation's Verwaltung tab reaches another viewer's header
+ * without a reload, via the {@code overview} section of the {@code operation:{id}} room
+ * (REQ-FE-015, ADR-0094).
  *
- * <p>The operation surface is the first non-mission consumer of the multiplexed {@code /ws/sync}
- * transport, so the deterministic pre-mutation wait is {@code
- * window.krtLiveSync.subscribedTopics()} becoming non-empty (a subscribe, unlike the mission legacy
- * socket, is only registered once its async server authorization has acked). Two browser contexts
- * as the same test user are two distinct {@code /ws/sync} sockets — exactly what the relay fans out
- * between.
- *
- * <p>The payout-toggle path drives the same {@code operation:{id}} receiver but needs a seeded
- * payout row (a linked mission with a checked-in participant and actual times); the core-data save
- * exercises the receiver end-to-end without that setup, so it is the mutation chosen here.
+ * <p>Waits for {@code window.krtLiveSync.subscribedTopics()} to be non-empty before mutating.
  */
 @Tag("e2e")
 class OperationLiveSyncE2eTest {
@@ -117,14 +107,10 @@ class OperationLiveSyncE2eTest {
         E2eSupport.navigate(pageB, baseUrl + "/operations/" + operationId);
         pageB.waitForLoadState();
 
-        // B starts with the original name (not the renamed one).
         assertThat(pageB.locator("#operation-title")).not().containsText(RENAMED);
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its operation:{id} subscribe is
-        // acked (subscribedTopics non-empty), so A's change frame cannot race past it.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -132,17 +118,12 @@ class OperationLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // Context A renames the operation on the Verwaltung tab and saves.
         pageA.locator("#optab-verw").click();
         pageA.locator("#op-name").fill(RENAMED);
         pageA.locator("button[type='submit'][form='operation-form']").click();
-        // A's own sticky header updates in place (sanity: the mutation succeeded).
         assertThat(pageA.locator("#operation-title"))
             .containsText(RENAMED, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
 
-        // The assertion under test: context B — which did nothing — reflects the new name in its
-        // sticky header, pushed over /ws/sync and applied as an in-place overview swap + header
-        // patch.
         assertThat(pageB.locator("#operation-title"))
             .containsText(RENAMED, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
         assertEquals(

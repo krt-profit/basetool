@@ -41,13 +41,8 @@ import org.springframework.session.MapSession;
 import org.springframework.session.data.redis.RedisSessionMapper;
 
 /**
- * The mapper must name the unreadable attribute and then get out of the way.
- *
- * <p>The name is the field the 2026-09-02 incident did not have: 496 WARN lines over three hours,
- * none of which said <em>which</em> session attribute could not be read. Everything else about the
- * session-building behaviour must stay byte-for-byte what {@link RedisSessionMapper} already does,
- * because that behaviour is what makes an unreadable attribute a signed-out member rather than an
- * unusable application.
+ * Verifies that the mapper names an unreadable session attribute and otherwise builds the session
+ * exactly as {@link RedisSessionMapper} does.
  */
 class SessionAttributeDiagnosticMapperTest {
 
@@ -114,19 +109,13 @@ class SessionAttributeDiagnosticMapperTest {
                 registryProvider())
             .apply("session-id", hash);
 
-    // The delegate must never see the marker: it is a diagnostic carrier, and every layer above
-    // this one understands only `null` for "this attribute is not set".
     assertNull(seenByDelegate.get().get(ATTRIBUTE_PREFIX + "SPRING_SECURITY_CONTEXT"));
     assertNotNull(session);
-    // A signed-out member with intact timestamps — which a login fixes — and NOT the
-    // `IllegalStateException: creationTime key must not be null` that a broken required key gives.
     assertTrue(session.getAttributeNames().isEmpty());
   }
 
   @Test
   void theOriginalMapIsNotMutated() {
-    // The repository hands over a map it may still hold a reference to; corrupting it would turn a
-    // read-side diagnostic into a write-side surprise.
     Map<String, Object> hash = requiredFields();
     UnreadableSessionValue marker =
         new UnreadableSessionValue(
@@ -140,9 +129,6 @@ class SessionAttributeDiagnosticMapperTest {
 
   @Test
   void aGenuineTombstoneIsLeftCompletelyAlone() {
-    // The reason the marker exists at all. BackendRoleSyncFilter and TermsAcceptanceGateFilter both
-    // removeAttribute on every re-check, so `null` values are routine housekeeping — reporting them
-    // would be a false alarm on nearly every request.
     Map<String, Object> hash = requiredFields();
     hash.put(ATTRIBUTE_PREFIX + "krt.terms.accepted", null);
     AtomicReference<Map<String, Object>> seenByDelegate = new AtomicReference<>();
@@ -155,7 +141,6 @@ class SessionAttributeDiagnosticMapperTest {
             registryProvider())
         .apply("session-id", hash);
 
-    // Same map instance, not a defensive copy: nothing failed, so nothing is done.
     assertEquals(hash, seenByDelegate.get());
     assertTrue(seenByDelegate.get().containsKey(ATTRIBUTE_PREFIX + "krt.terms.accepted"));
   }
@@ -174,10 +159,6 @@ class SessionAttributeDiagnosticMapperTest {
 
   @Test
   void theHardcodedAttributePrefixStillMatchesTheUpstreamMapper() {
-    // RedisSessionMapper.ATTRIBUTE_PREFIX is package-private upstream, so this class hardcodes the
-    // literal. This pins the literal against the real mapper's behaviour rather than against a copy
-    // of the constant, so an upstream change surfaces here instead of silently mis-naming every
-    // attribute in a WARN line.
     Map<String, Object> hash = requiredFields();
     hash.put(ATTRIBUTE_PREFIX + "probe", "value");
 
@@ -190,9 +171,6 @@ class SessionAttributeDiagnosticMapperTest {
   @ParameterizedTest
   @ValueSource(strings = {"creationTime", "lastAccessedTime", "maxInactiveInterval"})
   void aHashMissingARequiredKeyReadsAsNoSessionAndIsCounted(String missingKey) {
-    // REQ-SEC-063. Each of the three keys is exercised because `getRequired` reads them in order
-    // and only the first failure is ever seen — a guard that caught one of them and let the other
-    // two through would look correct in a single-case test and still 500 in production.
     Map<String, Object> hash = requiredFields();
     hash.remove(missingKey);
 
@@ -206,9 +184,6 @@ class SessionAttributeDiagnosticMapperTest {
 
   @Test
   void theRequiredKeyLiteralsStillMatchTheUpstreamMapper() {
-    // The three names are hardcoded here and in the mapper because upstream's constants are
-    // package-private, and they reach a metric tag and a WARN. Pinned against the real mapper, so a
-    // rename upstream fails here instead of silently reporting every failure as `other`.
     for (String key : new String[] {"creationTime", "lastAccessedTime", "maxInactiveInterval"}) {
       Map<String, Object> hash = requiredFields();
       hash.remove(key);
@@ -226,9 +201,6 @@ class SessionAttributeDiagnosticMapperTest {
 
   @Test
   void aDelegateFailureWithEveryRequiredKeyPresentIsCountedAsOther() {
-    // The metric tag must stay bounded even when the mapper gives up for a reason this class does
-    // not model — a fourth required key upstream, or a delegate of our own that refuses. `other`
-    // is the bucket that keeps the label closed (REQ-OBS-006).
     Map<String, Object> hash = requiredFields();
 
     MapSession session =
@@ -245,8 +217,6 @@ class SessionAttributeDiagnosticMapperTest {
 
   @Test
   void anUnreadableAttributeDoesNotTurnAHealthySessionIntoNoSession() {
-    // The two failure modes must stay separate. A poisoned ATTRIBUTE still yields a signed-out
-    // member with intact timestamps; only a missing REQUIRED key gives up on the session entirely.
     Map<String, Object> hash = requiredFields();
     hash.put(
         ATTRIBUTE_PREFIX + "SPRING_SECURITY_CONTEXT",

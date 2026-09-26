@@ -17,33 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Job-order list page module (/orders), extracted verbatim from the first inline script of
- * orders-index.html (ADR-0069, follow-up to #924).
- *
- * Age-colours the order-id cells (yellow past KRT_ORDERS_AGE_YELLOW days, red past
- * KRT_ORDERS_AGE_RED) on load and again on krt:swapped, and drives the in-place status/scope filter
- * through window.krtFetch.swap (the GET form stays the no-JS fallback).
- *
- * KRT_ORDERS_AGE_YELLOW / KRT_ORDERS_AGE_RED are defined by the inline Thymeleaf bootstrap block of
- * orders-index.html, which executes immediately before this classic script.
- */
-
 /* global KRT_ORDERS_AGE_YELLOW, KRT_ORDERS_AGE_RED, KRT_ORDERS_LIVESYNC_UPDATES, KRT_ORDERS_SECTION_REFRESH_ERROR */
 
-// ---- Live multi-user sync — the staff queue (REQ-FE-010 / REQ-FE-015, ADR-0094) -------------
-// When anyone creates / reorders / completes an order, every other viewer's queue re-fetches its
-// OWN filter/page in place over the shared /ws/sync `orders` room. Only the opaque `queue` key
-// crosses the wire; each viewer re-pulls its own authorization-checked list fragment (a non-profit
-// requester is denied the room entirely — canViewJobOrders). ORDERS_SECTIONS mirrors the server
-// LiveSyncTopicClass.ORDERS_QUEUE whitelist (the three-mirror-points rule).
 const ORDERS_SECTIONS = {
     queue: { container: '#orders-results', fragmentValue: 'results' },
 };
 
 (function () {
     if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
-        return; // no-JS / no-foundation: the classic GET filter form runs.
+        return;
     }
     const ordersQueueSeam = window.krtFetch.sectionWrite({
         dict() {
@@ -56,7 +38,6 @@ const ORDERS_SECTIONS = {
         },
         keys: { refreshErrorKey: 'orders.section.refresh.error' },
         sections: ORDERS_SECTIONS,
-        // Each peer re-fetches ITS OWN current filter + page, not the actor's.
         pageUrl() {
             return window.location.pathname + window.location.search;
         },
@@ -66,22 +47,18 @@ const ORDERS_SECTIONS = {
             }
         },
     });
-    // Exposed so the LOGISTICIAN-only reorder module can re-render + broadcast the queue in one call.
     window.krtRefreshOrdersQueue = ordersQueueSeam.refresh;
 
     if (window.krtLiveSync && window.krtLiveSync.createReceiver) {
         window.krtLiveSync.createReceiver({
             topic: 'orders',
             sections: ORDERS_SECTIONS,
-            // Global room: coalesce longer (#1125) to flatten the refetch herd when many viewers get
-            // the same signal at once.
             coalesceMs: 1500,
             refresh(keys) {
                 if (window.krtRefreshOrdersQueue) {
                     window.krtRefreshOrdersQueue(keys, { broadcast: false });
                 }
             },
-            // Never yank the queue out from under an in-flight drag-reorder.
             busyTest() {
                 return window.__ordersDragging === true;
             },
@@ -96,8 +73,6 @@ const ORDERS_SECTIONS = {
     }
 })();
 
-// Age-colour the order ids. Extracted so it can re-run on `krt:swapped` — the row colours are
-// otherwise only applied on the initial load and would be lost on a fragment swap (#573).
 function colorOrderAges(root) {
     const now = new Date();
     (root || document).querySelectorAll('.order-id-display').forEach((el) => {
@@ -120,27 +95,20 @@ function colorOrderAges(root) {
     });
 }
 
-// ---- Collapsible per-order material sublist (default collapsed, localStorage-persisted) ---------
-// Each order row's material summary starts collapsed; the set of expanded order ids is stored in
-// localStorage (JSON array) and re-applied on load AND after every fragment swap — the same idiom as
-// the Lager tree (REQ-INV-002, inventory-my.js). Order ids are globally unique, so a single
-// per-browser key is enough. State survives the queue's krtFetch swaps.
 const ORDERS_MATERIALS_EXPANDED_KEY = 'orders_materials_expanded';
 
 function readExpandedOrderMaterials() {
     try {
         return JSON.parse(localStorage.getItem(ORDERS_MATERIALS_EXPANDED_KEY) || '[]');
     } catch (_e) {
-        return []; // corrupt value / private mode: treat as none expanded
+        return [];
     }
 }
 
 function writeExpandedOrderMaterials(values) {
     try {
         localStorage.setItem(ORDERS_MATERIALS_EXPANDED_KEY, JSON.stringify(values));
-    } catch (_e) {
-        /* quota / private mode: skip persistence */
-    }
+    } catch (_e) {}
 }
 
 function applyOrderMaterialsState(orderId, expanded) {
@@ -186,14 +154,6 @@ function restoreOrderMaterials(root) {
     });
 }
 
-// ---- Multi-select squadron filter (default all, localStorage-persisted, REQ-ORDERS-027) ---------
-// A checkbox dropdown of the active squadrons (mirrors the Lager .multi-select-container). The
-// selection is stored per BROWSER in localStorage (the key is bare — no user id, unlike the Lager
-// tree's data-user-id suffix — so two accounts on one profile share it, ADR-0120); the list is
-// filtered SERVER-side (the queue is
-// paginated), so a change re-fetches the results fragment. "All checked" == no filter (show every
-// scoped order, incl. SK-only); a subset sends its ids; "none checked" sends a nil-uuid sentinel
-// (empty result). Absence of the key means "no saved preference" (leave the server default = all).
 const ORDERS_SQUADRON_FILTER_KEY = 'orders_squadron_filter';
 const ORDERS_SQUADRON_NONE_SENTINEL = '00000000-0000-0000-0000-000000000000';
 
@@ -209,9 +169,7 @@ function readSquadronFilter() {
 function writeSquadronFilter(ids) {
     try {
         localStorage.setItem(ORDERS_SQUADRON_FILTER_KEY, JSON.stringify(ids));
-    } catch (_e) {
-        /* quota / private mode: skip persistence */
-    }
+    } catch (_e) {}
 }
 
 function squadronBoxes() {
@@ -275,8 +233,6 @@ function updateSquadronState() {
     applyOrdersFilter();
 }
 
-// Re-render the results fragment for the current status + squadron selection (server-side filter +
-// pagination). Top-level so both the status inputs and the delegated squadron handlers share it.
 function applyOrdersFilter() {
     const filterForm = document.getElementById('orders-filter-form');
     const resultsContainer = document.getElementById('orders-results');
@@ -284,7 +240,7 @@ function applyOrdersFilter() {
     const data = new FormData(filterForm);
     const params = new URLSearchParams();
     for (const [key, value] of data.entries()) {
-        if (key === 'squadronId') continue; // rebuilt below with the all/subset/none semantics
+        if (key === 'squadronId') continue;
         if (value !== '') params.append(key, value);
     }
     const boxes = squadronBoxes();
@@ -295,7 +251,6 @@ function applyOrdersFilter() {
         } else if (checked.length < boxes.length) {
             checked.forEach((b) => params.append('squadronId', b.value));
         }
-        // all checked -> omit squadronId entirely (no narrowing, shows SK-only orders too)
     }
     const query = params.toString();
     window.krtFetch.swap({
@@ -305,9 +260,6 @@ function applyOrdersFilter() {
     });
 }
 
-// Apply the persisted squadron selection on load. Only re-fetches when the server did not already
-// render this exact selection, so a pagination reload (which already carries the ids) is not
-// clobbered back to page 1.
 function restoreSquadronFilter() {
     const saved = readSquadronFilter();
     if (saved === null) {
@@ -336,10 +288,6 @@ function restoreSquadronFilter() {
     );
 }
 
-// ---- Status filter (default OPEN+IN_PROGRESS, localStorage-persisted, REQ-ORDERS-027) -----------
-// The status checkboxes were formerly persisted in a server cookie (orders_filter_status); they now
-// use the same per-browser localStorage + query-param echo as the squadron filter, so no cookie is
-// set. Absence of the key means "no saved preference" (leave the server default = OPEN+IN_PROGRESS).
 const ORDERS_STATUS_FILTER_KEY = 'orders_status_filter';
 
 function statusBoxes() {
@@ -360,9 +308,7 @@ function readStatusFilter() {
 function writeStatusFilter(values) {
     try {
         localStorage.setItem(ORDERS_STATUS_FILTER_KEY, JSON.stringify(values));
-    } catch (_e) {
-        /* quota / private mode: skip persistence */
-    }
+    } catch (_e) {}
 }
 
 function persistStatusFilter() {
@@ -373,9 +319,6 @@ function persistStatusFilter() {
     );
 }
 
-// Apply the persisted status selection on load. Returns whether it differs from what the server
-// already rendered, so the caller can trigger a single results re-fetch. An empty saved selection is
-// ignored (treated as "no preference"), mirroring the former cookie's empty->default behaviour.
 function restoreStatusFilter() {
     const saved = readStatusFilter();
     if (saved === null || saved.length === 0) return false;
@@ -398,7 +341,6 @@ function restoreStatusFilter() {
     );
 }
 
-// Document-delegated so the toggles survive the queue's fragment swaps.
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'ord-toggle-materials', toggleOrderMaterials);
     window.krtEvents.on('click', 'ord-toggle-squadron-multi', toggleSquadronMulti);
@@ -406,7 +348,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'ord-update-squadron-state', updateSquadronState);
 }
 
-// Close the squadron dropdown on an outside click.
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.multi-select-container')) {
         document
@@ -418,16 +359,10 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     colorOrderAges(document);
     restoreOrderMaterials(document);
-    // Restore both persisted filters (status + squadron), then re-fetch the results fragment once if
-    // either differs from what the server rendered — avoids a double swap when both were customised.
     const statusDiffers = restoreStatusFilter();
     const squadronDiffers = restoreSquadronFilter();
     if ((statusDiffers || squadronDiffers) && window.krtFetch) applyOrdersFilter();
 
-    // In-place status + squadron filter (epic #571 / #573). The form id was renamed off the generic
-    // "filter-form" so the sidebar's generic change->submit auto-reload no longer fires here. The
-    // squadron checkboxes are handled by the delegated handlers above (they also persist + re-fetch);
-    // only the status inputs bind directly here (persisting to localStorage on change).
     const filterForm = document.getElementById('orders-filter-form');
     if (filterForm && window.krtFetch) {
         filterForm.addEventListener('submit', (event) => {

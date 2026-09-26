@@ -40,21 +40,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Mockito tests for {@link AdminPersonSearchPageController} (REQ-SEC-060).
- *
- * <p>The behaviours pinned here are the ones a later refactor could quietly break without any page
- * looking wrong: the too-short term never reaches the backend, the term is bound as a URI-template
- * variable so it is percent-encoded exactly once, the casing the admin typed is relayed untouched
- * (the backend matches case-insensitively — normalising it here would make that guarantee depend on
- * two places instead of one), and a backend failure leaves {@code searched} false so the page says
- * "failed" rather than "no mentions found".
- *
- * <p>The encoding test is a regression. The term used to be run through {@code URLEncoder} and then
- * concatenated into the URI, which WebClient's default {@code TEMPLATE_AND_VALUES} mode encoded a
- * second time: the backend received the literal escape sequence, its wildcard escaping turned those
- * {@code %} into {@code \\%}, and {@code ILIKE} matched nothing. Every term with an umlaut returned
- * no hits — and on this surface no hits reads as "this person appears nowhere", which is the answer
- * an admin acts on when serving an Art. 16 rectification.
+ * Mockito tests for {@link AdminPersonSearchPageController} (REQ-SEC-060): a too-short term never
+ * reaches the backend, the term is sent once-encoded as a URI-template variable with its casing
+ * untouched, and a backend failure leaves {@code searched} false.
  */
 class AdminPersonSearchPageControllerTest {
 
@@ -82,8 +70,6 @@ class AdminPersonSearchPageControllerTest {
 
   @Test
   void anEmptyTermIsTheInitialStateAndNotAnError() {
-    // The page is reachable from the admin menu with no term at all; that is not a mistake the
-    // admin made, so it must not render an error.
     BackendApiClient client = mock(BackendApiClient.class);
     AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
     Model model = new ConcurrentModel();
@@ -110,8 +96,6 @@ class AdminPersonSearchPageControllerTest {
 
   @Test
   void theTermIsBoundAsAUriVariableAndNeverEncodedByHand() {
-    // Encoded exactly once, by the WebClient, because it is a template variable. See the class
-    // note: hand-encoding it was double-encoding it on the wire and every umlaut found nothing.
     BackendApiClient client = mock(BackendApiClient.class);
     stubOneHit(client);
     AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
@@ -123,9 +107,6 @@ class AdminPersonSearchPageControllerTest {
 
   @Test
   void theTypedCasingIsRelayedUntouched() {
-    // The case-insensitive match is the backend's ILIKE. Normalising the term here would look
-    // harmless and would move the guarantee into a second place, where the next reader has to check
-    // both to know whether it still holds.
     BackendApiClient client = mock(BackendApiClient.class);
     stubOneHit(client);
     AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
@@ -153,8 +134,6 @@ class AdminPersonSearchPageControllerTest {
 
     assertEquals(true, model.getAttribute("searched"));
     assertEquals(true, model.getAttribute("truncated"));
-    // The per-column cap is carried separately, because it is reached far more often than the
-    // overall one and "narrow the term" is not the remedy for it.
     assertEquals(List.of("mission_participant.comment"), model.getAttribute("cappedColumns"));
     assertEquals(1, ((List<?>) model.getAttribute("hits")).size());
     assertFalse(model.containsAttribute("error"));
@@ -177,8 +156,6 @@ class AdminPersonSearchPageControllerTest {
 
   @Test
   void aBackendFailureLeavesSearchedFalseSoThePageCannotClaimNoMentions() {
-    // "No mentions found" and "the search did not run" look identical on a page that only counts
-    // hits, and they are opposite answers to a rectification request.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(any(String.class), resultType(), any(Object[].class)))
         .thenThrow(new BackendServiceException("boom", new RuntimeException(), 503));

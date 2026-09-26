@@ -75,10 +75,6 @@ class InventoryItemServiceBulkCheckoutTest {
   @Mock private AuditService auditService;
   @InjectMocks private InventoryCheckoutService inventoryItemService;
 
-  // -------------------------------------------------------------------------
-  // Helper
-  // -------------------------------------------------------------------------
-
   private User userWithId(UUID id) {
     User u = new User();
     u.setId(id);
@@ -92,13 +88,8 @@ class InventoryItemServiceBulkCheckoutTest {
     return item;
   }
 
-  // -------------------------------------------------------------------------
-  // Tests
-  // -------------------------------------------------------------------------
-
   @Test
   void bulkCheckout_successfullyRemovesMultipleItems() {
-    // Given
     UUID userId = UUID.randomUUID();
     UUID itemId1 = UUID.randomUUID();
     UUID itemId2 = UUID.randomUUID();
@@ -111,18 +102,13 @@ class InventoryItemServiceBulkCheckoutTest {
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
 
-    // When
     inventoryItemService.bulkCheckout(request, userId);
 
-    // Then – deleted in one batch (the association-clearing loop and its flush were removed;
-    // each row's job-order / mission allocations cascade away with it, FK ON DELETE CASCADE, V217).
     verify(inventoryItemRepository).deleteAllById(List.of(itemId1, itemId2));
   }
 
   @Test
   void bulkCheckout_recordsBulkCheckedOutAuditEventWithCount() {
-    // Gap 4: the bulk checkout of the audited Lager area must record INVENTORY_BULK_CHECKED_OUT,
-    // scoped to the acting user, with the removed count in its details payload.
     UUID userId = UUID.randomUUID();
     UUID itemId1 = UUID.randomUUID();
     UUID itemId2 = UUID.randomUUID();
@@ -151,10 +137,6 @@ class InventoryItemServiceBulkCheckoutTest {
 
   @Test
   void bulkCheckout_deletesEarmarkedItem_allocationsCascadeAway() {
-    // Given – an item earmarked to a job order and a mission. Variante C (REQ-INV-027): the
-    // earmarks now live in the entry's allocation collections, not on scalar columns, and a bulk
-    // checkout no longer clears them in code — the batch deleteAllById cascades the job-order /
-    // mission slices away with the row (FK ON DELETE CASCADE, V217).
     UUID userId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
 
@@ -171,16 +153,13 @@ class InventoryItemServiceBulkCheckoutTest {
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId));
 
-    // When
     inventoryItemService.bulkCheckout(request, userId);
 
-    // Then – the earmarked row is removed in the batch delete; its allocations cascade with it.
     verify(inventoryItemRepository).deleteAllById(List.of(itemId));
   }
 
   @Test
   void bulkCheckout_throwsAccessDenied_whenItemBelongsToAnotherUser() {
-    // Given
     UUID currentUserId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
@@ -190,7 +169,6 @@ class InventoryItemServiceBulkCheckoutTest {
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId));
 
-    // When / Then
     assertThrows(
         AccessDeniedException.class,
         () -> inventoryItemService.bulkCheckout(request, currentUserId));
@@ -200,7 +178,6 @@ class InventoryItemServiceBulkCheckoutTest {
 
   @Test
   void bulkCheckout_throwsNotFound_whenItemDoesNotExist() {
-    // Given
     UUID userId = UUID.randomUUID();
     UUID missingItemId = UUID.randomUUID();
 
@@ -208,7 +185,6 @@ class InventoryItemServiceBulkCheckoutTest {
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(missingItemId));
 
-    // When / Then
     NotFoundException ex =
         assertThrows(
             NotFoundException.class, () -> inventoryItemService.bulkCheckout(request, userId));
@@ -218,33 +194,26 @@ class InventoryItemServiceBulkCheckoutTest {
 
   @Test
   void bulkCheckoutRequest_failsValidation_whenItemIdsIsEmpty() {
-    // Given
     Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of());
 
-    // When
     Set<ConstraintViolation<BulkCheckoutRequest>> violations = validator.validate(request);
 
-    // Then
     assertFalse(violations.isEmpty(), "Validation should fail for empty itemIds list");
   }
 
   @Test
   void bulkCheckoutRequest_failsValidation_whenItemIdsIsNull() {
-    // Given
     Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
     BulkCheckoutRequest request = new BulkCheckoutRequest(null);
 
-    // When
     Set<ConstraintViolation<BulkCheckoutRequest>> violations = validator.validate(request);
 
-    // Then
     assertFalse(violations.isEmpty(), "Validation should fail for null itemIds");
   }
 
   @Test
   void bulkCheckout_stopsImmediately_whenFirstItemBelongsToOtherUser() {
-    // Given – two items, first belongs to another user
     UUID currentUserId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID itemId1 = UUID.randomUUID();
@@ -255,12 +224,10 @@ class InventoryItemServiceBulkCheckoutTest {
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
 
-    // When / Then
     assertThrows(
         AccessDeniedException.class,
         () -> inventoryItemService.bulkCheckout(request, currentUserId));
 
-    // Second item must never be fetched
     verify(inventoryItemRepository, never()).findByIdForUpdate(itemId2);
     verify(inventoryItemRepository, never()).deleteAllById(any());
   }

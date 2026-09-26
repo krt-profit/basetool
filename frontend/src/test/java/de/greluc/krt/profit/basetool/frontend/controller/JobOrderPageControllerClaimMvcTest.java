@@ -51,11 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the AJAX claim ("Eintragung") relay endpoints in {@link JobOrderWriteController}
- * (Phase 6, #346): create/update via {@code POST /orders/{id}/claims} and withdrawal via {@code
- * POST /orders/{id}/claims/{claimId}/withdraw}. Verifies the success path, the backend-status
- * propagation (409 conflict, 400 overclaim) that the detail-page JS turns into a clean toast, and
- * the role gate that returns 403 for a plain member without ever calling the backend.
+ * MVC tests for the AJAX claim endpoints of {@link JobOrderWriteController}: create/update and
+ * withdraw succeed, backend 409 and 400 statuses are relayed, and a plain member gets 403 without a
+ * backend call.
  */
 @SpringBootTest
 class JobOrderPageControllerClaimMvcTest {
@@ -148,12 +146,6 @@ class JobOrderPageControllerClaimMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_Conflict_PreservesRfc7807Code() throws Exception {
-    // A same-squadron first-claim race that outlasted the backend's bounded upsert retry surfaces a
-    // truthful 409 whose RFC 7807 code (OPTIMISTIC_LOCK) must reach krt-fetch verbatim so it drives
-    // the "stale data, reload?" confirm rather than a plain toast. If propagateBackendError ever
-    // regressed to ResponseEntity.status(409).build(), status().isConflict() would still pass but
-    // the code would be lost — this asserts the content-type AND the code, closing that gap (#1111
-    // collapse-to-500 / lost-code guard).
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();

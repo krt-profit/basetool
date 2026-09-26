@@ -42,15 +42,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link OrgUnitBankVisibilityService} — the view-grant write mechanics of the
- * org-unit bank seam (L3 split, #922). These lock the idempotent, audit-on-state-change contract of
- * the four grant tiers (role bucket, all-members, area-members, individual user) required by
- * REQ-AUDIT-001 / REQ-BANK-035: a grant/enable inserts a {@code bank_account_grant} row and records
- * {@code BALANCE_VISIBILITY_GRANTED} <em>only</em> when the grant did not already exist, and a
- * revoke/disable records {@code BALANCE_VISIBILITY_REVOKED} <em>only</em> when a row was actually
- * removed — so a duplicate grant never emits a phantom second audit line nor widens the balance
- * ACL, and revoking a non-existent grant records nothing. {@link
- * OrgUnitBankVisibilityService#grantUser} additionally guards on user existence.
+ * Unit tests for {@link OrgUnitBankVisibilityService} (REQ-BANK-035): each grant tier inserts a row
+ * and audits only when the grant is new, each revoke audits only when a row was removed, and {@link
+ * OrgUnitBankVisibilityService#grantUser} requires an existing user.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitBankVisibilityServiceTest {

@@ -68,10 +68,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the org-unit officer/lead bank page (epic #666 F1/F2) to pin that the balance card, the
- * request form modal and the own-request list with a cancel action all render without a Thymeleaf
- * error, that the page is gated to leadership roles (not {@code BANK_EMPLOYEE}), and that the
- * {@code orgUnitBank} fragment view resolves for the in-place swap.
+ * Renders the org-unit bank page for officers and leads: balance card, request form modal and own
+ * request list with cancel render without error, the page is gated to leadership roles, and the
+ * {@code orgUnitBank} fragment resolves.
  */
 @SpringBootTest
 class OrgUnitBankPageControllerMvcTest {
@@ -172,33 +171,21 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
-        // The 30-day trend renders: the sign-colored delta label + the inline SVG sparkline,
-        // mirroring the bank dashboard cards (REQ-BANK-016).
         .andExpect(content().string(Matchers.containsString("kpi-delta")))
         .andExpect(content().string(Matchers.containsString("kpi-sparkline")))
-        // The single page-level request CTA shows (an active account exists) and opens the modal.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-btn")))
         .andExpect(content().string(Matchers.containsString("org-unit-request-modal")))
-        // The merged source selector lists the active account as an option marked debitable
-        // (data-can-debit="true", since it is the caller's request-capable account), and offers the
-        // TRANSFER op (REQ-BANK-039/-042).
         .andExpect(content().string(Matchers.containsString("name=\"sourceAccountId\"")))
         .andExpect(content().string(Matchers.containsString("org-unit-request-account")))
         .andExpect(content().string(Matchers.containsString("data-can-debit=\"true\"")))
         .andExpect(content().string(Matchers.containsString("name=\"type\"")))
-        // REQ-BANK-040: the transfer destination select MUST be named targetAccountId to match the
-        // CreateBankBookingRequest DTO field — a mismatch silently 400s every transfer request.
         .andExpect(content().string(Matchers.containsString("name=\"targetAccountId\"")))
-        // The own-request row renders with a cancel form.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-cancel-btn")));
   }
 
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_rendersAccountNameFilterOverKontenList() throws Exception {
-    // REQ-BANK-046: the "Konten" list carries a client-side account-name live filter — the search
-    // box + its scope/empty wiring, the per-row data-filter-name and the filter-empty note all
-    // render inside the swapped fragment above the account list.
     stubData(UUID.randomUUID());
 
     mockMvc
@@ -206,16 +193,12 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("id=\"ou-acc-filter\"")))
         .andExpect(content().string(Matchers.containsString("data-bank-acc-filter")))
-        // The filter scopes the switchable account-list container (card grid OR table), not the
-        // former single .ou-list, so it works across both view layouts (REQ-BANK-021/-046).
         .andExpect(
             content().string(Matchers.containsString("data-filter-scope=\"#ou-acc-results\"")))
         .andExpect(
             content().string(Matchers.containsString("data-filter-empty=\"#ou-acc-filter-empty\"")))
-        // The account row carries the name the filter matches against.
         .andExpect(
             content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
-        // The no-results note (hidden until the filter empties the list) is present.
         .andExpect(content().string(Matchers.containsString("id=\"ou-acc-filter-empty\"")));
   }
 
@@ -233,21 +216,15 @@ class OrgUnitBankPageControllerMvcTest {
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_defaultLayoutRendersCardGridAndViewToggle() throws Exception {
-    // REQ-BANK-021: the Konten list defaults to the card grid, with a single per-user
-    // "Tabellenansicht" view toggle (no by-Bereich grouping). The toggle uses distinct
-    // data-ou-view-* attributes and is unchecked by default (card view).
     stubData(UUID.randomUUID());
 
     mockMvc
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
-        // The switchable account-list container + its server-rendered layout marker.
         .andExpect(content().string(Matchers.containsString("id=\"ou-acc-results\"")))
         .andExpect(content().string(Matchers.containsString("data-ou-layout=\"card\"")))
-        // The card grid renders (not the dense table's header strip).
         .andExpect(content().string(Matchers.containsString("ou-acc-grid")))
         .andExpect(content().string(Matchers.not(Matchers.containsString("ou-rowhead"))))
-        // The single view toggle, unchecked by default (its own module, not the dashboard's).
         .andExpect(content().string(Matchers.containsString("data-ou-view-toggles")))
         .andExpect(content().string(Matchers.containsString("data-ou-view-layout")));
   }
@@ -255,8 +232,6 @@ class OrgUnitBankPageControllerMvcTest {
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_tableLayoutRendersDenseTable() throws Exception {
-    // REQ-BANK-021: layout=table renders the dense table (the former .ou-list) instead of the card
-    // grid, and the toggle checkbox is checked.
     stubData(UUID.randomUUID());
 
     mockMvc
@@ -270,7 +245,6 @@ class OrgUnitBankPageControllerMvcTest {
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_accountsFragmentViewResolves() throws Exception {
-    // The view-toggle swap re-renders only the switchable account list (REQ-FE-005).
     stubData(UUID.randomUUID());
 
     mockMvc
@@ -283,16 +257,10 @@ class OrgUnitBankPageControllerMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void orgUnitBank_memberIsPermitted() throws Exception {
-    // REQ-BANK-037: the page is reachable by any KRT member (the cartel account is visible to all,
-    // and a member may have been granted access to other accounts); the backend seam scopes the
-    // visible accounts. The member sees an empty page here because no data is stubbed.
     mockMvc.perform(get("/org-unit-bank")).andExpect(status().isOk());
   }
 
   @Test
-  // The role was GUEST until V239 deleted it; NO_ROLE is the marker that replaced it
-  // (REQ-SEC-053). Such a caller never reaches the frontend at all now — BackendRoleSyncFilter
-  // parks it on the pending-approval page — so this is the page's own gate, held for defence.
   @WithMockUser(roles = {"NO_ROLE"})
   void orgUnitBank_roleLessCallerIsForbidden() throws Exception {
     mockMvc.perform(get("/org-unit-bank")).andExpect(status().isForbidden());
@@ -301,9 +269,6 @@ class OrgUnitBankPageControllerMvcTest {
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_failingFetchDegradesToEmptyAndStillRenders() throws Exception {
-    // F5: the landing-page reads run concurrently and each swallows its own failure -> a single
-    // backend hiccup degrades to an empty list instead of 500-ing or blanking the page, and every
-    // model attribute is still populated. Here /balances throws but /requests is stubbed.
     BankBookingRequestDto request =
         new BankBookingRequestDto(
             UUID.randomUUID(),
@@ -352,7 +317,6 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(view().name("org-unit-bank"))
         .andExpect(model().attributeExists("balances", "ownRequests", "foreignRequests"))
         .andExpect(model().attributeExists("requestTransferTargets", "anyCanRequest", "sparks"))
-        // The failed balances fetch degraded to empty -> no requestable account -> no request CTA.
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-btn"))));
   }
@@ -360,10 +324,6 @@ class OrgUnitBankPageControllerMvcTest {
   @Test
   @WithMockUser(roles = {"LOGISTICIAN"})
   void orgUnitBank_specialAccountIsDepositTargetWithCta() throws Exception {
-    // REQ-BANK-042: a special account (Sonderkonto) is not withdrawal/transfer-requestable
-    // (canRequest=false), but it IS a valid deposit target — so the page-level request CTA + modal
-    // are shown and the account appears as a (non-debitable) deposit option. Pins that the template
-    // handles the null org unit.
     UUID specialId = UUID.randomUUID();
     OrgUnitBankBalanceDto special =
         new OrgUnitBankBalanceDto(
@@ -395,21 +355,15 @@ class OrgUnitBankPageControllerMvcTest {
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("Event Sonderkonto")))
-        // The account row renders (its testid is unchanged from the former card).
         .andExpect(content().string(Matchers.containsString("org-unit-bank-card")))
-        // A deposit is possible against the special account -> the CTA + modal render.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-btn")))
         .andExpect(content().string(Matchers.containsString("org-unit-request-modal")))
-        // It is offered as a deposit option, marked non-debitable (no withdrawal/transfer from it).
         .andExpect(content().string(Matchers.containsString("data-can-debit=\"false\"")));
   }
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void orgUnitBank_noViewableAccountsStillOffersDepositCta() throws Exception {
-    // REQ-BANK-042: a member who may view no account can still raise a deposit request, so the CTA
-    // +
-    // modal render whenever at least one active account exists (here only via transfer-targets).
     BankAccountRefDto target = new BankAccountRefDto(UUID.randomUUID(), "KB-0001", "KRT", "CARTEL");
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), anyTypeRef())).thenReturn(List.of());
@@ -424,10 +378,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * Stubs the read-only account drill-in (REQ-BANK-038) plus the holder/OL settings region: an
-   * ORG_UNIT account with a balance target, a single booking, one granted role bucket and one
-   * granted user. The visibility/limit user pickers are server-side search comboboxes (#1193), so
-   * no user roster is stubbed here.
+   * Stubs the read-only account drill-in (REQ-BANK-038) and the settings region: an ORG_UNIT
+   * account with a balance target, one booking, one granted role bucket and one granted user.
    *
    * @param accountId the account id used in every backend URI
    */
@@ -539,33 +491,22 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank-account-detail"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
-        // Facts render as the kpi-total grid, target fact included.
         .andExpect(content().string(Matchers.containsString("ou-facts")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-target")))
-        // Two tabs (REQ-BANK-038): Buchungshistorie + Verantwortung & Sichtbarkeit, with the
-        // settings
-        // region and the booking history each in their tab panel.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-history")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-settings")))
         .andExpect(content().string(Matchers.containsString("data-tabpanel=\"settings\"")))
         .andExpect(content().string(Matchers.containsString("data-tabpanel=\"history\"")))
-        // Settings region with the quiet per-audience visibility toggles.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-settings")))
         .andExpect(content().string(Matchers.containsString("vis-row")))
         .andExpect(content().string(Matchers.containsString("org-unit-vis-role-LOGISTICIAN")))
-        // History panel kept (4-column, Halter-redacted).
         .andExpect(content().string(Matchers.containsString("org-unit-bank-bookings-panel")))
-        // The always-"Aktiv" status pill was dropped from the header.
         .andExpect(content().string(Matchers.not(Matchers.containsString("status-pill"))));
   }
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void orgUnitBankAccount_plainViewerNoLimits_rendersHistoryWithoutTabs() throws Exception {
-    // REQ-BANK-038: a viewer who cannot manage and whose account carries no approval limits has no
-    // "Verantwortung & Sichtbarkeit" tab — the booking history renders plainly with its own
-    // heading,
-    // the shared info tiles still on top.
     UUID accountId = UUID.randomUUID();
     BankAccountDto account =
         new BankAccountDto(
@@ -612,7 +553,6 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("ou-facts")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-bookings-panel")))
-        // No settings tab for a plain viewer with no limits — and so no tab nav at all.
         .andExpect(
             content()
                 .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-settings"))))
@@ -625,10 +565,6 @@ class OrgUnitBankPageControllerMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER"})
   void orgUnitBankAccount_viewerWithLimits_seesInlineLimitsButNoResponsibilityTab()
       throws Exception {
-    // REQ-BANK-038/-041: a plain viewer (not the responsible holder) still sees the read-only
-    // approval-limit display inline (it applies to their own requests), but NOT the "Verantwortung
-    // &
-    // Sichtbarkeit" tab — that tab is the responsible holder's alone.
     UUID accountId = UUID.randomUUID();
     BankAccountDto account =
         new BankAccountDto(
@@ -674,11 +610,7 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank/accounts/" + accountId))
         .andExpect(status().isOk())
-        // The read-only limits display renders for the viewer...
         .andExpect(content().string(Matchers.containsString("bank-approval-limits-display")))
-        // ...but there is no responsibility tab and no editable settings hud-box (match the exact
-        // testid attribute — the always-present swap container id is
-        // "org-unit-bank-settings-results").
         .andExpect(
             content()
                 .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-settings"))))
@@ -703,16 +635,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * REQ-BANK-055 regression: the pre-filled Empfaenger option must carry the caller's <b>JWT
-   * subject</b> as its value, never their username.
-   *
-   * <p>This client is configured with {@code user-name-attribute: preferred_username}, so {@code
-   * #authentication.name} is the USERNAME. Seeding the option with it submitted a username where
-   * the backend deserializes a UUID, which 400'd <em>every</em> withdrawal request — the request
-   * was silently never created. Nothing in the render tests noticed (the markup looked perfectly
-   * well-formed); only {@code BankOrgUnitRequestsE2eTest} caught it, and only because it asserts
-   * the request exists afterwards. Asserting the shape of the seeded value here makes the
-   * regression cheap to catch again.
+   * Verifies that the pre-filled Empfaenger option carries the caller's JWT subject, not their
+   * username (REQ-BANK-055).
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -735,7 +659,6 @@ class OrgUnitBankPageControllerMvcTest {
             .getResponse()
             .getContentAsString();
 
-    // The seeded option sits inside the counterparty picker; its value must parse as a UUID.
     Matcher seeded =
         Pattern.compile(
                 "counterpartyUserId.*?<option[^>]*value=\"([^\"]+)\"[^>]*selected", Pattern.DOTALL)
@@ -754,18 +677,11 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * Builds the caller principal the way {@code application.yml} configures this client: {@code
-   * user-name-attribute: preferred_username}.
-   *
-   * <p>That third constructor argument is the whole point. {@code oidcLogin()} defaults the name
-   * attribute to {@code sub}, which makes {@code #authentication.name} accidentally equal the user
-   * id in tests while it is the USERNAME in production — so a template reading {@code
-   * #authentication.name} as an id passes every render test and 400s every real request. Mirroring
-   * the configured key here is what lets {@link
-   * #orgUnitBank_empfaengerSeedIsTheSubjectNotTheUsername()} actually fail on that bug.
+   * Builds an officer principal with {@code preferred_username} as the name attribute, as the
+   * client is configured, so {@code #authentication.name} is the username rather than the subject.
    *
    * @param sub the JWT subject (the real user id)
-   * @return an OIDC principal whose {@code getName()} is the username, not the subject
+   * @return an OIDC principal whose {@code getName()} is the username
    */
   private static DefaultOidcUser officerPrincipal(String sub) {
     OidcIdToken idToken =
@@ -779,10 +695,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * REQ-BANK-056: a still-pending, unapproved own request offers an edit action and its per-row
-   * modal, which PUTs to the request's own endpoint. The modal is rendered once per row (rather
-   * than primed) because the Empfaenger picker is a remote combobox that only seeds itself from a
-   * server-rendered {@code selected} option.
+   * Verifies that a pending, unapproved own request offers an edit action with a per-row modal that
+   * PUTs to the request's endpoint (REQ-BANK-056).
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -800,12 +714,8 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("ou-req-edit-")))
         .andExpect(content().string(Matchers.containsString("data-method=\"PUT\"")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-amount")))
-        // WITHDRAWAL -> the Empfaenger block and the Begruendung field are rendered; the fixture is
-        // a withdrawal, so a missing picker here would mean the type gating is inverted.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-cp-user")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-justification")))
-        // The modal must NOT sit inside the table: a browser hoists it out of <tbody> and detaches
-        // it from its row. Assert it renders after the table has been closed.
         .andExpect(
             content()
                 .string(
@@ -814,9 +724,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * REQ-BANK-056: once the responsible holder has granted the over-limit approval the request is
-   * frozen — the backend refuses the edit, so the button and its modal must be gone rather than
-   * offering the requester a dead end. Cancel stays available.
+   * Verifies that an own request with a granted over-limit approval offers no edit action or modal,
+   * while cancel stays available (REQ-BANK-056).
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -830,7 +739,6 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
-        // Positive control: the row itself renders, so this cannot pass for the wrong reason.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-row")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-cancel-btn")))
         .andExpect(
@@ -884,12 +792,11 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * Builds a booking request for either the approval tab or the requester's own list, varying only
-   * the fields that decide whether the row is expandable.
+   * Builds a booking request, varying only the fields that decide whether the row is expandable.
    *
    * @param note the requester's note, or {@code null}
    * @param justification the requester's Begruendung, or {@code null}
-   * @param staffNote the confirming employee's own note (REQ-BANK-054), or {@code null}
+   * @param staffNote the confirming employee's note (REQ-BANK-054), or {@code null}
    * @return the request DTO
    */
   private static BankBookingRequestDto bookingRequest(
@@ -951,11 +858,7 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-detail")))
         .andExpect(content().string(Matchers.containsString("Missionsfreigabe")))
         .andExpect(content().string(Matchers.containsString("Missionsertrag")))
-        // The sub-row must span every column incl. the leading expand cell, or the detail cell
-        // silently shrinks the table.
         .andExpect(content().string(Matchers.containsString("colspan=\"8\"")))
-        // A shared bank-req-<id> would let this chevron toggle the "Meine Antraege" sub-row of the
-        // same request when the responsible holder raised it themselves.
         .andExpect(content().string(Matchers.containsString("ou-foreign-req-")));
   }
 
@@ -979,9 +882,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * REQ-BANK-022/-045: the requester's own "Meine Antraege" rows expand to reveal the Begruendung
-   * and Notiz they filed, the same mechanism as the staff queue and the approval tab. Without it a
-   * requester could not read back what they had written on a request they may still cancel.
+   * Verifies that the requester's own "Meine Antraege" rows expand to show their Begruendung and
+   * Notiz (REQ-BANK-022/-045).
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -999,12 +901,7 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-detail")))
         .andExpect(content().string(Matchers.containsString("Missionsfreigabe")))
         .andExpect(content().string(Matchers.containsString("Missionsertrag")))
-        // Seven columns here, not the approval tab's eight -- a stale colspan silently shrinks the
-        // detail cell.
         .andExpect(content().string(Matchers.containsString("colspan=\"7\"")))
-        // Distinct from the approval tab's ou-foreign-req-: a responsible holder who raised the
-        // request sees the SAME request in both tables, and a shared id would make one chevron
-        // toggle the other table's sub-row.
         .andExpect(content().string(Matchers.containsString("ou-own-req-")));
   }
 
@@ -1019,7 +916,6 @@ class OrgUnitBankPageControllerMvcTest {
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_ownRequestNeverRendersTheStaffNote() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    // Defence in depth: even if an unredacted DTO reached the template, nothing may render it.
     when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
         .thenReturn(List.of(bookingRequest(null, null, "Bar uebergeben, Zeuge greluc")));
 
@@ -1047,7 +943,6 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
-        // The tab itself must be there -- otherwise this test would pass for the wrong reason.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-row")))
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("org-unit-bank-foreign-expand"))))

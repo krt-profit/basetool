@@ -48,11 +48,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC render checks for the {@code /notifications} inbox page's no-silent-cap UI (REQ-NOTIF-019).
- * The page shows the newest 50 notifications; when more exist it must render the "latest N of M"
- * hint and a load-more control, and when they all fit one page it must render neither. This test
- * also guards the Thymeleaf template itself — its {@code #{notifications.showingLatest(...)}}
- * MessageFormat call and the load-more fragment are exercised nowhere else.
+ * MVC render checks for the {@code /notifications} inbox (REQ-NOTIF-019): the "latest N of M" hint
+ * and load-more control appear only when more notifications exist than fit one page.
  */
 @SpringBootTest
 class NotificationPageRenderMvcTest {
@@ -93,9 +90,6 @@ class NotificationPageRenderMvcTest {
     return new PageResponse<>(content, 0, 50, totalElements, totalPages, List.of());
   }
 
-  // covers REQ-NOTIF-019 — an inbox with more than one page renders the truncation hint + the
-  // load-more control, so the newest-50 cap is visible, never silent. Also proves the template's
-  // showingLatest(...) MessageFormat call and the load-more fragment render without error.
   @Test
   @WithMockUser
   void page_withMoreThanOnePage_rendersHintAndLoadMore() throws Exception {
@@ -110,7 +104,6 @@ class NotificationPageRenderMvcTest {
         .andExpect(content().string(containsString("data-notif-next-page=\"1\"")));
   }
 
-  // covers REQ-NOTIF-019 — an inbox that fits one page renders neither the hint nor the load-more.
   @Test
   @WithMockUser
   void page_withSinglePage_rendersNoLoadMore() throws Exception {

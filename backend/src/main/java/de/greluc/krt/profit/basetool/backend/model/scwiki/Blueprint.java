@@ -48,16 +48,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
- * A crafting blueprint synced from the SC Wiki {@code /api/blueprints} endpoint
- * (SC_WIKI_SYNC_PLAN.md §6.3.2). Keyed by {@link #scwikiUuid}; produces an output {@link GameItem}
- * from an ordered list of {@link BlueprintIngredient}s and yields a list of {@link
- * BlueprintDismantleReturn}s when dismantled.
- *
- * <p>The blueprint owns both child collections with {@code cascade = ALL} + {@code orphanRemoval}.
- * The R4 {@code ScWikiBlueprintSyncService} re-syncs by mutating the managed collections in place
- * (reusing lines by index, dropping trailing ones) and relying on Hibernate dirty-checking — it
- * never issues a {@code @Modifying} bulk update inside the per-blueprint loop, so the CLAUDE.md
- * detach-clear trap does not apply.
+ * A crafting blueprint synced from the SC Wiki {@code /api/blueprints} endpoint, keyed by {@link
+ * #scwikiUuid}. It produces an output {@link GameItem} from ordered {@link BlueprintIngredient}s
+ * and yields {@link BlueprintDismantleReturn}s when dismantled; it owns both child collections with
+ * cascade and orphan removal.
  */
 @Entity
 @Table(name = "blueprint")
@@ -141,8 +135,6 @@ public class Blueprint extends AbstractEntity<UUID> {
   /** Soft-delete marker: first run in which the Wiki stopped returning this blueprint. */
   @Column(name = "scwiki_deleted_at")
   private Instant scwikiDeletedAt;
-
-  // ───── KRT P4K Reader source lane (catalog import) ─────
 
   /**
    * DataForge {@code __ref} blueprint GUID observed by the KRT P4K Reader import. Kept alongside

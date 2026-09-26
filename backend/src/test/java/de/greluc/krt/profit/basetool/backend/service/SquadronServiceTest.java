@@ -65,13 +65,12 @@ class SquadronServiceTest {
   void createSquadron_MissingShorthand_ShouldThrow() {
     Squadron s = new Squadron();
     s.setName("Incomplete");
-    // No shorthand
 
     assertThrows(
         DataIntegrityViolationException.class,
         () -> {
           squadronService.createSquadron(s);
-          squadronRepository.flush(); // Force DB write
+          squadronRepository.flush();
         });
   }
 
@@ -98,7 +97,6 @@ class SquadronServiceTest {
     s.setName("Profit Toggle");
     s.setShorthand("PFT");
     s = squadronService.createSquadron(s);
-    // Squadrons default to NOT profit-eligible.
     assertFalse(s.isProfitEligible());
 
     Squadron enabled = squadronService.setProfitEligible(s.getId(), true);
@@ -111,7 +109,6 @@ class SquadronServiceTest {
 
   @Test
   void deleteSquadron_ShouldSetInactive() {
-    // Given
     Squadron squadron = new Squadron();
     squadron.setName("Active Squadron");
     squadron.setShorthand("ACT");
@@ -121,8 +118,6 @@ class SquadronServiceTest {
     mission.setName("Test Mission");
     mission.setStatus("PLANNED");
     mission.setPlannedStartTime(Instant.now());
-    // V89 made owning_squadron_id NOT NULL — stamp the test mission with the squadron
-    // created above so persist does not violate the new constraint.
     mission.setOwningOrgUnit(squadron);
     mission = missionRepository.save(mission);
 
@@ -132,11 +127,9 @@ class SquadronServiceTest {
     participant.setOrgUnits(java.util.List.of(squadron));
     missionParticipantRepository.save(participant);
 
-    // When
     UUID squadronId = squadron.getId();
     squadronService.deleteSquadron(squadronId);
 
-    // Then
     Squadron updatedSquadron = squadronRepository.findById(squadronId).orElseThrow();
     assertFalse(updatedSquadron.isActive());
   }

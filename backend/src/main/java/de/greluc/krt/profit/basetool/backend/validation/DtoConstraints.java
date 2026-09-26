@@ -20,14 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.validation;
 
 /**
- * Single source of truth for the write-DTO validation constants that were copy-pasted across the
- * request records (S13, #919). Referencing these compile-time constants from {@code @Size(max = …)}
- * / {@code @Pattern(regexp = …)} keeps the constraint value identical (so the generated {@code
- * openapi.json} {@code maxLength}/{@code pattern} is unchanged) while removing the duplication —
- * change a shared limit or regex here, not in N records.
- *
- * <p>New/migrated write DTOs should reference these rather than re-typing the literal; the
- * per-slice rollout across the remaining DTOs is incremental (ADR-0060).
+ * Shared validation constants for write DTOs, referenced from {@code @Size(max = …)} and
+ * {@code @Pattern(regexp = …)} so a shared limit or regex is defined once (ADR-0060).
  */
 public final class DtoConstraints {
 

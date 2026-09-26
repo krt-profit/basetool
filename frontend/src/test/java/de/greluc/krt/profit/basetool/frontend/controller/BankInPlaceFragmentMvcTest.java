@@ -58,13 +58,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the three in-place swap fragments introduced for #579 (no-reload Bank conversion,
- * REQ-FE-005) so a Thymeleaf error in the {@code th:fragment} / {@code th:block} wrapping is caught
- * at build time (the pure-Mockito controller tests only assert the returned view name, not that the
- * fragment renders). Each test also pins the swap BOUNDARY: the manage/grants fragments must
- * exclude their creation modals (which stay outside the swapped region), while the account-detail
- * {@code accountBody} fragment must INCLUDE the booking modals (their distribution-derived holder
- * selects refresh with the money region).
+ * Renders the three Bank in-place swap fragments (REQ-FE-005) and pins their boundaries: the
+ * manage/grants fragments exclude their creation modals, the {@code accountBody} fragment includes
+ * the booking modals.
  */
 @SpringBootTest
 class BankInPlaceFragmentMvcTest {
@@ -87,8 +83,6 @@ class BankInPlaceFragmentMvcTest {
   @WithMockUser(roles = {"BANK_MANAGEMENT"})
   void manage_fragmentManageBody_rendersPanelWithoutTheCreationModals() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    // The account list is paged now (REQ-BANK-053): the paged list request and the CARTEL lookup
-    // both hit /api/v1/bank/accounts?…, so a single startsWith stub feeds both.
     when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(
@@ -100,15 +94,11 @@ class BankInPlaceFragmentMvcTest {
                 Collections.emptyList()));
 
     mockMvc
-        // Pin the accounts tab explicitly: Halter is the default-open tab, so the account row only
-        // renders in the swapped body when ?tab=konten is requested.
         .perform(get("/bank/manage").param("tab", "konten").param("fragment", "manageBody"))
         .andExpect(status().isOk())
         .andExpect(view().name("bank-manage :: manageBody"))
-        // The tab-nav (with its counts) and the account row are inside the swapped body.
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-tab-accounts\"")))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-account-row\"")))
-        // The creation modal lives outside the fragment and must NOT be in the swapped HTML.
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("bank-create-account-modal"))));
   }
@@ -126,7 +116,6 @@ class BankInPlaceFragmentMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("bank-grants :: grantsMatrix"))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-grant-row\"")))
-        // The create-grant modal lives outside the fragment and must NOT be in the swapped HTML.
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("bank-grant-create-modal"))));
   }
@@ -165,28 +154,17 @@ class BankInPlaceFragmentMvcTest {
             List.of(
                 new BankHolderDto(
                     holderId, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
-    // No transfer-target roster is preloaded now — the destination is a server-side account-search
-    // combobox (remote-bank-accounts, REQ-FE-017/ADR-0106).
 
     mockMvc
         .perform(get("/bank/accounts/" + accountId).param("fragment", "accountBody"))
         .andExpect(status().isOk())
         .andExpect(view().name("bank-account-detail :: accountBody"))
-        // The facts strip + booking history are inside the swapped body.
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-balance\"")))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-bookings-panel\"")))
-        // Unlike manage/grants, the unified movement modal is part of the accountBody fragment so
-        // its
-        // distribution-derived holder selects refresh in the same swap (REQ-BANK-017, #997). The
-        // single Kontobewegung entry point + its type selector replace the three old modals.
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-movement-open\"")))
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-movement-type\"")))
-        // Field hints are inline "?" tooltip markers, not sub-field text.
         .andExpect(content().string(Matchers.containsString("field-hint-marker")))
-        // The fee-inclusive toggle (REQ-BANK-033, #999) renders in the modal, hidden by default
-        // (bank.js reveals it only for a fee-bearing withdrawal/transfer) and is unchecked by
-        // default: on-top is the default mode, fee-inclusive is opt-in.
         .andExpect(
             content()
                 .string(Matchers.containsString("data-testid=\"bank-movement-fee-inclusive\"")))
@@ -196,10 +174,6 @@ class BankInPlaceFragmentMvcTest {
                 .string(
                     Matchers.not(
                         Matchers.containsString("name=\"feeInclusive\" value=\"true\" checked"))))
-        // The external-counterparty toggle + free-text name + shared all-org-units source render
-        // (REQ-BANK-044, #994); the "kein Tool-Account" toggle now sits AFTER the
-        // Einzahler/Empfaenger
-        // picker and BEFORE the shared Einheit row.
         .andExpect(
             content().string(Matchers.containsString("data-role=\"bank-cp-external-toggle\"")))
         .andExpect(content().string(Matchers.containsString("name=\"counterpartyExternalName\"")))
@@ -212,17 +186,12 @@ class BankInPlaceFragmentMvcTest {
                             "data-counterparty-user",
                             "data-role=\"bank-cp-external-toggle\"",
                             "data-counterparty-orgunit"))))
-        // #1193 follow-up: the counterparty user picker is a server-side searchable combobox
-        // (remote-bank-users), so it carries the marker and preloads no user roster.
         .andExpect(
             content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-users\"")))
-        // REQ-FE-017/ADR-0106: the transfer-destination account picker is a server-side
-        // account-search combobox (remote-bank-accounts) and preloads no account roster.
         .andExpect(
             content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")))
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("id=\"bank-deposit-modal\""))));
-    // The roster is fetched on demand, so the accountBody render issues no all-users lookup.
     verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 

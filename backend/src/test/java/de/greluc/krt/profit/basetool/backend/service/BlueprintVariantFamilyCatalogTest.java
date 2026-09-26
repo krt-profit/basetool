@@ -76,18 +76,14 @@ class BlueprintVariantFamilyCatalogTest {
 
     Map<String, Set<String>> index = catalog.familyIndex();
 
-    // The base + both variants collapse onto one family holding all three concrete product keys.
     assertEquals(
         Set.of(
             "fresnel energy lmg",
             "fresnel \"molten\" energy lmg",
             "fresnel \"rockfall\" energy lmg"),
         index.get("fresnel energy lmg"));
-    // The magazine is its own atomic family, never folded into the weapon. Its (sentinel-prefixed)
-    // key comes from the resolver so the test does not hard-code the atomic-key encoding.
     String magazineFamily = resolver.familyKey("Fresnel Energy LMG Magazine (200 cap)");
     assertEquals(Set.of("fresnel energy lmg magazine (200 cap)"), index.get(magazineFamily));
-    // Null / blank output names are skipped (no empty-key family).
     assertTrue(index.keySet().stream().noneMatch(String::isEmpty));
   }
 

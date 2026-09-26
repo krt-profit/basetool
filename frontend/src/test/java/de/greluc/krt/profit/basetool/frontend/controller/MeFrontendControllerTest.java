@@ -44,13 +44,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the active-OrgUnit switcher endpoint {@code POST /me/active-org-unit} (FE-SEC-02).
- *
- * <p>The switcher redirects back to the form's {@code _referer} field, which used to go into a
- * {@code RedirectView} unchecked — a crafted form could send a signed-in member to any site. It is
- * now honoured only as a same-origin path. The {@code orgUnitId} is bound as a {@link UUID}, so a
- * malformed one is a {@code 400} rather than the {@code 500} an unguarded {@code UUID.fromString}
- * produced.
+ * Tests the active-OrgUnit switcher endpoint {@code POST /me/active-org-unit} (FE-SEC-02): the
+ * {@code _referer} redirect target is honoured only as a same-origin path, and a malformed {@code
+ * orgUnitId} yields {@code 400}.
  */
 @SpringBootTest
 class MeFrontendControllerTest {

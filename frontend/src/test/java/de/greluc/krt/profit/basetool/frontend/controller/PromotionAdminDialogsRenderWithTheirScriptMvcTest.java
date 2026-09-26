@@ -49,13 +49,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * The promotion admin pages render their dialogs exactly when they render the script that drives
- * them (REQ-UI-013).
- *
- * <p>In the admin's all-squadrons view the two pages show a pick-a-squadron prompt and load neither
- * their openers nor their page script. Until 2026-09-23 they still rendered every dialog: dead
- * markup whose close handlers did not exist. With a squadron pinned, dialogs and script come
- * together.
+ * Verifies that the promotion admin pages render their dialogs exactly when they render the script
+ * that drives them (REQ-UI-013).
  */
 @SpringBootTest
 class PromotionAdminDialogsRenderWithTheirScriptMvcTest {

@@ -37,43 +37,20 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One filled functional-rank position in the Profit-Bereich org chart (see Flyway migration {@code
- * V136}). A row binds a {@link User} to an {@link OrgChartPositionType} within one of the three
- * scopes (area leadership / Staffel / Spezialkommando) and, for the squadron sub-tree, to a {@link
- * #parent} position.
+ * One filled functional-rank position in the Profit-Bereich org chart, binding a holder to an
+ * {@link OrgChartPositionType} within a scope and, in the squadron sub-tree, to a {@link #parent}.
  *
- * <p><b>Scope discriminator.</b> A {@code null} {@link #orgUnit} marks an area-leadership position
- * (Bereichsleitung); a non-null {@link #orgUnit} marks a Staffel- or SK-scoped position. The {@code
- * chk_org_chart_scope} CHECK constraint keeps {@code position_type} and the nullability of {@code
- * org_unit_id} consistent at the database layer.
+ * <ul>
+ *   <li>A {@code null} {@link #orgUnit} marks an area-leadership position.
+ *   <li>{@link #parent} is set only for {@link OrgChartPositionType#DEPUTY_COMMAND_LEAD} and {@link
+ *       OrgChartPositionType#ENSIGN}; deleting a parent cascades to its children.
+ *   <li>A {@link OrgChartPositionType#COMMAND_LEAD} row models the Kommando itself: it may carry a
+ *       group {@link #name} and have no holder.
+ *   <li>Every other position is held by exactly one of a {@link #user} or a free-text {@link
+ *       #displayName}.
+ * </ul>
  *
- * <p><b>Tree.</b> {@link #parent} is only set for {@link OrgChartPositionType#DEPUTY_COMMAND_LEAD}
- * (points at its Kommandoleiter) and {@link OrgChartPositionType#ENSIGN} (points at a
- * Kommandoleiter; {@code null} means the Ensign reports directly to the Staffelleiter). The
- * self-referencing FK is {@code ON DELETE CASCADE}, so deleting a Kommandoleiter row removes its
- * Stv. and the Ensigns reporting into it in one statement; the inline editor warns the admin about
- * those children before the delete.
- *
- * <p><b>Kommando(gruppe).</b> A {@link OrgChartPositionType#COMMAND_LEAD} row models the Kommando
- * itself, not merely the person leading it: it carries an optional group {@link #name} and an
- * optional holder ({@link #user} may be {@code null} while the Kommandoleiter seat is still
- * vacant). This is the one rank allowed to have neither a {@link #user} nor a {@link #displayName}
- * — it lets an admin create and name a Kommando, attach a Stv. Kommandoleiter and Ensigns to it,
- * and only later assign the Kommandoleiter. The {@code chk_org_chart_name} CHECK (migration {@code
- * V138}) confines the Kommandogruppen-{@code name} to this rank; every other rank keeps a {@code
- * null} name.
- *
- * <p><b>Holder: account or free-text name.</b> A position is held by <em>exactly one</em> of a
- * {@link #user} (a Basetool account) or a free-text {@link #displayName} (a Kartell member without
- * an account yet) — never both, enforced by the {@code chk_org_chart_holder} CHECK (migration
- * {@code V171}). The {@code chk_org_chart_user} CHECK keeps every non-{@code COMMAND_LEAD} rank
- * filled by one of the two. Reassigning a free-text position to an account simply sets {@link
- * #user} and clears {@link #displayName} in the same transaction, so the swap is regression-free
- * (same row, same place in the tree).
- *
- * <p><b>Descriptive only.</b> Nothing here feeds authorization — the chart records who holds which
- * functional rank; permissions stay with the role model and the {@code org_unit_membership} flags.
- * A free-text holder therefore grants nothing, exactly like a leaderless Kommando.
+ * <p>Descriptive only: nothing here feeds authorization.
  */
 @Entity
 @Table(name = "org_chart_position")
@@ -123,14 +100,9 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   private User user;
 
   /**
-   * Free-text holder name for a Kartell member who has no Basetool account yet, e.g. {@code "Max
-   * Mustermann"}. Mutually exclusive with {@link #user}: the {@code chk_org_chart_holder} CHECK
-   * (migration {@code V171}) forbids both being set at once, and {@code chk_org_chart_user}
-   * requires one of the two on every rank except a leaderless {@link
-   * OrgChartPositionType#COMMAND_LEAD}. {@code null} whenever the holder is an account (or a
-   * Kommando is still leaderless). Once the member gets an account, reassigning the position to
-   * that account clears this field in the same transaction, leaving the row in place. Distinct from
-   * {@link #name}, the Kommandogruppen-Name. Capped at 120 characters by the column definition.
+   * Free-text holder name for a member without a Basetool account, or {@code null} when the holder
+   * is an account or the Kommando is leaderless. Mutually exclusive with {@link #user}; at most 120
+   * characters.
    */
   @Column(name = "display_name", length = 120)
   private String displayName;
@@ -163,14 +135,9 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   private int sortIndex;
 
   /**
-   * The {@link KommandoGroup} this Kommando node mirrors (epic #800, REQ-ROLE-006). Only ever set
-   * on a {@link OrgChartPositionType#COMMAND_LEAD} row — the {@code
-   * chk_org_chart_kommando_group_type} CHECK (migration {@code V186}) forces it {@code null} for
-   * every other rank, and {@code uq_org_chart_one_command_per_group} ties at most one Kommando node
-   * to a group. A non-null link marks a node that is the descriptive mirror of a functional rank
-   * (written solely by {@code OrgChartService.mirror*}); {@code null} marks a legacy,
-   * admin-authored Kommando. {@code ON DELETE CASCADE} removes the node when its group is deleted.
-   * Lazy because the chart assembly does not dereference it per row.
+   * The {@link KommandoGroup} this Kommando node mirrors (REQ-ROLE-006), or {@code null} for an
+   * admin-authored Kommando. Set only on a {@link OrgChartPositionType#COMMAND_LEAD} row, at most
+   * one node per group, and written solely by {@code OrgChartService.mirror*}.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "kommando_group_id")

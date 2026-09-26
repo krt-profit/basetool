@@ -58,11 +58,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link UexItemPriceSyncService} — the R7 UEX item-price matrix sync
- * (SC_WIKI_SYNC_PLAN.md §6.7 / §11 R7). Covers the flag gate, empty-feed abort, the
- * upsert-by-(item,terminal) path against the preloaded id maps (BE-PERF-09), skipping unknown items
- * / terminals, the per-row isolation of a failing row, and the non-empty-seen gate on the stale-row
- * sweep.
+ * Unit tests for {@link UexItemPriceSyncService}: the flag gate, the empty-feed abort, the upsert
+ * by item and terminal, skipping unknown items or terminals, per-row failure isolation and the gate
+ * on the stale-row sweep.
  */
 @ExtendWith(MockitoExtension.class)
 class UexItemPriceSyncServiceTest {
@@ -148,12 +146,9 @@ class UexItemPriceSyncServiceTest {
     assertEquals(0.0, price.getPriceSell());
     assertEquals(1778763945L, price.getDateModified());
     assertNotNull(price.getUexSyncedAt());
-    // Reserved-null columns the feed does not carry.
     assertNull(price.getPriceRent());
     assertNull(price.getStatusBuy());
-    // A processed row → non-empty seen set → the stale-row sweep runs.
     verify(gameItemPriceRepository).findIdsWithLivePrices();
-    // No per-row lookup: the ids come from the three preloaded maps (BE-PERF-09).
     verify(gameItemRepository, never()).findByUexItemId(any());
     verify(terminalRepository, never()).findByIdTerminal(any());
   }
@@ -215,8 +210,6 @@ class UexItemPriceSyncServiceTest {
 
   @Test
   void aPairRepeatedInTheFeed_updatesOneRow_insteadOfInsertingTwo() {
-    // Two feed rows for the same (item, terminal) pair: the second must update the row the first
-    // created, as the per-row lookup used to find it — a second INSERT would hit the unique key.
     GameItem item = gameItem();
     Terminal terminal = terminal();
     when(uexClient.getItemPrices())
@@ -243,7 +236,6 @@ class UexItemPriceSyncServiceTest {
     Terminal terminal = terminal();
     UUID id1 = UUID.randomUUID();
     UUID id3 = UUID.randomUUID();
-    // A priced row left over from an earlier run that this run's feed does not mention.
     UUID staleId = UUID.randomUUID();
     when(uexClient.getItemPrices())
         .thenReturn(
@@ -259,7 +251,6 @@ class UexItemPriceSyncServiceTest {
     when(gameItemRepository.getReferenceById(item2.getId())).thenReturn(item2);
     when(gameItemRepository.getReferenceById(item3.getId())).thenReturn(item3);
     when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
-    // The middle row's persistence blows up; the first and third must still save and be swept.
     when(gameItemPriceRepository.save(any(GameItemPrice.class)))
         .thenAnswer(
             inv -> {
@@ -274,20 +265,12 @@ class UexItemPriceSyncServiceTest {
 
     service.syncItemPrices();
 
-    // The chunk of three saved row 1, failed on row 2 and rolled back; each row was then replayed
-    // in
-    // its own transaction (REQ-DATA-005): row 1 again, row 2 (failing again), row 3 — five saves.
     verify(gameItemPriceRepository, times(5)).save(any(GameItemPrice.class));
     assertEquals(2, tx.rolledBack, "the chunk and the failing row roll back");
-    // Only the two successfully-saved ids count as seen, so they are spared and the leftover row
-    // is cleared. The sweep subtracts the seen ids from the priced rows and clears the remainder in
-    // bounded chunks (REQ-DATA-014).
     ArgumentCaptor<Collection<UUID>> sweep = ArgumentCaptor.captor();
     verify(gameItemPriceRepository).clearPricesByIds(sweep.capture());
     assertEquals(Set.of(staleId), Set.copyOf(sweep.getValue()));
   }
-
-  // ---- helpers ---------------------------------------------------------------------------------
 
   private void knownItems(de.greluc.krt.profit.basetool.backend.repository.UexKeyRef... refs) {
     when(gameItemRepository.findUexItemRefs()).thenReturn(List.of(refs));

@@ -35,67 +35,13 @@ import org.springframework.session.MapSession;
 import org.springframework.session.data.redis.RedisSessionMapper;
 
 /**
- * Turns {@link UnreadableSessionValue} markers back into the {@code null} Spring Session expects,
- * and — the whole point — names the attribute each one came from before it does.
+ * Session mapper that replaces {@link UnreadableSessionValue} markers with {@code null}, logging
+ * the attribute name each came from and queueing it in {@link SessionAttributeRepairQueue}
+ * (REQ-SEC-050, ADR-0157).
  *
- * <p><strong>The field the 2026-09-02 incident did not have.</strong> That day's export carries 496
- * WARN lines, four every ninety seconds for three hours, each reading "Dropped an unreadable
- * session value (InvalidTypeIdException)" and nothing more. There was no way to tell whether the
- * poison was the security context, a flash map, one of this application's own session flags, or
- * something Spring Security parks on its own — and therefore no way to decide what to fix. This
- * mapper closes that gap: it sees the whole session hash, so it can pair the failure's shape with
- * the hash field it sat in.
- *
- * <p>Attribute names are safe to log and nothing else here is. They are compile-time constants —
- * {@code SPRING_SECURITY_CONTEXT}, {@code SessionFlashMapManager.FLASH_MAPS}, {@code
- * krt.terms.accepted} — not member data, not a session id, not a value. The value itself never
- * reaches a log line; only the class names {@link UnreadableSessionValue} carries do.
- *
- * <p><strong>Read-only itself, but no longer the end of the story (2026-09-03).</strong> This class
- * still writes nothing: repairing from here would mean a Redis write on the session <em>read</em>
- * path, the subsystem that took the whole application down twice inside two releases. What it now
- * does is hand the attribute name to {@link SessionAttributeRepairQueue}, so {@link
- * SessionAttributeRepairFilter} can remove it through the ordinary {@code
- * HttpSession#removeAttribute} API before the request ends (REQ-SEC-050, ADR-0157).
- *
- * <p>The earlier version of this note deferred that decision until the WARN named something, on the
- * grounds that "an attribute re-written unreadably on every request would be deleted and
- * re-poisoned forever at an unchanged rate". The evidence arrived and settled it: the name was
- * Tomcat's {@code WsHttpSessionBindingListener}, its writer was fixed by ADR-0154's forced type id,
- * and what kept the alert firing was purely that nothing ever cleared the values written before
- * that fix. Repairing costs one write per drop even in the re-poisoning case, and ends the drop
- * entirely in every other.
- *
- * <p>The repetition guard is the reason this can log at WARN at all. A poisoned session re-reads
- * its whole hash on every request for as long as it lives — up to the 720-hour authenticated window
- * — so one line per occurrence is what produced the storm in the first place. One line per distinct
- * {@code attribute + cause + typeId} says everything the storm said, once.
- *
- * <p><strong>The second job, added 2026-09-16: a hash that is missing a required key reads as no
- * session at all</strong> (REQ-SEC-063, ADR-0186). {@link RedisSessionMapper} throws {@code
- * IllegalStateException: creationTime key must not be null} when the hash it is handed is non-empty
- * but carries none of that key, and nothing on Spring Session's read path catches it — so it leaves
- * {@code SessionRepositoryFilter} and becomes an HTTP 500 for every request that browser makes.
- * This mapper catches it and answers {@code null}, which both upstream call sites already treat as
- * "no session": {@code RedisIndexedSessionRepository#getSession} returns {@code null} to the
- * filter, which then mints a fresh session, and {@code #onMessage} skips the {@code
- * SessionCreatedEvent}. The member is signed out and a login fixes it, instead of being locked out
- * of every page until they delete the cookie themselves.
- *
- * <p>This is not hypothetical and it is not the 2026-09-02 failure mode. Production answered 286
- * such 500s on 2026-09-14 and 18 more on 2026-09-16, with not one "dropped an unreadable session
- * value" line beside them — so nothing had nulled the key, it was never written. {@code
- * RedisSession#saveDelta} writes a plain {@code HSET} of the changed fields only, and {@code
- * creationTime} is in that delta solely {@code if (isNew)}; a request that commits after its hash
- * has gone therefore re-creates the key holding {@code lastAccessedTime} alone and puts the full
- * session TTL back on it. The whole account is in the knowledge base note "A half-written session
- * hash 500s every request that browser makes".
- *
- * <p><strong>Answering {@code null} must stay loud.</strong> If every session lost a required key
- * at once — a genuine wire-format break — a silent {@code null} would sign the whole organisation
- * out with no signal anywhere. That is what {@code basetool_session_unmappable_total} and its
- * {@code SessionUnmappableSustained} alert are for; the counter is the price of the graceful
- * degradation, not an optional extra.
+ * <p>A hash missing a required key maps to {@code null}, read by callers as "no session", and bumps
+ * {@code basetool_session_unmappable_total} (REQ-SEC-063, ADR-0186). Only attribute names and class
+ * names are logged, deduplicated to one WARN per distinct cause; never values or session ids.
  */
 @Slf4j
 public class SessionAttributeDiagnosticMapper
@@ -111,14 +57,8 @@ public class SessionAttributeDiagnosticMapper
   private static final String ATTRIBUTE_PREFIX = "sessionAttr:";
 
   /**
-   * The three hash fields {@link RedisSessionMapper} requires, in the order it reads them.
-   *
-   * <p>Hardcoded for the same reason as {@link #ATTRIBUTE_PREFIX}: the upstream constants are
-   * package-private. They exist here only to name the missing one in the WARN and the metric tag —
-   * the decision to give up is taken from the thrown {@link IllegalStateException}, never by
-   * re-implementing upstream's presence check, so a fourth required key added upstream still
-   * degrades correctly and merely reports {@link #MISSING_KEY_OTHER}. {@code
-   * SessionAttributeDiagnosticMapperTest} pins each literal against the real mapper.
+   * The three hash fields {@link RedisSessionMapper} requires, in the order it reads them; used
+   * only to name the missing one.
    */
   private static final List<String> REQUIRED_KEYS =
       List.of("creationTime", "lastAccessedTime", "maxInactiveInterval");
@@ -139,13 +79,8 @@ public class SessionAttributeDiagnosticMapper
   private final BiFunction<String, Map<String, Object>, MapSession> delegate;
 
   /**
-   * Supplies the registry {@code basetool_session_unmappable_total} binds to.
-   *
-   * <p>An {@link ObjectProvider} rather than the registry itself, for the same reason {@link
-   * FaultTolerantSessionSerializer} uses one: this mapper is installed from the {@code
-   * SessionRepositoryCustomizer} that {@code @EnableRedisIndexedHttpSession} consumes, and a hard
-   * {@code MeterRegistry} dependency there drags Micrometer's auto-configuration into
-   * session-repository creation.
+   * Supplies the registry {@code basetool_session_unmappable_total} binds to, lazily so session
+   * repository creation does not depend on Micrometer.
    */
   private final ObjectProvider<MeterRegistry> meterRegistry;
 
@@ -165,7 +100,7 @@ public class SessionAttributeDiagnosticMapper
    * Creates a mapper decorating a fresh {@link RedisSessionMapper}.
    *
    * @param meterRegistry provider for the registry {@code basetool_session_unmappable_total} binds
-   *     to; resolved lazily, once per unmappable hash.
+   *     to; resolved lazily
    */
   public SessionAttributeDiagnosticMapper(@NotNull ObjectProvider<MeterRegistry> meterRegistry) {
     this(new RedisSessionMapper(), meterRegistry);
@@ -174,11 +109,9 @@ public class SessionAttributeDiagnosticMapper
   /**
    * Creates a mapper decorating an explicit delegate.
    *
-   * @param delegate the mapper that builds the {@link MapSession}; the test uses this to prove the
-   *     delegate is handed a map with no markers left in it, and to make it throw the way the real
-   *     one does on a half-written hash.
+   * @param delegate the mapper that builds the {@link MapSession}
    * @param meterRegistry provider for the registry {@code basetool_session_unmappable_total} binds
-   *     to; resolved lazily, once per unmappable hash.
+   *     to; resolved lazily
    */
   public SessionAttributeDiagnosticMapper(
       @NotNull BiFunction<String, Map<String, Object>, MapSession> delegate,
@@ -188,14 +121,13 @@ public class SessionAttributeDiagnosticMapper
   }
 
   /**
-   * Reports and strips unreadable values, then builds the session through the delegate — answering
-   * {@code null} instead of propagating a hash the delegate cannot map at all.
+   * Reports and strips unreadable values, then builds the session through the delegate, answering
+   * {@code null} for a hash the delegate cannot map.
    *
-   * @param sessionId the session's id — used for nothing but the delegate; never logged.
+   * @param sessionId the session's id, passed to the delegate; never logged
    * @param entries the deserialized session hash, possibly holding {@link UnreadableSessionValue}
-   *     markers.
-   * @return whatever the delegate makes of the cleaned map, or {@code null} when the hash is
-   *     missing a key the delegate requires — which every caller reads as "no session".
+   *     markers
+   * @return the delegate's session, or {@code null} when the hash is missing a required key
    */
   @Override
   public @Nullable MapSession apply(String sessionId, Map<String, Object> entries) {
@@ -210,23 +142,14 @@ public class SessionAttributeDiagnosticMapper
         }
         cleaned.put(entry.getKey(), null);
         String attribute = attributeName(entry.getKey());
-        // Queued rather than removed here: see the class Javadoc for why the write belongs to
-        // SessionAttributeRepairFilter and not to the read path.
         SessionAttributeRepairQueue.record(attribute);
         report(attribute, marker);
       }
     }
     Map<String, Object> forDelegate = cleaned != null ? cleaned : entries;
     try {
-      // The delegate sees exactly what it sees today whenever nothing failed, and a map whose bad
-      // values are null when something did — which is the "attribute not set" it already handles.
       return delegate.apply(sessionId, forDelegate);
     } catch (IllegalStateException ex) {
-      // The only IllegalStateException RedisSessionMapper raises is the missing-required-key one
-      // (`getRequired`). Caught narrowly and answered with null, because null is a contract both
-      // upstream call sites already honour and an uncaught throw here is an HTTP 500 that repeats
-      // for the life of the cookie (REQ-SEC-063, ADR-0186). The hash is deliberately NOT repaired:
-      // that would be a Redis write on the session read path, which ADR-0157 rules out.
       String missingKey = missingRequiredKey(forDelegate);
       countUnmappable(missingKey);
       reportUnmappable(missingKey, ex);
@@ -237,12 +160,8 @@ public class SessionAttributeDiagnosticMapper
   /**
    * Names the first {@link #REQUIRED_KEYS} entry the hash does not carry.
    *
-   * <p>Read off the map rather than parsed out of the exception message: the message is upstream
-   * prose and would silently stop matching, while the map is the evidence itself.
-   *
-   * @param entries the hash the delegate refused.
-   * @return the missing key's name, or {@link #MISSING_KEY_OTHER} when all three are present and
-   *     the delegate therefore failed for some other reason.
+   * @param entries the hash the delegate refused
+   * @return the missing key's name, or {@link #MISSING_KEY_OTHER} when all three are present
    */
   @NotNull
   private static String missingRequiredKey(@NotNull Map<String, Object> entries) {
@@ -255,13 +174,10 @@ public class SessionAttributeDiagnosticMapper
   }
 
   /**
-   * Bumps {@code basetool_session_unmappable_total} for one refused hash.
+   * Bumps {@code basetool_session_unmappable_total} for one refused hash, with a bounded {@code
+   * missing_key} tag (REQ-OBS-006).
    *
-   * <p>The {@code missing_key} tag can only take the three {@link #REQUIRED_KEYS} literals and
-   * {@link #MISSING_KEY_OTHER}, so it is bounded by construction (REQ-OBS-006). Nothing read out of
-   * Redis ever reaches a tag.
-   *
-   * @param missingKey the required key that was absent, as {@link #missingRequiredKey} resolved it.
+   * @param missingKey the absent required key, as {@link #missingRequiredKey} resolved it
    */
   private void countUnmappable(@NotNull String missingKey) {
     MeterRegistry registry = meterRegistry.getIfAvailable();
@@ -274,14 +190,11 @@ public class SessionAttributeDiagnosticMapper
   }
 
   /**
-   * Writes one WARN per distinct missing key, and DEBUG for every repeat.
+   * Writes one WARN per distinct missing key and DEBUG for every repeat; the session id is never
+   * logged.
    *
-   * <p>The session id is not logged, on purpose: it is the bearer token for that session, and this
-   * line is written on a path that anyone holding the cookie can reach. The missing key's name is a
-   * compile-time constant and carries nothing about the member.
-   *
-   * @param missingKey the required key that was absent.
-   * @param cause the delegate's refusal, passed for the stack trace on the first occurrence only.
+   * @param missingKey the absent required key
+   * @param cause the delegate's refusal, logged with its stack trace on the first occurrence only
    */
   private void reportUnmappable(@NotNull String missingKey, @NotNull IllegalStateException cause) {
     if (reportedMissingKeys.add(missingKey)) {

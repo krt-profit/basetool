@@ -53,10 +53,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the bank-staff confirmation queue (epic #666 F2) to pin that the request table, the
- * confirm modal (with its holder selector) and the reject modal render without a Thymeleaf error,
- * that the page is gated to {@code BANK_EMPLOYEE}, and that the {@code requestQueue} fragment view
- * resolves for the in-place swap.
+ * Renders the bank-staff confirmation queue: the request table and the confirm and reject modals
+ * render, the page is gated to {@code BANK_EMPLOYEE}, and the {@code requestQueue} fragment
+ * resolves.
  */
 @SpringBootTest
 class BankRequestQueuePageControllerMvcTest {
@@ -139,7 +138,6 @@ class BankRequestQueuePageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("officerX")))
         .andExpect(content().string(Matchers.containsString("bank-request-confirm-btn")))
         .andExpect(content().string(Matchers.containsString("bank-confirm-request-modal")))
-        // The confirm modal's holder selector is populated.
         .andExpect(content().string(Matchers.containsString("greluc")));
   }
 
@@ -162,14 +160,11 @@ class BankRequestQueuePageControllerMvcTest {
     mockMvc
         .perform(get("/bank/requests"))
         .andExpect(status().isOk())
-        // Parallel status-filter checkboxes replace the filled toggle chips; the bar and the
-        // per-user hook are present and only PENDING is checked by default (REQ-BANK-023).
         .andExpect(content().string(Matchers.containsString("data-bank-status-filter-bar")))
         .andExpect(content().string(Matchers.containsString("data-user-id")))
         .andExpect(content().string(Matchers.containsString("data-bank-status-filter=\"PENDING\"")))
         .andExpect(content().string(Matchers.containsString("type=\"checkbox\"")))
         .andExpect(content().string(Matchers.containsString("checked=\"checked\"")))
-        // The row carries a note, so it is expandable and its detail sub-row surfaces it.
         .andExpect(content().string(Matchers.containsString("bank-request-detail")))
         .andExpect(content().string(Matchers.containsString("from sale")));
   }
@@ -193,10 +188,8 @@ class BankRequestQueuePageControllerMvcTest {
   }
 
   /**
-   * With at least one active account, the direct-booking "Kontobewegung" CTA and the unified
-   * movement modal render (REQ-BANK-017/-023, #997): the type selector, the source-account picker
-   * (this page is not account-scoped) and the inline "?" field-hint markers are present, and the
-   * whole page still resolves without a Thymeleaf error.
+   * With an active account, the Kontobewegung CTA and the movement modal render with type selector,
+   * source-account picker and field hints (REQ-BANK-017/-023).
    */
   @Test
   @WithMockUser(roles = {"BANK_EMPLOYEE"})
@@ -225,48 +218,30 @@ class BankRequestQueuePageControllerMvcTest {
     mockMvc
         .perform(get("/bank/requests"))
         .andExpect(status().isOk())
-        // The page-level CTA and the unified modal render.
         .andExpect(content().string(Matchers.containsString("bank-movement-open")))
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
-        // The type selector plus the source-account picker (only present on this non-account-scoped
-        // surface), which is now a server-side account-search combobox (remote-bank-accounts,
-        // REQ-FE-017/ADR-0106) rather than a preloaded <select> of every active account.
         .andExpect(content().string(Matchers.containsString("bank-movement-type")))
-        // REQ-BANK-054: the direct-booking modal carries the employee's own note field too, for
-        // every type incl. a deposit.
         .andExpect(content().string(Matchers.containsString("bank-movement-staff-note")))
         .andExpect(content().string(Matchers.containsString("bank-movement-source-account")))
         .andExpect(
             content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")))
-        // The account label is type-aware (REQ-BANK-023): bank.js swaps it to Zielkonto for a
-        // deposit (which has no source account) and Quellkonto for a withdrawal/transfer, from the
-        // per-type data-label-* it carries.
         .andExpect(
             content().string(Matchers.containsString("data-role=\"bank-movement-account-label\"")))
         .andExpect(content().string(Matchers.containsString("data-label-deposit")))
-        // Field hints are inline "?" tooltip markers, not sub-field text.
         .andExpect(content().string(Matchers.containsString("field-hint-marker")))
-        // A type-gated row is present for the JS to switch.
         .andExpect(content().string(Matchers.containsString("data-movement-types")))
-        // #1193 follow-up: the deposit/withdrawal counterparty picker is a server-side searchable
-        // combobox (remote-bank-users), not a preloaded <select>.
         .andExpect(
             content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-users\"")));
-    // ...and the roster is fetched on demand, so no all-users lookup is issued to preload it.
     verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
   /**
-   * With no active account, {@code canBook} is false, so the direct-booking movement modal (and its
-   * CTA) must NOT render. Regression guard for the Thymeleaf attribute-precedence trap: {@code
-   * th:if="${canBook}"} shared its element with {@code th:replace}, so the modal rendered
-   * unconditionally even though the CTA that opens it was correctly hidden.
+   * With no active account, {@code canBook} is false and neither the movement modal nor its CTA
+   * renders.
    */
   @Test
   @WithMockUser(roles = {"BANK_EMPLOYEE"})
   void queue_noActiveAccounts_omitsMovementModal() throws Exception {
-    // stubData() leaves the /api/v1/bank/accounts fetch on the null catch-all -> activeAccounts
-    // empty -> canBook false.
     stubData();
 
     mockMvc

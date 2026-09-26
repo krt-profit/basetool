@@ -41,9 +41,7 @@ import org.springframework.boot.context.properties.source.MapConfigurationProper
  */
 public final class TestProperties {
 
-  private TestProperties() {
-    // Test-support holder — not instantiable.
-  }
+  private TestProperties() {}
 
   /**
    * Binds {@code app.ingest} with a local backend and frontend URL plus the given overrides.

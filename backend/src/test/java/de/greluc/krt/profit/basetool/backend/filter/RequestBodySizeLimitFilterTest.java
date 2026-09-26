@@ -58,9 +58,7 @@ class RequestBodySizeLimitFilterTest {
   }
 
   /**
-   * Builds the filter under test over a tiny 100-byte cap on {@link #CAPPED_PATH}, so the tests hit
-   * it with small bodies. The properties are an immutable record (BE-MOD-04), so switching the cap
-   * off means building a new filter.
+   * Builds the filter under test with a 100-byte cap on {@link #CAPPED_PATH}.
    *
    * @param enabled whether the cap is active
    * @return the filter under test
@@ -111,14 +109,9 @@ class RequestBodySizeLimitFilterTest {
   }
 
   /**
-   * The cap is not sheddable by percent-encoding the capped path.
+   * The body cap also applies to a percent-encoded capped path.
    *
-   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
-   * path, so the exact {@code paths.contains(uri)} test this replaced left the cap off for {@code
-   * /%61pi/v1/refinery-orders/import-extract} — which {@code RequestMappingHandlerMapping} then
-   * decoded and delivered to the very controller the cap protects, unbounded. The default {@code
-   * StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not {@code %61}. Must be a
-   * direct filter test: MockMvc normalises the path before the filter runs.
+   * <p>Tested on the filter directly because MockMvc normalises the path first.
    */
   @Test
   void declaredOversizedBody_onPercentEncodedCappedPath_isRejected413() throws Exception {
@@ -175,8 +168,6 @@ class RequestBodySizeLimitFilterTest {
 
   @Test
   void chunkedOversizedBody_withoutContentLength_isRejected413() throws Exception {
-    // A chunked request declares no Content-Length (getContentLengthLong() == -1); the filter must
-    // count the stream and reject once it crosses the cap rather than trust the missing length.
     MockHttpServletRequest req =
         new MockHttpServletRequest("POST", CAPPED_PATH) {
           @Override

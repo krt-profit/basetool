@@ -51,13 +51,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the location reference table. Public endpoint set; mutations are OFFICER/ADMIN.
- * Provides a lightweight {@code /lookup} projection for typeaheads and a dedicated {@code
- * /refineries} list used by the refinery-order create form.
+ * REST surface for the location reference table, including a {@code /lookup} projection for
+ * typeaheads and a {@code /refineries} list for the refinery-order form. Mutations are
+ * OFFICER/ADMIN.
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
+ * gate takes precedence (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/api/v1/locations")
@@ -99,16 +98,14 @@ public class LocationController {
   }
 
   /**
-   * Live search for the location pickers (REQ-FE-016): pages non-hidden locations whose name
-   * contains {@code search}, case-insensitively. Backs the searchable location comboboxes so every
-   * location stays reachable by typing regardless of catalogue size, while each response stays
-   * payload-bounded — the deliberate alternative to preloading (or silently capping) the full list.
+   * Pages non-hidden locations whose name contains {@code search}, case-insensitively, for the
+   * location pickers (REQ-FE-016).
    *
    * @param search optional name fragment; {@code null}/blank returns the unfiltered first page
    * @param page zero-based page index (defaulted by {@link PaginationUtil})
    * @param size page size (clamped by {@link PaginationUtil})
    * @param sort whitelisted sort ({@code name} or {@code id}), default name ascending
-   * @return one page of matching non-hidden locations as reference DTOs
+   * @return one page of matching non-hidden locations
    */
   @GetMapping("/search")
   public PageResponse<LocationReferenceDto> searchLocations(
@@ -165,10 +162,8 @@ public class LocationController {
   }
 
   /**
-   * Creates a new location. {@link
-   * de.greluc.krt.profit.basetool.backend.mapper.LocationMapper#stripServerManaged} removes
-   * client-supplied {@code id}/{@code version} so the client cannot mass-assign onto an existing
-   * row.
+   * Creates a new location; client-supplied {@code id}/{@code version} are stripped by {@link
+   * de.greluc.krt.profit.basetool.backend.mapper.LocationMapper#stripServerManaged}.
    *
    * @param location create payload
    * @return the persisted DTO
@@ -176,8 +171,6 @@ public class LocationController {
   @PostMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public LocationDto createLocation(@RequestBody @Valid @NotNull LocationDto location) {
-    // stripServerManaged drops client-supplied id / version so JPA performs an INSERT
-    // and the client cannot mass-assign onto an existing row through this endpoint.
     Location entity = LocationMapper.stripServerManaged(locationMapper.toEntity(location));
     return locationMapper.toDto(locationService.createLocation(entity));
   }

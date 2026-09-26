@@ -20,21 +20,17 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * Strategy an {@link AppException} declares for how {@code GlobalExceptionHandler}'s generic
- * dispatch handler treats its message and log level (S4, #910).
+ * How {@code GlobalExceptionHandler}'s generic dispatch treats an {@link AppException}'s message
+ * and log level.
  *
- * <p>Two exceptions — {@code ExternalServiceException} and {@code ReportGenerationException} —
- * deliberately deviate from the common case: their {@code getMessage()} may carry upstream response
- * bodies, library-internal paths or font/encoding details that must never reach the client (CWE-209
- * information exposure). {@link #SUPPRESSED} is that carve-out; every other {@code AppException}
- * uses {@link #STANDARD}.
+ * <p>{@link #SUPPRESSED} keeps messages that may carry upstream or library internals away from the
+ * client (CWE-209); every other exception uses {@link #STANDARD}.
  */
 public enum ErrorDisclosurePolicy {
 
   /**
-   * The common case: {@code getMessage()} flows to the client through {@code resolveDetail}
-   * (i18n-key-or-verbatim), and the dispatch handler logs the problem at WARN via {@code
-   * logProblem} — an expected, user-driven 4xx/409 outcome, not a server-side failure.
+   * The message reaches the client via {@code resolveDetail}, and the problem is logged at WARN as
+   * an expected client-side outcome.
    */
   STANDARD,
 

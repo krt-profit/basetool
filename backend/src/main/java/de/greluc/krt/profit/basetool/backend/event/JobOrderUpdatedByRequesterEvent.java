@@ -27,23 +27,17 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Domain event published right after a requesting owner (Auftraggeber) commits an edit to one of
- * their own job orders (REQ-ORDERS-023) — a quantity change, an add/remove of a not-yet-delivered
- * item or material, or a comment edit. Carries the scalars the notification pipeline needs (the
- * responsible / requesting org units, the display id and handle for rendering, and the editing
- * actor to exclude) so the after-commit listener never touches the managed {@link
- * de.greluc.krt.profit.basetool.backend.model.JobOrder}.
+ * Domain event published when a requesting owner (Auftraggeber) edits one of their own job orders
+ * (REQ-ORDERS-023).
  *
- * <p>The recipients are resolved from the {@link NotificationContextRole#RESPONSIBLE} org unit
- * (officers + leads of the processing squadron/SK) by the seeded default rule; the requesting org
- * unit is carried both as the {@link NotificationContextRole#REQUESTING} context and as the {@code
- * requester} render parameter so the message can name who changed the order without disclosing the
- * editing member's personal name (no PII in params).
+ * <p>Recipients are resolved from the {@link NotificationContextRole#RESPONSIBLE} org unit; the
+ * {@link NotificationContextRole#REQUESTING} org unit names the editor instead of a personal name.
+ * Carries only scalars.
  *
  * @param jobOrderId the edited job order's id (also the notification's loose entity id)
  * @param displayId the human-facing sequential display id
  * @param handle the order handle/title, or {@code null}
- * @param responsibleOrgUnit the processing org unit (id + kind) — the recipient-resolution target
+ * @param responsibleOrgUnit the processing org unit (id + kind); the recipient-resolution target
  * @param responsibleOrgUnitShorthand the processing org unit's shorthand, for rendering
  * @param requestingOrgUnit the requesting/customer org unit (id + kind)
  * @param requestingOrgUnitShorthand the requesting org unit's shorthand, for rendering

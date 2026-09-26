@@ -26,22 +26,20 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Inbound DTO for the admin {@code POST /api/v1/materials} create flow. UEX-imported fields ({@code
- * idCommodity}, {@code code}, {@code slug}, {@code priceBuy}, …) are intentionally absent — they
- * stay {@code null} for manual entries and get populated by the next UEX sync if the commodity
- * later appears upstream. The server stamps {@code sourceSystems=MANUAL} on creation (surfaced via
- * the derived {@code isManualEntry} wire field); the client cannot set it via this payload.
+ * Payload for the admin {@code POST /api/v1/materials} create flow.
  *
- * @param name unique material name; matched against UEX commodity names by the sync's {@code
- *     findByName} fallback when UEX later picks the material up.
+ * <p>UEX-imported fields are absent and stay {@code null} until a UEX sync fills them; the server
+ * stamps {@code sourceSystems=MANUAL}.
+ *
+ * @param name unique material name, also matched by the UEX sync's name fallback.
  * @param type material classification ({@code RAW}, {@code REFINED}, {@code NO_REFINE}).
  * @param quantityType inventory quantity unit ({@code SCU} or {@code PIECE}).
- * @param description optional free-text note (e.g. "manually created — missing from UEX").
- * @param refinedMaterialId optional FK to the refined output material; only honoured when {@code
- *     type=RAW} or {@code isManualRawMaterial=true}, rejected otherwise.
+ * @param description optional free-text note.
+ * @param refinedMaterialId optional refined output material; only allowed when {@code type=RAW} or
+ *     {@code isManualRawMaterial=true}.
  * @param categoryId optional FK to {@code MaterialCategory}.
- * @param isManualRawMaterial UEX-classification override that makes the material selectable as
- *     refinery input even when UEX would classify it as {@code NO_REFINE}/{@code REFINED}.
+ * @param isManualRawMaterial makes the material selectable as refinery input regardless of its UEX
+ *     classification.
  * @param isJobOrder marks the material as a job-order picker entry.
  * @param isIllegal warning flag (illegal cargo).
  * @param isVolatileQt warning flag (volatile under Quantum Travel).

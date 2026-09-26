@@ -39,14 +39,10 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Audit row that records the "has this participant been paid out for the operation?" flag, set by
- * mission managers (or higher) on the operation detail page. One row exists for each (operation,
- * participant) tuple that has ever been toggled — absence of a row is semantically equivalent to
- * {@code paid_out = false}, so the read path tolerates missing rows. {@code participant_key}
- * intentionally mirrors the opaque format produced by {@code
- * OperationPayoutService.getOperationPayouts} (real user UUID stringified, or {@code
- * "guest_<name>"} for guests) so the roll-up service can merge in payout status with a plain map
- * lookup.
+ * The "paid out" flag of one participant of an operation, toggled by mission managers or higher.
+ *
+ * <p>A missing row means {@code paid_out = false}. {@code participant_key} uses the key format of
+ * {@code OperationPayoutService.getOperationPayouts} (user UUID, or {@code "guest_<name>"}).
  */
 @Entity
 @Table(

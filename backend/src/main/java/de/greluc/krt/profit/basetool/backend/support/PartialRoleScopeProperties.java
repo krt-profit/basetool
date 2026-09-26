@@ -25,45 +25,20 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Which Keycloak clients mint tokens whose realm-role claim is <strong>deliberately
- * incomplete</strong>, and whose role claim must therefore never be written to {@code app_user}
- * (REQ-SEC-036).
+ * Keycloak clients whose tokens carry a deliberately incomplete realm-role claim that must never be
+ * written to {@code app_user} (REQ-SEC-036).
  *
- * <p>Ordinarily a token's {@code realm_access.roles} is the whole truth about a member and {@code
- * UserReconciliationService#syncUser(Jwt)} may replace the stored role set from it. That stops
- * being true for a client provisioned with {@code fullScopeAllowed: false} and a narrowed scope:
- * the mobile client's scope names five of the realm's eight roles (REQ-SEC-035), so its tokens
- * describe a member who is deliberately smaller than the real one. Until the 2026-09-02 reversal
- * the omitted role was {@code Admin}, which is the form of this that actually cost an administrator
- * their row; {@code Guest}, {@code Logistician} and {@code Mission Manager} are omitted still, so
- * the rule is unchanged and so is this record. Persisting that description would let the client a
- * member happened to use last decide what the database says they are.
+ * <p>Matched on the token's {@code azp}. Non-empty by default; an empty list disables the guard.
  *
- * <p>Matched on the token's {@code azp} — a claim inside a Keycloak-signed token, not something a
- * client can set — the same handle {@link IngestGatewayProperties} already uses for the far more
- * dangerous on-behalf-of decision, so this adds no new trust.
- *
- * <p><strong>Non-empty by default, and for the opposite reason to the gateway's empty one.</strong>
- * There, empty means "nobody may act for another member" and is the safe end of the range. Here the
- * unsafe end is empty: a deployment that forgot to list the mobile client would silently resume
- * overwriting stored roles from partial tokens, which is the defect this exists to close. The
- * default therefore names the client that is known to be partial, and an override is only needed by
- * a deployment that renames its realm clients. An immutable record (BE-MOD-04).
- *
- * @param clientIds the {@code azp} values whose role claim is not authoritative. Defaults are
- *     supplied by {@code application.yml}; an empty list disables the guard entirely.
+ * @param clientIds the {@code azp} values whose role claim is not authoritative
  */
 @Validated
 @ConfigurationProperties(prefix = "app.security.partial-role-scope")
 public record PartialRoleScopeProperties(@DefaultValue List<String> clientIds) {
 
   /**
-   * Whether {@code azp} names a client whose realm-role claim must not be persisted.
-   *
-   * <p>The single place the rule lives, so the two things that depend on it — "may this token
-   * rewrite the stored role set" and "which roles authorise this request" — cannot drift apart. A
-   * blank or absent {@code azp} is never a partial-scope client, and neither is anything when the
-   * list is empty.
+   * Whether {@code azp} names a client whose realm-role claim must not be persisted. A blank or
+   * absent {@code azp} never does.
    *
    * @param azp the authorized-party claim from the caller's token, may be {@code null}
    * @return {@code true} when this caller's role claim describes less than the whole member

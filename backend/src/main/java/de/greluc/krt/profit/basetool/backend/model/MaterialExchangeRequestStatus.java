@@ -20,13 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Lifecycle state of a {@link MaterialExchangeRequest} (Gesuch) on the Materialbörse trade board —
- * the request-side sibling of {@link MaterialExchangeOfferStatus} (ADR-0116, REQ-MARKET-016).
- *
- * <p>A request is {@link #ACTIVE} while it is publicly listed and {@link #DEACTIVATED} once the
- * requester withdraws it. Unlike an offer there is no one-active-per-Lager-row constraint — a
- * member may post several requests for the same material or item. The {@code MARKET} request
- * business-metric gauge counts {@link #ACTIVE} rows only.
+ * Lifecycle state of a {@link MaterialExchangeRequest}: {@link #ACTIVE} while listed, {@link
+ * #DEACTIVATED} once the requester withdraws it (REQ-MARKET-016).
  */
 public enum MaterialExchangeRequestStatus {
 

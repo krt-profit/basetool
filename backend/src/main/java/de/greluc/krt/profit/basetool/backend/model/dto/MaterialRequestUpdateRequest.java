@@ -26,20 +26,14 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 /**
- * Write payload for editing an existing wanted-listing ("Gesuch bearbeiten", REQ-MARKET-016).
- * Carries the new desired quantity, minimum quality and description. Only the owner may edit; the
- * echoed {@code version} guards against a concurrent edit via the {@code support.OptimisticLock}
- * check (409 on mismatch).
+ * Owner-only payload for editing a wanted-listing (REQ-MARKET-016); a stale {@code version} yields
+ * 409.
  *
- * <p>The edit is kind-aware: {@link #desiredAmount} carries the new SCU quantity for a material
- * request and the new whole-piece quantity for an item request (the service interprets it by the
- * request's kind, rejecting a non-whole value for an item request).
- *
- * @param desiredAmount the new desired quantity (SCU for a material request, whole pieces for an
- *     item request); must be positive.
+ * @param desiredAmount the new desired quantity, SCU for a material request or whole pieces for an
+ *     item request; must be positive.
  * @param minQuality the new optional minimum desired quality (0–1000), or {@code null} for no
  *     floor.
- * @param remark the new free-form Markdown description, at most 20 000 characters (may be blank).
+ * @param remark the new Markdown description, at most 20 000 characters (may be blank).
  * @param version the optimistic-lock version the client last saw.
  */
 public record MaterialRequestUpdateRequest(

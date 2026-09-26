@@ -17,27 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Materials overview page module (/materials), extracted verbatim from the former inline script of
- * materials.html (ADR-0069, follow-up to #924).
- *
- * Wires the material-name filter autocomplete (names read from the sibling
- * <datalist id="materialNames-data"> to sidestep the Thymeleaf 3.1 JS-inline list-truncation bug),
- * the category-grouped vs flat view toggle with per-browser localStorage persistence, per-kind
- * accordion expand/collapse, and the live text filter over whichever view is active. All wired via
- * window.krtEvents delegation (materials-filter / materials-toggle-kind / materials-toggle-grouping).
- *
- * The block carried no Thymeleaf interpolation, so there is no inline bootstrap; krtAutocomplete
- * comes from the autocomplete.js module loaded before this classic script.
- */
-
 /* global krtAutocomplete */
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Names come from the <datalist id="materialNames-data"> rendered above. The historical
-    // Thymeleaf JS inline comment-fallback pattern would truncate the entire <script> block
-    // once a Java List was serialised into it (see the parser-level comment next to the
-    // datalist for the full diagnosis).
     const dataEl = document.getElementById('materialNames-data');
     const materialNames = dataEl
         ? Array.from(dataEl.options).map(function (opt) {
@@ -47,12 +29,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const inp = document.getElementById('materialFilter');
     if (inp) krtAutocomplete(inp, materialNames);
 
-    // Restore the saved grouping preference and show the matching view.
     initGroupingView();
 });
 
-// Per-browser persistence of the grouping preference (guarded so privacy modes that
-// throw on storage access degrade to the default grouped view instead of breaking).
 const GROUP_PREF_KEY = 'materials_group_by_category';
 function readGroupPref() {
     try {
@@ -64,9 +43,7 @@ function readGroupPref() {
 function writeGroupPref(value) {
     try {
         localStorage.setItem(GROUP_PREF_KEY, value);
-    } catch (_e) {
-        /* storage unavailable */
-    }
+    } catch (_e) {}
 }
 
 function isGroupedMode() {
@@ -74,8 +51,6 @@ function isGroupedMode() {
     return !box || box.checked;
 }
 
-// Show #materialsGrouped (accordion) or #materialsFlat (flat alphabetical grid) to match the
-// toggle, then re-apply the current text filter to whichever view is now visible.
 function applyGroupingView() {
     const grouped = isGroupedMode();
     const groupedEl = document.getElementById('materialsGrouped');
@@ -108,7 +83,7 @@ function toggleKindGroup(element) {
         window.getComputedStyle(content).display === 'none' ||
         window.getComputedStyle(content).display === ''
     ) {
-        content.style.display = 'grid'; // or block depending on css, grid-auto-cards needs grid
+        content.style.display = 'grid';
         icon.textContent = '−';
     } else {
         content.style.display = 'none';
@@ -116,7 +91,6 @@ function toggleKindGroup(element) {
     }
 }
 
-// Applies the text filter to whichever view is active and toggles the no-results message.
 function filterMaterials() {
     const input = document.getElementById('materialFilter');
     const filter = (input ? input.value : '').toUpperCase();
@@ -128,8 +102,6 @@ function filterMaterials() {
     }
 }
 
-// Category-grouped view: filter cards within each .kind-group, hide empty groups, and
-// auto-expand the surviving groups while a filter is active. Returns the visible-card count.
 function filterGroupedView(filter) {
     const groups = document.getElementsByClassName('kind-group');
     let totalVisibleCount = 0;
@@ -158,7 +130,6 @@ function filterGroupedView(filter) {
             group.style.display = '';
             totalVisibleCount += visibleInGroup;
 
-            // If filtering is active, auto-expand groups
             const content = group.querySelector('.materialsGrid');
             const icon = group.querySelector('.toggle-icon');
             if (filter.length > 0) {
@@ -170,7 +141,6 @@ function filterGroupedView(filter) {
     return totalVisibleCount;
 }
 
-// Flat view: filter the single #materialsFlat grid of all cards. Returns the visible-card count.
 function filterFlatView(filter) {
     const container = document.getElementById('materialsFlat');
     if (!container) {
@@ -191,8 +161,6 @@ function filterFlatView(filter) {
     return visibleCount;
 }
 
-// CSP-safe delegated bindings (replace the historical onkeyup="filterMaterials()" and
-// onclick="toggleKindGroup(this)" inline handlers).
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('keyup', 'materials-filter', filterMaterials);
     window.krtEvents.on('click', 'materials-toggle-kind', function (el) {

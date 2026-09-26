@@ -1,19 +1,3 @@
-# E2E spike isolation override (docs/e2e-test/README.md, Phase 0).
-#
-# Replaces the shared `/var/iri/...` host bind mounts (which every stack on this
-# machine shares) with project-scoped named volumes, so the E2E run never reads
-# or clobbers another stack's Postgres cluster — and so a fresh run always gets
-# a clean DB that Flyway can migrate from scratch. Host-path log mounts are
-# dropped (container logs go to stdout); the Keycloak realm-import mount and the
-# keystore mount are kept. Uses the Compose `!override` tag to REPLACE the list
-# inherited from the YAML anchors rather than append to it.
-#
-# Pass AFTER the base + test + build files:
-#   docker compose --env-file .env.test \
-#     -f docker-compose.yml -f docker-compose.test.yml \
-#     -f docker-compose.build.yml -f docker-compose.e2e.yml \
-#     --profile dev up -d --wait \
-#     db-backend-dev db-keycloak-dev keycloak-dev redis-dev backend-dev frontend-dev
 services:
   db-backend-dev:
     volumes: !override
@@ -22,42 +6,13 @@ services:
     volumes: !override
       - iri-e2e-db-keycloak:/var/lib/postgresql/data
   redis-dev:
-    # The per-service Redis ACL users of production (REQ-SEC-068, ADR-0207), rendered from the
-    # committed template with the throwaway E2E passwords and `default` switched OFF -- the state
-    # production reaches at the end of its rollout. Every session, live-sync and handoff flow in the
-    # suite then runs under the users' real permissions; E2eStackExtension hands each app its
-    # REDIS_<SVC>_USERNAME / _PASSWORD. RedisAclFrontendIntegrationTest keeps this file equal to the
-    # template. No persistence: the stack is thrown away after the run.
     command: redis-server --save "" --appendonly no --notify-keyspace-events Egx --aclfile /etc/redis/users.acl
     volumes: !override
       - ./docker/test-redis/users.acl:/etc/redis/users.acl:ro
   keycloak-dev:
-    # KC 26 hostname-v2 rejected the browser's plain-HTTP OIDC auth request with
-    # "This combination of host and port requires TLS" when KC_HOSTNAME was the
-    # bare hostname `host.docker.internal` (the test override's value). Pinning
-    # the full http:// URL declares HTTP for the public hostname, so the
-    # browser-side redirect works over HTTP while the issuer string stays stable
-    # and identical for the host browser AND the in-Docker backend/frontend
-    # (both already use http://host.docker.internal:18080/auth/realms/iri). Dropping
-    # --proxy-headers (there is no reverse proxy in front of KC in this stack)
-    # lets KC read the real request scheme instead of expecting X-Forwarded-Proto.
-    #
-    # THE /auth IS PART OF THE URL AND MUST STAY THERE (ADR-0166). A full URL in
-    # KC_HOSTNAME overrides the context path that a bare hostname would take from
-    # the request, so an origin-only value here makes Keycloak serve under /auth
-    # (KC_HTTP_RELATIVE_PATH, base compose) while advertising root links. Measured:
-    # the stack then comes up with a HEALTHY Keycloak and the backend dies at
-    # start-up with `The Issuer "…/realms/iri" … did not match the requested issuer
-    # "…/auth/realms/iri"` — the failure looks like a backend fault and is not one.
     command: start-dev --import-realm --cache=local
     environment:
       KC_HOSTNAME: http://host.docker.internal:18080/auth
-    # Resolve the issuer host to THIS container on the shared Docker network, so the in-Docker
-    # backend/frontend reach Keycloak the same way on a Linux CI runner as on Docker Desktop. The
-    # published port is 127.0.0.1-only, so the test stack's `extra_hosts: host.docker.internal ->
-    # host-gateway` cannot reach it on a plain Linux bridge (the gateway IP is not the loopback);
-    # the alias bypasses the host round-trip entirely. Paired with the extra_hosts override on
-    # backend-dev/frontend-dev below, which clears the /etc/hosts entry that would shadow this alias.
     networks:
       net-backend-keycloak:
         aliases:
@@ -65,119 +20,34 @@ services:
           - host.docker.internal
     volumes: !override
       - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
-  # /app/logs needs a writable mount, and `volumes: !override` below replaces the whole list —
-  # so the tmpfs docker-compose.yml mounts there has to be repeated in it. It is not optional:
-  # Logback's FILE appender is active in every profile via <springProfile name="!prod">, and a
-  # failure to open its file happens during Spring Boot's logging initialisation, so the
-  # container EXITS rather than degrading -- compose then reports an unhealthy service whose
-  # real cause is buried in an appender stack trace.
-  #
-  # History, because the shape of it changed twice (corrected 2026-09-17). The images used to
-  # bake a ROOT-owned /app/logs/backend.log, created by the Dockerfile's AppCDS training run
-  # before `USER 10001`. Dropping the tmpfs was survivable then only because this override also
-  # runs the container as `user: "0:0"`: root owned that file and could append to it. #1932
-  # removed the baked files -- /app/logs now ships EMPTY, owned by 10001 -- so root has to
-  # CREATE a file in a directory it does not own, and `cap_drop: [ALL]` has taken
-  # CAP_DAC_OVERRIDE away from it. Every E2E job failed at compose-up until the tmpfs came
-  # back. `user: "0:0"` is now redundant (the tmpfs is 0777 and the image starts as 10001 on
-  # its own) and is kept only so this change carries one concern; it can go with the next edit
-  # to this file.
   backend-dev:
     user: "0:0"
-    # Disable the backend rate limiter for the throwaway E2E stack. The limiter keys its Bucket4j
-    # buckets by client IP, but the Thymeleaf frontend reaches the backend over a server-side
-    # WebClient — it is NOT a reverse proxy forwarding X-Forwarded-For — so every test's backend
-    # traffic arrives from the single frontend-container IP and shares one bucket. The suite funnels
-    # thousands of calls through that IP within a few minutes, exhausting both the global 300/min
-    # budget AND the far tighter per-endpoint rules (/api/v1/orders and /api/v1/missions at 10/min
-    # each in application.yml). The depletion surfaces as sporadic 429s that make unrelated writes
-    # fail together in a burst — e.g. JobOrderStatus staying OPEN and the Mission-create /
-    # Org-chart-Kommando POSTs timing out in the same ~30s window. Per-IP limiting is meaningless
-    # behind one IP, and the filter is unit-tested separately, so this stack switches it off. An env
-    # var (highest Spring property precedence) overrides the dev profile docker-compose.test.yml
-    # activates; the map merges with — does not replace — the base template's environment.
     environment:
       APP_RATE_LIMIT_ENABLED: "false"
-      # BackendSeeder provisions fixture users on the fly by logging them in, which lazily creates
-      # their app_user row. The prod fail-safe (REQ-SEC-017: a brand-new non-admin lands PENDING and
-      # needs admin approval) would leave those seeded users with no authorities -> 403 on the very
-      # next seeding call -> initializationError in every multi-user @BeforeAll. The e2e DB is
-      # ephemeral, so the V173 ACTIVE backfill that protects existing prod rows does not apply here.
-      # This stack therefore creates new non-admins ACTIVE; the approval lifecycle itself is covered
-      # by backend unit tests (UserServiceDiscordSyncTest / UserServiceApprovalTest), not e2e.
       APP_REGISTRATION_REQUIRE_APPROVAL: "false"
-    # Drop the test stack's host.docker.internal -> host-gateway mapping so the Keycloak network
-    # alias (above) resolves instead — the host-gateway route can't reach KC's 127.0.0.1-bound
-    # published port on a Linux runner.
     extra_hosts: !override []
     volumes: !override
-      # Restores the log tmpfs this `!override` drops. The header above says host-path log mounts
-      # are dropped because container logs go to stdout — true, but logback ALSO opens
-      # /app/logs/backend.log, and this stack runs the JVM as `user: "0:0"` with the base template's
-      # `cap_drop: [ALL]`. Root without DAC_OVERRIDE cannot create a file in a 0755 directory owned
-      # by another uid, and since #1932 the image ships /app/logs EMPTY and owned by 10001. Before
-      # that it shipped root-owned log files from the CDS training run, so root was appending to its
-      # own leftovers and this worked by accident. Without the tmpfs the container fails at
-      # "openFile(logs/backend.log) Permission denied" -> "Logback configuration error detected" ->
-      # exit 1, and every test in the suite reports initializationError.
       - type: tmpfs
         target: /app/logs
         tmpfs:
           mode: 0o777
-      # The committed test certificate (ADR-0139) -- this service's own leaf, signed by the test CA
-      # like production's per-service leaves (REQ-SEC-070) -- by a hardcoded path for the same reason
-      # docker-compose.test.yml uses one: IRI_KEYSTORE_HOST_PATH still selects the PRODUCTION
-      # keystore. It must be this file and not a locally generated one, because test.yml pins
-      # SERVER_SSL_KEY_STORE_PASSWORD to this keystore's password — mounting any other store makes
-      # the backend abort at start-up with "keystore password was incorrect".
       - ./docker/test-tls/basetool-test-backend.p12:/run/secrets/keystore.p12:ro
-      # The /app/logs tmpfs from docker-compose.yml, restored on purpose: `!override` replaces
-      # the whole list, and dropping this one made every E2E job fail at compose-up (see the
-      # note above the service).
       - type: tmpfs
         target: /app/logs
         tmpfs:
           mode: 0o777
   frontend-dev:
     user: "0:0"
-    # Serve HTTP/1.1 (not HTTP/2) for the throwaway E2E stack. The suite's dominant flake is an
-    # HTTP/2 stream reset on the in-place AJAX writes under CI load: Tomcat logs "Client reset the
-    # stream before the request was fully read", the browser's fetch() rejects with a network error
-    # (not an HTTP response), the in-place handler shows its failure toast, and Playwright's
-    # waitForResponse never matches and hangs to its timeout (BankAdminResetE2eTest wipe /
-    # BankBookingE2eTest deposit). Firefox was dropped to HTTP/1.1 via a browser pref (see
-    # E2eSupport#launchFirefox), but WebKit has no Playwright-level HTTP/2 toggle, so the only
-    # uniform fix is at the server. Disabling h2 here removes the stream-reset class for ALL three
-    # engines at the source; every browser then uses well-trodden HTTP/1.1 with keep-alive. This is
-    # transport-only — it changes neither the app nor any assertion, so a genuine failure still
-    # fails, and prod (which keeps h2) is untouched. An env var (highest Spring property precedence)
-    # overrides application.yml's server.http2.enabled=true; the map merges with — does not replace —
-    # the base template's environment.
     environment:
       SERVER_HTTP2_ENABLED: "false"
-      # The whole Playwright suite runs against the session type allow-list ENFORCED (REQ-SEC-067),
-      # although production ships `report`: every login, token refresh, flash redirect and live-sync
-      # handshake in the suite is then a real session read under the strictest mode, which is the
-      # evidence the production switch to `enforce` rests on.
       APP_SESSION_TYPE_ALLOW_LIST: enforce
     extra_hosts: !override []
     volumes: !override
-      # Same reason as backend-dev above: `user: "0:0"` plus `cap_drop: [ALL]` plus an /app/logs
-      # that #1932 made empty and owned by 10001.
       - type: tmpfs
         target: /app/logs
         tmpfs:
           mode: 0o777
-      # The committed test certificate (ADR-0139) -- this service's own leaf, signed by the test CA
-      # like production's per-service leaves (REQ-SEC-070) -- by a hardcoded path for the same reason
-      # docker-compose.test.yml uses one: IRI_KEYSTORE_HOST_PATH still selects the PRODUCTION
-      # keystore. It must be this file and not a locally generated one, because test.yml pins
-      # SERVER_SSL_KEY_STORE_PASSWORD to this keystore's password — mounting any other store makes
-      # the backend abort at start-up with "keystore password was incorrect".
       - ./docker/test-tls/basetool-test-frontend.p12:/run/secrets/keystore.p12:ro
-      # The /app/logs tmpfs from docker-compose.yml, restored on purpose: `!override` replaces
-      # the whole list, and dropping this one made every E2E job fail at compose-up (see the
-      # note above the service).
       - type: tmpfs
         target: /app/logs
         tmpfs:

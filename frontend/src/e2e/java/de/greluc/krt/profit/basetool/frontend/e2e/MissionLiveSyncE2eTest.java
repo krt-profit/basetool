@@ -35,21 +35,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end coverage for live multi-user mission sync (REQ-FE-010 / ADR-0031): a change one viewer
- * makes to a mission must appear on every other open mission-detail view without a manual reload.
+ * Verifies live multi-user mission sync (REQ-FE-010, ADR-0031): a crew change in one browser
+ * context appears in another open mission-detail view without a reload.
  *
- * <p>The relay broadcasts a {@code {"type":"changed","sections":[…]}} frame over the existing
- * presence WebSocket to every <em>other</em> socket on the mission and excludes the originating
- * <em>session</em> (not the user). This test therefore opens the same mission in <b>two browser
- * contexts</b> authenticated as the same test user — two distinct WebSocket sessions, exactly what
- * the relay fans out between — which exercises the full path (mutation in context A → relay →
- * context B re-fetches the crew fragment in place → the out-of-fragment header counts patch)
- * without needing a second seeded user. A genuine second user would hit the identical handler
- * branch.
- *
- * <p>A mission is staffel-scoped, so the user is assigned to the IRIDIUM Squadron first (mirrors
- * {@link MissionParticipantCountE2eTest}). The distinctive guest name resolves to no realm user, so
- * the add stays on the guest path.
+ * <p>Two contexts of the same user are two WebSocket sessions, which is what the relay fans out
+ * between. The user is assigned to the IRIDIUM Squadron first; the guest name keeps the add on the
+ * guest path.
  */
 @Tag("e2e")
 class MissionLiveSyncE2eTest {
@@ -121,21 +112,10 @@ class MissionLiveSyncE2eTest {
         E2eSupport.navigate(pageB, baseUrl + "/missions/" + missionId);
         pageB.waitForLoadState();
 
-        // Both views start with no participants.
         assertThat(pageB.locator("#facts-registered")).hasText("0");
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact,
-        // which
-        // is the whole point — B must update WITHOUT reloading.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Wait until B holds an ACKNOWLEDGED subscription to the mission room on the shared
-        // /ws/sync
-        // socket rather than sleeping a fixed interval before a race: a subscribe only appears in
-        // subscribedTopics() once the server has authorized it and acked, which means B is
-        // registered with the relay, so A's subsequent change frame deterministically reaches it.
-        // This is the /ws/sync analogue of the retired missionPresence.socket.readyState wait
-        // (#1236).
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -145,18 +125,13 @@ class MissionLiveSyncE2eTest {
                             + missionId
                             + "') !== -1)")));
 
-        // Context A adds a guest. A distinctive name resolves to no realm user, so it is a guest.
         pageA.locator("#add-participant-btn").click();
         assertThat(pageA.locator("#participant-modal")).isVisible();
         pageA.locator("#participant-search-input").fill(GUEST_PARTICIPANT_NAME);
         pageA.locator("#add-participant-form button[type='submit']").click();
-        // A's own view updates in place (sanity: the mutation succeeded).
         assertThat(pageA.locator("#facts-registered"))
             .hasText("1", new LocatorAssertions.HasTextOptions().setTimeout(20_000));
 
-        // The assertion under test: context B — which did nothing — reflects the new participant in
-        // its header count, pushed over the presence WebSocket and applied as an in-place crew
-        // swap.
         assertThat(pageB.locator("#facts-registered"))
             .hasText("1", new LocatorAssertions.HasTextOptions().setTimeout(20_000));
         assertThat(pageB.locator("#tab-crew .tab-count")).hasText("0/1");
@@ -173,11 +148,8 @@ class MissionLiveSyncE2eTest {
   }
 
   /**
-   * Same two-context setup, but for the Ziele objectives editor: context A adds an objective on the
-   * Verwaltung tab; context B — a passive viewer that never reloads — must gain the new objective
-   * row in its (backgrounded) editor IN PLACE. This pins the {@code objectives} section key across
-   * the full path (broadcast → relay whitelist → receiver container map): the key was once dropped
-   * at the relay AND missing from the receiver, so peers' Ziele stayed stale until a manual reload
+   * Verifies that an objective added on the Verwaltung tab in one context appears in place in
+   * another context's Ziele editor, pinning the {@code objectives} section key end to end
    * (REQ-FE-010).
    */
   @Test
@@ -197,9 +169,6 @@ class MissionLiveSyncE2eTest {
       Page pageA = contextA.newPage();
       Page pageB = contextB.newPage();
       try {
-        // A lands on the Verwaltung tab (deeplink) where the objectives editor is interactable;
-        // B stays on the default tab — its objectives container is in the DOM but backgrounded,
-        // which is exactly the state the live-sync swap must still reach.
         E2eSupport.navigate(pageA, baseUrl + "/missions/" + missionId + "?tab=verw");
         pageA.waitForLoadState();
         E2eSupport.navigate(pageB, baseUrl + "/missions/" + missionId);
@@ -207,11 +176,8 @@ class MissionLiveSyncE2eTest {
 
         int before = pageB.locator("#mission-objective-list .ae-row").count();
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Same deterministic wait as the participant test: an acked mission-room subscription on
-        // /ws/sync implies B is registered with the relay, so A's change frame cannot race past it.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -221,14 +187,10 @@ class MissionLiveSyncE2eTest {
                             + missionId
                             + "') !== -1)")));
 
-        // Context A adds an objective (created with the localized default title + PRIMARY kind).
         pageA.locator("#mission-objective-add").click();
-        // A's own editor re-renders in place (sanity: the mutation succeeded).
         assertThat(pageA.locator("#mission-objective-list .ae-row"))
             .hasCount(before + 1, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
 
-        // The assertion under test: context B — which did nothing — gains the new objective row,
-        // pushed over the presence WebSocket and applied as an in-place objectives swap.
         assertThat(pageB.locator("#mission-objective-list .ae-row"))
             .hasCount(before + 1, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
         assertEquals(

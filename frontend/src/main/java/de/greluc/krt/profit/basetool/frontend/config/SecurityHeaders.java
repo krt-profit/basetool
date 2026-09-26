@@ -28,60 +28,18 @@ import org.springframework.security.web.header.HeaderWriter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 /**
- * The frontend's security-response-header policy — the per-request {@code Content-Security-Policy}
- * (nonce-gated {@code script-src}/{@code style-src} plus a Keycloak-aware {@code form-action}),
- * {@code X-Frame-Options: DENY}, {@code Referrer-Policy}, Cross-Origin-Opener/Resource-Policy,
- * HSTS, {@code Permissions-Policy} and {@code X-Content-Type-Options} — extracted verbatim from
- * {@code SecurityConfig.filterChain} (audit L-tier config de-bloat, #15) so the filter chain wires
- * this self-contained concern with a single {@link #frontend(String)} call rather than an inline
- * ~40-line lambda plus its two supporting methods and the CSP template.
+ * The frontend's security response headers: the per-request nonce-gated {@code
+ * Content-Security-Policy} with a Keycloak-aware {@code form-action}, {@code X-Frame-Options:
+ * DENY}, {@code Referrer-Policy}, cross-origin policies, HSTS, {@code Permissions-Policy} and
+ * {@code X-Content-Type-Options}.
  *
- * <p>Stateless and static-only; the emitted headers are byte-identical to the previous inline
- * configuration and pinned by {@code SecurityHeadersTest}.
+ * <p>Stateless; pinned by {@code SecurityHeadersTest}.
  */
 @Slf4j
 public final class SecurityHeaders {
 
   private SecurityHeaders() {}
 
-  // CSP migration milestone: the ~200 inline event-handler attributes (onclick="…",
-  // onchange="…", onsubmit="…", oninput="…", onkeyup="…") that historically pinned us to a
-  // {@code script-src-attr 'unsafe-inline'} allowance have been moved to delegated handlers
-  // via the {@code data-trigger}-based dispatcher in {@code event-delegation.js} +
-  // {@code common-handlers.js} and per-page {@code krtEvents.on(...)} bindings in template
-  // {@code <script th:attr="nonce=${cspNonce}">} blocks. With zero inline {@code on*=}
-  // attributes remaining in the templates ({@code grep} verified), the policy drops
-  // {@code script-src-attr} entirely — the directive defaults to {@code 'none'} when omitted
-  // (CSP3 spec, MDN <a href=
-  // "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src-attr"
-  // >script-src-attr</a>), which slams the door on stored-XSS via a future template that
-  // accidentally re-introduces an inline event handler. {@code <script>} elements stay
-  // nonce-gated through {@code script-src} below — unchanged.
-  // Audit findings M-9 + M-10:
-  //   * M-10: dropped the broad {@code https:} fallback from {@code script-src}. Browsers that
-  //     understand {@code 'strict-dynamic'} (Chrome 52+, Firefox 52+, Safari 15.4+) ignore the
-  //     fallback anyway, but older browsers fell back to "any HTTPS origin loads scripts" — that
-  //     widened the policy unnecessarily for &lt;1% of installed-base browsers. With the fallback
-  //     removed the policy is uniformly strict across browsers.
-  //   * M-9: added {@code form-action 'self'} (an injected {@code &lt;form action=evil&gt;} cannot
-  //     POST any visible field — including the CSRF token — to a third-party origin) and {@code
-  //     upgrade-insecure-requests} (auto-rewrites HTTP subresources to HTTPS so a mixed-content
-  //     bug never falls back to plain HTTP). The Keycloak origin (derived per-environment from the
-  //     OIDC issuer-uri) is appended to {@code form-action} at runtime in {@code
-  //     cspNonceHeaderWriter}: the POST {@code /logout} form's success redirect targets Keycloak's
-  //     cross-origin {@code end_session_endpoint}, and with {@code 'self'} alone Chromium blocks
-  //     that redirect — the local session is cleared but the Keycloak SSO session stays alive, so
-  //     the next login silently re-authenticates (the regression after logout became POST-only).
-  // {@code style-src} no longer carries {@code 'unsafe-inline'} (audit finding L-3): every {@code
-  // <style>} block in the templates renders with {@code th:attr="nonce=${cspNonce}"}, so an
-  // injected {@code <style>} tag from a stored-XSS vector cannot be evaluated. The former {@code
-  // style-src-attr 'unsafe-inline'} fallback for inline {@code style=""} attributes has been
-  // dropped to {@code 'none'}: all inline style attributes were migrated out of the templates —
-  // static values to the generated {@code inline-migration.css} classes, and the data-driven ones
-  // (modal show/hide, opacity/colour toggles → {@code th:classappend} classes; progress-bar widths
-  // → a {@code data-krtm-width} attribute applied via the CSSOM in {@code inline-style-apply.js},
-  // which {@code style-src-attr} does not govern). With no {@code style=""} attribute remaining, an
-  // injected one is now blocked by the browser, closing the CSS-injection residual entirely.
   private static final String CSP_TEMPLATE =
       "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
           + "form-action %2$s; upgrade-insecure-requests; "
@@ -91,13 +49,10 @@ public final class SecurityHeaders {
           + "script-src 'nonce-%1$s' 'strict-dynamic'";
 
   /**
-   * Builds the frontend response-header {@link Customizer} for {@link HttpSecurity#headers}: the
-   * per-request CSP writer plus the static frame-options / referrer / cross-origin / HSTS /
-   * permissions-policy / content-type-options headers, in the exact order the filter chain applied
-   * them inline.
+   * Builds the frontend response-header {@link Customizer} for {@link HttpSecurity#headers}.
    *
-   * @param issuerUri the configured Keycloak issuer URI, used to derive the allowed logout-redirect
-   *     origin for the CSP {@code form-action} directive
+   * @param issuerUri the configured Keycloak issuer URI, from which the CSP {@code form-action}
+   *     logout-redirect origin is derived
    * @return the headers customizer to hand to {@code http.headers(...)}
    */
   public static Customizer<HeadersConfigurer<HttpSecurity>> frontend(String issuerUri) {
@@ -105,9 +60,6 @@ public final class SecurityHeaders {
       headers.addHeaderWriter(cspNonceHeaderWriter(issuerUri));
       headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
       headers.referrerPolicy(ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
-      // M-12: Cross-Origin-Opener-Policy + Cross-Origin-Resource-Policy. Same rationale
-      // as the backend — COOP isolates the browsing context group, CORP prevents
-      // cross-origin embedding of frontend resources via {@code <img>} / {@code <script>}.
       headers.crossOriginOpenerPolicy(
           coop ->
               coop.policy(
@@ -119,16 +71,11 @@ public final class SecurityHeaders {
                   org.springframework.security.web.header.writers
                       .CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy
                       .SAME_ORIGIN));
-      // Audit finding H-9: explicit HSTS. Frontend is reached over HTTPS in production;
-      // behind nginx-proxy-manager with X-Forwarded-Proto the default writer works,
-      // but pinning the policy here makes the contract explicit and prod-safe even if
-      // the proxy headers are misconfigured.
       headers.httpStrictTransportSecurity(
           hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
       headers.addHeaderWriter(
           new org.springframework.security.web.header.writers.StaticHeadersWriter(
               "Permissions-Policy",
-              // L-3: explicit deny for every browser feature the app does not use.
               "geolocation=(), camera=(), microphone=(), fullscreen=(),"
                   + " payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(),"
                   + " gyroscope=(), magnetometer=(), display-capture=(),"
@@ -138,23 +85,11 @@ public final class SecurityHeaders {
   }
 
   /**
-   * Builds the per-request CSP header writer. The nonce is substituted per request; the {@code
-   * form-action} source list is computed once here (this method runs a single time while the filter
-   * chain is assembled). {@code 'self'} covers every same-origin form in the app, and the
-   * configured Keycloak origin is appended to it.
+   * Builds the per-request CSP header writer. The nonce is substituted per request; {@code
+   * form-action} is {@code 'self'} plus the Keycloak origin, so the POST-logout redirect to the
+   * end-session endpoint is allowed.
    *
-   * <p>Since ADR-0166 that appended origin is normally the app's own: Keycloak serves at {@code
-   * /auth} on this host, so the POST {@code /logout} whose success redirect targets the {@code
-   * end_session_endpoint} no longer leaves the origin, and the directive collapses to the
-   * equivalent of {@code 'self'}. The derivation is kept rather than hardcoded for the reason it
-   * was written this way in the first place: it states the RULE — the end-session endpoint's origin
-   * must be a permitted form target — so a deployment configuring an issuer elsewhere stays correct
-   * without an edit. Before that ADR the two really did differ, and without this entry Chromium
-   * blocked the redirect: the local Spring session was cleared but the Keycloak SSO session
-   * survived, so the next login silently re-authenticated instead of prompting.
-   *
-   * @param issuerUri the configured Keycloak issuer URI, used to derive the allowed logout-redirect
-   *     origin
+   * @param issuerUri the configured Keycloak issuer URI
    * @return a header writer that emits the {@code Content-Security-Policy} response header
    */
   private static HeaderWriter cspNonceHeaderWriter(String issuerUri) {
@@ -168,14 +103,11 @@ public final class SecurityHeaders {
   }
 
   /**
-   * Derives the origin ({@code scheme://host[:port]}) from the configured OIDC issuer URI, for use
-   * in the CSP {@code form-action} directive. Keycloak's {@code end_session_endpoint} shares the
-   * issuer's origin, so this is precisely the origin the POST-logout redirect must be allowed to
-   * reach.
+   * Derives the origin ({@code scheme://host[:port]}) of the OIDC issuer URI, which Keycloak's
+   * {@code end_session_endpoint} shares.
    *
    * @param issuerUri the configured Keycloak issuer URI; may be {@code null}, blank, or unparseable
-   * @return the {@code scheme://host[:port]} origin, or an empty string if it cannot be derived (in
-   *     which case {@code form-action} stays {@code 'self'}-only)
+   * @return the origin, or an empty string if it cannot be derived
    */
   @NotNull
   private static String keycloakOriginOf(String issuerUri) {

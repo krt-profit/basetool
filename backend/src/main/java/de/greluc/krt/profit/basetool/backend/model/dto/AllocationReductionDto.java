@@ -24,16 +24,11 @@ import jakarta.validation.constraints.Positive;
 import java.util.UUID;
 
 /**
- * One line of a book-out / transfer "deduct from" plan (Variante C, REQ-INV-027): it takes {@code
- * amount} of the deducted quantity out of the entry's earmark to {@code targetId} (a job order or a
- * mission, depending on which dimension list carries it). The two dimensions of an entry —
- * job-order and mission splits — are independent, so a single deducted quantity is sourced
- * separately in each: {@link InventoryItemBookOutDto#jobOrderReductions()} spends it against
- * job-order slices and {@link InventoryItemBookOutDto#missionReductions()} against mission slices.
- * Whatever a dimension's reductions leave uncovered is taken from that dimension's not-yet-assigned
- * rest.
+ * One line of a book-out / transfer deduction plan (REQ-INV-027): takes {@code amount} out of the
+ * entry's earmark to {@code targetId}, a job order or mission depending on the list it is in. What
+ * a dimension's reductions leave uncovered comes from that dimension's unassigned rest.
  *
  * @param targetId the job order or mission whose slice to shrink; never {@code null}
- * @param amount the SCU (or whole pieces) to subtract from that slice; strictly positive
+ * @param amount the SCU or pieces to subtract; strictly positive
  */
 public record AllocationReductionDto(@NotNull UUID targetId, @NotNull @Positive Double amount) {}

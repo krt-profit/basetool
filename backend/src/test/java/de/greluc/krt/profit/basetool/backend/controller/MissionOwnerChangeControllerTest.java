@@ -51,16 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * The owner change over HTTP: {@code PUT /api/v1/missions/{id}/owner}, the versioned endpoint the
- * web frontend now calls (BE-SIMP-03).
- *
- * <p>Until 2026-09-22 nothing called this endpoint: the frontend used the unversioned {@code PUT
- * …/owner/{userId}}, and {@code MissionDto} carried no ownership version a client could have
- * echoed, so the later of two concurrent owner changes silently won. These cases pin the three
- * halves that make the lock real at the boundary — a stale echo is a {@code 409} with the {@code
- * OPTIMISTIC_LOCK} code the frontend's conflict dialog keys on, the success answer carries the
- * counter to echo next time, and a request without a version is refused rather than treated as
- * "skip the check".
+ * Tests the versioned owner change {@code PUT /api/v1/missions/{id}/owner}: a stale version is a
+ * {@code 409} with code {@code OPTIMISTIC_LOCK}, success returns the new counter, and a missing
+ * version is refused.
  */
 @SpringBootTest
 class MissionOwnerChangeControllerTest {

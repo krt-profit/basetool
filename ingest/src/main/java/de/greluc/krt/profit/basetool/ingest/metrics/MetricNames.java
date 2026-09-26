@@ -19,15 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.metrics;
 
-/**
- * Single source of truth for the ingest {@code basetool_*} business-metric names, tag keys and
- * bounded tag values (REQ-OBS-011).
- *
- * <p>Meter names use Micrometer's dotted convention (rendered with underscores + a type suffix by
- * the Prometheus scrape). Every tag value comes from a bounded, enumerable set (REQ-OBS-006): the
- * handoff {@code kind} is the {@code HandoffKind} enum, and the failure {@code reason} / rate-limit
- * {@code bucket} are the fixed value constants below — never a subject, IP or URI.
- */
+/** The ingest {@code basetool_*} metric names, tag keys and bounded tag values (REQ-OBS-011). */
 public final class MetricNames {
 
   /** Counter {@code basetool_ingest_handoff_total} — successful handoffs, tag {@code kind}. */
@@ -37,11 +29,9 @@ public final class MetricNames {
   public static final String INGEST_HANDOFF_ERRORS = "basetool.ingest.handoff.errors";
 
   /**
-   * Counter {@code basetool_ingest_payload_rejected_total} (untagged). Bumped by {@link
-   * de.greluc.krt.profit.basetool.ingest.filter.PayloadSizeLimitFilter} when a request body exceeds
-   * the cap and is refused with 413. The DoS guard was otherwise silent (no log, no metric), unlike
-   * its sibling bot / rate-limit reject filters, so a flood of oversized-body probes against the
-   * only internet-facing surface was undetectable (REQ-OBS-011, REQ-INGEST-005).
+   * Counter {@code basetool_ingest_payload_rejected_total} (untagged), bumped by {@link
+   * de.greluc.krt.profit.basetool.ingest.filter.PayloadSizeLimitFilter} on each 413
+   * (REQ-INGEST-005).
    */
   public static final String INGEST_PAYLOAD_REJECTED = "basetool.ingest.payload.rejected";
 
@@ -53,10 +43,8 @@ public final class MetricNames {
   public static final String RATELIMIT_REJECTIONS = "basetool.ratelimit.rejections";
 
   /**
-   * Counter {@code basetool_ratelimit_requests_total} — tag {@code bucket} ({@link #BUCKET_IP} /
-   * {@link #BUCKET_SUBJECT}). Bumped for every bucket evaluation (consumed or rejected), so
-   * rejections/requests gives a per-bucket rejection ratio rather than 429-only detection (#1041
-   * item 19).
+   * Counter {@code basetool_ratelimit_requests_total} with tag {@code bucket} ({@link #BUCKET_IP} /
+   * {@link #BUCKET_SUBJECT}), bumped on every bucket evaluation, consumed or rejected.
    */
   public static final String RATELIMIT_REQUESTS = "basetool.ratelimit.requests";
 
@@ -82,19 +70,14 @@ public final class MetricNames {
   public static final String REASON_BACKEND_UNAVAILABLE = "backend_unavailable";
 
   /**
-   * Failure reason: the backend answered {@code 401}/{@code 403} to the gateway's <em>own</em>
-   * service-account identity (ADR-0129). Kept apart from {@link #REASON_BACKEND_REJECT} because the
-   * member did nothing wrong — the gateway's token, secret or on-behalf-of allowlist entry is the
-   * fault — and from {@link #REASON_BACKEND_UNAVAILABLE} because the backend is up and answering,
-   * so {@code IngestBackendUnavailable} would send the operator to the wrong place.
+   * Failure reason: the backend answered {@code 401}/{@code 403} to the gateway's own
+   * service-account identity (ADR-0129).
    */
   public static final String REASON_BACKEND_AUTH = "backend_auth";
 
   /**
-   * Failure reason: the Redis handoff staging was unreachable, so the relayed draft could not be
-   * parked for browser pickup (REQ-INGEST-003). Kept apart from {@link #REASON_INTERNAL} because it
-   * is an availability event with an obvious operator action, not an application fault — the caller
-   * is told to retry (503) rather than handed a 500.
+   * Failure reason: the Redis handoff staging was unreachable, so the draft could not be parked
+   * (REQ-INGEST-003); answered with a retryable 503.
    */
   public static final String REASON_STAGING_UNAVAILABLE = "staging_unavailable";
 
@@ -102,11 +85,9 @@ public final class MetricNames {
   public static final String REASON_INTERNAL = "internal";
 
   /**
-   * Counter {@code basetool_http_error_total} — tag {@code code} (stable RFC-7807 code). Shares its
-   * name with the backend's error counter; the {@code application} common tag distinguishes the
-   * module. Emitted by {@link
+   * Counter {@code basetool_http_error_total} with tag {@code code}, emitted by {@link
    * de.greluc.krt.profit.basetool.ingest.config.IdentityProviderUnavailableFilter} for an
-   * identity-provider-unavailable 503 (REQ-SEC-024, REQ-OBS-011).
+   * identity-provider 503 (REQ-SEC-024).
    */
   public static final String HTTP_ERROR = "basetool.http.error";
 
@@ -114,10 +95,8 @@ public final class MetricNames {
   public static final String TAG_CODE = "code";
 
   /**
-   * Error code: a dependency the request needs was unreachable — retryable 503. Covers both the
-   * identity provider (Keycloak JWKS, {@code IdentityProviderUnavailableFilter}) and the Redis
-   * handoff staging ({@code GlobalExceptionHandler}); the client's reaction is the same in both
-   * cases, and {@link #INGEST_HANDOFF_ERRORS} separates them by {@code reason} for the dashboard.
+   * Error code for a retryable 503 when the identity provider or the Redis handoff staging is
+   * unreachable.
    */
   public static final String CODE_SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
 
@@ -131,14 +110,11 @@ public final class MetricNames {
   public static final String CODE_ACCESS_DENIED = "ACCESS_DENIED";
 
   /**
-   * Counter {@code basetool_bot_blocked_total} — tag {@code rule} ({@link #BOT_RULE_METHOD} /
+   * Counter {@code basetool_bot_blocked_total} with tag {@code rule} ({@link #BOT_RULE_METHOD} /
    * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION} / {@link
-   * #BOT_RULE_QUERY_STRING}). Bumped by {@link
-   * de.greluc.krt.profit.basetool.ingest.filter.BotProtectionFilter} at its four reject branches
-   * (REQ-INGEST-009), which are otherwise {@code log.debug}-only (prod-invisible). Shares its name
-   * with the frontend bot counter; the {@code application} common tag distinguishes the module. The
-   * counter also surfaces a self-inflicted false positive when a new legit route matches a blocked
-   * prefix (REQ-OBS-011).
+   * #BOT_RULE_QUERY_STRING}), bumped by {@link
+   * de.greluc.krt.profit.basetool.ingest.filter.BotProtectionFilter} on each rejection
+   * (REQ-INGEST-009).
    */
   public static final String BOT_BLOCKED = "basetool.bot.blocked";
 
@@ -163,30 +139,15 @@ public final class MetricNames {
   public static final String BOT_RULE_QUERY_STRING = "query_string";
 
   /**
-   * Counter {@code basetool_ingest_client_total} — tag {@code client_id}. Bumped once per accepted
-   * ingest call with the calling client's {@code azp} (REQ-INGEST-011, REQ-OBS-011). Answers "which
-   * software is actually driving the gateway", which no other signal carries: the handoff counter
-   * is tagged by draft kind and the access log by path, so a second producer appearing alongside
-   * the extractor was previously invisible.
-   *
-   * <p>The tag value is bounded by construction — it is the matched entry of the configured
-   * allowlist, or the literal {@link #CLIENT_ID_OTHER} for anything else. The raw {@code azp} is
-   * never used as a label: even though Keycloak only ever stamps a registered client id, deriving a
-   * label from a token claim is the shape of an unbounded-cardinality bug and is exactly what
-   * REQ-OBS-011 forbids.
+   * Counter {@code basetool_ingest_client_total} with tag {@code client_id}, bumped per accepted
+   * ingest call (REQ-INGEST-011). The tag is the matched allowlist entry or {@link
+   * #CLIENT_ID_OTHER}, never the raw {@code azp}.
    */
   public static final String INGEST_CLIENT = "basetool.ingest.client";
 
   /**
-   * Counter {@code basetool_ingest_client_rejected_total} — tag {@code reason}. Bumped whenever the
-   * client-identity gate refuses a caller, and — importantly — also when it <em>would have</em>
-   * refused one while {@code app.ingest.client-identity.audit-only} is set. That is what makes the
-   * audit-only rollout usable: the operator configures the gates, watches this counter stay at zero
-   * for a scrape interval, and only then enforces (REQ-INGEST-011).
-   *
-   * <p>It is also the alerting hook: a non-zero rate means either a foreign client is probing the
-   * ingress or a legitimate one drifted out of the allowlist. Both need a human, which is why
-   * {@code IngestUnknownClient} fires on it rather than leaving it to a dashboard nobody watches.
+   * Counter {@code basetool_ingest_client_rejected_total} with tag {@code reason}, bumped whenever
+   * the client-identity gate refuses a caller or would refuse it under audit-only (REQ-INGEST-011).
    */
   public static final String INGEST_CLIENT_REJECTED = "basetool.ingest.client.rejected";
 
@@ -197,10 +158,7 @@ public final class MetricNames {
   public static final String TAG_OUTCOME = "outcome";
 
   /**
-   * Bounded {@code client_id} tag value for a caller whose {@code azp} is not on the allowlist (or
-   * absent). Keeps the label set finite while still separating "the known extractor" from
-   * "something else"; the {@code reason} on {@link #INGEST_CLIENT_REJECTED} says which of the two
-   * it was.
+   * {@code client_id} tag value for a caller whose {@code azp} is absent or not on the allowlist.
    */
   public static final String CLIENT_ID_OTHER = "other";
 
@@ -227,49 +185,22 @@ public final class MetricNames {
   public static final String REASON_BAD_PROVENANCE = "bad_provenance";
 
   /**
-   * Client-identity reject reason: an <em>authenticated</em> principal reached the gate that is not
-   * a JWT, so none of the claim-based checks could run. Structurally impossible on today's chain —
-   * the bearer and DPoP providers both yield a JWT authentication — which is exactly why it is
-   * refused rather than waved through: a non-zero count means a new authentication mechanism was
-   * added without the gate knowing about it.
+   * Client-identity reject reason: an authenticated principal that is not a JWT reached the gate.
    */
   public static final String REASON_NON_JWT_PRINCIPAL = "non_jwt_principal";
 
   /**
-   * Counter {@code basetool_ingest_auth_failures_total} — tag {@code reason}: the RFC 6750 bearer
-   * error code the resource server raised ({@link #AUTH_INVALID_TOKEN} / {@link
-   * #AUTH_INVALID_REQUEST} / {@link #AUTH_INSUFFICIENT_SCOPE}), plus {@link #AUTH_NO_CREDENTIALS}
-   * for a request that presented no credential at all and {@link #AUTH_OTHER} for the remainder.
+   * Counter {@code basetool_ingest_auth_failures_total} with tag {@code reason}: the RFC 6750 error
+   * code ({@link #AUTH_INVALID_TOKEN} / {@link #AUTH_INVALID_REQUEST} / {@link
+   * #AUTH_INSUFFICIENT_SCOPE}), {@link #AUTH_NO_CREDENTIALS} or {@link #AUTH_OTHER}.
    *
-   * <p>{@link #AUTH_NO_CREDENTIALS} was split out on 2026-09-13 because without it the counter was
-   * a single flat series: all 4&nbsp;927 of this gateway's 401s read {@link #AUTH_OTHER}, and the
-   * bulk of them are the deployment's own blackbox probe, which asserts liveness by expecting a 401
-   * on the root (REQ-OBS-018). Reading the counter's total as a security signal therefore measures
-   * the monitoring plane, not an attacker.
-   *
-   * <p>Exists because a {@code 401} was previously undiagnosable. It is logged at {@code DEBUG}
-   * with nothing but the exception class — deliberately, since this is the only internet-facing
-   * surface and an anonymous scanner would otherwise flood the log — so in production a legitimate
-   * operator chasing a failing client had no signal at all. That cost real time on 2026-08-03: a
-   * client reporting "you must sign in" could have meant a malformed header, a bad signature, a
-   * wrong issuer, an expired token or a missing audience, and nothing distinguished them.
-   *
-   * <p>The tag is the error <b>code</b>, never the description: Spring's description embeds the
-   * decode failure verbatim ("An error occurred while attempting to decode the Jwt: …") and can
-   * therefore quote parts of the presented token, which must never reach an appender or a label
-   * (REQ-OBS-004). The code set is fixed by RFC 6750, so the label stays bounded (REQ-OBS-011).
+   * <p>The tag is the code, never the error description, which may quote the token (REQ-OBS-004).
    */
   public static final String INGEST_AUTH_FAILURES = "basetool.ingest.auth.failures";
 
   /**
-   * Bearer error: a token <em>was</em> presented and rejected — bad signature, wrong issuer,
-   * expired, or a failed audience check.
-   *
-   * <p>Corrected 2026-09-13: this said "by far the widest bucket, and the one an operator hits
-   * first". Production says the opposite — it stood at <b>zero</b> against 4&nbsp;927 failures,
-   * every one of which had presented no token at all. That is what makes it the series worth
-   * alerting on: it is quiet by default, so a rejected token stands out instead of being averaged
-   * into probe traffic.
+   * Bearer error: a presented token was rejected (bad signature, wrong issuer, expired or failed
+   * audience check).
    */
   public static final String AUTH_INVALID_TOKEN = "invalid_token";
 
@@ -279,32 +210,18 @@ public final class MetricNames {
   /** Bearer error: the token is valid but lacks a required scope. */
   public static final String AUTH_INSUFFICIENT_SCOPE = "insufficient_scope";
 
-  /**
-   * No credential was presented at all — no {@code Authorization} header, so the chain rejected the
-   * request with a plain {@code InsufficientAuthenticationException} and there is no {@code
-   * OAuth2AuthenticationException} to carry a code. RFC 6750 §3.1 deliberately defines none for
-   * this case; the literal exists anyway because separating "brought nothing" from "brought
-   * something that failed" is the whole diagnostic value of the counter.
-   */
+  /** No credential was presented at all, so there is no RFC 6750 code to report. */
   public static final String AUTH_NO_CREDENTIALS = "no_credentials";
 
   /**
-   * Bearer error: anything the resource server raised without an RFC 6750 code that is also not the
-   * no-credential case. Rare once {@link #AUTH_NO_CREDENTIALS} is split out, and a sustained
-   * non-zero rate means an unenumerated failure mode.
+   * Bearer error: any other failure without an RFC 6750 code that is not the no-credential case.
    */
   public static final String AUTH_OTHER = "other";
 
   /**
-   * Counter {@code basetool_ingest_service_account_token_total} — tag {@code outcome} ({@link
+   * Counter {@code basetool_ingest_service_account_token_total} with tag {@code outcome} ({@link
    * #SA_TOKEN_MINTED} / {@link #SA_TOKEN_CACHED} / {@link #SA_TOKEN_FAILED} / {@link
-   * #SA_TOKEN_BACKOFF}).
-   *
-   * <p>Since ADR-0129 the gateway calls the backend under its OWN identity instead of relaying the
-   * caller's token, so this grant sits on the critical path of every ingest write: if it fails,
-   * nobody can send, and the failure is in a hop no client can see. The cached/minted split also
-   * shows whether the token cache is working — a mint on every request means Keycloak is being
-   * asked for a token per upload.
+   * #SA_TOKEN_BACKOFF}) for the gateway's own backend token (ADR-0129).
    */
   public static final String INGEST_SERVICE_ACCOUNT_TOKEN = "basetool.ingest.service.account.token";
 
@@ -328,54 +245,26 @@ public final class MetricNames {
   public static final String SA_TOKEN_BACKOFF = "backoff";
 
   /**
-   * Error code: the caller authenticated successfully but its <em>client software</em> is not
-   * approved for the ingest path — 403 (REQ-INGEST-011). Deliberately distinct from {@link
-   * #CODE_ACCESS_DENIED}, which means the <em>user</em> lacks a permission: here the user is fully
-   * entitled and it is the tool that is refused, and the extractor surfaces the problem detail
-   * verbatim, so conflating the two would tell a member "you are not allowed" when the truth is
-   * "use the official extractor".
+   * Error code: the user is authenticated but the calling client software is not approved for
+   * ingest, answered with 403 (REQ-INGEST-011). Distinct from {@link #CODE_ACCESS_DENIED}.
    */
   public static final String CODE_CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
   /**
-   * Gauge {@code basetool_tracing_enabled} — {@code 1} while this module is configured to emit
-   * spans, {@code 0} while it is not.
-   *
-   * <p><b>What it is for.</b> The trace pipeline had no alert at either end until 2026-09-20, and
-   * that is why a dead one went unnoticed: on the Podman host the application containers could not
-   * resolve {@code alloy}, every span was dropped in this module's own exporter, and both {@code
-   * otelcol_receiver_accepted_spans_total} and {@code tempo_distributor_spans_received_total} were
-   * <em>absent</em> rather than zero. An alert on that absence alone cannot be written, because
-   * absence is also what a deliberately switched-off tracing stack looks like — the same problem
-   * the backend's {@code basetool_scheduled_job_enabled} solves for a switched-off job, and the
-   * same solution.
-   *
-   * <p><b>Reported as 0 rather than omitted</b>, which is the one way this differs from the
-   * scheduled-job gauge. That one is absent when off because the bean does not exist; here the
-   * series is registered unconditionally, so {@code basetool_tracing_enabled == 0} says "off on
-   * purpose" while <em>absence</em> says "this module is not being scraped at all". An alert that
-   * has to read "tracing is on" positively needs the difference.
-   *
-   * <p>Untagged: the deployment-wide {@code application} tag already separates the three modules,
-   * and a second identity for the same fact would only invite them to disagree (REQ-OBS-011).
+   * Gauge {@code basetool_tracing_enabled}: {@code 1} while this module emits spans, {@code 0}
+   * while tracing is off. Always registered, so absence means the module is not scraped.
    */
   public static final String TRACING_ENABLED = "basetool.tracing.enabled";
 
   /**
-   * Gauge {@code basetool_ingest_gate_enforcing} — tag {@link #TAG_GATE} ({@code azp} / {@code
-   * scope} / {@code tool} / {@code audience}); {@code 1} while that client gate refuses callers,
-   * {@code 0} while it is unconfigured or only counting under audit-only (REQ-INGEST-011).
-   *
-   * <p>Every gate is switched on by the environment alone, so without this series the question "is
-   * production actually protected" could only be answered by reading the host's environment. Backs
-   * {@code IngestAudienceGateOff}. Published by {@link IngestGatePostureMetric}.
+   * Gauge {@code basetool_ingest_gate_enforcing} with tag {@link #TAG_GATE} ({@code azp} / {@code
+   * scope} / {@code tool} / {@code audience}): {@code 1} while that gate refuses callers, {@code 0}
+   * otherwise (REQ-INGEST-011). Published by {@link IngestGatePostureMetric}.
    */
   public static final String INGEST_GATE_ENFORCING = "basetool.ingest.gate.enforcing";
 
   /** Tag key: which ingest client gate {@link #INGEST_GATE_ENFORCING} describes. */
   public static final String TAG_GATE = "gate";
 
-  private MetricNames() {
-    // Constants holder — not instantiable.
-  }
+  private MetricNames() {}
 }

@@ -33,9 +33,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
- * Unit test for {@link SecurityConfig#roleHierarchy()} (S3, #909): pins the exact reachability
- * semantics of the hierarchy chain now built from {@link Roles} constants, so the migration off the
- * hand-written multi-line string is verified byte-identical to the prior behaviour.
+ * Unit test for {@link SecurityConfig#roleHierarchy()}: pins the exact reachability semantics of
+ * the hierarchy built from {@link Roles} constants.
  */
 class SecurityConfigTest {
 

@@ -25,10 +25,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend's {@code JobOrderHandoverDto}. Carries the executing-user +
- * squadron audit snapshot so handover history rows can show "who performed it" alongside the
- * recipient details (MULTI_SQUADRON_PLAN.md section 4.4). Both fields stay {@code null} for
- * historical rows that pre-date the audit columns.
+ * Frontend mirror of the backend's {@code JobOrderHandoverDto}, including the executing user and
+ * squadron snapshot, which may be {@code null}.
  */
 public record JobOrderHandoverDto(
     UUID id,

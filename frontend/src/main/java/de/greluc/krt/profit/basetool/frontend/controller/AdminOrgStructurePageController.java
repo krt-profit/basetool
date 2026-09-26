@@ -50,20 +50,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Admin page for defining the org hierarchy (epic #692, REQ-ORG-014): creating Bereiche and the
- * Organisationsleitung and wiring the parent edges that put a Staffel/SK under a Bereich and a
- * Bereich under the OL. It is the UI front for the backend {@code /api/v1/org-hierarchy} admin API
- * — leader/member seating stays on the org-chart page; this surface is purely the structure (create
- * + parent).
+ * Admin page for defining the org hierarchy (REQ-ORG-014): creating Bereiche and the
+ * Organisationsleitung and setting parent edges, via the backend {@code /api/v1/org-hierarchy} API.
  *
- * <p>The page is gated to {@code hasRole('ADMIN')} (class-level), mirroring the backend. The write
- * actions are in-place AJAX twins ({@code X-Requested-With} header, JSON body) that relay to the
- * backend; on success the page re-renders the affected section through {@link #page}'s {@code
- * fragment} selector instead of reloading (REQ-FE-001), and broadcasts the change over the {@code
- * org-structure} live-sync room so a peer's editor — and the member-visible Organigramm — refresh
- * too (REQ-FE-010, #1235). Backend conflicts (a stale parent version, a duplicate name, the OL
- * singleton) are relayed verbatim as {@code problem+json} so the shared {@code krtFetch} client
- * shows the right toast.
+ * <p>Writes are in-place AJAX relays that re-render the affected section through {@link #page} and
+ * broadcast on the {@code org-structure} live-sync room (REQ-FE-010); backend conflicts are relayed
+ * as {@code problem+json}.
  */
 @Controller
 @UsesLayoutModel
@@ -100,9 +92,8 @@ public class AdminOrgStructurePageController {
       new ParameterizedTypeReference<>() {};
 
   /**
-   * The six Kartell departments (Bereichsfarben), mirroring the frozen backend {@code Department}
-   * enum (epic #692, REQ-ORG-026). Used to populate the create-Bereich department picker; the
-   * display labels come from the {@code department.*} message keys.
+   * The six Kartell departments, mirroring the backend {@code Department} enum (REQ-ORG-026), for
+   * the create-Bereich picker; labels come from the {@code department.*} message keys.
    */
   private static final List<String> DEPARTMENTS =
       List.of(
@@ -111,20 +102,13 @@ public class AdminOrgStructurePageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the org-structure management page: the create-OL / create-Bereich forms and the table
-   * of every org unit with its current parent. Splits the single backend read into the per-kind
-   * option pools the parent pickers need (OL for a Bereich's parent, Bereiche for a Staffel/SK's
-   * parent).
+   * Renders the org-structure page: the create-OL and create-Bereich forms and the table of every
+   * org unit with its parent, plus the per-kind parent option pools.
    *
-   * <p>When {@code fragment} names {@code units} or {@code forms} only that section is rendered, so
-   * a local mutation — or a peer's, relayed over the {@code org-structure} live-sync room — updates
-   * the page in place instead of reloading it (REQ-FE-001/-010, #1235). Both sections are fed by
-   * the same single backend read, so serving one costs no more than serving the whole page.
-   *
-   * @param fragment when {@code "units"} or {@code "forms"}, only that fragment is rendered for an
-   *     in-place AJAX swap; otherwise the full page.
-   * @param model the view model.
-   * @return the view name, or the requested fragment selector.
+   * @param fragment {@code "units"} or {@code "forms"} to render only that fragment for an in-place
+   *     swap; otherwise the full page
+   * @param model the view model
+   * @return the view name, or the requested fragment selector
    */
   @NotNull
   @GetMapping
@@ -157,13 +141,11 @@ public class AdminOrgStructurePageController {
   }
 
   /**
-   * Orders the flat node list for stable display: top-down by tier ({@link #KIND_DISPLAY_ORDER} —
-   * OL, then Bereiche, then Staffeln/SKs) and case-insensitively by name within a tier. The backend
-   * read returns rows in arbitrary order; sorting here also gives the per-kind parent-option pools
-   * (derived by filtering this list) a stable alphabetical order.
+   * Orders nodes by tier ({@link #KIND_DISPLAY_ORDER}: OL, Bereiche, then Staffeln/SKs) and
+   * case-insensitively by name within a tier.
    *
-   * @param nodes the unsorted nodes; never {@code null}.
-   * @return a new list ordered by tier then name.
+   * @param nodes the unsorted nodes; never {@code null}
+   * @return a new list ordered by tier then name
    */
   private static List<OrgUnitNodeDto> sortForDisplay(@NotNull List<OrgUnitNodeDto> nodes) {
     return nodes.stream()
@@ -188,9 +170,6 @@ public class AdminOrgStructurePageController {
         "create Bereich (ajax)",
         () -> {
           Object created = backendApiClient.post(BACKEND_BEREICHE, request, Object.class);
-          // A new Bereich appears in the cached /org-units/active-all-kinds picker, so evict the
-          // shared
-          // catalogue cache or that picker stays stale up to the TTL (REQ-DATA-007 eviction gate).
           backendApiClient.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(created);
         });
@@ -211,8 +190,6 @@ public class AdminOrgStructurePageController {
         "create Organisationsleitung (ajax)",
         () -> {
           Object created = backendApiClient.post(BACKEND_OL, request, Object.class);
-          // The Organisationsleitung appears in the cached /org-units/active-all-kinds picker →
-          // evict.
           backendApiClient.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(created);
         });
@@ -237,9 +214,6 @@ public class AdminOrgStructurePageController {
           Object updated =
               backendApiClient.patch(
                   "/api/v1/org-hierarchy/org-units/" + id + "/parent", request, Object.class);
-          // Re-parenting changes the org-unit tree the cached /org-units/active-all-kinds picker
-          // renders
-          // (a unit can move under a different Bereich), so evict the shared catalogue cache.
           backendApiClient.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(updated);
         });

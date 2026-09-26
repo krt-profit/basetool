@@ -26,24 +26,19 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.GrantedAuthority;
 
 /**
- * The authorities to act with on behalf of a member, and the refusal when that member is not live
+ * Supplies the authorities to act with on behalf of a member, and refuses a member who is not live
  * (ADR-0129).
  *
- * <p>Declared here, in the dependency-free leaf, for the same reason as {@link TermsConsentCheck}:
- * the filter that needs the answer lives in {@code config} and the answer lives in {@code service},
- * and ArchUnit rejects that edge (ADR-0047). Both packages point at this interface instead of at
- * each other.
+ * <p>Declared in this dependency-free package so {@code config} and {@code service} both depend on
+ * it instead of on each other (ADR-0047).
  */
 public interface ActingMemberAuthorities {
 
   /**
    * Assembles the authorities of the member a gateway request is acting for.
    *
-   * <p>Implementations must fail <strong>closed</strong>: a subject with no local account is
-   * refused rather than created, and a member the last roster sync no longer found in the identity
-   * provider is refused outright. Without the second check a member disabled in Keycloak would keep
-   * their full authority set here indefinitely — the database does not mirror account liveness —
-   * and a named subject would outlive the revocation that a token expiry normally enforces.
+   * <p>Implementations fail closed: a subject with no local account is refused rather than created,
+   * and a member the last roster sync no longer found in the identity provider is refused.
    *
    * @param member the subject named in the on-behalf-of header
    * @return the member's authorities, assembled from the database

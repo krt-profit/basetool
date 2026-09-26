@@ -23,15 +23,13 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One row of the admin consent overview: a user and whether they have accepted the Terms-of-Use
- * version currently in force (REQ-SEC-028).
+ * One row of the admin consent overview: a user and whether they accepted the Terms-of-Use version
+ * in force (REQ-SEC-028).
  *
  * @param userId the user's {@code app_user.id}
- * @param username the login name, shown so an admin can act on the row
- * @param displayName the callsign, may be {@code null} for an account that never set one
- * @param acceptedAt when this user accepted the version in force, or {@code null} if they have not
- *     — the null-ness <em>is</em> the pending state, so the DTO needs no separate boolean that
- *     could contradict it
+ * @param username the login name
+ * @param displayName the callsign; may be {@code null}
+ * @param acceptedAt when the version in force was accepted, or {@code null} while pending
  */
 public record TermsAcceptanceStatusDto(
     UUID userId, String username, String displayName, Instant acceptedAt) {

@@ -22,18 +22,13 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * The material demand of one <em>responsible</em> (processing) org unit in the cross-order overview
- * (REQ-ORDERS-034) — the group a user reads to answer "what does my unit still have to gather".
- * Grouping on the responsible rather than the requesting unit is deliberate: the responsible unit
- * is the one that has to procure the material, and it is the side the job-order visibility scope
- * keys on (REQ-ORG-003).
+ * The material demand of one responsible (processing) org unit in the cross-order overview
+ * (REQ-ORDERS-034).
  *
  * @param orgUnit the responsible squadron or Spezialkommando; {@code null} only for the fallback
- *     group collecting orders whose responsible unit could not be resolved, so such demand is
- *     surfaced rather than silently dropped
- * @param materials the unit's aggregated material buckets, SCU materials first, then by material
- *     name, then {@code GOOD} before {@code NONE} — the ordering the order detail's material tables
- *     already use; never empty (a unit with no demand produces no group at all)
+ *     group of orders whose responsible unit could not be resolved
+ * @param materials the unit's aggregated buckets, SCU first, then by material name, then {@code
+ *     GOOD} before {@code NONE}; never empty
  */
 public record MaterialDemandGroupDto(
     SquadronReferenceDto orgUnit, List<MaterialDemandRowDto> materials) {}

@@ -44,12 +44,7 @@ public interface MissionFinanceEntryRepository extends JpaRepository<MissionFina
   List<MissionFinanceEntry> findAllByMissionIdIn(List<UUID> missionIds);
 
   /**
-   * Aggregates a mission's finance entries into per-type sum + count in ONE grouped query, so the
-   * finance summary strip and the total-sum endpoint no longer materialize every row. Under the
-   * multi-user mission-page live-update fan-out (ADR-0078) the previous {@code size=1000} load-all
-   * pinned a database connection per render and, at 200 viewers, starved the pool. A SQL {@code
-   * SUM} over an empty set is {@code NULL}, so the aggregate's sums may be {@code null} (no entry
-   * of that type); the caller coalesces them to zero. Counts are never {@code null} (0 when none).
+   * Aggregates a mission's finance entries into per-type sum and count in one grouped query.
    *
    * @param missionId mission id
    * @return per-type sum/count aggregate; sums may be {@code null}, counts are 0 when none
@@ -69,13 +64,9 @@ public interface MissionFinanceEntryRepository extends JpaRepository<MissionFina
 
   /**
    * Aggregates the finance entries of several missions into one {@code (missionId, incomeSum,
-   * expenseSum)} row per mission in ONE grouped query, so the operation finance roll-up no longer
-   * materializes every entry across every child mission. Backs the operation-detail "Ergebnis je
-   * Einsatz" bars + Gesamtergebnis (the operation-side ADR-0078 gap, #1121): the previous {@code
-   * findAllByMissionIdIn} load-all pinned a database connection across the math + serialization on
-   * every render and every payout toggle. Missions with no entry of a given type simply do not
-   * contribute to that {@code SUM} (a SQL {@code SUM} over an empty set is {@code NULL}); a mission
-   * with no entries at all yields no row and the caller treats it as zero.
+   * expenseSum)} row per mission in one grouped query, for the operation finance roll-up.
+   *
+   * <p>A mission without entries yields no row.
    *
    * @param missionIds the missions to aggregate (typically an operation's child missions)
    * @return one aggregate per mission that has at least one entry; sums may be {@code null}

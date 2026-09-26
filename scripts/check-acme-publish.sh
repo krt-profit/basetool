@@ -1,47 +1,11 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Run the acme container's certificate-publishing step and assert it lands
-# (ADR-0162).
-#
-# This step has broken twice, both times silently and both times only on a host
-# that already had certificates:
-#
-#   1. It iterated /data/certificates/*.crt. lego issues ONE multi-SAN
-#      certificate for its whole -d list, so exactly one host directory was ever
-#      written and the other four kept whatever seeded them — to expire.
-#   2. It ran `chown -R 101:101 /certs`, handing the DIRECTORIES to uid 101.
-#      `cap_drop: [ALL]` removes CAP_DAC_OVERRIDE, so root then held only r-x
-#      there, could not replace the files, and `set -eu` turned the next pass
-#      into a restart loop.
-#
-# Neither is visible in `docker compose config`, in a syntax check, or on a
-# first run against an empty volume. Both are visible here.
-#
-# What makes this a real gate: the script under test is READ FROM
-# docker/acme/publish-loop.sh -- the file the acme container actually executes --
-# not restated, and docker-compose.yml (the source the Quadlet unit is generated
-# from) is checked to still point at it. A fix applied to a copy in this file
-# would leave production broken and this check green.
-#
-# lego itself is stubbed out — the publishing step is what is under test, and a
-# config check must never depend on reaching Let's Encrypt.
-#
-# Usage:  scripts/check-acme-publish.sh
-# Exit:   0 = the publish step works, 1 = it does not
-# =============================================================================
 set -euo pipefail
 
-# Git-Bash/MSYS rewrites any argument that looks like a POSIX path, so the
-# container-side `/in/acme.sh` arrives as `C:/Program Files/Git/in/acme.sh`.
-# Excluding that one prefix leaves the host paths in `-v` alone, which still need
-# converting. Ignored on Linux and in any real shell.
 export MSYS2_ARG_CONV_EXCL='/in'
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${REPO_ROOT}/docker-compose.yml"
 IMAGE="alpine:3"
-# The uid the edge runs as, and therefore the uid the certificate files must end
-# up owned by. Mirrors `user: "101:101"` on the edge service.
 EDGE_UID=101
 
 [[ -f "${COMPOSE_FILE}" ]] || { echo "FAIL: ${COMPOSE_FILE} does not exist"; exit 1; }
@@ -57,19 +21,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Take the acme command from where it now lives --------------------------
-# It used to be a YAML block scalar inside the service's `command:`, and this
-# read it out of docker-compose.yml. It moved into a script file when the Quadlet
-# units were generated -- `Exec=` is one line and cannot hold a multi-line
-# command -- and this gate was not moved with it. It kept passing anyway, because
-# it searched for the FIRST `- |` anywhere after the `acme:` line and found the
-# npm service's, several hundred lines further down. Deleting npm is what made it
-# say so. A gate that reads the wrong block is worse than one that reads nothing:
-# it reports on something, and the something is not what runs.
-#
-# So: the script file is the subject, and compose is asked only whether it still
-# points at it. The two `/lego` invocations become no-ops and the 12-hour sleep
-# becomes a clean exit, so one pass runs and returns.
 ACME_SCRIPT="${REPO_ROOT}/docker/acme/publish-loop.sh"
 [[ -f "${ACME_SCRIPT}" ]] \
   || { echo "FAIL: ${ACME_SCRIPT} does not exist"; exit 1; }
@@ -86,19 +37,12 @@ out = []
 for line in body:
     stripped = line.strip()
     if "/lego " in stripped:
-        # Substring, not startswith: lego v5's `migrate` step is invoked as
-        # `echo "Y" | /lego migrate ...` (piping a confirmation past its
-        # interactive prompt), so the binary is no longer always the first
-        # token on the line. Keep the indentation so the surrounding
-        # if/else/while stays valid.
         out.append(line[:len(line) - len(line.lstrip())] + ": # lego stubbed out")
     elif stripped.startswith("sleep "):
         out.append(line[:len(line) - len(line.lstrip())] + "exit 0")
     else:
         out.append(line)
 
-# No `$$` collapse here: that was compose escaping shell variables inside the
-# block scalar. A script file on disk carries real dollars already.
 script = chr(10).join(out)
 if "ACME_HOSTS" not in script:
     sys.exit("FAIL: the extracted script never mentions ACME_HOSTS")
@@ -108,25 +52,14 @@ PY
 
 sh -n "${WORK}/acme.sh" || { echo "FAIL: the extracted acme command is not valid POSIX shell"; exit 1; }
 
-# The container mounts this directory and runs as root WITHOUT CAP_DAC_OVERRIDE —
-# the very rule under test. `mktemp -d` gives 0700 owned by the invoking user, so
-# on a Linux runner that root cannot read its own input and the check fails with
-# `sh: can't open '/in/acme.sh': Permission denied`. Nothing secret is in here.
 chmod 0755 "${WORK}"
 chmod 0644 "${WORK}/acme.sh"
 
-# ACME_HOSTS is an ENVIRONMENT variable now: the host list differs per environment
-# and lives in the host .env, not in the bundle. So this check supplies its own --
-# and deliberately not the production names, because a gate that only ever exercises
-# production's spelling would pass a script that hardcoded it.
 HOSTS_LINE="edge1.check.invalid edge2.check.invalid edge3.check.invalid"
-# shellcheck disable=SC2206  # deliberate word splitting: ACME_HOSTS is space-separated
+# shellcheck disable=SC2206
 HOSTS=(${HOSTS_LINE})
 PRIMARY="${HOSTS[0]}"
 
-# --- Build the state a production host is actually in ------------------------
-# Not an empty volume: both defects only appear when /certs already holds the
-# seeded material, owned by uid 101, exactly as the cutover leaves it.
 docker volume create "${VOL_CERTS}" >/dev/null
 docker volume create "${VOL_DATA}" >/dev/null
 docker run --rm -v "${VOL_DATA}:/data" -v "${VOL_CERTS}:/certs" "${IMAGE}" sh -c "
@@ -143,10 +76,6 @@ done
 chown -R ${EDGE_UID}:${EDGE_UID} /certs
 " >/dev/null
 
-# --- Run it under the container's real capabilities --------------------------
-# `--cap-drop ALL --cap-add CHOWN` and root are what the compose file grants. Run
-# it TWICE: the first pass is the cutover, the second is a renewal 12 hours later
-# against a tree the first pass already wrote. Defect 2 only showed on the second.
 for pass in 1 2; do
   echo "==> publish pass ${pass}"
   if ! docker run --rm --cap-drop ALL --cap-add CHOWN \
@@ -159,7 +88,6 @@ for pass in 1 2; do
   fi
 done
 
-# --- Assert what the edge needs ----------------------------------------------
 docker run --rm -v "${VOL_CERTS}:/certs:ro" "${IMAGE}" sh -c "
 set -eu
 rc=0
@@ -178,18 +106,11 @@ for h in ${HOSTS_LINE}; do
   mode=\"\$(stat -c '%a' \"/certs/\$h/fullchain.pem\")\"
   [ \"\$mode\" = '644' ] || { echo \"FAIL: /certs/\$h/fullchain.pem is mode \$mode, expected 644\"; rc=1; }
 done
-# A stray temporary file means a rename was skipped somewhere.
 leftover=\"\$(find /certs -name '*.new' -print)\"
 [ -z \"\$leftover\" ] || { echo \"FAIL: temporary files left behind: \$leftover\"; rc=1; }
 exit \$rc
 "
 
-# --- Close the chain: can the edge actually OPEN what acme just wrote? --------
-# Ownership and mode are only a proxy. This is the real question, and it is the
-# one that kept coming back: the edge's MASTER process opens every certificate
-# and key at startup AS uid 101, and a file it cannot read is not a permission
-# error in the log — it is a container that exits in three seconds, a failed
-# health check and an automatic rollback. Asked directly, in the real image.
 EDGE_IMAGE="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(nginxinc\/nginx-unprivileged:[^[:space:]@]*\).*/\1/p' "${COMPOSE_FILE}" | head -1)"
 [[ -n "${EDGE_IMAGE}" ]] \
   || { echo "FAIL: no nginx-unprivileged image in docker-compose.yml — the edge service changed"; exit 1; }

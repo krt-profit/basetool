@@ -76,12 +76,10 @@ class PersonalInventoryPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_shouldRenderPersonalInventoryView_whenAuthenticated() throws Exception {
-    // Given
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
 
-    // When & Then
     mockMvc
         .perform(get("/personal-inventory"))
         .andExpect(status().isOk())
@@ -90,9 +88,6 @@ class PersonalInventoryPageControllerMvcTest {
         .andExpect(model().attributeExists("items"));
   }
 
-  // covers REQ-FE-002 — an AJAX filter swap (fragment=results) renders only the item-list fragment:
-  // the total marker is present, but the swap-target wrapper, the filter form and the modals (all
-  // outside the fragment) are not.
   @Test
   @WithMockUser
   void view_fragmentResults_rendersOnlyResultsFragment() throws Exception {
@@ -111,11 +106,6 @@ class PersonalInventoryPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"krt-pi-modal\""))));
   }
 
-  // Regression guard for the frontend-proxy double-encoding sub-class: the UEX typeahead must
-  // forward a multi-word free-text term as a WebClient URI-template variable ({q}), not URLEncoder
-  // it into the URI string, so the backend @RequestParam decodes the exact typed term. URLEncoder
-  // form-encoding (space -> '+') double-encodes across the frontend->backend hop and yields zero
-  // matches.
   @Test
   @WithMockUser
   void uexSearch_passesMultiWordQueryAsUriVariable() throws Exception {
@@ -132,9 +122,6 @@ class PersonalInventoryPageControllerMvcTest {
     assertEquals("Port Olisar", qCaptor.getValue());
   }
 
-  // Same guard with an umlaut term: "Müller Hütte" encodes to M%C3%BC… under URLEncoder, which the
-  // hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
-  // backend.
   @Test
   @WithMockUser
   void uexSearch_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {

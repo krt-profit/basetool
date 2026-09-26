@@ -47,17 +47,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the Art. 17 erasure-request surface (REQ-SEC-061).
- *
- * <p>Two gates, and they are opposites, which is the point of testing them together:
+ * MockMvc gate matrix for the erasure-request surface (REQ-SEC-061).
  *
  * <ul>
- *   <li>{@code /api/v1/users/me/deletion-request} is open to <b>every</b> authenticated member. It
- *       has to be — the right is the member's — and it is safe because the subject comes from the
- *       token and no endpoint accepts a user id.
- *   <li>{@code /api/v1/admin/deletion-requests} is <b>admin-only</b>, at the URL matcher and again
- *       at the method level. Not only because carrying a request out deletes an account, but
- *       because the queue itself names every member who has asked to be erased.
+ *   <li>{@code /api/v1/users/me/deletion-request} is open to every authenticated member and accepts
+ *       no user id.
+ *   <li>{@code /api/v1/admin/deletion-requests} is admin-only at the URL matcher and the method
+ *       level.
  * </ul>
  */
 @SpringBootTest
@@ -75,7 +71,6 @@ class DeletionRequestControllerSecurityTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  // covers REQ-SEC-061 — an ordinary member may read their own request
   @Test
   void myRequest_member_isAllowed() throws Exception {
     mockMvc
@@ -93,7 +88,6 @@ class DeletionRequestControllerSecurityTest {
     mockMvc.perform(get("/api/v1/users/me/deletion-request")).andExpect(status().isUnauthorized());
   }
 
-  // covers REQ-SEC-061 — the admin queue is closed to a member, an officer and bank staff alike
   @Test
   void adminQueue_member_isForbidden() throws Exception {
     mockMvc
@@ -135,8 +129,6 @@ class DeletionRequestControllerSecurityTest {
         .andExpect(status().isOk());
   }
 
-  // covers REQ-SEC-061 — the irreversible action is unreachable without ADMIN, and the refusal
-  // happens at the gate rather than in the service
   @Test
   void execute_officer_isForbiddenAndNeverReachesTheService() throws Exception {
     mockMvc

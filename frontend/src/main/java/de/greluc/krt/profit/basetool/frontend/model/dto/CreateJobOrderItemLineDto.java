@@ -26,9 +26,8 @@ import java.util.UUID;
  * Frontend mirror of the backend {@code CreateJobOrderItemLineDto}: one ordered finished-item line
  * in the item-order create payload.
  *
- * @param id the existing line this payload updates, or {@code null} for a new line; echoing it is
- *     what lets the backend edit the line in place instead of recreating it, preserving its booked
- *     production (REQ-ORDERS-032)
+ * @param id the existing line to update in place, keeping its booked production (REQ-ORDERS-032),
+ *     or {@code null} for a new line
  * @param gameItemId the finished item to order
  * @param blueprintId the chosen recipe (must output {@code gameItemId})
  * @param amount whole-unit count (≥ 1)

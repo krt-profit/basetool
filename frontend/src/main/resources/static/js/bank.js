@@ -1,23 +1,3 @@
-/*
- * Bank area client behaviors (epic #556).
- *
- * Covers every interactive surface of the bank pages:
- *  - modal field priming: `data-field-*` attributes on an open-modal trigger are
- *    copied into the modal form before it opens (row-scoped id/version/name),
- *  - AJAX forms (`form.bank-ajax-form`): JSON POST/PATCH/DELETE against
- *    /api/proxy/bank/** sent through the shared window.krtFetch.write (CSRF +
- *    retry-once-on-403 + X-Reauthenticate redirect; #906 Q13 retired the former
- *    bespoke bankWrite loop), success = in-place server-fragment swap of the region named by the form's
- *    `data-refresh` attribute (accountBody / manageBody / grantsMatrix) so balances,
- *    holder distribution, tab-counts and every @Version stay server-authoritative
- *    without a page reload (#579, REQ-FE-005); errors = localized inline message
- *    next to the field the conflict names,
- *  - grants matrix toggles: one PATCH per flag click with all three flags + version,
- *    applied in place (button pressed state + row data-can-* + synced data-version),
- *  - grants filter selects: navigate to the grouped view on change,
- *  - account-create type switch: org-unit vs. area name dependent fields,
- *  - searchable user selects (holder registration / grant creation).
- */
 (function () {
     'use strict';
 
@@ -46,48 +26,30 @@
         BANK_SELF_TRANSFER: 'destinationAccountId',
         BANK_GRANTEE_MISSING_ROLE: 'userId',
         BANK_HOLDER_INACTIVE: 'holderId',
-        // Split deposit conflicts (REQ-BANK-043): surface at the percentage field.
         BANK_SPLIT_NO_TARGETS: 'splitPercent',
         BANK_SPLIT_TOO_SMALL: 'splitPercent',
-        // Missing Begründung on a debit from a justification-mandating account (REQ-BANK-045).
         BANK_JUSTIFICATION_REQUIRED: 'justification',
-        // Fee-inclusive amount that does not exceed the fee, so nothing would arrive (REQ-BANK-033).
         BANK_FEE_EXCEEDS_AMOUNT: 'amount',
     };
 
     /**
-     * Maps a form's `data-refresh` token to the stable swap container on each bank page and whether
-     * the current query string is preserved on the in-place re-render (#579, REQ-FE-005):
-     *  - accountBody  -> the account-detail body; query dropped so the booking history resets to
-     *                    page 0 and the just-booked row shows newest-first,
-     *  - manageBody   -> the manage tab-nav + active panel; `?tab=` preserved,
-     *  - grantsMatrix -> the grants matrix; `?view=/accountId=/userId=` filter preserved (#573).
+     * Maps a form's `data-refresh` token to its swap container and whether the current query string
+     * is preserved on the in-place re-render (REQ-FE-005). `accountBody` drops the query so the
+     * booking history resets to page 0.
      */
     const REFRESH_TARGETS = {
         accountBody: { container: '#bank-account-results', preserveQuery: false },
         manageBody: { container: '#bank-manage-results', preserveQuery: true },
         grantsMatrix: { container: '#bank-grants-results', preserveQuery: true },
-        // Org-unit officer/lead page (#666 F2): balance cards + own-request list re-render after a
-        // create/cancel; `?layout=` preserved so the account list keeps the caller's chosen card/
-        // table view (REQ-BANK-021), the server re-rendering it in that layout.
         orgUnitBank: { container: '#org-unit-bank-results', preserveQuery: true },
-        // Org-unit account detail (REQ-BANK-035/-036): the facts + responsibility settings region
-        // re-renders in place after a target/visibility write; query dropped.
         orgUnitBankSettings: { container: '#org-unit-bank-settings-results', preserveQuery: false },
-        // Bank-staff confirmation queue (#666 F2): the request table re-renders after a
-        // confirm/reject; `?status=` preserved so the staffer stays on the filtered view.
         requestQueue: { container: '#bank-request-queue-results', preserveQuery: true },
-        // Bank dashboard (REQ-BANK-016/-023): a direct booking from the header Kontobewegung modal
-        // re-renders the switchable account grid so balances + 30-day deltas refresh in place;
-        // `?layout=/group=` preserved so the booking keeps the caller's chosen view.
         bankGrid: { container: '#bank-grid-results', preserveQuery: true },
     };
 
     /**
-     * Maps a movement type on the unified "Kontobewegung" modal (#997) onto its backend endpoint and
-     * the JSON field the (fixed or chosen) source-account id is submitted under: a deposit/withdrawal
-     * books against `accountId`, a transfer against `sourceAccountId`. syncMovementRows switches the
-     * form's `data-endpoint` + `data-account-id-field` from this on every type change and on open.
+     * Maps a movement type on the unified "Kontobewegung" modal onto its backend endpoint and the
+     * JSON field the source-account id is submitted under.
      */
     const MOVEMENT_ENDPOINTS = {
         DEPOSIT: { endpoint: '/api/proxy/bank/deposits', accountField: 'accountId' },
@@ -102,28 +64,12 @@
         canTransfer: 'data-can-transfer',
     };
 
-    // ---- Live multi-user sync — the Kartellbank rooms (REQ-FE-010 / REQ-FE-015, ADR-0094) --------
-    // A peer's booking / request / grant / settings change re-renders the affected bank fragment in
-    // place for every other viewer of the same room, over the shared /ws/sync socket. Only opaque
-    // section keys cross the wire; each viewer re-pulls its OWN authorization-checked fragment (its
-    // own filter/page). The four section maps below are the single source of truth shared with the
-    // server LiveSyncTopicClass whitelists (the three-mirror-points rule, build-enforced by
-    // LiveSyncSectionMapParityTest). Both sides ship together: the RECEIVE side (these maps + the
-    // receivers wired below) and the publish side (publishBankLiveSync, driven by the per-form
-    // data-livesync matrix, called from handleBankSuccess).
-
-    // bank:{id} on the STAFF account-detail page: the balance chart + booking history are NESTED
-    // inside #bank-account-results (the accountBody fragment), so re-rendering any of the three keys
-    // re-renders all of them — hence the shared container. makeBankReceiverRefresh dedupes by
-    // container so three inbound keys collapse to a single accountBody swap.
     const BANK_ACCOUNT_SECTIONS = {
         account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
         bookings: { container: '#bank-account-results', fragmentValue: 'accountBody' },
         chart: { container: '#bank-account-results', fragmentValue: 'accountBody' },
     };
 
-    // bank:{id} on the ORG-UNIT account-detail page: separate sibling containers for the
-    // facts/settings region, the booking history and the balance chart.
     const ORGUNIT_ACCOUNT_SECTIONS = {
         account: {
             container: '#org-unit-bank-settings-results',
@@ -139,9 +85,6 @@
         },
     };
 
-    // bank (staff-global): the dashboard grid, the confirmation queue, the management tab and the
-    // grants matrix — one per staff page, so each page renders only its own container (the receiver
-    // silently skips the absent ones).
     const BANK_STAFF_SECTIONS = {
         grid: { container: '#bank-grid-results', fragmentValue: 'bankGrid' },
         requestQueue: { container: '#bank-request-queue-results', fragmentValue: 'requestQueue' },
@@ -149,7 +92,6 @@
         grants: { container: '#bank-grants-results', fragmentValue: 'grantsMatrix' },
     };
 
-    // orgunit-bank (global): the officer/lead overview and the account-detail settings region.
     const ORGUNIT_BANK_SECTIONS = {
         orgUnitBank: { container: '#org-unit-bank-results', fragmentValue: 'orgUnitBank' },
         orgUnitBankSettings: {
@@ -159,10 +101,9 @@
     };
 
     /**
-     * Reads the localized "updates available" pill label from `<main data-bank-livesync-updates>` so
-     * this file stays i18n-free; undefined falls back to the shared receiver default.
+     * Reads the localized "updates available" pill label from `<main data-bank-livesync-updates>`.
      *
-     * @returns {string|undefined} the pill label, or undefined
+     * @returns {string|undefined} the pill label, or undefined for the receiver default
      */
     function bankLiveSyncUpdates() {
         const main = document.querySelector('main[data-bank-livesync-updates]');
@@ -182,9 +123,8 @@
     }
 
     /**
-     * The dedicated "saved, but reload" refresh-error message (NOT the generic "action failed" text):
-     * a peer's follow-up refresh that bounces must tell the user to reload, never that an action
-     * failed.
+     * Reads the localized "saved, but reload" refresh-error message from `<main>`, falling back to
+     * the generic error text.
      *
      * @returns {string} the refresh-error message
      */
@@ -194,10 +134,8 @@
     }
 
     /**
-     * Builds a live-sync receiver refresh closure for one section map: on an inbound peer change it
-     * re-renders each present container ONCE (deduped by container, since the staff account-detail
-     * collapses account/bookings/chart into a single accountBody swap), re-fetching each viewer's OWN
-     * pathname+query so a peer keeps its filter/page rather than adopting the actor's.
+     * Builds a live-sync receiver refresh closure for one section map. It re-renders each present
+     * container once (deduplicated by container) from the viewer's own pathname and query.
      *
      * @param {Object} sectionMap the section → {container, fragmentValue} map for the room
      * @returns {function(string[]): void} the refresh handler passed to createReceiver
@@ -226,11 +164,6 @@
         };
     }
 
-    // Subscribe each bank page to the rooms it participates in and re-render present containers on an
-    // inbound peer change. A page subscribes to `bank` when it renders any staff container, to
-    // `orgunit-bank` when it renders an org-unit container, and to `bank:{id}` on an account-detail
-    // page (its section map picked by whether it is the staff or the org-unit account view). All bank
-    // receivers share the default pill; each re-fetches only the containers it actually renders.
     (function () {
         if (
             !window.krtLiveSync ||
@@ -238,7 +171,7 @@
             !window.krtFetch ||
             typeof window.krtFetch.swap !== 'function'
         ) {
-            return; // no-JS / no-foundation: the classic in-place swaps still run for the actor.
+            return;
         }
         function pill() {
             return { label: bankLiveSyncUpdates };
@@ -253,8 +186,6 @@
             window.krtLiveSync.createReceiver({
                 topic: 'bank',
                 sections: BANK_STAFF_SECTIONS,
-                // Global room: coalesce longer to flatten the refetch herd when many staffers get the
-                // same signal at once (#1125).
                 coalesceMs: 1500,
                 refresh: makeBankReceiverRefresh(BANK_STAFF_SECTIONS),
                 pill: pill(),
@@ -276,8 +207,6 @@
 
         const accountId = bankAccountId();
         if (accountId) {
-            // The staff detail renders #bank-account-results; the org-unit detail its
-            // settings/bookings/chart siblings — pick the section map accordingly.
             const sectionMap = document.querySelector('#bank-account-results')
                 ? BANK_ACCOUNT_SECTIONS
                 : ORGUNIT_ACCOUNT_SECTIONS;
@@ -291,11 +220,8 @@
     })();
 
     /**
-     * Builds the JSON + CSRF request headers via the shared window.krtCsrf (#579 migration; replaces
-     * bank.js's former bespoke meta-tag reader). Degrades to a minimal meta-tag read only if
-     * krt-fetch.js is somehow absent, so a write still attempts rather than silently dropping the
-     * token. The added X-Requested-With does not change the bank error body — the frontend
-     * GlobalExceptionHandler already answers JSON because bank requests send Accept: application/json.
+     * Builds the JSON + CSRF request headers via the shared window.krtCsrf, falling back to reading
+     * the CSRF meta tags when krt-fetch.js is absent.
      *
      * @param {Object<string,string>} [base] optional base headers merged under the CSRF header
      * @returns {Object<string,string>} headers for a same-origin JSON fetch
@@ -317,8 +243,7 @@
     }
 
     /**
-     * The localized fallback error text, sourced from the page (the templates set
-     * `data-bank-generic-error` on <main>) so this file stays i18n-free.
+     * Reads the localized fallback error text from `<main data-bank-generic-error>`.
      *
      * @returns {string} the generic error message
      */
@@ -328,9 +253,8 @@
     }
 
     /**
-     * The localized "over-ceiling direct booking was filed as an approval request" notice
-     * (REQ-BANK-047/ADR-0109), sourced from the page (`data-bank-approval-request-filed` on <main>)
-     * so this file stays i18n-free; falls back to the generic text when the attribute is absent.
+     * Reads the localized "booking was filed as an approval request" notice from `<main>`, falling
+     * back to the generic error text (REQ-BANK-047).
      *
      * @returns {string} the approval-request-filed notice
      */
@@ -373,10 +297,9 @@
     }
 
     /**
-     * Copies the trigger's `data-field-*` attributes into the modal: form controls
-     * whose name matches the suffix (case-insensitively — the browser lowercases
-     * attribute names) receive the value, `[data-bank-label]` elements receive it
-     * as text. Also resets the modal's previous inline errors.
+     * Copies the trigger's `data-field-*` attributes into the modal's matching form controls
+     * (case-insensitive) and `[data-bank-label]` elements, then resets errors and re-syncs the
+     * modal's dependent rows and previews.
      *
      * @param {HTMLElement} trigger the clicked open-modal button
      * @param {HTMLElement} modal the overlay element being opened
@@ -385,11 +308,6 @@
         const form = modal.querySelector('form.bank-ajax-form');
         if (form) {
             clearErrors(form);
-            // The employee's own note (REQ-BANK-054) is authored per booking and is deliberately NOT
-            // primed from a `data-field-*` attribute. These modals are reused across rows, and the
-            // priming loop below only overwrites controls it has an attribute for — so without this
-            // reset a note typed for one request would still sit in the box on the next one and ride
-            // along with a different money movement.
             const staffNote = form.querySelector('[name="staffNote"]');
             if (staffNote) {
                 staffNote.value = '';
@@ -413,13 +331,9 @@
                 }
             });
         }
-        // Reset/refresh the live transfer-fee preview to match the (re)opened modal's amount
-        // (REQ-BANK-033); updateFeePreview hides it when there is nothing to show.
         if (form && form.querySelector('[data-fee-preview]')) {
             updateFeePreview(form);
         }
-        // Org-unit request modal (REQ-BANK-040/-041): re-apply the transfer-type rows and the live
-        // over-limit warning for the (re)opened modal — the CTA carries no per-row data-field-*.
         if (form && form.querySelector('[data-limit-warning]')) {
             const typeSelect = form.querySelector('select[data-role="org-unit-request-type"]');
             if (typeSelect) {
@@ -427,18 +341,12 @@
             }
             updateLimitWarning(form);
         }
-        // Split deposit (REQ-BANK-043): re-sync the percentage row + preview to the (re)opened modal's
-        // toggle so a reused modal never shows a stale split state. The org-unit request modal's split
-        // visibility is additionally driven by the type via syncRequestTypeRows above.
         if (form && form.querySelector('[data-split-row]')) {
             const splitToggle = form.querySelector('[data-role="bank-split-toggle"]');
             if (splitToggle) {
                 toggleSplitRow(splitToggle);
             }
         }
-        // Unified movement modal (#997): sync the whole modal (rows, endpoint, submit label, live
-        // helpers) to its type selector's current value so a (re)opened modal never shows a stale
-        // type's fields. Runs last so it owns the final consistent state.
         if (form) {
             const movementType = form.querySelector('[data-role="bank-movement-type"]');
             if (movementType) {
@@ -462,13 +370,11 @@
     });
 
     /**
-     * Fills a counterparty org-unit <select> from the chosen counterparty user's
-     * memberships (REQ-BANK-044). Resets it to just its placeholder and disables it
-     * while loading or when no user is selected; auto-selects when the user has exactly
-     * one membership. A read-only same-origin GET, so no CSRF / krtFetch is involved.
+     * Fills a counterparty org-unit <select> from the chosen user's memberships (REQ-BANK-044). It
+     * stays disabled while loading or without a user, and auto-selects a single membership.
      *
-     * @param {HTMLElement} userSelect the counterparty user picker — a native {@code <select>}, or
-     *     the searchable combobox's hidden value input after enhancement (both expose {@code .value})
+     * @param {HTMLElement} userSelect the counterparty user picker (native select or combobox value
+     *     input)
      * @param {HTMLSelectElement} orgSelect the dependent org-unit picker
      */
     async function fillCounterpartyOrgUnits(userSelect, orgSelect) {
@@ -512,12 +418,6 @@
         }
     }
 
-    // Delegated so it survives the accountBody fragment swap (REQ-FE-005): a change on a
-    // counterparty user picker (re)loads its paired org-unit select. The picker is a searchable
-    // combobox (remote-bank-users, #1193 follow-up), so [data-counterparty-user] resolves to the
-    // enhancer's hidden VALUE input (an <input>, not a <select>) — it inherits the marker attributes
-    // and re-dispatches a bubbling `change` on commit, which this catches (so match on the attribute,
-    // not the tag).
     document.addEventListener('change', function (event) {
         const userSelect = event.target.closest('[data-counterparty-user]');
         if (!userSelect) {
@@ -530,8 +430,7 @@
     });
 
     /**
-     * Resets a counterparty org-unit select to just its placeholder option and clears the selection,
-     * mirroring {@link fillCounterpartyOrgUnits}'s reset before it repopulates.
+     * Resets a counterparty org-unit select to just its placeholder option and clears the selection.
      *
      * @param {HTMLSelectElement} select the org-unit select
      */
@@ -545,20 +444,10 @@
     }
 
     /**
-     * Switches a counterparty block between the registered-tool-user path and the external
-     * free-text path (REQ-BANK-044, #994). External: hide + disable the user lookup, show + enable the
-     * free-text name, and widen the unit picklist to ALL active org units (cloned from the shared
-     * [data-bank-all-orgunits] source) with no membership filter. Registered (default): the reverse —
-     * the unit select resets to its placeholder and is disabled until a user is chosen (then
-     * {@link fillCounterpartyOrgUnits} fills it from that user's memberships). A no-op for a
-     * gated-off (movement-type-inactive) block, since its toggle is disabled.
-     *
-     * <p>The registered-user lookup is a searchable combobox (remote-bank-users, #1193 follow-up), so
-     * enabling/disabling + clearing it routes through {@link setMovementControlActive}: that resets
-     * the value via the combobox controller ({@code krtCombobox.setValue('')}) and mirrors the
-     * disabled state onto the visible textbox — setting {@code .disabled} on the hidden value input
-     * alone would not stop the user typing into the box. The plain free-text name input goes through
-     * the same helper (its non-combobox branch), so both alternatives share one code path.
+     * Switches a counterparty block between a registered tool user and an external free-text name
+     * (REQ-BANK-044). External enables the name input and offers all active org units from
+     * `[data-bank-all-orgunits]`; registered enables the user lookup and disables the unit select
+     * until a user is chosen.
      *
      * @param {HTMLInputElement} toggle the "kein Tool-Account" checkbox
      */
@@ -604,7 +493,6 @@
         }
     }
 
-    // Delegated so it survives the accountBody swap: toggling "kein Tool-Account" swaps the block.
     document.addEventListener('change', function (event) {
         const toggle = event.target.closest('[data-role="bank-cp-external-toggle"]');
         if (toggle) {
@@ -637,20 +525,14 @@
     }
 
     /**
-     * Serializes and sends one bank AJAX form: `_`-prefixed fields fill the
-     * endpoint's `{placeholder}` slots instead of the body, `data-account-id`
-     * is injected under `data-account-id-field` (default `accountId`), success
-     * runs the in-place refresh ({@link handleBankSuccess}: close modal + swap the
-     * `data-refresh` fragment), errors render inline.
+     * Serializes and sends one bank AJAX form. `_`-prefixed fields fill the endpoint's
+     * `{placeholder}` slots instead of the body, `data-account-id` is sent under
+     * `data-account-id-field` (default `accountId`); success refreshes in place, errors render inline.
      *
      * @param {HTMLFormElement} form the submitted form
      */
     async function submitBankForm(form) {
         clearErrors(form);
-        // Unified movement modal (#997): the source-account picker carries no name, so mirror its
-        // current value onto data-account-id (submitBankForm injects it under the type-specific
-        // data-account-id-field). Its native `required` gates an empty pick before submit even fires;
-        // a stray empty value is a backstop the backend rejects with an inline accountId error.
         const movementSource = form.querySelector('[data-role="bank-movement-source"]');
         if (movementSource) {
             form.setAttribute('data-account-id', movementSource.value || '');
@@ -683,13 +565,6 @@
                 return filled !== undefined ? encodeURIComponent(filled) : match;
             });
 
-        // Routed through the shared window.krtFetch.write (#906 Q13): it owns the CSRF header,
-        // the retry-once-on-403 and the X-Reauthenticate 401 redirect. The submit button is the
-        // opts.submitter, so send() disables it for the round-trip and re-enables it in its finally
-        // (which runs right after onSuccess schedules handleBankSuccess's async swap, matching the
-        // former explicit early re-enable). toast:false keeps the bank's inline field-level error
-        // rendering; onError handles every non-ok branch (returning true suppresses the default
-        // toast), and onNetworkError reproduces the old null-response inline _global error.
         const submitButton = form.querySelector('button[type="submit"]');
         await window.krtFetch.write({
             method,
@@ -700,9 +575,6 @@
             errorMessage: genericError(),
             onSuccess(payload) {
                 handleBankSuccess(form);
-                // REQ-BANK-047/ADR-0109: an over-ceiling KRT withdrawal/transfer is not booked but
-                // filed as an approval request; the outcome body then carries `pendingRequest`
-                // instead of `transaction`. Surface the "request filed, tell the Bankleitung" notice.
                 if (payload && payload.pendingRequest) {
                     if (typeof window.showFrontendSuccessToast === 'function') {
                         window.showFrontendSuccessToast(approvalRequestFiledMessage());
@@ -710,8 +582,6 @@
                 }
             },
             onError(status, payload) {
-                // A backend body flag (not the header-based 401 that krtFetch redirects on) telling
-                // us the OAuth2 session is gone: reload so the browser re-runs the login flow.
                 if (payload && payload.unauthenticated) {
                     window.location.reload();
                     return true;
@@ -742,20 +612,13 @@
     }
 
     /**
-     * Resolves a bank live-sync account placeholder to a concrete account id. `account`: the form's
-     * dedicated publish-only `data-livesync-account`, else its submitted `data-account-id` (the
-     * movement modal), else a primed `_livesyncAccount` field (the confirm modal, filled per-row by
-     * primeModal). `destination`: an enabled non-empty submitted `destinationAccountId` (a movement
-     * transfer target), else a primed `_livesyncDestination` field (a confirm of a transfer
-     * request). Returns null when the form has no such account (e.g. a deposit / a non-transfer
-     * confirm has no destination) so the entry is skipped. None of these are read into the submit
-     * body (`data-livesync-account` is an attribute; the `_livesync*` fields are `_`-prefixed, so
-     * submitBankForm treats them as unused endpoint placeholders), so tagging a form for publishing
-     * never changes its money write.
+     * Resolves a bank live-sync account placeholder to a concrete account id. `account` reads
+     * `data-livesync-account`, `data-account-id` or a primed `_livesyncAccount` field; `destination`
+     * reads an enabled `destinationAccountId` or a primed `_livesyncDestination` field.
      *
      * @param {HTMLFormElement} form the form whose write just succeeded
      * @param {string} ref the placeholder name (`account` or `destination`)
-     * @returns {string|null} the resolved account id, or null
+     * @returns {string|null} the resolved account id, or null when the form has none
      */
     function resolveBankLiveSyncAccount(form, ref) {
         if (ref === 'account') {
@@ -776,13 +639,10 @@
     }
 
     /**
-     * Broadcasts a bank form's live-sync publish matrix after a successful write (REQ-FE-015): the
-     * form's `data-livesync` attribute is a space-separated list of `topic/section,section` entries,
-     * where a `bank:@account` / `bank:@destination` topic resolves its placeholder to the form's
-     * account. Publishing needs no subscription (the sanctioned cross-topic case) — the acting page
-     * is not subscribed to most of these rooms, yet their viewers must still update. Fully additive
-     * and fire-and-forget: it never touches the write or the local swap, duplicate topics are
-     * collapsed, and an unresolvable-account entry is simply skipped.
+     * Broadcasts a bank form's live-sync publish matrix after a successful write (REQ-FE-015). The
+     * `data-livesync` attribute lists space-separated `topic/section,section` entries; a
+     * `bank:@account` / `bank:@destination` topic resolves to the form's account, and entries that
+     * are duplicate or unresolvable are skipped.
      *
      * @param {HTMLFormElement} form the form whose write just succeeded
      */
@@ -814,7 +674,7 @@
                 if (at >= 0) {
                     const id = resolveBankLiveSyncAccount(form, topic.slice(at + 2));
                     if (!id) {
-                        return; // no such account on this form — skip this entry.
+                        return;
                     }
                     topic = topic.slice(0, at) + ':' + id;
                 }
@@ -828,26 +688,15 @@
     }
 
     /**
-     * The in-place success path for a bank AJAX form (#579, REQ-FE-005): closes the form's modal,
-     * shows the localized success toast and re-renders the server fragment named by the form's
-     * `data-refresh` attribute (accountBody / manageBody / grantsMatrix). Re-rendering server-side
-     * keeps money aggregates (balance, holder distribution, tab-counts) and every trigger button's
-     * fresh `data-field-version` authoritative — the page never recomputes them in JS. The swap is
-     * given the dedicated `data-bank-refresh-error` message (NOT the generic "action failed" text):
-     * the write already succeeded, so if only the follow-up refresh GET bounces the user must be told
-     * "saved, but reload" rather than "action failed, retry" — the latter could prompt a second money
-     * booking. Falls back to a full reload if the swap helper or the refresh target is missing.
+     * Handles a successful bank AJAX form write in place (REQ-FE-005): closes the modal, shows the
+     * success toast, publishes live sync and re-renders the fragment named by `data-refresh`. A failed
+     * refresh shows the "saved, but reload" message; without a swap target the page reloads.
      *
      * @param {HTMLFormElement} form the form whose write just succeeded
      */
     function handleBankSuccess(form) {
         const modal = form.closest('.krt-modal-overlay');
         if (modal) {
-            // Close through the shared contract, NOT an inline style.display: an inline
-            // `style="display:none"` outranks the class rule the shared open uses, so a modal closed
-            // that way could never be re-opened without a full page reload — the bank staffer who
-            // decided one request and then clicked the confirm/reject button on a second one got a
-            // dead button. window.krtModal.close also ends the modal state of the <dialog>.
             window.krtModal.close(modal);
         }
         const main = document.querySelector('main[data-bank-saved]');
@@ -855,9 +704,6 @@
         if (savedMessage && typeof window.showFrontendSuccessToast === 'function') {
             window.showFrontendSuccessToast(savedMessage);
         }
-        // Tell peers viewing the affected rooms that these sections changed (REQ-FE-015), read from
-        // the form's data-livesync matrix. Done before the local swap and independent of it —
-        // additive and fire-and-forget, so it never affects the actor's own re-render below.
         publishBankLiveSync(form);
         const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];
         if (!spec || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
@@ -868,13 +714,6 @@
         const url = spec.preserveQuery
             ? window.location.pathname + window.location.search
             : window.location.pathname;
-        // Freeze the about-to-be-replaced open-modal trigger buttons for the duration of the
-        // in-flight swap. The swap is async, so until its fresh DOM lands the old triggers still
-        // carry a now-stale data-field-version; a rapid re-open + submit would prime a modal with it
-        // and 409 (the manage/holder lifecycle race the old full reload dodged by navigating away).
-        // It also blocks an accidental rapid double money booking. On a successful swap they are
-        // replaced by fresh enabled buttons; if the swap bails (rare expired-session bounce, DOM left
-        // untouched) we re-enable exactly the ones we froze.
         const container = document.querySelector(spec.container);
         const frozen = container
             ? Array.from(
@@ -913,9 +752,9 @@
 
     /**
      * Reads the org-wide in-game transfer-fee rate from `<main data-transfer-fee-rate>`
-     * (REQ-BANK-033). Returns 0 (no preview) when absent or out of the sane [0, 1) range.
+     * (REQ-BANK-033).
      *
-     * @returns {number} the fee rate as a fraction
+     * @returns {number} the fee rate as a fraction, or 0 when absent or outside [0, 1)
      */
     function transferFeeRate() {
         const main = document.querySelector('main[data-transfer-fee-rate]');
@@ -924,15 +763,9 @@
     }
 
     /**
-     * Live transfer-fee preview + fee-mode gating (REQ-BANK-033, ADR-0052, #999). The fee is always
-     * `round(entered * rate)`; only what the toggle does with it differs. In the default on-top mode
-     * the entered amount is what ARRIVES and the source is debited `amount + fee`; in the fee-inclusive
-     * mode (`feeInclusive` checkbox on) the entered amount is the gross DEBITED and the recipient gets
-     * `amount - fee`. The preview shows the fee, the "wird abgebucht" gross and the "kommt an" net for
-     * the selected mode. A fee applies only to a withdrawal and a holder-changing transfer — a deposit
-     * and a same-holder transfer are fee-free, where the fee-inclusive toggle is hidden, reset and
-     * disabled (so it is omitted from the body) and the preview is suppressed. Guidance only; the
-     * authoritative fee is computed server-side at booking time.
+     * Updates the live transfer-fee preview and the fee-inclusive toggle (REQ-BANK-033). The fee is
+     * `round(amount * rate)`, added on top by default or deducted from the amount when `feeInclusive`
+     * is checked. Deposits and same-holder transfers are fee-free and hide the toggle and preview.
      *
      * @param {HTMLFormElement} form the booking form carrying a `[data-fee-preview]` block
      */
@@ -948,11 +781,7 @@
         const src = form.querySelector('[name="sourceHolderId"]');
         const dst = form.querySelector('[name="destinationHolderId"]');
         const sameHolder = !!(src && dst && src.value && src.value === dst.value);
-        // A fee applies to a withdrawal and to a holder-changing transfer (ADR-0052); a deposit and a
-        // same-holder transfer are fee-free.
         const feeApplies = rate > 0 && type !== 'DEPOSIT' && !(type === 'TRANSFER' && sameHolder);
-        // The fee-inclusive toggle (#999) is only meaningful where a fee applies: reveal + enable it
-        // there, otherwise hide, reset and disable it so `feeInclusive` is omitted from the body.
         const inclusiveRow = form.querySelector('[data-fee-inclusive-row]');
         const inclusiveToggle = inclusiveRow
             ? inclusiveRow.querySelector('input[name="feeInclusive"]')
@@ -998,15 +827,9 @@
     }
 
     /**
-     * Live owner-approval warning on the org-unit request modal (REQ-BANK-041, amended): shows the
-     * warning whenever the withdrawal/transfer will need the responsible holder's approval. The
-     * per-account limit rides on each source-account <option> as `data-limit`. Semantics: a configured
-     * limit warns only when the entered amount exceeds it; a MISSING limit (`data-limit` absent/empty,
-     * i.e. no per-user/role/all-members limit applies) means approval is ALWAYS required, so it warns
-     * for any positive amount. An account the caller is the responsible holder of carries
-     * `data-exempt="true"` and never warns at all — a holder is bound by no ceiling on their own
-     * account (owner decision). Advisory only — it never blocks submission; the request is still filed
-     * and then flagged for the responsible holder.
+     * Shows the advisory owner-approval warning on the org-unit request modal when a withdrawal or
+     * transfer exceeds the source option's `data-limit` (REQ-BANK-041). A missing limit always warns;
+     * a `data-exempt="true"` account never does.
      *
      * @param {HTMLFormElement} form the org-unit request form carrying a `[data-limit-warning]` block
      */
@@ -1017,7 +840,6 @@
         if (!warning || !amountEl || !accountEl) {
             return;
         }
-        // REQ-BANK-042: a deposit is never subject to an approval limit — never warn.
         const typeEl = form.querySelector('select[data-role="org-unit-request-type"]');
         if (typeEl && typeEl.value === 'DEPOSIT') {
             warning.hidden = true;
@@ -1029,14 +851,12 @@
             return;
         }
         const option = accountEl.options[accountEl.selectedIndex];
-        // REQ-BANK-041 (owner decision): the responsible holder is exempt on their own account.
         if (option && option.getAttribute('data-exempt') === 'true') {
             warning.hidden = true;
             return;
         }
         const rawLimit = option ? option.getAttribute('data-limit') : null;
         const limit = rawLimit === null || rawLimit === '' ? null : Number(rawLimit);
-        // No configured limit => approval is always required; a configured limit => only above it.
         const needsApproval = limit === null || !Number.isFinite(limit) || amount > limit;
         warning.hidden = !needsApproval;
     }
@@ -1054,12 +874,9 @@
     }
 
     /**
-     * Recomputes the Begründung field's `required` flag on the ORG-UNIT request modal (REQ-BANK-045):
-     * the field is required only for a WITHDRAWAL/TRANSFER whose selected source account mandates a
-     * reason — its <option> carries `data-requires-justification="true"` (set for CARTEL / CARTEL_BANK
-     * / SPECIAL). For a deposit, or a source account that does not mandate a reason, it is optional.
-     * The bank-employee withdraw/transfer modals are NOT touched here — they have no
-     * `[data-request-justification-only]` wrapper and carry a server-rendered `required` flag instead.
+     * Recomputes the Begründung field's `required` flag on the org-unit request modal (REQ-BANK-045):
+     * required only for a withdrawal or transfer whose source option carries
+     * `data-requires-justification="true"`.
      *
      * @param {HTMLFormElement} form the org-unit request form
      */
@@ -1080,9 +897,8 @@
     }
 
     /**
-     * Recomputes the org-unit request modal's justification-required flag for the form the edited
-     * field belongs to. Scoped to that modal via its `[data-request-justification-only]` wrapper so a
-     * field edit in a bank-employee modal never clears its server-set `required`.
+     * Recomputes the justification-required flag for the edited field's form, only when it has a
+     * `[data-request-justification-only]` wrapper.
      *
      * @param {EventTarget} target the field that fired the event
      */
@@ -1094,10 +910,8 @@
     }
 
     /**
-     * Shows/hides and enables/disables a deposit form's split-percentage row to match its toggle
-     * checkbox (REQ-BANK-043). The percentage input is disabled while hidden so {@link submitBankForm}
-     * omits it entirely (and the backend's "split off ⇒ no percentage" rule is never tripped). Clears
-     * the value + preview when the split is switched off, then refreshes the preview.
+     * Shows and enables a deposit form's split-percentage row to match its toggle (REQ-BANK-043).
+     * When off, the input is disabled and cleared so it is not submitted; the preview is refreshed.
      *
      * @param {HTMLInputElement} toggle the split toggle checkbox
      */
@@ -1122,12 +936,9 @@
     }
 
     /**
-     * Live split-deposit preview (REQ-BANK-043): the entered amount is the gross; this fills the
-     * slice distributed across the squadron accounts (`round(gross * percent / 100)`) and the
-     * remainder that stays on the named account (`gross - slice`). Hidden when the split is off or the
-     * inputs are incomplete/out of range. Guidance only — the authoritative split (and the exact
-     * per-account amounts, which depend on how many squadron accounts are active) is computed
-     * server-side at booking time.
+     * Updates the live split-deposit preview (REQ-BANK-043): the slice distributed to the squadron
+     * accounts (`round(gross * percent / 100)`) and the remainder kept on the named account. Hidden
+     * when the split is off or the inputs are out of range.
      *
      * @param {HTMLFormElement} form the deposit/request form carrying a `[data-split-preview]` block
      */
@@ -1179,7 +990,6 @@
         }
     }
 
-    /* Split toggle: show/hide the percentage row and refresh the preview as it is ticked/unticked. */
     document.addEventListener('change', function (event) {
         const toggle = event.target.closest('[data-role="bank-split-toggle"]');
         if (toggle) {
@@ -1188,11 +998,8 @@
     });
 
     /**
-     * Live balance-split calculator on the holder detail page (REQ-BANK-032): given the holder's
-     * entered current in-game balance and their server-rendered global custody total
-     * (`data-reserved`), shows how much is the holder's own private money (`balance − reserved`).
-     * Purely client-side — nothing is stored. A negative own value (physically less than the bank's
-     * records say) is flagged; a negative reserved means the bank owes the holder.
+     * Updates the client-side balance-split calculator on the holder detail page (REQ-BANK-032): the
+     * holder's own money is the entered in-game balance minus the panel's `data-reserved` total.
      *
      * @param {HTMLInputElement} input the balance input that fired
      */
@@ -1220,10 +1027,8 @@
     }
 
     /**
-     * Dispatches one field edit to both client-side helpers — the live transfer-fee preview
-     * (REQ-BANK-033) and the balance-split calculator (REQ-BANK-032). Registered once for `input`
-     * and once for `change`, so a select change (the holder pickers in the transfer modal) refreshes
-     * the fee preview too.
+     * Dispatches one field edit to the fee preview, limit warning, justification flag, split preview
+     * and balance calculator.
      *
      * @param {EventTarget} target the field that fired the event
      */
@@ -1245,10 +1050,8 @@
     });
 
     /**
-     * Applies a successful grant flag PATCH in place (#579): flips the clicked button's pressed
-     * state, mirrors the new value onto the row's data-can-<flag> attribute (read by the next click)
-     * and syncs the row's data-version from the BankGrantDto response so an immediate second toggle
-     * on the same row does not 409.
+     * Applies a successful grant flag PATCH in place: sets the button's pressed state, the row's
+     * `data-can-<flag>` attribute and the row's `data-version` from the response.
      *
      * @param {HTMLButtonElement} button the clicked matrix-flag button
      * @param {HTMLTableRowElement} row the grant row carrying the flag + version attributes
@@ -1275,11 +1078,8 @@
     }
 
     /**
-     * Grants matrix: clicking a flag cell PATCHes the grant with the toggled flag plus the row's
-     * other two flags and its optimistic-lock version, then applies the result IN PLACE (#579) via
-     * {@link applyGrantFlagResult}. This is the one isolated single-row write in the bank area (no
-     * aggregate, count or structural change on screen), so a precise dom-patch beats a whole-matrix
-     * re-render that would reset focus and feel heavy on rapid toggling.
+     * Grants matrix: clicking a flag cell PATCHes the grant with all three flags and the row's
+     * version, then patches the row in place.
      */
     document.addEventListener('click', async function (event) {
         const flagButton = event.target.closest('button.matrix-flag[data-flag]');
@@ -1291,22 +1091,12 @@
             return;
         }
         const flag = flagButton.getAttribute('data-flag');
-        // The intended new state of the CLICKED flag, captured now. The rest of the payload (the
-        // other two flags + the row's optimistic-lock version) is re-read from the row LAZILY at send
-        // time (see the payload thunk) and the write is serialized per grant row, so toggling a
-        // second flag on the same row while the first is in flight sees the first toggle's applied
-        // state + fresh version instead of reverting it or 409-ing (self-collision fix).
         const newValue = row.getAttribute(FLAG_ATTR[flag]) !== 'true';
         const endpoint =
             '/api/proxy/bank/grants/' +
             encodeURIComponent(row.getAttribute('data-user-id')) +
             '/' +
             encodeURIComponent(row.getAttribute('data-account-id'));
-        // Routed through window.krtFetch.write (#906 Q13): flagButton is the submitter (disabled
-        // for the round-trip, re-enabled in send()'s finally); applyGrantFlagResult receives the
-        // parsed success body. toast:false + an explicit onError preserve the bank's payload.message
-        // error toast — krtFetch's default error toast reads a problem+json `detail`, but the bank
-        // grant error body carries `message`, so the default would downgrade it to the generic text.
         await window.krtFetch.write({
             method: 'PATCH',
             url: endpoint,
@@ -1330,8 +1120,6 @@
             errorMessage: genericError(),
             onSuccess(payload) {
                 applyGrantFlagResult(flagButton, row, flag, newValue, payload);
-                // The grants matrix changed for every other viewer (REQ-FE-015). This isolated
-                // DOM-patch write does not go through handleBankSuccess, so broadcast here.
                 if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
                     window.krtLiveSync.sendChanged('bank', ['grants']);
                 }
@@ -1352,11 +1140,6 @@
         });
     });
 
-    // Grants filter selects: navigate to the chosen grouping/entity on change. Match on the
-    // attribute, NOT the tag: the account filter is a searchable combobox (remote-bank-accounts), so
-    // after enhancement [data-role="bank-grants-filter"] resolves to the enhancer's hidden value
-    // input (an <input>, not a <select>); the employee filter stays a native <select>. Both inherit
-    // the data-view / data-param attributes read below.
     document.addEventListener('change', function (event) {
         const select = event.target.closest('[data-role="bank-grants-filter"]');
         if (!select) {
@@ -1371,9 +1154,8 @@
     });
 
     /**
-     * The org-unit kinds each account type may own (epic #692 Phase 6, REQ-ORG-019): an ORG_UNIT
-     * account is owned by a Staffel/SK, an AREA account by its Bereich, the CARTEL account by the
-     * Organisationsleitung. CARTEL_BANK / SPECIAL own no org unit (the picker is hidden).
+     * The org-unit kinds each account type may be owned by (REQ-ORG-019); types absent here own no
+     * org unit.
      */
     const ACCOUNT_TYPE_OWNER_KINDS = {
         ORG_UNIT: ['SQUADRON', 'SPECIAL_COMMAND'],
@@ -1382,11 +1164,9 @@
     };
 
     /**
-     * Account-create modal: a single org-unit picker is shown for the types that carry an owner
-     * (ORG_UNIT / AREA / CARTEL) and its options are filtered to the kinds that type may own, so an
-     * AREA account can only pick a Bereich and a CARTEL only the Organisationsleitung. The picker is
-     * required for ORG_UNIT and AREA (they must be linked) and optional for CARTEL (a CARTEL may
-     * predate the OL). Hidden / filtered-out values are cleared so stale ids never reach the backend.
+     * Shows the account-create modal's org-unit picker for owner-carrying account types and filters
+     * its options to the allowed kinds. It is required for ORG_UNIT and AREA; a hidden or filtered-out
+     * selection is cleared.
      *
      * @param {HTMLSelectElement} select the account-type select
      */
@@ -1406,12 +1186,11 @@
         if (!control) {
             return;
         }
-        // AREA and ORG_UNIT must be linked; CARTEL link is optional.
         control.required = type === 'ORG_UNIT' || type === 'AREA';
         let currentStillVisible = false;
         Array.prototype.forEach.call(control.options, function (option) {
             if (!option.value) {
-                return; // keep the "please choose" placeholder
+                return;
             }
             const kind = option.getAttribute('data-kind');
             const visible = !!allowedKinds && allowedKinds.indexOf(kind) !== -1;
@@ -1421,7 +1200,6 @@
                 currentStillVisible = true;
             }
         });
-        // Reset the selection when the picker is hidden or the current pick is now filtered out.
         if (!allowedKinds || !currentStillVisible) {
             control.value = '';
         }
@@ -1437,9 +1215,8 @@
     document.querySelectorAll('select[data-role="bank-account-type"]').forEach(syncAccountTypeRows);
 
     /**
-     * Toggles a transfer-only row and its inner <select>: shown/enabled/required only for a
-     * TRANSFER, otherwise hidden, disabled (so it is omitted from the submitted body) and cleared.
-     * No-op when the row is absent. Shared by the request modal and the confirm modal.
+     * Toggles a transfer-only row and its select: shown, enabled and required only for a transfer,
+     * otherwise hidden, disabled and cleared.
      *
      * @param {HTMLElement|null} row the transfer-only row wrapper
      * @param {boolean} isTransfer whether the current request type is TRANSFER
@@ -1449,9 +1226,6 @@
             return;
         }
         row.hidden = !isTransfer;
-        // Native <select> before enhancement / no-JS, or the searchable combobox's hidden input
-        // afterwards (the holder picker is upgraded into a combobox). Disabling the hidden input
-        // keeps it out of the submit for a non-transfer; the visible textbox is disabled to match.
         const control = row.querySelector('select, .krt-combobox input[type="hidden"]');
         if (control) {
             control.disabled = !isTransfer;
@@ -1472,14 +1246,9 @@
     }
 
     /**
-     * Org-unit request modal (REQ-BANK-039/-040/-042): adapts the modal to the chosen request type.
-     *  - Source picker: a DEPOSIT may target ANY active account (REQ-BANK-042); a WITHDRAWAL/TRANSFER
-     *    only the caller's request-capable accounts (the `data-can-debit` options, REQ-BANK-039).
-     *    Non-eligible options are hidden + disabled and the selection re-points to the first eligible
-     *    one if the current pick fell out (mirrors {@link syncAccountTypeRows}).
-     *  - Account hint follows the type ("any active account" vs. "only accounts you may request for").
-     *  - Transfer destination row: shown/enabled only for a TRANSFER.
-     *  - The over-limit warning is recomputed (and stays hidden for a deposit).
+     * Adapts the org-unit request modal to the chosen request type (REQ-BANK-039, REQ-BANK-042):
+     * filters the source accounts (any for a deposit, `data-can-debit` otherwise), and toggles the
+     * hints, transfer, split, justification and counterparty rows before recomputing the warnings.
      *
      * @param {HTMLSelectElement} select the request-type select
      */
@@ -1520,8 +1289,6 @@
         }
         const row = form.querySelector('[data-request-transfer-only]');
         toggleTransferOnlyControl(row, isTransfer);
-        // Split deposit (REQ-BANK-043): the split is DEPOSIT-only. Show the block only for a deposit,
-        // and disable its toggle otherwise so splitEnabled is omitted from a withdrawal/transfer body.
         const splitBlock = form.querySelector('[data-split-deposit-only]');
         if (splitBlock) {
             splitBlock.hidden = !isDeposit;
@@ -1534,9 +1301,6 @@
                 toggleSplitRow(splitToggle);
             }
         }
-        // Begründung (REQ-BANK-045): shown + enabled only for a WITHDRAWAL/TRANSFER; disabled while
-        // hidden so a deposit request omits it from the body entirely. The required flag is then
-        // recomputed from the selected source account's type.
         const justificationRow = form.querySelector('[data-request-justification-only]');
         if (justificationRow) {
             const isDebit = type === 'WITHDRAWAL' || type === 'TRANSFER';
@@ -1556,20 +1320,9 @@
     }
 
     /**
-     * Shows/enables the requester's Empfaenger block for a WITHDRAWAL request and hides + disables
-     * it otherwise (REQ-BANK-055), so a DEPOSIT/TRANSFER request omits both counterparty fields
-     * from the JSON body — the backend rejects a counterparty on either.
-     *
-     * Deliberately does NOT clear the controls on deactivation, unlike setMovementControlActive:
-     * the user picker is server-seeded with the requester, and clearing it when the type flips away
-     * would silently drop the pre-fill for good, since nothing re-seeds it. Disabled alone already
-     * keeps it out of the submit.
-     *
-     * The dependent Einheit select is populated by the shared change-delegated loader
-     * (fillCounterpartyOrgUnits). krtCombobox seeding fires no `change`, so on the first activation
-     * this pokes one synthetic bubbling `change` at the picker to load the seeded requester's
-     * memberships; the marker keeps it to once per picker, so re-opening the modal or toggling the
-     * type does not refetch and does not clobber a unit the requester has since chosen by hand.
+     * Enables the request's Empfänger block only for a withdrawal (REQ-BANK-055); otherwise its
+     * controls are disabled but keep their values. On first activation it dispatches one `change` on
+     * a pre-filled user picker so its org units load.
      *
      * @param {HTMLFormElement} form the request form
      * @param {boolean} on whether the block is active (the request is a withdrawal)
@@ -1610,11 +1363,8 @@
     });
 
     /**
-     * Enables or disables one control inside a unified movement-modal row (#997), keeping a gated-off
-     * control out of the submitted JSON (submitBankForm skips disabled controls). Clears the value
-     * when disabling so a hidden type's field never leaks into another type's booking: a checkbox is
-     * unticked, a searchable-select combobox is reset via its controller, any other control blanked;
-     * the combobox's visible textbox mirrors the disabled state.
+     * Enables or disables one movement-modal control, clearing its value (or combobox selection) when
+     * disabled; a combobox's visible textbox mirrors the disabled state.
      *
      * @param {HTMLElement} control the form control to toggle
      * @param {boolean} on whether the owning row is active for the current movement type
@@ -1640,11 +1390,7 @@
     }
 
     /**
-     * Shows/hides a movement-modal row and enables/disables every submittable control inside it, so
-     * only the active movement type's fields are visible AND submitted. A combobox replaces its
-     * <select> with a hidden value input, so the two selector groups never double-count one control;
-     * the visible combobox textbox is excluded (its disabled state rides on its hidden input via
-     * {@link setMovementControlActive}).
+     * Shows or hides a movement-modal row and enables or disables every submittable control in it.
      *
      * @param {HTMLElement} row the [data-movement-types] wrapper
      * @param {boolean} on whether the row is active for the current movement type
@@ -1660,10 +1406,8 @@
 
     /**
      * Recomputes the Begründung field's `required` flag on the unified movement modal (REQ-BANK-045):
-     * required only for a WITHDRAWAL/TRANSFER whose source account mandates a reason. On the
-     * account-detail page the source is fixed, so the mandate rides on the form as
-     * data-justification-required; on the requests overview it comes from the chosen source account's
-     * <option> data-requires-justification.
+     * required only for a withdrawal or transfer whose source account mandates a reason, read from
+     * the source option, `window.krtBankAccountMeta` or the form's `data-justification-required`.
      *
      * @param {HTMLFormElement} form the movement form
      */
@@ -1680,10 +1424,6 @@
         }
         const source = form.querySelector('[data-role="bank-movement-source"]');
         if (source) {
-            // A native <select> carries the mandate on the chosen <option>; the enhanced
-            // remote-bank-accounts combobox is a hidden value input (no <option>s), so read the
-            // mandate from window.krtBankAccountMeta — populated by the account-search source as the
-            // user searches, keyed by the committed account id (REQ-FE-017, ADR-0106).
             if (source.options) {
                 const option = source.options[source.selectedIndex];
                 input.required =
@@ -1698,12 +1438,9 @@
     }
 
     /**
-     * Adapts the unified "Kontobewegung" modal (#997, REQ-BANK-017/-023) to the chosen movement type:
-     * routes the form to the type's endpoint + source-account field name (MOVEMENT_ENDPOINTS), shows
-     * only that type's [data-movement-types] rows (disabling the rest so they stay out of the body),
-     * swaps the submit-button label, and refreshes the live split / fee / justification helpers. A
-     * deposit exposes the split + Einzahler rows; a withdrawal the payer holder + Empfänger + fee
-     * preview + Begründung; a transfer the destination account/holder pair + fee preview + Begründung.
+     * Adapts the unified "Kontobewegung" modal to the chosen movement type (REQ-BANK-017): sets the
+     * endpoint and source-account field, activates only that type's `[data-movement-types]` rows,
+     * swaps the labels and refreshes the split, fee and justification helpers.
      *
      * @param {HTMLSelectElement} typeSelect the movement-type select
      */
@@ -1722,20 +1459,15 @@
             const types = row.getAttribute('data-movement-types').split(/\s+/);
             setMovementRowActive(row, types.indexOf(type) !== -1);
         });
-        // The split toggle sits in a DEPOSIT-only block: re-sync its percentage row + preview after
-        // the block's active state changed (it is unchecked + disabled when the block is gated off).
         const splitToggle = form.querySelector('[data-role="bank-split-toggle"]');
         if (splitToggle) {
             toggleSplitRow(splitToggle);
         }
-        // Restore each ACTIVE counterparty block's registered-vs-external state after the type gating
-        // (#994): a gated-off block's toggle is disabled, so skip it — its controls stay disabled.
         form.querySelectorAll('[data-role="bank-cp-external-toggle"]').forEach(function (t) {
             if (!t.disabled) {
                 toggleCounterpartyExternal(t);
             }
         });
-        // Submit label follows the type (localized keys carried on the button as data-label-*).
         const submit = form.querySelector('button[type="submit"][data-label-deposit]');
         if (submit) {
             const label = submit.getAttribute('data-label-' + type.toLowerCase());
@@ -1743,10 +1475,6 @@
                 submit.textContent = label;
             }
         }
-        // Source-account label follows the type on the selectable (requests / dashboard) variant
-        // (REQ-BANK-023): a deposit lands ON the account (Zielkonto — a deposit has no source
-        // account, that would be a transfer); a withdrawal/transfer debits it (Quellkonto). Only
-        // present when accountSelectable; a no-op on the fixed-account detail modal.
         const accountLabel = form.querySelector('[data-role="bank-movement-account-label"]');
         if (accountLabel) {
             const accountLabelText = accountLabel.getAttribute('data-label-' + type.toLowerCase());
@@ -1765,12 +1493,6 @@
         }
     });
 
-    // The source-account picker (requests / dashboard overview) drives the fixed-account id mirrored
-    // onto the form, the per-account Begründung mandate and the fee preview: re-sync them when it
-    // changes. Match on the attribute, NOT the tag: the picker is a searchable combobox
-    // (remote-bank-accounts), so after enhancement [data-role="bank-movement-source"] resolves to
-    // the enhancer's hidden VALUE input (an <input>, not a <select>) that re-dispatches change on
-    // commit — a `select[...]` selector would miss it.
     document.addEventListener('change', function (event) {
         const source = event.target.closest('[data-role="bank-movement-source"]');
         if (!source) {
@@ -1786,14 +1508,9 @@
     });
 
     /**
-     * Per-row state for the bank confirmation modal (REQ-BANK-040/-041), read from the trigger's
-     * data-field-* attributes (which are NOT form controls, so they are not primed onto inputs):
-     *  - the over-limit owner-approval block + its mandatory checkbox (pre-ticked when the
-     *    responsible holder already granted in-app), gating the confirm button until it is ticked;
-     *  - the transfer destination-holder select (enabled only for a TRANSFER) and the adaptive
-     *    source-holder label.
-     * Re-applied on every open: the modal is reused across rows and {@link submitBankForm} re-enables
-     * the submit button on success.
+     * Applies one request row's state to the reused bank confirmation modal on every open
+     * (REQ-BANK-040, REQ-BANK-041): the owner-approval checkbox gating the submit button, the split
+     * and justification notices, the transfer destination-holder row and the holder label.
      *
      * @param {HTMLElement} trigger the clicked confirm button carrying the request's data-field-*
      * @param {HTMLElement} modal the confirm modal overlay
@@ -1822,8 +1539,6 @@
             submit.disabled = requiresApproval && !(checkbox && checkbox.checked);
         }
 
-        // Split deposit notice (REQ-BANK-043): show the percentage that will be distributed across the
-        // squadron accounts, so the staffer knows what they are confirming.
         const splitNotice = form.querySelector('[data-split-confirm]');
         if (splitNotice) {
             const splitEnabled = trigger.getAttribute('data-field-splitenabled') === 'true';
@@ -1838,9 +1553,6 @@
             }
         }
 
-        // Requester's Begründung (REQ-BANK-045): show it read-only when the request carries one. The
-        // trigger omits data-field-justification entirely when there is none (a deposit, or an
-        // optional reason the requester left blank), so an absent attribute hides the block.
         const justificationNotice = form.querySelector('[data-confirm-justification]');
         if (justificationNotice) {
             const justification = trigger.getAttribute('data-field-justification');
@@ -1865,7 +1577,6 @@
         }
     }
 
-    /* Over-limit confirmation checkbox: re-arms the confirm button as it is ticked/unticked. */
     document.addEventListener('change', function (event) {
         const checkbox = event.target.closest('[data-owner-approval-check]');
         if (!checkbox) {
@@ -1878,15 +1589,8 @@
         }
     });
 
-    /*
-     * The user pickers (data-role="bank-holder-user") and holder pickers are enhanced into
-     * searchable comboboxes by the global krt-searchable-select.js auto-initialiser (they carry the
-     * data-krt-combobox marker in the templates); no per-page wiring is needed here (REQ-FE-011).
-     */
-
     /**
-     * Fetches one bank PDF with CSRF + the browser's IANA zone and saves it as a file.
-     * Reports failures through the given callback (toast or inline error).
+     * Fetches one bank PDF with CSRF and the browser's IANA time zone and saves it as a file.
      *
      * @param {string} url the proxy URL
      * @param {string} filename the download filename
@@ -1917,14 +1621,12 @@
         const a = document.createElement('a');
         a.href = objectUrl;
         a.download = filename;
-        // Inside an open modal <dialog> the body is inert; append where a click still lands.
         window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(objectUrl);
     }
 
-    /* Direct download buttons (dashboard three-month report). */
     document.addEventListener('click', function (event) {
         const button = event.target.closest('.bank-download-btn[data-download-url]');
         if (!button) {
@@ -1945,8 +1647,8 @@
     });
 
     /**
-     * Type-to-confirm hurdle (admin wipe-reset): the named submit button stays disabled until
-     * the input value exactly matches the token (case-sensitive), guarding the danger action.
+     * Type-to-confirm hurdle: the named submit button stays disabled until the input exactly matches
+     * `data-confirm-token`.
      */
     document.addEventListener('input', function (event) {
         const input = event.target.closest('input[data-confirm-token][data-confirm-submit]');
@@ -1960,11 +1662,8 @@
     });
 
     /**
-     * In-place admin wipe-reset (#582): posts via the AJAX twin and reports the outcome as a toast
-     * instead of the former PRG reload. The no-reload win is the failure path (inline toast, modal
-     * stays open to retry); on success the danger modal closes and the type-to-confirm hurdle
-     * resets. Falls back to the native POST when krtFetch is unavailable (no-JS). The success /
-     * no-op / error strings come from data-* attributes on the form so bank.js stays i18n-free.
+     * Admin wipe-reset: posts in place and reports the outcome as a toast; on success the modal
+     * closes and the confirm input resets. Without krtFetch the form submits natively.
      */
     document.addEventListener('submit', function (event) {
         const form = event.target.closest('form[data-bank-wipe]');
@@ -2003,8 +1702,6 @@
                                       .replace('{1}', zeroed);
                         window.showFrontendSuccessToast(message);
                     }
-                    // Close the danger modal and clear the confirm input so a re-open requires
-                    // re-typing the WIPE token (the hurdle is re-armed in finally below).
                     const overlay = form.closest('.krt-modal-overlay');
                     const closeBtn = overlay
                         ? overlay.querySelector('[data-trigger="close-modal-display"]')
@@ -2028,8 +1725,7 @@
     });
 
     /**
-     * Statement export form: the datetime-splitter keeps the hidden from/to fields as UTC
-     * ISO instants; both are required, then the PDF is fetched as a blob download.
+     * Statement export form: requires the hidden UTC `from`/`to` instants, then downloads the PDF.
      */
     document.addEventListener('submit', function (event) {
         const form = event.target.closest('form.bank-download-form');
@@ -2069,16 +1765,9 @@
     });
 
     /**
-     * Client-side account-name live filter shared by the bank dashboard cards (D1) and the org-unit
-     * account list (REQ-BANK-046). Purely visual and read-only: as the user types into a
-     * `[data-bank-acc-filter]` search box, every account item inside the container named by the box's
-     * `data-filter-scope` selector whose `data-filter-name` does not contain the entered term
-     * (case-insensitive substring) is hidden via the `hidden` attribute. This is a pure DOM toggle
-     * with no server round-trip — so no krtFetch, no reload and no CSRF — which is why the live-update
-     * standard is met by construction (REQ-FE-001). The optional `[data-filter-empty]` note named by
-     * the box's `data-filter-empty` selector is revealed only when a non-empty account set is filtered
-     * down to nothing (never on a genuinely empty list, which shows its own server-rendered empty
-     * state).
+     * Client-side account-name filter (REQ-BANK-046): hides every `[data-filter-name]` item in the
+     * `data-filter-scope` container that does not contain the term (case-insensitive), hides empty
+     * groups, and shows the `data-filter-empty` note when a non-empty list is filtered to nothing.
      *
      * @param {HTMLInputElement} input the account-filter search box that fired the event
      */
@@ -2098,8 +1787,6 @@
                 visible += 1;
             }
         });
-        // By-Bereich view (REQ-BANK-016): hide a group whose accounts are all filtered out so no
-        // empty coloured header lingers. A no-op on the flat views (no groups present).
         scope.querySelectorAll('[data-bank-acc-group]').forEach(function (groupEl) {
             const anyVisible = Array.prototype.some.call(
                 groupEl.querySelectorAll('[data-filter-name]'),
@@ -2116,9 +1803,6 @@
         }
     }
 
-    // Delegated so the single handler serves both the dashboard filter and the org-unit filter, and
-    // survives the org-unit `orgUnitBank` fragment swap (after a swap the input is re-rendered empty,
-    // which naturally resets the filter to "show all").
     document.addEventListener('input', function (event) {
         const input = event.target.closest ? event.target.closest('[data-bank-acc-filter]') : null;
         if (input) {
@@ -2127,10 +1811,8 @@
     });
 
     /**
-     * Toggles a collapsible region driven by an aria-expanded control and an aria-controls target:
-     * flips aria-expanded on the control (the CSS rotates the chevron) and shows/hides the target
-     * element. Shared by the booking-row detail sub-row (REQ-BANK-045) and the account-detail
-     * Konto-Info tile (REQ-BANK-017).
+     * Toggles a collapsible region: flips the control's `aria-expanded` and shows or hides its
+     * `aria-controls` target.
      *
      * @param {HTMLElement} control the button carrying aria-expanded + aria-controls
      */
@@ -2144,11 +1826,6 @@
         }
     }
 
-    // Booking-row expand (REQ-BANK-045): the chevron button toggles the detail sub-row directly; a
-    // click anywhere else on an expandable row toggles it too — but not when it lands on another
-    // control (the reverse button, a link, an input), so the whole row is the click target the design
-    // asks for while the button stays the keyboard control. Document-delegated so it survives the
-    // booking-history fragment swap (REQ-FE-002), on both the bank-staff and org-unit detail pages.
     document.addEventListener('click', function (event) {
         const toggle = event.target.closest
             ? event.target.closest('[data-trigger="bank-row-expand"]')
@@ -2169,8 +1846,6 @@
         }
     });
 
-    // Collapsible Konto-Info tile (REQ-BANK-017): the head button toggles its body. Document-delegated
-    // so it survives the accountBody fragment swap; a swap re-renders it collapsed (the default).
     document.addEventListener('click', function (event) {
         const head = event.target.closest
             ? event.target.closest('[data-trigger="bank-info-collapse"]')
@@ -2181,13 +1856,6 @@
     });
 })();
 
-// ------------------------------------------------------------------------------------------------
-// Booking-request queue status filter (REQ-BANK-023): parallel checkboxes whose selection is
-// persisted per user in localStorage and replayed through the `status` query parameter. The
-// checkboxes live outside the swapped `requestQueue` fragment, so this module owns their checked
-// state and re-fetches the table via the shared krtFetch.swap on every change. Default (no saved
-// preference) is Ausstehend only, rendered server-side; deselecting all shows the "no filter" hint.
-// ------------------------------------------------------------------------------------------------
 (function () {
     const STATUSES = ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED'];
 
@@ -2225,9 +1893,7 @@
     function writeSaved(list) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify(list));
-        } catch {
-            /* localStorage unavailable (private mode): the filter simply will not persist. */
-        }
+        } catch {}
     }
 
     function renderedSelection() {
@@ -2246,10 +1912,6 @@
         });
     }
 
-    // A blank query value collapses to null via the frontend's global emptyAsNull string binder,
-    // which the controller reads as "no selection" and defaults to PENDING. So an empty selection is
-    // sent as the non-empty `NONE` sentinel (an unknown status the controller filters out to an empty
-    // set), keeping deselect-all distinct from a first, unfiltered load.
     function refetch(list) {
         if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
             window.location.reload();
@@ -2263,10 +1925,6 @@
         });
     }
 
-    // On load, reconcile the saved per-user selection with the server-rendered checkboxes. An
-    // explicit `status` in the address bar (deep link / back-forward) is authoritative and is
-    // persisted; otherwise a saved selection that differs from the server default (PENDING) is
-    // applied and the queue re-fetched to match.
     document.addEventListener('DOMContentLoaded', function () {
         if (!filterBar()) {
             return;
@@ -2286,8 +1944,6 @@
         }
     });
 
-    // A checkbox toggle fires `change`; its own `checked` state is already the new one, so the
-    // current selection is read straight off the DOM and persisted + replayed.
     document.addEventListener('change', function (event) {
         const checkbox = event.target.closest
             ? event.target.closest('input[data-bank-status-filter]')
@@ -2301,14 +1957,6 @@
     });
 })();
 
-// ------------------------------------------------------------------------------------------------
-// Bank dashboard view options (REQ-BANK-016): two independent checkboxes — a table-view toggle and
-// a by-Bereich grouping toggle — each persisted per user in localStorage and replayed through the
-// `layout` / `group` query parameters. The checkboxes live outside the swapped `bankGrid` fragment,
-// so this module owns their checked state and re-fetches just the grid via krtFetch.swap on every
-// change, re-applying the account-name filter afterwards. Default (both unchecked, no saved
-// preference) is the card grid ordered A→Z, rendered server-side.
-// ------------------------------------------------------------------------------------------------
 (function () {
     function viewToggles() {
         return document.querySelector('[data-bank-view-toggles]');
@@ -2328,8 +1976,6 @@
         return document.querySelector('input[data-bank-view-group]');
     }
 
-    // The checked checkbox maps to the non-default value (table / bereich); unchecked = the default
-    // (card / alpha), so the pair encodes the same {layout, group} state the query params carry.
     function renderedState() {
         const layoutEl = layoutCheckbox();
         const groupEl = groupCheckbox();
@@ -2358,9 +2004,7 @@
     function writeSaved(state) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify(state));
-        } catch {
-            /* localStorage unavailable (private mode): the choice simply will not persist. */
-        }
+        } catch {}
     }
 
     function applyCheckboxStates(state) {
@@ -2398,9 +2042,6 @@
             });
     }
 
-    // On load, reconcile the saved per-user view with the server-rendered checkboxes. An explicit
-    // `layout`/`group` in the address bar is authoritative and is persisted; otherwise a saved view
-    // that differs from the server default (card + A→Z) is applied and the grid re-fetched.
     document.addEventListener('DOMContentLoaded', function () {
         if (!viewToggles()) {
             return;
@@ -2421,8 +2062,6 @@
         }
     });
 
-    // A checkbox toggle fires `change`; its own `checked` state is already the new one, so the
-    // current {layout, group} is read straight off the DOM, persisted and replayed onto the grid.
     document.addEventListener('change', function (event) {
         const checkbox = event.target.closest
             ? event.target.closest('input[data-bank-view-layout],input[data-bank-view-group]')
@@ -2436,18 +2075,6 @@
     });
 })();
 
-// ------------------------------------------------------------------------------------------------
-// Org-unit bank account-list view toggle (REQ-BANK-021/-046): a SINGLE per-user "Tabellenansicht"
-// checkbox that switches the "Konten" list between the card grid (default) and the dense table —
-// there is NO by-Bereich grouping here (unlike the dashboard, REQ-BANK-016). Mirrors the dashboard
-// view-options module above: the choice is persisted per user in localStorage and replayed through
-// the `layout` query parameter on an `orgUnitBankAccounts` fragment swap (`#ou-acc-results`, no
-// reload, REQ-FE-005), and the layout rides in the address bar (history:true) so it survives the
-// `orgUnitBank` fragment swap after a request create/cancel (that refresh preserves the query, so
-// the server re-renders the chosen layout). The checkbox lives OUTSIDE the swapped `#ou-acc-results`
-// container, so it keeps its state across a layout swap. Distinct `data-ou-view-*` attributes keep
-// it clear of the dashboard's `data-bank-view-*` module.
-// ------------------------------------------------------------------------------------------------
 (function () {
     function toggleGroup() {
         return document.querySelector('[data-ou-view-toggles]');
@@ -2463,8 +2090,6 @@
         return 'org_unit_bank_view_' + uid;
     }
 
-    // The checkbox maps to the non-default layout (table); unchecked = the default card grid, so the
-    // checkbox encodes the same layout the server rendered / the query param carries.
     function renderedLayout() {
         const checkbox = layoutCheckbox();
         return checkbox && checkbox.checked ? 'table' : 'card';
@@ -2486,13 +2111,9 @@
     function writeSaved(layout) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify({ layout }));
-        } catch {
-            /* localStorage unavailable (private mode): the choice simply will not persist. */
-        }
+        } catch {}
     }
 
-    // The name filter box lives outside the swapped #ou-acc-results, so a layout swap leaves its term
-    // applied only to the OLD items; re-dispatch its input event to re-filter the freshly swapped set.
     function reapplyNameFilter() {
         const input = document.querySelector('#ou-panel-konten [data-bank-acc-filter]');
         if (input && input.value) {
@@ -2517,10 +2138,6 @@
             });
     }
 
-    // On load, reconcile the saved per-user layout with the server-rendered checkbox. An explicit
-    // `layout=` in the address bar is authoritative and is persisted; otherwise a saved layout that
-    // differs from the server default (card) is applied and the list re-fetched. No krt:swapped
-    // listener is needed: the layout rides in the query, so every swap re-renders it server-side.
     document.addEventListener('DOMContentLoaded', function () {
         if (!toggleGroup()) {
             return;
@@ -2543,8 +2160,6 @@
         }
     });
 
-    // A checkbox toggle fires `change`; its own `checked` state is already the new one, so read the
-    // layout straight off the DOM, persist it and replay it onto the account list.
     document.addEventListener('change', function (event) {
         const checkbox = event.target.closest
             ? event.target.closest('input[data-ou-view-layout]')
@@ -2558,16 +2173,6 @@
     });
 })();
 
-// ------------------------------------------------------------------------------------------------
-// Account-detail collapsible panels (REQ-BANK-050): the balance chart and the booking history are
-// each collapsible, DEFAULT EXPANDED (the server renders aria-expanded="true"), with the
-// collapsed/expanded state persisted per user in localStorage and replayed on load AND on every
-// krt:swapped — an accountBody / settings re-render restores the server default (expanded), so a
-// user who collapsed a panel keeps it collapsed after a money/settings write. The toggle button
-// carries data-collapse-key ("chart" / "history"); the store is a { key: collapsed } object under
-// bank_panel_collapse_<uid>. Distinct from the always-default-collapsed, unpersisted Konto-Info tile
-// (data-trigger="bank-info-collapse"). Document-delegated so it survives every fragment swap.
-// ------------------------------------------------------------------------------------------------
 (function () {
     function storageKey() {
         const main = document.querySelector('main[data-user-id]');
@@ -2587,13 +2192,9 @@
     function writeSaved(state) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify(state));
-        } catch {
-            /* localStorage unavailable (private mode): the choice simply will not persist. */
-        }
+        } catch {}
     }
 
-    // Reflects the collapsed flag onto a toggle head + its aria-controls body (the CSS rotates the
-    // chevron off aria-expanded).
     function setCollapsed(head, collapsed) {
         head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
         const id = head.getAttribute('aria-controls');
@@ -2603,8 +2204,6 @@
         }
     }
 
-    // Replays the saved collapsed state onto every panel that has one; panels the user never toggled
-    // keep the server default (expanded).
     function apply() {
         const saved = readSaved();
         document
@@ -2624,7 +2223,6 @@
         if (!head) {
             return;
         }
-        // Currently expanded => this click collapses it (and vice versa).
         const collapsed = head.getAttribute('aria-expanded') === 'true';
         setCollapsed(head, collapsed);
         const saved = readSaved();
@@ -2637,19 +2235,6 @@
     apply();
 })();
 
-// ------------------------------------------------------------------------------------------------
-// Grants view + entity-filter persistence (REQ-UI-017): the /bank/grants grouping ("Nach Konto" /
-// "Nach Mitarbeiter") and the per-view account/employee filter are full-page navigations
-// (`?view=` tab links, `?view=&accountId=/userId=` filter selects), so the choice is persisted per
-// user in localStorage and replayed through a one-time location.replace on a BARE /bank/grants
-// load — the server then renders the saved grouping with the tab active and the filter widget
-// preselected (the account combobox is seeded via `selectedAccount`, the employee select via
-// `selectedUserId`). An explicit view/accountId/userId in the address bar is authoritative and is
-// re-persisted; the replace target always carries `view`, so the redirect cannot loop. A filter
-// change is additionally persisted right away by a second delegated change listener — it runs
-// after the navigation handler above in the same synchronous dispatch, and the localStorage write
-// still lands before the page unloads. Both filters are id-valued selects (no free text).
-// ------------------------------------------------------------------------------------------------
 (function () {
     function storageKey() {
         const main = document.querySelector('main[data-user-id]');
@@ -2681,14 +2266,9 @@
     function writeSaved(state) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify(state));
-        } catch {
-            /* localStorage unavailable (private mode): the filter simply will not persist. */
-        }
+        } catch {}
     }
 
-    // The address-bar state, normalised like the controller normalises it: any view other than
-    // `employee` means the default per-account grouping, and only the active view's entity id
-    // is meaningful (the controller ignores the other one).
     function urlState() {
         const params = new URLSearchParams(window.location.search);
         const view =
@@ -2700,9 +2280,6 @@
         };
     }
 
-    // On load, reconcile the saved per-user grouping with the address bar. Explicit query params
-    // are adopted and re-persisted; a bare URL replays a saved non-default state via ONE
-    // location.replace so the server renders the whole page (matrix + preselected filter) for it.
     document.addEventListener('DOMContentLoaded', function () {
         if (!onGrantsPage()) {
             return;
@@ -2729,9 +2306,6 @@
         }
     });
 
-    // A filter pick persists immediately, before the grants module's navigation lands. The changed
-    // control carries the same data-view/data-param attributes the navigation handler reads
-    // (combobox-enhanced hidden input or native select alike).
     document.addEventListener('change', function (event) {
         const select = event.target.closest
             ? event.target.closest('[data-role="bank-grants-filter"]')
@@ -2748,19 +2322,6 @@
     });
 })();
 
-// ------------------------------------------------------------------------------------------------
-// Balance-chart range persistence (REQ-UI-017): ONE global per-user preference shared by both
-// account-detail surfaces (bank-staff /bank/accounts/{id} and org-unit
-// /org-unit-bank/accounts/{id}, REQ-BANK-049) — the same key scheme as bank_panel_collapse above.
-// A range click swaps only the chart fragment (data-swap links, history:false), so the chosen
-// range is captured on the krt:swapped of the two chart containers — which ONLY a range change
-// swaps; a money write re-renders the enclosing accountBody instead — and replayed on load by
-// clicking the matching range link once, driving the exact bindSwap interception the page's
-// inline script installs. An explicit `chartRange=` in the address bar (the no-JS fallback
-// navigation) is authoritative and is re-persisted. A money-write accountBody re-render still
-// resets the chart to its server default (90d) by design; the saved preference only replays on
-// the next full page load.
-// ------------------------------------------------------------------------------------------------
 (function () {
     const CHART_CONTAINER_IDS = ['bank-chart-results', 'org-unit-bank-chart-results'];
 
@@ -2780,8 +2341,6 @@
         return null;
     }
 
-    // The active range is rendered as the inert `.is-active` span; its data-range attribute is
-    // the server's `chartRange` model value (fragments/bank-balance-chart.html).
     function renderedRange() {
         const active = document.querySelector('.bank-chart-range-btn.is-active[data-range]');
         return active ? active.getAttribute('data-range') : null;
@@ -2803,16 +2362,9 @@
     function writeSaved(range) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify({ range }));
-        } catch {
-            /* localStorage unavailable (private mode): the choice simply will not persist. */
-        }
+        } catch {}
     }
 
-    // On load, reconcile the saved per-user range with the server-rendered chart. An explicit
-    // `chartRange=` in the address bar is adopted and re-persisted; otherwise a differing saved
-    // range is replayed by clicking its range link exactly once — no matching link (unknown key,
-    // or the saved range IS the rendered one) means nothing happens, which also validates the
-    // stored value without duplicating the server's range list client-side.
     document.addEventListener('DOMContentLoaded', function () {
         const container = chartContainer();
         if (!container) {
@@ -2835,9 +2387,6 @@
         }
     });
 
-    // Persist the range whenever one of the chart containers itself swaps: only a range click
-    // (user's, or the one-time replay above) does that, and the freshly rendered fragment is the
-    // authoritative source for the now-active range.
     document.addEventListener('krt:swapped', function (event) {
         const container = event.detail && event.detail.container;
         if (!container || CHART_CONTAINER_IDS.indexOf(container.id) === -1) {

@@ -38,11 +38,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * Unit tests for {@link CapabilityFlagsAdvice}. Exercises the shared {@code meCapabilities}
- * resolver (the capabilities part of the one {@code /me/layout} read, admins short-circuited to
- * all-on, anonymous short-circuited to all-off, fail-closed on error) and the derived sidebar flags
- * {@code canSeeBlueprintOverview} (#364), {@code canViewJobOrders} (profit-eligible order
- * visibility) and {@code canViewOwnJobOrders} (the requester capability, REQ-ORDERS-023) that read
+ * Unit tests for {@link CapabilityFlagsAdvice}: the shared {@code meCapabilities} resolver (all-on
+ * for admins, all-off for anonymous callers, fail-closed on error) and the sidebar flags derived
  * from it.
  */
 @ExtendWith(MockitoExtension.class)

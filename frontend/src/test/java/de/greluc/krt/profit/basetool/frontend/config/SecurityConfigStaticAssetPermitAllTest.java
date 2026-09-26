@@ -40,11 +40,8 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Verifies that {@link SecurityConfig} permits anonymous access to static-asset paths so that
- * background sourcemap and asset probes from DevTools and browser extensions never trigger the
- * OAuth2 entry point. The crucial assertion is that none of these paths returns a 3xx redirect —
- * the actual resource may resolve (200) or be missing (404), but it must never land in {@link
- * SsoReAuthenticationEntryPoint} and therefore never be stored as a saved request.
+ * Verifies that {@link SecurityConfig} lets anonymous static-asset requests through without
+ * redirecting them to {@link SsoReAuthenticationEntryPoint}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -69,31 +66,9 @@ class SecurityConfigStaticAssetPermitAllTest {
   }
 
   /**
-   * The asset paths exercised here cover the reasons such a request can show up in the wild:
-   *
-   * <ul>
-   *   <li>{@code /js/vendor/example-1.0.0.min.js.map} — DevTools sourcemap lookup for a {@code
-   *       /js/vendor/} bundle path that 404s (vendored bundles ship without sourcemaps).
-   *   <li>{@code /sm/abcdef123456.map} — Sentry-Replay / browser-extension sourcemap probe with
-   *       arbitrary hash.
-   *   <li>{@code /favicon.ico} — no favicon shipped in {@code static/}.
-   *   <li>{@code /robots.txt} and {@code /css/styles.css} — present in {@code static/}.
-   *   <li>{@code /css/does-not-exist.css.map} — generic {@code /**}/{@code *.map} probe against a
-   *       CSS sourcemap.
-   *   <li>{@code /error/foo} — non-default Spring Boot error dispatch subpath; must stay open so it
-   *       never lands in the saved-request slot.
-   *   <li>{@code /manifest.webmanifest} — the web app manifest (REQ-UI-020, ADR-0164). A browser
-   *       reads it on the landing page with no session and no credentials; a redirect here makes
-   *       every new home-screen install take its name and icon from the login page, which is the
-   *       Android-side failure {@code /.well-known/assetlinks.json} already lived through.
-   * </ul>
-   *
-   * <p>Exact response status is intentionally not asserted — known files resolve 200, missing files
-   * resolve 404, and {@code /error}-style paths can resolve 500 because no error attribute is set
-   * on a direct GET. The discriminating check is that {@link
-   * MockHttpServletResponse#getRedirectedUrl()} stays {@code null}: a hit on {@link
-   * SsoReAuthenticationEntryPoint} would set the Location header to {@code
-   * /oauth2/authorization/keycloak}.
+   * Verifies that none of the asset paths (sourcemaps, favicon, robots, stylesheet, error subpath,
+   * web manifest) is redirected; the status itself is not asserted, only that {@link
+   * MockHttpServletResponse#getRedirectedUrl()} stays {@code null}.
    */
   @ParameterizedTest
   @ValueSource(
@@ -109,12 +84,8 @@ class SecurityConfigStaticAssetPermitAllTest {
       })
   @WithAnonymousUser
   void anonymousGetOnStaticAssetPath_doesNotRedirectToOAuth2Login(String path) throws Exception {
-    // When
     MockHttpServletResponse response = mockMvc.perform(get(path)).andReturn().getResponse();
 
-    // Then — SsoReAuthenticationEntryPoint emits a 302 to /oauth2/authorization/keycloak when it
-    // gates a request. The resource handler and the static-content path emit no redirect. Asserting
-    // a null redirect URL catches the only failure mode that matters for this fix.
     assertNull(
         response.getRedirectedUrl(),
         "Path "

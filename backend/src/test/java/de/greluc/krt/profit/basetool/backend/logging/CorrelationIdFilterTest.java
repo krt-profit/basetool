@@ -66,8 +66,6 @@ class CorrelationIdFilterTest {
       new CorrelationIdFilter(props, authHelperService, ownerScopeService);
 
   {
-    // Default behaviour: anonymous traffic returns "none" through the filter's defensive
-    // fallback. Tests that assert orgUnit-context behaviour can stub these mocks per-case.
     when(authHelperService.isAuthenticated()).thenReturn(false);
     when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
   }
@@ -80,49 +78,39 @@ class CorrelationIdFilterTest {
 
   @Test
   void missingHeader_ShouldGenerateUuidAndEchoBack() throws ServletException, IOException {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
     MockHttpServletResponse response = new MockHttpServletResponse();
     AtomicReference<String> mdcDuringChain = new AtomicReference<>();
     FilterChain chain = (req, res) -> mdcDuringChain.set(MDC.get(props.correlationIdMdcKey()));
 
-    // When
     filter.doFilter(request, response, chain);
 
-    // Then
     String echoed = response.getHeader(props.correlationIdHeader());
     assertThat(echoed).isNotBlank();
-    assertThat(echoed).hasSize(36); // UUID length with dashes
+    assertThat(echoed).hasSize(36);
     assertThat(mdcDuringChain.get()).isEqualTo(echoed);
-    // MDC cleaned up in finally
     assertThat(MDC.get(props.correlationIdMdcKey())).isNull();
   }
 
   @Test
   void inboundHeader_ShouldBeReused() throws ServletException, IOException {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
     request.addHeader(props.correlationIdHeader(), "req-abc-123");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilter(request, response, (req, res) -> {});
 
-    // Then
     assertThat(response.getHeader(props.correlationIdHeader())).isEqualTo("req-abc-123");
   }
 
   @Test
   void unsafeInboundHeader_ShouldBeReplacedWithUuid() throws ServletException, IOException {
-    // Given: CR/LF injection attempt
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
     request.addHeader(props.correlationIdHeader(), "abc\ninjected: evil");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilter(request, response, (req, res) -> {});
 
-    // Then
     String echoed = response.getHeader(props.correlationIdHeader());
     assertThat(echoed).doesNotContain("\n", "injected");
     assertThat(echoed).hasSize(36);
@@ -130,7 +118,6 @@ class CorrelationIdFilterTest {
 
   @Test
   void authenticatedRequest_ShouldPlaceJwtSubIntoMdc() throws ServletException, IOException {
-    // Given
     Jwt jwt = mock(Jwt.class);
     when(jwt.getSubject()).thenReturn("user-sub-42");
     JwtAuthenticationToken auth = new JwtAuthenticationToken(jwt);
@@ -141,17 +128,14 @@ class CorrelationIdFilterTest {
     AtomicReference<String> userIdDuringChain = new AtomicReference<>();
     FilterChain chain = (req, res) -> userIdDuringChain.set(MDC.get(props.userIdMdcKey()));
 
-    // When
     filter.doFilter(request, response, chain);
 
-    // Then
     assertThat(userIdDuringChain.get()).isEqualTo("user-sub-42");
     assertThat(MDC.get(props.userIdMdcKey())).isNull();
   }
 
   @Test
   void unauthenticatedRequest_ShouldExposeAnonymousUserId() throws ServletException, IOException {
-    // Given: non-JWT principal (e.g. anonymous filter)
     SecurityContextHolder.getContext()
         .setAuthentication(
             new AnonymousAuthenticationToken(
@@ -160,25 +144,20 @@ class CorrelationIdFilterTest {
     MockHttpServletResponse response = new MockHttpServletResponse();
     AtomicReference<String> userIdDuringChain = new AtomicReference<>();
 
-    // When
     filter.doFilter(
         request, response, (req, res) -> userIdDuringChain.set(MDC.get(props.userIdMdcKey())));
 
-    // Then
     assertThat(userIdDuringChain.get()).isEqualTo("anonymous");
   }
 
   @Test
   void initialDispatch_ShouldStashTheResolvedValuesForAnAsyncDispatch()
       throws ServletException, IOException {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/notifications");
     request.addHeader(props.correlationIdHeader(), "stash-me");
 
-    // When
     filter.doFilter(request, new MockHttpServletResponse(), (req, res) -> {});
 
-    // Then
     assertThat(request.getAttribute(CorrelationIdFilter.CORRELATION_ID_ATTRIBUTE))
         .isEqualTo("stash-me");
     assertThat(request.getAttribute(CorrelationIdFilter.USER_ID_ATTRIBUTE)).isEqualTo("anonymous");
@@ -189,7 +168,6 @@ class CorrelationIdFilterTest {
   @Test
   void asyncDispatch_ShouldRebindTheStashedValuesWithoutResolvingAnything()
       throws ServletException, IOException {
-    // Given: the stream's async result is dispatched back, carrying a header the client sent
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", "/api/v1/notifications/stream");
     request.setDispatcherType(DispatcherType.ASYNC);
@@ -200,10 +178,8 @@ class CorrelationIdFilterTest {
     MockHttpServletResponse response = new MockHttpServletResponse();
     AtomicReference<Map<String, String>> mdcDuringChain = new AtomicReference<>();
 
-    // When
     filter.doFilter(request, response, (req, res) -> mdcDuringChain.set(MDC.getCopyOfContextMap()));
 
-    // Then
     assertThat(mdcDuringChain.get())
         .containsEntry(props.correlationIdMdcKey(), "from-initial")
         .containsEntry(props.userIdMdcKey(), "member-sub")
@@ -220,7 +196,6 @@ class CorrelationIdFilterTest {
   @Test
   void asyncDispatchWithoutStash_ShouldMintNothingAndTrustNoHeader()
       throws ServletException, IOException {
-    // Given
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", "/api/v1/notifications/stream");
     request.setDispatcherType(DispatcherType.ASYNC);
@@ -228,13 +203,11 @@ class CorrelationIdFilterTest {
     MockHttpServletResponse response = new MockHttpServletResponse();
     AtomicReference<String> correlationDuringChain = new AtomicReference<>("unset");
 
-    // When
     filter.doFilter(
         request,
         response,
         (req, res) -> correlationDuringChain.set(MDC.get(props.correlationIdMdcKey())));
 
-    // Then
     assertThat(correlationDuringChain.get()).isNull();
     assertThat(response.getHeader(props.correlationIdHeader())).isNull();
   }

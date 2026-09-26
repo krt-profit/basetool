@@ -26,34 +26,12 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Derives the <em>variant family key</em> of a blueprint product name: the identity under which a
- * base item and its cosmetic variants are treated as one craftable family for the item-order
- * blueprint-coverage view and the org-unit blueprint-availability overview (#364). In Star Citizen
- * a cosmetic variant is the base name with a quoted nickname spliced in — {@code Fresnel Energy
- * LMG} → {@code Fresnel "Rockfall" Energy LMG} / {@code Fresnel "Molten" Energy LMG}; {@code Novian
- * Crossbow} → {@code Novian "Wildshot" Crossbow}. Owning the blueprint for any family member lets a
- * member craft the ordered item, so coverage must count the whole family, in both directions.
+ * Derives the variant family key of a blueprint product name, under which a base item and its
+ * cosmetic variants (the base name with a quoted nickname) count as one craftable family.
  *
- * <p>The family key is computed by stripping the quoted nickname from the {@link
- * BlueprintNameNormalizer}-normalized name and re-collapsing whitespace, then applying the curated
- * {@link BlueprintVariantAliasOverrides}. The rule is intentionally <b>conservative</b>: it keeps
- * the full unquoted residue (manufacturer/model tokens <em>and</em> the weapon-type word like
- * {@code Rifle}/{@code SMG}/{@code Crossbow}), which is what prevents cross-family collisions (a
- * {@code Sawtooth "Sirocco" Combat Knife} keys to {@code sawtooth combat knife}, never to a {@code
- * Karna} rifle). Genuinely distinct products that differ only by an unquoted token — ship
- * sub-models ({@code Aurora MR} vs {@code Aurora LN}), color/edition suffixes, personal-name
- * editions ({@code Salvo Esteban}) — therefore stay separate unless a curated alias deliberately
- * merges them.
- *
- * <p><b>Magazines are never variants.</b> A magazine / battery / ammo box (in-game ammo containers,
- * commonly carrying a {@code (NNN cap)} capacity suffix) must never be counted toward its weapon. A
- * name detected as a magazine gets an opaque, capacity-sensitive <em>atomic</em> family key that
- * can only ever equal an identical magazine — it folds into no weapon family and two capacities of
- * the "same" magazine stay distinct.
- *
- * <p>The same static derivation must drive both the required-side and the owned-side of every
- * match, so callers always route through {@link #familyKey(String)} (and never re-implement the
- * stripping), keeping the matching symmetric.
+ * <p>The key is the normalized name with the quoted nickname stripped, then canonicalized through
+ * {@link BlueprintVariantAliasOverrides}. Magazines get an atomic key that never joins a weapon
+ * family. Both sides of every match must use {@link #familyKey(String)}.
  */
 @Component
 @RequiredArgsConstructor
@@ -80,20 +58,14 @@ public class BlueprintVariantFamilyResolver {
   private static final Pattern WHITESPACE_RUN = Pattern.compile("\\s+");
 
   /**
-   * A capacity parenthetical — a {@code (… N cap …)} group whose inner text has a digit run
-   * followed by the whole word {@code cap}. The digit requirement keeps a state/sub-model
-   * parenthetical such as {@code (modified)} out, and the {@code \b} keeps substrings like {@code
-   * capacitor} / {@code capstone} / {@code escape} out. Tested against the already-lowercased
-   * normalized name.
+   * A capacity parenthetical: a {@code (… N cap …)} group with a digit run followed by the whole
+   * word {@code cap}. Tested against the lowercased normalized name.
    */
   private static final Pattern CAPACITY_MAGAZINE = Pattern.compile("\\(\\s*\\d+\\s*cap\\b[^)]*\\)");
 
   /**
-   * A standalone ammo-container noun ({@code magazine} subsumes {@code bolt magazine}). Caught as a
-   * whole word so it fires even when the capacity parenthetical is absent (an energy {@code
-   * Battery} or an {@code Ammo Box} with no printed capacity), and never on a substring. No real
-   * weapon base name carries any of these tokens, so misclassifying such an item as atomic is
-   * harmless (it has no cosmetic variants and still matches itself exactly).
+   * A standalone ammo-container noun ({@code magazine}, {@code battery}, {@code ammo box}), matched
+   * as a whole word.
    */
   private static final Pattern AMMO_NOUN = Pattern.compile("\\b(?:magazine|battery|ammo box)\\b");
 
@@ -101,14 +73,11 @@ public class BlueprintVariantFamilyResolver {
   private final BlueprintVariantAliasOverrides aliasOverrides;
 
   /**
-   * Computes the variant family key of a product name. A {@code null} or all-whitespace name yields
-   * an empty key (skipped by callers). A magazine yields an atomic key. Otherwise the quoted
-   * nickname is removed, whitespace re-collapsed, and the result canonicalized through {@link
-   * BlueprintVariantAliasOverrides}. Two names match (base ↔ variant, or two variants) exactly when
-   * their family keys are equal.
+   * Computes the variant family key of a product name: an atomic key for a magazine, otherwise the
+   * quoted nickname removed, whitespace re-collapsed and the result canonicalized through {@link
+   * BlueprintVariantAliasOverrides}.
    *
-   * @param name a blueprint product name (an item line's chosen-blueprint {@code output_name} or a
-   *     personal blueprint's {@code productName}); may be {@code null}
+   * @param name a blueprint product name; may be {@code null}
    * @return the family key; never {@code null}, empty for a blank name
    */
   @NotNull
@@ -126,19 +95,12 @@ public class BlueprintVariantFamilyResolver {
   }
 
   /**
-   * Computes the coverage match key for a product name under an order's chosen counting mode. When
-   * {@code countWithVariants} is {@code true} the key is the {@link #familyKey(String) variant
-   * family key}, so a base item and its cosmetic variants collapse onto one key (the historic
-   * behaviour). When {@code false} the key is the exact {@link BlueprintNameNormalizer#normalize
-   * normalized} name, so a name matches only an identical blueprint and the other variants of the
-   * same family are excluded — what a member ordering one specific variant wants. Both the
-   * required-side and the owned-side of a match must route through this one method so the keys stay
-   * symmetric; the empty key a blank name yields is skipped by callers in either mode.
+   * Computes the coverage match key for a product name: the {@link #familyKey(String) family key}
+   * when variants count, otherwise the exact {@link BlueprintNameNormalizer#normalize normalized}
+   * name. Both sides of a match must use this method.
    *
-   * @param name a blueprint product name (an item line's chosen-blueprint {@code output_name} or a
-   *     personal blueprint's {@code productName}); may be {@code null}
-   * @param countWithVariants whether cosmetic variants fold into one family ({@code true}) or each
-   *     name matches only itself ({@code false})
+   * @param name a blueprint product name; may be {@code null}
+   * @param countWithVariants whether cosmetic variants fold into one family
    * @return the match key; never {@code null}, empty for a blank name
    */
   @NotNull
@@ -147,9 +109,8 @@ public class BlueprintVariantFamilyResolver {
   }
 
   /**
-   * Whether the given product name denotes a magazine / battery / ammo box rather than a craftable
-   * weapon — i.e. an item that must never be counted toward a weapon family. Normalizes the name
-   * before testing, so callers may pass a raw display name.
+   * Whether the product name denotes a magazine, battery or ammo box rather than a craftable
+   * weapon. The name is normalized first.
    *
    * @param name a blueprint product name; may be {@code null}
    * @return {@code true} if the name is detected as an ammo container
@@ -159,15 +120,11 @@ public class BlueprintVariantFamilyResolver {
   }
 
   /**
-   * Presentation label for a variant family derived from one of its member names: the name with the
-   * cosmetic quoted nickname removed, <em>preserving</em> the original casing (unlike {@link
-   * #familyKey(String)}, which lowercases for matching). Used to label a family row in the org-unit
-   * availability overview from a representative owned blueprint. Curly double-quote glyphs are
-   * folded first so a curly-quoted variant strips correctly; a magazine name (no cosmetic quote) is
-   * returned trimmed and otherwise unchanged.
+   * Returns a case-preserving family label: the name with its quoted nickname removed (curly quotes
+   * folded first). A magazine name is returned trimmed.
    *
-   * @param name a member name of the family (a base or variant product name); may be {@code null}
-   * @return the case-preserving base label; never {@code null}, empty for a blank name
+   * @param name a base or variant product name of the family; may be {@code null}
+   * @return the base label; never {@code null}, empty for a blank name
    */
   @NotNull
   public String displayBaseName(@Nullable String name) {
@@ -180,9 +137,8 @@ public class BlueprintVariantFamilyResolver {
   }
 
   /**
-   * Magazine detection on an already-{@link BlueprintNameNormalizer#normalize normalized}
-   * (lowercased, whitespace-collapsed, quote-folded) name: true when it carries a numeric capacity
-   * parenthetical or a standalone ammo-container noun.
+   * Detects a magazine on an already-{@link BlueprintNameNormalizer#normalize normalized} name: a
+   * numeric capacity parenthetical or a standalone ammo-container noun.
    *
    * @param normalized the normalized product name
    * @return {@code true} if the normalized name is an ammo container

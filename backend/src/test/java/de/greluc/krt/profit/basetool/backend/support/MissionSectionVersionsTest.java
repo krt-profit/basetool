@@ -83,10 +83,6 @@ class MissionSectionVersionsTest {
   @Test
   @DisplayName("an echo of Long.MAX_VALUE is refused instead of wrapping the counter negative")
   void maxValueEchoDoesNotWrapTheCounter() {
-    // The repository is mocked to report a match, which the real bigint column could never do for
-    // this value (PostgreSQL rejects the out-of-range bump first). Without the bound the helper
-    // would write Long.MIN_VALUE onto the managed entity and the dirty-checking flush would
-    // persist it.
     when(repository.bumpCoreVersionIfMatches(MISSION_ID, Long.MAX_VALUE)).thenReturn(1);
 
     assertThatThrownBy(

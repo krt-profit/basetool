@@ -49,11 +49,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-/**
- * Verifies the {@code /api/v1/org-hierarchy/**} surface (epic #692) is ADMIN-only: defining the
- * Bereich/OL hierarchy is org-unit lifecycle administration. An OFFICER is forbidden on both the
- * read and the write endpoints; an ADMIN is admitted.
- */
+/** Verifies that the {@code /api/v1/org-hierarchy/**} endpoints admit ADMIN and forbid OFFICER. */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -112,10 +108,8 @@ class OrgHierarchyControllerSecurityTest {
   }
 
   /**
-   * Every remaining {@code /api/v1/org-hierarchy/**} read and write endpoint, each paired with a
-   * <em>valid</em> body / path so the only thing that can reject the request is the {@code
-   * hasRole('ADMIN')} gate (not bean validation or a missing path variable). Keeps the surface from
-   * silently losing its ADMIN gate as endpoints are added.
+   * Supplies every {@code /api/v1/org-hierarchy/**} endpoint with a valid request, so only the
+   * {@code hasRole('ADMIN')} gate can reject it.
    *
    * @return one request builder per endpoint.
    */

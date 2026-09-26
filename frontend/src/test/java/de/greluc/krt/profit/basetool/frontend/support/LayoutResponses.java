@@ -26,11 +26,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Builds canned {@code GET /api/v1/me/layout} answers for tests that stub the mocked {@code
- * BackendApiClient}. Since FE-PERF-01 the layout advices read their org-unit context, capability
- * flags and unread count from that one endpoint, so a render test that needs, say, {@code
- * canViewJobOrders} stubs the layout answer instead of the retired {@code /api/v1/me/capabilities}
- * read. Every factory leaves the parts it is not about at their fail-closed value.
+ * Builds canned {@code GET /api/v1/me/layout} answers for tests stubbing a mocked {@code
+ * BackendApiClient}. Each factory leaves the parts it does not concern at their fail-closed values.
  */
 public final class LayoutResponses {
 

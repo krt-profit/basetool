@@ -51,19 +51,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * The end-to-end guard for #1653: bytes written into an {@code SseEmitter} must reach a socket.
- *
- * <p>{@link StreamAwareShallowEtagHeaderFilterTest} pins the one filter that broke this, which is
- * the narrower half of the guard and would not have caught the defect had it come from a different
- * filter. This one runs the request through the <em>real</em> chain on a real port and waits for a
- * byte, so any future component that buffers, wraps or delays a streaming response fails here
- * regardless of which one it is.
- *
- * <p>That distinction is the whole reason this test exists: the original defect was invisible to
- * every server-side signal we had. The emitter accepted the write, the delivery counter
- * incremented, {@code basetool_sse_connections} was healthy, and the client on the other end of the
- * connection received nothing for as long as it held it. Only reading the socket separates the two
- * states, so only a test that reads a socket can pin them apart.
+ * End-to-end guard that bytes written into an {@code SseEmitter} reach the socket through the real
+ * filter chain on a real port, so any component that buffers or delays a streaming response fails
+ * here. Complements {@link StreamAwareShallowEtagHeaderFilterTest}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -80,11 +70,8 @@ class SseDeliveryThroughFilterChainTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   /**
-   * Stubbed past the terms gate. The subject here is a token, not a seeded member, so the real
-   * check refuses it with a {@code 403} before the request ever reaches a filter that could buffer
-   * it — which is the property under test. The concrete service is overridden rather than its
-   * {@code TermsConsentCheck} interface, because the same bean satisfies both and replacing it
-   * under the narrower type leaves the admin controller without its dependency.
+   * Stubbed so the token subject passes the terms gate and reaches the filters under test. The
+   * concrete service is mocked because the bean also serves the admin controller.
    */
   @MockitoBean private TermsAcceptanceService termsAcceptanceService;
 
@@ -96,8 +83,6 @@ class SseDeliveryThroughFilterChainTest {
    */
   @MockitoBean private CustomJwtGrantedAuthoritiesConverter authoritiesConverter;
 
-  // HTTP/1.1 explicitly, for the reason ManagementPortIsolationTest gives: the JDK client's HTTP/2
-  // stream handling can RST_STREAM against a Tomcat still warming up under full-suite load.
   private final HttpClient http =
       HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
@@ -126,9 +111,6 @@ class SseDeliveryThroughFilterChainTest {
   @DisplayName("the notification stream delivers its first event to a real socket")
   void notificationStreamDeliversToASocket() throws Exception {
     assertThat(firstLineOf("/api/v1/notifications/stream"))
-        // The service sends `connected` the moment it registers the emitter, so the very first
-        // frame is already proof. Waiting for a heartbeat instead would cost 20 s per run and test
-        // the same property.
         .as("first frame of the notification stream")
         .contains("connected");
   }
@@ -143,15 +125,12 @@ class SseDeliveryThroughFilterChainTest {
   }
 
   /**
-   * Opens a stream and returns everything that arrived up to and including its first non-blank
-   * line, giving up after {@link #FIRST_BYTE_BUDGET}.
+   * Opens a stream and returns the first non-blank line, giving up after {@link
+   * #FIRST_BYTE_BUDGET}. Reads a line stream because the body never ends.
    *
-   * <p>The response is consumed as a line stream rather than a string: a string body handler waits
-   * for the end of a body that, by design, has none.
-   *
-   * @param path the stream path including any query, leading slash included.
-   * @return the first non-blank line of the body.
-   * @throws Exception if the request fails, or if no line arrives within the budget.
+   * @param path the stream path including any query, leading slash included
+   * @return the first non-blank line of the body
+   * @throws Exception if the request fails or no line arrives within the budget
    */
   private String firstLineOf(String path) throws Exception {
     HttpRequest request =
@@ -163,9 +142,6 @@ class SseDeliveryThroughFilterChainTest {
 
     HttpResponse<Stream<String>> response = http.send(request, HttpResponse.BodyHandlers.ofLines());
     if (response.statusCode() != 200) {
-      // The body is read into the message deliberately: every refusal on this path is an RFC 7807
-      // document naming the gate, and a bare status code sends the next reader hunting for which
-      // of the four filters in front of the stream said no.
       throw new AssertionError(
           "status "
               + response.statusCode()
@@ -175,8 +151,6 @@ class SseDeliveryThroughFilterChainTest {
               + response.body().toList());
     }
 
-    // The read has to be interruptible: a swallowed stream blocks forever rather than failing, so
-    // an ordinary read on this thread would hang the build instead of reporting the defect.
     CompletableFuture<List<String>> firstLine =
         CompletableFuture.supplyAsync(
             () -> response.body().filter(line -> !line.isBlank()).limit(1).toList());

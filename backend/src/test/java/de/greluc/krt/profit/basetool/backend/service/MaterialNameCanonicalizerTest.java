@@ -25,15 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests of the shared commodity-name folding (#434). The {@code canonicalCore} cases mirror the
- * historical {@code ScWikiCommoditySyncService.canonicalName} expectations bit-identically — the
- * Wiki sync delegates here, so a behaviour change would silently alter its resolution chain.
+ * Tests the shared commodity-name folding, including the {@code canonicalCore} results the SC Wiki
+ * sync relies on.
  */
 class MaterialNameCanonicalizerTest {
 
   @Test
   void canonicalCore_stripsQualifiersAndParentheticals() {
-    // Given / When / Then — parity with the pre-#434 Wiki-sync folding
     assertEquals("silicon", MaterialNameCanonicalizer.canonicalCore("Raw Silicon"));
     assertEquals("silicon", MaterialNameCanonicalizer.canonicalCore("Silicon (Raw)"));
     assertEquals("silicon", MaterialNameCanonicalizer.canonicalCore("Silicon"));
@@ -44,11 +42,9 @@ class MaterialNameCanonicalizerTest {
 
   @Test
   void canonicalCore_foldsScreenUppercaseToMasterDataForm() {
-    // Given — the SC screen renders "STILERON (ORE)", UEX stores "Stileron (Raw)"
     String screen = MaterialNameCanonicalizer.canonicalCore("STILERON (ORE)");
     String master = MaterialNameCanonicalizer.canonicalCore("Stileron (Raw)");
 
-    // Then — both sides meet at the same core
     assertEquals("stileron", screen);
     assertEquals(screen, master);
   }
@@ -62,7 +58,6 @@ class MaterialNameCanonicalizerTest {
 
   @Test
   void fuzzyKey_preservesWordBoundaries() {
-    // Given / When / Then — the token-set Jaccard signal needs the spaces
     assertEquals(
         "construction salvage", MaterialNameCanonicalizer.fuzzyKey("Construction Salvage"));
     assertEquals("stileron", MaterialNameCanonicalizer.fuzzyKey("STILERON (ORE)"));

@@ -35,11 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Exemplar for epic #571 / #573 (REQ-FE-005): filtering the missions list swaps the results in
- * place — no page navigation — and keeps the address-bar URL in sync so a refresh re-renders the
- * same filter. Two distinctively-named missions are seeded; filtering by one's token must keep that
- * row and drop the other, prove no reload happened (a window marker survives), and leave the URL
- * carrying the {@code search} parameter.
+ * Verifies that filtering the missions list swaps the results in place without navigation and keeps
+ * the {@code search} parameter in the URL (REQ-FE-005).
  */
 @Tag("e2e")
 class MissionListFilterInPlaceE2eTest {
@@ -100,21 +97,17 @@ class MissionListFilterInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // showPast=true so a seeded mission whose planned start is not in the future still lists.
         E2eSupport.navigate(page, baseUrl + "/missions?showPast=true");
         page.waitForLoadState();
         E2eSupport.openFilterPanel(page);
 
-        // Mark the live document: a full navigation/reload wipes it.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         page.locator("#mission-search").fill(MATCH);
 
-        // The matching mission stays, the other is filtered out — an in-place fragment swap ran.
         assertThat(page.getByText(MATCH + " Mission")).isVisible();
         assertThat(page.getByText(OTHER + " Mission")).hasCount(0);
 
-        // No navigation happened, and the URL reflects the filter (history sync).
         assertEquals(
             Boolean.TRUE,
             page.evaluate("() => window.__krtNoReload === true"),

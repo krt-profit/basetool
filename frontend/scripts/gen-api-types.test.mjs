@@ -20,14 +20,8 @@
 /**
  * Regression tests for scripts/gen-api-types.mjs (ADR-0130).
  *
- * Two things are worth testing here, and they are not the happy path. First, the type mapping:
- * this emitter replaced a maintained package, so a wrong `$ref` or a dropped `required` would
- * quietly mistype a DTO and the drift protection of REQ-FE-018 would pass on a lie. Second — and
- * more important — the guard: an OpenAPI construct the emitter cannot express must FAIL the build,
- * because the alternative is a DTO silently degraded to `unknown`, which type-checks everywhere.
- *
- * Runs the real script as a subprocess against synthetic specs in a temp directory. No network,
- * no Gradle, no npm packages — a couple of hundred milliseconds.
+ * Covers the type mapping and the guard that fails on unsupported OpenAPI constructs, by running the
+ * real script as a subprocess against synthetic specs in a temp directory.
  */
 
 import assert from "node:assert/strict";
@@ -65,8 +59,6 @@ function run(spec, label) {
     return { ok: false, stderr: String(err.stderr ?? ""), out: "" };
   }
 }
-
-// --- type mapping -----------------------------------------------------------------------------
 
 test("maps primitives, honours `required` for optionality", () => {
   const { ok, out } = run(
@@ -162,8 +154,6 @@ test("declares paths and operations for dto.d.ts source compatibility", () => {
   assert.match(out, /export interface paths \{\}/);
   assert.match(out, /export interface operations \{\}/);
 });
-
-// --- the guard --------------------------------------------------------------------------------
 
 for (const keyword of ["allOf", "oneOf", "anyOf", "not", "discriminator"]) {
   test(`FAILS the build on '${keyword}' instead of degrading the DTO to unknown`, () => {

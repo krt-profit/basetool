@@ -26,14 +26,12 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 /**
- * Write payload for setting (upserting) one per-tier approval limit on a bank account
- * (REQ-BANK-041). The tier is named by the URL path (role bucket / all-members / user); this body
- * carries only the new ceiling. Unlike the balance target the limit may be {@code 0}
- * ({@code @DecimalMin("0")}) — a zero ceiling means every request of that tier needs the
- * responsible holder's approval. To remove a limit entirely the client issues a DELETE, not a
- * zero-value set.
+ * Write payload for upserting one per-tier approval limit on a bank account (REQ-BANK-041); the
+ * tier is named by the URL path. A limit of {@code 0} means every request of that tier needs
+ * approval; a limit is removed with DELETE.
  *
- * @param limit the whole-aUEC ceiling (>= 0) up to which the tier may request without approval
+ * @param limit the whole-aUEC ceiling, at least 0, up to which the tier may request without
+ *     approval
  */
 public record SetBankApprovalLimitRequest(
     @NotNull @DecimalMin("0") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal limit) {}

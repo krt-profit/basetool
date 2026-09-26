@@ -29,38 +29,19 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuration properties under {@code app.keycloak.sync.*}.
+ * Configuration of the scheduled Keycloak user sync under {@code app.keycloak.sync.*}, used by
+ * {@link de.greluc.krt.profit.basetool.backend.task.UserSyncTask}.
  *
- * <p>Drives {@link de.greluc.krt.profit.basetool.backend.task.UserSyncTask}: the admin URL, realm
- * and client credentials let the backend authenticate against the Keycloak Admin API; {@code cron}
- * plus {@code zone} set the once-per-day cadence; {@code enabled} short-circuits the task in
- * environments where the Admin API is unreachable (e.g. CI). All values are validated at startup so
- * a missing secret fails the boot rather than producing 401s at the first scheduled run.
- *
- * <p>An immutable record bound by {@code @ConfigurationPropertiesScan} (BE-MOD-04). Its {@link
- * #toString()} redacts the client secret, which the former Lombok {@code @Data} class printed.
+ * <p>Validated at startup; {@link #toString()} redacts the client secret.
  *
  * @param enabled whether the periodic user sync runs
- * @param cron the Spring cron expression (6-field {@code sec min hour dom mon dow}) for the daily
- *     reconciliation. Defaults to {@code 0 0 5 * * *} — 05:00 every day, off-peak. The sync is a
- *     drift-correction safety net, not a live feed: a once-per-day cadence keeps its Keycloak
- *     Admin-API load a single off-peak burst instead of the pre-2026-07 per-minute hammering that
- *     accelerated the native-thread exhaustion incident. Admins who need an immediate refresh use
- *     the "Sync now" button (POST {@code /api/v1/users/sync}) rather than a hot schedule. An
- *     invalid expression fails the context at startup (Spring parses it when wiring
- *     {@code @Scheduled}), so a typo can never silently disable the sync.
- * @param zone the IANA time-zone id {@code cron} is evaluated in. Defaults to {@code Europe/Berlin}
- *     so "05:00" tracks the organisation's local night across DST rather than drifting with the
- *     host's UTC clock.
- * @param adminUrl the Keycloak base URL for the Admin API (e.g. {@code http://localhost:8080})
+ * @param cron the 6-field Spring cron expression of the sync; defaults to {@code 0 0 5 * * *}
+ * @param zone the IANA time zone {@code cron} is evaluated in; defaults to {@code Europe/Berlin}
+ * @param adminUrl the Keycloak base URL for the Admin API
  * @param realm the realm to sync users from
- * @param clientId the client id used for admin access; it must hold the {@code manage-users} or
- *     {@code view-users} role
- * @param clientSecret the client secret used for admin access; never printed by {@link #toString()}
- * @param pageSize the page size for the Keycloak Admin API user listing. {@code GET /users} caps
- *     each response at a server-side maximum (~100 by default), so the sync pages through {@code
- *     first}/{@code max} until a short page returns; without paging it would only ever see the
- *     first page and then wrongly flag every user beyond it as missing. Bounded to a sane range.
+ * @param clientId the admin client id; needs {@code manage-users} or {@code view-users}
+ * @param clientSecret the admin client secret; never printed by {@link #toString()}
+ * @param pageSize the page size used to page through the Admin API user listing
  */
 @Validated
 @ConfigurationProperties(prefix = "app.keycloak.sync")

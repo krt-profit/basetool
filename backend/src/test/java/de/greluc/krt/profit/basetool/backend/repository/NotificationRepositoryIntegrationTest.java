@@ -58,11 +58,8 @@ class NotificationRepositoryIntegrationTest {
   private final Set<UUID> seededRecipients = new HashSet<>();
 
   /**
-   * Creates the {@code app_user} row the recipient id has to point at, unless it already exists.
-   *
-   * <p>Needed since V235: {@code recipient_user_id} is a foreign key to {@code app_user(id)}
-   * (REQ-DATA-008), so the random per-test recipient ids no longer insert on their own. Called from
-   * both {@code save} helpers so every call site keeps working unchanged.
+   * Creates the {@code app_user} row the recipient id must reference, unless it already exists
+   * (REQ-DATA-008).
    *
    * @param recipient the notification's recipient id
    */
@@ -78,12 +75,8 @@ class NotificationRepositoryIntegrationTest {
   }
 
   /**
-   * Removes the users this class created.
-   *
-   * <p>These rows commit (the helpers write through a {@link TransactionTemplate}) into a database
-   * shared by the whole suite, and a leftover login-capable user shifts the totals other classes
-   * assert over -- the terms-acceptance overview counts every one of them. Deleting the user takes
-   * its notifications with it (V235, {@code ON DELETE CASCADE}).
+   * Removes the committed users this class created, cascading to their notifications, so they do
+   * not skew other test classes' totals.
    */
   @AfterEach
   void removeSeededRecipients() {
@@ -201,11 +194,8 @@ class NotificationRepositoryIntegrationTest {
   }
 
   /**
-   * Backdates a row's {@code created_at} through native SQL.
-   *
-   * <p>{@code AbstractEntity.createdAt} is {@code @CreationTimestamp} + {@code updatable = false},
-   * so Hibernate stamps it at insert and ignores any value set on the entity — an aged unread
-   * notification cannot be produced through the mapping at all, only underneath it.
+   * Backdates a row's {@code created_at} through native SQL, since Hibernate ignores the value set
+   * on the entity.
    *
    * @param id the notification to age
    * @param createdAt the creation instant to write
@@ -220,7 +210,6 @@ class NotificationRepositoryIntegrationTest {
                 .executeUpdate());
   }
 
-  // covers REQ-NOTIF-009 — the unread half of the sweep ages from createdAt, not readAt
   @Test
   void deleteUnreadOlderThanDeletesOnlyOldUnreadRows() {
     UUID a = UUID.randomUUID();
@@ -238,12 +227,9 @@ class NotificationRepositoryIntegrationTest {
     assertThat(deleted).isEqualTo(1);
     assertThat(repository.findByIdAndRecipientUserId(oldUnread.getId(), a)).isEmpty();
     assertThat(repository.findByIdAndRecipientUserId(recentUnread.getId(), a)).isPresent();
-    // A read row of the same age belongs to the other window and must survive this statement.
     assertThat(repository.findByIdAndRecipientUserId(oldRead.getId(), a)).isPresent();
   }
 
-  // covers REQ-NOTIF-009 — the unread backlog that used to outlive every stated retention period
-  // is now bounded; this is the regression the two-window sweep was built for
   @Test
   void anUnreadBacklogNoLongerSurvivesIndefinitely() {
     UUID a = UUID.randomUUID();
@@ -259,8 +245,6 @@ class NotificationRepositoryIntegrationTest {
 
   @Test
   void supersedeByTypeAndEntityMatchesTypeAndEntityOnly() {
-    // REQ-NOTIF-018: clearing the created-notifications of a decided request must match by type +
-    // loose entity, span all recipients, and leave other types / other entities untouched.
     UUID staffA = UUID.randomUUID();
     UUID staffB = UUID.randomUUID();
     UUID requestId = UUID.randomUUID();
@@ -279,14 +263,12 @@ class NotificationRepositoryIntegrationTest {
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
             "BANK_BOOKING_REQUEST",
             requestId);
-    // Different type, same entity — must survive (the requester's decision notification).
     Notification decision =
         save(
             staffA,
             NotificationType.BANK_BOOKING_REQUEST_CONFIRMED,
             "BANK_BOOKING_REQUEST",
             requestId);
-    // Same type, different entity — must survive (another still-open request).
     Notification otherRequest =
         save(
             staffA,

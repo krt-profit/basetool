@@ -56,9 +56,8 @@ class ServerConfiguredKeyspaceNotificationsActionTest {
   }
 
   /**
-   * An unreachable store, a refused {@code AUTH} or a timeout surfaces from {@code PING} as a
-   * {@code DataAccessException}, and the action lets it through unchanged so the context refresh
-   * fails — the fail-fast start the {@code CONFIG GET} used to provide.
+   * Verifies that a {@code DataAccessException} from the {@code PING} propagates unchanged, so the
+   * startup fails.
    */
   @Test
   void aFailedPingFailsTheStartup() {

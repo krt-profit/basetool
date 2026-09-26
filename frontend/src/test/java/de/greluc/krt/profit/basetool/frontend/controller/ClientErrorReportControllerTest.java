@@ -49,39 +49,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
 /**
- * Unit tests for {@link ClientErrorReportController}, the server half of the M12 client-error
- * beacon.
+ * Unit tests for {@link ClientErrorReportController}, the server half of the client-error beacon.
  *
- * <p>The endpoint's whole risk profile is that the payload is attacker-controllable <em>and</em>
- * self-triggerable, so the assertions here are deliberately about the guardrails rather than the
- * happy path: the level is the contract (DEBUG, because INFO/WARN would flood and the ERROR path
- * would trip {@code LogbackErrorSpike}), the {@code kind} tag must come from the server-side
- * allowlist so it can never become an unbounded label, a script URL must lose its query string
- * server-side, and control characters in the message must not survive into the log (CWE-117).
+ * <p>Asserts the guardrails for an attacker-controllable payload: logging at DEBUG, a {@code kind}
+ * tag from the server-side allowlist, script URLs stripped of their query string, and control
+ * characters removed (CWE-117).
  */
 class ClientErrorReportControllerTest {
 
   /** The shipped beacon module, read off the test classpath to pin the client/server kind set. */
   private static final String BEACON_MODULE = "/static/js/krt-client-error.js";
 
-  /**
-   * Captures the beacon's payload object literal. It has no nested braces, so the brace-excluding
-   * body class is exact, and neither of the module's {@code JSON.stringify} calls can match it.
-   *
-   * <p>Anchored on the {@code payload} declaration rather than on the {@code JSON.stringify}
-   * argument: since the CSRF-queueing retry the payload is built once and then either delivered or
-   * parked, so it is no longer an inline argument. {@link #BEACON_BODY_IS_THE_PAYLOAD} closes the
-   * gap that opens up — on its own, this pattern would no longer prove the captured literal is what
-   * actually reaches the wire.
-   */
+  /** Captures the beacon's {@code payload} object literal, which has no nested braces. */
   private static final Pattern BEACON_PAYLOAD = Pattern.compile("const payload = \\{([^}]*)\\}");
 
-  /**
-   * The beacon's request body must be the payload object <em>verbatim</em> — not a wrapper, not a
-   * spread with something merged in. Together with {@link #BEACON_PAYLOAD} this is the same
-   * guarantee the single inline-literal match used to give: exactly these five fields leave the
-   * browser.
-   */
+  /** Matches the beacon's request body being exactly the {@link #BEACON_PAYLOAD} object. */
   private static final Pattern BEACON_BODY_IS_THE_PAYLOAD =
       Pattern.compile("body: JSON\\.stringify\\(payload\\)");
 
@@ -139,8 +121,6 @@ class ClientErrorReportControllerTest {
         new ClientErrorReport(
             "boom", "https://app/js/a.js", 1, 2, MetricNames.CLIENT_ERROR_UNHANDLED_REJECTION));
 
-    // The level IS the contract here: this endpoint is self-triggerable at frame rate, so anything
-    // above DEBUG is a log-flood vector and an ERROR would additionally trip LogbackErrorSpike.
     assertThat(appender.list).hasSize(1);
     assertThat(appender.list.getFirst().getLevel()).isEqualTo(Level.DEBUG);
   }
@@ -152,8 +132,6 @@ class ClientErrorReportControllerTest {
         controller.report(new ClientErrorReport("boom", "https://app/js/a.js", 1, 2, kind));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    // Not merely "count stayed 0": no meter must exist at all, or a crafted kind would still
-    // create an unbounded, attacker-chosen label series (REQ-OBS-006).
     assertThat(meterRegistry.find(MetricNames.CLIENT_ERROR).counters()).isEmpty();
   }
 
@@ -190,10 +168,7 @@ class ClientErrorReportControllerTest {
             forged, "https://app/js/a.js", 1, 2, MetricNames.CLIENT_ERROR_RESOURCE_ERROR));
 
     String line = appender.list.getFirst().getFormattedMessage();
-    // No newline may survive: a member pasting one could otherwise fabricate a second log line
-    // that reads as genuine during an incident triage (CWE-117).
     assertThat(line).doesNotContain("\n");
-    // Truncated well below the raw 400+ characters the caller sent.
     assertThat(line.length()).isLessThan(forged.length());
   }
 
@@ -209,9 +184,6 @@ class ClientErrorReportControllerTest {
 
   @Test
   void payloadAcceptsExactlyTheFiveDeclaredFields() {
-    // The record's shape IS the input allowlist — Jackson drops unknown properties, so a field
-    // added here is a field that can reach a log line. Stack traces, document.title, DOM content,
-    // form values and location.search must stay impossible to submit.
     List<String> components =
         Arrays.stream(ClientErrorReport.class.getRecordComponents())
             .map(RecordComponent::getName)
@@ -224,8 +196,6 @@ class ClientErrorReportControllerTest {
   void beaconModuleShipsExactlyTheServerSideKindAllowlist() throws IOException {
     String beacon = readBeaconModule();
 
-    // Both halves of the kind vocabulary drift silently otherwise: a client kind the server does
-    // not know contributes no series at all, and the failure looks exactly like "no errors".
     assertThat(ClientErrorReportController.ALLOWED_KINDS)
         .allSatisfy(kind -> assertThat(beacon).contains("'" + kind + "'"));
     assertThat(beacon).contains("'" + ClientErrorReportController.PATH + "'");
@@ -246,18 +216,11 @@ class ClientErrorReportControllerTest {
       keys.add(key.group(1));
     }
 
-    // The client-side mirror of payloadAcceptsExactlyTheFiveDeclaredFields: the server ignores
-    // extra properties, so a stack trace, document.title, DOM content, a form value or
-    // location.search added to this literal would leave the browser unnoticed before the server
-    // ever got the chance to drop it.
     assertThat(keys).containsExactlyInAnyOrder("kind", "message", "source", "line", "column");
   }
 
   @Test
   void everyKindTheBeaconDeclaresIsOneTheServerAccepts() throws IOException {
-    // The reverse half of beaconModuleShipsExactlyTheServerSideKindAllowlist: a KIND_* the beacon
-    // sends but the server does not know is answered 400 and counted nowhere — the new signal would
-    // look exactly like "no errors of that kind". Both lists move together or this fails.
     String beacon = readBeaconModule();
     Matcher declaration = BEACON_KIND_DECLARATION.matcher(beacon);
     List<String> beaconKinds = new ArrayList<>();
@@ -272,8 +235,6 @@ class ClientErrorReportControllerTest {
 
   @Test
   void beaconListensForCspViolations() throws IOException {
-    // FE-SEC-04: the CSP is enforcing with no report-uri, so this listener is the only way a
-    // blocked inline script / style or a new third-party host ever reaches a server.
     assertThat(readBeaconModule()).contains("addEventListener('securitypolicyviolation'");
   }
 
@@ -294,8 +255,6 @@ class ClientErrorReportControllerTest {
 
   @Test
   void i18nMissingReport_isCountedUnderItsOwnKind() {
-    // Owner decision 2026-09-23: a script that finds no localized string renders the key name and
-    // reports it; the report carries only that key name as its message.
     ResponseEntity<Void> response =
         controller.report(
             new ClientErrorReport(
@@ -307,8 +266,6 @@ class ClientErrorReportControllerTest {
 
   @Test
   void beaconExposesTheMissingTranslationCheck() throws IOException {
-    // Every script's localized strings run through window.krtI18nText, which reports a gap as
-    // i18n_missing and renders the key name instead of a hardcoded default.
     String beacon = readBeaconModule();
     assertThat(beacon).contains("window.krtI18nText = i18nText;");
     assertThat(beacon).contains("report(KIND_I18N_MISSING, name, null, null, null);");
@@ -316,8 +273,6 @@ class ClientErrorReportControllerTest {
 
   @Test
   void cspViolationSource_isReducedToItsOriginServerSide() {
-    // A crafted beacon that skips the client-side reduction still cannot put a path, a query or
-    // user info into the log.
     controller.report(
         new ClientErrorReport(
             "img-src",

@@ -26,10 +26,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One row of a holder's custody history (REQ-BANK-032, ADR-0039): this holder's ledger leg with its
- * transaction context. Unlike the account history, the annotation is the <em>account</em> the money
- * moved on (the account leg whose sign matches this holder leg) and — for a holder→holder Umbuchung
- * — the counter holder.
+ * One row of a holder's custody history (REQ-BANK-032): this holder's ledger leg with the account
+ * it moved on and, for a holder-to-holder Umbuchung, the counter holder.
  *
  * @param postingId the holder leg's id (stable row identity)
  * @param transactionId the owning transaction's id (the reversal target)
@@ -39,16 +37,12 @@ import org.jetbrains.annotations.Nullable;
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for {@code REVERSAL} rows the corrected transaction's id, else
  *     {@code null}
- * @param counterAccountNo the account number this leg moved on
- *     (deposit/withdrawal/transfer/reversal legs), {@code null} for a {@code HOLDER_TRANSFER} or
- *     {@code WIPE_RESET} that touches no account
+ * @param counterAccountNo the account number this leg moved on, {@code null} for a {@code
+ *     HOLDER_TRANSFER} or {@code WIPE_RESET}
  * @param counterAccountName the matching account's name, like {@code counterAccountNo}
- * @param counterHolderHandle for a {@code HOLDER_TRANSFER} the other holder of the Umbuchung,
- *     {@code null} otherwise
- * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
- *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee rows. On an
- *     outgoing leg (amount &lt; 0) the leg is the gross debited, so the destination received {@code
- *     |amount| − transferFee}
+ * @param counterHolderHandle for a {@code HOLDER_TRANSFER} the other holder, else {@code null}
+ * @param transferFee the transfer fee borne by the debited source (REQ-BANK-033), {@code 0} for
+ *     non-fee rows; an outgoing leg is the gross debited amount
  */
 public record BankHolderBookingDto(
     UUID postingId,

@@ -30,16 +30,9 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time parity guard for the subscribe-deny {@code reason} that now rides the {@code denied}
- * control frame.
- *
- * <p>The value is a mirror point in the same sense as the live-sync section maps: the server writes
- * it from {@link MetricNames#SUBSCRIBE_DENY_INDETERMINATE} in {@code LiveSyncWebSocketHandler}, and
- * {@code krt-live-sync.js} compares the received frame against its own literal to decide whether
- * the refusal earns its single reconnect retry. If the two drift, nothing fails and nothing logs:
- * the retry silently stops happening and a transient backend blip is back to permanently stripping
- * live sync from a tab — exactly the defect the reason was introduced to fix. This turns that drift
- * into a red build.
+ * Verifies that the subscribe-deny {@code reason} written from {@link
+ * MetricNames#SUBSCRIBE_DENY_INDETERMINATE} matches the literal {@code krt-live-sync.js} compares
+ * against to decide on its reconnect retry.
  */
 class LiveSyncDenyReasonWireParityTest {
 
@@ -62,10 +55,6 @@ class LiveSyncDenyReasonWireParityTest {
   @Test
   void clientTreatsOnlyTheIndeterminateReasonAsRetryable() throws IOException {
     String js = readResource("/static/js/krt-live-sync.js");
-    // The authorization deny is a real permission verdict and must stay terminal: the client must
-    // not branch on it at all. A literal 'authz' appearing in the module would mean someone taught
-    // the client to react to it, which is the point at which a denied room starts re-subscribing in
-    // a loop against a backend that will keep refusing it.
     assertThat(js)
         .as(
             "krt-live-sync.js must not branch on the terminal '%s' deny reason",

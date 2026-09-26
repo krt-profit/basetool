@@ -64,14 +64,6 @@ import org.springframework.beans.factory.annotation.Autowired;
     uses = {ShipMapper.class, UserMapper.class, OperationMapper.class, SquadronMapper.class})
 public abstract class MissionMapper {
 
-  // MapStruct generates a concrete subclass via the annotation processor; the generated subclass
-  // cannot accept additional constructor parameters, so we fall back to field-level @Autowired
-  // here.
-  // The mapper depends ONLY on the MissionViewerAccess leaf interface (support package), never on
-  // Spring's SecurityContextHolder (ArchUnit mapperLayerShouldNotReachIntoSecurityContext) and —
-  // since the cycle cleanup, ADR-0047 — never on the service layer directly: the implementation
-  // (MissionViewerAccessService) is what wires AuthHelperService + MissionSecurityService, so the
-  // mapper -> service edge that closed the mapper <-> service package cycle is gone.
   @Autowired protected MissionViewerAccess missionViewerAccess;
 
   /**
@@ -82,18 +74,13 @@ public abstract class MissionMapper {
   @Autowired protected UserMapper rosterUserMapper;
 
   /**
-   * Seeds the {@link UserMapper} request memo for every user the full mission DTO embeds as a
-   * {@code UserDto} — each participant's user and each assigned unit's ship owner — in two queries,
-   * before MapStruct maps them one by one (REQ-DATA-003). Without it, each embedded user cost up to
-   * three queries (its Staffel memberships and two squadron loads), so a 30-participant mission
-   * detail issued roughly ninety statements for the roster alone.
+   * Seeds the {@link UserMapper} request memo for every participant user and ship owner of the full
+   * mission DTO in two queries (REQ-DATA-003).
    *
-   * <p>Runs only for the full {@link MissionDto}: the list row and the reference DTO embed no
-   * {@code UserDto}, and touching the lazy {@code participants} / {@code assignedUnits} collections
-   * there would itself be a query per row.
+   * <p>Runs only when the target is {@link MissionDto}.
    *
-   * @param mission the mission about to be mapped; {@code null} is ignored.
-   * @param targetType the DTO type the current mapping method produces.
+   * @param mission the mission about to be mapped; {@code null} is ignored
+   * @param targetType the DTO type the current mapping method produces
    */
   @BeforeMapping
   protected void primeRosterUsers(@Nullable Mission mission, @TargetType Class<?> targetType) {
@@ -113,19 +100,12 @@ public abstract class MissionMapper {
   }
 
   /**
-   * Full {@link Mission} -&gt; DTO mapping. The five {@code resolve*} expressions are applied on
-   * top of the default field copy so the DTO carries the caller-aware projections ({@code canEdit},
-   * {@code canManageManagers}, description redaction below Logistician, participant counts).
+   * Maps a {@link Mission} to its full DTO, adding the caller-aware projections ({@code canEdit},
+   * {@code canManageManagers}, description redaction, participant counts) and the owning org unit
+   * as {@code owningSquadron}.
    *
-   * <p>After R9 Step 2 the mission entity exposes {@code owningOrgUnit} (typed {@code OrgUnit});
-   * the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API
-   * stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
-   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned missions now
-   * surface their SK badge instead of a blank cell.
-   *
-   * @param mission the mission entity to project; {@code null} returns {@code null}.
-   * @return the populated mission DTO.
+   * @param mission the entity to project; {@code null} returns {@code null}
+   * @return the mission DTO
    */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(mission))")
@@ -140,13 +120,11 @@ public abstract class MissionMapper {
   public abstract MissionDto toDto(Mission mission);
 
   /**
-   * Maps a {@link MissionParticipant} entity to its outbound DTO. The {@code orgUnits} target is
-   * filled by {@link #orgUnitsToReferenceDtos(java.util.Set)} so the participant's Staffel and/or
-   * Spezialkommando affiliations surface as a sorted reference list rather than the former single
-   * squadron field.
+   * Maps a {@link MissionParticipant} to its DTO, with the participant's org-unit affiliations as a
+   * sorted reference list.
    *
-   * @param participant the participant entity to project; {@code null} returns {@code null}.
-   * @return the populated participant DTO.
+   * @param participant the entity to project; {@code null} returns {@code null}
+   * @return the participant DTO
    */
   @Mapping(
       target = "orgUnits",
@@ -188,42 +166,24 @@ public abstract class MissionMapper {
   public abstract MissionReferenceDto toReferenceDto(Mission mission);
 
   /**
-   * Slim list-row DTO of a mission; same description redaction as the full DTO. Also routes the
-   * mission's {@code owningOrgUnit} through {@code SquadronMapper.orgUnitToReferenceDto} for the
-   * {@code owningSquadron} DTO slot so the column on the missions list renders without an extra
-   * round-trip, projecting either a Staffel or a Spezialkommando owner into the slim reference.
+   * Maps a mission to its slim list-row DTO, with the same description redaction as the full DTO
+   * and the owning org unit as {@code owningSquadron}.
    *
-   * <p>The registration count is passed in rather than read off {@code mission.getParticipants()}:
-   * that collection is lazy, so touching it once per row would be a SELECT per mission
-   * (REQ-DATA-003). The caller resolves the whole page's counts in one grouped statement ({@code
-   * MissionService.registeredCounts}) and hands each row its own figure.
-   *
-   * @param mission the mission entity to project; {@code null} returns {@code null}.
-   * @param registeredCount how many participants the mission has, zero when it has none.
-   * @return the slim list-row DTO.
+   * @param mission the entity to project; {@code null} returns {@code null}
+   * @param registeredCount the mission's participant count, resolved by the caller for the page
+   * @return the list-row DTO
    */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   @Mapping(target = "owningSquadron", source = "mission.owningOrgUnit")
   @Mapping(target = "registeredCount", expression = "java(registeredCount)")
   public abstract MissionListDto toListDto(Mission mission, long registeredCount);
 
-  // toEntity(MissionDto) has been removed (audit finding C-3, 2026-05-20): the previous mapper
-  // copied id / version / owningSquadron / parent / isInternal straight from the response DTO
-  // into a fresh Mission entity, which made `missionRepository.save(entity)` invoke
-  // EntityManager.merge() and overwrite an attacker-supplied existing row. Write paths now go
-  // through dedicated CreateMissionRequest / UpdateMissionRequest records that physically lack
-  // those fields. The ArchUnit rule {@code missionDtoMustNotBeAcceptedAsRequestBody} keeps this
-  // direction one-way.
-
   /**
-   * Projects a participant's {@code Set<OrgUnit>} affiliations into a deterministically ordered
-   * list of {@link OrgUnitReferenceDto} — Staffel first, then Spezialkommandos alphabetically by
-   * name — mirroring the order {@code OrgUnitMembershipService} uses for membership pickers so the
-   * roster badges and the sign-up picker render consistently. Each org unit's {@code kind} is taken
-   * from the entity's {@code getKind()} discriminator (no lazy-proxy {@code instanceof} pitfall).
+   * Projects org-unit affiliations into {@link OrgUnitReferenceDto}s, Staffel first, then
+   * Spezialkommandos alphabetically by name.
    *
-   * @param orgUnits the participant's affiliations; {@code null} or empty yields an empty list.
-   * @return the sorted reference DTOs; never {@code null}.
+   * @param orgUnits the affiliations; {@code null} or empty yields an empty list
+   * @return the sorted reference DTOs; never {@code null}
    */
   public List<OrgUnitReferenceDto> orgUnitsToReferenceDtos(Set<OrgUnit> orgUnits) {
     if (orgUnits == null || orgUnits.isEmpty()) {
@@ -242,22 +202,11 @@ public abstract class MissionMapper {
   }
 
   /**
-   * Returns the mission description only to squadron members and above; anything below gets {@code
-   * null} (REQ-SEC-009).
+   * Returns the mission description to squadron members and above, and {@code null} to anyone else
+   * (REQ-SEC-009, REQ-SEC-041).
    *
-   * <p>REQ-SEC-041: the gate is membership, not bare authentication. <b>Kept after ADR-0159 as belt
-   * and braces, not as live protection.</b> Its original audience — a role-less {@code GUEST} token
-   * that was authenticated yet an outsider — cannot exist any more: such a token is now refused
-   * with {@code 403 NO_ROLE} before a handler runs (REQ-SEC-053). What it still guards is the
-   * PENDING/REJECTED shape and any future authority set that authenticates without membership. The
-   * defect it was written for is worth remembering: the detail endpoint compensated for an {@code
-   * isAuthenticated()} gate by nulling the description in the redactor, while the list/search rows
-   * ran through no redactor at all — so the same caller read on {@code /api/v1/missions/search} the
-   * free-text planning notes the detail withheld. Gating at the single source is what made both
-   * projections agree.
-   *
-   * @param mission the mission being projected; {@code null} yields {@code null}.
-   * @return the description for a member-or-above caller, otherwise {@code null}.
+   * @param mission the mission being projected; {@code null} yields {@code null}
+   * @return the description for a member-or-above caller, otherwise {@code null}
    */
   @Nullable
   public String resolveDescription(Mission mission) {
@@ -310,11 +259,8 @@ public abstract class MissionMapper {
   }
 
   /**
-   * Sorts crew members of a mission unit so that leadership roles appear first. A crew member is
-   * considered a leader if at least one of its assigned JobTypes is flagged as leadership role
-   * (independent of archetype so CREW and MISSION leadership JobTypes both qualify; MISSION
-   * semantics remain unchanged). Secondary sort is stable by participant display name to keep the
-   * previous alphabetical ordering for non-leaders.
+   * Sorts a mission unit's crew with leaders first (any assigned JobType flagged as leadership),
+   * then by participant display name.
    */
   public List<MissionCrewDto> resolveCrew(MissionUnit unit) {
     if (unit == null || unit.getCrew() == null) {

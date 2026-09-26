@@ -38,13 +38,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time enforcement of the REQ-FE-015 three-mirror-points rule for live-sync section maps: the
- * server-side {@link LiveSyncTopicClass} whitelist and the page's JS seam map must name exactly the
- * same section keys. A key added on one side without the other silently strands peers stale
- * (REQ-FE-010) — this test turns that drift into a red build.
- *
- * <p>Reads the shipped JS module from the classpath ({@code src/main/resources} is on the test
- * runtime classpath), extracts the seam-map keys, and asserts set-equality with the registry.
+ * Enforces the REQ-FE-015 mirror rule: the {@link LiveSyncTopicClass} whitelists and the pages' JS
+ * seam maps name exactly the same section keys.
  */
 class LiveSyncSectionMapParityTest {
 
@@ -75,12 +70,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void ordersQueueSeamMaps_partitionTheOrdersQueueTopicWhitelist() throws IOException {
-    // REQ-ORDERS-034: the global `orders` room is shared by TWO pages that each render a different
-    // fold of the same queue — the order list (`queue`) and the cross-order material-demand
-    // overview (`demand`) — so neither seam map matches the whole whitelist on its own (the
-    // org-structure precedent). Assert both are subsets AND that their union is exactly the
-    // whitelist: the union check is what catches an orphaned registry key no page ever renders,
-    // which a pair of subset assertions alone would let through.
     Set<String> queueKeys = seamMapKeys("/static/js/orders-index.js", "ORDERS_SECTIONS");
     Set<String> demandKeys = seamMapKeys("/static/js/orders-material-demand.js", "DEMAND_SECTIONS");
     Set<String> whitelist = LiveSyncTopicClass.ORDERS_QUEUE.allowedSections();
@@ -101,10 +90,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orderDetailCrossPublish_keepsTheDemandOverviewInSync() throws IOException {
-    // REQ-ORDERS-034: an order's status change adds or removes its whole material contribution to
-    // the demand overview, so the detail page's cross-publish into the `orders` room must carry
-    // `demand` alongside `queue`. The relay drops an unknown key silently, and a missing key leaves
-    // exactly those peers stale with no error (the REQ-FE-010 defect class), so pin both here.
     String js = readResource("/static/js/orders-detail.js");
     assertSendChangedKeysWhitelisted(
         js, "'orders'", LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
@@ -115,11 +100,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryPages_pokeTheDemandOverviewWhenOrderLinkedStockChanges() throws IOException {
-    // REQ-ORDERS-034: the demand overview's `Bestand` column is the order-linked inventory, so an
-    // inventory write that touches an earmarked row must poke `orders`/`demand` as well as the
-    // per-order rooms it already publishes to. Without it a peer's gathering list keeps showing
-    // stock that has already been booked elsewhere. Both Lager pages (inventory-my.js,
-    // inventory-admin.js) publish through the module they share since FE-SIMP-03.
     for (String module : new String[] {"/static/js/inventory-common.js"}) {
       String js = readResource(module);
       assertSendChangedKeysWhitelisted(
@@ -142,8 +122,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void refineryOrderSeamMap_matchesTheRefineryOrderTopicWhitelist() throws IOException {
-    // #1238: the refinery-order detail page broadcasts and receives on refinery-order:{id}; its
-    // REFINERY_ORDER_SECTIONS map drives BOTH sides, so it must match the whitelist exactly.
     Set<String> jsKeys =
         seamMapKeys("/static/js/refinery-orders-details.js", "REFINERY_ORDER_SECTIONS");
     assertThat(jsKeys)
@@ -155,13 +133,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void refineryOrderCrossPublishes_onlyEverSendWhitelistedKeys() throws IOException {
-    // #1238: an earmarked store row changes its job order's material roll-up, so the detail page
-    // cross-publishes to the `order:{id}` room it does not itself render. That raw sendChanged(...)
-    // call is NOT covered by any seam-map parity test, and the relay drops an out-of-whitelist key
-    // silently — leaving exactly those peers stale with no error (the REQ-FE-010 defect class).
-    // `refinery`/`queue` and `inventory`/`stock` are deliberately absent: since #1235 the write
-    // controller publishes both server-side for every refinery mutation, so the client must not
-    // duplicate them.
     String js = readResource("/static/js/refinery-orders-details.js");
     assertSendChangedKeysWhitelisted(
         js, "'order:' \\+ jobOrderId", LiveSyncTopicClass.ORDER.allowedSections());
@@ -172,13 +143,11 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * Asserts every section key of each {@code sendChanged(<topicExpression>, [...])} call in {@code
-   * js} is inside {@code whitelist}, and that at least one such call exists (so a silent rename of
-   * the call site fails the build rather than quietly disabling the check).
+   * Asserts that every section key of each {@code sendChanged(<topicExpression>, [...])} call in
+   * {@code js} is whitelisted, and that at least one such call exists.
    *
    * @param js the module source to scan
-   * @param topicExpressionRegex the regex matching the call's topic argument as written in the
-   *     source
+   * @param topicExpressionRegex the regex matching the call's topic argument as written
    * @param whitelist the topic class's accepted section keys
    */
   private static void assertSendChangedKeysWhitelisted(
@@ -208,11 +177,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void materialCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
-    // #1309: the standalone material-collection page joins order:{id} to refresh its table on a
-    // delivered flip / row move, but renders only a SUBSET of the ORDER sections (it reuses the
-    // existing `materials` key), so it cannot match the full whitelist like orders-detail. Assert
-    // every key it names is a real ORDER section — a stray/typo key the relay would silently drop
-    // (stranding peers stale, REQ-FE-010) still fails the build.
     Set<String> jsKeys =
         seamMapKeys("/static/js/material-collection.js", "MATERIAL_COLLECTION_SECTIONS");
     assertThat(jsKeys)
@@ -224,13 +188,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void itemCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
-    // REQ-ORDERS-031: the standalone Itemsammelübersicht page joins order:{id} to refresh its table
-    // on a delivered flip / row move, but renders only a SUBSET of the ORDER sections (it reuses
-    // the
-    // existing `items` key — the order-detail renders the earmarked stock inline in the items
-    // table), so it cannot match the full whitelist like orders-detail. Assert every key it names
-    // is
-    // a real ORDER section — a stray/typo key the relay would silently drop still fails the build.
     Set<String> jsKeys = seamMapKeys("/static/js/item-collection.js", "ITEM_COLLECTION_SECTIONS");
     assertThat(jsKeys)
         .as(
@@ -241,12 +198,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryInputOrderSeamMap_isASubsetOfTheOrdersQueueWhitelist() throws IOException {
-    // #1740 (REQ-INV-039): the Einbuchen form joins the global `orders` room to re-read the
-    // outstanding need its picker labels carry. It renders a SUBSET of that room — it reuses the
-    // existing `demand` key rather than introducing one — so it cannot match the whole whitelist
-    // the way the two partitioning pages do. Assert the key it names is a real section: the relay
-    // drops an unknown key silently, which would strand every viewer of this form on figures that
-    // never refresh, with no error anywhere (the REQ-FE-010 defect class).
     Set<String> jsKeys =
         seamMapKeys("/static/js/inventory-input.js", "INVENTORY_INPUT_ORDER_SECTIONS");
     assertThat(jsKeys)
@@ -258,10 +209,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryPageOrderSeamMaps_areASubsetOfTheOrdersQueueWhitelist() throws IOException {
-    // #1740 (REQ-INV-039): both Lager pages already PUBLISH to `orders`/`demand`; since the
-    // allocation popover's options carry the outstanding need, they now RECEIVE on it too — an
-    // order-side write (a handover, an edited line) moves that figure without touching any
-    // inventory row, so `inventory`/`stock` alone would leave the popover stale.
     assertThat(seamMapKeys("/static/js/inventory-admin.js", "INVENTORY_ALL_ORDER_SECTIONS"))
         .as("INVENTORY_ALL_ORDER_SECTIONS keys in inventory-admin.js vs the ORDERS_QUEUE whitelist")
         .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
@@ -272,8 +219,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    // #1307: the shared Lager's INVENTORY_ALL_SECTIONS receiver map must mirror the
-    // LiveSyncTopicClass.INVENTORY_ALL whitelist (the broadcast derives its keys from this map).
     Set<String> jsKeys = seamMapKeys("/static/js/inventory-admin.js", "INVENTORY_ALL_SECTIONS");
     assertThat(jsKeys)
         .as(
@@ -284,9 +229,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryMySeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    // #1309: the personal Lager joins the same `inventory` room, so its receiver map must mirror
-    // the
-    // same whitelist (a different container, the same `stock` key).
     Set<String> jsKeys = seamMapKeys("/static/js/inventory-my.js", "INVENTORY_MY_SECTIONS");
     assertThat(jsKeys)
         .as("INVENTORY_MY_SECTIONS keys in inventory-my.js vs LiveSyncTopicClass.INVENTORY_ALL")
@@ -295,7 +237,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryIndexSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    // #1309: the aggregated overview joins the same `inventory` room (receive-only).
     Set<String> jsKeys = seamMapKeys("/static/js/inventory-index.js", "INVENTORY_INDEX_SECTIONS");
     assertThat(jsKeys)
         .as(
@@ -306,7 +247,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryMaterialSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    // #1309: the per-material drilldown joins the same `inventory` room (receive-only).
     Set<String> jsKeys =
         seamMapKeys("/static/js/inventory-material.js", "INVENTORY_MATERIAL_SECTIONS");
     assertThat(jsKeys)
@@ -318,9 +258,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryGameItemSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    // REQ-INV-030: the per-game-item drilldown joins the same `inventory` room (receive-only) —
-    // no new section keys were added for the item views, the single `stock` seam covers both
-    // catalogs.
     Set<String> jsKeys =
         seamMapKeys("/static/js/inventory-game-item.js", "INVENTORY_GAME_ITEM_SECTIONS");
     assertThat(jsKeys)
@@ -332,8 +269,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void missionsListSeamMap_matchesTheMissionsListTopicWhitelist() throws IOException {
-    // #1235: the /missions list joins the global `missions` room (receive-only — its create /
-    // update / delete all redirect, so the broadcast is server-side in MissionWriteController).
     Set<String> jsKeys = seamMapKeys("/static/js/missions.js", "MISSIONS_SECTIONS");
     assertThat(jsKeys)
         .as("MISSIONS_SECTIONS keys in missions.js vs LiveSyncTopicClass.MISSIONS_LIST whitelist")
@@ -342,9 +277,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void refinerySeamMap_matchesTheRefineryTopicWhitelist() throws IOException {
-    // #1235: the /refinery-orders list joins the global `refinery` room (receive-only — every
-    // refinery mutation navigates away, so the broadcast is server-side in
-    // RefineryOrderWriteController).
     Set<String> jsKeys = seamMapKeys("/static/js/refinery-orders-index.js", "REFINERY_SECTIONS");
     assertThat(jsKeys)
         .as("REFINERY_SECTIONS keys in refinery-orders-index.js vs LiveSyncTopicClass.REFINERY")
@@ -353,9 +285,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void membersSeamMap_matchesTheMembersTopicWhitelist() throws IOException {
-    // #1235: the /members Mitgliederverwaltung roster — the surface the issue calls "Rollen" —
-    // joins the ADMIN-gated global `members` room (receive-only; the edit that invalidates the
-    // roster happens on /members/{id}/edit, so the broadcast is server-side).
     Set<String> jsKeys = seamMapKeys("/static/js/members.js", "MEMBERS_SECTIONS");
     assertThat(jsKeys)
         .as("MEMBERS_SECTIONS keys in members.js vs LiveSyncTopicClass.MEMBERS whitelist")
@@ -364,11 +293,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgStructureSeamMaps_partitionTheOrgStructureTopicWhitelist() throws IOException {
-    // #1235: the `org-structure` room is shared by TWO pages that each render part of the one
-    // hierarchy, so neither seam map can match the whole whitelist on its own (the
-    // material-collection precedent). Assert both are subsets AND that their union is exactly the
-    // whitelist — the union check is what catches an orphaned registry key no page ever renders,
-    // which a pair of subset assertions alone would let through.
     Set<String> editorKeys =
         seamMapKeys("/static/js/admin-org-structure.js", "ORG_STRUCTURE_SECTIONS");
     Set<String> chartKeys = seamMapKeys("/static/js/org-chart.js", "ORG_CHART_SECTIONS");
@@ -390,10 +314,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgStructureCrossPublishConstants_nameTheOtherPagesSection() throws IOException {
-    // The two org-structure pages poke EACH OTHER's section by a bare string constant rather than
-    // through their own seam map (publishing needs no subscription, so the key is not in the
-    // publisher's map). A typo there is silently dropped by the relay — the exact REQ-FE-010
-    // "stale peer, no error" failure — so pin both constants against the registry.
     String editorJs = readResource("/static/js/admin-org-structure.js");
     String chartJs = readResource("/static/js/org-chart.js");
     Set<String> whitelist = LiveSyncTopicClass.ORG_STRUCTURE.allowedSections();
@@ -432,8 +352,6 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgUnitAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    // The org-unit account-detail variant carries the SAME bank:{id} section keys as the staff map,
-    // just different sibling containers — so it too must match the BANK_ACCOUNT whitelist.
     Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "ORGUNIT_ACCOUNT_SECTIONS");
     assertThat(jsKeys)
         .as("ORGUNIT_ACCOUNT_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_ACCOUNT whitelist")
@@ -468,13 +386,8 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * The Materialbörse board uses {@code subscribe(topic, {onChanged})} + {@code swapList} rather
-   * than a {@code {container}} seam map, so the generic seam-map parity tests do not cover it (F4).
-   * Pin its <em>broadcast</em> side directly: every {@code
-   * krtLiveSync.sendChanged('materialboard'|MATERIALBOARD_TOPIC, [...])} call across the three
-   * materialboerse modules must send only keys in {@link LiveSyncTopicClass#MATERIALBOARD}'s
-   * whitelist — so a stray out-of-whitelist key (silently dropped by the relay → stale peer) fails
-   * the build instead.
+   * Verifies that every Materialbörse {@code sendChanged} call sends only keys in {@link
+   * LiveSyncTopicClass#MATERIALBOARD}'s whitelist.
    */
   @Test
   void materialboardBroadcasts_onlyEverSendWhitelistedKeys() throws IOException {
@@ -488,11 +401,8 @@ class LiveSyncSectionMapParityTest {
         List.of(
             "/static/js/materialboerse.js",
             "/static/js/materialboerse-release.js",
-            // REQ-MARKET-018: the Gesuche create/edit modal broadcasts the `requests` section key.
             "/static/js/materialgesuch-modal.js",
             "/static/js/inventory-materialboerse.js",
-            // #1309: a stock-reducing inventory write clamps offers, so it pokes the board too.
-            // Both Lager pages send that poke through their shared module (FE-SIMP-03).
             "/static/js/inventory-common.js")) {
       Matcher matcher = sendChanged.matcher(readResource(module));
       while (matcher.find()) {
@@ -514,12 +424,8 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * Build-enforces the <em>broadcast</em> side of the three-mirror-points rule for the bank surface
-   * (F5). Unlike the JS {@code *_SECTIONS} receiver maps (covered above), the bank publish side is
-   * driven by {@code data-livesync="topic/sec,sec …"} HTML attributes evaluated in {@code
-   * publishBankLiveSync} — so a stray out-of-whitelist section there is silently dropped by the
-   * server with no red build. This scans every template for those attributes and asserts each
-   * section key is inside its topic class's whitelist.
+   * Verifies that every section key in a template's {@code data-livesync="topic/sec,…"} attribute
+   * is inside its topic class's whitelist.
    *
    * @throws IOException if a template cannot be read
    * @throws URISyntaxException if the templates classpath root cannot be resolved
@@ -528,9 +434,6 @@ class LiveSyncSectionMapParityTest {
   void dataLivesyncBroadcastKeys_areAllWithinTheirTopicClassWhitelist()
       throws IOException, URISyntaxException {
     Pattern attribute = Pattern.compile("data-livesync=\"([^\"]*)\"");
-    // Anchor on a KNOWN template file rather than the bare `/templates` directory resource
-    // (getResource on a directory is not portable); its parent is the real templates root on the
-    // classpath, and Files.walk covers the subdirectories (admin/, fragments/, …).
     URL anchor = LiveSyncSectionMapParityTest.class.getResource("/templates/bank-grants.html");
     assertThat(anchor).as("/templates/bank-grants.html classpath resource").isNotNull();
     Path templatesRoot = Paths.get(anchor.toURI()).getParent();
@@ -578,10 +481,9 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * Resolves a {@code data-livesync} topic token (its account-id placeholder stripped) to its
-   * {@link LiveSyncTopicClass} by prefix and whether it carries an id segment — so {@code
-   * bank:@account} resolves to the scoped {@link LiveSyncTopicClass#BANK_ACCOUNT} while the bare
-   * {@code bank} resolves to {@link LiveSyncTopicClass#BANK_STAFF}.
+   * Resolves a {@code data-livesync} topic token to its {@link LiveSyncTopicClass} by prefix and
+   * whether it carries an id segment, e.g. {@code bank:@account} to {@link
+   * LiveSyncTopicClass#BANK_ACCOUNT} and {@code bank} to {@link LiveSyncTopicClass#BANK_STAFF}.
    *
    * @param topic the topic token (e.g. {@code bank:@account}, {@code bank}, {@code orgunit-bank})
    * @return the matching class, or {@code null} if none matches
@@ -624,14 +526,8 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * Returns the brace-balanced object-literal body assigned to {@code variableName} (excluding the
-   * outer braces), so nested objects do not terminate the scan early.
-   *
-   * <p>Anchored on the <em>assignment</em> — the first {@code <NAME> = &#123;} — not on the first
-   * bare occurrence of the name (F6). The seam-map name typically appears first in a preceding
-   * comment; a plain {@code indexOf(name)} then {@code indexOf('{')} would silently mis-scan the
-   * wrong span if that comment ever contained a brace (e.g. an {@code operation:&#123;id&#125;}
-   * example), extracting garbage instead of failing loudly.
+   * Returns the brace-balanced object-literal body assigned to {@code variableName}, excluding the
+   * outer braces, anchored on the {@code <NAME> = &#123;} assignment.
    *
    * @param js the full module source
    * @param variableName the seam-map variable name
@@ -643,7 +539,7 @@ class LiveSyncSectionMapParityTest {
     assertThat(declaration.find())
         .as("%s = { assignment present (not just a comment mention)", variableName)
         .isTrue();
-    int open = declaration.end() - 1; // the '{' the assignment regex matched
+    int open = declaration.end() - 1;
     int depth = 0;
     for (int i = open; i < js.length(); i++) {
       char c = js.charAt(i);

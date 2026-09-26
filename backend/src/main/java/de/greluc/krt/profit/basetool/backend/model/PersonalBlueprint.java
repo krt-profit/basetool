@@ -38,19 +38,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * A crafting blueprint a single user (identified by their {@code app_user.id}, stored in {@link
- * #ownerUserId}) has unlocked in-game. Part of the Personal Inventory area (#327), alongside {@link
- * PersonalInventoryItem}.
+ * A crafting blueprint one user ({@link #ownerUserId}) has unlocked in-game; part of the Personal
+ * Inventory area alongside {@link PersonalInventoryItem}.
  *
- * <p>Ownership is modelled <strong>per product</strong>, not per recipe: several SC Wiki blueprint
- * recipes can share one product name, and the SCMDB import only knows the product name, so a single
- * row stands for "I own the blueprint for product X". Identity is the normalized {@link
- * #productKey} (derived from the SC Wiki output name); {@link #productName} keeps the original
- * display spelling and {@link #outputItem} optionally links the resolved {@link GameItem} for later
- * cross-feature use — it is informational, not the identity.
- *
- * <p>The unique constraint on {@code (owner_user_id, product_key)} guarantees a user owns each
- * product at most once. Optimistic locking is inherited via {@link AbstractEntity#getVersion()}.
+ * <p>Ownership is per product, not per recipe: identity is the normalized {@link #productKey},
+ * unique per owner; {@link #productName} keeps the display spelling and {@link #outputItem}
+ * optionally links the resolved {@link GameItem}.
  */
 @Entity
 @Table(
@@ -72,12 +65,9 @@ public class PersonalBlueprint extends AbstractEntity<UUID> {
   private UUID id;
 
   /**
-   * {@code app_user.id} of the owning user. Never expose to clients.
-   *
-   * <p>A plain id rather than a {@code @ManyToOne User}: the column carries a foreign key with
-   * {@code ON DELETE CASCADE} (V235, REQ-DATA-008), and an association would make every row the
-   * cascade removes a managed entity holding a reference to the user being deleted -- the {@code
-   * TransientPropertyValueException} landmine REQ-DATA-008 documents.
+   * {@code app_user.id} of the owning user; never exposed to clients. A plain id rather than an
+   * association so the {@code ON DELETE CASCADE} foreign key can remove rows without managed
+   * references to the deleted user (REQ-DATA-008).
    */
   @Column(name = "owner_user_id", nullable = false)
   private UUID ownerUserId;

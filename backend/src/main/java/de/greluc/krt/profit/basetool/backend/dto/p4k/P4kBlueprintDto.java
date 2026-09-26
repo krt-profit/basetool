@@ -23,27 +23,21 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 /**
- * One crafting-blueprint record from the P4K catalog ({@code CraftingBlueprintRecord} under {@code
- * crafting/blueprints}). Reconciled against the local {@code blueprint} table by {@link #guid} (=
- * {@code scwiki_uuid}) first, then {@link #key} (= {@code scwiki_key}, a {@code BP_CRAFT_*} token).
+ * One crafting-blueprint record from the P4K catalog, matched to {@code blueprint} by {@link #guid}
+ * ({@code scwiki_uuid}) first, then {@link #key} ({@code scwiki_key}).
  *
- * <p>The importer enriches blueprint scalars (fill-if-null) and then resolves <em>existing</em>
- * unresolved {@code blueprint_ingredient} rows by their stored Wiki UUIDs — it does not create
- * blueprints or rewrite ingredient rows from {@link #ingredients}. The {@code slots} array in the
- * source JSON is unconsumed and dropped by {@code @JsonIgnoreProperties}.
- *
- * <p>Any field may be {@code null} when the source DCB did not resolve it.
+ * <p>The importer only fills null blueprint columns; it never creates blueprints or rewrites
+ * ingredient rows. Any field may be {@code null} when the source did not resolve it.
  *
  * @param guid DataForge {@code __ref} GUID (string form of {@code blueprint.scwiki_uuid})
  * @param key blueprint key {@code BP_CRAFT_*}; matches {@code blueprint.scwiki_key}
  * @param path source DCB record path (forensic; not persisted)
  * @param categoryGuid blueprint category GUID (forensic; not persisted)
- * @param producedItemGuid produced item {@code __ref} GUID, resolved against {@code
- *     game_item.external_uuid} and enriched into {@code blueprint.output_item} when currently null
- * @param craftTimeSeconds craft time in seconds, enriched into {@code blueprint.craft_time_seconds}
- *     when currently null
- * @param ingredients ingredient lines (carried for completeness; the resolve step reads the
- *     persisted ingredient UUIDs, not this list)
+ * @param producedItemGuid produced item GUID, resolved against {@code game_item.external_uuid} and
+ *     filled into {@code blueprint.output_item} when null
+ * @param craftTimeSeconds craft time in seconds, filled into {@code blueprint.craft_time_seconds}
+ *     when null
+ * @param ingredients ingredient lines; not read by the importer
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kBlueprintDto(

@@ -22,32 +22,25 @@ package de.greluc.krt.profit.basetool.backend.dto.p4k;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * One ship record from the P4K catalog ({@code EntityClassDefinition} under {@code
- * entities/spaceships}). Reconciled against the local {@code ship_type} table by {@link #guid} (=
- * {@code external_uuid}) first, then a unique case-insensitive {@link #className}, then a
- * case-insensitive {@link #name}.
+ * One ship record from the P4K catalog, matched to {@code ship_type} by {@link #guid} ({@code
+ * external_uuid}) first, then a unique case-insensitive {@link #className}, then a case-insensitive
+ * {@link #name}.
  *
- * <p>{@code @JsonIgnoreProperties(ignoreUnknown = true)} keeps the parse tolerant of catalog
- * additions. Any field may be {@code null} when the source DCB / localization did not resolve it.
- * The importer deliberately does NOT touch crew or SCU on enriched rows; {@link #role}, {@link
- * #career}, {@link #crewSize} and {@link #vehicleDefinition} are forensic only.
+ * <p>Any field may be {@code null}. Crew and SCU columns are never touched.
  *
  * @param guid DataForge {@code __ref} GUID (string form of {@code ship_type.external_uuid})
  * @param className RSI engine class name; matches {@code ship_type.class_name}
  * @param path source DCB record path (forensic; not persisted)
  * @param name English display name; matches {@code ship_type.name}
  * @param nameDe German display name, or {@code null}
- * @param desc English description, enriched into {@code ship_type.description_en} when currently
- *     null
- * @param descDe German description, enriched into {@code ship_type.description_de} when currently
- *     null
+ * @param desc English description, filled into {@code ship_type.description_en} when null
+ * @param descDe German description, filled into {@code ship_type.description_de} when null
  * @param nameKey raw {@code @LOC} name localization key (forensic; not persisted)
  * @param descKey raw {@code @LOC} description localization key (forensic; not persisted)
  * @param role ship role token (forensic; not persisted)
  * @param career ship career token (forensic; not persisted)
- * @param crewSize crew size from {@code displayParams} (forensic; crew columns are left untouched)
- * @param manufacturerGuid manufacturer {@code __ref} GUID, resolved against the manufacturer index
- *     and enriched into {@code ship_type.manufacturer} when currently null
+ * @param crewSize crew size (forensic; not persisted)
+ * @param manufacturerGuid manufacturer GUID, filled into {@code ship_type.manufacturer} when null
  * @param vehicleDefinition vehicle-definition path (forensic; not persisted)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

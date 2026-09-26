@@ -45,12 +45,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the star-system reference table. UEX owns the bulk of the data; this controller
- * adds the admin-mutable CRUD for systems UEX doesn't know about yet.
+ * REST surface for the star-system reference table: UEX owns most rows, admins may manage systems
+ * UEX does not know.
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
+ * gate still wins (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/api/v1/star-systems")
@@ -99,8 +98,6 @@ public class StarSystemController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
     var toCreate = starSystemMapper.toEntity(starSystem);
-    // L-7: never honour a client-supplied id/version on create — a non-null id routes save() to
-    // merge() (UPSERT) and could overwrite another row (same mass-assignment class as H-2).
     toCreate.setId(null);
     toCreate.setVersion(null);
     return starSystemMapper.toDto(starSystemService.createStarSystem(toCreate));

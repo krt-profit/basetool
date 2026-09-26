@@ -41,25 +41,8 @@ import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.server.HttpServer;
 
 /**
- * A pooled HTTP/2 connection must survive being idle for longer than the read timeout.
- *
- * <p><b>This is the regression the first HTTP/2 run actually shipped</b>, and it did not look like
- * a transport problem from the outside. The connector attached a channel-level {@code
- * ReadTimeoutHandler} through {@code doOnConnected}, which bounds silence on a <em>connection</em>.
- * That was harmless while a hundred connections each carried one request: the timeout closed an
- * idle spare. Under HTTP/2 with strict connection reuse one or two connections carry everything and
- * are idle between bursts by design, so the timeout closed the connection the whole application was
- * riding, and whatever was in flight died with {@code PrematureCloseException: Connection
- * prematurely closed BEFORE response}.
- *
- * <p>The symptom was five unrelated E2E write flows failing on {@code window.__krtNoReload},
- * because {@code krtFetch} falls back to a full page reload when a call fails. 169 log lines, none
- * of them carrying a correlation id — which is the tell that the timeout fired with no request in
- * flight.
- *
- * <p>So the assertion is not "a request succeeds" but "the <b>same socket</b> served both", because
- * a connection that was closed and silently replaced would still answer the second request and
- * would still leave the race that broke production behaviour.
+ * Verifies that a pooled HTTP/2 connection survives being idle for longer than the read timeout,
+ * with the same socket serving both requests.
  */
 @SpringBootTest(properties = "app.http.read-timeout=300ms")
 class WebClientHttp2IdleConnectionTest {
@@ -112,8 +95,6 @@ class WebClientHttp2IdleConnectionTest {
     assertThat(get()).isEqualTo("ok");
     assertThat(peers).as("the first call opened exactly one connection").hasSize(1);
 
-    // The idle window the bug needed. Nothing is in flight; with a channel-level ReadTimeoutHandler
-    // armed this is where the connection was closed underneath the pool.
     Thread.sleep(IDLE.toMillis());
 
     assertThat(get()).as("the second call must still be served").isEqualTo("ok");

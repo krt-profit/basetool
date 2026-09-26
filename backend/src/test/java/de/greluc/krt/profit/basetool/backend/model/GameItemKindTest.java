@@ -43,7 +43,6 @@ class GameItemKindTest {
 
   @Test
   void mergeMoreSpecific_incomingGeneric_keepsExistingSpecific() {
-    // The HIGH-2 invariant: a specific kind set by an earlier pass is never downgraded to GENERIC.
     assertEquals(
         GameItemKind.VEHICLE_ITEM,
         GameItemKind.mergeMoreSpecific(GameItemKind.VEHICLE_ITEM, GameItemKind.GENERIC));
@@ -68,7 +67,6 @@ class GameItemKindTest {
 
   @Test
   void mergeMoreSpecific_attachmentNotDowngradedByWeapon() {
-    // Reverse direction: an already-specific WEAPON_ATTACHMENT is not flipped back to WEAPON.
     assertEquals(
         GameItemKind.WEAPON_ATTACHMENT,
         GameItemKind.mergeMoreSpecific(GameItemKind.WEAPON_ATTACHMENT, GameItemKind.WEAPON));

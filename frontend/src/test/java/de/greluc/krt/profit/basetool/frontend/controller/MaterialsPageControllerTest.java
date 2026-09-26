@@ -56,7 +56,6 @@ class MaterialsPageControllerTest {
 
   @Test
   void listMaterials_ShouldAddMaterialsToModel() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -79,10 +78,8 @@ class MaterialsPageControllerTest {
             eq("/api/v1/materials/prices-overview?size=10000&sort=name,asc"), anyTypeRef()))
         .thenReturn(pageResponse);
 
-    // Act
     String viewName = controller.listMaterials(model);
 
-    // Assert
     assertEquals("materials", viewName);
     List<MaterialPriceOverviewDto> materials =
         (List<MaterialPriceOverviewDto>) model.getAttribute("materials");
@@ -93,7 +90,6 @@ class MaterialsPageControllerTest {
 
   @Test
   void listMaterials_ShouldHandleErrorAndAddEmptyListToModel() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -102,10 +98,8 @@ class MaterialsPageControllerTest {
             eq("/api/v1/materials/prices-overview?size=10000&sort=name,asc"), anyTypeRef()))
         .thenThrow(new RuntimeException("API Error"));
 
-    // Act
     String viewName = controller.listMaterials(model);
 
-    // Assert
     assertEquals("materials", viewName);
     List<MaterialPriceOverviewDto> materials =
         (List<MaterialPriceOverviewDto>) model.getAttribute("materials");
@@ -116,7 +110,6 @@ class MaterialsPageControllerTest {
 
   @Test
   void getMaterialDetail_ShouldAddMaterialAndPricesToModel() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -152,8 +145,6 @@ class MaterialsPageControllerTest {
             200,
             true,
             true);
-    // The detail page now page-walks the price list (CatalogPages.fetchAll); a single-page response
-    // (totalPages=1) ends the walk after page 0 (ADR-0102/0103, REQ-UI-015).
     PageResponse<MaterialPriceDto> pageResponse =
         new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, Collections.emptyList());
 
@@ -162,10 +153,8 @@ class MaterialsPageControllerTest {
             anyTypeRef()))
         .thenReturn(pageResponse);
 
-    // Act
     String viewName = controller.getMaterialDetail(id, model);
 
-    // Assert
     assertEquals("material-detail", viewName);
     MaterialDto material = (MaterialDto) model.getAttribute("material");
     assertNotNull(material);
@@ -179,7 +168,6 @@ class MaterialsPageControllerTest {
 
   @Test
   void getMaterialDetail_ShouldHandleErrorAndAddEmptyDataToModel() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -188,10 +176,8 @@ class MaterialsPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
         .thenThrow(new RuntimeException("API Detail Error"));
 
-    // Act
     String viewName = controller.getMaterialDetail(id, model);
 
-    // Assert
     assertEquals("material-detail", viewName);
     assertEquals("error.material.details.load", model.getAttribute("error"));
     assertTrue(((List<MaterialPriceDto>) model.getAttribute("prices")).isEmpty());
@@ -199,7 +185,6 @@ class MaterialsPageControllerTest {
 
   @Test
   void getMatrixOverview_ShouldPopulateFilterLists() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -207,10 +192,8 @@ class MaterialsPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(matrixPage());
 
-    // Act — the shell endpoint only derives the filter source lists; the grid loads separately.
     String viewName = controller.getMatrixOverview(model);
 
-    // Assert
     assertEquals("materials-overview", viewName);
     Collection<String> systems = (Collection<String>) model.getAttribute("starSystems");
     Collection<String> materials = (Collection<String>) model.getAttribute("materialNames");
@@ -222,18 +205,14 @@ class MaterialsPageControllerTest {
 
   @Test
   void getMatrixData_ShouldTagTerminalsWithPlanetCssClass() {
-    // Arrange — three terminals: Hurston (canonical), unknown planet (hash fallback),
-    // no planet at all (Lagrange-style, must land in planet-unknown and sort to the tail).
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
 
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(matrixPage());
 
-    // Act — no filter selection takes the cached (page-walked) unfiltered path.
     MatrixGridDto grid = controller.getMatrixData(null, null, false, false);
 
-    // Assert
     assertNotNull(grid);
     Map<String, String> classByTerminal = new java.util.HashMap<>();
     for (MatrixGridDto.Column col : grid.terminals()) {
@@ -245,25 +224,19 @@ class MaterialsPageControllerTest {
         "expected hash fallback for unknown planet, got: " + classByTerminal.get("FAKE-1"));
     assertEquals(PlanetColorResolver.UNKNOWN_CLASS, classByTerminal.get("JP-Lagrange"));
 
-    // Sort assertion: terminals with a planet come before planet-less ones inside the same
-    // star system. HUR-L1 and FAKE-1 may swap depending on planet-name alphabetical order, but
-    // JP-Lagrange must be last.
     assertEquals("JP-Lagrange", grid.terminals().get(grid.terminals().size() - 1).name());
   }
 
   @Test
   void getMatrixData_ShouldReturnEmptyGridOnError() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
 
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
-    // Act
     MatrixGridDto grid = controller.getMatrixData(null, null, false, false);
 
-    // Assert — failures degrade to an empty grid so the client shows its no-results state.
     assertNotNull(grid);
     assertTrue(grid.terminals().isEmpty());
     assertTrue(grid.groups().isEmpty());
@@ -271,10 +244,6 @@ class MaterialsPageControllerTest {
 
   @Test
   void getMatrixData_withFilters_relaysFilterParamsToBackendPageWalk() {
-    // Arrange — an active filter selection must go through the parameterised (server-side filtered)
-    // page-walk, not the cached unfiltered path (ADR-0105, REQ-UI-014). One material + one system
-    // ⇒ two URI variables; Mockito matches varargs element-wise, and a totalPages=1 response ends
-    // the page-walk after page 0.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
 
@@ -282,14 +251,9 @@ class MaterialsPageControllerTest {
             anyString(), anyTypeRef(), any(), any()))
         .thenReturn(matrixPage());
 
-    // Act — material + system + loading-dock selected; auto-load off.
     MatrixGridDto grid =
         controller.getMatrixData(List.of("Aluminum"), List.of("Stanton"), true, false);
 
-    // Assert — the relayed template carries one placeholder per active filter (values are passed as
-    // URI variables so the WebClient encodes them, never URLEncoder; the wire encoding is pinned by
-    // BackendApiClientHappyPathTest), the page cursor is appended, the inactive boolean is omitted,
-    // and the cached unfiltered path was not consulted.
     assertNotNull(grid);
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), any(), any());
@@ -304,7 +268,6 @@ class MaterialsPageControllerTest {
 
   @Test
   void getMatrixOverview_ShouldHandleBackendError() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -312,10 +275,8 @@ class MaterialsPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
-    // Act
     String viewName = controller.getMatrixOverview(model);
 
-    // Assert
     assertEquals("materials-overview", viewName);
     assertEquals("error.materials.matrix.load", model.getAttribute("error"));
   }

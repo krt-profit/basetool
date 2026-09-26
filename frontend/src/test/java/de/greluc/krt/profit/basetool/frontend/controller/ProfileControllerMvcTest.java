@@ -61,7 +61,6 @@ class ProfileControllerMvcTest {
 
   @Test
   void profile_ShouldSetMonthsInSquadron_WhenJoinDateIsPresent() throws Exception {
-    // Given
     LocalDate joinDate = LocalDate.now().minusMonths(14);
     long expectedMonths = ChronoUnit.MONTHS.between(joinDate, LocalDate.now());
 
@@ -74,7 +73,6 @@ class ProfileControllerMvcTest {
                 "version", 1L,
                 "joinDate", joinDate.toString()));
 
-    // When & Then
     mockMvc
         .perform(get("/profile").with(oidcLogin()))
         .andExpect(status().isOk())
@@ -84,7 +82,6 @@ class ProfileControllerMvcTest {
 
   @Test
   void profile_ShouldNotSetMonthsInSquadron_WhenJoinDateIsAbsent() throws Exception {
-    // Given
     when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(
             Map.of(
@@ -93,7 +90,6 @@ class ProfileControllerMvcTest {
                 "displayName", "TestUser",
                 "version", 1L));
 
-    // When & Then
     mockMvc
         .perform(get("/profile").with(oidcLogin()))
         .andExpect(status().isOk())
@@ -103,7 +99,6 @@ class ProfileControllerMvcTest {
 
   @Test
   void profile_ShouldNotSetMonthsInSquadron_WhenJoinDateIsNull() throws Exception {
-    // Given
     Map<String, Object> userMap = new HashMap<>();
     userMap.put("rank", "Pilot");
     userMap.put("description", "Test");
@@ -113,7 +108,6 @@ class ProfileControllerMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef())).thenReturn(userMap);
 
-    // When & Then
     mockMvc
         .perform(get("/profile").with(oidcLogin()))
         .andExpect(status().isOk())

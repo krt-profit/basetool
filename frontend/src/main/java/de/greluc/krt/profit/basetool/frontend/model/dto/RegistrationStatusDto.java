@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
  * The calling user's own approval status, read once per session to route a {@code PENDING}/{@code
- * REJECTED} user to the waiting-for-approval page (epic #720, Track 1).
+ * REJECTED} user to the waiting-for-approval page.
  *
  * @param approvalStatus the caller's approval lifecycle state ({@code PENDING}/{@code
  *     ACTIVE}/{@code REJECTED})

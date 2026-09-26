@@ -43,23 +43,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins every inbound catalogue DTO to the field names its upstream endpoint actually serves.
+ * Pins every inbound catalogue DTO to the field names its upstream endpoint serves (REQ-DATA-015).
  *
- * <p>Each record here is {@code @JsonIgnoreProperties(ignoreUnknown = true)}, which is the right
- * setting for a third-party feed but turns a mapping mistake into silence: a component bound to a
- * name the payload does not carry decodes to {@code null} on every row of every run, and the sync
- * services then write that {@code null} onto their entities. Three such mappings were live in
- * production until 2026-08-28 — {@code ScWikiDimensionDto}'s {@code x/y/z} (the Wiki serves {@code
- * width/height/length}, so {@code game_item.dimension_x/y/z} never held a value), eleven components
- * of {@link UexVehicleDto} (which additionally cleared what the SC-Wiki vehicle sync had just
- * filled in), and a scattering of {@code code} / {@code slug} fields across the UEX universe DTOs.
- * REQ-DATA-015 / ADR-0148.
- *
- * <p>The key sets below are the union of the keys each live endpoint returned on 2026-08-28. The
- * test asserts one direction only — <b>every mapped name must exist upstream</b> — because the
- * other direction (upstream fields we deliberately do not bind) is an ever-growing choice, not a
- * defect. A failure here means either the mapping is wrong or the upstream renamed something and
- * the key set needs re-capturing against the live API; it never means "add the field".
+ * <p>Asserts one direction only: every mapped name must exist in the captured upstream key set. A
+ * failure means the mapping is wrong or the upstream renamed a field and the key set needs
+ * re-capturing.
  */
 class ExternalCatalogueMappingTest {
 
@@ -607,7 +595,6 @@ class ExternalCatalogueMappingTest {
   @DisplayName("SC Wiki item DTOs bind only names the /api/items payload carries")
   void scWikiItemDtos_bindOnlyServedNames() {
     assertMapsOnlyServedNames(ScWikiItemDto.class, SCWIKI_ITEM_KEYS);
-    // The regression this file exists for: x/y/z is not how the Wiki names a bounding box.
     assertMapsOnlyServedNames(ScWikiDimensionDto.class, SCWIKI_ITEM_DIMENSION_KEYS);
   }
 
@@ -640,11 +627,8 @@ class ExternalCatalogueMappingTest {
   /**
    * Resolves the JSON name a record component binds to.
    *
-   * <p>{@code @JsonProperty} does not list {@code RECORD_COMPONENT} among its targets, so javac
-   * propagates it to the generated field / accessor instead and {@link
-   * RecordComponent#getAnnotation} answers {@code null} for every one of them. Reading only the
-   * component would silently fall back to the Java name and pass this whole test for exactly the
-   * components whose JSON name differs — which is all the ones worth checking.
+   * <p>Reads {@code @JsonProperty} from the generated accessor, because javac does not keep it on
+   * the record component.
    *
    * @param record the declaring record class
    * @param component the component to resolve

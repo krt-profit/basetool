@@ -25,23 +25,14 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for a bank employee confirming a pending booking request (REQ-BANK-023/-040/-041):
- * the holder(s) the employee records, the over-limit owner-approval attestation and the echoed
- * optimistic-locking version to detect a concurrent decision.
+ * Write payload for a bank employee confirming a pending booking request (REQ-BANK-023).
  *
- * <p>For a {@code TRANSFER} request {@link #holderId} is the source holder and {@link
- * #destinationHolderId} the destination holder (both recorded on the booked transfer); for {@code
- * DEPOSIT} / {@code WITHDRAWAL} only {@link #holderId} is used. {@link #ownerApprovalConfirmed}
- * must be {@code true} to confirm a request flagged {@code requiresOwnerApproval} (REQ-BANK-041) —
- * the "approval by the responsible holder obtained" checkbox — and is ignored otherwise.
- *
- * @param holderId the holder recorded for the booked transaction (source holder for a transfer)
+ * @param holderId the holder recorded for the booking; the source holder for a transfer
  * @param destinationHolderId the destination holder for a transfer; {@code null} otherwise
- * @param ownerApprovalConfirmed whether the employee attests the responsible holder's approval was
- *     obtained (required when the request exceeds the requester's limit)
- * @param staffNote the confirming employee's own free-text note ("Notiz Bankmitarbeiter",
- *     REQ-BANK-054) recording internal context for the booking; always optional, snapshotted on the
- *     request and copied onto the transaction the confirmation books
+ * @param ownerApprovalConfirmed the attestation that the responsible holder approved; required for
+ *     a request flagged {@code requiresOwnerApproval} (REQ-BANK-041), ignored otherwise
+ * @param staffNote the confirming employee's optional internal note (REQ-BANK-054), copied onto the
+ *     booked transaction
  * @param version the request's echoed {@code @Version}; a mismatch surfaces as 409
  */
 public record ConfirmBankBookingRequest(

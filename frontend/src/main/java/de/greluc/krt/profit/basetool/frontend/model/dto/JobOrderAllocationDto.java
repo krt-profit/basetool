@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend job-order quantity slice of an inventory entry (Variante C,
- * REQ-INV-027): the amount of an entry's stock earmarked to one job order, rendered as a chip with
- * its amount.
+ * Frontend mirror of the job-order quantity slice of an inventory entry (REQ-INV-027), rendered as
+ * a chip.
  *
  * @param jobOrderId the earmarked job order's id.
  * @param jobOrderDisplayId the earmarked job order's human-facing display id (chip label).

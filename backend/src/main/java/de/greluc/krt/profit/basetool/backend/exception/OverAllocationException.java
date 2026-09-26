@@ -20,19 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * Thrown when a request would allocate more of an inventory entry's quantity to a dimension (its
- * job orders or its missions) than the entry actually holds — Σ of the dimension's slice amounts
- * would exceed the entry's own amount (Variante C, REQ-INV-027, rule R5).
+ * Thrown when an allocation to a dimension (job orders or missions) would exceed the inventory
+ * entry's own amount (REQ-INV-027).
  *
- * <p>Distinct from a plain {@link BadRequestException} (400, malformed input) and from an {@code
- * ObjectOptimisticLockingFailureException} (409, stale version): the request is well-formed and the
- * version is current, but the amount is semantically rejected by a business invariant. Mapped to
- * HTTP {@code 422 Unprocessable Entity} with the stable code {@code OVER_ALLOCATION} by {@link
- * GlobalExceptionHandler}'s generic {@link AppException} dispatch — a status the frontend's {@code
- * krt-fetch.js} surfaces as an inline toast rather than the 409 reload-confirm, so the user can fix
- * the amount without losing their edit.
- *
- * <p>Every accessor is inherited unchanged from {@link AppException}, delegating to {@link
+ * <p>Mapped to {@code 422 Unprocessable Entity} with code {@code OVER_ALLOCATION} via {@link
  * AppExceptionKind#OVER_ALLOCATION}.
  */
 public final class OverAllocationException extends AppException {

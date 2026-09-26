@@ -19,27 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.support;
 
-/**
- * The header naming the member the ingest gateway is acting for (ADR-0129).
- *
- * <p>All that remains of {@code ActingSubjectResolver}. That class resolved the acting subject per
- * call site, which was the design this PR replaced: the subject is now swapped into the {@link
- * org.springframework.security.core.context.SecurityContext} once, by {@code ActingMemberFilter},
- * so nothing downstream resolves anything. Keeping the resolver as dead code would have been worse
- * than deleting it — its Javadoc still promised that the header "cannot grant a role, widen a scope
- * or select an org unit", which is precisely the sentence this change had to amend.
- *
- * <p>Not an enum or a utility with static helpers: there is one constant and no behaviour.
- */
+/** Holds the header naming the member the ingest gateway is acting for (ADR-0129). */
 public final class ActingMemberHeader {
 
   /**
    * Names the member the ingest gateway is acting for.
    *
-   * <p>Must stay identical to {@code BackendImportClient.ON_BEHALF_OF_HEADER} in the ingest module.
-   * The two are separate modules with no shared code, so the literal is duplicated on purpose and
-   * pinned by {@code OnBehalfOfHeaderParityTest} — a rename on one side alone would not fail, it
-   * would silently stop attributing ingest writes to the sending member.
+   * <p>Must equal {@code BackendImportClient.ON_BEHALF_OF_HEADER} in the ingest module, which
+   * {@code OnBehalfOfHeaderParityTest} verifies.
    */
   public static final String ON_BEHALF_OF_HEADER = "X-Ingest-On-Behalf-Of";
 

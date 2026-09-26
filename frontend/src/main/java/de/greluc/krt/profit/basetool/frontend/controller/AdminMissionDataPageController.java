@@ -66,13 +66,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the admin mission-data page ({@code /admin/mission-data}).
- *
- * <p>Manages the three reference catalogs the mission editor depends on: job types, squadrons and
- * frequency types. Each catalog gets CRUD + activate (soft re-enable after delete) endpoints;
- * frequency types additionally support reordering via an AJAX endpoint because their order is
- * surfaced in the UI dropdown. The {@code includeInactive*} query flags control whether
- * soft-deleted entries are listed so admins can find them to re-activate.
+ * Controller for the admin mission-data page ({@code /admin/mission-data}), managing the job-type,
+ * squadron and frequency-type catalogs with create, update, soft delete and re-activate; the {@code
+ * includeInactive*} flags list soft-deleted entries.
  */
 @Controller
 @UsesLayoutModel
@@ -90,26 +86,18 @@ public class AdminMissionDataPageController {
   private final ParallelPageLoader parallelPageLoader;
 
   /**
-   * Renders all three reference catalogs side by side, each fetched <em>completely</em> — every
-   * page, not one capped chunk (REQ-ADMIN-001, ADR-0102). Seeds empty forms when the model does not
-   * already carry one (a previous validation failure rerender). The three catalogs are fetched in
-   * parallel via {@link ParallelPageLoader}; if any individual fetch throws, the corresponding
-   * catalog renders empty and a single shared error message ({@code error.admin.mission.data.load})
-   * is surfaced — same user-visible behaviour as the previous sequential implementation. If a page
-   * walk hits its safety cap, the per-section flags {@code jobTypesTruncated} / {@code
-   * squadronsTruncated} / {@code frequencyTypesTruncated} render a loud warning banner inside the
-   * affected section's results fragment — inside, so the include-inactive AJAX swap re-evaluates it
-   * (REQ-ADMIN-002).
+   * Renders all three complete catalogs, fetched in parallel via {@link ParallelPageLoader}
+   * (REQ-ADMIN-001). A failed catalog renders empty with {@code error.admin.mission.data.load}; a
+   * catalog hitting the page-walk cap sets its {@code *Truncated} flag (REQ-ADMIN-002).
    *
    * @param includeInactiveJobTypes show soft-deleted job types
    * @param includeInactiveSquadrons show soft-deleted squadrons
    * @param includeInactiveFrequencyTypes show soft-deleted frequency types
-   * @param fragment when one of {@code "squadrons-results"} / {@code "jobtypes-results"} / {@code
-   *     "freqtypes-results"} only that section's table fragment is rendered (AJAX include-inactive
-   *     filter swap, REQ-FE-002); otherwise the full page is returned
-   * @param model Thymeleaf model populated with all three lists, all three forms and the toggles
-   * @return the {@code admin/mission-data} view name, or one section's {@code results} fragment for
-   *     an AJAX swap
+   * @param fragment {@code "squadrons-results"}, {@code "jobtypes-results"} or {@code
+   *     "freqtypes-results"} to render only that section's table (REQ-FE-002); otherwise the full
+   *     page
+   * @param model Thymeleaf model populated with the lists, forms and toggles
+   * @return the {@code admin/mission-data} view name, or one section's fragment
    */
   @NotNull
   @GetMapping
@@ -174,9 +162,6 @@ public class AdminMissionDataPageController {
     if (freqsCatalog != null) {
       model.addAttribute("frequencyTypes", freqsCatalog.items());
     }
-    // Per-section flags, not one page-wide OR: each results fragment carries its own banner so
-    // the include-inactive AJAX swap (REQ-FE-002) re-evaluates truncation without a full reload,
-    // and a truncated job-type walk never banners the unaffected squadron/frequency sections.
     model.addAttribute("jobTypesTruncated", jobTypesCatalog != null && jobTypesCatalog.truncated());
     model.addAttribute(
         "squadronsTruncated", squadronsCatalog != null && squadronsCatalog.truncated());
@@ -193,14 +178,11 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Logs a parallel fragment-load failure at the level REQ-OBS-001 mandates. A {@link
-   * BackendServiceException} (wrapped in a {@link CompletionException} by {@link
-   * CompletableFuture#exceptionally}) was already logged once at the {@code BackendApiClient}
-   * boundary, so it stays at DEBUG here — a routine backend blip while this admin page loads must
-   * not re-inflate {@code logback_events_total{level="error"}} and trip {@code LogbackErrorSpike}.
-   * A genuinely unexpected failure is still logged at ERROR.
+   * Logs a parallel fragment-load failure (REQ-OBS-001): a {@link BackendServiceException},
+   * possibly wrapped in a {@link CompletionException}, at DEBUG since {@code BackendApiClient}
+   * already logged it; anything else at ERROR.
    *
-   * @param what short label of the fragment that failed to load (e.g. {@code "job types"})
+   * @param what label of the fragment that failed to load (e.g. {@code "job types"})
    * @param e the throwable handed to {@link CompletableFuture#exceptionally}
    */
   private static void logFragmentLoadFailure(String what, Throwable e) {
@@ -213,11 +195,8 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Fetches the <em>complete</em> job-type catalog from the backend — every page, not one capped
-   * chunk (REQ-ADMIN-001, ADR-0102) — transforms the raw {@code Map} payload into a list of {@link
-   * JobTypeDto} records and sorts the result case-insensitively by name. An empty backend catalog
-   * yields an empty item list; the returned wrapper carries the truncation flag for the page-level
-   * warning banner (REQ-ADMIN-002).
+   * Fetches the complete job-type catalog (REQ-ADMIN-001) as {@link JobTypeDto}s sorted by name,
+   * with the truncation flag (REQ-ADMIN-002).
    */
   @NotNull
   private CompleteCatalog<JobTypeDto> fetchJobTypes(boolean includeInactive) {
@@ -251,11 +230,8 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Fetches the <em>complete</em> squadron catalog from the backend — every page, not one capped
-   * chunk (REQ-ADMIN-001, ADR-0102) — transforms the raw {@code Map} payload into a list of {@link
-   * SquadronDto} records and sorts the result case-insensitively by name. An empty backend catalog
-   * yields an empty item list; the returned wrapper carries the truncation flag for the page-level
-   * warning banner (REQ-ADMIN-002).
+   * Fetches the complete squadron catalog (REQ-ADMIN-001) as {@link SquadronDto}s sorted by name,
+   * with the truncation flag (REQ-ADMIN-002).
    */
   @NotNull
   private CompleteCatalog<SquadronDto> fetchSquadrons(boolean includeInactive) {
@@ -305,15 +281,14 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Creates a new job type. Validation failure re-renders the list page inline with the modal
-   * re-opened (BindingResult stays request-scoped). A 409 surfaces as the dedicated duplicate-name
-   * toast; all other failures redirect with an error query param.
+   * Creates a job type. A validation failure re-renders the page with the modal open; a 409 shows
+   * the duplicate-name toast.
    *
    * @param form job-type form
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used for inline re-rendering
+   * @param model Thymeleaf model for inline re-rendering
    * @param redirectAttributes flash attributes carrier
-   * @return inline list page on failure, otherwise redirect to {@code /admin/mission-data}
+   * @return the list page on validation failure, otherwise redirect to {@code /admin/mission-data}
    */
   @NotNull
   @PostMapping("/job-types")
@@ -323,8 +298,6 @@ public class AdminMissionDataPageController {
       Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render directly; the BindingResult stays request-scoped so it never goes
-      // through a Redis-serialised FlashMap (see RedisSessionConfig).
       model.addAttribute("openModal", "jobtype-modal");
       model.addAttribute("modalAction", "/admin/mission-data/job-types");
       return listData(false, false, false, null, model);
@@ -359,16 +332,15 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Updates an existing job type. Distinguishes optimistic-locking conflict ({@code
-   * concurrency-conflict} problem type) from a duplicate-name 409 so the user gets the right toast
-   * message.
+   * Updates a job type, distinguishing an optimistic-lock conflict from a duplicate-name 409 in the
+   * toast.
    *
    * @param id job-type id
-   * @param form job-type form (carries the version)
+   * @param form job-type form, carrying the version
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used for inline re-rendering
+   * @param model Thymeleaf model for inline re-rendering
    * @param redirectAttributes flash attributes carrier
-   * @return inline list page on failure, otherwise redirect
+   * @return the list page on validation failure, otherwise redirect
    */
   @NotNull
   @PostMapping("/job-types/{id}/update")
@@ -417,13 +389,11 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Soft-deletes a job type. A 409 indicates the type is still referenced by an existing mission;
-   * surfaces as the dedicated "in use" toast so the admin knows the delete is harmless to retry
-   * once the references are cleared.
+   * Soft-deletes a job type; a 409 (still referenced by a mission) shows the "in use" toast.
    *
    * @param id job-type id
    * @param redirectAttributes flash attributes carrier
-   * @return redirect to {@code /admin/mission-data} (optionally with error param)
+   * @return redirect to {@code /admin/mission-data}, optionally with an error parameter
    */
   @NotNull
   @PostMapping("/job-types/{id}/delete")
@@ -448,8 +418,7 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Re-activates a soft-deleted job type. ADMIN-only because re-enabling reference data has wider
-   * effects than a typical OFFICER edit.
+   * Re-activates a soft-deleted job type; admin only.
    *
    * @param id job-type id
    * @param redirectAttributes flash attributes carrier
@@ -475,13 +444,13 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Creates a new squadron. Same validation + 409 handling pattern as {@link #createJobType}.
+   * Creates a squadron, handling validation and 409 like {@link #createJobType}.
    *
    * @param form squadron form
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used for inline re-rendering
+   * @param model Thymeleaf model for inline re-rendering
    * @param redirectAttributes flash attributes carrier
-   * @return inline list page on failure, otherwise redirect
+   * @return the list page on validation failure, otherwise redirect
    */
   @NotNull
   @PostMapping("/squadrons")
@@ -517,15 +486,14 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Updates a squadron. Mirrors {@link #updateJobType} including the optimistic-lock vs
-   * duplicate-name distinction in the 409 handling.
+   * Updates a squadron, handling conflicts like {@link #updateJobType}.
    *
    * @param id squadron id
    * @param form squadron form
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used for inline re-rendering
+   * @param model Thymeleaf model for inline re-rendering
    * @param redirectAttributes flash attributes carrier
-   * @return inline list page on failure, otherwise redirect
+   * @return the list page on validation failure, otherwise redirect
    */
   @NotNull
   @PostMapping("/squadrons/{id}/update")
@@ -625,14 +593,13 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Creates a new frequency type. Same pattern as {@link #createJobType}; new types are appended to
-   * the order by the backend.
+   * Creates a frequency type like {@link #createJobType}; the backend appends it to the order.
    *
    * @param form frequency-type form
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used for inline re-rendering
+   * @param model Thymeleaf model for inline re-rendering
    * @param redirectAttributes flash attributes carrier
-   * @return inline list page on failure, otherwise redirect
+   * @return the list page on validation failure, otherwise redirect
    */
   @NotNull
   @PostMapping("/frequency-types")
@@ -662,17 +629,16 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Updates a frequency type. Optionally toggles {@code active} via the query parameter so the same
-   * endpoint serves both "save edit" and "toggle visibility" without a second mapping. 409
-   * concurrency-conflict surfaces as a dedicated toast.
+   * Updates a frequency type, optionally overriding {@code active}; a concurrency-conflict 409
+   * shows a dedicated toast.
    *
    * @param id frequency-type id
    * @param form frequency-type form
-   * @param active optional active override; defaults to {@code true} when omitted
+   * @param active optional active override; defaults to {@code true}
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used for inline re-rendering
+   * @param model Thymeleaf model for inline re-rendering
    * @param redirectAttributes flash attributes carrier
-   * @return inline list page on failure, otherwise redirect
+   * @return the list page on validation failure, otherwise redirect
    */
   @NotNull
   @PostMapping("/frequency-types/{id}/update")
@@ -712,8 +678,7 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Soft-deletes a frequency type. 409 surfaces as the dedicated "in use" toast (still referenced
-   * by an existing mission).
+   * Soft-deletes a frequency type; a 409 (still referenced by a mission) shows the "in use" toast.
    *
    * @param id frequency-type id
    * @param redirectAttributes flash attributes carrier
@@ -742,9 +707,8 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Re-activates a soft-deleted frequency type. No ADMIN gate here (officers may bring back a
-   * frequency type they previously hid) — diverges intentionally from {@link #activateJobType} and
-   * {@link #activateSquadron}.
+   * Re-activates a soft-deleted frequency type. Unlike {@link #activateJobType} and {@link
+   * #activateSquadron}, not restricted to admins.
    *
    * @param id frequency-type id
    * @param redirectAttributes flash attributes carrier
@@ -784,14 +748,6 @@ public class AdminMissionDataPageController {
       return ResponseEntity.status(500).build();
     }
   }
-
-  // In-place (AJAX) twins (#582). Each is routed ahead of its classic POST->redirect sibling by
-  // the X-Requested-With header, so the no-JS forms keep their redirect fallback. They return 200
-  // on success — the page re-swaps the affected section fragment (the same fragment the
-  // include-inactive filter swaps), which re-renders the correct derived state (active badges,
-  // ordering) and fresh @Version data attributes. A backend conflict is relayed as
-  // application/problem+json so krtFetch toasts the domain message (duplicate / in-use) or offers
-  // the reload-confirm (OPTIMISTIC_LOCK).
 
   /**
    * In-place twin of {@link #createJobType}.

@@ -59,7 +59,6 @@ class PendingRegistrationMailEventListenerTest {
         .when(pendingRegistrationMailService)
         .sendPendingRegistrationMail(event);
 
-    // Best-effort: a mail failure must not propagate out of the after-commit listener.
     listener.onDiscordRegistrationPending(event);
 
     verify(pendingRegistrationMailService).sendPendingRegistrationMail(event);

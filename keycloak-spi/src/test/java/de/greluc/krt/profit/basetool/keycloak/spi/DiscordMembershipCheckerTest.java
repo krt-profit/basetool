@@ -97,7 +97,6 @@ class DiscordMembershipCheckerTest {
   void rateLimited429AfterRetryBudget_failsClosed() throws IOException {
     HttpServer server = start(respond(429, "{\"retry_after\":0}"));
     try {
-      // Zero retry budget => the first 429 denies immediately.
       assertEquals(Result.DENIED_ERROR, check(server, Duration.ofSeconds(2), 0));
     } finally {
       server.stop(0);
@@ -117,7 +116,6 @@ class DiscordMembershipCheckerTest {
               writeResponse(exchange, 200, "{\"roles\":[\"999\"]}");
             });
     try {
-      // 300 ms request timeout against a 2 s server => fail closed.
       assertEquals(Result.DENIED_ERROR, check(server, Duration.ofMillis(300), 0));
     } finally {
       server.stop(0);

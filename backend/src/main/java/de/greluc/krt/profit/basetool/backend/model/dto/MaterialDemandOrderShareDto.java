@@ -25,24 +25,18 @@ import java.util.UUID;
 
 /**
  * One order's share of a material bucket in the cross-order material-demand overview
- * (REQ-ORDERS-034) — the drill-down row a user expands to see <em>which</em> orders make up an
- * aggregated demand figure. Every component is this single order's contribution to the enclosing
- * {@link MaterialDemandRowDto}, so the row's totals are exactly the sum of its shares.
+ * (REQ-ORDERS-034); a {@link MaterialDemandRowDto}'s totals are the sum of its shares.
  *
- * @param jobOrderId the contributing order's surrogate id, so the row can link to its detail page
- * @param displayId the order's human-readable sequential number, the label a user recognises
- * @param status the order's status; always a non-terminal one ({@code OPEN} or {@code IN_PROGRESS})
- *     because the overview never aggregates completed or rejected orders
- * @param type the order kind this share came from — {@code MATERIAL} for a direct material line,
- *     {@code ITEM} for a blueprint-derived requirement — so the UI can explain why an order without
- *     visible material lines still contributes demand
- * @param requiredAmount this order's <b>outstanding</b> required amount for the bucket: the
- *     material line's remaining {@code amount} for a {@code MATERIAL} order (handovers already
- *     decrement it), or the not-yet-manufactured share for an {@code ITEM} order
- * @param bookedAmount the inventory linked to <em>this</em> order for the bucket's material at or
- *     above its quality floor; {@code 0.0} when nothing is linked
- * @param claimedAmount the amount squadrons have collectively claimed on this order's bucket;
- *     {@code 0.0} for a squadron-responsible order, which carries no claims
+ * @param jobOrderId the contributing order's id
+ * @param displayId the order's human-readable sequential number
+ * @param status the order's status; always {@code OPEN} or {@code IN_PROGRESS}
+ * @param type the order kind this share came from: {@code MATERIAL} or blueprint-derived {@code
+ *     ITEM}
+ * @param requiredAmount this order's outstanding required amount for the bucket
+ * @param bookedAmount the inventory linked to this order for the bucket at or above its quality
+ *     floor; {@code 0.0} when none
+ * @param claimedAmount the amount claimed on this order's bucket; {@code 0.0} for a
+ *     squadron-responsible order
  */
 public record MaterialDemandOrderShareDto(
     UUID jobOrderId,

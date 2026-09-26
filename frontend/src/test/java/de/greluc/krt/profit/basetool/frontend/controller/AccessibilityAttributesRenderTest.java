@@ -37,19 +37,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the two page-wide accessibility attributes that {@code AccessibilitySmokeE2eTest} gates on
- * but that only the heavyweight ephemeral-stack e2e run otherwise exercises: the {@code <html
- * lang>} attribute (axe {@code html-has-lang}) and the icon-only hamburger button's {@code
- * aria-label} (axe {@code button-name}). Both live in every standalone page — the hamburger inline
- * in each {@code <header>}, the {@code lang} on each {@code <html>} — so rendering the anonymous
- * {@code GET /} index through the full Thymeleaf pipeline is a representative, fast regression
- * guard that survives in plain {@code :frontend:test} (no Docker, no browser). Assertions are
- * locale-agnostic (regex find, not literal copy) so they hold whichever default locale the test
- * context resolves.
+ * Renders the anonymous {@code GET /} index and checks the {@code <html lang>} attribute and the
+ * hamburger button's {@code aria-label}, the two page-wide attributes the accessibility e2e test
+ * gates on.
  *
- * <p>Mirrors {@link HomeControllerMvcTest}'s setup: the two collaborators the index render path
- * touches are mocked, and the {@code /api/v1/missions/search} next-7-days lookup is stubbed to
- * {@code null} (the valid "no upcoming missions" response).
+ * <p>Setup mirrors {@link HomeControllerMvcTest}; assertions are locale-agnostic.
  */
 @SpringBootTest
 class AccessibilityAttributesRenderTest {

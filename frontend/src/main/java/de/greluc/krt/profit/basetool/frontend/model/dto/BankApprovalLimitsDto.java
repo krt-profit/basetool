@@ -25,22 +25,18 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of an account's per-tier approval limits (REQ-BANK-041), shared by both
- * account-detail surfaces: the read-only figures everyone may see plus the editor structure
- * (available role buckets + whether the calling surface may edit). A tier missing from {@link
- * #roleLimits} / a {@code null} {@link #allMembersLimit} / a user not in {@link #userLimits} means
- * unlimited (no approval needed).
+ * Frontend mirror of an account's per-tier approval limits (REQ-BANK-041): the configured limits
+ * plus the editor structure. A missing or {@code null} limit means unlimited.
  *
  * @param canEdit whether the calling surface may set/clear limits
  * @param configurable whether this account type carries per-audience approval limits at all
  * @param allMembersSupported whether the all-members tier applies to this account
- * @param areaMembersSupported whether the "Mitglieder des Bereichs" cascade tier applies — only for
- *     AREA (Bereichskonto) accounts (REQ-BANK-048)
+ * @param areaMembersSupported whether the "Mitglieder des Bereichs" tier applies, only for AREA
+ *     accounts (REQ-BANK-048)
  * @param availableRoleCodes the role buckets that may carry a limit, in display order
  * @param roleLimits the configured role-bucket limits, keyed by role code
  * @param allMembersLimit the configured all-members limit, or {@code null}
- * @param areaMembersLimit the configured "Mitglieder des Bereichs" cascade limit, or {@code null}
- *     (REQ-BANK-048)
+ * @param areaMembersLimit the configured "Mitglieder des Bereichs" limit, or {@code null}
  * @param userLimits the configured individual-user limits, with resolved display names
  */
 public record BankApprovalLimitsDto(

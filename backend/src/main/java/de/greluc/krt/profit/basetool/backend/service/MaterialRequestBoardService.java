@@ -59,26 +59,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read/projection half of the Materialbörse Gesuche (wanted-listings) board — the request-side
- * sibling of {@link MaterialExchangeBoardService} (REQ-MARKET-015…, ADR-0116). It owns every
- * caller-visible read (the paged board, the tab counts, the single-request detail) plus the
- * supplier-anonymity redaction and the request→DTO mapping.
+ * Read half of the Materialbörse Gesuche board (REQ-MARKET-015, ADR-0116): the paged board, tab
+ * counts and request detail, plus the supplier-anonymity redaction.
  *
- * <p><b>Board scope:</b> the board is org-wide — every {@code ACTIVE} request is visible to every
- * member regardless of the request's owning org unit; there is no OrgUnit scope filter. Only real
- * members reach this service (the controller gates reads on {@code KRT_MEMBER}).
- *
- * <p><b>Anonymity (REQ-MARKET-019):</b> the supplier names ("Ich kann liefern") are disclosed only
- * to the request's owner; every other viewer sees only the count. The redaction lives here, in
- * {@link #detailDto(MaterialExchangeRequest, UUID)} — a name list is loaded only when the viewer is
- * the owner.
- *
- * <p><b>Write→read seam:</b> {@link #detailDto(MaterialExchangeRequest, UUID)} and {@link
- * #detail(UUID)} are public because the write half ({@link MaterialRequestService}) injects this
- * service to project its own mutation results through the very same redaction — a one-way
- * write→read dependency, so no cycle. Called from inside a write transaction the projection joins
- * that transaction (propagation {@code REQUIRED}), so the class-level {@code readOnly} flag only
- * takes effect for the standalone reads that start their own transaction.
+ * <p>The board is org-wide with no OrgUnit scope filter. Supplier names are disclosed only to the
+ * request's owner (REQ-MARKET-019). {@link MaterialRequestService} projects its mutation results
+ * through this service, joining its write transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -109,10 +95,8 @@ public class MaterialRequestBoardService {
   private final UserMapper userMapper;
 
   /**
-   * Reads each requesting member's badge-kind memberships ({@link #BADGE_KINDS}: {@code SQUADRON} /
-   * {@code SPECIAL_COMMAND} / {@code BEREICH}) so the board can render <b>all</b> of the
-   * requester's affiliation badges after the username — batch-loaded to stay N+1-free across a
-   * board page.
+   * Batch-loads each requesting member's badge-kind memberships so the board shows all of the
+   * requester's affiliation badges without N+1.
    */
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
 
@@ -124,21 +108,19 @@ public class MaterialRequestBoardService {
   private final OrgUnitRepository orgUnitRepository;
 
   /**
-   * Returns a page of the board — the "Alle Gesuche" tab, or the caller's own requests for the
-   * "Meine Gesuche" tab — applying the toolbar filters and sort. Supplier counts and the viewer's
-   * own signals are batch-loaded so the list has no N+1; supplier names are never included in a
-   * list DTO.
+   * Returns a page of the board, either all requests or the caller's own, with the toolbar filters
+   * and sort applied; list DTOs never carry supplier names.
    *
    * @param tab {@code "mein"} for the caller's own requests, anything else (incl. {@code null}) for
-   *     all requests.
-   * @param query a free-text fragment matched against the material/item name and the owner's
-   *     handle, or {@code null}/blank for no text filter.
-   * @param minQuality the inclusive minimum quality floor (0/{@code null} disables the filter).
-   * @param minAmount the inclusive minimum desired quantity, or {@code null} for no amount filter.
-   * @param sort the sort key — {@code qual} (default) / {@code menge} / {@code mat} / {@code neu}.
-   * @param page the zero-based page index.
-   * @param size the page size (clamped to {@value MaterialExchangeQueryParams#MAX_PAGE_SIZE}).
-   * @return the matching page of board requests.
+   *     all requests
+   * @param query text matched against material/item name and owner handle, or {@code null}/blank
+   *     for none
+   * @param minQuality inclusive minimum quality floor; 0/{@code null} disables the filter
+   * @param minAmount inclusive minimum desired quantity, or {@code null} for none
+   * @param sort the sort key: {@code qual} (default) / {@code menge} / {@code mat} / {@code neu}
+   * @param page the zero-based page index
+   * @param size the page size (clamped to {@value MaterialExchangeQueryParams#MAX_PAGE_SIZE})
+   * @return the matching page of board requests
    */
   public PageResponse<MaterialRequestDto> board(
       @Nullable String tab,
@@ -221,14 +203,12 @@ public class MaterialRequestBoardService {
   }
 
   /**
-   * Builds the viewer-relative detail DTO, loading the supplier names only when the viewer owns the
-   * request (anonymity gate, REQ-MARKET-019). Public so the write half ({@link
-   * MaterialRequestService}) can project a just-mutated request through the identical redaction
-   * without duplicating it (write→read, no cycle).
+   * Builds the viewer-relative request detail, loading supplier names only when the viewer owns the
+   * request (REQ-MARKET-019).
    *
-   * @param request the request to project.
-   * @param viewerId the requesting member, or {@code null} if unresolved.
-   * @return the request detail.
+   * @param request the request to project
+   * @param viewerId the requesting member, or {@code null} if unresolved
+   * @return the request detail
    */
   @NotNull
   public MaterialRequestDto detailDto(MaterialExchangeRequest request, @Nullable UUID viewerId) {
@@ -331,16 +311,12 @@ public class MaterialRequestBoardService {
   }
 
   /**
-   * Batch-resolves each given member's org-unit affiliation badges for the board — every {@link
-   * #BADGE_KINDS} ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH}) membership the
-   * member holds, ordered by {@link #ORG_UNIT_BADGE_ORDER} (Staffel(n), then Spezialkommando(s),
-   * then Bereich(e), each name-sorted). Two queries total regardless of page size — one membership
-   * batch, one org-unit batch — so the board stays free of the per-request N+1 (REQ-DATA-003). A
-   * dangling membership whose org unit no longer resolves is dropped.
+   * Batch-resolves the given members' Staffel, Spezialkommando and Bereich badges in two queries,
+   * ordered by {@link #ORG_UNIT_BADGE_ORDER}; memberships whose org unit no longer resolves are
+   * dropped.
    *
-   * @param ownerIds the requesting members whose affiliations to resolve; an empty set yields an
-   *     empty map.
-   * @return owner id → their ordered affiliation badges; members with no membership are absent.
+   * @param ownerIds the requesting members; an empty set yields an empty map
+   * @return owner id to ordered badges; members without memberships are absent
    */
   @NotNull
   private Map<UUID, List<OrgUnitReferenceDto>> ownerOrgUnitBadges(Set<UUID> ownerIds) {
@@ -377,13 +353,11 @@ public class MaterialRequestBoardService {
   }
 
   /**
-   * Sort rank of an org-unit kind for the affiliation-badge order: Staffel (0) before
-   * Spezialkommando (1) before Bereich (2). The Organisationsleitung (3) is never queried into a
-   * badge (it is absent from {@link #BADGE_KINDS}); it is ranked last only to keep the switch
-   * exhaustive.
+   * Sort rank of an org-unit kind for badges: Staffel, Spezialkommando, Bereich, then
+   * Organisationsleitung.
    *
-   * @param kind the org-unit kind.
-   * @return the badge sort rank (lower sorts first).
+   * @param kind the org-unit kind
+   * @return the badge sort rank (lower sorts first)
    */
   private static int badgeRank(OrgUnitKind kind) {
     return switch (kind) {

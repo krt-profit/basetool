@@ -39,34 +39,12 @@ import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.representations.IDToken;
 
 /**
- * OIDC protocol mapper that emits the {@code discord_user_id} claim from the user's <em>federated
- * identity link</em> rather than from an imported user attribute.
+ * OIDC protocol mapper that emits the {@code discord_user_id} claim from the user's Discord
+ * federated identity link (REQ-DATA-006).
  *
- * <p>This is the steady-state source of the Discord-link claim (epic #720 / REQ-DATA-006). The
- * older approach mapped a {@code discord_user_id} <em>user attribute</em> (written by {@link
- * DiscordUserAttributeMapper} only on the federation <em>import</em> path) into the token. That
- * attribute is written exclusively when Keycloak <em>creates</em> a user from the Discord
- * federation — i.e. for accounts that <em>registered</em> via Discord. An existing credential
- * account that links Discord later (same Keycloak subject, federated identity added afterwards)
- * goes through {@code updateBrokeredUser}, which the JSON attribute mapper only honours under sync
- * mode {@code FORCE}, and never on a pure credential login — so its attribute (and therefore the
- * claim) stayed empty and the admin member list showed no Discord icon for it.
- *
- * <p>Reading the {@link FederatedIdentityModel} instead removes that whole class of false
- * negatives: the link exists for <strong>every</strong> linked user regardless of how or when it
- * was established (Discord registration, first-broker-login account link, or account-console
- * linking), and the claim is computed at token-issuance time, so it is present on
- * <strong>every</strong> login method — including a pure username/password login that never
- * performs a Discord broker round-trip. The backend persists the claim onto {@code
- * app_user.discord_user_id} unchanged (it still reads the same claim name). The Discord user id
- * stored in the federated link is the Discord snowflake — the exact value the legacy importer
- * stored.
- *
- * <p>Registered via {@code META-INF/services/org.keycloak.protocol.ProtocolMapper}. Add it to the
- * {@code basetool-frontend} client (dedicated scope) so the claim rides the issued tokens; the
- * configured {@link #CONFIG_IDP_ALIAS identity-provider alias} must match the Discord IdP's alias
- * ({@code discord}). The raw snowflake is never logged here — only mapped into the token the
- * backend already consumes.
+ * <p>The claim is computed at token issuance, so it is present for every linked user and every
+ * login method. The configured {@link #CONFIG_IDP_ALIAS identity-provider alias} must match the
+ * Discord IdP's alias. The Discord id is never logged.
  */
 public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
     implements OIDCAccessTokenMapper, OIDCIDTokenMapper, UserInfoTokenMapper {
@@ -87,12 +65,7 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
   /** Default token claim name; the backend reads exactly this claim ({@code discord_user_id}). */
   public static final String DEFAULT_CLAIM_NAME = "discord_user_id";
 
-  /**
-   * The admin-console configuration of this mapper, frozen once built. It used to be a
-   * public-facing mutable {@code ArrayList} handed straight out of {@link #getConfigProperties()},
-   * so any caller inside the Keycloak JVM could add to or clear the definition every mapper
-   * instance shares.
-   */
+  /** The mapper's admin-console configuration properties, shared by all instances and immutable. */
   private static final @Unmodifiable List<ProviderConfigProperty> CONFIG_PROPERTIES =
       buildConfigProperties();
 
@@ -117,8 +90,6 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
     OIDCAttributeMapperHelper.addIncludeInTokensConfig(
         properties, DiscordFederatedIdentityMapper.class);
 
-    // Pre-fill the claim name with the value the backend expects, so a hand-added mapper that is
-    // saved without editing the field still emits the right claim.
     for (ProviderConfigProperty property : properties) {
       if (OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME.equals(property.getName())) {
         property.setDefaultValue(DEFAULT_CLAIM_NAME);
@@ -155,18 +126,14 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
   }
 
   /**
-   * Resolves the user's Discord federated-identity link and, when present, writes its id into the
-   * configured claim. A user with no Discord link (or a link carrying a blank id) leaves the token
-   * untouched, so the claim is simply absent — exactly the "not linked" signal the backend treats
-   * as {@code null}. Reads the link directly from the user store, so it is independent of how the
-   * link was created and of the IdP mapper sync mode.
+   * Writes the id of the user's Discord federated identity link into the configured claim; without
+   * a link or with a blank id the claim is omitted.
    *
-   * @param token the token being assembled (access, id, or userinfo).
-   * @param mappingModel this mapper instance's realm configuration (claim name, alias, token
-   *     flags).
-   * @param userSession the active user session whose {@link UserModel} owns the federated link.
-   * @param keycloakSession the current Keycloak session, used for the realm and the user store.
-   * @param clientSessionCtx the client session context (unused; required by the contract).
+   * @param token the token being assembled (access, id or userinfo)
+   * @param mappingModel this mapper's realm configuration
+   * @param userSession the user session whose {@link UserModel} owns the federated link
+   * @param keycloakSession the current Keycloak session, used for the realm and user store
+   * @param clientSessionCtx the client session context; unused
    */
   @Override
   protected void setClaim(

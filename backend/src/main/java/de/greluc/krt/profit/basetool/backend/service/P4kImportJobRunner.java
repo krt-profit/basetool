@@ -33,19 +33,13 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Runs an enqueued {@link de.greluc.krt.profit.basetool.backend.model.P4kImportJob} on the
- * single-thread {@code @Async} import executor, off the request thread, so the upload returns
- * immediately and the admin page polls the job for progress. It only orchestrates: every state
- * change and the heavy parse-and-reconcile live behind transactional proxies ({@link
- * P4kImportJobService} and {@link P4kImportService}) and are invoked here cross-bean so those
- * proxies actually apply.
+ * single-thread {@code @Async} import executor, delegating every state change and the
+ * parse-and-reconcile work to the transactional {@link P4kImportJobService} and {@link
+ * P4kImportService}.
  *
- * <p>Flow per run: mark {@code RUNNING} (own transaction, so polling sees it at once), parse and
- * reconcile in {@link P4kImportService} (its own transaction; for APPLY an all-or-nothing
- * read-write one), then mark {@code SUCCEEDED} with the serialized result, or {@code FAILED} with
- * the reason if anything threw. The reconcile transaction is separate from the status writes so
- * that a rolled-back apply does not also revert the {@code RUNNING} / {@code FAILED} bookkeeping.
- * In the {@code finally} block an APPLY reclaims its (now-consumed) payload and every run prunes
- * the job history; housekeeping failures are logged, never allowed to mask the run's own outcome.
+ * <p>Each run marks the job {@code RUNNING}, reconciles in a separate transaction, then marks it
+ * {@code SUCCEEDED} or {@code FAILED}. Afterwards an APPLY reclaims its payload and every run
+ * prunes the job history; housekeeping failures are only logged.
  */
 @Component
 @RequiredArgsConstructor
@@ -69,9 +63,6 @@ public class P4kImportJobRunner {
   @Async(AsyncConfig.IMPORT_EXECUTOR)
   public void run(@NotNull UUID jobId, @NotNull P4kImportJobKind kind, boolean seedNew) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
-    // Whether the APPLY reconcile transaction actually committed (its own @Transactional; a normal
-    // return means committed). Gates the cache eviction below so it fires iff master data changed —
-    // never for a PREVIEW and never for an apply that rolled back.
     boolean appliedMasterData = false;
     try {
       jobService.markRunning(jobId);
@@ -86,26 +77,18 @@ public class P4kImportJobRunner {
       jobService.markSucceeded(jobId, objectMapper.writeValueAsString(result));
       log.info("P4K import job {} ({}) succeeded.", jobId, kind);
     } catch (BadRequestException e) {
-      // Expected bad-catalog input — the message is enough; a stacktrace would just be noise.
       log.warn("P4K import job {} ({}) failed: {}", jobId, kind, e.getMessage());
       jobService.markFailed(jobId, describe(e));
     } catch (Exception e) {
-      // Genuinely unexpected (parse NPE, DB constraint, ...): keep the stacktrace for root-causing.
       log.warn("P4K import job {} ({}) failed", jobId, kind, e);
       jobService.markFailed(jobId, describe(e));
     } finally {
       if (kind == P4kImportJobKind.APPLY) {
         if (appliedMasterData) {
-          // The apply runs on the import executor, outside the UEX / SC Wiki scheduler sweeps, so
-          // it
-          // has no @CacheEvict of its own — evict the master-data caches it rewrote (materials,
-          // manufacturers, ship types, blueprint family index) so the changes are visible on the
-          // next read instead of after the 12 h TTL (REQ-DATA-011, CACHE-SYNC-EVICT-001).
           safely(
               cacheEvictionService::evictP4kSyncedMasterData,
               "evict P4K-synced master-data caches");
         }
-        // The apply ran against its own payload copy and is terminal — reclaim the bytes now.
         safely(() -> jobService.deletePayload(jobId), "delete payload");
       }
       safely(jobService::pruneOldJobs, "prune old jobs");

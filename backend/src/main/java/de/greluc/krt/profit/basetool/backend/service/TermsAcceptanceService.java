@@ -50,14 +50,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * Records and answers Terms-of-Use consent (REQ-SEC-028).
  *
- * <p>The read side sits on the request path of <em>every</em> authenticated API call, because the
- * gate covers the relayed ingest traffic as well as the web UI. It is therefore backed by a cache
- * that only ever stores {@code true}. That asymmetry is deliberate and is what keeps the cache
- * correct across instances: acceptance is monotonic within a process (the version in force cannot
- * change without a restart — see {@link TermsVersionProvider}), so a cached {@code true} can never
- * become stale, whereas a cached {@code false} would keep blocking a user who accepted on a
- * <em>different</em> instance until the entry expired. A user who has not accepted pays one indexed
- * lookup per request, which is the path where they are being refused anyway.
+ * <p>The read side runs on every authenticated API call and is backed by a cache that stores only
+ * {@code true}; that stays correct across instances because consent to the version in force is
+ * monotonic.
  */
 @Slf4j
 @Service
@@ -87,21 +82,10 @@ public class TermsAcceptanceService implements TermsConsentCheck {
   private final TermsVersionProvider termsVersionProvider;
   private final MeterRegistry meterRegistry;
 
-  /**
-   * How long a positive verdict may outlive the read that produced it.
-   *
-   * <p>The cache stores only {@code true}, and consent is monotonic within a version, so a stale
-   * entry cannot wrongly refuse anyone — it can only wrongly admit, and only if the entry was wrong
-   * to begin with. A bound in time exists so that "wrong to begin with" is survivable: an unbounded
-   * positive lives for the process lifetime, which for this application means until the next
-   * deploy.
-   */
+  /** How long a cached positive verdict may outlive the read that produced it. */
   private static final Duration CACHE_TTL = Duration.ofMinutes(30);
 
-  /**
-   * Users known to have accepted the version currently in force. Only {@code true} is ever stored
-   * (see the class comment); the value type exists solely because the cache API needs one.
-   */
+  /** Users known to have accepted the version in force; only {@code true} is ever stored. */
   private final Cache<UUID, Boolean> acceptedCache =
       Caffeine.newBuilder().maximumSize(CACHE_MAX_ENTRIES).expireAfterWrite(CACHE_TTL).build();
 
@@ -124,18 +108,8 @@ public class TermsAcceptanceService implements TermsConsentCheck {
   /**
    * Reports whether the user has accepted the wording currently in force.
    *
-   * <p>Deliberately <strong>not</strong> {@code @Transactional}. This runs on every authenticated
-   * {@code /api/**} request, and a transactional annotation here would put the proxy boundary
-   * <em>outside</em> the cache probe — so every request in the app would begin and commit a
-   * transaction even when the answer came from memory and no statement was ever issued. Hibernate's
-   * delayed connection acquisition keeps a JDBC connection out of it, but the {@code EntityManager}
-   * plus begin/commit is pure overhead on the hottest path there is.
-   *
-   * <p>Dropping it costs nothing: the miss path is a single {@code exists} query, and Spring Data's
-   * own repository proxy already wraps every query method in a read-only transaction. So the
-   * transaction still exists exactly where a statement is issued — it just no longer wraps the
-   * cache hit that issues none. A self-proxy indirection to keep an explicit annotation would add
-   * machinery for no behaviour.
+   * <p>Deliberately not {@code @Transactional}, so a cache hit on this hot path opens no
+   * transaction.
    *
    * @param userId the user's {@code app_user.id}, i.e. the Keycloak {@code sub}
    * @return {@code true} if consent for the current version is on record
@@ -156,10 +130,7 @@ public class TermsAcceptanceService implements TermsConsentCheck {
   /**
    * Records the user's consent to the wording currently in force.
    *
-   * <p>Idempotent in both directions: an in-process repeat is short-circuited by {@link
-   * #hasAcceptedCurrentTerms}, and a genuine race between two instances is absorbed by catching the
-   * {@code uq_terms_acceptance_user_version} violation. Neither writes a second history row, which
-   * is what keeps the log readable as evidence.
+   * <p>Idempotent: a repeat or a cross-instance race never writes a second history row.
    *
    * @param userId the accepting user's {@code app_user.id}, i.e. the Keycloak {@code sub}
    * @return {@code true} if this call wrote a new acceptance, {@code false} if consent already
@@ -180,38 +151,18 @@ public class TermsAcceptanceService implements TermsConsentCheck {
     try {
       termsAcceptanceRepository.save(acceptance);
     } catch (DataIntegrityViolationException e) {
-      // Another instance recorded the same consent between the check and this insert. The row that
-      // matters exists either way, so treat it as already-accepted rather than surfacing a 500.
-      // NOT cached here: this transaction is now aborted, and whether the other instance's row is
-      // actually committed is not knowable from inside it. The next request re-reads and caches
-      // the truth at the cost of one `exists` query.
       log.debug("Concurrent terms acceptance for the same user and version; keeping the first");
       return false;
     }
     cacheAfterCommit(userId);
     meterRegistry.counter(MetricNames.TERMS_ACCEPTANCES).increment();
-    // No callsign or e-mail (REQ-OBS-004); the sub is already the MDC userId on this request.
     log.info("Terms of Use accepted, version {}", currentVersion());
     return true;
   }
 
   /**
-   * Records the positive verdict only once the transaction that justifies it has committed.
-   *
-   * <p>The write used to happen inline, which put it on the failure path as well as the success
-   * path. {@code TermsAcceptance} carries an assigned {@code @Id} and no {@code @Version}, so
-   * {@code save()} issues no SQL of its own — the insert, and therefore any constraint violation it
-   * trips, surfaces at <strong>commit</strong>, after this method has returned. A caller whose
-   * insert failed there was cached as consenting for the process lifetime, with no row to show for
-   * it, and the consent gate (REQ-SEC-028) then waved them through until the next deploy.
-   *
-   * <p>The foreign key to {@code app_user} makes that reachable rather than theoretical: any
-   * subject without a local row trips it. Deferring the write to {@code afterCommit} means a
-   * rolled-back acceptance leaves no trace in memory either, which is the only state in which the
-   * cache and the table cannot disagree.
-   *
-   * <p>Falls back to writing inline when no transaction is active, so the method stays correct if a
-   * future caller invokes it outside one.
+   * Caches the positive verdict only after the transaction that recorded it has committed, or
+   * immediately when no transaction is active.
    *
    * @param userId the user whose consent was just recorded
    */
@@ -244,23 +195,12 @@ public class TermsAcceptanceService implements TermsConsentCheck {
   }
 
   /**
-   * Rewrites a sort property into the explicit JPQL alias path it belongs to.
-   *
-   * <p>Spring Data appends a {@link Pageable}'s sort to the query resolved against its
-   * <em>root</em> — here {@code User u}. {@code acceptedAt} does not live on {@code User} but on
-   * the outer-joined {@code TermsAcceptance ta}, so passing it through unchanged makes Hibernate
-   * reject the whole query with {@code Could not resolve attribute 'acceptedAt' of User}. That is a
-   * 500 on the one sort an admin most obviously wants — "who accepted most recently" — and it
-   * surfaces only at runtime, which is why {@code TermsAcceptanceQueryDataTest} pins it.
-   *
-   * <p>{@link JpaSort#unsafe} is safe here despite the name: the caller's property never reaches
-   * the query, only the fixed path this map returns, and an unmapped property is rejected outright
-   * rather than passed along.
+   * Rewrites the sort properties into the JPQL alias paths they belong to, since {@code acceptedAt}
+   * lives on the joined {@code TermsAcceptance} rather than the {@code User} root.
    *
    * @param pageable the requested page, whose sort properties the controller already whitelisted
    * @return an equivalent pageable whose sort names aliased paths
-   * @throws IllegalArgumentException if a property has no mapping — a whitelist/mapping mismatch is
-   *     a programming error, not user input
+   * @throws IllegalArgumentException if a property has no mapping
    */
   private static @NotNull Pageable withAliasedSort(@NotNull Pageable pageable) {
     if (pageable.getSort().isUnsorted()) {

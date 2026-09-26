@@ -20,11 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Result of the internal Discord account-existence precheck (REQ-SEC-022): a single boolean fact
- * and nothing else. Deliberately carries no account details — the SPI only needs to know whether to
- * deny the first-broker-login and point the user at account linking.
+ * Result of the Discord account-existence precheck (REQ-SEC-022).
  *
- * @param exists {@code true} iff at least one existing account matches the supplied Discord
- *     username / server nickname (against username or display name) or e-mail
+ * @param exists {@code true} iff an existing account matches the supplied name or e-mail
  */
 public record DiscordAccountExistenceResponse(boolean exists) {}

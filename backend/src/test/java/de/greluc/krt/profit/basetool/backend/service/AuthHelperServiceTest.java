@@ -53,15 +53,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
- * Unit tests for {@link AuthHelperService} — the sole sanctioned reader of {@link
- * SecurityContextHolder} in this codebase. ArchUnit forbids every other service / mapper /
- * controller from touching the static security context, so the behaviour of this class is
- * load-bearing for every {@code @PreAuthorize} decision in the backend. The previous test coverage
- * of these branches was effectively zero; this suite exercises each one.
+ * Unit tests for {@link AuthHelperService}, the only sanctioned reader of {@link
+ * SecurityContextHolder}.
  *
- * <p>{@link SecurityContextHolder} state is bound to the calling thread, so every test must restore
- * an empty context on teardown to avoid cross-test leakage when the suite is run with a shared
- * thread.
+ * <p>Each test restores an empty security context on teardown.
  */
 @ExtendWith(MockitoExtension.class)
 class AuthHelperServiceTest {
@@ -80,16 +75,11 @@ class AuthHelperServiceTest {
     SecurityContextHolder.clearContext();
   }
 
-  // ---------------------------------------------------------------------
-  // currentAuthentication() — null + anonymous filtered out, real returned
-  // ---------------------------------------------------------------------
-
   @Nested
   class CurrentAuthenticationTests {
 
     @Test
     void returnsEmpty_whenSecurityContextHolderHasNoAuth() {
-      // setSecurityContext default is an empty context (auth==null)
       assertTrue(helper.currentAuthentication().isEmpty());
     }
 
@@ -120,10 +110,6 @@ class AuthHelperServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // currentUserId() — reads the SUBJECT through the seam, never the principal name
-  // ---------------------------------------------------------------------
-
   @Nested
   class CurrentUserIdTests {
 
@@ -140,15 +126,8 @@ class AuthHelperServiceTest {
     }
 
     /**
-     * A caller whose {@code getName()} is a UUID but who carries no subject yields empty.
-     *
-     * <p>The behaviour this accessor changed. It used to read {@link Authentication#getName()} and
-     * parse it, so this returned the id; since ADR-0129 it asks {@code AuthenticatedSubject}, which
-     * accepts a JWT subject or an authentication that opts in via {@code SubjectAuthentication} and
-     * nothing else. That narrowing is the point: {@code getName()} is a callsign on such a token,
-     * and REQ-OBS-004 keeps callsigns out of everything this id feeds. Unreachable in production —
-     * the backend is a pure resource server — but this is the accessor with ~53 call sites behind
-     * it, so the contract is pinned rather than assumed.
+     * A caller whose {@link Authentication#getName()} is a UUID but who carries no subject yields
+     * empty (ADR-0129).
      */
     @Test
     void yieldsEmptyForAPrincipalNameThatMerelyLooksLikeAnId() {
@@ -186,10 +165,6 @@ class AuthHelperServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // rawAuthentication() — passes through whatever is bound, including null + anonymous
-  // ---------------------------------------------------------------------
-
   @Nested
   class RawAuthenticationTests {
 
@@ -223,10 +198,6 @@ class AuthHelperServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // isAuthenticated() — all three negation paths + the positive path
-  // ---------------------------------------------------------------------
-
   @Nested
   class IsAuthenticatedTests {
 
@@ -250,8 +221,6 @@ class AuthHelperServiceTest {
       AnonymousAuthenticationToken anon =
           new AnonymousAuthenticationToken(
               "key", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
-      // Anonymous tokens internally are isAuthenticated()==true, so the
-      // anonymous-check is what saves us.
       SecurityContextHolder.getContext().setAuthentication(anon);
 
       assertFalse(helper.isAuthenticated());
@@ -268,29 +237,19 @@ class AuthHelperServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // hasReachableRole() — auth-null short-circuit, direct match, hierarchy match, miss
-  // ---------------------------------------------------------------------
-
   @Nested
   class HasReachableRoleTests {
 
     @Test
     void falseWhenContextIsEmpty_withoutConsultingRoleHierarchy() {
-      // setUp left the context empty.
       assertFalse(helper.hasReachableRole("ROLE_ADMIN"));
 
-      // Critical: an empty context must NOT invoke the role hierarchy at all
-      // (otherwise we leak auth-context-state to the hierarchy and risk an NPE
-      // when running with `SecurityContextHolder.MODE_INHERITABLETHREADLOCAL`).
       verify(roleHierarchy, never()).getReachableGrantedAuthorities(any());
     }
 
     @Test
     void trueWhenAuthorityIsDirectlyHeld() {
       authContextWith("ROLE_OFFICER");
-      // RoleHierarchy spelled out below — the hierarchy reaches ROLE_OFFICER
-      // from itself (identity reach), nothing else.
       stubHierarchyReaches(List.of("ROLE_OFFICER"));
 
       assertTrue(helper.hasReachableRole("ROLE_OFFICER"));
@@ -298,7 +257,6 @@ class AuthHelperServiceTest {
 
     @Test
     void trueWhenAuthorityIsReachableViaHierarchy() {
-      // Mirrors the production config: ROLE_ADMIN > ROLE_LOGISTICIAN.
       authContextWith("ROLE_ADMIN");
       stubHierarchyReaches(List.of("ROLE_ADMIN", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
 
@@ -318,8 +276,6 @@ class AuthHelperServiceTest {
 
     @Test
     void rolePrefixIsLiteral_noFallbackResolution() {
-      // hasReachableRole must compare strings verbatim — passing "LOGISTICIAN"
-      // (without the ROLE_ prefix) must NOT silently match "ROLE_LOGISTICIAN".
       authContextWith("ROLE_LOGISTICIAN");
       stubHierarchyReaches(List.of("ROLE_LOGISTICIAN"));
 
@@ -334,18 +290,9 @@ class AuthHelperServiceTest {
       authContextWith("ROLE_KRT_MEMBER");
       stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
 
-      // role parameter is @NotNull; calling with null is a programmer error
-      // that should not be silently swallowed. (String.equals(null) returns
-      // false rather than throwing, so the resulting return value is false;
-      // we assert that to lock in the "null returns false" behaviour rather
-      // than relying on an undocumented exception.)
       assertFalse(helper.hasReachableRole("ROLE_NONEXISTENT"));
     }
   }
-
-  // ---------------------------------------------------------------------
-  // isLogisticianOrAbove() — shortcut for hasReachableRole("ROLE_LOGISTICIAN")
-  // ---------------------------------------------------------------------
 
   @Nested
   class IsLogisticianOrAboveTests {
@@ -384,15 +331,10 @@ class AuthHelperServiceTest {
 
     @Test
     void falseWhenNobodyIsLoggedIn() {
-      // No context bound at all -> false, hierarchy never consulted.
       assertFalse(helper.isLogisticianOrAbove());
       verify(roleHierarchy, never()).getReachableGrantedAuthorities(any());
     }
   }
-
-  // ---------------------------------------------------------------------
-  // isAdminOrOfficer() — the programmatic twin of Roles.ADMIN_OR_OFFICER (BE-SIMP-07)
-  // ---------------------------------------------------------------------
 
   @Nested
   class IsAdminOrOfficerTests {
@@ -415,7 +357,6 @@ class AuthHelperServiceTest {
 
     @Test
     void falseForARoleTheTwoImplyButThatImpliesNeither() {
-      // MISSION_MANAGER sits below both in the hierarchy; reaching it must not count.
       authContextWith("ROLE_MISSION_MANAGER");
       stubHierarchyReaches(List.of("ROLE_MISSION_MANAGER"));
 
@@ -428,11 +369,6 @@ class AuthHelperServiceTest {
       verify(roleHierarchy, never()).getReachableGrantedAuthorities(any());
     }
   }
-
-  // ---------------------------------------------------------------------
-  // isMemberOrAbove() — the "mission outsider" predicate (its negation): false for anonymous and
-  // for an authenticated role-less GUEST; true for every registered-member / elevated role.
-  // ---------------------------------------------------------------------
 
   @Nested
   class IsMemberOrAboveTests {
@@ -456,12 +392,6 @@ class AuthHelperServiceTest {
 
     @Test
     void falseForARoleLessAccount() {
-      // The authority was ROLE_GUEST until V239 deleted the role; ROLE_NO_ROLE is the marker that
-      // replaced it (REQ-SEC-053). What the case pins is unchanged — holding it is not membership
-      // — but the account carrying it no longer reaches anything at all:
-      // PendingApprovalAccessFilter
-      // refuses it with 403 NO_ROLE before a handler runs, so isMemberOrAbove() answering false is
-      // now defence in depth rather than the decision.
       authContextWith("ROLE_NO_ROLE");
       stubHierarchyReaches(List.of("ROLE_NO_ROLE"));
 
@@ -503,18 +433,12 @@ class AuthHelperServiceTest {
 
     @Test
     void trueForContextualLogisticianWithoutSquadronMemberRole() {
-      // A user promoted via an org-unit is_logistician flag carries ROLE_LOGISTICIAN even without a
-      // KRT_MEMBER realm role — they are still an insider, not an outsider.
       authContextWith("ROLE_LOGISTICIAN");
       stubHierarchyReaches(List.of("ROLE_LOGISTICIAN"));
 
       assertTrue(helper.isMemberOrAbove());
     }
   }
-
-  // ---------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------
 
   private void authContextWith(String... roles) {
     Authentication auth =

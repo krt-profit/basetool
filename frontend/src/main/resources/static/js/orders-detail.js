@@ -17,46 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Page module for the job-order detail page (templates/orders-detail.html), extracted verbatim
- * from the former three end-of-body inline script blocks (#924 Part 2).
- *
- * Covers: the material-handover and item-handover modals (lazy inventory cache, dynamic row
- * builder, amount validation, AJAX submit via krtOrderWrite + in-place section re-swaps), order
- * date localization (re-run on every krt:swapped), the edit-modal material-row editor, the
- * krtOrderWrite conflict-aware write wrapper, the delete / edit / claim / status /
- * blueprint-variant-counting flows, handover-report download and preview, the per-material
- * inventory drill-down, the delegated krtEvents od-* / claim-* bindings, and the assignee
- * ("Bearbeiter") section IIFE with its bespoke oaSend fragment swap and oa-* bindings.
- *
- * Localized strings and per-request server values come from the th:inline bootstrap block that
- * precedes this script's loader tag in orders-detail.html; this file must load as a classic
- * synchronous script at the same end-of-body position, never with defer.
- */
-
 /* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
 
-// ---- Live multi-user sync — the order detail page (REQ-FE-010 / REQ-FE-015, ADR-0094) ---------
-// A peer's status / edit / handover / claim / assignee change re-renders the affected order-detail
-// section fragment in place for every other viewer of the SAME order, over the shared /ws/sync
-// order room. Only opaque section keys cross the wire; each viewer re-pulls its own
-// authorization-checked (and, for a requesting owner, redacted) fragment. Its keys mirror the server
-// LiveSyncTopicClass.ORDER whitelist, and the same map drives both the write-side broadcast and the
-// receive-side refresh (the three-mirror-points rule). ORDER_SECTIONS is that single source of truth.
 const ORDER_SECTIONS = {
     header: { container: '#order-header-results', fragmentValue: 'header' },
     kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },
     materials: { container: '#order-materials-results', fragmentValue: 'materials' },
     aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
     items: { container: '#order-items-results', fragmentValue: 'items' },
-    // The earmarked item stock is now rendered inline in each ordered item's expand row (part of the
-    // `items` fragment), so the `item-stock` wire key — still broadcast by the Lager pages
-    // (`inventory-my.js` / `inventory-admin.js` broadcastOrdersChanged) and still whitelisted on the
-    // relay — re-renders the items section. Keeping the key aliased (rather than dropping it) means
-    // those external broadcasters need no change and stay in sync.
     'item-stock': { container: '#order-items-results', fragmentValue: 'items' },
     handovers: { container: '#order-handovers-results', fragmentValue: 'handovers' },
     'item-handovers': {
@@ -76,7 +47,7 @@ const ORDER_SECTIONS = {
 
 (function () {
     if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
-        return; // no-JS / no-foundation: the classic forms + the bespoke swaps below run unchanged.
+        return;
     }
     const orderSeam = window.krtFetch.sectionWrite({
         dict() {
@@ -92,7 +63,6 @@ const ORDER_SECTIONS = {
         pageUrl() {
             return window.orderId ? '/orders/' + window.orderId : null;
         },
-        // Tell other users viewing THIS order that these sections changed (REQ-FE-015).
         broadcast(keys) {
             if (
                 window.orderId &&
@@ -103,17 +73,9 @@ const ORDER_SECTIONS = {
             }
         },
     });
-    // krtRefreshOrderSection re-renders one or more sections in place (and broadcasts unless
-    // {broadcast:false}); krtNotifyOrderChanged broadcasts only (for handlers that already swapped
-    // their own DOM, e.g. the assignee section's bespoke outerHTML swap in oaSend).
     window.krtRefreshOrderSection = orderSeam.refresh;
     window.krtNotifyOrderChanged = orderSeam.notify;
 
-    // Inbound peer changes: subscribe to order:{id} on /ws/sync and re-fetch the affected section
-    // fragments locally with {broadcast:false} so an applied peer change never echoes back. The
-    // receiver's default busy-guard holds a refresh while any of this page's modals is open (edit,
-    // handover, claim, note, status-warning) and shows the deferred-refresh pill instead of yanking
-    // the DOM; a missing container (order-kind- or requesterView-gated) is silently skipped.
     if (window.orderId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
         window.krtLiveSync.createReceiver({
             topic: 'order:' + window.orderId,
@@ -134,21 +96,12 @@ const ORDER_SECTIONS = {
     }
 })();
 
-// Cross-publish the staff order queue (the `orders` global room) after a mutation that changes an
-// order's queue-visible fields — status, edit, delete. Publishing needs no subscription (the
-// sanctioned cross-topic case): the detail page subscribes to order:{id}, not to `orders`, yet every
-// queue viewer must still see the change. A non-profit requester is refused the room server-side, so
-// the key reaches only viewers who may read the queue.
-// `demand` rides along because the cross-order material-demand overview (REQ-ORDERS-034) is a fold
-// of exactly these orders: a status change into or out of OPEN/IN_PROGRESS adds or removes an
-// order's whole material contribution, and an edit changes the amounts it contributes.
 function _publishOrdersQueue() {
     if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
         window.krtLiveSync.sendChanged('orders', ['queue', 'demand']);
     }
 }
 
-// Serialize the material-handover modal form to the JSON its AJAX twin binds (#575).
 function _serializeHandoverForm() {
     const items = [];
     document
@@ -178,7 +131,6 @@ function _serializeHandoverForm() {
     };
 }
 
-// Serialize the item-handover modal's per-line whole-unit amounts to the JSON its twin binds.
 function _serializeItemHandoverForm() {
     const entries = [];
     document.querySelectorAll('#item-handover-modal .item-handover-line').forEach(function (line) {
@@ -196,22 +148,16 @@ function _serializeItemHandoverForm() {
     };
 }
 
-// Variante C (REQ-INV-027): a handover for THIS order (window.orderId) may draw only from the
-// entry's own earmark to this order — never from a sibling order's slice or the free rest. Returns
-// that slice's amount (0 when the entry carries no slice for this order), used as the handover cap.
 function orderSliceAmount(inv) {
     if (!inv || !Array.isArray(inv.jobOrderAllocations)) return 0;
     const slice = inv.jobOrderAllocations.find((a) => a.jobOrderId === window.orderId);
     return slice && typeof slice.amount === 'number' ? slice.amount : 0;
 }
 
-// Formats a handover amount whole (no decimals) for a PIECE material, three decimals for SCU —
-// matches the inventory chip / krtScuInput convention so the picker never shows "5.000" for pieces.
 function _handoverFmtAmount(n, isPiece) {
     return isPiece ? String(Math.round(n)) : Number(n).toFixed(3);
 }
 
-// Whether the entry selected in a handover row holds a PIECE-counted material.
 function _handoverRowIsPiece(row) {
     const sel = row.querySelector('select');
     const inv = sel ? cachedInventoryItems.find((i) => i.id === sel.value) : null;
@@ -247,8 +193,7 @@ async function openHandoverModal() {
 }
 
 /**
- * Substitutes `{0}`, `{1}`, … in a localized template with the given values, in order — the
- * bundle strings of ORDER_HANDOVER_I18N carry their placeholders MessageFormat-style.
+ * Substitutes the MessageFormat-style `{0}`, `{1}`, … in a localized template with the values.
  *
  * @param {string} template the localized template
  * @param {Array<unknown>} values the values for {0}, {1}, …
@@ -338,18 +283,11 @@ function addHandoverItemRow() {
             }
             _refreshHandoverMissionPicker(row);
         });
-        // The mission "Herkunft" picker's visibility depends on the handed amount vs the mission
-        // rest, so re-evaluate it on every amount keystroke too.
         amtInput.addEventListener('input', () => _refreshHandoverMissionPicker(row));
     }
     container.appendChild(row);
 }
 
-// Renders / refreshes a handover row's mission "Herkunft" picker (Variante C, REQ-INV-027). Shown
-// only when the selected entry is earmarked to two or more missions AND the handed amount cannot come
-// entirely from the not-yet-assigned mission rest — i.e. only when the mission clamp is ambiguous.
-// Inputs default to 0, meaning the backend auto-clamps (rest-first, then proportional); a non-zero
-// input directs that much of the handed amount out of that mission's earmark.
 function _refreshHandoverMissionPicker(row) {
     const sel = row.querySelector('select');
     const amtInput = row.querySelector('input[data-scu-decimal]');
@@ -375,8 +313,6 @@ function _refreshHandoverMissionPicker(row) {
         holder.style.borderTop = '1px solid var(--color-gray-3)';
         row.appendChild(holder);
     }
-    // Rebuild the inputs only when the selected entry changed, so an amount keystroke never clobbers
-    // what the user already typed into the mission fields.
     if (holder.getAttribute('data-entry') !== inv.id) {
         holder.setAttribute('data-entry', inv.id);
         holder.textContent = '';
@@ -426,8 +362,6 @@ function _refreshHandoverMissionPicker(row) {
     _updateHandoverMissionRest(row);
 }
 
-// Recomputes a row's mission "from rest" hint and flags (danger) a plan the mission rest cannot
-// cover, so the submit validation and the visible chip agree.
 function _updateHandoverMissionRest(row) {
     const holder = row.querySelector('[data-role="mission-herkunft"]');
     const sel = row.querySelector('select');
@@ -459,8 +393,6 @@ function _updateHandoverMissionRest(row) {
           );
 }
 
-// Collects a handover row's mission "deduct from" plan from its picker (only inputs > 0), or null
-// when the row has no picker / no positive input (the backend then auto-clamps the mission dimension).
 function _collectHandoverMissionReductions(row) {
     const holder = row.querySelector('[data-role="mission-herkunft"]');
     if (!holder) return null;
@@ -499,9 +431,6 @@ function validateHandoverAmounts() {
             showFrontendErrorToast(msg);
             return false;
         }
-        // Variante C (REQ-INV-027): if the mission "Herkunft" picker is showing, its plan must be
-        // applyable — each input within its slice, the total not exceeding the handed amount, and the
-        // missions absorbing at least what the mission rest cannot (else the backend 422s).
         const holder = row.querySelector('[data-role="mission-herkunft"]');
         if (holder) {
             const missionRest = typeof inv.missionRest === 'number' ? inv.missionRest : 0;
@@ -561,27 +490,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
                 onSuccess(order) {
-                    // Patch the edit-modal @Version (the handover may auto-complete + bump it);
-                    // the status select gets its fresh version from the header swap below.
                     const editVer = document.querySelector('#edit-modal input[name="version"]');
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('handover-modal');
                     if (modal) window.krtModal.close(modal);
-                    // The handover spent stock → the cached inventory + the modal's rows are
-                    // stale; drop them so a reopen re-fetches and starts clean.
                     isInventoryCached = false;
                     cachedInventoryItems = [];
                     const itemsContainer = document.getElementById('handover-items-container');
                     if (itemsContainer) itemsContainer.innerHTML = '';
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
-                    // Re-render the requirement table (stock/status), the handover history (new
-                    // row) and the header (status select + version, if the order auto-completed);
-                    // each swap also broadcasts its section to peers viewing this order (REQ-FE-015).
                     _refreshMaterialsSection(orderId);
                     _swapOrderSection(orderId, 'order-handovers-results', 'handovers');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
-                    // A handover that auto-completes the order removes it from the staff queue's
-                    // default filter — tell peers viewing the queue to re-fetch (REQ-FE-015).
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
                         _publishOrdersQueue();
                     }
@@ -616,28 +536,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const modal = document.getElementById('item-handover-modal');
                     if (modal) window.krtModal.close(modal);
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
-                    // Re-render the ordered-items table (delivered/outstanding), the history (new
-                    // row + button-gating), the modal's outstanding-line rows (fresh max=) and the
-                    // header (status, if auto-completed). The datetime widget + recipient stay put,
-                    // so the form binding and the one-shot datetime enhancer survive.
                     _swapOrderSection(orderId, 'order-items-results', 'items');
                     _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
-                    // The delivery consumed the order's earmarked item stock (REQ-ORDERS-030); that
-                    // stock is now rendered inline in the ordered-items table, so the `items` swap
-                    // above already refreshes it — no separate item-stock swap needed.
-                    // The same consumption drew stock out of the Lager, so poke the global inventory
-                    // room's existing `stock` seam — Lager viewers re-pull their fragments without a
-                    // reload (design §6.5).
                     if (
                         window.krtLiveSync &&
                         typeof window.krtLiveSync.sendChanged === 'function'
                     ) {
                         window.krtLiveSync.sendChanged('inventory', ['stock']);
                     }
-                    // A delivery that auto-completes the order removes it from the staff queue's
-                    // default filter — tell peers viewing the queue to re-fetch (REQ-FE-015).
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
                         _publishOrdersQueue();
                     }
@@ -647,12 +555,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Localize the created-date + elapsed-days (header facts-bar + meta-grid) and every handover
-// timestamp. Extracted so it re-runs after a header / handover fragment swap (#575) — it was a
-// one-shot DOMContentLoaded enhancer, so swapped-in dates would otherwise stay raw ISO strings.
-// Variante A shows created/elapsed in BOTH the facts-bar and the "Zeit" meta-group, so this
-// localizes every .od-created-date / .od-elapsed-days copy (the facts-bar copy additionally
-// keeps #created-date-span / #elapsed-days-span / #elapsed-days-container).
 function localizeOrderDates(root) {
     const scope = root || document;
     const now = new Date();
@@ -671,8 +573,6 @@ function localizeOrderDates(root) {
         if (isNaN(date)) return;
         const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
         el.textContent = diffDays > 0 ? diffDays : 0;
-        // Colour the whole "<n> Tage" value (the .od-elapsed-cell wrapper), falling back to the
-        // number span when no wrapper is present.
         const targetEl = el.closest('.od-elapsed-cell') || el;
         if (diffDays >= ORDER_AGE_RED) {
             targetEl.classList.add('text-danger');
@@ -703,13 +603,9 @@ document.addEventListener('krt:swapped', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     localizeOrderDates(document);
 
-    // Material Row Management
     const materialsContainer = document.getElementById('materials-container');
     const addMaterialBtn = document.getElementById('add-material-btn');
     if (addMaterialBtn && materialsContainer) {
-        // Mirror the amount field to the chosen material's quantity type. `min` must track `step`:
-        // with min="0.001" left in place a step="1" would make HTML5 step-validation reject whole
-        // numbers, so PIECE switches both to integer.
         function refreshEditMaterialUnit(row) {
             if (!row) {
                 return;
@@ -721,9 +617,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!sel || !amountInput) {
                 return;
             }
-            // The material picker is a searchable combobox (REQ-FE-016): data-role lives on
-            // the hidden input and the selected option's data-quantity-type is mirrored onto
-            // it. Fallback to the raw <select>'s option covers a not-yet-enhanced row.
             let qt = sel.dataset.quantityType || '';
             if (!qt && sel.tagName === 'SELECT') {
                 const opt = sel.selectedOptions && sel.selectedOptions[0];
@@ -748,11 +641,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         addMaterialBtn.addEventListener('click', () => {
-            // A fresh row is cloned from the inert #edit-material-row-template — never from a
-            // live row: the material picker is an enhanced combobox (REQ-FE-016), and a cloned
-            // combobox is dead (listeners dropped, no native <select> left to re-enhance). The
-            // template clone carries raw markup, gets its indexed names, and is enhanced after
-            // insertion.
             const nextIndex = materialsContainer.querySelectorAll('.material-row').length;
             const rowTemplate = document.getElementById('edit-material-row-template');
             if (!rowTemplate) {
@@ -823,18 +711,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Page-local krtFetch.write wrapper (#571 / #575): injects the already-localized order conflict
-// strings so every order write shares ONE optimistic-lock UX (krtFetch hardcodes no user text),
-// and retires the four bespoke CSRF readers on this page (krtFetch.write reads window.krtCsrf
-// internally + retries once on a stale-token 403).
 function krtOrderWrite(opts) {
     return window.krtFetch.write(
         Object.assign({}, opts, {
-            // All order writes touch the same order @Version (one order per page), so serialize them
-            // under one key: a status change, a variant-counting toggle, an edit save and a handover
-            // run in submission order instead of racing each other into a self-collision 409. A
-            // caller may override opts.serialize (the per-edge assignee writes use oaSend, a separate
-            // raw fetch, and are unaffected).
             serialize: opts.serialize || 'order',
             conflict: {
                 title: ORDER_CONFLICT.title,
@@ -847,10 +726,6 @@ function krtOrderWrite(opts) {
     );
 }
 
-// Delete order in place (#575): add a KRT confirm (none existed — destructive + the
-// no-native-dialogs rule), then krtFetch.write DELETE and navigate to the list. A backend
-// rejection (e.g. the order still has linked inventory) keeps the user on the page with the
-// error toast instead of a redirect-reflash. The classic POST form is the no-JS fallback.
 (function () {
     const form = document.getElementById('delete-order-form');
     if (!form) return;
@@ -875,19 +750,12 @@ function krtOrderWrite(opts) {
             errorMessage: MSG_DELETE_ERROR,
         });
         if (res.ok) {
-            // The order left the queue — tell peers viewing the staff queue to re-fetch (REQ-FE-015)
-            // before we navigate away from this page.
             _publishOrdersQueue();
             window.location.assign('/orders');
         }
     });
 })();
 
-// Edit order in place (#575): serialize the modal form (header fields + the dynamic material
-// editor) and krtFetch.write the JSON twin, then re-render the kv-list header and the material
-// requirement section in place — no reload. The edit modal lives outside both swap containers,
-// so its material editor survives; its hidden @Version input is patched from the returned order
-// (the status select gets its fresh version from the header swap). Classic POST is the fallback.
 function _serializeEditForm() {
     const materials = [];
     document.querySelectorAll('#materials-container .material-row').forEach(function (row) {
@@ -932,8 +800,6 @@ function _serializeEditForm() {
             showFrontendErrorToast(MSG_MATERIAL_INVALID);
             return;
         }
-        // REQ-ORDERS-023: a requesting owner's limited edit posts to the dedicated requester endpoint
-        // (comment + not-yet-delivered materials only); the backend ignores handle/org-unit/status.
         const requesterView = form.getAttribute('data-requester-view') === 'true';
         const updateUrl = requesterView
             ? '/orders/' + orderId + '/requested-update'
@@ -950,34 +816,18 @@ function _serializeEditForm() {
                 const modal = document.getElementById('edit-modal');
                 if (modal) window.krtModal.close(modal);
                 showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
-                // Re-render the header (handle / status / priority) and the material requirement
-                // section in place and broadcast both to peers viewing this order (REQ-FE-015).
                 _swapOrderSection(orderId, 'order-header-results', 'header');
                 _refreshMaterialsSection(orderId);
-                // The edit can change the handle shown in the staff queue — refresh peers' queues too.
                 _publishOrdersQueue();
             },
         });
     });
 })();
 
-// Re-render the material section in place (#575) after a claim create/edit/withdraw OR an
-// inventory unlink. The MATERIAL table's "Offen" open-amount, the claim buttons' data-open max
-// (both tables — the aggregated ITEM table carries the remainder only there, having no "Offen"
-// column) and the per-row stock/status cells are backend-derived and not returned per write, so a
-// partial DOM patch would desync them — re-pull the whole table fragment instead. MATERIAL orders
-// render the requirement table on #order-materials-results, ITEM orders the aggregated table on
-// #order-aggregated-results; swap whichever exists.
 function _refreshMaterialsSection(orderId, broadcastOpts) {
-    // Route through the order live-sync seam so a local claim/edit/unlink re-render also broadcasts
-    // materials/aggregated to peers viewing this order (REQ-FE-015). The seam swaps whichever of the
-    // two containers this order actually renders (MATERIAL -> materials, ITEM -> aggregated) and
-    // skips the absent one; broadcastOpts lets a receiver-applied refresh pass {broadcast:false} so
-    // an inbound peer change is not echoed back.
     if (window.krtRefreshOrderSection) {
         return window.krtRefreshOrderSection(['materials', 'aggregated'], broadcastOpts);
     }
-    // Fallback (foundation present but the section seam unavailable): the former direct swap.
     orderId = orderId || window.orderId || (document.getElementById('claim-order-id') || {}).value;
     const mat = document.getElementById('order-materials-results');
     const agg = document.getElementById('order-aggregated-results');
@@ -993,12 +843,6 @@ function _refreshMaterialsSection(orderId, broadcastOpts) {
     });
 }
 
-// Swap one order-detail section by container id + fragment value (#575). Used by the handover
-// flow to re-render the handover history + the header (status select carrying the fresh
-// @Version) in place. Routed through the order live-sync seam so the local re-render also
-// broadcasts the section to peers (REQ-FE-015): the section key equals the fragment value, and the
-// seam resolves the container from ORDER_SECTIONS — containerId is kept only for the fallback path.
-// broadcastOpts lets a receiver-applied refresh pass {broadcast:false} to avoid an echo loop.
 function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
     if (window.krtRefreshOrderSection) {
         return window.krtRefreshOrderSection(fragmentValue, broadcastOpts);
@@ -1014,10 +858,6 @@ function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
     });
 }
 
-// Detach a linked inventory item in place (#575): the AJAX twin re-fetches the order so we can
-// patch the bumped ORDER @Version (the detach mutates the aggregate, so the next status/handover
-// write would otherwise 409) and then re-render the material section (stock/status recompute; the
-// open drill-down collapses with the swap). Delegated on the button, so it survives the swap.
 async function unlinkInventoryItem(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const invId = btn.getAttribute('data-inventory-item-id');
@@ -1158,9 +998,6 @@ function withdrawClaimAction() {
 let _pendingStatus = null;
 let _previousStatus = null;
 
-// The last successfully-saved status of the select, read from data-saved-status (set on every
-// successful in-place change) and falling back to the server-rendered selected option. Replaces
-// the reload the old flow relied on to reset the control after a change.
 function _knownStatus(selectElement) {
     return (
         selectElement.dataset.savedStatus ||
@@ -1199,11 +1036,6 @@ function confirmStatusChange() {
     _previousStatus = null;
 }
 
-// The order's current optimistic-lock @Version, read from its canonical live carriers — the status
-// select and, as a fallback, the edit-modal hidden input — both of which every order write's
-// onSuccess patches. Read at SEND time (from inside a payload thunk) so a serialized order write
-// picks up the version the write before it bumped, instead of a value captured when the handler
-// first fired (the self-collision fix).
 function _orderVersion() {
     const sel = document.getElementById('status-select');
     if (sel && sel.dataset.version != null && sel.dataset.version !== '') {
@@ -1214,9 +1046,6 @@ function _orderVersion() {
 }
 
 function _doStatusUpdate(orderId, status, selectElement) {
-    // In-place (#575): no reload. Capture the last-good status up front so a failed change can
-    // revert the optimistic <select>; krtOrderWrite reads CSRF via krtCsrf (+ retry-on-403) and
-    // surfaces the 409 conflict reload-prompt itself.
     const savedStatus = selectElement ? _knownStatus(selectElement) : null;
     krtOrderWrite({
         method: 'POST',
@@ -1227,33 +1056,19 @@ function _doStatusUpdate(orderId, status, selectElement) {
         toast: false,
         errorMessage: MSG_STATUS_ERROR,
         onSuccess(data) {
-            // Patch ONLY the two elements carrying the ORDER @Version — the status select (next
-            // status change) and the edit-modal hidden input (next edit save). The assignee
-            // edges carry their own per-edge version and must NOT be overwritten here.
             if (data && data.version != null && selectElement) {
                 selectElement.dataset.version = data.version;
                 const editVer = document.querySelector('#edit-modal input[name="version"]');
                 if (editVer) editVer.value = data.version;
             }
             if (selectElement) selectElement.dataset.savedStatus = status;
-            // The header kv-list shows the status + priority, both backend-derived: a terminal
-            // status nulls the priority, and reactivating a terminal order assigns a fresh one
-            // (JobOrderService.updateJobOrderStatus). Re-pull the header on EVERY status change so
-            // the priority cell matches the server instead of going stale on the reactivate path
-            // (mirrors the edit flow), and broadcast it to peers viewing this order (REQ-FE-015). The
-            // swap also re-renders the delegated status select with a fresh @Version.
             _swapOrderSection(orderId, 'order-header-results', 'header');
-            // COMPLETED/REJECTED additionally detach linked inventory server-side (lowering the
-            // per-material stock + fulfilment cells); re-pull the materials section and drop any
-            // open inventory drill-down (lazily re-fetched on the next row click).
             if (status === 'COMPLETED' || status === 'REJECTED') {
                 document.querySelectorAll('.inventory-details-row').forEach(function (r) {
                     r.remove();
                 });
                 _refreshMaterialsSection(orderId);
             }
-            // A status change moves the order in/out of the staff queue's default OPEN+IN_PROGRESS
-            // filter — tell peers viewing the queue to re-fetch their own list (REQ-FE-015).
             _publishOrdersQueue();
             showFrontendSuccessToast(MSG_STATUS_SUCCESS);
         },
@@ -1264,23 +1079,12 @@ function _doStatusUpdate(orderId, status, selectElement) {
     });
 }
 
-// Blueprint-coverage variant-counting toggle (#822). Persist the chosen mode on the order, then
-// re-render the whole coverage panel in place (no reload) so the counts + per-item hints reflect
-// the new mode. The order @Version is bumped server-side, so patch it onto the two version
-// carriers that live OUTSIDE this panel (status select + edit-modal hidden input) — otherwise the
-// user's next status/edit write would 409. On failure the optimistic checkbox is reverted.
 function _toggleBlueprintCounting(checkbox) {
     const orderId = checkbox.getAttribute('data-order-id');
     const desired = checkbox.checked;
     if (!orderId || !window.krtFetch) {
         return;
     }
-    // Disable for the round-trip so a quick double-toggle can't fire a second, stale-version
-    // write (a change-event control isn't covered by krtFetch's submit-button double-submit
-    // guard). On success the panel swap replaces this checkbox; on failure we re-enable + revert.
-    // The version is read lazily from the order's canonical carrier (status select / edit-modal
-    // input) at send time, since this checkbox's own data-version is not patched by other order
-    // writes — only those two carriers are.
     checkbox.disabled = true;
     krtOrderWrite({
         method: 'POST',
@@ -1336,11 +1140,8 @@ async function downloadHandoverReport(btn) {
         timeStr,
     ]);
     try {
-        // Forward the user's actual IANA time zone so the backend can render handover date/time
-        // in the user's local time zone instead of the server's ZoneId.systemDefault().
         const userTimeZone =
             Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
-        // A GET download: no CSRF header needed (the CSRF filter only guards writes).
         const downloadHeaders = {};
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
@@ -1362,7 +1163,6 @@ async function downloadHandoverReport(btn) {
         a.href = url;
         a.target = '_blank';
         a.download = filename;
-        // Inside an open modal <dialog> the body is inert; append where a click still lands.
         window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1372,8 +1172,6 @@ async function downloadHandoverReport(btn) {
     }
 }
 
-// Item-order delivery-note download. Mirrors downloadHandoverReport but targets the item-handover
-// proxy endpoint; the backend renders date/time in the user's IANA zone forwarded below.
 async function downloadItemHandoverReport(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const handoverId = btn.getAttribute('data-handover-id');
@@ -1404,7 +1202,6 @@ async function downloadItemHandoverReport(btn) {
     try {
         const userTimeZone =
             Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
-        // A GET download: no CSRF header needed (the CSRF filter only guards writes).
         const downloadHeaders = {};
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
@@ -1426,7 +1223,6 @@ async function downloadItemHandoverReport(btn) {
         a.href = url;
         a.target = '_blank';
         a.download = filename;
-        // Inside an open modal <dialog> the body is inert; append where a click still lands.
         window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1436,9 +1232,6 @@ async function downloadItemHandoverReport(btn) {
     }
 }
 
-// Block submission of an empty item handover (every amount blank/zero) so the user gets a toast
-// instead of a server-side "no items" round-trip. The per-row max attribute enforces the upper
-// bound natively; this only guards the lower bound across the whole form.
 function validateItemHandoverForm() {
     const inputs = document.querySelectorAll('#item-handover-modal input[type="number"]');
     for (const inp of inputs) {
@@ -1523,9 +1316,6 @@ async function previewHandoverReport(btn) {
         items,
     };
     if (!window.krtFetch) return;
-    // A read-only POST (renders a PDF, stores nothing) — routed through krtFetch.write so it carries
-    // CSRF, the 403 retry and the re-auth redirect (REQ-FE-002); responseType 'blob' hands the PDF
-    // bytes to the download below. Every failure keeps the page's own error toast.
     const result = await window.krtFetch.write({
         method: 'POST',
         url: '/api/v1/orders/' + encodeURIComponent(orderId) + '/handovers/report/preview',
@@ -1561,7 +1351,6 @@ async function previewHandoverReport(btn) {
             previewDate,
             previewTime,
         ]);
-        // Inside an open modal <dialog> the body is inert; append where a click still lands.
         window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1575,9 +1364,6 @@ async function toggleInventory(row) {
     const orderId = row.getAttribute('data-order-id');
     const materialId = row.getAttribute('data-material-id');
     const amountType = row.getAttribute('data-amount-type');
-    // Markup pieces for the inventory sub-table, declared at function level: the lint rule only
-    // traces a variable declared in the same function scope as the innerHTML sink it feeds. Every
-    // write is a literal or an escapeHtml / escapeAttr result (FE-SEC-05).
     /** @type {string} */
     let html;
     let unlinkColHeader = '';
@@ -1617,7 +1403,6 @@ async function toggleInventory(row) {
             return;
         }
 
-        // Optional pieces are assigned through if (not a ternary), so the sink only sees escaped values.
         if (IS_LOGISTICIAN) unlinkColHeader = `<th class="od-inv-th"></th>`;
         const subColspan = IS_LOGISTICIAN ? 7 : 6;
 
@@ -1706,10 +1491,6 @@ async function toggleInventory(row) {
     }
 }
 
-// ---- Tab navigation (REQ-ORDERS-026) — the mission-detail .tab-nav pattern ----------------------
-// The overview + KPI band stay; the sections below live one per .tab-pane. Deeplink via ?tab= / #tab=
-// (falls back to localStorage then the first present tab), ArrowLeft/ArrowRight roving-tabindex nav,
-// aria-selected toggled at runtime. Panes are all server-rendered; switching only toggles `.on`.
 (function () {
     const nav = document.querySelector('.tab-nav[role="tablist"]');
     if (!nav) {
@@ -1736,9 +1517,7 @@ async function toggleInventory(row) {
         });
         try {
             localStorage.setItem(storeKey, key);
-        } catch (_e) {
-            /* private mode: no persistence */
-        }
+        } catch (_e) {}
     }
 
     function resolveInitial(useStore) {
@@ -1756,9 +1535,7 @@ async function toggleInventory(row) {
                 if (s && validKeys.indexOf(s) >= 0) {
                     return s;
                 }
-            } catch (_e) {
-                /* private mode: no persistence */
-            }
+            } catch (_e) {}
         }
         return validKeys[0];
     }
@@ -1800,13 +1577,6 @@ async function toggleInventory(row) {
     apply(resolveInitial(true));
 })();
 
-// ---- Herstellung (production booking, REQ-ORDERS-025) -------------------------------------------
-// The modal lets a logistician record how many units of an ordered item were manufactured and, per
-// required material, exactly which linked inventory entries the material was drawn from. The demand
-// per material scales the line's snapshot (requiredTotal × k / lineAmount, rounded for the quantity
-// type) exactly as the backend does; "buchen" is enabled only when every non-skipped material is
-// covered. A material whose "Nicht ausbuchen" checkbox is ticked is recorded but not booked out —
-// its demand is excluded from the gate and it is posted in skippedMaterialIds instead.
 let _prodMaterials = [];
 let _prodContext = null;
 
@@ -1828,11 +1598,6 @@ function _prodFmtQty(x, quantityType) {
         : _prodRound3(x).toFixed(3) + ' ' + PRODUCTION_I18N.unitScu;
 }
 
-// Per-material demand for k units, mirroring the backend: sum the rounded per-row demands
-// (roundForQuantityType(requiredTotal * k / lineAmount)) across every snapshot row that maps to this
-// material. Rounding each row before summing — not summing the raw totals first — keeps the frontend
-// "buchen" gate in lockstep with the backend's exact-coverage 422, because round(a)+round(b) can
-// differ from round(a+b) for PIECE materials.
 function _prodDemand(mat, k) {
     const lineAmount = _prodContext && _prodContext.lineAmount ? _prodContext.lineAmount : 1;
     return mat.requiredTotals.reduce(function (sum, rt) {
@@ -1840,10 +1605,6 @@ function _prodDemand(mat, k) {
     }, 0);
 }
 
-// Toggle the collapsible "Bedarf je Stück" demand sub-row in the Herstellung table (the chevron
-// button carries aria-controls -> the sub-row's id). Mirrors the bank booking-detail toggle: flip
-// aria-expanded and the target's hidden attribute; the page CSS rotates the chevron off
-// [aria-expanded='true'].
 function _odToggleDemandRow(control) {
     if (!control) {
         return;
@@ -1906,12 +1667,6 @@ function openProductionModal(button) {
 
     const row = button.closest('tr');
     const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
-    // A line's material snapshot can carry more than one row for the same material — a blueprint that
-    // lists an ingredient twice, or a RESOURCE plus a bridged non-craftable ITEM that map to the same
-    // Material. The backend aggregates demand per material id (demandByMaterial.merge over the rounded
-    // per-row demands); mirror that here so each distinct material yields exactly one card. Otherwise
-    // two cards share a data-prod-material value, querySelector reads only the first, and the second
-    // row's demand can never be reconciled — the "buchen" button stays disabled forever.
     const byMaterialId = new Map();
     demandLis.forEach(function (li) {
         const materialId = li.getAttribute('data-material-id');
@@ -1921,7 +1676,6 @@ function openProductionModal(button) {
         const requiredTotal = parseFloat(li.getAttribute('data-required-total')) || 0;
         const existing = byMaterialId.get(materialId);
         if (existing) {
-            // Keep the per-row totals separate so demand stays a sum of rounded rows (see _prodDemand).
             existing.requiredTotals.push(requiredTotal);
             return;
         }
@@ -1938,8 +1692,6 @@ function openProductionModal(button) {
         const card = document.createElement('div');
         card.className = 'card card--inset mb-1';
         card.setAttribute('data-prod-material', mat.materialId);
-        // "Nicht ausbuchen": when checked, this material is recorded but not booked out — its demand
-        // drops out of the reconcile gate and no consumption is posted for it (skippedMaterialIds).
         card.innerHTML =
             '<div class="card-head"><h3 class="card-title">' +
             escapeHtml(mat.materialName) +
@@ -2032,30 +1784,16 @@ function _renderProdMaterialEntries(card, mat) {
     });
 }
 
-// ===== Production book-in section (REQ-INV-032, design §6.4) =====
-
-// The acting user's id, stamped on #production-form by the server — the owner combobox's seed and
-// the fallback owner when the picker is cleared (the backend defaults a null ownerUserId to the
-// actor; the org-unit picker mirrors that resolution).
 function _prodActingUserId() {
     const form = document.getElementById('production-form');
     return form ? form.getAttribute('data-acting-user-id') || '' : '';
 }
 
-// The acting user's display name, stamped alongside the id on #production-form. Passed as the
-// label when re-seeding the owner combobox on reset: remote-users is a server-searched combobox,
-// so a prior search replaces its loaded item set and evicts the server-seeded acting-user option;
-// a bare setValue(id) with no label would then resolve no label and blank the field (REQ-FE-016).
-// Supplying the label makes the reset re-seed the visible name regardless of the picker's item set.
 function _prodActingUserName() {
     const form = document.getElementById('production-form');
     return form ? form.getAttribute('data-acting-user-name') || '' : '';
 }
 
-// Sets an enhanced combobox (or its raw-<select> fallback) to a value, syncing the visible label
-// through the supported controller API (REQ-FE-016). The optional label seeds the visible text for
-// a value outside the picker's loaded item set (remote mode / programmatic fill); it is ignored
-// when the value resolves against a loaded option.
 function _prodSetPicker(id, value, label) {
     const el = document.getElementById(id);
     if (!el) {
@@ -2068,9 +1806,6 @@ function _prodSetPicker(id, value, label) {
     }
 }
 
-// Resets the book-in section to its per-open defaults: no location yet (the reconcile gate holds
-// the submit until one is picked), owner = acting user, non-personal, "dem Auftrag zuordnen" on
-// (§5.6), and the org-unit picker repopulated for the resolved owner.
 function _prodResetBookIn() {
     _prodSetPicker('production-location', '');
     _prodSetPicker('production-owner', _prodActingUserId(), _prodActingUserName());
@@ -2087,9 +1822,6 @@ function _prodResetBookIn() {
     _prodRefreshOrgUnitPicker();
 }
 
-// Personal stock never carries allocations (§5.6): while "persönlich" is checked the
-// "dem Auftrag zuordnen" checkbox is disabled AND cleared; unchecking restores the default-on
-// earmark (mirrors syncPersonalAllocations on the Einbuchen page).
 function _prodSyncPersonalAllocate() {
     const personalCb = document.getElementById('production-personal');
     const allocateCb = document.getElementById('production-allocate');
@@ -2101,10 +1833,6 @@ function _prodSyncPersonalAllocate() {
     allocateCb.checked = !personal;
 }
 
-// A personal book-in is only ever into one's OWN private pool: the backend refuses personal = true
-// on behalf of another member with a 403 (REQ-INV-032, APPSEC-01, as Einbuchen does). So while the
-// owner picker names someone other than the acting user, "persönlich" is disabled and cleared, and
-// the earmark checkbox follows. Picking oneself again re-enables it (unchecked, the default).
 function _prodSyncPersonalForOwner() {
     const personalCb = document.getElementById('production-personal');
     if (!personalCb) {
@@ -2120,13 +1848,6 @@ function _prodSyncPersonalForOwner() {
     }
 }
 
-// Repopulates the book-in org-unit picker for the resolved owner — the #1328 Umbuchen semantics
-// (copied from inventory-admin.js refreshUmbuchenTransferOrgUnitPicker, via the UserProxyController
-// route): offer the owner's direct memberships across ALL FOUR org-unit kinds (?allKinds=true),
-// always show the picker when the owner has >=1 membership, preset a concrete default — the
-// order's responsible unit when it is among the owner's memberships, else the first (primary)
-// membership — with no empty placeholder, and hide it only for a membershipless owner. This keeps
-// the REQ-ORG-004 ">1 memberships + no picker output -> 400" branch unreachable from the UI.
 function _prodRefreshOrgUnitPicker() {
     const wrapper = document.getElementById('production-orgunit-wrapper');
     const select = document.getElementById('production-orgunit');
@@ -2177,10 +1898,6 @@ function _prodRefreshOrgUnitPicker() {
         });
 }
 
-// Collects the book-in payload block (REQ-INV-032): the picked location/owner/org-unit and the
-// personal / allocate flags. personal implies allocateToOrder=false (the checkbox is disabled and
-// cleared while personal is checked, but the payload re-derives it so the invariant holds even if
-// the DOM was tampered with).
 function _prodCollectBookIn() {
     const locEl = document.getElementById('production-location');
     const ownerEl = document.getElementById('production-owner');
@@ -2219,8 +1936,6 @@ function _prodReconcile() {
         const skipCb = card.querySelector('[data-prod-skip]');
         const skipped = !!(skipCb && skipCb.checked);
         const chip = card.querySelector('[data-prod-chip]');
-        // A skipped material is recorded but not booked out: disable its stock inputs, flag the card
-        // and never count it against the "buchen" gate.
         card.classList.toggle('od-prod-skipped', skipped);
         card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
             inp.disabled = skipped;
@@ -2256,8 +1971,6 @@ function _prodReconcile() {
             allCovered = false;
         }
     });
-    // Book-in gate (REQ-INV-032): the produced stock needs a location ("wo"), so the submit stays
-    // disabled until one is picked (bookIn.locationId is @NotNull server-side).
     const locEl = document.getElementById('production-location');
     if (!locEl || !locEl.value) {
         allCovered = false;
@@ -2284,8 +1997,6 @@ function bookProduction() {
     _prodMaterials.forEach(function (mat) {
         const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
         const skipCb = card ? card.querySelector('[data-prod-skip]') : null;
-        // A material marked "nicht ausbuchen" is posted in skippedMaterialIds (the backend drops its
-        // demand) and contributes no consumption.
         if (skipCb && skipCb.checked) {
             skippedMaterialIds.push(mat.materialId);
             return;
@@ -2319,8 +2030,6 @@ function bookProduction() {
         showFrontendErrorToast(PRODUCTION_I18N.allocError);
         return;
     }
-    // Book-in gate (REQ-INV-032): the reconcile gate already disables the button without a
-    // location; this guards the residual paths (e.g. a queued click racing the gate).
     const bookIn = _prodCollectBookIn();
     if (!bookIn.locationId) {
         showFrontendErrorToast(PRODUCTION_I18N.bookInLocationRequired);
@@ -2343,8 +2052,6 @@ function bookProduction() {
             window.krtModal.close('production-modal');
             showFrontendSuccessToast(PRODUCTION_I18N.booked);
             if (window.krtRefreshOrderSection) {
-                // The book-in auto-earmarks the produced units to this order by default; that stock
-                // is rendered inline in the ordered-items table, so re-rendering `items` refreshes it.
                 window.krtRefreshOrderSection([
                     'items',
                     'aggregated',
@@ -2354,10 +2061,6 @@ function bookProduction() {
                     'item-handover-lines',
                 ]);
             }
-            // The booking now also books the produced units in as Lager item stock
-            // (REQ-INV-032), so poke the global inventory room's existing `stock` seam — Lager
-            // viewers re-pull their fragments without a reload (design §6.5; the key exists at
-            // all three REQ-FE-010 mirror points, no seam-map change).
             if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
                 window.krtLiveSync.sendChanged('inventory', ['stock']);
             }
@@ -2365,10 +2068,6 @@ function bookProduction() {
     });
 }
 
-// CSP-safe delegated bindings (replaces the 18 inline on*= handlers in this template).
-// Modal open/close goes through window.krtModal (directly, or via the global
-// open-modal-display / close-modal-display triggers); the rest call into page-local functions
-// defined in this script and the inline script higher up.
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'od-update-status', function (el) {
         updateStatus(el);
@@ -2377,10 +2076,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         _toggleBlueprintCounting(el);
     });
     window.krtEvents.on('click', 'od-toggle-inventory', function (el, ev) {
-        // Skip the row inventory-toggle when the click originated on a claim control or the
-        // in-drill-down unlink button (both live inside the clickable material row); krtEvents
-        // fires each data-trigger independently, so without this guard the unlink click would
-        // also collapse the drill-down.
         if (
             ev &&
             ev.target &&
@@ -2409,10 +2104,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
     window.krtEvents.on('click', 'od-open-production', openProductionModal);
     window.krtEvents.on('click', 'od-book-production', bookProduction);
-    // Book-in section (REQ-INV-032): the location pick re-runs the submit gate, an owner change
-    // repopulates the org-unit picker (#1328 semantics), and the personal toggle disables + clears
-    // the order earmark (§5.6). The two comboboxes' data-trigger rides the enhancer's hidden-input
-    // passthrough (REQ-FE-016), so the delegated change handlers keep working after enhancement.
     window.krtEvents.on('change', 'od-production-bookin-changed', function () {
         _prodReconcile();
     });
@@ -2440,9 +2131,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         previewHandoverReport(el);
     });
     window.krtEvents.on('click', 'od-remove-handover-row', function (el) {
-        // Mirrors the historical inline `this.parentElement.parentElement.remove();
-        // updateHandoverIndexes();` — climb two parents to reach the handover row, drop it,
-        // re-index so the remaining rows keep contiguous form field names.
         const row = el.parentElement && el.parentElement.parentElement;
         if (row) row.remove();
         updateHandoverIndexes();
@@ -2453,20 +2141,12 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
 }
 
-// Bearbeiter (assignee) section — AJAX enroll / unenroll / note edit. Every mutation re-renders
-// the whole #assignees-section fragment (server-rendered HTML swapped in via outerHTML), so the
-// per-edge @Version values are always fresh and there is no manual data-version DOM sync. All
-// bindings are delegated (document level), so they survive the fragment swap.
 (function () {
     function oaOrderId() {
         const sec = document.getElementById('assignees-section');
         return sec ? sec.getAttribute('data-order-id') : null;
     }
 
-    // The assignee edge's 409 is always its optimistic lock (the controller relays the backend's
-    // status without a problem code), so it is surfaced through krtFetch's OPTIMISTIC_LOCK path:
-    // the page's conflict toast plus the reload-confirm — the one sanctioned reload (REQ-FE-001/003)
-    // instead of the former unconditional timed reload.
     const OA_CONFLICT = {
         title: ORDER_CONFLICT.title,
         reloadLabel: ORDER_CONFLICT.reload,
@@ -2476,8 +2156,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     };
 
     /**
-     * Sends one assignee mutation through krtFetch (REQ-FE-002: CSRF, the bare-403 refresh-and-retry
-     * and the re-auth redirect) and swaps the returned #assignees-section fragment in place.
+     * Sends one assignee mutation through krtFetch (REQ-FE-002) and swaps the returned
+     * #assignees-section fragment in place.
      *
      * @param {string} method the HTTP method
      * @param {string} url the endpoint
@@ -2492,17 +2172,13 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const common = {
             method,
             url,
-            // The endpoints answer the re-rendered section as an HTML fragment.
             accept: 'text/html',
             toast: false,
             errorMessage: errorMsg,
             onSuccess(html) {
                 const sec = document.getElementById('assignees-section');
                 if (sec && typeof html === 'string') {
-                    // Same-origin Thymeleaf fragment (orders-detail :: assigneesSection).
                     window.krtFetch.replaceWithTrustedHtml(sec, html);
-                    // Let global enhancers re-process the swapped-in subtree (mirrors
-                    // krtFetch.swap, which this outerHTML swap predates).
                     document.dispatchEvent(
                         new CustomEvent('krt:swapped', {
                             detail: { container: document.getElementById('assignees-section') },
@@ -2510,10 +2186,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                     );
                 }
                 if (opts.successMsg) showFrontendSuccessToast(opts.successMsg);
-                // Broadcast the assignee change to peers viewing this order — their order:{id}
-                // receiver re-fetches the assignees fragment into #order-assignees-results
-                // (REQ-FE-015). The actor already applied its own swap above, so notify
-                // (broadcast-only), not refresh.
                 if (window.krtNotifyOrderChanged) {
                     window.krtNotifyOrderChanged(['assignees']);
                 }

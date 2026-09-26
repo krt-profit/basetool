@@ -34,20 +34,10 @@ import org.springframework.stereotype.Component;
 /**
  * Scheduled retention sweep over the activity and bank audit trails (REQ-AUDIT-006).
  *
- * <p>Gated by {@code app.audit.retention.enabled} (default on; disabled under {@code test} so the
- * sweep never races assertions) and paced by {@code app.audit.retention.interval}. Failures are
- * recorded and swallowed by {@link TaskMetrics}, so a bad sweep never tears down the scheduler
- * thread.
- *
- * <p>The default window is <b>730 days</b>, two years. Expressed in days rather than months because
- * {@link java.time.Duration} has no month unit — a month is not a fixed length — and the precision
- * does not matter for a retention boundary. There is no statutory retention obligation behind this
- * number: it is chosen to outlast the organisation's own operating cycles so an old dispute stays
- * reconstructible, and to stop there, because "indefinitely" is not a retention period.
- *
- * <p>The window is read from the validated {@link AuditRetentionProperties}, which refuse to start
- * the context for a window under 30 days — a {@code P0D} or negative value would otherwise have
- * deleted the whole trail on the next run (BE-MOD-03).
+ * <p>Gated by {@code app.audit.retention.enabled} and paced by {@code
+ * app.audit.retention.interval}; the window comes from the validated {@link
+ * AuditRetentionProperties} (default 730 days, at least 30). Failures are recorded and swallowed by
+ * {@link TaskMetrics}.
  */
 @Component
 @ConditionalOnProperty(
@@ -91,13 +81,8 @@ public class AuditRetentionTask {
   }
 
   /**
-   * Publishes {@code basetool_scheduled_job_enabled{task="audit_retention"} = 1}.
-   *
-   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
-   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
-   * Without it, following the documented instruction to disable a sweep before its first
-   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
-   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   * Publishes {@code basetool_scheduled_job_enabled{task="audit_retention"} = 1}, so {@code
+   * ScheduledJobStale} can tell a disabled sweep (no bean, no gauge) from one that never succeeded.
    */
   @PostConstruct
   void publishEnabledGauge() {

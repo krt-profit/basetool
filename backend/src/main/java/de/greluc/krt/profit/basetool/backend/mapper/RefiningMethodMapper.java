@@ -31,7 +31,6 @@ public interface RefiningMethodMapper {
   RefiningMethodDto toDto(RefiningMethod entity);
 
   /** Builds a new {@link RefiningMethod} entity from the inbound DTO. */
-  // RefiningMethodDto carries no version: the admin edit is last-writer-wins by design.
   @Mapping(target = "version", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)

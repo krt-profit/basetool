@@ -40,11 +40,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Spring-Boot integration tests for the {@code @Cacheable} / {@code @CacheEvict} annotations on
- * {@link TerminalService}. Loads a real Caffeine-backed {@link CacheManager} and inspects the cache
- * contents directly, so the assertions cover both that the read path populates the cache and that
- * every one of the five mutators clears it (visibility, and the two loading-dock / two auto-load
- * override flips).
+ * Verifies with a real Caffeine {@link CacheManager} that {@link TerminalService} populates its
+ * cache on reads and that each of its five mutators clears it.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -157,7 +154,6 @@ class TerminalServiceCachingTest {
     try {
       terminalService.getTerminal(unknownId);
     } catch (Exception ignored) {
-      // expected — the service throws NotFoundException for the unknown id
     }
 
     assertNull(

@@ -28,30 +28,11 @@ import org.springframework.security.oauth2.server.resource.web.authentication.DP
 import org.springframework.security.web.authentication.AuthenticationConverter;
 
 /**
- * Builds the DPoP {@code htu} comparison target from a <em>configured</em> public base URL instead
- * of from the request (ADR-0129).
+ * Builds the DPoP {@code htu} comparison target from the configured public base URL instead of the
+ * proxy-rewritten request URL (ADR-0129).
  *
- * <p>Spring compares {@code htu} with a bare {@code String.equals} — no normalisation, no
- * trailing-slash tolerance, no case folding — against {@code HttpServletRequest#getRequestURL()}.
- * Tomcat assembles that from scheme, server name and port, all of which {@code RemoteIpValve}
- * rewrites from the proxy's forwarded headers ({@code forward-headers-strategy: native}). The
- * client meanwhile signs a normalised URL it derives on its own. Both sides must land on a
- * byte-identical string, and the gateway's half depends on a reverse-proxy configuration that no
- * test exercises.
- *
- * <p>Concretely: if nginx-proxy-manager omits {@code X-Forwarded-Port}, the internal port survives
- * and the server expects {@code https://ingest.example:11262/v1/...} while the client signed {@code
- * https://ingest.example/v1/...}. One character, {@code invalid_dpop_proof}, and — with the stock
- * entry point — a bodyless 401 that never reaches this module's problem handler or its metrics. It
- * would pass every test and fail only in production, invisibly.
- *
- * <p>Pinning the origin to configuration removes the proxy from the comparison entirely: the value
- * is the same in dev, in CI and in production, and it is the value the extractor is documented to
- * sign. Only the origin is replaced; the path still comes from the request, so a proof remains
- * bound to the specific endpoint it was minted for.
- *
- * <p>With no base URL configured this delegates unchanged, so the stock behaviour is what an
- * unconfigured deployment gets rather than a half-applied override.
+ * <p>Only the origin is replaced; the path still comes from the request. Without a configured base
+ * URL it delegates unchanged.
  */
 public final class PublicUriDpopAuthenticationConverter implements AuthenticationConverter {
 

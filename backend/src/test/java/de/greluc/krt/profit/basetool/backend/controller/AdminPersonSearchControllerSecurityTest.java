@@ -45,18 +45,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the admin Personensuche (REQ-SEC-060).
- *
- * <p>Admin-only, and the reason is worth restating where it is tested: the endpoint returns every
- * place a given name appears, which is a profile of that person assembled across the whole system.
- * An officer or bank employee has no business assembling one.
- *
- * <p>The class also pins down that a served search reaches the seam that records it. What the
- * recorded payload may contain — the term's <b>length</b>, never the term, because a trail of every
- * name an admin searched for would be a second store of exactly the data this search exists to help
- * remove — is asserted in {@link
- * de.greluc.krt.profit.basetool.backend.service.PersonSearchServiceAuditTest}, which is where the
- * payload is now built.
+ * MockMvc gate matrix for the admin-only Personensuche (REQ-SEC-060), including that a served
+ * search reaches the seam that records it. The recorded payload is covered by {@link
+ * de.greluc.krt.profit.basetool.backend.service.PersonSearchServiceAuditTest}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -125,7 +116,6 @@ class AdminPersonSearchControllerSecurityTest {
         .andExpect(status().isOk());
   }
 
-  // covers REQ-SEC-060 — a served search is handed to the service that records it
   @Test
   void personSearch_isHandedToTheAuditingSeam() throws Exception {
     PersonSearchService.PersonSearchResult result =
@@ -142,12 +132,6 @@ class AdminPersonSearchControllerSecurityTest {
                         .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk());
 
-    // The controller's whole audit responsibility is this delegation. It cannot write the row
-    // itself: AuditService.record is MANDATORY-propagated and a handler has no transaction, so a
-    // direct call 500s the endpoint (ArchitectureTest#controllerLayerMustNotWriteAuditRowsDirectly
-    // forbids it). The payload's shape — length yes, term never — is asserted where it is now
-    // built, in PersonSearchServiceAuditTest, and end-to-end against a real AuditService in
-    // DataSubjectRightsAuditIntegrationTest.
     verify(personSearchService).recordSearch(eq("SomeVeryDistinctiveHandle"), eq(result));
   }
 }

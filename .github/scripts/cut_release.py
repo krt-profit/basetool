@@ -1,24 +1,9 @@
 #!/usr/bin/env python3
 """Cut the ``[Unreleased]`` block into a dated ``## [vX.Y.Z]`` release section.
 
-This is the release-time complement to ``reconcile_changelog.py``. Where reconcile
-moves *already-shipped* entries under their *existing* tags (via ``git blame`` +
-``git tag --contains``), this script performs the forward cut for a release that
-is being prepared: it renames the current ``## [Unreleased]`` heading to
-``## [vX.Y.Z](<repo>/releases/tag/vX.Y.Z) - YYYY-MM-DD`` and inserts a fresh,
-empty ``## [Unreleased]`` above it. Everything that was under ``[Unreleased]``
-becomes the new version's section verbatim.
-
-Crucially this needs *no* git tag to exist yet -- the new section is produced by a
-pure text transform -- which is what lets the release pipeline prepare the
-changelog (and the tag) *before* the tag is created, instead of force-moving a
-tag that already exists.
-
-Idempotency / safety:
-  * Refuses to run if a ``## [vX.Y.Z]`` section already exists (the version was
-    already cut) so re-running the prepare workflow cannot double-cut.
-  * The heading link + date format match ``reconcile_changelog.py`` exactly, so a
-    later reconcile run treats the section as already-cut and leaves it alone.
+Renames ``## [Unreleased]`` to ``## [vX.Y.Z](<repo>/releases/tag/vX.Y.Z) - YYYY-MM-DD``
+and inserts a fresh empty ``## [Unreleased]`` above it; no tag needs to exist. Refuses
+to run when the version section already exists.
 
 Usage:
     cut_release.py v0.3.55                       # cut, dated today, repo cwd
@@ -35,7 +20,6 @@ import re
 import subprocess
 import sys
 
-# Same strict version shape reconcile_changelog.py accepts -- typo tags are out.
 VERSION_TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 
 
@@ -60,8 +44,7 @@ def run_git(repo: str, args: list[str]) -> str:
 def derive_repo_url(repo: str) -> str:
     """Derive ``https://github.com/<owner>/<repo>`` from the ``origin`` remote.
 
-    Mirrors ``reconcile_changelog.py`` so both scripts emit identical version
-    heading links; falls back to the canonical project URL on a detached clone.
+    Falls back to the project URL without ``origin``.
 
     :param repo: repository root to read ``origin`` from.
     :return: the GitHub base URL without a trailing ``.git``.

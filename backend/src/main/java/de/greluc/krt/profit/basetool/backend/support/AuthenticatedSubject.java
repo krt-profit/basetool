@@ -28,59 +28,24 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
- * The one place that answers "which subject is this request acting as".
+ * Answers which subject a request is acting as, for token-based and token-less (ADR-0129)
+ * authentications alike.
  *
- * <p><strong>Two tempting shortcuts are deliberately not taken.</strong>
- *
- * <ul>
- *   <li><em>Falling back to {@code getName()}.</em> It reads like the general case and is the one
- *       thing that must not happen: on a username/password authentication that name is the member's
- *       callsign, and REQ-OBS-004 keeps callsigns out of log lines and MDC fields because they are
- *       PII. A token-less authentication opts in by implementing {@link SubjectAuthentication}
- *       instead, which is a promise that the value really is a {@code sub}.
- *   <li><em>Gating on {@code isAuthenticated()}.</em> It looks like free fail-closed hardening, but
- *       Spring's single-argument {@code JwtAuthenticationToken(Jwt)} constructor leaves the flag
- *       false, so the check would silently drop identities that are genuinely present. The type
- *       discrimination above already excludes the anonymous token, which is the case the flag was
- *       reached for.
- * </ul>
- *
- * <p>The application grew two idioms for that question — {@code Authentication#getName()}, and
- * {@code instanceof JwtAuthenticationToken} — and they were interchangeable only for as long as
- * every authenticated caller carried a token. ADR-0129 ended that: a request the ingest gateway
- * makes on behalf of a member carries the member's identity with no token behind it.
- *
- * <p>Leaving both idioms in place cost two defects at once, in opposite directions, and they are
- * the reason this class exists rather than a wider {@code instanceof}:
- *
- * <ul>
- *   <li>{@code CurrentUserArgumentResolver} demanded a token and threw — every gateway call failed
- *       at argument resolution, one layer past the gate that used to fail it.
- *   <li>{@code TermsAcceptanceAccessFilter} demanded a token and, finding none, <em>let the request
- *       through</em> — the consent gate (REQ-SEC-028) silently stopped applying to the very path
- *       ADR-0129 was written to keep it applying to.
- * </ul>
- *
- * <p>One failed closed and one failed open, from the same type check. So the check lives here once,
- * and every consumer asks this class instead of asking the type.
+ * <p>Never falls back to {@code getName()}, which is the member's callsign on a username/password
+ * authentication (REQ-OBS-004); a token-less authentication opts in via {@link
+ * SubjectAuthentication}. Does not gate on {@code isAuthenticated()}, which a single-argument
+ * {@code JwtAuthenticationToken} leaves false.
  */
 public final class AuthenticatedSubject {
 
   /** Authorized-party claim: the Keycloak client id a token was issued to (OIDC Core section 2). */
   private static final String AUTHORIZED_PARTY_CLAIM = "azp";
 
-  private AuthenticatedSubject() {
-    // Utility holder — not instantiable.
-  }
+  private AuthenticatedSubject() {}
 
   /**
-   * Extracts the acting subject, whether it arrived in a token or was established for a member.
-   *
-   * <p>Reads the token's {@code sub} when there is one, and otherwise only from an authentication
-   * that opts in via {@link SubjectAuthentication} — never from {@link Authentication#getName()},
-   * which on a username/password token is the member's callsign (REQ-OBS-004). Deliberately
-   * tolerant of an absent authentication: callers decide whether "no subject" means refuse or means
-   * anonymous, and those two answers differ per call site.
+   * Extracts the acting subject from a token's {@code sub} or from a {@link SubjectAuthentication},
+   * never from {@link Authentication#getName()}.
    *
    * @param authentication the current authentication, may be {@code null}
    * @return the subject, or empty when there is no authenticated caller
@@ -96,30 +61,14 @@ public final class AuthenticatedSubject {
       return Optional.ofNullable(jwt.getSubject()).filter(s -> !s.isBlank());
     }
     if (authentication instanceof SubjectAuthentication subjectAuth) {
-      // ofNullable, matching the two branches above, although the interface contract is @NotNull:
-      // an implementation that breaks that contract should yield "no subject" here rather than a
-      // NullPointerException inside a security filter.
       return Optional.ofNullable(subjectAuth.subject()).filter(s -> !s.isBlank());
     }
-    // Everything else has no subject — NOT a fallback to getName(). See the class Javadoc: on an
-    // AnonymousAuthenticationToken that name is a placeholder, and on a username/password token it
-    // is the member's callsign, which REQ-OBS-004 keeps out of logs entirely.
     return Optional.empty();
   }
 
   /**
-   * Extracts the {@code azp} claim — which Keycloak client the caller's token was issued to.
-   *
-   * <p>Lives here rather than in the one filter that needs it for the reason the class exists: the
-   * question "what is in this caller's token" must be asked in exactly one place, or the next
-   * authentication type splits its consumers into fail-open and fail-closed all over again. A
-   * token-less authentication (the acting member of ADR-0129) has no authorized party at all, and
-   * that reads as empty rather than as an exception — an absent client identity is a legitimate
-   * answer that the caller decides how to treat.
-   *
-   * <p>Bounding the value is deliberately NOT this method's job. It returns whatever the token
-   * says; a consumer that turns it into a metric label or writes it to a row must map it onto a
-   * bounded set first (REQ-OBS-006), which is what {@link ClientAttribution} is for.
+   * Extracts the unbounded {@code azp} claim naming the Keycloak client the caller's token was
+   * issued to. Consumers that label or persist it must bound it via {@link ClientAttribution}.
    *
    * @param authentication the current authentication, may be {@code null}
    * @return the {@code azp} claim, or empty when there is no token or the claim is absent/blank
@@ -148,11 +97,7 @@ public final class AuthenticatedSubject {
   }
 
   /**
-   * Same as {@link #of(Authentication)}, as the {@link UUID} the persistence layer wants.
-   *
-   * <p>Empty rather than throwing for a non-UUID subject: a service account or a malformed token
-   * has a subject that is simply not a member id, and whether that is an error depends on the call
-   * site.
+   * Returns {@link #of(Authentication)} as a {@link UUID}, empty for a non-UUID subject.
    *
    * @param authentication the current authentication, may be {@code null}
    * @return the subject as a UUID, or empty when absent or not a UUID

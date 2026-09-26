@@ -24,9 +24,8 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Form-binding object for Unit input. {@code name} is the required display name of the unit (owner
- * decision 2026-07-03 — the unit's single mandatory field); {@code responsibleUserId} optionally
- * pins an explicit responsible person; {@code note} is a free-text planning note.
+ * Form-binding object for Unit input: the required display {@code name}, an optional {@code
+ * responsibleUserId} and a free-text planning {@code note}.
  */
 public record UnitForm(
     @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,

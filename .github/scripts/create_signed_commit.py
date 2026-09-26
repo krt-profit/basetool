@@ -2,21 +2,9 @@
 """Create a GitHub-signed commit on a branch via the GraphQL
 ``createCommitOnBranch`` mutation.
 
-Release automation runs on a GitHub-hosted runner that holds no commit-signing
-key, so a plain ``git commit`` produces an *unsigned* commit. The ``main`` branch
-enforces a ``required_signatures`` rule, which would block the release pull
-request. ``createCommitOnBranch`` sidesteps this entirely: every commit it
-creates is signed with GitHub's own web-flow key and therefore shows as
-``Verified`` -- no private key is ever stored on, or handed to, the runner.
-
-The mutation commits the given files (read from the working tree, Base64-encoded)
-onto an already-existing branch whose tip equals ``--expected-head-oid``. Create
-the branch ref first (e.g. ``POST /git/refs`` at the main tip) and pass that tip
-as the expected head; the mutation then fails loudly if the branch moved under
-us instead of committing onto an unexpected base. The API token is read from the
-``GH_TOKEN`` environment variable; the commit's author is the token's identity,
-so the default ``GITHUB_TOKEN`` yields a ``github-actions[bot]`` author that the
-DCO check treats as exempt.
+The commit is signed with GitHub's web-flow key. The files are committed onto an
+existing branch whose tip must equal ``--expected-head-oid``. The token comes from
+``GH_TOKEN``, and its identity is the commit author.
 
 Usage:
     create_signed_commit.py --repo owner/name --branch release/v1.2.3 \\
@@ -31,18 +19,16 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import json
 import os
 import sys
 import urllib.error
 import urllib.request
 
-# Ensure output prints on any console (Windows defaults to cp1252 and crashes).
 for _stream in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(AttributeError, ValueError):
         _stream.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):  # already wrapped / not reconfigurable
-        pass
 
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
 
@@ -67,11 +53,8 @@ def build_payload(
     :param branch: branch name to commit onto; it must already exist.
     :param head_oid: the branch's current tip SHA, asserted as ``expectedHeadOid``.
     :param message: the commit headline.
-    :param trailers: lines joined into the commit-message body (e.g. a
-                     ``Signed-off-by`` trailer); blank entries are dropped and an
-                     empty list yields a headline-only message.
-    :param files: working-tree paths to commit; each is read and Base64-encoded
-                  into one ``FileAddition``.
+    :param trailers: commit-body lines; blank entries are dropped.
+    :param files: working-tree paths to commit, each Base64-encoded.
     :return: a ``{"query", "variables"}`` dict ready to POST to the GraphQL API.
     """
     additions = []
@@ -107,8 +90,7 @@ def create_commit(payload: dict, token: str) -> str:
     :param payload: the ``{"query", "variables"}`` body from :func:`build_payload`.
     :param token: a GitHub token with ``contents: write`` on the repository.
     :return: the OID (SHA) of the commit created by ``createCommitOnBranch``.
-    :raises SystemExit: on a transport error or any GraphQL ``errors`` entry, so
-                        the workflow step fails with the underlying message.
+    :raises SystemExit: on a transport error or any GraphQL ``errors`` entry.
     """
     request = urllib.request.Request(
         GRAPHQL_ENDPOINT,

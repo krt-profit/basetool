@@ -187,7 +187,7 @@ Then, in this order:
 2. **Verify the tokens**, not only the config: [step 5b](#step-5--verify-both-token-sets-carry-the-audience-gate-for-step-6)
    on a fresh frontend login.
 3. **Verify the shape**: run `scripts/keycloak-config-snapshot.sql` on this host and on production
-   (the recipe is in the file's header) and `diff` the two. What may still differ is listed there —
+   (the recipe is in [`docs/keycloak/README.md`](keycloak/README.md)) and `diff` the two. What may still differ is listed there —
    the origins, Keycloak-version artefacts on built-ins, and what the provisioner reported as *only
    on this realm*. Any other line is drift.
 

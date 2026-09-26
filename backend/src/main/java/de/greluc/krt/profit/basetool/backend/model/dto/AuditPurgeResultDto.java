@@ -20,12 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Result of an admin audit-log retention purge (REQ-AUDIT-004): how many audit rows older than the
- * chosen cutoff were deleted. Shared by the per-area purge ({@code DELETE /api/v1/audit/{domain}})
- * and the bank purge ({@code DELETE /api/v1/bank/admin/audit}); the UI renders the deleted count
- * back to the admin. The purge itself is audit-logged and is therefore <em>not</em> counted here.
+ * Result of an admin audit-log retention purge (REQ-AUDIT-004), shared by the per-area and the bank
+ * purge. The purge's own audit row is not counted.
  *
- * @param deletedCount the number of audit rows removed (non-negative; {@code 0} when nothing was
- *     older than the cutoff)
+ * @param deletedCount the number of audit rows removed; {@code 0} when nothing was older than the
+ *     cutoff
  */
 public record AuditPurgeResultDto(int deletedCount) {}

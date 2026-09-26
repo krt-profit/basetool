@@ -132,7 +132,6 @@ class SmtpMailServiceTest {
         .send(any(SimpleMailMessage.class));
     SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, HOST);
 
-    // Best-effort: a failed send must not propagate to the caller.
     service.send(MSG);
 
     verify(javaMailSender).send(any(SimpleMailMessage.class));

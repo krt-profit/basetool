@@ -27,22 +27,10 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.session.data.redis.config.ConfigureRedisAction;
 
 /**
- * The startup step Spring Session runs against Redis when the frontend authenticates as its own ACL
- * user: it proves the session store answers, and sends no {@code CONFIG} at all (REQ-SEC-068,
- * ADR-0207).
+ * Spring Session's Redis startup step for the frontend's own ACL user: sends a {@code PING} instead
+ * of any {@code CONFIG} command (REQ-SEC-068, ADR-0207).
  *
- * <p>The {@code basetool-frontend} user is deliberately not granted {@code CONFIG}; the server
- * carries {@code --notify-keyspace-events Egx} on its own command line instead. Asking for {@code
- * CONFIG GET} anyway, as {@link TolerantKeyspaceNotificationsAction} does, is refused on every
- * start and each refusal lands in Redis's {@code ACL LOG} and in {@code
- * redis_acl_access_denied_cmd_total} — the counter {@code RedisAclDenials} sums, which then sat at
- * its threshold on every frontend restart and taught operators to ignore the alert that means "a
- * service's ACL is wrong" (observed on production 2026-09-25).
- *
- * <p>What the {@code CONFIG GET} also did — open a connection and fail the context refresh when the
- * session store cannot be reached or the credentials are wrong (ADR-0084: Redis is mandatory for
- * the frontend) — is kept by a {@code PING}, which the user's {@code +@connection} allows. Any
- * failure of it propagates unchanged.
+ * <p>The server enables keyspace notifications itself. A failed {@code PING} still fails startup.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -59,15 +47,13 @@ public final class ServerConfiguredKeyspaceNotificationsAction implements Config
   private final @NotNull String username;
 
   /**
-   * Sends one {@code PING} over the connection Spring Session opened for its startup step, and
-   * nothing else.
+   * Sends one {@code PING} over the connection Spring Session opened for its startup step.
    *
-   * @param connection the connection Spring Session's keyspace-notification initializer hands over
-   *     at startup and closes afterwards.
-   * @throws DataAccessException when Redis cannot be reached, refuses the credentials, or times out
-   *     — which fails the frontend's startup, exactly as the {@code CONFIG GET} of before did.
+   * @param connection the connection Spring Session hands over at startup and closes afterwards
+   * @throws DataAccessException when Redis cannot be reached, refuses the credentials, or times
+   *     out, which fails startup
    * @throws IllegalStateException when Redis answers the {@code PING} with anything but {@code
-   *     PONG}, which no healthy session store does.
+   *     PONG}
    */
   @Override
   public void configure(@NotNull RedisConnection connection) {

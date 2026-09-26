@@ -1,55 +1,14 @@
 name: E2E
 
-# The destructive functional flows (@Tag("e2e")) against an ephemeral full stack
-# (Postgres x2 + Keycloak + Redis + backend + frontend), built and torn down by
-# E2eStackExtension via `docker compose`, fanned out over three browser engines
-# (Chromium, Firefox, WebKit) as a matrix. Heavy (~2 GB RAM + a Keycloak boot),
-# so it runs nightly + on manual dispatch, and on PRs only when they carry the
-# `e2e` label.
-#
-# The non-destructive @Tag("smoke") checks against a staging deployment live in
-# `e2e-smoke.yml` — a post-release / nightly concern, deliberately NOT a PR check
-# (so a dormant, skipped job never shows up as a confusing matrix placeholder on
-# pull requests).
 on:
   pull_request:
     branches: [main]
-    # `labeled` is included so applying the `e2e` label AFTER a PR is opened
-    # triggers the suite immediately. Without it the gate below only ever sees
-    # the label state captured at open/synchronize, so a label added later (e.g.
-    # by `gh pr create --label e2e`, which lands after the open event) silently
-    # skips e2e until the next push — a real, recurring footgun.
     types: [opened, synchronize, reopened, labeled]
   schedule:
-    # Daily. Scheduled at 02:37 UTC, off the full hour when every repository on GitHub queues its
-    # crons -- but GitHub starts scheduled runs late (4 to 6.5 hours were measured on this
-    # repository's weekly workflows in September 2026), so read it as "once a day", not as a time
-    # (audit item CI-16).
     - cron: '37 2 * * *'
   workflow_dispatch:
 
 concurrency:
-  # The group is claimed when the run is CREATED -- before the job gate below is evaluated. A run
-  # that goes on to skip every job therefore still cancels the incumbent on its way to skipping,
-  # and that is the whole bug: `gh pr create --label a --label b --label e2e` fires `opened` plus
-  # one `labeled` event per label inside a second, a single shared group made each cancel its
-  # predecessor, and the survivor was whichever label happened to land last -- usually not `e2e`,
-  # so its gate was false and it skipped. The heavy suite never executed, while `gh pr checks`
-  # renders the cancelled runs as `fail`, so the PR showed red checks with nothing behind them.
-  # Seen on #1537 and again on #1871: the same footgun the `labeled` trigger above exists to fix,
-  # reintroduced one layer down by the concurrency group.
-  #
-  # So the group separates the two populations. Every run whose gate will PASS shares `-suite`,
-  # where `cancel-in-progress` still does the job it exists for -- a new push supersedes the
-  # in-flight suite. Every run that will SKIP gets a group of its own, keyed on the per-run-unique
-  # `github.run_id`: it cancels nothing, nothing cancels it, and it reports `skipped` rather than
-  # the `fail`-coloured `cancelled`. Event ordering stops mattering, because of those five runs
-  # only the one carrying `e2e` can ever enter `-suite`.
-  #
-  # The selector is the job gate VERBATIM, and must stay that way: a selector LOOSER than the gate
-  # lets a skipping run back into `-suite` and restores the bug (a `labeled` event for an unrelated
-  # label on a PR that already carries `e2e` is exactly such a run). `check_e2e_gate_mirror.py`
-  # fails repo-lint if the two ever drift -- change one, change the other.
   group: >-
     e2e-${{ github.workflow }}-${{ github.ref }}-${{
     (github.event_name != 'pull_request' ||
@@ -63,19 +22,6 @@ permissions:
   contents: read
 
 jobs:
-  # Builds the two application images ONCE per run and hands them to all fifteen matrix cells as
-  # an artifact (audit item CI-06). Before, every cell ran `docker compose up --build` itself: the
-  # same backend and frontend images, from the same commit, built fifteen times in parallel -- each
-  # build a full multi-stage Gradle compile inside Docker, each a fresh chance at the Maven Central
-  # 429 that kills a cell before a single test runs (Delivery note, "Same class, different
-  # remote"). One build, fifteen `docker load`s.
-  #
-  # An artifact, not the GitHub Actions layer cache ADR-0137 rejected: that decision is about
-  # `cache-to: type=gha`, which wrote gigabytes per run into the shared 10 GB cache store and had
-  # them evicted before anything read them. A run-scoped artifact does not touch the cache store,
-  # is read by the fifteen cells of THIS run only, and expires after a day.
-  #
-  # The gate is the matrix job's gate verbatim, so a PR without the `e2e` label builds nothing.
   build-stack:
     name: Build E2E images
     if: >-
@@ -86,24 +32,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # The names docker-compose.build.yml gives the built services, with the tag
-      # E2eStackExtension sets (IRI_BASETOOL_VERSION=e2e-local, its IMAGE_TAG constant). The matrix
-      # cells boot them with `--no-build`, and E2eStackExtension refuses to start in prebuilt mode
-      # when either is missing, so a rename on one side fails loudly instead of pulling from GHCR.
       BACKEND_IMAGE: ghcr.io/krt-profit/basetool-backend:e2e-local
       FRONTEND_IMAGE: ghcr.io/krt-profit/basetool-frontend:e2e-local
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
-      # The same two builds `docker compose ... up --build` ran in every cell: context `.`, the
-      # shared app Dockerfile, `MODULE` the only build arg (docker-compose.build.yml passes the same
-      # and nothing else). Retried once, for the same reason E2eStackExtension retried its
-      # `up --build`: the Gradle dependency download inside the image build is the network call
-      # that fails transiently.
       - name: Build the backend and frontend images
         run: |
           set -euo pipefail
@@ -122,8 +59,6 @@ jobs:
           build frontend "$FRONTEND_IMAGE"
           docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep ':e2e-local '
 
-      # zstd ships on the runner; -T0 uses every core. Uploaded uncompressed by the artifact action
-      # (compression-level 0), because it is compressed already.
       - name: Save the images
         run: |
           set -euo pipefail
@@ -131,7 +66,7 @@ jobs:
           ls -l e2e-images.tar.zst
 
       - name: Upload the images
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: e2e-images
           path: e2e-images.tar.zst
@@ -140,55 +75,24 @@ jobs:
           if-no-files-found: error
 
   e2e:
-    # The DEVICE belongs in the name. With fifteen jobs and only the browser in it, five are
-    # indistinguishable per engine — when one was cancelled at its timeout, working out WHICH
-    # device class it was meant comparing artifact sizes, and the run log interleaves all five
-    # under one name so it cannot be read per job at all.
     name: E2E flows (${{ matrix.browser }}, ${{ matrix.device }})
     needs: build-stack
-    # PRs: only when labelled `e2e`. A `labeled` event must be the `e2e` label
-    # itself, so toggling an unrelated label never spins up this heavy stack;
-    # open/synchronize/reopened run whenever the label is currently present.
-    # schedule / workflow_dispatch: always.
-    #
-    # This expression is mirrored verbatim into the `concurrency.group` selector above so that
-    # runs which will skip cannot cancel the run that will execute. Editing it here without
-    # editing it there fails the `e2e-gate-mirror` repo-lint check. `build-stack` carries the same
-    # expression, so the two jobs run or skip together.
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
       (github.event.action != 'labeled' &&
       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubuntu-latest
-    # Back to 45 now that each runner measures ONE device class instead of five.
-    #
-    # The touch-class sweep added 65 routes x 5 device classes on top of the 93 existing classes,
-    # and Firefox is roughly four times slower than Chromium on that workload: it was CANCELLED at
-    # this ceiling on six consecutive runs while Chromium finished in 20 minutes and WebKit in 21,
-    # and two green engines made it easy to miss. Trimming the sweep came first — screenshots
-    # confined to the artifact-bearing shard, the duplicate whole-document walk removed, and a flat
-    # 150ms-per-measurement sleep replaced by the condition it was guessing at, together about 40%
-    # — and the ceiling was briefly 75 while the remaining margin was too thin to trust.
     timeout-minutes: 45
     strategy:
-      # Run all three engines even if one fails, so a Chromium-only regression
-      # doesn't hide a Firefox/WebKit pass (and vice versa).
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
-        # One runner per device class (owner decision 2026-09-13), rather than five walked one
-        # after another inside a single @Test. Each runner still runs the whole destructive suite,
-        # because that is what puts rows in the tables and an empty table hides what this sweep
-        # exists to find — so 14 of the 15 repeat work that only one of them needs. That is the
-        # price, and it was chosen knowingly: it buys a wall clock per job that does not sit on the
-        # timeout, and it removes the in-process parallelisation that would otherwise be needed
-        # (a Playwright instance is not thread-safe, so that is a refactor rather than a setting).
         device: ['375x812', '810x1080', '1024x768', '1280x800', '1600x900']
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
@@ -197,14 +101,8 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # Cache the Playwright-managed browser (~/.cache/ms-playwright) so the playwrightInstall task
-      # is a no-op on a hit. Keyed on the version catalog, so a Playwright bump
-      # (gradle/libs.versions.toml) invalidates it -- and on the BROWSER, because each cell now
-      # installs only its own engine (`-Pe2e.browser`, audit item CI-06): a shared key would hand a
-      # Firefox cell a Chromium-only cache and let the first engine to finish decide what the key
-      # holds for everyone.
       - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('gradle/libs.versions.toml') }}
@@ -212,7 +110,7 @@ jobs:
             playwright-${{ runner.os }}-${{ matrix.browser }}-
 
       - name: Download the E2E images
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: e2e-images
           path: ${{ runner.temp }}/e2e-images
@@ -225,19 +123,9 @@ jobs:
           zstd -d -c "$ARCHIVE" | docker load
           rm -f "$ARCHIVE"
 
-      # WebKit has no launch-level DNS override, so the ephemeral stack's Keycloak
-      # issuer host must be mapped to the loopback at the OS level. Chromium (a
-      # resolver arg) and Firefox (a profile pref) remap it themselves, but the
-      # entry is harmless for them.
       - name: Map host.docker.internal to the loopback (needed by WebKit)
         run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
-      # E2eStackExtension brings the stack up itself (no E2E_BASE_URL => ephemeral mode).
-      # `-Pe2e.prebuilt=true` makes it boot the images loaded above with `--no-build` instead of
-      # building them, and refuse to start if either is missing. Docker + compose v2 ship on the
-      # runner.
-      #
-      # `--configuration-cache`: switched on in CI first (audit item BLD-PERF-04), see ci.yml.
       - name: Run e2e flows
         env:
           BROWSER: ${{ matrix.browser }}
@@ -250,14 +138,10 @@ jobs:
           --stacktrace
           --configuration-cache
 
-      # Playwright traces, failure screenshots/HTML dumps and the docker compose
-      # boot logs all land under frontend/build/e2e.
       - name: Upload e2e artifacts
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          # The device belongs in the name: fifteen jobs upload, and an artifact name
-          # collision drops all but one.
           name: e2e-artifacts-${{ matrix.browser }}-${{ matrix.device }}
           path: |
             frontend/build/e2e/**

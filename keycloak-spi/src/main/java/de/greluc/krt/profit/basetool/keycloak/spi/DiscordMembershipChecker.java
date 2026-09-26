@@ -33,18 +33,11 @@ import org.jetbrains.annotations.Nullable;
 import org.keycloak.util.JsonSerialization;
 
 /**
- * Pure, side-effect-free decision logic for the Discord guild + KRT-Mitglied membership gate
- * (REQ-SEC-016). Calls {@code GET {apiBaseUrl}/users/@me/guilds/{guildId}/member} with the user's
- * own brokered access token and decides whether the login may proceed.
+ * Decision logic of the Discord guild and KRT-Mitglied membership gate (REQ-SEC-016).
  *
- * <p><strong>Fails closed.</strong> The login is admitted ({@link Result#ALLOWED}) <em>only</em> on
- * HTTP 200 whose {@code roles[]} contains the configured role id (matched by numeric id as a JSON
- * string). A clean HTTP 404 means "not in the guild" ({@link Result#DENIED_NOT_MEMBER}). Every
- * other outcome — 5xx, 401/403, a malformed body, a network error or timeout, or a 429 once the
- * retry budget is exhausted — is a fail-closed denial ({@link Result#DENIED_ERROR}). All three
- * non-allow results deny access; the distinction exists only for non-PII logging.
- *
- * <p>This class never logs the token, the response body, or any Discord id.
+ * <p>Fails closed: only HTTP 200 whose {@code roles[]} contains the configured role id yields
+ * {@link Result#ALLOWED}; 404 yields {@link Result#DENIED_NOT_MEMBER}, anything else {@link
+ * Result#DENIED_ERROR}. Never logs the token, the body or any Discord id.
  */
 @JBossLog
 @RequiredArgsConstructor
@@ -90,24 +83,17 @@ public class DiscordMembershipChecker {
   }
 
   /**
-   * Performs the one guild-member read of a first login and returns the membership decision
-   * together with the member object it was taken from.
+   * Reads the guild member once and returns the membership decision with the member JSON it was
+   * based on, so a first login needs exactly one Discord call.
    *
-   * <p>Exists so the first-login gate needs exactly one Discord call. It used to read the same
-   * {@code /users/@me/guilds/{guildId}/member} twice — once here for the roles, once more through
-   * {@link DiscordGuildNicknameReader} for the nickname — which doubled the rate-limit budget a
-   * login spends and let the two answers disagree. The body is handed back only on an {@link
-   * Result#ALLOWED} decision, i.e. only from a clean HTTP 200 that parsed; a caller derives the
-   * nickname from it with {@link DiscordGuildNicknameReader#extractNick(String)}.
-   *
-   * <p>The fail-closed contract is unchanged: every outcome other than a 200 carrying the role is a
-   * denial, and a denial carries no body.
+   * <p>The body is returned only on {@link Result#ALLOWED}; the caller can derive the nickname with
+   * {@link DiscordGuildNicknameReader#extractNick(String)}.
    *
    * @param apiBaseUrl Discord API base URL, e.g. {@code https://discord.com/api/v10}
-   * @param guildId the required guild (server) id
-   * @param roleId the required role id (numeric snowflake, as a string)
-   * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
-   * @return the decision, plus the member JSON when (and only when) the login is allowed
+   * @param guildId the required guild id
+   * @param roleId the required role id, as a string
+   * @param accessToken the user's brokered Discord access token
+   * @return the decision, plus the member JSON only when the login is allowed
    */
   public @NotNull MemberLookup lookup(
       @NotNull String apiBaseUrl,
@@ -122,9 +108,6 @@ public class DiscordMembershipChecker {
         response =
             httpClient.send(buildRequest(url, accessToken), HttpResponse.BodyHandlers.ofString());
       } catch (IOException e) {
-        // Timeout / connection reset / DNS failure / truncated read — fail closed. This is the
-        // single most likely cause of a "nobody can log in" report, so it must not be silent: the
-        // authenticator downstream only ever sees DENIED_ERROR and cannot say what went wrong.
         log.warnf(
             e,
             "Discord membership check failed to reach the API (%s); denying.",
@@ -144,14 +127,11 @@ public class DiscordMembershipChecker {
               ? new MemberLookup(Result.ALLOWED, body)
               : MemberLookup.denied(Result.DENIED_NOT_MEMBER);
         } catch (IOException e) {
-          // Malformed / unparseable body — fail closed. Distinct from a transport failure: this one
-          // means Discord answered 200 with something we could not read, i.e. a contract change.
           log.warnf(e, "Discord returned an unreadable member payload; denying.");
           return MemberLookup.denied(Result.DENIED_ERROR);
         }
       }
       if (status == 404) {
-        // Clean "not a member of the guild".
         return MemberLookup.denied(Result.DENIED_NOT_MEMBER);
       }
       if (status == 429 && attempt < max429Retries) {
@@ -159,10 +139,6 @@ public class DiscordMembershipChecker {
         waitForRetry(response);
         continue;
       }
-      // 5xx / 401 / 403 / 429-after-retries / anything unexpected — fail closed. The status is the
-      // whole diagnosis: 401 means the brokered token is bad, 403 a missing scope, 429 that we are
-      // being rate-limited, 5xx a Discord outage. Never log the token or the URL (it carries the
-      // guild id).
       log.warnf(
           "Discord membership check denied on HTTP %d after %d retry attempt(s).", status, attempt);
       return MemberLookup.denied(Result.DENIED_ERROR);
@@ -170,8 +146,7 @@ public class DiscordMembershipChecker {
   }
 
   /**
-   * The outcome of one guild-member read: the membership decision and, on an allowed login only,
-   * the raw member JSON it was decided from. Never logged — the body carries Discord ids and names.
+   * Outcome of one guild-member read; never logged.
    *
    * @param result the fail-closed membership decision
    * @param memberBody the guild-member JSON on {@link Result#ALLOWED}; {@code null} on any denial
@@ -240,7 +215,6 @@ public class DiscordMembershipChecker {
     try {
       return (long) (Double.parseDouble(headerValue.trim()) * 1000);
     } catch (NumberFormatException e) {
-      // A non-numeric Retry-After (HTTP-date form) — fall back to a small fixed wait.
       log.debugf("Non-numeric Discord Retry-After header; using the default backoff.");
       return 200L;
     }

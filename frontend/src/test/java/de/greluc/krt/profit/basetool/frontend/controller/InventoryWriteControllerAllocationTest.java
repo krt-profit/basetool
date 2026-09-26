@@ -39,11 +39,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Pure-Mockito unit tests for the three Variante-C allocation proxy endpoints of {@link
- * InventoryWriteController} (REQ-INV-027): each forwards to the canonical backend path with the
- * matching HTTP method and relays the backend status/body verbatim through {@code
- * propagateBackendError} — so the AJAX layer keeps its 409-reload vs 422-toast distinction (the
- * over-allocation case).
+ * Unit tests for the three allocation proxy endpoints of {@link InventoryWriteController}
+ * (REQ-INV-027): each calls the backend path with the right HTTP method and relays the backend
+ * status and body verbatim.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryWriteControllerAllocationTest {
@@ -109,7 +107,6 @@ class InventoryWriteControllerAllocationTest {
 
     ResponseEntity<Object> result = controller().addAllocation(id, dto);
 
-    // propagateBackendError relays the backend status so krt-fetch.js can toast (not reload).
     assertEquals(422, result.getStatusCode().value());
   }
 

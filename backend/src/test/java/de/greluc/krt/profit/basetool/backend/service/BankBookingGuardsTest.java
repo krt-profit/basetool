@@ -49,14 +49,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Unit tests for the pre-persist validation guards {@link BankBookingGuards} extracted from {@code
- * BankLedgerService} (#1253) — the KRT-account direct-booking cap {@code
- * exceedsCartelDirectBookingCeiling} (REQ-BANK-047, ADR-0109) and the fee-inclusive {@code amount -
- * fee <= 0} guard {@code requireAmountExceedsFee} (REQ-BANK-033, #999). Pure Mockito — these are
- * pre-persist branch decisions driven by the role hierarchy, the {@code CARTEL} type/ceiling and
- * the fee, so no database is needed. The overdraft, closed-account and holder-activity guards stay
- * covered by the Testcontainers booking suites that drive them end-to-end ({@code
- * BankLedgerServiceTest}, {@code BankLedgerSplitDepositTest}, {@code BankHolderTransferFeeTest}).
+ * Unit tests for {@link BankBookingGuards}: the KRT-account direct-booking cap (REQ-BANK-047) and
+ * the {@code amount - fee <= 0} guard (REQ-BANK-033).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -68,60 +62,47 @@ class BankBookingGuardsTest {
 
   @InjectMocks private BankBookingGuards bankBookingGuards;
 
-  // ---- exceedsCartelDirectBookingCeiling (REQ-BANK-047, ADR-0109) -------------------------------
-
   @Test
   void exceedsCartelDirectBookingCeiling_plainEmployeeAboveCeiling_returnsTrue() {
-    // Given: a plain bank employee (not management) and a KRT/CARTEL account with a T1 ceiling of
-    // 1000.
     UUID accountId = UUID.randomUUID();
     when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
         .thenReturn(false);
     when(accountRepository.findById(accountId))
         .thenReturn(Optional.of(cartelAccount(accountId, new BigDecimal("1000"))));
 
-    // When / Then: a direct booking above the ceiling must be re-routed to an approval request.
     assertTrue(
         bankBookingGuards.exceedsCartelDirectBookingCeiling(accountId, new BigDecimal("1500")));
   }
 
   @Test
   void exceedsCartelDirectBookingCeiling_atOrBelowCeiling_returnsFalse() {
-    // Given: a plain employee and a CARTEL account with a 1000 ceiling.
     UUID accountId = UUID.randomUUID();
     when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
         .thenReturn(false);
     when(accountRepository.findById(accountId))
         .thenReturn(Optional.of(cartelAccount(accountId, new BigDecimal("1000"))));
 
-    // When / Then: exactly at the ceiling books directly — the guard is strictly greater-than, so a
-    // flipped comparison (>= instead of >) would wrongly re-route this boundary amount.
     assertFalse(
         bankBookingGuards.exceedsCartelDirectBookingCeiling(accountId, new BigDecimal("1000")));
   }
 
   @Test
   void exceedsCartelDirectBookingCeiling_nullCeilingTreatedAsZero_anyPositiveReturnsTrue() {
-    // Given: a plain employee and a CARTEL account whose ceiling is unset (null -> treated as 0).
     UUID accountId = UUID.randomUUID();
     when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
         .thenReturn(false);
     when(accountRepository.findById(accountId))
         .thenReturn(Optional.of(cartelAccount(accountId, null)));
 
-    // When / Then: with a null ceiling any positive direct booking needs approval.
     assertTrue(bankBookingGuards.exceedsCartelDirectBookingCeiling(accountId, new BigDecimal("1")));
   }
 
   @Test
   void exceedsCartelDirectBookingCeiling_management_returnsFalseEvenAboveCeiling() {
-    // Given: the caller reaches BANK_MANAGEMENT.
     UUID accountId = UUID.randomUUID();
     when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
         .thenReturn(true);
 
-    // When / Then: management is uncapped and short-circuits before ever loading the account (an
-    // inverted role check would instead fall through to findById here).
     assertFalse(
         bankBookingGuards.exceedsCartelDirectBookingCeiling(
             accountId, new BigDecimal("999999999")));
@@ -130,25 +111,18 @@ class BankBookingGuardsTest {
 
   @Test
   void exceedsCartelDirectBookingCeiling_nonCartelAccount_returnsFalse() {
-    // Given: a plain employee and a non-CARTEL (AREA) account — the cap is CARTEL-only.
     UUID accountId = UUID.randomUUID();
     when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
         .thenReturn(false);
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(areaAccount(accountId)));
 
-    // When / Then: any amount books directly on a non-CARTEL account regardless of its ceiling.
     assertFalse(
         bankBookingGuards.exceedsCartelDirectBookingCeiling(
             accountId, new BigDecimal("999999999")));
   }
 
-  // ---- requireAmountExceedsFee (REQ-BANK-033, #999) --------------------------------------------
-
   @Test
   void requireAmountExceedsFee_amountEqualsFee_throwsFeeExceedsAmount() {
-    // Given / When / Then: a punitive fee that consumes the whole entered amount (fee 1 on amount 1
-    // -> amount - fee = 0) leaves nothing to arrive, so the inclusive guard rejects it with the
-    // stable code and reports the fee.
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -161,14 +135,9 @@ class BankBookingGuardsTest {
 
   @Test
   void requireAmountExceedsFee_amountExceedsFee_passes() {
-    // When / Then: as long as the entered amount strictly exceeds the fee, something arrives and
-    // the
-    // guard passes — the boundary is strictly greater-than.
     assertDoesNotThrow(
         () -> bankBookingGuards.requireAmountExceedsFee(new BigDecimal("2"), new BigDecimal("1")));
   }
-
-  // ---- fixtures --------------------------------------------------------------------------------
 
   /**
    * Builds an active {@code CARTEL} account with the given direct-booking ceiling.

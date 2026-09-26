@@ -24,14 +24,10 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Material Matrix Item payload.
+ * One material price row of the material matrix at a single terminal.
  *
- * <p>The {@code planetName} field carries the <i>effective</i> planet name that groups a terminal
- * into its UEX planet system: it is resolved on the SQL side via {@code COALESCE} over {@code
- * terminal.planet_name}, {@code moon.planet_name} (indirectly via {@code terminal.moon_name}) and
- * finally the {@code Planet} whose own name matches {@code terminal.orbit_name} within the same
- * star system. It is {@code null} for terminals that are not attached to any planet (e.g. raw
- * jump-point or Lagrange-only stations).
+ * <p>{@code planetName} is the effective planet (direct, via moon, or via a like-named orbit), or
+ * {@code null} for a terminal not attached to any planet.
  */
 public record MaterialMatrixItemDto(
     UUID materialId,

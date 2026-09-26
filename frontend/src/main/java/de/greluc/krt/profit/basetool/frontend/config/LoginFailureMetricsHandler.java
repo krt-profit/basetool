@@ -36,51 +36,28 @@ import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 
 /**
- * OAuth2 login failure handler that counts every failed login into {@code
- * basetool_login_total{outcome="failure", reason=…}} before performing the usual redirect to the
- * configured failure URL ({@code /?error}).
+ * OAuth2 login failure handler that counts each failure into {@code
+ * basetool_login_total{outcome="failure", reason=…}}, logs it once, and redirects to the failure
+ * URL (REQ-OBS-011).
  *
- * <p>The {@code reason} tag is derived from the exception <b>type</b> and, for an {@link
- * OAuth2AuthenticationException}, its bounded OAuth2 error <b>code</b> — never the raw, provider-
- * supplied error description (which could be arbitrary and would blow up the metric cardinality).
- * It collapses to three buckets: {@code invalid_state} (a benign authorization-response / {@code
- * state}-validation failure raised BEFORE any token exchange — the state check failed, the callback
- * was not a valid authorization response at all, or the {@code prompt=none} silent-SSO probe found
- * no live Keycloak SSO session), {@code provider_error} (a genuine post-authorization failure — a
- * bad IdP response or a failed code-to-token exchange, the failure class {@code
- * KeycloakLoginErrorSpike}'s event regex misses) and {@code other} (a non-OAuth2 authentication
- * exception). Keeping pre-token-exchange traffic OUT of {@code provider_error} is what stops it
- * false-tripping {@code FrontendLoginBroken}; see {@link #isStateError(String)}. See {@link
- * LoginSuccessMetricsHandler} for the paired success signal (#1041 item 18, REQ-OBS-011).
- *
- * <p>Each failure is also written to the log exactly once, at the level its bucket warrants (see
- * {@link #logFailure(String, AuthenticationException)}). The handler used to be metric-only, which
- * left {@code FrontendLoginBroken} — whose own description says "check the frontend logs" —
- * pointing at a log that contained nothing about the failure: {@code org.springframework.security}
- * is pinned to {@code INFO} in {@code logback-spring.xml} / {@code application.yml}, so Spring's
- * own DEBUG lines about the failed exchange are off in every environment.
+ * <p>The {@code reason} is {@code invalid_state} for benign authorization-response failures (see
+ * {@link #isStateError(String)}), {@code provider_error} for failures after authorization, and
+ * {@code other} for non-OAuth2 exceptions. It never uses the provider's error description. Pairs
+ * with {@link LoginSuccessMetricsHandler}.
  */
 @Slf4j
 public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHandler {
 
   /**
-   * The bounded set of OAuth2 / OIDC error codes that denote a benign authorization-response
-   * outcome. Every code in here is raised at the authorization-response stage — BEFORE any
-   * code-to-token exchange — so none of them can ever be the token-exchange break {@code
-   * provider_error} exists to signal. See {@link #isStateError(String)} for what each group means
-   * and why leaving a code out of this set false-trips {@code FrontendLoginBroken}.
+   * OAuth2 / OIDC error codes raised at the authorization-response stage, before any token
+   * exchange, which count as {@code invalid_state}.
    */
   private static final Set<String> BENIGN_AUTHORIZATION_RESPONSE_ERRORS =
       Set.of(
-          // The callback could not be correlated to a saved authorization request (state failure).
           "authorization_request_not_found",
           "invalid_state_parameter",
           "invalid_state",
-          // The callback was not a valid authorization response at all (scanner / stale bookmark).
           "invalid_request",
-          // The prompt=none silent-SSO probe found no usable Keycloak SSO session (OIDC Core
-          // 3.1.2.6). SsoReAuthenticationEntryPoint issues that probe by design, so these are
-          // self-inflicted and expected — not a provider fault.
           "login_required",
           "interaction_required",
           "consent_required",
@@ -148,38 +125,14 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
         .increment();
     logFailure(reason, exception);
 
-    // Deliberately NOT super.onAuthenticationFailure(...): that calls the superclass's `final`
-    // saveException, which parks the exception in the HTTP session. See redirectWithoutPoisoning.
     redirectWithoutPoisoningTheSession(request, response, exception);
   }
 
   /**
-   * Performs the failure redirect without writing the exception into the session.
+   * Performs the failure redirect without storing the exception in the session.
    *
-   * <p><strong>This replaces the one line that caused the 2026-09-02 outage.</strong> {@code
-   * SimpleUrlAuthenticationFailureHandler#onAuthenticationFailure} calls {@code saveException},
-   * which stores the {@link AuthenticationException} under {@code SPRING_SECURITY_LAST_EXCEPTION}
-   * in the session. Sessions are JSON in Redis here, and that value writes cleanly — with its
-   * {@code @class} — and then <em>cannot be read back</em>: reconstruction dies on {@code
-   * IllegalArgumentException: authenticationRequest cannot be null}, a field the serialized form
-   * never carried. Reading a session deserializes every field, so this single attribute poisoned
-   * the whole session and every later request answered HTTP 500. Every new failed login armed
-   * another one, which is why clearing Redis only bought minutes.
-   *
-   * <p>The superclass's {@code saveException} is {@code protected final}, so it cannot be
-   * overridden — the redirect is reproduced here instead, minus that one call. It is the same two
-   * lines the superclass runs for the redirect case, using the same {@link
-   * org.springframework.security.web.RedirectStrategy} so a configured strategy still applies.
-   *
-   * <p><strong>Nothing is lost.</strong> This handler redirects to its failure URL and the UI reads
-   * the <em>query parameter</em> ({@code param.error} in {@code fragments/toast.html}), never the
-   * session attribute. The diagnostic value is captured before this runs: the login-failure counter
-   * carries the reason bucket and {@link #logFailure} writes the single log line. The attribute was
-   * written, never read, and able to take the site down.
-   *
-   * <p>It is still set as a <em>request</em> attribute, exactly as the superclass does on its
-   * forward path, so anything inspecting it within this request still finds it. A request attribute
-   * is never serialized.
+   * <p>The exception is not deserializable from the JSON Redis session and would break every later
+   * request of that session. It is kept as a request attribute only.
    *
    * @param request the current request.
    * @param response the response to redirect.
@@ -197,32 +150,13 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
 
   /**
    * Writes the single log line for this failure: WARN for {@link
-   * MetricNames#LOGIN_REASON_PROVIDER_ERROR} (the bucket {@code FrontendLoginBroken} fires on — a
-   * failed code-to-token exchange, a JWKS/IdP fault, an explicit refusal), DEBUG for {@link
-   * MetricNames#LOGIN_REASON_INVALID_STATE} and {@link MetricNames#LOGIN_REASON_OTHER}. The benign
-   * buckets are attacker- and scanner-driven by construction — every bare hit on {@code
-   * /login/oauth2/code/*} and every {@code prompt=none} probe without a Keycloak SSO cookie lands
-   * there — so anything above DEBUG would be a log-flood vector (REQ-OBS-001).
+   * MetricNames#LOGIN_REASON_PROVIDER_ERROR}, DEBUG for {@link
+   * MetricNames#LOGIN_REASON_INVALID_STATE} and {@link MetricNames#LOGIN_REASON_OTHER}
+   * (REQ-OBS-001).
    *
-   * <p><b>Abuse envelope of the WARN.</b> {@code provider_error} is not purely operator-triggered:
-   * {@code access_denied} is deliberately mapped into it (see {@link #isStateError(String)}), and
-   * that code is <em>mintable</em> by anyone with a browser through a two-request loop — start an
-   * authorization request, then replay the callback with {@code error=access_denied} and the
-   * matching {@code state}. A determined caller can therefore drive this WARN at request rate. That
-   * is accepted rather than fixed here for one reason: it is the <em>same</em> envelope the
-   * existing {@code basetool_login_total{reason="provider_error"}} counter and the {@code
-   * FrontendLoginBroken} alert already carry, so the log line adds no new exposure — it only makes
-   * an alert that already fires on this traffic explainable. A reader triaging a WARN burst must
-   * know that a flood of them with {@code oauth2ErrorCode=access_denied} is consistent with abuse
-   * and not, by itself, evidence that login is broken. If that envelope is ever tightened, tighten
-   * the metric and the alert with it, not just this line.
-   *
-   * <p>Deliberately absent from the message: {@code OAuth2Error.getDescription()}
-   * (provider-supplied free text and therefore a log-injection surface — it never reaches a logger,
-   * sanitised or not), the {@code code} and {@code state} request parameters, any token, and the
-   * principal. The only two payload fields are the length-capped, control-character-stripped OAuth2
-   * error code and the root cause's class simple name, which is what tells a TLS/DNS/connect fault
-   * apart from a real {@code invalid_grant}.
+   * <p>Logs only the sanitised OAuth2 error code and the root cause's class name; never the error
+   * description, request parameters, tokens or the principal. A WARN burst with {@code
+   * access_denied} can be caller-driven and does not by itself mean login is broken.
    *
    * @param reason the bucket {@link #reasonFor(AuthenticationException)} mapped this failure to
    * @param exception the authentication failure being reported
@@ -263,12 +197,9 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
   }
 
   /**
-   * Walks the cause chain to its end and returns that throwable's class simple name — the field
-   * that separates "Keycloak answered with an error" from "we never reached Keycloak" (a {@code
-   * ConnectException} / {@code SSLHandshakeException} / {@code PrematureCloseException} at the
-   * bottom of the chain). The walk is hop-bounded and stops on a self-reference, so a cyclic chain
-   * cannot hang the request thread. Only the type name is used; the message is never logged,
-   * because it can carry the provider's free-text description.
+   * Returns the class simple name of the deepest cause in the chain, which distinguishes an error
+   * answer from an unreachable Keycloak. The walk is hop-bounded and cycle-safe; the message is
+   * never used.
    *
    * @param exception the authentication failure being reported
    * @return the simple class name of the deepest cause, or of {@code exception} itself when it has
@@ -306,46 +237,14 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
   }
 
   /**
-   * Recognises the OAuth2 error codes Spring Security raises at the authorization-response / {@code
-   * state}-validation stage — BEFORE any code-to-token exchange — so they are benign and must never
-   * inflate {@code provider_error}. Two shapes land here:
+   * Recognises OAuth2 error codes raised before any code-to-token exchange, which must not count as
+   * {@code provider_error}.
    *
-   * <ul>
-   *   <li>the saved authorization request could not be correlated to the callback (the state check
-   *       failed / the request was lost): {@code authorization_request_not_found}, {@code
-   *       invalid_state_parameter}, {@code invalid_state};
-   *   <li>the callback was not a valid authorization response at all: {@code invalid_request}.
-   *       {@code OAuth2LoginAuthenticationFilter} throws this from {@code attemptAuthentication}
-   *       when {@code isAuthorizationResponse(params)} fails (a bare or partial hit to the
-   *       path-only-matched {@code /login/oauth2/code/*} callback — no {@code code}/{@code state}),
-   *       i.e. exactly the traffic a scanner/probe or a stale bookmark generates. It is raised
-   *       before the authorization-request lookup and before the {@code AuthenticationManager}
-   *       runs, so it can NEVER be a token-exchange failure. Leaving it out of this set let those
-   *       malformed-callback hits fall through to {@code provider_error} and, off-peak with no
-   *       fresh successes, trip {@code FrontendLoginBroken} with nothing actually broken;
-   *   <li>the {@code prompt=none} silent-SSO probe found no usable Keycloak SSO session: {@code
-   *       login_required}, {@code interaction_required}, {@code consent_required}, {@code
-   *       account_selection_required} (the OIDC Core 3.1.2.6 {@code prompt=none} error set). {@link
-   *       SsoReAuthenticationEntryPoint} sends every unauthenticated top-level navigation through
-   *       that probe by design, and Keycloak answers {@code login_required} whenever the browser
-   *       carries no live SSO cookie — so this is the single most frequent login failure the app
-   *       generates about itself. Keycloak returns it as an <em>authorization-response</em> error
-   *       (the callback arrives with {@code error=…&state=…} and no {@code code}), which {@code
-   *       OAuth2LoginAuthenticationProvider} rethrows as an {@link OAuth2AuthenticationException}
-   *       before any token request is made — so, like {@code invalid_request}, it can never be a
-   *       token-exchange failure. This is the 2026-07-28 fix: {@code login_required} used to fall
-   *       through to {@code provider_error}, so a scanner walking unauthenticated paths ({@code
-   *       /blog/}, {@code /wp/}, {@code /old/}, …) minted one {@code provider_error} per probe and
-   *       tripped {@code FrontendLoginBroken} overnight with login perfectly healthy.
-   * </ul>
-   *
-   * <p>Anything else — {@code invalid_grant}, {@code server_error}, {@code invalid_token_response},
-   * … — is a genuine post-authorization token/IdP failure and correctly maps to {@code
-   * provider_error}, the class the {@code FrontendLoginBroken} alert exists to catch. {@code
-   * access_denied} is deliberately NOT folded in: it is also an authorization-response error, but
-   * it means an explicit refusal (a user declining consent, or a client/IdP policy rejecting the
-   * request) rather than routine "no session yet" noise, and it is rare enough that surfacing it is
-   * worth more than the alert quiet.
+   * <p>These are the state-correlation failures ({@code authorization_request_not_found}, {@code
+   * invalid_state_parameter}, {@code invalid_state}), a malformed callback ({@code
+   * invalid_request}), and the {@code prompt=none} errors ({@code login_required}, {@code
+   * interaction_required}, {@code consent_required}, {@code account_selection_required}). {@code
+   * access_denied} is deliberately excluded.
    *
    * @param code the OAuth2 error code, or {@code null}
    * @return {@code true} when the code denotes a benign authorization-response / state failure

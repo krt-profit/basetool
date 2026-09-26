@@ -22,15 +22,8 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import java.math.BigDecimal;
 
 /**
- * Single-query per-type aggregate over a mission's finance entries, produced by {@link
- * MissionFinanceEntryRepository#aggregateFinanceByMission} via a JPQL constructor expression.
- *
- * <p>It exists so the finance summary strip and the total-sum endpoint compute their numbers with
- * one grouped SQL query instead of materializing every finance-entry row: under the multi-user
- * mission-page live-update fan-out (ADR-0078) the previous {@code size=1000} load-all pinned a
- * database connection per render and, at 200 viewers, starved the pool. The sums are {@code null}
- * when the mission has no entry of that type (SQL {@code SUM} over an empty set is {@code NULL});
- * the caller coalesces them to zero.
+ * Per-type sums and counts of a mission's finance entries, produced in one query by {@link
+ * MissionFinanceEntryRepository#aggregateFinanceByMission}.
  *
  * @param incomeSum summed amount of all {@code INCOME} entries, or {@code null} when there are none
  * @param incomeCount number of {@code INCOME} entries (never {@code null}; 0 when none)

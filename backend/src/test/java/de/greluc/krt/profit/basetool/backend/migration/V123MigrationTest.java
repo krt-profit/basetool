@@ -32,12 +32,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V123__add_item_job_orders.sql} (issue #304, Phase
- * 1). Asserts the {@code job_order.type} discriminator and the four new item-order tables exist
- * with their expected columns. Booting the full context also exercises Hibernate {@code
- * ddl-auto=validate}, so a mismatch between the new entities ({@code JobOrderItem}, {@code
- * JobOrderItemMaterial}, {@code JobOrderItemHandover}, {@code JobOrderItemHandoverEntry}) and this
- * migration fails the test.
+ * Migration test for {@code V123__add_item_job_orders.sql}: the {@code job_order.type}
+ * discriminator and the four item-order tables exist, and the item-order entities validate against
+ * the schema.
  */
 @SpringBootTest
 @ActiveProfiles("test")

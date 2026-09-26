@@ -37,36 +37,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Phase 7 (#700) end-to-end visibility matrix for the new Bereich tier of the org hierarchy (epic
- * #692) — the security/regression gate's cross-Bereich slice, asserting the three invariants the
- * restructure must hold for a {@code BEREICH}-leadership principal:
+ * End-to-end visibility matrix for the Bereich tier of the org hierarchy.
+ *
+ * <p>For a {@code BEREICH}-leadership principal it asserts:
  *
  * <ul>
- *   <li><b>Own-Bereich reach:</b> a Bereichsleiter sees their own Bereich's data (the cascade
- *       includes the Bereich's own id), via the strict-staffel Lager-View.
- *   <li><b>Strict silo (no cross-Bereich leak):</b> the same Bereichsleiter is denied a
- *       <em>foreign</em> Bereich's data — and a plain Staffel member never sees Bereich-owned data
- *       at all.
- *   <li><b>No admin escalation (REQ-ORG-015 HARD INVARIANT):</b> a Bereichsleiter's
- *       officer-equivalent reach grants <b>no</b> admin rights — an {@code ADMIN}-gated endpoint
- *       stays 403.
+ *   <li>a Bereichsleiter sees their own Bereich's data in the Lager view;
+ *   <li>they are denied a foreign Bereich's data, and a plain Staffel member never sees
+ *       Bereich-owned data;
+ *   <li>their reach grants no admin rights: an {@code ADMIN}-gated endpoint stays 403
+ *       (REQ-ORG-015).
  * </ul>
  *
- * <p>The descendant cascade (Bereichsleiter → child Staffel/SK) and the OL total-reach are pinned
- * at the unit level ({@code OwnerScopeServiceTest.CascadingScopeTests}); this e2e drives the new
- * Bereich-leadership path through the real stack end-to-end.
- *
- * <p><b>Fixtures.</b> {@code test-bereich} is a dedicated realm user carrying only the {@code KRT
- * Member} base role and <em>no</em> Staffel membership, so it can be made a Bereichsleiter without
- * tripping the leader-excludes-Staffel invariant (REQ-ORG-017). It is this suite's own
- * membership-shape-owned profile: making a user a Bereich leader gives it a Bereich membership for
- * the rest of the sequentially-run shared stack, so we must <em>not</em> reuse {@code test-none} —
- * the dedicated membershipless user that {@code RefineryOrderTenancyE2eTest} and {@code
- * InventoryTenancyE2eTest} rely on staying membershipless (a single membership would auto-stamp
- * their "ownerless" fixtures and break their tenancy assertions). The admin seeds two Bereiche, one
- * inventory item owned by each Bereich (create-on-behalf stamping, REQ-ORG-016, on its own material
- * so a material maps 1:1 to a Bereich), then grants {@code test-bereich} the {@code LEITER} role on
- * Bereich A only.
+ * <p>Uses the dedicated membershipless user {@code test-bereich}, made Bereichsleiter of Bereich A
+ * only, because the appointment leaves a membership behind on the shared stack.
  */
 @Tag("e2e")
 class OrgHierarchyVisibilityMatrixE2eTest {
@@ -87,9 +71,8 @@ class OrgHierarchyVisibilityMatrixE2eTest {
   private static Browser browser;
   private static BackendSeeder seeder;
 
-  // Seeded Bereiche and the per-Bereich item materials (1:1 material→Bereich in the grouped view).
-  private static String matAId; // owned by Bereich A (test-bereich's Bereich)
-  private static String matBId; // owned by Bereich B (foreign)
+  private static String matAId;
+  private static String matBId;
 
   /**
    * Seeds two Bereiche, one inventory item owned by each (admin create-on-behalf), and grants
@@ -104,11 +87,8 @@ class OrgHierarchyVisibilityMatrixE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // Admin needs a membership so the create-on-behalf resolver reaches the canEditOrgUnit widening
-    // (a membershipless user with a non-null owner pick is rejected before that branch).
     seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
-    seeder.getUserId(
-        BEREICH_USER, BEREICH_PASSWORD); // materialise test-bereich; it stays Staffel-less
+    seeder.getUserId(BEREICH_USER, BEREICH_PASSWORD);
 
     String bereichAId =
         seeder.createBereich(ADMIN_USER, ADMIN_PASSWORD, "E2E Vis Bereich A", "EVBA");
@@ -119,13 +99,11 @@ class OrgHierarchyVisibilityMatrixE2eTest {
     matAId = seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Vis Mat A");
     matBId = seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Vis Mat B");
 
-    // One Bereich-owned item per Bereich (admin create-on-behalf stamps the Bereich — REQ-ORG-016).
     seeder.createInventoryItemOwnedBy(
         ADMIN_USER, ADMIN_PASSWORD, matAId, locId, SEED_QUALITY, 100, bereichAId);
     seeder.createInventoryItemOwnedBy(
         ADMIN_USER, ADMIN_PASSWORD, matBId, locId, SEED_QUALITY, 100, bereichBId);
 
-    // test-bereich becomes Bereichsleiter of Bereich A only.
     seeder.addBereichLeader(
         ADMIN_USER,
         ADMIN_PASSWORD,

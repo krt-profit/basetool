@@ -37,10 +37,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * User-facing read surface for the blueprint master (#327). Exposes a slim type-ahead search over
- * the SC Wiki blueprint products, de-duplicated to the per-product unit of ownership. Open to any
- * authenticated user (blueprints are non-sensitive global reference data); the richer admin detail
- * view stays on the admin-only {@link BlueprintController}.
+ * User-facing type-ahead search over the SC Wiki blueprint products, de-duplicated to the
+ * per-product unit of ownership. Open to any authenticated user; the admin detail view is {@link
+ * BlueprintController}.
  */
 @RestController
 @RequestMapping("/api/v1/blueprints/products")

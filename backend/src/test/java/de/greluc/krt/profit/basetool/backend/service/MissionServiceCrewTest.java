@@ -82,7 +82,6 @@ class MissionServiceCrewTest {
     assertEquals(1, updatedCrew.getJobTypes().size());
     assertEquals(jobTypeId, updatedCrew.getJobTypes().iterator().next().getId());
 
-    // Option A: parent Mission.version must NOT be bumped by a sub-section (crew) write.
     verify(missionRepository, never()).save(any(Mission.class));
     verify(missionCrewRepository).save(crew);
   }
@@ -137,7 +136,6 @@ class MissionServiceCrewTest {
 
   @Test
   void updateCrewInShip_throwsConflict_whenClientVersionStale() {
-    // #1131: a stale full-set crew save must 409 rather than silently revert a concurrent edit.
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
@@ -149,13 +147,11 @@ class MissionServiceCrewTest {
     mission.getAssignedUnits().add(unit);
     MissionCrew crew = new MissionCrew();
     crew.setId(crewId);
-    crew.setVersion(5L); // persisted version
+    crew.setVersion(5L);
     unit.getCrew().add(crew);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    // Client echoes a stale version (4 != 5) -> optimistic-lock conflict, before any job-type
-    // fetch.
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () ->
@@ -199,7 +195,6 @@ class MissionServiceCrewTest {
 
   @Test
   void updateMissionUnit_throwsConflict_whenClientVersionStale() {
-    // #1131: the same guard on the unit full-form save — a stale snapshot must 409, not clobber.
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
 
@@ -212,7 +207,6 @@ class MissionServiceCrewTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    // Stale client version (8 != 9) -> 409 at the check, before any ship / name resolution.
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () ->
@@ -245,7 +239,6 @@ class MissionServiceCrewTest {
     MissionUnit updatedUnit = updatedMission.getAssignedUnits().iterator().next();
     assertTrue(updatedUnit.getCrew().isEmpty());
 
-    // Option A: parent Mission.version must NOT be bumped by a sub-section (crew) write.
     verify(missionRepository, never()).save(any(Mission.class));
   }
 
@@ -270,9 +263,6 @@ class MissionServiceCrewTest {
 
   @Test
   void addCrewToShip_rejectsNonCrewArchetypeJobType() {
-    // validateAndFetchJobTypes must reject a MISSION-archetype job type: a mission-lead / logistics
-    // role must never be attachable to a ship crew (would corrupt the crew role model). The guard
-    // fires before the crew row is persisted.
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -303,15 +293,12 @@ class MissionServiceCrewTest {
             missionStructureService.addCrewToShip(
                 missionId, unitId, participantId, Set.of(jobTypeId)));
 
-    // A wrong-archetype job type must abort before the crew row is written.
     verify(missionCrewRepository, never()).save(any());
     assertTrue(unit.getCrew().isEmpty());
   }
 
   @Test
   void addCrewToShip_throwsWhenParticipantNotInMission() {
-    // A participant id that is not on this mission's roster must 404 rather than silently crew a
-    // stranger from another mission.
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
 
@@ -335,8 +322,6 @@ class MissionServiceCrewTest {
 
   @Test
   void addCrewToShip_addsCrewWithResolvedCrewJobTypes_andKeepsMissionVersion() {
-    // Happy path: a CREW-archetype job type resolves and the crew is attached; only the child crew
-    // row is written, so the parent Mission.@Version must NOT be bumped (per-row crew scope).
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -375,7 +360,6 @@ class MissionServiceCrewTest {
     assertEquals(jobTypeId, addedCrew.getJobTypes().iterator().next().getId());
 
     verify(missionCrewRepository).save(addedCrew);
-    // A crew write must not touch the parent Mission row.
     verify(missionRepository, never()).save(any(Mission.class));
     assertEquals(3L, mission.getVersion());
   }

@@ -59,15 +59,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Behavioural guard for the prefetch-safe one-click ingest handoff (REQ-INGEST-004, ADR-0110): the
- * navigational {@code GET /refinery-orders/create?handoff=<id>} must render the empty form and
- * <strong>never</strong> consume the single-use pickup (so a browser prefetch / duplicate top-level
- * load cannot burn the token — the 2026-07-19 Firefox double-GET incident), while the
- * script-initiated {@code POST /refinery-orders/import-handoff} performs the one-time consume and
- * returns the pre-filled {@code refineryImportFormBody} fragment (a miss degrades to the fresh form
- * plus the {@code ingest.handoff.notFound} inline notice). The end-to-end pre-fill via the in-place
- * swap is covered by {@code IngestHandoffE2eTest}; this pins the controller contract through a full
- * template render.
+ * Tests the prefetch-safe ingest handoff (REQ-INGEST-004, ADR-0110): {@code GET
+ * /refinery-orders/create?handoff=<id>} renders the empty form without consuming the single-use
+ * pickup, while {@code POST /refinery-orders/import-handoff} consumes it and returns the pre-filled
+ * form fragment, or the fresh form with a not-found notice.
  */
 @SpringBootTest
 class RefineryOrderHandoffMvcTest {
@@ -123,13 +118,9 @@ class RefineryOrderHandoffMvcTest {
                 .with(oidcLogin().idToken(token -> token.subject(SUB.toString()))))
         .andExpect(status().isOk())
         .andExpect(view().name("refinery-orders-create"))
-        // The id is threaded to the page module, which will POST it to /import-handoff.
         .andExpect(model().attribute("pendingHandoffId", "tQfTskHGirAhVIpYj8BiDP876m0"))
-        // A safe navigation must not show the not-found notice and must not have consumed anything.
         .andExpect(model().attributeDoesNotExist("importErrorKey"));
 
-    // The crux of the fix: the navigational GET never touches the single-use Redis pickup, so a
-    // prefetch or a duplicate top-level load cannot burn it.
     verify(ingestHandoffService, never()).consume(any(), any(), any(), any());
   }
 
@@ -185,7 +176,6 @@ class RefineryOrderHandoffMvcTest {
                 .with(csrf()))
         .andExpect(status().isOk())
         .andExpect(view().name("refinery-orders-create :: refineryImportFormBody"))
-        // The review banner renders because the counters (importGoodsTotal) are present.
         .andExpect(model().attribute("importGoodsTotal", 2))
         .andExpect(model().attributeDoesNotExist("importErrorKey"))
         .andExpect(content().string(containsString("data-testid=\"refinery-import-banner\"")));

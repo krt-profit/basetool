@@ -38,17 +38,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * UEX item-price row — one retail price per {@link GameItem} × {@link Terminal} pair, populated by
- * the R7 {@code UexItemPriceSyncService} from UEX {@code /items_prices_all} (SC_WIKI_SYNC_PLAN.md
- * §6.7). The {@code (game_item_id, terminal_id)} pair is UNIQUE so the sync upserts in place; the
- * stale-row sweep nulls the price columns of pairs UEX no longer returns rather than deleting the
- * row (mirrors {@link MaterialPrice}).
+ * UEX retail price of one {@link GameItem} at one {@link Terminal}; the pair is unique and upserted
+ * by {@code UexItemPriceSyncService}.
  *
- * <p>{@code priceBuy} / {@code priceSell} and the UEX {@code dateModified} unix timestamp are the
- * fields the live feed actually carries. {@code priceRent}, {@code statusBuy}, {@code statusSell}
- * and {@code gameVersion} are reserved per the §6.7 schema but stay {@code null}: the {@code
- * /items_prices_all} feed (game 4.8.0) does not return them. They are kept so a future richer feed
- * can populate them without another migration.
+ * <p>Pairs UEX no longer returns keep their row with nulled prices. {@code priceRent}, {@code
+ * statusBuy}, {@code statusSell} and {@code gameVersion} are not supplied by the feed and stay
+ * {@code null}.
  */
 @Entity
 @Getter

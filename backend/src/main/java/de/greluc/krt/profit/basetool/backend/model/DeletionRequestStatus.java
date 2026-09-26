@@ -20,13 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * The lifecycle of a member's Art. 17 erasure request (REQ-SEC-061).
- *
- * <p><b>There is deliberately no {@code EXECUTED} value.</b> Carrying the request out deletes the
- * {@code app_user} row, and {@code deletion_request.user_id} is {@code ON DELETE CASCADE}, so the
- * request goes with the account — which is the point of an erasure. The record that the deletion
- * happened is the {@code USER_DELETED} audit event, not a surviving row about a member who asked to
- * be forgotten.
+ * The lifecycle of a member's Art. 17 erasure request (REQ-SEC-061). There is no executed state:
+ * carrying the request out deletes it together with the account.
  */
 public enum DeletionRequestStatus {
 
@@ -37,9 +32,8 @@ public enum DeletionRequestStatus {
   PENDING,
 
   /**
-   * Taken back by the member before it was decided. Kept rather than deleted so the queue's history
-   * reads truthfully: "this member asked and changed their mind" is a different fact from "this
-   * member never asked", and it is the difference an admin needs when a second request arrives.
+   * Taken back by the member before it was decided; kept so the queue shows that the member asked
+   * and changed their mind.
    */
   WITHDRAWN,
 

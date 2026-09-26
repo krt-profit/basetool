@@ -1,26 +1,9 @@
 #!/usr/bin/env python3
 """Fail when e2e.yml's concurrency selector stops mirroring its job gate.
 
-``e2e.yml`` has to state one decision -- "does this event run the Playwright
-suite?" -- in two places, because GitHub evaluates them at different moments and
-offers no way to share the expression:
-
-* ``jobs.e2e.if`` decides whether the job runs, and is evaluated *after* the run
-  exists;
-* ``concurrency.group`` is evaluated when the run is *created*, so it decides
-  which runs may cancel each other before any gate has been consulted.
-
-The group therefore has to predict the gate. It does that by embedding the gate
-expression verbatim: runs the gate will admit share one ``-suite`` group, where
-``cancel-in-progress`` supersedes a stale suite, and every other run is parked in
-a group of its own so it can neither cancel nor be cancelled.
-
-That holds only while the two copies agree, and a selector merely *looser* than
-the gate silently restores the original bug -- a run that will skip re-enters
-``-suite`` and cancels the run that would have executed. #1537 and #1871 both
-reached a green board with zero end-to-end coverage that way, each time behind
-cancelled runs that ``gh pr checks`` renders as ``fail``. None of that is visible
-in a diff, which is why it is asserted here rather than trusted to a comment.
+``concurrency.group`` must embed ``jobs.e2e.if`` verbatim, select ``'suite'`` for
+admitted runs and fall back to ``github.run_id`` otherwise, and ``pull_request.types``
+must contain ``labeled`` (ADR-0169).
 
 Exit codes:
   0  -> the selector still mirrors the gate.
@@ -41,39 +24,23 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO / ".github" / "workflows" / "e2e.yml"
 
-# The job whose gate the group must predict, and the literal the group selects
-# for the runs that gate admits.
 JOB = "e2e"
 SUITE_KEY = "'suite'"
 
-# Every run the gate will NOT admit must land in a group nothing else shares.
-# `github.run_id` is unique per run and is the only context value available here
-# that is; without it the skipped runs share one group again and start cancelling
-# each other, which is the half of the bug that paints the PR red.
 UNIQUE_KEY = "github.run_id"
 
-# The gate's `labeled` clause is only reachable while `labeled` is a trigger.
-# Dropping it is a real option -- a label applied after open would then wait for
-# the next push -- but it is a decision to take deliberately (ADR-0169), not a
-# line to lose, so the coupling is asserted rather than assumed.
 REQUIRED_PR_TYPE = "labeled"
 
 
 def _normalise(expression: str) -> str:
-    """Collapse an expression's whitespace so YAML folding cannot fake a difference.
-
-    ``if:`` and ``group:`` are both folded block scalars broken at different
-    widths, so the same expression arrives with different runs of spaces. Only
-    the token sequence is meaningful to GitHub.
-    """
+    """Collapse an expression's whitespace so YAML folding cannot fake a difference."""
     return re.sub(r"\s+", " ", expression).strip()
 
 
 def check(document: str) -> list[str]:
     """Return one message per way the workflow's two copies of the gate disagree.
 
-    Takes the workflow source rather than a path so the self-test can feed it
-    documents that are deliberately broken. An empty list means they agree.
+    Takes the workflow source text; an empty list means they agree.
     """
     problems: list[str] = []
     workflow = yaml.safe_load(document) or {}
@@ -108,8 +75,6 @@ def check(document: str) -> list[str]:
             "share a group again and cancel each other -- which reads as `fail` on the PR."
         )
 
-    # PyYAML resolves the bare `on:` key to the boolean True (YAML 1.1), so the
-    # trigger block answers to either spelling depending on how it was written.
     triggers = workflow.get(True) or workflow.get("on") or {}
     types = ((triggers or {}).get("pull_request") or {}).get("types") or []
     if REQUIRED_PR_TYPE not in types:
@@ -121,8 +86,6 @@ def check(document: str) -> list[str]:
     return problems
 
 
-# A minimal workflow shaped like the real one: the self-test mutates this to
-# produce each way the two copies can drift apart.
 _GOOD = """
 on:
   pull_request:
@@ -153,12 +116,7 @@ _GOOD_GROUP = (
 
 
 def selftest() -> int:
-    """Prove the detector still tells a mirrored selector from a drifted one.
-
-    Runs before the real check in CI so the gate can never pass vacuously: a
-    checker that quietly stopped resolving the workflow would otherwise report
-    "no problems" forever, which is the exact failure mode it exists to catch.
-    """
+    """Check that the detector tells a mirrored selector from each drifted variant; return the exit code."""
     cases: list[tuple[str, str, bool]] = [
         ("mirrored selector", _GOOD, False),
         (

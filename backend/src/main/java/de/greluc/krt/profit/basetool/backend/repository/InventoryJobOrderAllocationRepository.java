@@ -25,11 +25,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link InventoryJobOrderAllocation} — the per-entry job-order quantity
- * slices of the Variante-C split (REQ-INV-027). Fulfilment sums that used to read the scalar {@code
- * inventory_item.job_order_id} traverse the allocation collection from {@link
- * InventoryItemRepository}; direct allocation reads/deletes that the entry-collection cascade
- * cannot express (e.g. the material-scoped handover unlink) live here.
+ * Spring Data repository for {@link InventoryJobOrderAllocation}, the per-entry job-order quantity
+ * slices (REQ-INV-027). Holds the direct allocation reads and deletes the entry-collection cascade
+ * cannot express, such as the material-scoped handover unlink.
  */
 @Repository
 public interface InventoryJobOrderAllocationRepository

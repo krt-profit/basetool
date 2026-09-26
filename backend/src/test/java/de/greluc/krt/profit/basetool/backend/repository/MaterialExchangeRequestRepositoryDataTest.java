@@ -45,18 +45,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for the Materialbörse Gesuche repositories ({@link
- * MaterialExchangeRequestRepository} / {@link MaterialExchangeRequestInterestRepository}) against
- * the real Postgres test schema (Testcontainers + Flyway V224 via the {@code test} profile).
- * Validates the board JPQL (the CASE-based cross-kind name/quantity filters/sort spanning both
- * material and item requests, REQ-MARKET-015), the anonymity-safe grouped supplier counts, and the
- * DB invariants the migration enforces: the exactly-one-branch {@code CHECK} on a request's kind,
- * the 0–1000 min-quality range {@code CHECK}, and one fulfilment signal per {@code (request,
- * user)}.
- *
- * <p>{@link Transactional} so each method rolls back — the seeded rows must never commit to the
- * shared Testcontainers database. Reads still see the rows because they are flushed within the test
- * transaction.
+ * Verifies the Materialbörse request repositories against PostgreSQL: board filters and sort across
+ * material and item requests (REQ-MARKET-015), grouped supplier counts, and the schema invariants.
+ * Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -170,7 +161,7 @@ class MaterialExchangeRequestRepositoryDataTest {
     bad.setKind(MaterialExchangeRequestKind.MATERIAL);
     bad.setRequestedMaterial(material);
     bad.setRequestedAmount(120.0);
-    bad.setItemProductKey("venture_helmet"); // forbidden on the MATERIAL branch
+    bad.setItemProductKey("venture_helmet");
     bad.setOwner(owner);
     bad.setStatus(MaterialExchangeRequestStatus.ACTIVE);
     bad.setPostedAt(Instant.now());
@@ -187,7 +178,7 @@ class MaterialExchangeRequestRepositoryDataTest {
     bad.setKind(MaterialExchangeRequestKind.ITEM);
     bad.setItemProductKey("venture_helmet");
     bad.setItemName("Venture Helmet");
-    bad.setItemQuantity(null); // required on the ITEM branch
+    bad.setItemQuantity(null);
     bad.setOwner(owner);
     bad.setStatus(MaterialExchangeRequestStatus.ACTIVE);
     bad.setPostedAt(Instant.now());
@@ -205,7 +196,7 @@ class MaterialExchangeRequestRepositoryDataTest {
     bad.setKind(MaterialExchangeRequestKind.MATERIAL);
     bad.setRequestedMaterial(material);
     bad.setRequestedAmount(50.0);
-    bad.setMinQuality(1500); // out of the 0-1000 range
+    bad.setMinQuality(1500);
     bad.setOwner(owner);
     bad.setStatus(MaterialExchangeRequestStatus.ACTIVE);
     bad.setPostedAt(Instant.now());

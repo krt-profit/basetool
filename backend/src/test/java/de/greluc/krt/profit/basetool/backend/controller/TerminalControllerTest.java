@@ -39,11 +39,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Pure-method unit tests for {@link TerminalController}. The PUT endpoint has a non-obvious
- * contract that's documented inline in the controller: even though it accepts a full {@link
- * TerminalDto}, the service only applies the {@code hidden} flag — a regression that started
- * writing the full DTO would unexpectedly let admins rename / re-link UEX-imported terminals via
- * this endpoint.
+ * Unit tests for {@link TerminalController}: the PUT endpoint applies only the {@code hidden} flag
+ * of the submitted {@link TerminalDto}.
  */
 @ExtendWith(MockitoExtension.class)
 class TerminalControllerTest {
@@ -100,10 +97,6 @@ class TerminalControllerTest {
 
   @Test
   void updateTerminal_onlyPropagatesHiddenFlag_notFullDto() {
-    // SECURITY-ADJACENT: the controller's contract is "only `hidden` is mutable
-    // through this endpoint" (see inline comment in TerminalController). A
-    // refactor that switched to `service.update(id, fullDto)` would silently
-    // let admins rewrite UEX-imported fields. This test pins the contract.
     UUID id = UUID.randomUUID();
     TerminalDto request =
         new TerminalDto(
@@ -148,7 +141,6 @@ class TerminalControllerTest {
 
     assertSame(response, result);
     verify(service).updateTerminalVisibility(id, true);
-    // Critically: the FULL DTO is NEVER forwarded — only the boolean.
     verify(service, never()).getTerminal(any());
   }
 
@@ -166,8 +158,6 @@ class TerminalControllerTest {
 
     verify(service).updateTerminalVisibility(id, false);
   }
-
-  // ── PATCH/DELETE /{id}/loading-dock and /{id}/auto-load ─────────────────
 
   @Test
   void setLoadingDockOverride_forwardsValueAndReturnsDto() {

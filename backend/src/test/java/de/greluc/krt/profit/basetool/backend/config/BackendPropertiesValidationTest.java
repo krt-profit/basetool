@@ -37,15 +37,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 /**
- * Startup-validation tests for the backend's {@code @ConfigurationProperties} classes.
- *
- * <p><strong>One properties class per runner, deliberately.</strong> A runner that registers
- * several of them cannot assert a <em>successful</em> start: {@link KeycloakSyncProperties} alone
- * carries four {@code @NotBlank} fields with no defaults ({@code adminUrl}, {@code realm}, {@code
- * clientId}, {@code clientSecret}), so any context that does not supply them fails binding whatever
- * the class under test does. The subtler damage is to the failure cases — a shared runner makes
- * {@code hasFailed()} pass for the wrong reason, so such a test stays green even with its own
- * constraint deleted. Isolating each class keeps every assertion about its own subject.
+ * Startup-validation tests for the backend's {@code @ConfigurationProperties} classes, one
+ * properties class per context runner so each failure assertion fails only for its own subject's
+ * constraint.
  */
 class BackendPropertiesValidationTest {
 
@@ -254,11 +248,7 @@ class BackendPropertiesValidationTest {
                     .isEqualTo(AuthoritiesCacheProperties.MAX_TTL));
   }
 
-  /**
-   * With nothing configured the shipped default is five minutes (ADR-0174). Asserted because every
-   * environment that does not set the variable — dev, test, e2e, and production until an operator
-   * overrides it — runs on exactly this value.
-   */
+  /** Without configuration, the authorities cache TTL defaults to five minutes (ADR-0174). */
   @Test
   void shouldDefaultToFiveMinutes_WhenAuthoritiesCacheTtlOmitted() {
     authoritiesCacheRunner.run(
@@ -267,7 +257,6 @@ class BackendPropertiesValidationTest {
                 .isEqualTo(Duration.ofMinutes(5)));
   }
 
-  // covers REQ-SEC-033 carve-out (APPSEC-10) — a zero export capacity would refuse every export
   @Test
   void shouldFail_WhenSubjectExportCapacityIsZero() {
     rateLimitRunner
@@ -275,7 +264,7 @@ class BackendPropertiesValidationTest {
         .run((context) -> assertThat(context).hasFailed());
   }
 
-  /** The shipped export budget is ten a minute (owner decision 2026-09-22). */
+  /** Without configuration, the subject export budget defaults to ten per minute. */
   @Test
   void shouldDefaultToTenPerMinute_WhenSubjectExportOmitted() {
     rateLimitRunner.run(
@@ -288,7 +277,6 @@ class BackendPropertiesValidationTest {
         });
   }
 
-  // covers REQ-AUDIT-006 (BE-MOD-03) — P0D would put the cutoff at "now" and purge the whole trail
   @Test
   void shouldFail_WhenAuditRetentionMaxAgeIsZero() {
     auditRetentionRunner
@@ -343,7 +331,6 @@ class BackendPropertiesValidationTest {
         });
   }
 
-  // covers REQ-SEC-057 (BE-MOD-03) — "not zero on purpose" is a startup check now
   @Test
   void shouldFail_WhenRejectedRetentionMaxAgeIsZero() {
     rejectedRetentionRunner
@@ -366,7 +353,6 @@ class BackendPropertiesValidationTest {
                 .isEqualTo(Duration.ofDays(90)));
   }
 
-  // covers REQ-NOTIF-009 (BE-MOD-03) — both windows carry the floor
   @Test
   void shouldFail_WhenNotificationReadMaxAgeIsZero() {
     notificationRetentionRunner
@@ -384,7 +370,6 @@ class BackendPropertiesValidationTest {
         .run((context) -> assertThat(context).hasFailed());
   }
 
-  // covers REQ-NOTIF-009 — an unread notification is never reaped sooner than a read one
   @Test
   void shouldFail_WhenNotificationUnreadWindowIsShorterThanReadWindow() {
     notificationRetentionRunner

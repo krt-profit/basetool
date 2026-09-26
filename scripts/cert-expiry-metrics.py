@@ -1,21 +1,8 @@
 #!/usr/bin/env python3
 """Profit Basetool - expiry metrics for certificates that no listener serves.
 
-Every TLS certificate this deployment serves is already watched: the blackbox exporter probes it
-and ``probe_ssl_earliest_cert_expiry`` feeds the ``CertificateExpiringSoon`` alert. That mechanism
-has one blind spot, and it is structural rather than an oversight - **a probe can only see a
-certificate something is serving.**
-
-The internal CA is the case that matters. ``/var/iri/monitoring/certs/basetool-ca.crt`` is the trust
-anchor for every ``proxy_ssl_verify on`` upstream at the edge and for the ``https_internal`` probe
-module itself. Nothing listens on it, so nothing probes it, so nothing would have noticed it
-expiring - and the day it does, every verified upstream fails at once AND the probes that would
-otherwise have warned about the leaves fail with it. Measured 2026-09-20: it was the one certificate
-in the monitoring plane with no coverage at all.
-
-The same applies to any certificate placed in that directory for a service that is currently down.
-Grafana's self-signed pair is probed through ``blackbox-internal-tls-grafana``, but only while
-Grafana is running; the file is readable either way.
+Reads PEM certificate files (such as the internal CA) from disk, since a blackbox probe only sees
+certificates a listener serves. PKCS#12 keystores are not read.
 
 What it emits
 -------------
@@ -26,69 +13,39 @@ What it emits
     basetool_certificate_files
     basetool_certificate_metrics_timestamp_seconds
 
-``self_signed="true"`` marks a certificate whose issuer equals its subject - a root CA or a
-standalone self-signed leaf. The alert rules give those a longer lead time, because re-issuing a CA
-means re-issuing everything it signed, which is not a fourteen-day job.
-
-Label cardinality is bounded by the contents of a directory an operator provisions by hand
-(REQ-OBS-011) - two files on the testing host today, the internal CA and Grafana's leaf.
+``self_signed="true"`` marks a certificate whose issuer equals its subject. Label cardinality is
+bounded by the hand-provisioned directory contents (REQ-OBS-011).
 
 Usage
 -----
 ::
 
-    # one shot, the way the systemd timer runs it
     python3 scripts/cert-expiry-metrics.py --output /var/iri/monitoring/textfile/certificates.prom
 
-    # see what it would write, without writing
     python3 scripts/cert-expiry-metrics.py --dry-run
 
-    # additional directories, repeatable
     python3 scripts/cert-expiry-metrics.py --dir /var/iri/monitoring/certs --dir /etc/pki/basetool
 
 Exit codes: ``0`` wrote (or would have written) a file, ``1`` no certificate was found or the write
-failed, ``2`` bad invocation. Finding no certificate is an error rather than an empty file, for the
-same reason the cgroup collector treats it that way: an empty metrics file and a mistyped directory
-look identical to Prometheus, and only one of them is benign.
-
-PKCS#12 keystores are deliberately NOT read. They need a password, this collector must never hold
-one, and the leaf inside them is served by backend, frontend, ingest and Keycloak - so the probes
-already cover it.
+failed, ``2`` bad invocation.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import subprocess
 import sys
 import time
 from typing import Iterable, NamedTuple
 
-#: Where an operator provisions the certificates this deployment does not serve.
 DEFAULT_DIRS = ("/var/iri/monitoring/certs",)
 
-#: What counts as a certificate file. `.key` is deliberately absent: this collector never opens
-#: private material, and a key file carries no expiry of its own anyway.
 SUFFIXES = (".crt", ".pem", ".cer")
 
 METRIC = "basetool_certificate"
 
-#: How a distinguished name is rendered into the ``subject`` and ``issuer`` labels.
-#:
-#: NOT openssl's default, and that is not a preference. Measured 2026-09-20 on the same certificate:
-#:
-#:     OpenSSL 3.0.13 (Ubuntu 24.04)   subject=C = DE, O = DAS KARTELL, CN = ... CA
-#:     OpenSSL 3.5.7  (Rocky 10.2)     subject=C=DE, O=DAS KARTELL, CN=... CA
-#:
-#: Same file, different label value. Prometheus identifies a series BY its labels, so an openssl
-#: upgrade under a running host would silently retire every certificate series and start new ones -
-#: the old set going stale exactly like a collector that stopped, which is the state
-#: ``CertificateMetricsStale`` exists to report and would not, because the timestamp keeps moving.
-#:
-#: RFC 2253 is defined by the RFC rather than by the tool, supported since OpenSSL 1.x, and escapes
-#: its own special characters. It also reverses the order to most-specific-first
-#: (``CN=...,OU=...,O=...,C=DE``), which is what the RFC says and what LDAP tooling expects.
 NAME_FORMAT = "RFC2253"
 
 HELP = {
@@ -121,8 +78,7 @@ class Cert(NamedTuple):
         """Whether the certificate signed itself.
 
         Returns:
-            True when issuer and subject are identical, which is what a root CA and a standalone
-            self-signed leaf have in common and what earns the longer alerting lead time.
+            True when issuer and subject are identical.
         """
         return self.subject == self.issuer
 
@@ -131,8 +87,7 @@ def _escape(value: str) -> str:
     """Escape a Prometheus label value.
 
     Args:
-        value: the raw label value, which for a subject or issuer contains commas and spaces and
-            may contain a backslash or a quote.
+        value: the raw label value.
 
     Returns:
         The value with backslash, double quote and newline escaped, per the exposition format.
@@ -142,10 +97,6 @@ def _escape(value: str) -> str:
 
 def _openssl(path: str, *args: str) -> str:
     """Run ``openssl x509`` against one file and return its stdout.
-
-    openssl rather than a Python X.509 library on purpose: `cryptography` is not installed on the
-    target host and this collector must not add a dependency to a box whose whole point is that it
-    runs a fixed, audited set of packages. openssl is present because the platform ships it.
 
     Args:
         path: the certificate file.
@@ -157,7 +108,6 @@ def _openssl(path: str, *args: str) -> str:
     Raises:
         CollectorError: when openssl is absent or the file is not a certificate.
     """
-    # Callers asking for a DN get RFC 2253, never openssl's default -- see NAME_FORMAT.
     try:
         proc = subprocess.run(
             ["openssl", "x509", "-in", path, "-noout", *args],
@@ -191,9 +141,6 @@ def _parse_date(raw: str) -> int:
     value = value.strip()
     if not value:
         raise CollectorError(f"no date in {raw!r}")
-    # openssl prints GMT and nothing else for these fields, so the parse is fixed rather than
-    # locale-dependent. calendar.timegm, not mktime: the latter would apply the HOST's timezone to
-    # a value that is explicitly GMT, which is a silent offset of up to a day near an expiry.
     import calendar
 
     try:
@@ -227,12 +174,10 @@ def discover(dirs: Iterable[str]) -> list[str]:
     """Find every certificate file under the given directories.
 
     Args:
-        dirs: directories to walk. A directory that does not exist is skipped rather than fatal,
-            because the same unit runs on hosts at different stages of provisioning.
+        dirs: directories to scan; a missing directory is skipped.
 
     Returns:
-        Sorted absolute paths, so the output is stable between runs and a diff of two scrapes shows
-        a real change rather than a reordering.
+        Sorted paths of files with a certificate suffix.
     """
     found: list[str] = []
     for directory in dirs:
@@ -280,12 +225,7 @@ def render(certs: list[Cert], now: int) -> str:
 
 
 def write_atomically(target: str, content: str) -> None:
-    """Write the exposition file so no scrape ever sees it half-written.
-
-    node_exporter reads the whole textfile directory on every scrape, so a partially written file
-    is a parse error served to Prometheus. Writing a sibling and renaming makes the swap atomic;
-    the sibling goes in the same directory because ``os.replace`` is only atomic within one
-    filesystem.
+    """Write the exposition file via a sibling temporary file and an atomic rename.
 
     Args:
         target: the final path, conventionally ending in ``.prom``.
@@ -303,22 +243,13 @@ def write_atomically(target: str, content: str) -> None:
             os.fsync(handle.fileno())
         os.replace(tmp, target)
     except OSError as exc:
-        # Best-effort cleanup, and its failure is deliberately swallowed: this path is already
-        # handling a failed write, and the two ways the unlink can fail are both uninteresting --
-        # the sibling was never created (the `open` itself failed), or the directory is not
-        # writable, which is the same fact `exc` already carries. Raising from here would replace
-        # the diagnosis with a symptom, so the ORIGINAL error is re-raised on the next line and a
-        # stray `.tmp` is left for `ls` to show. node_exporter ignores it: the textfile collector
-        # reads `*.prom` only.
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise CollectorError(f"cannot write {target}: {exc}") from exc
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Entry point.
+    """Scan the directories and write (or print) the certificate metrics.
 
     Args:
         argv: command-line arguments, defaulting to ``sys.argv[1:]``.
@@ -350,9 +281,6 @@ def main(argv: list[str] | None = None) -> int:
         try:
             certs.append(read_cert(path))
         except CollectorError as exc:
-            # One unreadable file must not cost the coverage of the others: a directory holding a
-            # stray text file is a configuration mistake, and a CA that goes unwatched because of
-            # it would be the expensive kind.
             print(f"cert-expiry-metrics: skipping {path}: {exc}", file=sys.stderr)
             failures += 1
 

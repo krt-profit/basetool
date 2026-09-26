@@ -164,18 +164,12 @@ public class SquadronService {
   }
 
   /**
-   * Toggles the per-squadron promotion-feature flag. Kept as a dedicated mutator separate from
-   * {@link #updateSquadron(UUID, SquadronDto)} so the flag cannot be flipped as an accidental
-   * side-effect of editing the squadron's name/shorthand/description, and so the audit trail in the
-   * access log can clearly attribute "X disabled promotion for squadron Y" to the admin who pressed
-   * the toggle. Flipping the flag never touches the promotion data — categories, ranks, and
-   * evaluations stay in the DB and become visible again as soon as the flag goes back to {@code
-   * true}.
+   * Toggles the per-squadron promotion feature. Separate from {@link #updateSquadron(UUID,
+   * SquadronDto)}; promotion data is kept and reappears when re-enabled.
    *
    * @param id squadron primary key
-   * @param enabled new value of {@code is_promotion_enabled}; {@code true} re-exposes a previously
-   *     hidden squadron, {@code false} hides the promotion menu for the squadron's non-admin
-   *     members.
+   * @param enabled new value of {@code is_promotion_enabled}; {@code false} hides the promotion
+   *     menu for the squadron's non-admin members.
    * @return the persisted squadron
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no matching row.
    */
@@ -188,13 +182,9 @@ public class SquadronService {
   }
 
   /**
-   * Toggles the per-squadron profit-eligibility flag deciding whether the squadron may be picked as
-   * the responsible (processing) org unit of a Job Order. Kept as a dedicated mutator separate from
-   * {@link #updateSquadron(UUID, SquadronDto)} — for the same reasons as {@link
-   * #setPromotionEnabled(UUID, boolean)} — so the flag cannot be flipped as an accidental
-   * side-effect of a name/shorthand/description edit and the access log can attribute the change to
-   * the admin who pressed the toggle. Flipping the flag never touches any Job Order; it only
-   * changes whether the squadron appears in the responsible picker from now on.
+   * Sets whether the squadron may be picked as the responsible (processing) org unit of a Job
+   * Order. Separate from {@link #updateSquadron(UUID, SquadronDto)}; existing Job Orders are not
+   * touched.
    *
    * @param id squadron primary key
    * @param eligible new value of {@code is_profit_eligible}; {@code true} makes the squadron

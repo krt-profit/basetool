@@ -32,13 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-/**
- * Verifies that the indexes introduced by the Flyway migrations actually exist in the test
- * database. The test profile now boots Postgres via Testcontainers and runs every V<n>__*.sql
- * migration during context startup (see {@code application-test.yml}), so this test no longer needs
- * its own container/dynamic-property wiring nor the {@code ENABLE_TC} gate that historically kept
- * it from running in the default build — it is part of the standard test suite now.
- */
+/** Verifies that the indexes created by the Flyway migrations exist in the test database. */
 @SpringBootTest
 class DatabaseIndexMigrationTest {
 
@@ -49,59 +43,25 @@ class DatabaseIndexMigrationTest {
   @Autowired private DataSource dataSource;
 
   /**
-   * Spot-checks a handful of indexes from the Flyway migrations to make sure they are actually
-   * present in the live Postgres test schema. Picks one representative index from each migration
-   * that introduces a non-trivial indexing strategy:
-   *
-   * <ul>
-   *   <li>V34 (foreign-key b-tree index, e.g. {@code idx_ship_owner_id})
-   *   <li>V35 (pg_trgm GIN index used by the ILIKE search endpoints)
-   *   <li>V48 (mission owner/manager indexes added with the ownership rewrite)
-   *   <li>V65 (personal inventory composite owner+name index)
-   *   <li>V92 (backfill FK indexes that escaped V34's blanket sweep)
-   *   <li>V122 (second FK backfill: handover / unit / yield lookup indexes)
-   * </ul>
-   *
-   * The test is intentionally not exhaustive: it acts as an early-warning canary that Flyway
-   * actually ran and produced the expected DDL. A missing index here is almost always a sign that a
-   * migration was renamed/squashed without updating the index name.
+   * Spot-checks one representative index per migration with a non-trivial indexing strategy (V34,
+   * V35, V48, V65, V92, V122) in the live test schema.
    */
   @Test
   void flywayMigrationAddsExpectedIndexes() {
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
 
-    // V34: FK index on ship.owner_id
     assertIndexExists(jdbc, "ship", "idx_ship_owner_id");
-    // V34: FK index on inventory_item.material_id
     assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_material_id");
-    // V35: trigram GIN index on mission.name (powers the ILIKE search)
     assertIndexExists(jdbc, "mission", "idx_mission_name_trgm");
-    // V35: trigram GIN index on material.name
     assertIndexExists(jdbc, "material", "idx_material_name_trgm");
-    // V48: mission owner index
     assertIndexExists(jdbc, "mission", "idx_mission_owner");
-    // V65: composite owner+name index on personal_inventory_item
     assertIndexExists(jdbc, "personal_inventory_item", "idx_personal_inventory_item_owner_name");
-    // V92: FK index on mission.operation_id (powers the operation filter on the missions list)
     assertIndexExists(jdbc, "mission", "idx_mission_operation_id");
-    // V96: partial UNIQUE index that backs the multi-user signup race fix — keeps a registered
-    // user from being added twice to the same mission via two parallel "Anmelden" clicks. The
-    // in-memory check in MissionService.addParticipant catches the common case; this index is
-    // the DB-level backstop against the TOCTOU race.
     assertIndexExists(jdbc, "mission_participant", "uq_mission_participant_user");
-    // V122: FK index on job_order_handover.job_order_id (powers the handover view) and the
-    // ON DELETE CASCADE child index on job_order_handover_item — representative of the second
-    // FK backfill sweep.
     assertIndexExists(jdbc, "job_order_handover", "idx_job_order_handover_job_order_id");
     assertIndexExists(jdbc, "job_order_handover_item", "idx_job_order_handover_item_handover_id");
-    // V122: composite (terminal_id, material_id) lookup index on refinery_yield.
     assertIndexExists(jdbc, "refinery_yield", "idx_refinery_yield_terminal_material");
-    // V143: composite stack-key index backing the group-on-read GROUP BY and the lazy per-stack
-    // entries lookup (ADR-0003, REQ-INV-002).
     assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_stack_key");
-    // V220 (REQ-INV-029, ADR-0101): the item-side partial stack-key sibling over game-item rows.
-    // Pin the shape too — the partial WHERE predicate and the key columns are what make the item
-    // stack GROUP BYs and drill-downs index-backed; a rename-preserving narrowing must fail here.
     assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_item_stack_key");
     assertIndexDefContains(
         jdbc,
@@ -113,45 +73,25 @@ class DatabaseIndexMigrationTest {
         "personal",
         "owning_org_unit_id",
         "where (game_item_id is not null)");
-    // V146 (covers REQ-REFINERY-010): case-insensitive unique index that replaced the V108
-    // case-sensitive constraint — guarantees the IgnoreCase alias resolver can never see two
-    // case-variant rows for the same (source_system, external_name).
     assertIndexExists(
         jdbc, "material_external_alias", "uq_material_external_alias_source_lower_name");
-    // V150 (REQ-BANK-001): partial unique indexes enforcing one account per org unit and the
-    // CARTEL / CARTEL_BANK singletons at the database level.
     assertIndexExists(jdbc, "bank_account", "uq_bank_account_org_unit");
     assertIndexExists(jdbc, "bank_account", "uq_bank_account_singleton_cartel");
     assertIndexExists(jdbc, "bank_account", "uq_bank_account_singleton_cartel_bank");
-    // V152 (REQ-BANK-009): reverse lookup powering the per-account grants matrix.
     assertIndexExists(jdbc, "bank_account_grant", "idx_bank_account_grant_account");
-    // V153 (REQ-BANK-020): the compute-on-read account-balance and statement paths.
     assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_account_created");
     assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_transaction");
-    // V180/V181 (ADR-0039): the holder dimension moved to its own ledger; the per-(account, holder)
-    // composite index idx_bank_posting_account_holder was dropped with the holder column.
     assertIndexExists(jdbc, "bank_holder_posting", "idx_bank_holder_posting_holder_created");
     assertIndexExists(jdbc, "bank_holder_posting", "idx_bank_holder_posting_transaction");
-    // V154 (REQ-BANK-012): the admin audit viewer (newest-first plus per-account filter).
     assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_occurred");
     assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_account");
-    // V162 (REQ-DATA-004 / ADR-0023): the UEX company-id → manufacturer alias lookup index.
     assertIndexExists(
         jdbc, "manufacturer_uex_company", "idx_manufacturer_uex_company_manufacturer");
-    // V175 (REQ-DATA-017): round-three FK / hot-query backfill — standalone FK indexes the
-    // leading-column composites could not serve, plus two partial indexes for the pending-approval
-    // queue and the active job-order board.
     assertIndexExists(jdbc, "job_order_assignees", "idx_job_order_assignees_user_id");
-    // idx_bank_posting_holder_id (V175) was auto-dropped with the bank_posting.holder_id column
-    // (V181, ADR-0039); the holder ledger carries its own (holder_id, created_at) index instead.
     assertIndexExists(jdbc, "bank_transaction", "idx_bank_transaction_initiated_by");
     assertIndexExists(jdbc, "app_user", "idx_app_user_approved_by_id");
     assertIndexExists(jdbc, "app_user", "idx_app_user_pending_approval");
     assertIndexExists(jdbc, "job_order", "idx_job_order_active_priority");
-    // The two V175 partial indexes only pay off if the planner can match their WHERE predicate
-    // (and, for the active board, the key ordering) to the query. assertIndexExists checks only the
-    // name, so a future migration could keep the name while narrowing the predicate or flipping a
-    // sort and still pass — pin the shape here so such a regression fails loudly instead.
     assertIndexDefContains(
         jdbc,
         "app_user",
@@ -168,20 +108,11 @@ class DatabaseIndexMigrationTest {
         "status",
         "'OPEN'",
         "'IN_PROGRESS'");
-    // V224 (REQ-MARKET-015, ADR-0116): the Materialbörse wanted-listings (Gesuche) tables — the
-    // status/owner board-filter indexes and the idempotent one-signal-per-(request, user) unique
-    // index on the fulfilment-signal child table.
     assertIndexExists(jdbc, "material_exchange_request", "idx_material_exchange_request_status");
     assertIndexExists(jdbc, "material_exchange_request", "idx_material_exchange_request_owner");
-    // V244 (REQ-SEC-058, REQ-NOTIF-009): the four queries the data-subject-rights surfaces ran
-    // without an index. Three sections of the member-reachable export were sequential scans of the
-    // two audit tables, and the unread half of the notification sweep scanned daily while its read
-    // sibling had had a partial index since V155.
     assertIndexExists(jdbc, "audit_event", "idx_audit_event_target");
     assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_actor");
     assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_target");
-    // The predicate is the point here: an index over all of notification would not serve a sweep
-    // that only ever reads the unread rows.
     assertIndexDefContains(
         jdbc,
         "notification",
@@ -190,9 +121,6 @@ class DatabaseIndexMigrationTest {
         "where (is_read = false)");
     assertIndexExists(
         jdbc, "material_exchange_request_interest", "uq_material_exchange_request_interest");
-    // V245 (REQ-DATA-017, BE-PERF-10): the 38 foreign keys the catalogue sweep found uncovered.
-    // ForeignKeyIndexCoverageTest is the exhaustive gate; these are the canaries that the migration
-    // ran, one per shape: a NOT NULL key (plain index) and a nullable one (IS NOT NULL partial).
     assertIndexExists(jdbc, "material_claim", "idx_material_claim_claimed_by_user_id");
     assertIndexExists(jdbc, "mission_unit", "idx_mission_unit_responsible_user_id");
     assertIndexExists(jdbc, "org_unit", "idx_org_unit_grand_admiral_user_id");
@@ -228,19 +156,13 @@ class DatabaseIndexMigrationTest {
   }
 
   /**
-   * Pins the live {@code CREATE INDEX} definition of {@code indexName} on {@code table} by
-   * asserting (case-insensitively) that every given fragment appears in its {@code pg_get_indexdef}
-   * text. Unlike {@link #assertIndexExists}, which only proves the name is present, this locks the
-   * index <em>shape</em>: the partial-index {@code WHERE} predicate and the key-column ordering. It
-   * catches a migration that keeps the index name but silently narrows the predicate or flips a
-   * sort direction — a change that would otherwise pass green while no longer serving the query the
-   * index was added for.
+   * Asserts that the {@code pg_get_indexdef} text of {@code indexName} on {@code table} contains
+   * every fragment, case-insensitively, pinning the index shape rather than only its name.
    *
    * @param jdbc the template bound to the live Postgres test schema
    * @param table the table owning the index
    * @param indexName the index whose {@code pg_indexes.indexdef} text is inspected
-   * @param fragments substrings, each matched case-insensitively, that must all appear in the
-   *     definition
+   * @param fragments substrings that must all appear in the definition
    */
   private static void assertIndexDefContains(
       JdbcTemplate jdbc, String table, String indexName, String... fragments) {

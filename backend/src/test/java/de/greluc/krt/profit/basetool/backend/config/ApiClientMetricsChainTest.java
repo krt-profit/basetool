@@ -39,16 +39,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Client attribution through the <strong>real filter chain</strong> (A8, REQ-OBS-018).
- *
- * <p>{@link ApiClientMetricsFilterTest} covers what the filter decides; this covers where it sits,
- * which is the half a unit test cannot see and the half that has already broken once. Registering
- * the filter with {@code addFilterBefore(…, ActingMemberFilter.class)} <em>above</em> the call that
- * introduces {@code ActingMemberFilter} fails the whole context with "does not have a registered
- * order" — 813 tests, one cause — and the position it guards is not cosmetic: one slot later, an
- * on-behalf-of call would already have had its authentication replaced by an {@code
- * ActingMemberAuthentication} that carries no claims, and every gateway request would be counted as
- * an anonymous one.
+ * Tests client attribution of the API metrics filter through the real filter chain (REQ-OBS-018),
+ * pinning its position before {@code ActingMemberFilter} so gateway calls are attributed to the
+ * gateway.
  */
 @SpringBootTest
 class ApiClientMetricsChainTest {
@@ -76,10 +69,8 @@ class ApiClientMetricsChainTest {
   }
 
   /**
-   * Reads the attribution counter for one client label.
-   *
-   * <p>A delta, not an absolute: the registry is a context-scoped singleton and every test that ran
-   * before this one in the same context has already contributed.
+   * Reads the attribution counter for one client label; tests read it as a delta because the
+   * registry is shared across the context.
    *
    * @param clientId the bounded {@code client_id} label
    * @return the current count, or {@code 0} when nothing has been counted under it
@@ -96,8 +87,6 @@ class ApiClientMetricsChainTest {
   @Test
   @DisplayName("the attribution filter runs before the identity swap, in the chain as built")
   void theAttributionFilterRunsBeforeTheActingMemberSwap() {
-    // The proxy holds several chains — the management-port and monitoring-scrape ones come first
-    // by @Order — so the API chain has to be found by content rather than by position.
     List<Filter> filters =
         filterChainProxy.getFilterChains().stream()
             .map(chain -> chain.getFilters())
@@ -116,9 +105,6 @@ class ApiClientMetricsChainTest {
                 + "and would be counted as anonymous")
         .isLessThan(identitySwap);
 
-    // The other half of the sandwich, and the one this test was missing: BEFORE the bearer filter
-    // there is no SecurityContext at all, so the filter would see every request as anonymous and
-    // count nothing — silently, because "no subject" is a legitimate outcome it skips.
     int authentication =
         indexOf(
             filters,

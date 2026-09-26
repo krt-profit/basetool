@@ -74,10 +74,6 @@ class RefineryOrderCreateE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      // Location + refining method come from the SQL catalog seed (E2eStackExtension.seedCatalog);
-      // the input material, and the second one with a refined output for the keyboard-pick test,
-      // are seeded by E2eStackExtension before any page renders, because the picker's catalogue is
-      // cached from the first render on. This only looks the first one's id up.
       materialId =
           seeder.ensureRefineryMaterial(
               USERNAME, PASSWORD, E2eStackExtension.PICKER_MATERIAL_REFINERY);
@@ -115,11 +111,6 @@ class RefineryOrderCreateE2eTest {
         page.waitForURL(url -> url.contains("/refinery-orders/create"));
         page.waitForLoadState();
 
-        // The owner picker is a searchable combobox for logisticians (enhanced from #ownerId), and
-        // a
-        // disabled native field otherwise; pick the first user when the editable combobox is
-        // present,
-        // else it auto-defaults to the caller via a hidden field.
         Locator ownerCombo = page.locator(".krt-combobox:has(#ownerId) .krt-combobox__input");
         if (ownerCombo.count() > 0) {
           E2eSupport.selectComboboxFirstOption(ownerCombo);
@@ -127,26 +118,15 @@ class RefineryOrderCreateE2eTest {
         page.locator("#locationId").selectOption(new SelectOption().setLabel("E2E Refinery Hub"));
         page.locator("#refiningMethodId")
             .selectOption(new SelectOption().setLabel("E2E Refining Method"));
-        // The input-material picker is a server-side-search combobox (REQ-FE-016); its id stays on
-        // the hidden input. The empty-query popup renders only the first 25 catalog rows (name
-        // ascending) and the seeded material sorts beyond that window, so the pick must type the
-        // material's name first — the real-user narrowing flow.
         E2eSupport.selectComboboxByValue(
             page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"),
             materialId,
             "E2E Refinery Material");
-        // Both the input and the expected output quantity of the goods row are required.
         page.locator("#inputQuantity_0").fill("100");
         page.locator("#outputQuantity_0").fill("100");
-        // Wait for the full post-submit redirect to settle before navigating, else WebKit aborts
-        // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
         E2eSupport.awaitFormPost(page, () -> page.getByTestId("refinery-submit").click());
 
-        // The created order must appear in the list (fresh ephemeral DB => exactly one). Route the
-        // post-submit GET through the retry helper: WebKit can still abort it (HTTP/2
-        // INTERNAL_ERROR) even after the redirect settled — see E2eSupport#navigate.
         E2eSupport.navigate(page, baseUrl + "/refinery-orders");
-        // 20 s, not the 5 s default: the post-submit list render is slow on WebKit under CI load.
         assertThat(page.getByTestId("refinery-order-row").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
@@ -157,14 +137,8 @@ class RefineryOrderCreateE2eTest {
   }
 
   /**
-   * Regression: narrowing the input-material picker by typing and committing the sole match with
-   * ENTER — without clicking the dropdown row — must prefill the read-only output material, exactly
-   * as a mouse pick does.
-   *
-   * <p>The combobox's rendered-row list used to carry only each option's value and label, so the
-   * keyboard commit paths mirrored an option with no metadata onto the hidden input and {@code
-   * updateOutputMaterial} read an empty {@code data-refined-name}, leaving the output display at
-   * its "-" placeholder while the input showed a correctly picked material.
+   * Verifies that committing the sole match of the input-material picker with ENTER prefills the
+   * read-only output material, as a mouse pick does.
    */
   @Test
   void keyboardPickPrefillsTheOutputMaterial() {
@@ -183,8 +157,6 @@ class RefineryOrderCreateE2eTest {
         Locator combo = page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input");
         combo.click();
         combo.fill(KEYBOARD_RAW_MATERIAL);
-        // Wait for the debounced remote fetch to render the sole match before committing it, so
-        // Enter lands on a populated list rather than on the transient "loading" row.
         assertThat(combo.locator("xpath=..").locator("li[role='option']:not([data-value=''])"))
             .hasCount(1);
         combo.press("Enter");

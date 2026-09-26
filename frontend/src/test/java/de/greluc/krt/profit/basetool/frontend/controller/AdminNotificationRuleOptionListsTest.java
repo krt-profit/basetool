@@ -36,17 +36,9 @@ import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the option lists of {@link AdminNotificationRulePageController} — the single source every
- * {@code <option>} of the notification-rule editor is rendered from — against the backend and the
- * message bundles.
- *
- * <p>The frontend holds no copy of the backend enums, so these lists are hand-kept. Two drifts are
- * silent at runtime and are therefore gated here: a backend enum that gains a value the editor does
- * not offer (the defect this editor shipped with — four of twelve event types, and no {@code
- * ACCOUNT_RESPONSIBLE}, so opening a seeded rule selected an option that did not exist), and a code
- * whose label key no bundle declares. The label keys are built at render time as {@code
- * <prefix>.__${code}__}, which {@code MessageBundleConsistencyTest}'s literal-key scan cannot see,
- * and a missing one renders as {@code ??key??} in the admin's dropdown.
+ * Pins the option lists of {@link AdminNotificationRulePageController} against the backend enums in
+ * the committed OpenAPI document and against the message bundles, so a new enum value or a missing
+ * {@code <prefix>.__${code}__} label key fails the build.
  */
 class AdminNotificationRuleOptionListsTest {
 

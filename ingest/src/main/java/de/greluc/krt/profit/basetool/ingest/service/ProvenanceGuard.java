@@ -32,23 +32,11 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Checks the payload's self-declared producer against the configured allowlist (REQ-INGEST-011,
- * {@code app.ingest.client-identity.allowed-tools}) — the payload-level companion to the
- * token-level checks in {@code ClientIdentityFilter}, which cannot run here because the body is not
- * parsed until the controller.
+ * Checks the payload's self-declared producer against {@code
+ * app.ingest.client-identity.allowed-tools} (REQ-INGEST-011).
  *
- * <p><b>Be precise about what this is worth.</b> The {@code tool} field is client-supplied and the
- * contract that documents it is published (REQ-INGEST-010), so anyone who wants to set it to the
- * expected value will. It is <em>not</em> authentication and must never be counted as such. It
- * earns its place for two cheaper reasons: a hand-rolled payload that never thought about
- * provenance fails immediately, and — through {@code
- * basetool_ingest_client_rejected_total{reason="bad_provenance"}} — a producer drifting away from
- * the registered client becomes visible instead of blending in. The load-bearing controls remain
- * the token-level gates and the fact that the ingest path persists nothing (REQ-INGEST-004).
- *
- * <p>Inert until {@code allowed-tools} is configured, and reduced to log-and-count while {@code
- * audit-only} is set — the same rollout discipline every other gate here follows, so an operator
- * can measure the real client population before enforcing.
+ * <p>The {@code tool} field is client-supplied and is not authentication. The guard is inert until
+ * the allowlist is configured and only logs and counts while {@code audit-only} is set.
  */
 @Slf4j
 @Component
@@ -88,10 +76,6 @@ public class ProvenanceGuard {
           LogSafe.text(provenance.toolVersion(), MAX_LOGGED_PROVENANCE));
       return;
     }
-    // WARN with the declared values: this is the one reject reason a caller fully controls, so the
-    // actual string is the entire diagnostic value — it separates "an old extractor build emits a
-    // legacy tool name" from "someone is hand-building payloads". LogSafe first: the fields are
-    // unvalidated internet-facing free text and could otherwise forge a second log line.
     log.warn(
         "Ingest payload provenance rejected: tool={}, toolVersion={}, schemaVersion={}",
         LogSafe.text(tool, MAX_LOGGED_PROVENANCE),
@@ -103,18 +87,8 @@ public class ProvenanceGuard {
   }
 
   /**
-   * Reports whether the declared producer is on the allowlist, compared <b>case-insensitively</b>.
-   *
-   * <p>Case folding is not cosmetic here. The producer strings are hand-maintained constants in a
-   * separately-released client, and this project has already been bitten by exactly that class of
-   * drift: the extractor emits {@code basetool-sc-extractor} on the refinery path but {@code
-   * Basetool SC Extractor} on the blueprint path, which is what broke every blueprint send in the
-   * 2026-08-03 incident. The two spellings differ structurally, so folding case alone would not
-   * have prevented it — both belong on the allowlist — but it removes the adjacent failure mode
-   * where a later release merely re-cases its constant and takes the ingest path down again.
-   *
-   * <p>Uses {@link Locale#ROOT} rather than the default locale: under a Turkish default, {@code
-   * "I".toLowerCase()} yields a dotless ı and an ASCII producer name would stop matching itself.
+   * Reports whether the declared producer matches an allowlist entry, ignoring case under {@link
+   * Locale#ROOT}.
    *
    * @param tool the payload's declared, non-null producer
    * @return {@code true} when an allowlist entry matches ignoring case

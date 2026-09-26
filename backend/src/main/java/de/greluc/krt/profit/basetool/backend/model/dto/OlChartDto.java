@@ -23,24 +23,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The Organisationsleitung tier at the very top of the multi-Bereich org chart (epic #692,
- * REQ-ORG-026): the OL org unit's identity plus its OL_MEMBER nodes. Carried as its own record
- * (rather than a bare node list) so the chart can caption the tier with the OL's name and the
- * inline admin editor can stamp a new OL_MEMBER against {@code orgUnitId} even while the tier is
- * still empty.
+ * The Organisationsleitung tier at the top of the org chart: the OL org unit's identity plus its
+ * OL_MEMBER nodes (REQ-ORG-026). The whole record is {@code null} on {@link OrgChartDto} when no
+ * active OL exists.
  *
- * <p>The whole record is {@code null} on the parent {@link OrgChartDto} when no active OL exists,
- * so the chart simply omits the OL tier and degrades to the per-Bereich / legacy view.
- *
- * @param orgUnitId the OL org unit's id (the scope new OL_MEMBER positions are stamped against).
- * @param name the OL's display name (the tier caption).
- * @param shorthand the OL's short tag.
- * @param grandAdmiral the OL member designated as the Grand Admiral (REQ-ORG-021), rendered at the
- *     top of the OL above the other members, or {@code null} when the post is vacant. Its holder is
- *     one of the OL members with the OL_MEMBER rank — this node is the same person split out of
- *     {@code members} for prominent placement, so it never also appears in {@code members}.
- * @param members the remaining OL members (OL_MEMBER positions, excluding the Grand Admiral); never
- *     {@code null}, possibly empty.
+ * @param orgUnitId the OL org unit's id, the scope new OL_MEMBER positions are stamped against
+ * @param name the OL's display name (the tier caption)
+ * @param shorthand the OL's short tag
+ * @param grandAdmiral the OL member holding the Grand Admiral post (REQ-ORG-021), or {@code null}
+ *     when vacant; never also listed in {@code members}
+ * @param members the remaining OL members; never {@code null}, possibly empty
  */
 public record OlChartDto(
     UUID orgUnitId,

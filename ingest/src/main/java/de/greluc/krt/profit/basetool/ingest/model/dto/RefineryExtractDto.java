@@ -27,11 +27,8 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Gateway-side mirror of the backend's {@code RefineryExtractDto} — the frozen {@code
- * RefineryExtract} JSON contract v1 (ADR-0008). The gateway accepts it as a validated request body
- * so a malformed payload is rejected at the edge before the backend relay; the backend re-validates
- * and performs all matching. Kept field-for-field with the backend record so the relayed JSON is
- * identical (REQ-INGEST-001).
+ * Gateway mirror of the backend's {@code RefineryExtractDto}, the {@code RefineryExtract} contract
+ * v1 (ADR-0008), validated at the edge and relayed unchanged (REQ-INGEST-001).
  *
  * @param schemaVersion contract version; only {@code 1} is processed by the backend
  * @param tool producing tool identifier (provenance only)

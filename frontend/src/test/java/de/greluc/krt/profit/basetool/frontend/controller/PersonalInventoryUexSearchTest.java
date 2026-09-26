@@ -53,21 +53,15 @@ class PersonalInventoryUexSearchTest {
 
   @Test
   void uexSearch_delegatesToBackend_andDefaultsLimitTo25() {
-    // Given
     UexLocationDto dto =
         new UexLocationDto(
             42, PersonalInventoryLocationType.CITY, "Lorville", "Stanton", "Hurston");
-    // The free-text term is forwarded as a URI-template variable ({q}) with the raw value passed
-    // separately — eq("lor") pins that raw value, so a URLEncoder-into-the-string regression (which
-    // would put "lor" inside the URI and drop the third argument) fails to match here.
     when(backendApiClient.get(
             contains("/api/v1/uex/locations/search?q={q}&limit=25"), anyTypeRef(), eq("lor")))
         .thenReturn(List.of(dto));
 
-    // When
     List<UexLocationDto> result = controller.uexSearch("lor", null);
 
-    // Then
     assertNotNull(result);
     assertEquals(1, result.size());
     assertEquals("Lorville", result.get(0).name());
@@ -75,26 +69,19 @@ class PersonalInventoryUexSearchTest {
 
   @Test
   void uexSearch_clampsLimit_to100() {
-    // Given
     when(backendApiClient.get(contains("limit=100"), anyTypeRef())).thenReturn(List.of());
 
-    // When
     List<UexLocationDto> result = controller.uexSearch("x", 9999);
 
-    // Then
     assertTrue(result.isEmpty());
   }
 
   @Test
   void uexSearch_returnsEmptyList_whenBackendThrows() {
-    // Given: backend throws unexpectedly; the controller must swallow it. The term is forwarded
-    // through the URI-variable overload, so the throw is stubbed on that (3-arg) overload.
     when(backendApiClient.get(any(), anyTypeRef(), any())).thenThrow(new RuntimeException("boom"));
 
-    // When
     List<UexLocationDto> result = controller.uexSearch("anything", 25);
 
-    // Then
     assertNotNull(result);
     assertTrue(result.isEmpty());
   }

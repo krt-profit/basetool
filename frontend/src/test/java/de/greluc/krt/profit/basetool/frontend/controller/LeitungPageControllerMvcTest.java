@@ -50,16 +50,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level security test for {@link LeitungPageController} (epic #800, REQ-ROLE-004). Pins the
- * page's role gate to {@code ADMIN} / {@code OFFICER} ({@code Roles.ADMIN_OR_OFFICER}): every
- * functional leader carries the operative {@code OFFICER} grant, so an officer (and admin) reaches
- * the page and its write proxies, while the previously-accepted {@code LOGISTICIAN} / {@code
- * MISSION_MANAGER} capability roles — which have no appointment reach and only ever saw an empty
- * page — are now forbidden. The delegated per-unit authority still lives at the backend appointment
- * endpoints; this test only fixes the coarse frontend gate that used to admit them.
+ * Security tests for {@link LeitungPageController} (REQ-ROLE-004): the page and its write proxies
+ * admit only {@code ADMIN} and {@code OFFICER}, and {@code LOGISTICIAN} / {@code MISSION_MANAGER}
+ * are forbidden.
  *
- * <p>It also pins how the Spezialkommando section renders the two caps: the roster cap links to the
- * SK member page, the lead cap shows the lead toggle, and neither leaks into the other.
+ * <p>Also pins that the Spezialkommando section renders the roster and lead caps independently.
  */
 @SpringBootTest
 class LeitungPageControllerMvcTest {
@@ -108,9 +103,9 @@ class LeitungPageControllerMvcTest {
    * Stubs a view holding exactly one Spezialkommando with one member and the given capability
    * flags.
    *
-   * @param skId the SK id.
-   * @param canAppointLead the lead-appointment cap (parent Bereichsleiter / admin).
-   * @param canManageRoster the roster cap (the SK's own lead / admin).
+   * @param skId the SK id
+   * @param canAppointLead the lead-appointment cap
+   * @param canManageRoster the roster cap
    */
   private void stubSpecialCommandView(UUID skId, boolean canAppointLead, boolean canManageRoster) {
     LeitungUnitDto sk =
@@ -128,8 +123,6 @@ class LeitungPageControllerMvcTest {
         .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of(sk)));
   }
 
-  // An SK lead (roster cap only) gets the link to the SK member page and no lead toggle — the
-  // lead seat is appointed from the tier above, never from within the SK.
   @Test
   @WithMockUser(roles = "OFFICER")
   void page_skLead_linksToMemberPageWithoutLeadToggle() throws Exception {
@@ -145,8 +138,6 @@ class LeitungPageControllerMvcTest {
         .andExpect(content().string(not(containsString("toggle-sk-lead"))));
   }
 
-  // A Bereichsleiter who does not lead the SK (lead cap only) keeps the lead toggle and gets no
-  // member-page link.
   @Test
   @WithMockUser(roles = "OFFICER")
   void page_bereichsleiter_keepsLeadToggleWithoutMemberPageLink() throws Exception {
@@ -178,9 +169,6 @@ class LeitungPageControllerMvcTest {
     mockMvc.perform(get("/organisation/leitung")).andExpect(status().isForbidden());
   }
 
-  // The whole Leitung surface is gated, not just the GET: the write proxies carry the same
-  // Roles.ADMIN_OR_OFFICER, so an officer's appointment write relays to the backend (200) while a
-  // logistician is forbidden before any backend call.
   @Test
   @WithMockUser(roles = "OFFICER")
   void assignSquadronRank_officer_returns200() throws Exception {

@@ -109,20 +109,13 @@ public interface NotificationEvent {
   Map<String, String> renderParams();
 
   /**
-   * Notification types this event marks obsolete for its {@link #entityId()}: the creation pipeline
-   * deletes every outstanding notification of one of these types tagged with this event's {@link
-   * #entityType()} + {@link #entityId()} pair, across <em>all</em> recipients, when the event is
-   * processed (REQ-NOTIF-018). Default: none.
+   * Notification types this event marks obsolete for its {@link #entityId()} (REQ-NOTIF-018).
    *
-   * <p>Lets a lifecycle-terminating event clear the now-stale "action needed" notifications an
-   * earlier event in the same lifecycle produced — e.g. deciding (confirm/reject) or withdrawing
-   * (cancel) a bank booking request removes the {@code BANK_BOOKING_REQUEST_CREATED} inbox items
-   * the bank staff were shown. The removal runs regardless of whether this event itself resolves
-   * any recipients, so a purely-terminating event (a self-service cancel that notifies nobody)
-   * still clears the stale items.
+   * <p>When the event is processed, every outstanding notification of these types tagged with this
+   * event's {@link #entityType()} and {@link #entityId()} is deleted for all recipients, even if
+   * the event itself resolves no recipients. Default: none.
    *
-   * @return the notification types superseded for this event's entity; never {@code null}, possibly
-   *     empty
+   * @return the superseded notification types; never {@code null}, possibly empty
    */
   @NotNull
   @Unmodifiable

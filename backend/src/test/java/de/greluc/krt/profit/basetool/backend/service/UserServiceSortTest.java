@@ -60,18 +60,14 @@ class UserServiceSortTest {
 
   @Test
   void findAll_shouldRequestSortedUsers() {
-    // Given: admin in "all squadrons" mode — squadron scope is empty so the repository receives
-    // a null filter alongside the case-insensitive sort.
     when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
     when(userRepository.findAllScopedList(
             org.mockito.ArgumentMatchers.<java.util.Collection<java.util.UUID>>any(),
             org.mockito.ArgumentMatchers.<Sort>any()))
         .thenReturn(Collections.emptyList());
 
-    // When
     userService.findAll();
 
-    // Then
     ArgumentCaptor<Sort> sortCaptor = ArgumentCaptor.forClass(Sort.class);
     verify(userRepository)
         .findAllScopedList(org.mockito.ArgumentMatchers.isNull(), sortCaptor.capture());
@@ -81,6 +77,6 @@ class UserServiceSortTest {
 
     assertThat(order).isNotNull();
     assertThat(order.getDirection()).isEqualTo(Sort.Direction.ASC);
-    assertThat(order.isIgnoreCase()).isTrue(); // Optional but good for usernames
+    assertThat(order.isIgnoreCase()).isTrue();
   }
 }

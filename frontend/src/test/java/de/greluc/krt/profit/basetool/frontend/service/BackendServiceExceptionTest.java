@@ -34,13 +34,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Unit tests for {@link BackendServiceException} — the single seam through which the frontend
- * translates an RFC 7807 Problem+JSON response from the backend into a structured value the
- * controller advice can map to a localized user-visible error. Coverage was 69% line / 42% branch
- * with no dedicated test file. A regression here means users see "UNKNOWN" instead of a meaningful
- * message, or worse, a backend stack trace leaks through.
- *
- * <p>The class is a pure value type + parser, so the tests are pure JUnit without a Spring context.
+ * Unit tests for {@link BackendServiceException}, which parses a backend RFC 7807 Problem+JSON
+ * response into the structured value the controller advice maps to a localized error.
  */
 class BackendServiceExceptionTest {
 
@@ -50,10 +45,6 @@ class BackendServiceExceptionTest {
   void setUp() {
     mapper = JsonMapper.builder().build();
   }
-
-  // ---------------------------------------------------------------
-  // fromProblem — parses the body, derives code, populates fieldErrors
-  // ---------------------------------------------------------------
 
   @Nested
   class FromProblemTests {
@@ -99,8 +90,6 @@ class BackendServiceExceptionTest {
 
     @Test
     void nullBody_fallsBackToStatusDerivedCode() {
-      // WebClientResponseException can have a null body for content-less responses
-      // (e.g. 503 with no payload from a misconfigured upstream).
       BackendServiceException ex = BackendServiceException.fromProblem(wcre(503, null), mapper);
 
       assertEquals(503, ex.getStatusCode());
@@ -117,9 +106,6 @@ class BackendServiceExceptionTest {
 
     @Test
     void malformedJsonBody_fallsBackToStatusDerivedCode() {
-      // The catch (Exception ignored) path: a non-JSON payload (e.g. HTML
-      // from an upstream proxy 503) must not throw — the exception must
-      // still carry the HTTP status and the status-derived code.
       BackendServiceException ex =
           BackendServiceException.fromProblem(
               wcre(503, "<html><body>503 service unavailable</body></html>"), mapper);
@@ -144,13 +130,11 @@ class BackendServiceExceptionTest {
 
     @Test
     void fieldErrorsWithMissingFieldOrMessage_useEmptyString() {
-      // Defensive: the backend should always send both keys, but if it doesn't
-      // the parser must use "" rather than null, so the consumer never NPEs.
       String body =
           "{\"fieldErrors\":["
-              + "{\"field\":\"name\"}," // missing message
-              + "{\"message\":\"must not be null\"}," // missing field
-              + "{}" // both missing
+              + "{\"field\":\"name\"},"
+              + "{\"message\":\"must not be null\"},"
+              + "{}"
               + "]}";
 
       BackendServiceException ex = BackendServiceException.fromProblem(wcre(400, body), mapper);
@@ -166,8 +150,6 @@ class BackendServiceExceptionTest {
 
     @Test
     void fieldErrorsThatIsNotAnArray_isIgnored() {
-      // Defensive: if `fieldErrors` is mistyped as an object, the parser
-      // must not crash — the field-errors list must just be empty.
       String body = "{\"fieldErrors\":{\"name\":\"oops\"}}";
 
       BackendServiceException ex = BackendServiceException.fromProblem(wcre(400, body), mapper);
@@ -184,10 +166,6 @@ class BackendServiceExceptionTest {
       assertTrue(ex.getMessage().contains("CUSTOM_CODE"));
     }
   }
-
-  // ---------------------------------------------------------------
-  // deriveCodeFromStatus — exercise every documented status mapping
-  // ---------------------------------------------------------------
 
   @Nested
   class DeriveCodeTests {
@@ -240,20 +218,14 @@ class BackendServiceExceptionTest {
 
     @Test
     void otherStatus_returnsUnknown() {
-      // 418 ("I'm a teapot") is not in the explicit switch -> defaults to UNKNOWN.
       assertEquals(
           BackendServiceException.CODE_UNKNOWN,
           BackendServiceException.fromProblem(wcre(418, ""), mapper).getProblemCode());
-      // Also confirm the broad default for an unmapped 5xx.
       assertEquals(
           BackendServiceException.CODE_UNKNOWN,
           BackendServiceException.fromProblem(wcre(500, ""), mapper).getProblemCode());
     }
   }
-
-  // ---------------------------------------------------------------
-  // getReadableErrorMessage — multi-layer fallback chain
-  // ---------------------------------------------------------------
 
   @Nested
   class ReadableErrorMessageTests {
@@ -275,7 +247,6 @@ class BackendServiceExceptionTest {
 
     @Test
     void blankProblemDetail_fallsThroughToCauseChain() {
-      // problemDetail blank -> reads the cause body to extract ProblemDetail title/detail.
       BackendServiceException ex =
           new BackendServiceException(
               "msg",
@@ -286,9 +257,6 @@ class BackendServiceExceptionTest {
               List.of(),
               "   ");
 
-      // The fallback uses WebClientResponseException.getResponseBodyAs(ProblemDetail.class).
-      // That method does its own Jackson decode and may return null if not configured;
-      // we only assert it does not throw and returns SOMETHING non-empty.
       String readable = ex.getReadableErrorMessage();
       assertNotNull(readable);
     }
@@ -302,8 +270,6 @@ class BackendServiceExceptionTest {
 
     @Test
     void nonWebClientCause_fallsBackToExceptionMessage() {
-      // The cause type-check at line 73 must fall through cleanly when the
-      // cause isn't a WebClientResponseException.
       BackendServiceException ex =
           new BackendServiceException(
               "fallback", new RuntimeException("unrelated"), 500, "X", null, List.of(), null);
@@ -311,10 +277,6 @@ class BackendServiceExceptionTest {
       assertEquals("fallback", ex.getReadableErrorMessage());
     }
   }
-
-  // ---------------------------------------------------------------
-  // getProblemType — strips the type URI to its trailing segment
-  // ---------------------------------------------------------------
 
   @Nested
   class ProblemTypeTests {
@@ -335,18 +297,11 @@ class BackendServiceExceptionTest {
 
     @Test
     void webClientCauseWithoutBody_returnsNullSilently() {
-      // No problem-detail body to extract type from. Method must return null,
-      // not throw.
       BackendServiceException ex = new BackendServiceException("x", wcre(500, ""), 500);
 
-      // The try/catch in getProblemType() means any decode failure becomes null.
       assertNull(ex.getProblemType());
     }
   }
-
-  // ---------------------------------------------------------------
-  // Defensive: fieldErrors list is immutable
-  // ---------------------------------------------------------------
 
   @Test
   void fieldErrorsList_isImmutableCopy() {
@@ -356,12 +311,9 @@ class BackendServiceExceptionTest {
     BackendServiceException ex =
         new BackendServiceException("msg", null, 400, "X", null, mutable, null);
 
-    // Caller mutating their list after construction must not affect ours.
     mutable.add(new BackendServiceException.FieldError("z", "w"));
     assertEquals(1, ex.getFieldErrors().size(), "internal fieldErrors must be a defensive copy");
 
-    // And the returned list must reject modification (List.copyOf gives an
-    // unmodifiable list).
     assertTrue(
         isUnmodifiable(ex.getFieldErrors()), "getFieldErrors() must return an unmodifiable view");
   }
@@ -374,10 +326,6 @@ class BackendServiceExceptionTest {
       return true;
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private static WebClientResponseException wcre(int status, String body) {
     byte[] bodyBytes = body == null ? null : body.getBytes(StandardCharsets.UTF_8);

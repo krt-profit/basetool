@@ -33,14 +33,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Documents the project's RFC&nbsp;7807 problem-detail responses in the generated OpenAPI spec.
- *
- * <p>Every endpoint can produce a 400/401/403/404/409/500 with {@code application/problem+json}
- * (the contract enforced by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}). SpringDoc cannot infer
- * that from controller signatures alone, so this customizer attaches the {@code ProblemDetail}
- * schema reference to every operation's response map and registers the schema itself in the
- * components section so the spec lints cleanly.
+ * SpringDoc customizer that documents the RFC&nbsp;7807 {@code application/problem+json} error
+ * responses of every operation and registers the {@code ProblemDetail} schema.
  */
 @Configuration
 public class OpenApiProblemDetailsConfig {

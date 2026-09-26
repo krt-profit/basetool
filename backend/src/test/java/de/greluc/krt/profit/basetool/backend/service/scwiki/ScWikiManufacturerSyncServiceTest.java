@@ -109,14 +109,11 @@ class ScWikiManufacturerSyncServiceTest {
     verify(syncReportService, never()).beginRun();
     verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(manufacturerRepository, never()).save(any());
-    // An empty Wiki response reconciles no rows → 0 items (#1041 item 2, SyncZeroItems).
     assertEquals(0, written, "an empty Wiki response must report zero reconciled rows");
   }
 
   @Test
   void syncManufacturers_notModified_reportsLiveCount_andSkipsReconciliationAndSweep() {
-    // A 304 (unchanged) catalogue reconciles nothing, but is healthy — it must report the live
-    // reconciled-manufacturer count, NOT 0, so an all-304 run is not a zero-item outage (#1182).
     when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.unchanged());
     when(manufacturerRepository.countLiveScwikiManufacturers()).thenReturn(7L);
@@ -145,7 +142,6 @@ class ScWikiManufacturerSyncServiceTest {
     assertEquals("AEGS", local.getScwikiCode());
     assertNotNull(local.getScwikiSyncedAt());
     assertNull(local.getScwikiDeletedAt());
-    // UEX-canonical fields untouched.
     assertEquals("Aegis Dynamics", local.getName());
     assertEquals("AEGS", local.getAbbreviation());
     verify(manufacturerRepository).save(local);
@@ -157,7 +153,6 @@ class ScWikiManufacturerSyncServiceTest {
             eq(uuid),
             any(),
             any());
-    // One link → non-empty seen set → the orphan sweep runs.
     verify(manufacturerRepository).markScwikiDeletedExcept(any(), any());
   }
 
@@ -165,7 +160,7 @@ class ScWikiManufacturerSyncServiceTest {
   void linksByScwikiUuid_refresh_doesNotReLogLinked() {
     UUID uuid = UUID.randomUUID();
     Manufacturer local = manufacturer("Roberts Space Industries", "RSI");
-    local.setScwikiUuid(uuid); // already linked on a prior run
+    local.setScwikiUuid(uuid);
     when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
         .thenReturn(
             ScWikiClient.FetchResult.of(List.of(dto(uuid, "Roberts Space Industries", "RSI"))));
@@ -185,9 +180,7 @@ class ScWikiManufacturerSyncServiceTest {
     UUID uuid = UUID.randomUUID();
     Manufacturer local = manufacturer("Aegis Dynamics", "AEGS");
     when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
-        .thenReturn(
-            ScWikiClient.FetchResult.of(
-                List.of(dto(uuid, "Aegis", "AEGS")))); // wiki name differs from UEX name
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(uuid, "Aegis", "AEGS"))));
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Aegis")).thenReturn(Optional.empty());
     when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("AEGS"))
@@ -196,7 +189,7 @@ class ScWikiManufacturerSyncServiceTest {
     service.syncManufacturers();
 
     assertEquals(uuid, local.getScwikiUuid());
-    assertEquals("Aegis Dynamics", local.getName()); // canonical name preserved
+    assertEquals("Aegis Dynamics", local.getName());
     verify(manufacturerRepository).save(local);
   }
 
@@ -215,7 +208,7 @@ class ScWikiManufacturerSyncServiceTest {
 
     service.syncManufacturers();
 
-    assertEquals(alreadyLinked, local.getScwikiUuid()); // link not hijacked
+    assertEquals(alreadyLinked, local.getScwikiUuid());
     verify(manufacturerRepository, never()).save(any());
     verify(syncReportService)
         .logScwikiEvent(
@@ -225,7 +218,6 @@ class ScWikiManufacturerSyncServiceTest {
             eq(incoming),
             any(),
             any());
-    // Nothing reconciled → empty seen set → no sweep.
     verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
   }
 
@@ -246,8 +238,6 @@ class ScWikiManufacturerSyncServiceTest {
     verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(syncReportService, never()).logScwikiEvent(any(), any(), any(), any(), any(), any());
   }
-
-  // ---- helpers ---------------------------------------------------------------------------------
 
   /**
    * Builds a Wiki manufacturer payload.

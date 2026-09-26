@@ -39,16 +39,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Live multi-user sync for the {@code /missions} list (#1235, REQ-FE-015, ADR-0094).
- *
- * <p>The mission surface publishes <b>server-side</b> because create, core update and delete all
- * redirect: a client broadcast issued just before that navigation races the socket teardown. These
- * tests pin the delete path — the one core mutation whose handler takes no bound form — plus the
- * registry consistency of the topic and section strings the controller hardcodes.
- *
- * <p>The per-mission {@code mission:&#123;id&#125;} detail room is a <em>different</em> class and
- * is covered by the mission-detail tests; what matters here is that the two never collapse into
- * one.
+ * Tests the server-side live-sync publish for the {@code /missions} list (REQ-FE-015, ADR-0094):
+ * the delete path, and consistency of the hardcoded topic and section strings with the registry.
+ * The list topic must stay distinct from the per-mission detail room.
  */
 class MissionListLiveSyncPublishTest {
 
@@ -75,9 +68,6 @@ class MissionListLiveSyncPublishTest {
 
   @Test
   void missionsListTopic_isDistinctFromTheMissionDetailRoom() {
-    // The `mission`/`missions` stem repeats the `order`/`orders` shape. If the two ever collapsed
-    // onto one class, mission-detail presence frames (pseudonymous ids + callsigns) would be
-    // relayed into a room the list page joins with no presence gate at all.
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.prefix()).isEqualTo("missions");
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.allowedSections()).containsExactlyElementsOf(LIST);
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.presenceEnabled()).isFalse();
@@ -98,8 +88,6 @@ class MissionListLiveSyncPublishTest {
 
   @Test
   void deleteMission_onBackendFailure_doesNotPublish() {
-    // The mission is still there; telling peers otherwise makes every open list re-fetch for
-    // nothing and — worse — reads as a successful delete in the relay metrics.
     UUID id = UUID.randomUUID();
     doThrow(new RuntimeException("backend down")).when(backendApiClient).delete(anyString(), any());
 

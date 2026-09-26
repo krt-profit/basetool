@@ -37,19 +37,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * The admin Personensuche page ({@code /admin/person-search}, REQ-SEC-060).
+ * The admin Personensuche page ({@code /admin/person-search}, REQ-SEC-060), which finds every place
+ * a name appears so a rectification or erasure request can cover all of them.
  *
- * <p>Find every place a name appears, so an Art. 16 rectification or an Art. 17 erasure can cover
- * all of them. {@code docs/privacy/data-subject-requests.md} tells the reader to run it for
- * <b>every</b> such request, including from a member — a member's handle can sit in a free-text
- * field that no foreign key connects to their account.
- *
- * <p>ADMIN only, and not only because the sweep is expensive: the result is a profile of one person
- * assembled across the whole system.
- *
- * <p><b>The search term never reaches a log line here.</b> It is somebody's name, and the request
- * log already records the path; a debug line quoting the term would put the name of every searched
- * person into the log stream, which the observability rules forbid outright (REQ-OBS-004).
+ * <p>ADMIN only. The search term is a person's name and is never logged (REQ-OBS-004).
  */
 @Controller
 @UsesLayoutModel
@@ -92,27 +83,15 @@ public class AdminPersonSearchPageController {
 
     if (term.length() >= 3) {
       try {
-        // The term goes as a URI-template variable so it is percent-encoded exactly once across
-        // the frontend->backend hop (REQ-FE-016). URLEncoder here was encoded twice: WebClient's
-        // default TEMPLATE_AND_VALUES mode re-encodes each '%' to '%25', the backend's
-        // @RequestParam
-        // then held the literal escape sequence, escapeLikeWildcards escaped those '%' into '\%',
-        // and ILIKE matched nothing. Plain ASCII terms were unaffected, which is why it sat
-        // unnoticed -- and a search for a name with an umlaut reported no mentions at all, which on
-        // this surface is the one answer that must never be wrong (REQ-SEC-060).
         PersonSearchResultDto result =
             backendApiClient.get("/api/v1/admin/person-search?q={q}", RESULT_TYPE, term);
         model.addAttribute("hits", result == null ? List.of() : result.hits());
         model.addAttribute("truncated", result != null && result.truncated());
-        // Reported separately from the overall cap, which almost never fires: 75 targets at 25
-        // hits each means a name occurring 40 times in ONE column produced a union total far
-        // below 300 and truncated == false, so the page said the list was complete.
         model.addAttribute(
             "cappedColumns",
             result == null || result.cappedColumns() == null ? List.of() : result.cappedColumns());
         model.addAttribute("searched", true);
       } catch (BackendServiceException e) {
-        // No term in the message: see the class comment.
         log.debug("Person search failed with status {}", e.getStatusCode());
         model.addAttribute("error", "admin.personSearch.error.load");
       } catch (Exception e) {

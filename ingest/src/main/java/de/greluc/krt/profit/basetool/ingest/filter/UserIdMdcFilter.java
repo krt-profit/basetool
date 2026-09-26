@@ -36,22 +36,11 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Refines the {@code userId} MDC field from {@link CorrelationIdFilter#ANONYMOUS} to the
- * authenticated caller's JWT {@code sub} so every gateway log line is attributable to one subject —
- * the ingest half of the backend/frontend MDC contract (REQ-OBS-001/-002). Restricted to {@code
- * sub} by design: a Keycloak {@code preferred_username} / callsign is a name and must never reach
- * the appenders, whereas the {@code sub} UUID is not PII (REQ-OBS-004).
+ * Sets the {@code userId} MDC field to the authenticated caller's JWT {@code sub}, never a name
+ * (REQ-OBS-001/-004).
  *
- * <p>Installed <em>inside</em> the Spring Security chain, immediately after {@code
- * BearerTokenAuthenticationFilter} (see {@code SecurityConfig}), because the shared servlet filters
- * all run before authentication and would only ever see an empty {@link SecurityContextHolder}. It
- * is deliberately <b>not</b> a {@code @Component}: Boot would then also auto-register it as a plain
- * servlet filter, where it would run too early and be useless.
- *
- * <p>The filter never removes the key. {@link CorrelationIdFilter} wraps the whole request from
- * outside the security chain and owns the MDC lifecycle, so leaving the value in place is what lets
- * the {@link RequestLoggingFilter} access-log line — emitted after the security chain has already
- * unwound and cleared its {@code SecurityContext} — still carry the subject.
+ * <p>Installed inside the security chain after {@code BearerTokenAuthenticationFilter}, not as a
+ * component. It never removes the key; {@link CorrelationIdFilter} clears it at request end.
  */
 @RequiredArgsConstructor
 public class UserIdMdcFilter extends OncePerRequestFilter {

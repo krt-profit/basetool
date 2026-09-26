@@ -37,12 +37,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST controller for the order-detail Item-Bestand panel (REQ-ORDERS-028): lists the game-item
- * stock earmarked to a job order, grouped per game item — the item sibling of {@link
- * MaterialCollectionController}. Reading the panel requires being able to see the order ({@code
- * canSeeJobOrder}); the per-entry owner/location is additionally redacted for a requesting-side
- * viewer of an SK-public order (REQ-ORDERS-029, ADR-0107) via {@link
- * JobOrderInventoryOwnerRedactor}, gated on {@code canSeeJobOrderInventoryOwners}.
+ * REST controller for the order-detail Item-Bestand panel: lists the game-item stock earmarked to a
+ * job order, grouped per game item (REQ-ORDERS-028).
+ *
+ * <p>Reading requires {@code canSeeJobOrder}; per-entry owner and location are redacted via {@link
+ * JobOrderInventoryOwnerRedactor} unless {@code canSeeJobOrderInventoryOwners} holds
+ * (REQ-ORDERS-029).
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -54,16 +54,14 @@ public class JobOrderItemStockController {
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
-   * Returns the game-item stock earmarked to the given job order, grouped per game item. The
-   * per-entry owner and location are blanked when the caller is not entitled to the order's
-   * responsible side ({@code canSeeJobOrderInventoryOwners} is {@code false} — a requesting-side
-   * viewer of an SK-public order, REQ-ORDERS-029); amounts and the delivered marker are always
-   * kept.
+   * Returns the game-item stock earmarked to the given job order, grouped per game item.
+   *
+   * <p>Owner and location are blanked when {@code canSeeJobOrderInventoryOwners} is {@code false}
+   * (REQ-ORDERS-029); amounts and the delivered marker are always kept.
    *
    * @param jobOrderId job order id
-   * @return name-sorted game-item groups with per-entry owner (redacted for requesting-side
-   *     viewers), location, whole-unit amounts, this-order slice, delivered marker and entry
-   *     version
+   * @return name-sorted game-item groups with per-entry owner, location, amounts, this-order slice,
+   *     delivered marker and version
    */
   @Operation(
       summary = "Get the earmarked item stock for a job order",

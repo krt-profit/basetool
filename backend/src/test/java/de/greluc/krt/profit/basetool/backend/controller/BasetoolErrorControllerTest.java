@@ -52,7 +52,6 @@ class BasetoolErrorControllerTest {
 
   @BeforeEach
   void setUp() {
-    // Return the caller-supplied default (arg 2 == the bundle key here) so assertions are stable.
     MessageSource messageSource = mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any()))
         .thenAnswer(invocation -> invocation.getArgument(2));

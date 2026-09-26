@@ -49,30 +49,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the full {@code index} view (including {@code fragments/sidebar} and the transitively
- * included {@code fragments/toast}) end-to-end through MockMvc, so any breakage in the toast
- * fragment's SpEL expressions surfaces as a failed test rather than a 500 in production.
- *
- * <p>Regression context: {@code fragments/toast} previously called {@code
- * #strings.matches(param.error[0], '...')}, which throws {@code SpelEvaluationException: EL1004E:
- * Method matches(java.lang.String,java.lang.String) cannot be found on type
- * org.thymeleaf.expression.Strings}. Thymeleaf's {@code Strings} utility has no {@code matches}
- * method &mdash; {@code matches} is a native SpEL infix operator. The fix switched both branches to
- * {@code param.X[0] matches '...'}. The original crash happened on plain {@code GET /} for
- * anonymous users after a failed Keycloak callback (re)appended {@code ?error=...} to the URL; the
- * tests below cover exactly that path.
- *
- * <p>The pre-fix code reached the broken {@code Strings.matches} call only when {@code param.error
- * != null} (resp. {@code param.success != null}) due to SpEL's short-circuiting {@code and}, so the
- * regression cases here intentionally supply a matching query parameter.
+ * Renders the full {@code index} view, including the sidebar and toast fragments, through MockMvc
+ * so a broken SpEL expression in the toast fragment fails a test instead of returning 500. Uses
+ * {@code ?error=} and {@code ?success=} parameters to exercise the toast's {@code matches}
+ * branches.
  */
 @SpringBootTest
-// REQ-SEC-052: these cases exist to render the WHOLE index template through Thymeleaf — the
-// sidebar, the toast fragment, the SpEL in both. That template is the member's dashboard now, so
-// every request carries an OIDC principal (`oidcLogin()`, not `@WithMockUser`: the handler binds
-// `@AuthenticationPrincipal OidcUser`, and a username/password principal arrives as null and routes
-// to the landing page). The anonymous half of GET / has its own case at the bottom, and it asserts
-// the opposite of rendering: no data, no backend call, no session.
 class HomeControllerMvcTest {
 
   private static final String ERROR_TOAST_ID = "errorNotificationParam";
@@ -92,20 +74,12 @@ class HomeControllerMvcTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    // The member's home() path: backendApiClient.get(searchUri, typeRef) for the
-    // next-7-days upcoming-missions search. Returning null is a valid "no upcoming missions"
-    // response and keeps the template's empty-state branch simple.
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(null);
   }
 
   @Test
   void home_ShouldRenderIndex_WithoutQueryParams() throws Exception {
-    // Given: no toast-controlling query parameters
-    // When: GET / as a member
-    // Then: index renders normally; the toast fragment's param-gated branches stay
-    //       inactive, but the rest of fragments/toast (script + style block) still
-    //       runs through Thymeleaf and SpEL.
     mockMvc
         .perform(get("/").with(oidcLogin()))
         .andExpect(status().isOk())
@@ -113,16 +87,10 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * Direct regression: pre-fix this exact request crashed the template with {@code EL1004E: Method
-   * matches(String,String) cannot be found on type org.thymeleaf.expression.Strings}. After the
-   * fix, the SpEL infix {@code param.error[0] matches '...'} evaluates cleanly and the param-toast
-   * div is emitted in the response body.
+   * An {@code ?error=} value matching the key pattern renders the page with the parameter toast.
    */
   @Test
   void home_ShouldRenderIndex_WhenErrorParamMatchesKeyPattern() throws Exception {
-    // Given: ?error= with a value that matches '^[A-Za-z][A-Za-z0-9._-]{0,79}$'
-    // When: GET / as a member
-    // Then: 200, view "index", and the param-error toast div is in the HTML.
     mockMvc
         .perform(get("/").with(oidcLogin()).param("error", "notification.error.title"))
         .andExpect(status().isOk())
@@ -131,9 +99,7 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * Same regression as the error variant above, but for the symmetric {@code ?success=} branch
-   * (toast.html line 38). Both branches used the broken {@code #strings.matches} call and both must
-   * now route through the SpEL {@code matches} operator.
+   * A {@code ?success=} value matching the key pattern renders the page with the parameter toast.
    */
   @Test
   void home_ShouldRenderIndex_WhenSuccessParamMatchesKeyPattern() throws Exception {
@@ -153,9 +119,6 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WithoutParamErrorToast_WhenErrorParamFailsKeyPattern()
       throws Exception {
-    // Given: a value that violates the key pattern (contains spaces, starts with digit)
-    // When: GET / as a member
-    // Then: 200, view "index", and the param-error toast div is absent.
     mockMvc
         .perform(get("/").with(oidcLogin()).param("error", "9 invalid value with spaces"))
         .andExpect(status().isOk())
@@ -232,7 +195,6 @@ class HomeControllerMvcTest {
             null,
             false,
             null,
-            // owningSquadron null → ownerless mission (mirrors the serialized DTO).
             null,
             null,
             0L,
@@ -373,7 +335,6 @@ class HomeControllerMvcTest {
   void home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersSpecialCommand()
       throws Exception {
     UUID specialCommandId = UUID.randomUUID();
-    // No Staffel on the /me record — the membership comes purely from /me/org-unit-ids.
     UserDto me =
         new UserDto(
             UUID.randomUUID(),
@@ -426,14 +387,7 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * The landing page renders no data, calls no backend and mints no session (REQ-SEC-052, D7).
-   *
-   * <p>All three used to be violated on every hit. The seven-day mission grid was fetched and
-   * rendered for anyone who asked; and a session was created twice over — once by the {@code
-   * HttpSession} parameter Spring resolves with {@code getSession(true)} whether the body uses it
-   * or not, and once by {@code SafeCsrfAdvice} forcing the deferred CSRF token, which the default
-   * {@code HttpSessionCsrfTokenRepository} saves into a fresh session before any template runs.
-   * Every crawler hit cost two sessions in Redis for a page that carries no form.
+   * The landing page renders no data, calls no backend and creates no session (REQ-SEC-052).
    *
    * @throws Exception if the request could not be performed
    */
@@ -457,16 +411,9 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * The landing page shows a logged-out visitor no navigation.
-   *
-   * <p>Pinned because of what it depends on: {@code landing.html} includes {@code
-   * fragments/sidebar}, and that fragment carries the tool's whole navigation, the notification
-   * bell and the org-unit switcher behind {@code sec:authorize="isAuthenticated()"}. Those three
-   * guards look exactly like the twenty-five on the pages behind the login — which are redundant
-   * with the URL matrix, because those pages answer nobody without a session. These are not: this
-   * page is one of the four surfaces REQ-SEC-052 serves without one, so the guards are the only
-   * thing between a visitor and the navigation. Somebody tidying "always-true" template guards
-   * would delete all twenty-eight, and only this case would notice.
+   * The landing page shows a logged-out visitor no navigation, notification bell or org-unit
+   * switcher; the sidebar's {@code sec:authorize} guards are the only protection on this public
+   * page (REQ-SEC-052).
    *
    * @throws Exception if the request could not be performed
    */

@@ -24,23 +24,12 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Inbound request payload for the Update Unit operation — the versioned twin of {@link
+ * Request payload for a full-form edit of a mission unit, the versioned twin of {@link
  * AddUnitRequest}.
  *
- * <p>It carries the same editable fields as {@link AddUnitRequest} plus {@code version}: the {@code
- * MissionUnit.@Version} the client last saw, echoed back so a stale full-form save is rejected with
- * a 409 instead of silently clobbering a concurrent edit (#1131). Because the whole update path
- * rewrites <em>every</em> unit field from the caller's form snapshot, the entity's own
- * {@code @Version} WHERE-clause never fires on a stale form (the fresh {@code findById} always
- * matches the current row version) — the client-echoed {@code version} is the only guard against
- * the lost update. {@code version} is nullable so a privileged force-save (or a legacy caller that
- * omits it) skips the check via {@link
- * de.greluc.krt.profit.basetool.backend.support.OptimisticLock#checkOptionalClient}; a present,
- * mismatching value 409s.
- *
- * <p>Field semantics match {@link AddUnitRequest}: {@code name} is the required display name;
- * {@code shipTypeId} / {@code shipId} are optional; {@code responsibleUserId} optionally pins the
- * responsible person; {@code note} is a free-text planning note.
+ * <p>A present {@code version} that does not match the unit's current version yields 409, the only
+ * guard against a stale form overwriting a concurrent edit; {@code null} skips the check via {@link
+ * de.greluc.krt.profit.basetool.backend.support.OptimisticLock#checkOptionalClient}.
  */
 public record UpdateUnitRequest(
     @NotBlank @Size(max = 255) String name,

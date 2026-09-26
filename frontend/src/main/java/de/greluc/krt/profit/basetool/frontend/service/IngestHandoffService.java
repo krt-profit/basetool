@@ -34,18 +34,12 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Reads the one-click ingest handoff the gateway staged in the shared Redis (epic #639, {@code
- * REQ-INGEST-003/-004}). When the extractor opens {@code ?handoff=<id>}, the frontend consumes the
- * staged draft for {@code (session sub, handoffId)} — single-use, scoped to the browsing user — and
- * pre-fills the existing review surface.
+ * Reads the one-click ingest handoff the gateway staged in the shared Redis (REQ-INGEST-003,
+ * REQ-INGEST-004), so the review surface can be pre-filled from it.
  *
- * <p>The key schema is shared with the gateway: {@code ingest:handoff:<sub>:<handoffId>} → {@link
- * StagedHandoff} JSON. The read is an atomic {@code GETDEL}, so a stolen or replayed id is useless
- * and the entry is gone after the first successful pickup. Scoping the key by the session {@code
- * sub} means a foreign id never resolves to another user's draft (no IDOR). Every failure — unknown
- * / expired / consumed id, wrong kind, malformed value, or Redis being unreachable — degrades to
- * {@link Optional#empty()} so the page never errors out (it falls back to the normal empty form).
- * The session token is never logged.
+ * <p>The key is {@code ingest:handoff:<sub>:<handoffId>}, read with an atomic {@code GETDEL}, so a
+ * handoff is single-use and scoped to the session user. Every failure degrades to {@link
+ * Optional#empty()}; the session token is never logged.
  */
 @Slf4j
 @Service
@@ -94,18 +88,6 @@ public class IngestHandoffService {
     try {
       String raw = redisTemplate.opsForValue().getAndDelete(KEY_PREFIX + sub + ":" + handoffId);
       if (raw == null) {
-        // Diagnostic correlator (REQ-OBS-004): the key the gateway staged was not here. Log the
-        // same
-        // non-reversible hashes of the subject and handoff id the gateway's stage logs (never the
-        // raw
-        // subject — pseudonymous PII — or the secret id), so a stage/consume pair can be lined up:
-        // a
-        // MATCHING sub hash with an absent key means an expired or already-consumed handoff (the
-        // 5→30m TTL fix), while a DIFFERENT sub hash means a subject mismatch between the
-        // device-grant
-        // token and this browser session. This is what disambiguates the "Import-Link abgelaufen
-        // oder
-        // ungültig" notice.
         log.info(
             "Ingest handoff not found (sub=u-{}, hid=h-{}, kind={}) — expired, already consumed, or"
                 + " subject mismatch",

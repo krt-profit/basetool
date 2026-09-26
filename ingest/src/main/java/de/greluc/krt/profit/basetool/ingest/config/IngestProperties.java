@@ -29,49 +29,25 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe, fail-fast configuration for the ingest gateway (prefix {@code app.ingest}). Bound once
- * through the canonical record constructor and validated at startup ({@code @Validated}), so a
- * missing backend URL or a nonsensical handoff TTL aborts the boot instead of surfacing as a
- * runtime 500 on the first call (REQ-INGEST-001/-003/-005).
+ * Fail-fast configuration of the ingest gateway ({@code app.ingest}), validated at startup
+ * (REQ-INGEST-001/-003/-005).
  *
- * @param backendBaseUrl internal base URL of the backend resource server the gateway forwards to
- *     (e.g. {@code https://backend:11261}); reached over the internal network only — the backend
- *     stays internet-unreachable (REQ-INGEST-001)
- * @param frontendBaseUrl public base URL of the frontend the browser is sent to after a successful
- *     ingest (e.g. {@code https://app.profit-base.online}); used to build the {@code frontendUrl}
- *     returned to the extractor
- * @param publicBaseUrl the gateway's own externally reachable origin, e.g. {@code
- *     https://ingest.profit-base.online}. Used only to build the DPoP {@code htu} comparison
- *     target, so the comparison does not depend on the reverse proxy's forwarded headers (ADR-0129,
- *     {@link PublicUriDpopAuthenticationConverter}). Blank keeps Spring's stock request-derived
- *     target
- * @param refineryPath frontend path that renders the pre-filled refinery create form; the handoff
- *     id is appended as {@code ?handoff=<id>} (REQ-INGEST-004)
- * @param blueprintPath frontend path that renders the pre-filled personal-blueprint import preview;
- *     the handoff id is appended as {@code ?handoff=<id>} (REQ-INGEST-004)
- * @param handoffTtl lifetime of a staged handoff entry in Redis (REQ-INGEST-003). 30 minutes rather
- *     than the original 5: staging happens the moment the user clicks Send, whereas opening the
- *     pre-filled page is a <em>separate</em> manual click (plus a possible full browser login), so
- *     a 5-minute window expired before pickup for slower users. The entry stays single-use and
- *     per-subject scoped. Overridable via {@code APP_INGEST_HANDOFF_TTL}
- * @param maxPayloadBytes hard upper bound on an accepted ingest payload, in bytes; mirrors the
- *     frontend proxy's 2&nbsp;MB cap (REQ-INGEST-005)
- * @param maxHandoffBytes hard upper bound on a single <em>staged</em> handoff document, in bytes.
- *     Deliberately far below {@code maxPayloadBytes}: the staging store shares the Redis that holds
- *     the frontend's Spring Session store under {@code --maxmemory-policy noeviction}, where
- *     reaching the ceiling refuses writes, i.e. nobody can log in any more. Overridable via {@code
- *     APP_INGEST_MAX_HANDOFF_BYTES}
- * @param maxHandoffsPerSubject maximum number of live staged handoffs per subject; the oldest are
- *     evicted beyond it, turning an unbounded per-subject footprint into {@code
- *     maxHandoffsPerSubject × maxHandoffBytes}. Overridable via {@code
- *     APP_INGEST_MAX_HANDOFFS_PER_SUBJECT}
- * @param verifyBackendHostname whether the relay to the backend verifies that the backend's
- *     certificate names the host it dialled, on top of the pinned {@code backend-trust} chain
- *     (REQ-SEC-070, ADR-0211). {@code false}, the default, keeps ADR-0204's opt-out: chain only.
- *     {@code true} once every service serves its own leaf from the internal CA — the anchor then
- *     vouches for all of them, and the name is what tells the backend's certificate from the
- *     gateway's own. Bound from {@code INTERNAL_TLS_VERIFY_HOSTNAME}; ignored under {@code
- *     dev}/{@code test}
+ * @param backendBaseUrl internal base URL of the backend the gateway forwards to
+ * @param frontendBaseUrl public frontend base URL used to build the {@code frontendUrl} returned to
+ *     the extractor
+ * @param publicBaseUrl the gateway's external origin, used only as the DPoP {@code htu} comparison
+ *     target (ADR-0129); blank keeps the request-derived target
+ * @param refineryPath frontend path of the pre-filled refinery form; {@code ?handoff=<id>} is
+ *     appended (REQ-INGEST-004)
+ * @param blueprintPath frontend path of the pre-filled blueprint import preview; {@code
+ *     ?handoff=<id>} is appended (REQ-INGEST-004)
+ * @param handoffTtl lifetime of a single-use staged handoff entry in Redis (REQ-INGEST-003)
+ * @param maxPayloadBytes upper bound on an accepted ingest payload, in bytes (REQ-INGEST-005)
+ * @param maxHandoffBytes upper bound on one staged handoff document, in bytes; kept small because
+ *     the staging Redis also holds the frontend sessions
+ * @param maxHandoffsPerSubject maximum live staged handoffs per subject; the oldest are evicted
+ * @param verifyBackendHostname whether the backend relay also verifies the certificate's host name
+ *     on top of the pinned chain (REQ-SEC-070, ADR-0211); ignored under {@code dev}/{@code test}
  */
 @Validated
 @ConfigurationProperties(prefix = "app.ingest")

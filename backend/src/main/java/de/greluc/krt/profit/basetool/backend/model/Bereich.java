@@ -25,25 +25,11 @@ import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Bereich (area / division) tenant — one level <em>above</em> Staffeln and Spezialkommandos in the
- * Kartell hierarchy (epic #692, REQ-ORG-014, ADR-0025). Concrete {@link OrgUnit} subclass
- * discriminated by {@code kind = 'BEREICH'} on the {@code org_unit} table.
+ * Bereich (area) org unit, one level above Staffeln and Spezialkommandos (REQ-ORG-014, ADR-0025).
  *
- * <p>A Bereich (e.g. Profit, Sub-Radar, Raumueberlegenheit) groups several Staffeln and SKs as its
- * children via {@code org_unit.parent_org_unit_id} (wired up by an admin in a later phase) and is
- * run by its Bereichsleitung — the {@code is_bereichsleiter} / {@code is_bereichskoordinator} /
- * {@code is_bereichsoperator} flags on {@link OrgUnitMembership}. Its own parent is the {@link
- * Organisationsleitung}. The leadership's reach over the Bereich's children is a cascading,
- * officer-equivalent scope computed in {@code OwnerScopeService} (REQ-ORG-015) — it grants no admin
- * rights.
- *
- * <p><b>Promotion is permanently disabled for Bereich rows</b>, exactly as for {@link
- * SpecialCommand}: the {@code chk_org_unit_promotion_only_squadron} CHECK forces {@code
- * is_promotion_enabled = false} on every non-{@code SQUADRON} row, so the no-arg constructor sets
- * the inherited flag to {@code false} up front to keep the transient state aligned with the DB
- * invariant (otherwise Hibernate's dirty-check would try to UPDATE the column to {@code true} and
- * Postgres would reject the row at flush time). The entity adds no fields beyond {@link OrgUnit};
- * the subclass exists for type-safe references and Hibernate's discriminator dispatch.
+ * <p>Groups Staffeln and SKs as children and sits below the {@link Organisationsleitung}; its
+ * leadership gets a cascading, officer-equivalent scope over the children, no admin rights.
+ * Promotion is always disabled, so the constructor sets the inherited flag to {@code false}.
  */
 @Entity
 @DiscriminatorValue("BEREICH")
@@ -86,13 +72,10 @@ public class Bereich extends OrgUnit {
   }
 
   /**
-   * Refuses to enable promotion on a Bereich. Surfaces a buggy {@code setPromotionEnabled(true)}
-   * call at the call site rather than waiting for the {@code chk_org_unit_promotion_only_squadron}
-   * CHECK to reject the UPDATE at flush time.
+   * Refuses to enable promotion on a Bereich.
    *
-   * @param value the requested flag value; must be {@code false}.
-   * @throws IllegalArgumentException when {@code value} is {@code true} — Bereiche must never
-   *     expose the promotion subsystem.
+   * @param value the requested flag value; must be {@code false}
+   * @throws IllegalArgumentException when {@code value} is {@code true}
    */
   @Override
   public void setPromotionEnabled(boolean value) {

@@ -48,7 +48,6 @@ class SseSendFailureCauseTest {
 
   @Test
   void everythingElseIsOther_evenAnUncheckedWrapperOfAnIoException() {
-    // The mapping reads the thrown type only; it does not unwrap causes.
     assertThat(SseSendFailureCause.tagOf(new UncheckedIOException(new IOException())))
         .isEqualTo(MetricNames.CAUSE_OTHER);
     assertThat(SseSendFailureCause.tagOf(new RuntimeException()))

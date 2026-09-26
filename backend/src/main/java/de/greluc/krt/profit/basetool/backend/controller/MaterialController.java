@@ -56,14 +56,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for materials. Public reads cover the full catalog, the per-material price list, the
- * price-overview projection, the full material × terminal matrix, the job-order sub-catalog, and
- * the lightweight reference projection. Mutations are ADMIN/OFFICER and only touch the
- * admin-maintained fields (UEX-imported flags stay untouched).
+ * REST surface for materials: catalog, price lists, price overview, material × terminal matrix,
+ * job-order sub-catalog and reference projection. Mutations are ADMIN/OFFICER and touch only
+ * admin-maintained fields.
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
+ * gate takes precedence (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/api/v1/materials")
@@ -76,14 +74,10 @@ public class MaterialController {
   private final MaterialMapper materialMapper;
 
   /**
-   * Paged material list. {@code hasTerminals=true} returns the heavier projection with terminal
-   * prices eagerly loaded — used by views that show prices inline.
+   * Pages the material list, visible materials only unless {@code includeHidden} is set.
    *
-   * <p>By default only <b>visible</b> materials are returned ({@code is_visible = true}): wiki-only
-   * commodities imported invisible (§4.3) stay out of trading flows. The admin catalog passes
-   * {@code includeHidden=true} to see and review every row, including the hidden ones. The
-   * price-eager {@code hasTerminals} branch is already gated to materials that have a price row, so
-   * price-less wiki-only rows never surface there regardless of {@code includeHidden}.
+   * <p>{@code hasTerminals=true} returns the price-eager projection, limited to materials with a
+   * price row.
    *
    * @param hasTerminals when true, return the price-eager projection
    * @param includeHidden when true (admin), also return materials with {@code is_visible = false}
@@ -129,10 +123,9 @@ public class MaterialController {
   }
 
   /**
-   * Lightweight projection for typeaheads — only id, name and quantity type. Deliberately complete:
-   * a silent bound would make materials beyond it unreachable for consumers of the full list.
-   * Pickers that must stay payload-bounded use {@link #searchMaterials(String, Boolean, Boolean,
-   * Integer, Integer, String)}.
+   * Returns every visible material as a lightweight typeahead projection (id, name, quantity type),
+   * unbounded; bounded pickers use {@link #searchMaterials(String, Boolean, Boolean, Integer,
+   * Integer, String)}.
    *
    * @return all visible materials as reference DTOs
    */
@@ -142,13 +135,8 @@ public class MaterialController {
   }
 
   /**
-   * Live search for the material pickers (REQ-FE-016): pages visible materials whose name contains
-   * {@code search}, case-insensitively — optionally narrowed to the job-order subset (orders
-   * material lines) or to refinery inputs (RAW or manually raw-flagged). Backs the searchable
-   * material comboboxes so every material stays reachable by typing regardless of catalogue size,
-   * while each response stays payload-bounded — the deliberate alternative to preloading (or
-   * silently capping) the full list. Returns full {@link MaterialDto}s because the pickers mirror
-   * option metadata (quantity type, refined material) off the results.
+   * Pages visible materials whose name contains {@code search}, case-insensitively, for the
+   * material pickers (REQ-FE-016), optionally narrowed to job-order materials or refinery inputs.
    *
    * @param search optional name fragment; {@code null}/blank returns the unfiltered first page
    * @param jobOrderOnly when true, only {@code isJobOrder = true} materials
@@ -195,12 +183,8 @@ public class MaterialController {
   }
 
   /**
-   * Material × terminal price matrix used by the matrix overview page, with optional server-side
-   * filtering (ADR-0105, REQ-UI-014). The frontend relays its four filter dimensions as query
-   * parameters and page-walks the result, so a universe larger than one {@code size} page is no
-   * longer forced through an in-memory-only filter over a single clamped fetch. Absent parameters
-   * mean "no filter" on that dimension, so a bare {@code /matrix} call still returns the full
-   * matrix.
+   * Pages the material × terminal price matrix with optional server-side filters (ADR-0105). Absent
+   * parameters apply no filter on that dimension.
    *
    * @param page zero-based page index (optional)
    * @param size page size (optional; clamped by {@link PaginationUtil})
@@ -276,10 +260,8 @@ public class MaterialController {
   }
 
   /**
-   * Creates a material manually. Uses the dedicated {@link MaterialCreateDto} (UEX-imported columns
-   * are absent) — the service resolves {@code refinedMaterialId} / {@code categoryId} by id and
-   * stamps {@code sourceSystems=MANUAL} so the admin UI can badge it (via the derived {@code
-   * isManualEntry} field) and the next UEX sync flips it off {@code MANUAL} on a name-match.
+   * Creates a material manually from a {@link MaterialCreateDto}; the service resolves the
+   * referenced ids and stamps {@code sourceSystems=MANUAL}.
    *
    * @param material create payload
    * @return the persisted DTO
@@ -291,8 +273,7 @@ public class MaterialController {
   }
 
   /**
-   * Updates the admin-mutable subset of a material (name, type, description, category,
-   * refined-material link, manual flags). UEX-imported numeric fields stay untouched.
+   * Updates the admin-mutable fields of a material; UEX-imported numeric fields stay untouched.
    *
    * @param id material id
    * @param material update payload (carries the expected version)

@@ -37,11 +37,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestClient;
 
 /**
- * Proves the W3C trace-context propagation on the ingest&rarr;backend relay hop (REQ-OBS-009, epic
- * #936 Phase 1b): with tracing enabled, a request through the hand-built {@code backendRestClient}
- * (wired to the observation registry in {@link RestClientConfig}) carries a {@code traceparent}
- * header to the (mocked) backend. OTLP export stays off — no exporter, no network export; the
- * propagation path alone is under test.
+ * Integration tests asserting that, with tracing enabled, a relay through the {@code
+ * backendRestClient} of {@link RestClientConfig} carries a W3C {@code traceparent} header to the
+ * backend (REQ-OBS-009); OTLP export stays off.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.MOCK,
@@ -81,14 +79,11 @@ class MonitoringTracingPropagationTest {
 
   @Test
   void shouldPropagateTraceparentHeaderOnBackendRelayCall() throws Exception {
-    // Given
     mockBackend.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
 
-    // When
     backendRestClient.get().uri("/api/v1/settings").retrieve().toBodilessEntity();
     RecordedRequest recorded = mockBackend.takeRequest(10, TimeUnit.SECONDS);
 
-    // Then: the instrumented client injected the W3C trace context (version-traceId-spanId-flags).
     assertThat(recorded).isNotNull();
     assertThat(recorded.getHeader("traceparent"))
         .as("backend relay call must carry the W3C traceparent header")

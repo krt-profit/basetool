@@ -27,16 +27,11 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Inbound request payload for the Update Participant operation. {@code @Size} caps mirror the
- * create payload (audit finding H-2) so an edit cannot grow the row past the create-time limit.
- * They were written for an anonymous guest editing their own entry, an audience ADR-0159 removed; a
- * member can fill a table too, and a bound on a free-text column is cheap.
+ * Request payload for editing a mission participant; its {@code @Size} caps mirror the create
+ * payload.
  *
- * <p>{@code orgUnitIds} replaces the entry's full org-unit affiliation set on update, taken <b>as
- * submitted</b> for an external participant and for a registered one alike, so the edit modal can
- * adjust affiliations explicitly. {@code MissionParticipantService.resolveSubmittedOrgUnits}
- * applies no per-org-unit authorization filter: the affiliation is a roster label that grants
- * nothing.
+ * <p>{@code orgUnitIds} replaces the entry's full org-unit affiliation set as submitted, without an
+ * authorization filter, because the affiliation is a roster label that grants nothing.
  */
 public record UpdateParticipantRequest(
     UUID desiredMissionJobTypeId,

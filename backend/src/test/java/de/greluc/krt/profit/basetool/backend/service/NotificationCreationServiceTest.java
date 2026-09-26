@@ -80,8 +80,6 @@ class NotificationCreationServiceTest {
 
     Set<UUID> recipients = flatten(service.createFromEvent(event));
 
-    // #1152: createFromEvent now returns the deduped recipients (the listener publishes to them
-    // after commit) rather than a row count; the row count stays covered by the saveAll capture.
     assertThat(recipients).containsExactlyInAnyOrder(A, B);
     ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
     verify(notificationRepository).saveAll(captor.capture());
@@ -112,8 +110,6 @@ class NotificationCreationServiceTest {
 
   @Test
   void plainEventDoesNotTouchSupersedeQueries() {
-    // REQ-NOTIF-018: an event that supersedes nothing (JobOrderCreatedEvent) never runs the
-    // supersede find/delete — its resolvesNotificationTypes() is empty.
     JobOrderCreatedEvent event = event();
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
@@ -126,9 +122,6 @@ class NotificationCreationServiceTest {
 
   @Test
   void decisionEventRemovesSupersededCreatedNotificationsAndReturnsTheirRecipients() {
-    // REQ-NOTIF-018: confirming a booking request clears the BANK_BOOKING_REQUEST_CREATED items the
-    // staff were shown and notifies the requester; the returned set is the union of both so both
-    // inboxes refresh live.
     UUID requestId = UUID.fromString("00000000-0000-0000-0000-00000000e777");
     UUID requester = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
     UUID staffA = UUID.fromString("00000000-0000-0000-0000-0000000000d1");
@@ -149,7 +142,6 @@ class NotificationCreationServiceTest {
 
     Set<UUID> affected = flatten(service.createFromEvent(event));
 
-    // The removed-notification holders (staff) plus the new-notification recipient (requester).
     assertThat(affected).containsExactlyInAnyOrder(staffA, staffB, requester);
     verify(notificationRepository)
         .deleteByTypeInAndEntity(superseded, "BANK_BOOKING_REQUEST", requestId);
@@ -166,8 +158,6 @@ class NotificationCreationServiceTest {
 
   @Test
   void withdrawalEventOnlyRemovesAndCreatesNothing() {
-    // REQ-NOTIF-018: a cancel notifies nobody (empty rule result) but still clears the staff's
-    // stale created-notifications and returns their subs so their badge refreshes.
     UUID requestId = UUID.fromString("00000000-0000-0000-0000-00000000e888");
     UUID staff = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
     BankBookingRequestCancelledEvent event =
@@ -189,7 +179,6 @@ class NotificationCreationServiceTest {
 
   @Test
   void supersedeIsSkippedWhenNoStaleNotificationsExist() {
-    // No stale rows → no delete issued, no phantom recipients returned.
     UUID requestId = UUID.fromString("00000000-0000-0000-0000-00000000e999");
     BankBookingRequestCancelledEvent event =
         new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
@@ -208,12 +197,7 @@ class NotificationCreationServiceTest {
   }
 
   /**
-   * Every recipient the call reached, whatever they were told.
-   *
-   * <p>The result is keyed by signal now, because one event can raise different notification types
-   * for different audiences. These assertions are about *who* was reached, which is the question
-   * they were always asking; the signal itself is asserted where it matters, in {@code
-   * NotificationEventListenerTest}.
+   * Unions every recipient reached by the call, regardless of signal.
    *
    * @param bySignal the call's result
    * @return the union of its recipient sets

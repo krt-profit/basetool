@@ -56,22 +56,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Write/lifecycle half of the Materialbörse — the org-wide material-exchange trade board of Flotte
- * &amp; Logistik (REQ-MARKET-001…) — split out from the reads into {@link
- * MaterialExchangeBoardService} (audit Thema 7, #14). It owns the release / re-release / deactivate
- * / edit lifecycle of an offer, the interest register / withdraw signals, and the audit trail for
- * every mutation.
+ * Write half of the Materialbörse offer board (REQ-MARKET-001): release, re-release, edit and
+ * deactivation of offers, interest signals, and their audit trail.
  *
- * <p>Every mutation projects its result through {@link MaterialExchangeBoardService} — the injected
- * read half — so the anonymity redaction (REQ-MARKET-006: interessenten names for the owner only)
- * is applied by the exact same code that serves {@link MaterialExchangeBoardService#detail(UUID)}.
- * The dependency is one-way (write→read), so the split introduces no cycle. The projection runs
- * inside the caller's write transaction (propagation {@code REQUIRED}), so it observes the
- * just-flushed offer.
- *
- * <p><b>Facts (decision D1, amended by ADR-0086):</b> material and quality are read live from the
- * linked {@link InventoryItem}; the offered amount is the owner's stored choice (a whole row or a
- * part of it), validated against the item's current stock on every write.
+ * <p>Every mutation returns its result through {@link MaterialExchangeBoardService}, so the
+ * anonymity redaction (REQ-MARKET-006) is shared. Offered amounts are validated against the item's
+ * current stock on every write.
  */
 @Service
 @RequiredArgsConstructor
@@ -94,9 +84,8 @@ public class MaterialExchangeService {
   private final MaterialExchangeBoardService boardService;
 
   /**
-   * Resolves and validates a blueprint product for an item offer (#1185, REQ-MARKET-012): {@code
-   * resolveByProductKey(...)} is both the "an item for which a blueprint exists" gate and the
-   * source of the canonical display name snapshotted onto the offer.
+   * Resolves the blueprint product of an item offer, gating it and supplying the display name
+   * snapshotted onto the offer (REQ-MARKET-012).
    */
   private final BlueprintProductService blueprintProductService;
 
@@ -109,10 +98,8 @@ public class MaterialExchangeService {
   private final OwnerScopeService ownerScopeService;
 
   /**
-   * Publishes the {@link MaterialExchangeInterestRegisteredEvent} that drives the owner's
-   * interest-registered notification (#1187, REQ-MARKET-011). The after-commit notification
-   * listener consumes it, so the publish stays a side-effect-free scalar hand-off inside the
-   * registration transaction (REQ-NOTIF-002).
+   * Publishes the {@link MaterialExchangeInterestRegisteredEvent} that notifies the offer's owner
+   * after commit (REQ-MARKET-011).
    */
   private final ApplicationEventPublisher eventPublisher;
 
@@ -125,22 +112,18 @@ public class MaterialExchangeService {
   private final ObjectProvider<MaterialExchangeService> selfProvider;
 
   /**
-   * Releases one of the caller's own Lager rows to the board (REQ-MARKET-002/014). The row may be a
-   * <b>material</b> row — releasing a {@link MaterialExchangeOfferKind#MATERIAL} offer whose
-   * material and quality are read live from the item and whose offered quantity may be the whole
-   * row or only a part of it (ADR-0086) — or a <b>game-item</b> row — releasing a stock-backed
-   * {@link MaterialExchangeOfferKind#ITEM} offer (design §8), delegated to {@link
-   * #releaseFromItemStock(InventoryItem, MaterialExchangeReleaseRequest, UUID)}. Either way the
-   * caller-supplied {@link MaterialExchangeReleaseRequest#offeredAmount()} must be positive and at
-   * most the item's current stock, and an existing active offer for the row is re-released rather
-   * than duplicated. Owner and org unit are derived from the item — the caller never sets them.
+   * Releases one of the caller's own Lager rows to the board as a material or stock-backed item
+   * offer (REQ-MARKET-002, REQ-MARKET-014).
    *
-   * @param request the item id, the offered quantity and the trade remark.
-   * @return the resulting offer detail (the caller is the owner, so names are included).
-   * @throws NotFoundException if the item does not exist.
-   * @throws AccessDeniedException if the item does not belong to the caller.
-   * @throws BadRequestException if the offered amount exceeds the item's current stock, or a
-   *     game-item row is not produced by any active blueprint.
+   * <p>The offered amount must be positive and at most the item's current stock; an existing active
+   * offer for the row is re-released. Owner and org unit are taken from the item.
+   *
+   * @param request the item id, the offered quantity and the trade remark
+   * @return the resulting offer detail, including interessenten names
+   * @throws NotFoundException if the item does not exist
+   * @throws AccessDeniedException if the item does not belong to the caller
+   * @throws BadRequestException if the amount exceeds the stock, or a game-item row is not produced
+   *     by any active blueprint
    */
   @Transactional
   public MaterialExchangeOfferDto release(MaterialExchangeReleaseRequest request) {
@@ -191,24 +174,17 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Releases a <b>game-item</b> Lager row as a stock-backed {@link MaterialExchangeOfferKind#ITEM}
-   * offer (design §8, REQ-MARKET-014, ADR-0108) — the item sibling of the material release branch
-   * of {@link #release(MaterialExchangeReleaseRequest)}. Unlike a free-stated item offer ({@link
-   * #releaseItem(MaterialExchangeItemReleaseRequest)}, craft-on-demand), a stock-backed offer is
-   * bound to the physical stock row: its offered quantity (carried in the request's {@code
-   * offeredAmount} field, interpreted as whole units) must be positive and at most the row's
-   * current stock, and its blueprint {@code productKey} + display name are derived from the row's
-   * game item via {@link BlueprintProductService#resolveByGameItem(UUID)} (the same identity a
-   * free-stated offer of the same item carries, ADR-0087). An existing active offer on the row is
-   * re-released (the V210 one-active-offer-per-row index governs stock-backed item offers too),
-   * otherwise a new one is created.
+   * Releases a game-item Lager row as a stock-backed {@link MaterialExchangeOfferKind#ITEM} offer
+   * (REQ-MARKET-014), re-releasing an existing active offer on the row.
    *
-   * @param item the caller's own game-item Lager row (ownership already checked).
-   * @param request the release payload — {@code offeredAmount} is the whole-unit quantity to offer.
-   * @param viewerId the acting owner.
-   * @return the resulting offer detail (the caller is the owner, so names are included).
-   * @throws BadRequestException if the quantity is not a positive whole number, exceeds the row's
-   *     current stock, or the game item is not produced by any active blueprint.
+   * <p>The product key and name come from {@link BlueprintProductService#resolveByGameItem(UUID)}.
+   *
+   * @param item the caller's own game-item Lager row (ownership already checked)
+   * @param request the release payload; {@code offeredAmount} is the whole-unit quantity
+   * @param viewerId the acting owner
+   * @return the resulting offer detail, including interessenten names
+   * @throws BadRequestException if the quantity is not a positive whole number, exceeds the stock,
+   *     or the item is not produced by any active blueprint
    */
   private MaterialExchangeOfferDto releaseFromItemStock(
       InventoryItem item, @NotNull MaterialExchangeReleaseRequest request, UUID viewerId) {
@@ -258,19 +234,15 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Lists a craftable item on the board (#1185, REQ-MARKET-012) — the "Item anbieten" counterpart
-   * to {@link #release(MaterialExchangeReleaseRequest)}. Unlike a material release, an item offer
-   * has no backing Lager row: the caller supplies the blueprint {@code productKey} and the
-   * quantity, the product is validated against {@link
-   * BlueprintProductService#resolveByProductKey(String)} (only items an active blueprint produces
-   * can be listed) and its canonical display name is snapshotted, and owner + squadron are stamped
-   * from the acting member. Item offers are not de-duplicated — a member may list the same item
-   * several times — so this always inserts a fresh active offer.
+   * Lists a craftable item on the board without a backing Lager row (REQ-MARKET-012); always
+   * inserts a new active offer.
    *
-   * @param request the blueprint product key, the whole-piece quantity, and the trade remark.
-   * @return the resulting offer detail (the caller is the owner, so names are included).
+   * <p>The product key must resolve to an active blueprint product, whose name is snapshotted.
+   *
+   * @param request the blueprint product key, the whole-piece quantity and the trade remark
+   * @return the resulting offer detail, including interessenten names
    * @throws NotFoundException if the caller is unknown or the product key resolves to no active
-   *     blueprint product.
+   *     blueprint product
    */
   @Transactional
   public MaterialExchangeOfferDto releaseItem(MaterialExchangeItemReleaseRequest request) {
@@ -307,34 +279,18 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Edits an existing offer's offered quantity and trade remark ("Angebot bearbeiten",
-   * REQ-MARKET-007/014). Only the owner may edit; the echoed version guards against a concurrent
-   * edit. The edit is <b>kind-aware</b> (the item sibling of {@link
-   * #release(MaterialExchangeReleaseRequest)}), so it never dereferences a {@code null}
-   * inventoryItem on an item offer (the pre-existing defect this fixes):
+   * Edits an offer's quantity and trade remark; owner only, guarded by the echoed version
+   * (REQ-MARKET-007).
    *
-   * <ul>
-   *   <li>a {@link MaterialExchangeOfferKind#MATERIAL} offer validates the new offered amount to be
-   *       positive and at most the linked item's current stock (ADR-0086) and stores it in {@code
-   *       offeredAmount};
-   *   <li>a <b>stock-backed</b> {@link MaterialExchangeOfferKind#ITEM} offer validates the new
-   *       quantity to be a positive whole number at most the backing row's current stock
-   *       (REQ-MARKET-014) and stores it in {@code itemQuantity};
-   *   <li>a <b>free-stated</b> item offer validates only that the new quantity is a positive whole
-   *       number (it has no backing stock to cap against, REQ-MARKET-012) and stores it in {@code
-   *       itemQuantity}.
-   * </ul>
+   * <p>Material and stock-backed item offers are capped at the backing row's current stock; item
+   * quantities must be positive whole numbers.
    *
-   * <p>The request's {@code offeredAmount} field carries the SCU amount for a material offer and
-   * the whole-unit quantity for an item offer.
-   *
-   * @param offerId the offer to edit.
-   * @param request the new offered amount/quantity, remark and the client's last-seen version.
-   * @return the updated offer detail.
-   * @throws NotFoundException if the offer does not exist.
-   * @throws AccessDeniedException if the caller is not the owner.
-   * @throws BadRequestException if the amount/quantity is invalid or exceeds the item's current
-   *     stock.
+   * @param offerId the offer to edit
+   * @param request the new amount or quantity, remark and last-seen version
+   * @return the updated offer detail
+   * @throws NotFoundException if the offer does not exist
+   * @throws AccessDeniedException if the caller is not the owner
+   * @throws BadRequestException if the amount/quantity is invalid or exceeds the current stock
    */
   @Transactional
   public MaterialExchangeOfferDto updateOffer(
@@ -390,14 +346,12 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Deactivates the active offer for a Lager row (un-checking "Für Börse freigeben" on the Lager
-   * leaf). A no-op-safe entry point keyed by the item, since the Lager row knows its item id rather
-   * than the offer id.
+   * Deactivates the active offer backing a Lager row (un-checking "Für Börse freigeben").
    *
-   * @param inventoryItemId the Lager row whose active offer to take off the board.
-   * @return the resulting offer detail.
-   * @throws NotFoundException if the item has no active offer.
-   * @throws AccessDeniedException if the caller is not the owner.
+   * @param inventoryItemId the Lager row whose active offer to take off the board
+   * @return the resulting offer detail
+   * @throws NotFoundException if the item has no active offer
+   * @throws AccessDeniedException if the caller is not the owner
    */
   @Transactional
   public MaterialExchangeOfferDto deactivateForItem(UUID inventoryItemId) {
@@ -412,16 +366,15 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Registers the caller's interest in an offer ("Interesse anmelden", REQ-MARKET-006). A
-   * non-transactional orchestrator: it runs the insert in a fresh transaction through the proxy and
-   * treats a concurrent duplicate-registration race (the unique {@code (offer, user)} constraint)
-   * as an idempotent success (CLAUDE.md find-or-create rule), then re-reads the offer for the
-   * response.
+   * Registers the caller's interest in an offer (REQ-MARKET-006).
    *
-   * @param offerId the offer to register interest in.
-   * @return the resulting offer detail (with {@code iAmInterested = true}).
-   * @throws NotFoundException if the offer does not exist or is not active.
-   * @throws AccessDeniedException if the caller is the offer's owner.
+   * <p>Not transactional itself: the insert runs in a new transaction, and a concurrent duplicate
+   * registration counts as success.
+   *
+   * @param offerId the offer to register interest in
+   * @return the resulting offer detail (with {@code iAmInterested = true})
+   * @throws NotFoundException if the offer does not exist or is not active
+   * @throws AccessDeniedException if the caller is the offer's owner
    */
   public MaterialExchangeOfferDto registerInterest(UUID offerId) {
     UUID viewerId = requireViewerId();
@@ -434,17 +387,14 @@ public class MaterialExchangeService {
   }
 
   /**
-   * The transactional insert behind {@link #registerInterest(UUID)}, run in a fresh transaction so
-   * a unique-constraint violation aborts only this transaction (the orchestrator catches it).
-   * Public so the Spring proxy applies the {@code REQUIRES_NEW} propagation. On a genuinely new
-   * registration it publishes a {@link MaterialExchangeInterestRegisteredEvent} so the after-commit
-   * notification listener alerts the offer's owner (#1187, REQ-MARKET-011); a duplicate
-   * registration returns early and publishes nothing.
+   * Inserts the interest registration behind {@link #registerInterest(UUID)} in a new transaction
+   * and, for a new registration, publishes a {@link MaterialExchangeInterestRegisteredEvent}
+   * (REQ-MARKET-011).
    *
-   * @param offerId the offer to register interest in.
-   * @param viewerId the registering member.
-   * @throws NotFoundException if the offer does not exist or is not active.
-   * @throws AccessDeniedException if the member is the offer's owner.
+   * @param offerId the offer to register interest in
+   * @param viewerId the registering member
+   * @throws NotFoundException if the offer does not exist or is not active
+   * @throws AccessDeniedException if the member is the offer's owner
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void registerInterestInNewTransaction(UUID offerId, UUID viewerId) {
@@ -471,9 +421,6 @@ public class MaterialExchangeService {
         offerLabel(offer),
         offer.getOwner() == null ? null : offer.getOwner().getId(),
         AuditDetails.of("offer", offerId));
-    // Notify the owner about the new interested party (#1187, REQ-MARKET-011). Published only on a
-    // genuinely new registration (the idempotent-duplicate return above skips it), inside this
-    // transaction so the after-commit listener never fires for a rolled-back registration.
     if (offer.getOwner() != null) {
       eventPublisher.publishEvent(
           new MaterialExchangeInterestRegisteredEvent(
@@ -558,17 +505,13 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Validates and normalises a client-supplied offered quantity against the item's current stock
-   * (partial offers, REQ-MARKET-002 / ADR-0086): it must be a positive number no greater than the
-   * item's amount, and is rounded to three-decimal SCU storage precision so the stored value never
-   * carries floating-point noise. The {@code @Positive}/{@code @NotNull} DTO constraints already
-   * reject the null/non-positive input on the controller path; this re-check keeps the service safe
-   * when called directly and enforces the cross-field ceiling {@code @Valid} cannot express.
+   * Validates an offered SCU amount against the item's stock and rounds it to three decimals
+   * (REQ-MARKET-002).
    *
-   * @param requested the client-supplied offered quantity in SCU.
-   * @param item the source Lager row whose current amount caps the offer.
-   * @return the offered quantity rounded to three-decimal SCU precision.
-   * @throws BadRequestException if the amount is not positive or exceeds the item's current stock.
+   * @param requested the client-supplied offered quantity in SCU
+   * @param item the source Lager row whose current amount caps the offer
+   * @return the offered quantity rounded to three-decimal SCU precision
+   * @throws BadRequestException if the amount is not positive or exceeds the item's current stock
    */
   private static double requireOfferableAmount(@Nullable Double requested, InventoryItem item) {
     if (requested == null || requested <= 0.0) {
@@ -591,15 +534,11 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Validates a client-supplied item-offer quantity as a positive whole number — the item sibling
-   * of the positive/whole part of {@link #requireOfferableAmount(Double, InventoryItem)}
-   * (REQ-MARKET-012/014). Used directly for a free-stated item offer (no backing stock to cap
-   * against) and as the first step of {@link #requireOfferableItemQuantity(Double, InventoryItem)}.
-   * The request carries the quantity as a {@link Double}; it must round to a whole number.
+   * Validates an item-offer quantity as a positive whole number.
    *
-   * @param requested the client-supplied whole-unit quantity.
-   * @return the quantity as a whole int.
-   * @throws BadRequestException if the quantity is absent, below one, or not a whole number.
+   * @param requested the client-supplied whole-unit quantity
+   * @return the quantity as a whole int
+   * @throws BadRequestException if the quantity is absent, below one, or not a whole number
    */
   private static int wholeItemQuantity(@Nullable Double requested) {
     if (requested == null || requested < 1.0) {
@@ -613,17 +552,14 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Validates and normalises a client-supplied item-offer quantity against a <b>stock-backed</b>
-   * item offer's backing row (design §8, REQ-MARKET-014) — the whole-unit item sibling of {@link
-   * #requireOfferableAmount(Double, InventoryItem)}: the quantity must be a positive whole number
-   * no greater than the game-item row's current stock. Enforced at release <em>and</em> edit,
-   * mirroring the material rule.
+   * Validates a stock-backed item-offer quantity as a positive whole number no greater than the
+   * backing row's stock (REQ-MARKET-014).
    *
-   * @param requested the client-supplied whole-unit quantity.
-   * @param item the backing game-item Lager row whose current amount caps the offer.
-   * @return the offered quantity as a whole int.
+   * @param requested the client-supplied whole-unit quantity
+   * @param item the backing game-item Lager row whose current amount caps the offer
+   * @return the offered quantity as a whole int
    * @throws BadRequestException if the quantity is not a positive whole number or exceeds the row's
-   *     current stock.
+   *     current stock
    */
   private static int requireOfferableItemQuantity(@Nullable Double requested, InventoryItem item) {
     int quantity = wholeItemQuantity(requested);
@@ -640,13 +576,11 @@ public class MaterialExchangeService {
   }
 
   /**
-   * The non-personal audit subject label of an offer — the material name for a {@link
-   * MaterialExchangeOfferKind#MATERIAL} offer, the snapshotted item name for a {@link
-   * MaterialExchangeOfferKind#ITEM} offer. Kind-aware so it never dereferences a {@code null}
-   * inventoryItem for an item offer (both are game asset names, never PII).
+   * Returns the PII-free audit subject label of an offer: the material name or the snapshotted item
+   * name.
    *
-   * @param offer the offer.
-   * @return the audit subject label.
+   * @param offer the offer
+   * @return the audit subject label
    */
   private static String offerLabel(MaterialExchangeOffer offer) {
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
@@ -656,12 +590,11 @@ public class MaterialExchangeService {
   }
 
   /**
-   * The PII-free {@code kind=… subject=…} audit details identifying an offer's subject — the Lager
-   * row id for a material offer, the blueprint product key for an item offer. Kind-aware so it
-   * never dereferences a {@code null} inventoryItem for an item offer.
+   * Builds the PII-free {@code kind=… subject=…} audit details of an offer: the Lager row id for a
+   * material offer, the blueprint product key for an item offer.
    *
-   * @param offer the offer.
-   * @return the composed audit details.
+   * @param offer the offer
+   * @return the composed audit details
    */
   private static AuditDetails offerSubjectDetails(MaterialExchangeOffer offer) {
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {

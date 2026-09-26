@@ -46,12 +46,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Guard-branch coverage for {@link MissionParticipantService}: the {@code
- * updateParticipantAttributes} input-validation rejections (pre-start guard, start-after-end guard,
- * non-{@code MISSION}-archetype desired/planned job type) and the {@code addParticipant} hard
- * roster cap (Audit finding M-4). All happy paths and the concurrency writeback semantics are
- * covered elsewhere ({@code MissionTimeTest}, {@code MissionServicePayoutTest}); this class asserts
- * only that each guard actually throws and that no participant row is persisted when it does.
+ * Guard tests for {@link MissionParticipantService}: the input validation of {@code
+ * updateParticipantAttributes} and the roster cap of {@code addParticipant}, each throwing without
+ * persisting a row.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionParticipantServiceValidationTest {
@@ -74,40 +71,34 @@ class MissionParticipantServiceValidationTest {
 
   @Test
   void updateParticipantAttributes_rejectsStartBeforeMissionActualStart() {
-    // Setting a participant start time while the mission was never activated (actualStartTime null)
-    // would let the credited window begin before the mission existed. The pre-start guard must
-    // reject it and persist nothing.
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Mission mission = new Mission();
     mission.setId(missionId);
-    // mission.actualStartTime stays null → the mission has never been activated.
 
     MissionParticipant p = new MissionParticipant();
     p.setId(participantId);
-    p.setMission(mission); // guest participant (no user) → no membership resolution
+    p.setMission(mission);
     mission.getParticipants().add(p);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    // When / Then
     assertThrows(
         IllegalArgumentException.class,
         () ->
             missionParticipantService.updateParticipantAttributes(
                 missionId,
                 participantId,
-                null, // desiredMissionJobTypeId
-                null, // plannedMissionJobTypeId
+                null,
+                null,
                 "comment",
-                Instant.now(), // startTime set while the mission has no actual start time
-                null, // endTime
-                null, // orgUnitIds
-                null, // payoutPreference
-                null, // guestName
-                null, // version — null skips the optimistic-lock check
-                authentication)); // the manager path; the gate is answered inside the service
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                authentication));
 
     verify(missionParticipantRepository, never()).saveAndFlush(any(MissionParticipant.class));
   }
@@ -115,14 +106,11 @@ class MissionParticipantServiceValidationTest {
   @Test
   void updateParticipantAttributes_rejectsStartAfterEnd() {
     when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
-    // An inverted window (start after end) would store a negative credited duration and corrupt the
-    // payout breakdown. The start-after-end guard must reject it.
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     Mission mission = new Mission();
     mission.setId(missionId);
-    mission.setActualStartTime(Instant.now().minusSeconds(7200)); // activated → pre-start guard OK
+    mission.setActualStartTime(Instant.now().minusSeconds(7200));
 
     MissionParticipant p = new MissionParticipant();
     p.setId(participantId);
@@ -132,9 +120,8 @@ class MissionParticipantServiceValidationTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     Instant start = Instant.now();
-    Instant end = start.minusSeconds(3600); // end one hour before start → inverted window
+    Instant end = start.minusSeconds(3600);
 
-    // When / Then
     assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -158,9 +145,6 @@ class MissionParticipantServiceValidationTest {
   @Test
   void updateParticipantAttributes_rejectsNonMissionArchetypeDesiredJobType() {
     when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
-    // A desired mission role must be a MISSION-archetype job type. A CREW (or any other) archetype
-    // must be rejected so a non-mission role is never stored as a participant's desired role.
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     UUID desiredJobTypeId = UUID.randomUUID();
@@ -180,7 +164,6 @@ class MissionParticipantServiceValidationTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(jobTypeRepository.findById(desiredJobTypeId)).thenReturn(Optional.of(crewJobType));
 
-    // When / Then
     assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -204,9 +187,6 @@ class MissionParticipantServiceValidationTest {
   @Test
   void updateParticipantAttributes_rejectsNonMissionArchetypePlannedJobType() {
     when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
-    // A planned mission role must also be a MISSION-archetype job type — a CREW archetype planned
-    // role must be rejected so it cannot corrupt the role model / isMissionLead constraint.
-    // Given
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     UUID plannedJobTypeId = UUID.randomUUID();
@@ -215,7 +195,7 @@ class MissionParticipantServiceValidationTest {
 
     MissionParticipant p = new MissionParticipant();
     p.setId(participantId);
-    p.setMission(mission); // guest participant → guest org-unit branch, no membership lookup
+    p.setMission(mission);
     mission.getParticipants().add(p);
 
     JobType crewJobType = new JobType();
@@ -226,14 +206,13 @@ class MissionParticipantServiceValidationTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(jobTypeRepository.findById(plannedJobTypeId)).thenReturn(Optional.of(crewJobType));
 
-    // When / Then
     assertThrows(
         IllegalArgumentException.class,
         () ->
             missionParticipantService.updateParticipantAttributes(
                 missionId,
                 participantId,
-                null, // desiredMissionJobTypeId — null so the desired branch is skipped
+                null,
                 plannedJobTypeId,
                 "comment",
                 null,
@@ -249,10 +228,6 @@ class MissionParticipantServiceValidationTest {
 
   @Test
   void addParticipant_rejectsWhenRosterAtCap() {
-    // Audit finding M-4: the roster is capped at MAX_PARTICIPANTS_PER_MISSION to close the guest
-    // sign-up DoS vector. A mission already at the cap must reject a further add with a
-    // BusinessConflictException (409) and persist no new row.
-    // Given
     UUID missionId = UUID.randomUUID();
     Mission mission = new Mission();
     mission.setId(missionId);
@@ -267,7 +242,6 @@ class MissionParticipantServiceValidationTest {
 
     UUID userId = UUID.randomUUID();
 
-    // When / Then
     assertThrows(
         BusinessConflictException.class,
         () ->
@@ -278,12 +252,8 @@ class MissionParticipantServiceValidationTest {
   }
 
   /**
-   * REQ-MISSION-013 / audit MEDIUM-9: the planned mission job type is the organisation's assignment
-   * - it carries the Einsatzleiter designation - and is not part of a guest's payload.
-   *
-   * <p>Before this gate the block had no caller distinction at all, so a guest presenting their
-   * row's capability token could designate themselves Einsatzleiter; the single-lead rule then
-   * blocked the real leader with a 409 until somebody cleared the guest row.
+   * A caller who cannot manage the mission may not set the planned job type, which carries the
+   * Einsatzleiter designation (REQ-MISSION-013).
    */
   @Test
   void updateParticipantAttributes_refusesPlannedJobTypeFromACallerWhoCannotManageTheMission() {
@@ -304,7 +274,7 @@ class MissionParticipantServiceValidationTest {
                 missionId,
                 participantId,
                 null,
-                UUID.randomUUID(), // plannedMissionJobTypeId - manager-only
+                UUID.randomUUID(),
                 "comment",
                 null,
                 null,
@@ -318,9 +288,8 @@ class MissionParticipantServiceValidationTest {
   }
 
   /**
-   * The symmetric half, which matters just as much: a {@code null} used to CLEAR the designation,
-   * so an ordinary guest edit silently undid a manager's assignment. A caller who may not manage
-   * the mission must leave the field exactly as it was.
+   * A caller who cannot manage the mission leaves the planned job type unchanged, including when
+   * sending {@code null}.
    */
   @Test
   void updateParticipantAttributes_doesNotClearThePlannedJobTypeForANonManagingCaller() {

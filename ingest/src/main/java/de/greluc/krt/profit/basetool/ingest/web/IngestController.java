@@ -48,15 +48,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The gateway's entire public surface: exactly two forward-only ingest endpoints (REQ-INGEST-001).
- * Both require only an authenticated caller (class- and method-level {@code @PreAuthorize},
- * mirroring the backend import endpoints), forward the payload to the backend under the gateway's
- * own service-account identity while naming the caller in an on-behalf-of header (ADR-0129), stage
- * the returned draft for a one-time browser pickup, and return the handoff. The caller's token
- * stops here — only its {@code sub} travels on, which is why both methods take the {@link Jwt} and
- * hand the service a subject rather than a credential. Nothing here interprets the draft or
- * persists squadron data — saving happens later, in the browser, through the unchanged create path
- * (REQ-INGEST-004, REQ-REFINERY-002).
+ * The gateway's two authenticated, forward-only ingest endpoints (REQ-INGEST-001).
+ *
+ * <p>Each forwards the payload under the gateway's own identity, naming the caller's {@code sub}
+ * (ADR-0129), stages the returned draft for one-time browser pickup and returns the handoff. The
+ * caller's token is not forwarded and nothing is persisted (REQ-INGEST-004).
  */
 @RestController
 @RequestMapping("/v1")
@@ -85,13 +81,8 @@ public class IngestController {
   private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
   /**
-   * Description of {@link #CORRELATION_ID_HEADER} in the published contract.
-   *
-   * <p>The header is documented but deliberately <b>not</b> bound as a controller argument: it is
-   * consumed by {@code CorrelationIdFilter}, which validates it against a strict charset and mints
-   * a fresh id when it fails. Binding it here and threading it onward is what previously let an
-   * unvalidated client value be copied onto the internal backend call (security audit) — the relay
-   * now takes the sanitized id from the MDC instead.
+   * Description of {@link #CORRELATION_ID_HEADER} in the published contract; the header is consumed
+   * and validated by {@code CorrelationIdFilter}, not bound here.
    */
   private static final String CORRELATION_ID_HEADER_DESCRIPTION =
       "Optional correlation id, echoed on the response and propagated to the backend for"
@@ -105,9 +96,7 @@ public class IngestController {
    * Accepts a validated {@code RefineryExtract}, forwards it to the backend refinery import, and
    * returns the handoff the extractor opens.
    *
-   * @param jwt the authenticated caller's token; only its {@code sub} is read — it scopes the
-   *     handoff and names the member the backend call acts for (ADR-0129). The token itself is not
-   *     forwarded.
+   * @param jwt the authenticated caller's token; only its {@code sub} is used (ADR-0129)
    * @param acceptLanguage the caller's locale, relayed so backend problems are localized
    * @param extract the validated extract payload
    * @return the handoff id, kind and frontend URL
@@ -182,14 +171,10 @@ public class IngestController {
   }
 
   /**
-   * Accepts a blueprint export as a JSON object, forwards it to the backend's multipart preview,
-   * and returns the handoff the extractor opens. The body is opaque to the gateway beyond the "must
-   * be a JSON object" sanity check (mirroring the frontend proxy); the backend parses and matches
-   * it.
+   * Accepts a blueprint export JSON object, forwards it to the backend's multipart preview, and
+   * returns the handoff the extractor opens.
    *
-   * @param jwt the authenticated caller's token; only its {@code sub} is read — it scopes the
-   *     handoff and names the member the backend call acts for (ADR-0129). The token itself is not
-   *     forwarded.
+   * @param jwt the authenticated caller's token; only its {@code sub} is used (ADR-0129)
    * @param acceptLanguage the caller's locale, relayed so backend problems are localized
    * @param export the blueprint export JSON; must be a JSON object
    * @return the handoff id, kind and frontend URL
@@ -276,10 +261,6 @@ public class IngestController {
       throw new BadRequestException("The blueprint export must be a JSON object.");
     }
     byte[] bytes = objectMapper.writeValueAsBytes(export);
-    // The body stays opaque (the backend parses it), but the envelope's provenance triple is read
-    // here so the blueprint path gets the same client-identity check and shape logging the refinery
-    // path has (REQ-INGEST-011). The export carries `tool`/`toolVersion`/`schemaVersion` itself, so
-    // this needs no extra header and no extractor change.
     return ingestService.ingestBlueprint(
         jwt.getSubject(), acceptLanguage, bytes, Provenance.from(export));
   }

@@ -32,16 +32,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduled purge of registrations refused longer ago than the retention window (REQ-SEC-057).
+ * Scheduled purge of registrations rejected longer ago than the retention window (REQ-SEC-057).
  *
- * <p>Gated by {@code app.registrations.rejected-retention.enabled} (default on; disabled under
- * {@code test} so the sweep never races assertions) and paced by {@code
- * app.registrations.rejected-retention.interval}. Failures are recorded and swallowed by {@link
- * TaskMetrics}, so a bad sweep never tears down the scheduler thread.
- *
- * <p>The window doubles as the period in which an erroneous rejection can still be reversed through
- * {@code reopenRegistration} (REQ-SEC-034) — purging the row ends that possibility, which is why
- * the default is generous rather than immediate.
+ * <p>Gated by {@code app.registrations.rejected-retention.enabled} and paced by {@code
+ * app.registrations.rejected-retention.interval}; failures are recorded and swallowed by {@link
+ * TaskMetrics}. A purged rejection can no longer be reopened (REQ-SEC-034).
  */
 @Component
 @ConditionalOnProperty(
@@ -90,13 +85,8 @@ public class RejectedRegistrationRetentionTask {
   }
 
   /**
-   * Publishes {@code basetool_scheduled_job_enabled{task="rejected_registration_retention"} = 1}.
-   *
-   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
-   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
-   * Without it, following the documented instruction to disable a sweep before its first
-   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
-   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   * Publishes {@code basetool_scheduled_job_enabled{task="rejected_registration_retention"} = 1},
+   * so the stale-job alert can tell a disabled task from one that never succeeded.
    */
   @PostConstruct
   void publishEnabledGauge() {

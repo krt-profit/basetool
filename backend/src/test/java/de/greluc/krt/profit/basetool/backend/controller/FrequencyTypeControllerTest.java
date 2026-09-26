@@ -42,16 +42,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Pure-method unit tests for {@link FrequencyTypeController}. The Spring-MVC binding (path params,
- * `@PreAuthorize`, JSON serialisation) is covered by the integration suite; here we focus on:
- *
- * <ul>
- *   <li>Pagination wrapper: the {@link PageResponse} is assembled from the Spring {@link Page}
- *       correctly (page / size / total / sort).
- *   <li>Service-layer delegation: every CRUD action delegates with the expected arguments and the
- *       {@link FrequencyTypeMapper} round-trips in both directions.
- *   <li>Activate / reorder endpoints are void-returning and do not silently swallow the id list.
- * </ul>
+ * Pure-method unit tests for {@link FrequencyTypeController}: {@link PageResponse} assembly from
+ * {@link Page}, service delegation with {@link FrequencyTypeMapper} round-trips, and that the
+ * activate and reorder endpoints pass the id list through.
  */
 @ExtendWith(MockitoExtension.class)
 class FrequencyTypeControllerTest {
@@ -61,11 +54,8 @@ class FrequencyTypeControllerTest {
 
   @InjectMocks private FrequencyTypeController controller;
 
-  // ── GET list ────────────────────────────────────────────────────────────
-
   @Test
   void getAll_buildsPageableAndMapsContent() {
-    // Given a service that returns one frequency type
     FrequencyType combat = new FrequencyType();
     combat.setName("Combat");
     FrequencyTypeDto dto = new FrequencyTypeDto(UUID.randomUUID(), "Combat", "desc", true, 0, 1L);
@@ -74,11 +64,9 @@ class FrequencyTypeControllerTest {
     when(service.getAllFrequencyTypes(eq(true), any(Pageable.class))).thenReturn(page);
     when(mapper.toDto(combat)).thenReturn(dto);
 
-    // When
     PageResponse<FrequencyTypeDto> response =
         controller.getAllFrequencyTypes(null, null, null, true);
 
-    // Then
     assertEquals(1, response.totalElements());
     assertEquals(1, response.content().size());
     assertSame(dto, response.content().getFirst());
@@ -109,8 +97,6 @@ class FrequencyTypeControllerTest {
     assertEquals(25, pageable.getPageSize());
   }
 
-  // ── GET by id ───────────────────────────────────────────────────────────
-
   @Test
   void getById_delegatesAndMaps() {
     UUID id = UUID.randomUUID();
@@ -123,8 +109,6 @@ class FrequencyTypeControllerTest {
 
     assertSame(dto, result);
   }
-
-  // ── POST ────────────────────────────────────────────────────────────────
 
   @Test
   void create_roundTripsDtoToEntityViaMapperAndBack() {
@@ -146,8 +130,6 @@ class FrequencyTypeControllerTest {
     verify(mapper).toDto(persisted);
   }
 
-  // ── PUT ─────────────────────────────────────────────────────────────────
-
   @Test
   void update_passesIdAndMappedEntityToService() {
     UUID id = UUID.randomUUID();
@@ -166,8 +148,6 @@ class FrequencyTypeControllerTest {
     verify(service).updateFrequencyType(id, entity);
   }
 
-  // ── DELETE ──────────────────────────────────────────────────────────────
-
   @Test
   void delete_delegatesIdToService() {
     UUID id = UUID.randomUUID();
@@ -177,8 +157,6 @@ class FrequencyTypeControllerTest {
     verify(service).deleteFrequencyType(id);
     verifyNoMoreInteractions(service, mapper);
   }
-
-  // ── POST /activate ──────────────────────────────────────────────────────
 
   @Test
   void activate_delegatesIdToService() {
@@ -190,16 +168,12 @@ class FrequencyTypeControllerTest {
     verifyNoMoreInteractions(service, mapper);
   }
 
-  // ── POST /reorder ───────────────────────────────────────────────────────
-
   @Test
   void reorder_passesIdListVerbatim() {
     List<UUID> ids = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
 
     controller.reorderFrequencyTypes(ids);
 
-    // The order matters — the service uses it to assign sortIndex values,
-    // so the controller MUST forward the list unmodified.
     verify(service).reorderFrequencyTypes(ids);
   }
 }

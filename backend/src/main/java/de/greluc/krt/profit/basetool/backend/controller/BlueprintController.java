@@ -40,12 +40,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Admin-only read surface for synced crafting blueprints and their requirement-group stat graph.
- * Backs the {@code /admin/blueprints} frontend page.
  *
- * <p>Class-level {@code @PreAuthorize("hasRole('ADMIN')")}: synced game reference data is an
- * administration concern (mirrors {@link SyncReportController}). Read-only — the SC Wiki sync is
- * the only writer. Blueprints are not org-unit-scoped, so no {@code OwnerScopeService} gating
- * applies.
+ * <p>Read-only; the SC Wiki sync is the only writer. Blueprints are not org-unit-scoped.
  */
 @RestController
 @RequestMapping("/api/v1/blueprints")

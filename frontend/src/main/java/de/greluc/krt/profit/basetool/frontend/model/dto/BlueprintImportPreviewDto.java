@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Import preview result mirroring the backend {@code BlueprintImportPreviewDto} (#327): one row per
- * unique external name plus per-status counts for the summary banner.
+ * Frontend mirror of the backend {@code BlueprintImportPreviewDto}: one row per unique external
+ * name plus per-status counts.
  *
  * @param total number of unique external names parsed from the upload
  * @param matched count of directly matched rows

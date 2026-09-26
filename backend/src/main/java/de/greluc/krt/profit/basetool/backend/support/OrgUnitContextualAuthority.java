@@ -25,30 +25,15 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.security.core.GrantedAuthority;
 
 /**
- * SPEZIALKOMMANDO_PLAN.md §6.1 contextual GrantedAuthority subtype. Represents a role granted to a
- * user <em>in a specific OrgUnit</em> — e.g. "Logistician of Staffel IRIDIUM" — as opposed to the
- * flat {@code ROLE_LOGISTICIAN} that the R6.d converter still emits as the OR-union over all
- * memberships.
+ * A role granted to a user in one specific org unit, with the string form {@code
+ * ROLE_<NAME>@<orgUnitUuid>}; emitted alongside the flat {@code ROLE_*} authority.
  *
- * <p>The string form is {@code ROLE_<NAME>@<orgUnitUuid>}, which lets a {@code @PreAuthorize} SpEL
- * expression match against {@code hasAuthority('ROLE_LOGISTICIAN@<uuid>')} when it knows the exact
- * OrgUnit id at evaluation time. For the common case where the OrgUnit id is only known at runtime
- * (the dto's {@code owningOrgUnitId}), callers should go through {@link
- * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#hasRoleInOrgUnit} instead — the
- * helper reads the {@code Authentication} object and matches contextual authorities by value,
- * regardless of the SpEL string the caller used.
+ * <p>When the org unit id is only known at runtime, use {@link
+ * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#hasRoleInOrgUnit}.
  *
- * <p><b>Dual-track migration:</b> the converter emits BOTH the flat {@code ROLE_LOGISTICIAN} (R6.d
- * backwards-compatibility) AND this contextual form. Existing {@code hasRole('LOGISTICIAN')} SpEL
- * strings keep working unchanged; new code paths that need per-OrgUnit scoping can opt into the
- * contextual variant. The flat authority is the one that comes out with the destructive cleanup
- * release; the contextual one stays as the long-term shape.
- *
- * @param roleName the role this authority grants (e.g. {@code "LOGISTICIAN"} or {@code
- *     "MISSION_MANAGER"}). Stored without the {@code ROLE_} prefix; the prefix is added when {@link
- *     #getAuthority()} composes the string form. Must not be {@code null}.
- * @param orgUnitId the OrgUnit (Staffel or SK) this authority is scoped to. Must not be {@code
- *     null} — there is no "all-OrgUnits" form, that's what the flat authority is for.
+ * @param roleName the role, without the {@code ROLE_} prefix (e.g. {@code "LOGISTICIAN"}); not
+ *     {@code null}
+ * @param orgUnitId the org unit this authority is scoped to; not {@code null}
  */
 public record OrgUnitContextualAuthority(String roleName, UUID orgUnitId)
     implements GrantedAuthority {
@@ -65,13 +50,10 @@ public record OrgUnitContextualAuthority(String roleName, UUID orgUnitId)
   }
 
   /**
-   * Returns the canonical string form Spring Security consumes: {@code
-   * ROLE_<roleName>@<orgUnitUuid>}. {@code hasAuthority('ROLE_LOGISTICIAN@<uuid>')} SpEL strings
-   * match this verbatim. Equality is delegated to the record's auto-generated {@code equals} via
-   * the underlying fields, so two instances with the same roleName + orgUnitId are interchangeable.
+   * Returns the string form {@code ROLE_<roleName>@<orgUnitUuid>}, matched verbatim by {@code
+   * hasAuthority(...)}.
    *
-   * @return the string Spring Security stores in the {@code Authentication} object; never {@code
-   *     null}.
+   * @return the authority string; never {@code null}
    */
   @NotNull
   @Override

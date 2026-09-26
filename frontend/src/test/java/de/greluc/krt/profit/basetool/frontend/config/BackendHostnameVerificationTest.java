@@ -44,16 +44,11 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Pins the frontend→backend TLS hop's hostname check on the pinned prod path (REQ-SEC-070,
- * ADR-0211), against a real HTTPS server.
+ * Verifies the frontend-to-backend TLS hostname check on the pinned prod path against a real HTTPS
+ * server (REQ-SEC-070, ADR-0211).
  *
- * <p>Two certificates, both pinned in turn: one naming {@code localhost} — the host the tests dial
- * — and one naming only {@code backend}. With {@code app.http.verify-backend-hostname} off (the
- * default, and every deployment's behaviour before the per-service certificates) the pinned chain
- * alone decides, so a misnamed certificate is accepted. With it on, the misnamed one is refused and
- * the correctly named one still accepted — so the refusal is the name and nothing else. That
- * difference is the point of the per-service certificates: once one internal CA signs every
- * service, the chain vouches for all of them and only the name tells the backend apart.
+ * <p>With {@code app.http.verify-backend-hostname} off, a pinned certificate with the wrong name is
+ * accepted; with it on, it is refused while a correctly named one is still accepted.
  */
 class BackendHostnameVerificationTest {
 
@@ -123,13 +118,12 @@ class BackendHostnameVerificationTest {
   }
 
   /**
-   * The real {@link WebClientConfig} under the {@code prod} profile, its {@code backend-trust}
-   * bundle pinning the given certificate — the path production takes.
+   * Builds the real {@link WebClientConfig} backend client under the {@code prod} profile, its
+   * {@code backend-trust} bundle pinning the given certificate.
    *
    * @param pinned the certificate the bundle pins.
    * @param verifyHostname {@code app.http.verify-backend-hostname}.
-   * @return the backend WebClient (the streaming one: it needs no OAuth2 wiring and shares the
-   *     trust logic of every other backend client).
+   * @return the streaming backend WebClient, which shares the trust logic of every backend client.
    * @throws Exception when the truststore cannot be built.
    */
   private static WebClient client(HeldCertificate pinned, boolean verifyHostname) throws Exception {

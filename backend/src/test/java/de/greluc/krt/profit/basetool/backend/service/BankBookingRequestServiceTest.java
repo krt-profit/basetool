@@ -83,11 +83,8 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for {@link BankBookingRequestService} — the F2 lifecycle engine (REQ-BANK-022/-023):
- * create (audit + notification event), cancel (ownership + pending guards), confirm (capability +
- * ledger reuse + state flip), reject and the close-account input. The ledger / overdraft mechanics
- * themselves are pinned by {@code BankLedgerServiceTest}; here the ledger is mocked and we assert
- * the request orchestration around it.
+ * Unit tests for {@link BankBookingRequestService} (REQ-BANK-022): create, cancel, confirm, reject
+ * and close-account orchestration, with the ledger mocked.
  */
 @ExtendWith(MockitoExtension.class)
 class BankBookingRequestServiceTest {
@@ -146,9 +143,9 @@ class BankBookingRequestServiceTest {
   }
 
   /**
-   * Builds an active {@code CARTEL} account — a {@linkplain
+   * Builds an active {@code CARTEL} account, a {@linkplain
    * BankAccountType#requiresDebitJustification() justification-mandating} type with no owning org
-   * unit — for the REQ-BANK-045 Begr&uuml;ndung tests.
+   * unit (REQ-BANK-045).
    *
    * @param id the account id
    * @return an active CARTEL account
@@ -356,9 +353,6 @@ class BankBookingRequestServiceTest {
 
   @Test
   void create_splitDeposit_snapshotsSplitOnRequest() {
-    // REQ-BANK-043: a split deposit request snapshots split_enabled + split_percent on the
-    // off-ledger
-    // row; the concrete per-squadron legs are resolved only at confirmation.
     UUID accountId = UUID.randomUUID();
     UUID requesterSub = UUID.randomUUID();
     BankAccount account = account(accountId);
@@ -424,9 +418,6 @@ class BankBookingRequestServiceTest {
 
   @Test
   void create_withdrawalFromMandatingAccount_blankJustification_rejected() {
-    // REQ-BANK-045: a withdrawal/transfer request leaving a CARTEL / CARTEL_BANK / SPECIAL account
-    // must carry a non-blank Begründung; a blank one is rejected with BANK_JUSTIFICATION_REQUIRED
-    // and nothing is persisted.
     UUID accountId = UUID.randomUUID();
     BankAccount account = cartelAccount(accountId);
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
@@ -455,8 +446,6 @@ class BankBookingRequestServiceTest {
 
   @Test
   void create_withdrawalFromOrgUnitAccount_blankJustification_succeeds() {
-    // REQ-BANK-045: an ORG_UNIT (or AREA) account leaves the Begründung optional — a withdrawal
-    // request without one is accepted and persists a null justification.
     UUID accountId = UUID.randomUUID();
     UUID requesterSub = UUID.randomUUID();
     BankAccount account = account(accountId);
@@ -492,8 +481,6 @@ class BankBookingRequestServiceTest {
 
   @Test
   void create_withdrawalFromMandatingAccount_persistsJustification() {
-    // REQ-BANK-045: a non-blank Begründung is snapshotted on the request so it can be carried onto
-    // the booking at confirmation.
     UUID accountId = UUID.randomUUID();
     UUID requesterSub = UUID.randomUUID();
     BankAccount account = cartelAccount(accountId);
@@ -549,8 +536,6 @@ class BankBookingRequestServiceTest {
             eq(null),
             eq(requester),
             any());
-    // REQ-NOTIF-018: withdrawing fires the cancelled event so the pipeline clears the staff's stale
-    // BANK_BOOKING_REQUEST_CREATED notifications.
     ArgumentCaptor<BankBookingRequestCancelledEvent> event =
         ArgumentCaptor.forClass(BankBookingRequestCancelledEvent.class);
     verify(eventPublisher).publishEvent(event.capture());
@@ -662,11 +647,7 @@ class BankBookingRequestServiceTest {
     assertThat(request.getRequiredApprover()).isEqualTo(BankRequestApprover.RESPONSIBLE_HOLDER);
   }
 
-  /**
-   * REQ-BANK-056: once the responsible holder has granted the over-limit approval, the request is
-   * frozen. The approval was given for the amount and reason AS THEY STOOD, so allowing an edit
-   * would turn a small approved request into an arbitrarily large pre-approved one.
-   */
+  /** A request whose over-limit approval was already granted cannot be edited (REQ-BANK-056). */
   @Test
   void updateOwn_alreadyApproved_throwsConflict() {
     UUID requestId = UUID.randomUUID();
@@ -838,8 +819,6 @@ class BankBookingRequestServiceTest {
     when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(decider)).thenReturn(Optional.of(new User()));
-    // REQ-BANK-044: the confirmed booking records the requester (Einzahler) plus their primary
-    // unit.
     UUID requesterOrgUnit = UUID.randomUUID();
     when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(requester))
         .thenReturn(Optional.of(requesterOrgUnit));
@@ -852,7 +831,6 @@ class BankBookingRequestServiceTest {
     verify(bankLedgerService).bookDeposit(booked.capture());
     assertThat(booked.getValue().accountId()).isEqualTo(accountId);
     assertThat(booked.getValue().holderId()).isEqualTo(holderId);
-    // The requester becomes the counterparty, with their resolved primary org unit (REQ-BANK-044).
     assertThat(booked.getValue().counterpartyUserId()).isEqualTo(requester);
     assertThat(booked.getValue().counterpartyOrgUnitId()).isEqualTo(requesterOrgUnit);
     verify(bankAuditService)
@@ -867,24 +845,16 @@ class BankBookingRequestServiceTest {
     ArgumentCaptor<BankBookingRequestConfirmedEvent> event =
         ArgumentCaptor.forClass(BankBookingRequestConfirmedEvent.class);
     verify(eventPublisher).publishEvent(event.capture());
-    // The non-split deposit hands a non-split payload to the ledger.
     assertThat(booked.getValue().splitEnabled()).isFalse();
     assertThat(event.getValue().contextRecipientUserId()).isEqualTo(requester);
     assertThat(event.getValue().actorSub()).isEqualTo(decider);
-    // REQ-BANK-026/-034: the event carries the account id so the ACCOUNT_RESPONSIBLE selector can
-    // notify the account's responsible holder.
     assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
-    // REQ-NOTIF-018: confirming clears the staff's stale BANK_BOOKING_REQUEST_CREATED
-    // notifications.
     assertThat(event.getValue().resolvesNotificationTypes())
         .containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
   }
 
   @Test
   void confirm_staffNote_isSnapshottedOnRequestAndHandedToTheBooking() {
-    // REQ-BANK-054: the confirming employee's note is written in TWO places on purpose — onto the
-    // request (so the staff queue and the approval tab render it without joining the transaction)
-    // and onto the booking the confirmation produces (so it reaches the history and the PDFs).
     UUID requestId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID holderId = UUID.randomUUID();
@@ -950,10 +920,8 @@ class BankBookingRequestServiceTest {
   }
 
   /**
-   * REQ-BANK-055: confirmation happens an arbitrary time after the request, and the ledger
-   * re-validates the org unit against the counterparty's CURRENT memberships. A unit that went
-   * stale in between must degrade to their primary unit rather than 400 and block the employee from
-   * confirming at all.
+   * On confirming a withdrawal, a counterparty org unit that is no longer current degrades to the
+   * counterparty's primary unit (REQ-BANK-055).
    */
   @Test
   void confirm_withdrawal_staleCounterpartyOrgUnitDegradesToThePrimary() {
@@ -972,7 +940,6 @@ class BankBookingRequestServiceTest {
     request.setCounterpartyOrgUnitId(leftUnit);
     request.setCounterpartyOrgUnitName("Ex-Staffel");
     stubWithdrawalConfirm(requestId, accountId, holderId, txId, request);
-    // They are no longer in the unit they picked when filing.
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
         .thenReturn(List.of());
     when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(recipientId))
@@ -988,9 +955,8 @@ class BankBookingRequestServiceTest {
   }
 
   /**
-   * A withdrawal request that named nobody keeps the historical behaviour exactly: the requester is
-   * derived as the Empfaenger (REQ-BANK-044). This is the no-regression control for every request
-   * raised before V232.
+   * A withdrawal request naming no counterparty derives the requester as the Empfaenger on
+   * confirmation (REQ-BANK-044).
    */
   @Test
   void confirm_withdrawal_withoutNamedCounterparty_stillDerivesTheRequester() {
@@ -1043,9 +1009,6 @@ class BankBookingRequestServiceTest {
 
   @Test
   void confirm_splitDeposit_booksWithSplitSnapshot() {
-    // REQ-BANK-043: confirming a split deposit request books via bookDeposit carrying the
-    // snapshotted
-    // percentage; the ledger resolves the concrete legs against the squadron accounts active now.
     UUID requestId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID holderId = UUID.randomUUID();
@@ -1161,9 +1124,7 @@ class BankBookingRequestServiceTest {
         ArgumentCaptor.forClass(BankBookingRequestRejectedEvent.class);
     verify(eventPublisher).publishEvent(event.capture());
     assertThat(event.getValue().reason()).isEqualTo("duplicate");
-    // REQ-BANK-026/-034: the event carries the account id for the ACCOUNT_RESPONSIBLE selector.
     assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
-    // REQ-NOTIF-018: rejecting clears the staff's stale BANK_BOOKING_REQUEST_CREATED notifications.
     assertThat(event.getValue().resolvesNotificationTypes())
         .containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
   }
@@ -1226,10 +1187,6 @@ class BankBookingRequestServiceTest {
 
   @Test
   void confirm_transfer_bypassesDestinationVisibilityGate() {
-    // REQ-BANK-040 (review F1): confirming a transfer *request* must not require the employee to
-    // hold a grant on the destination — the requester already chose it from any active account.
-    // The confirm path therefore never consults canSee(destination) and always books with
-    // destinationVisible = true, so a scoped employee cannot hit a permanent dead-end.
     UUID requestId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID destId = UUID.randomUUID();

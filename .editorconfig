@@ -1,17 +1,8 @@
-# EditorConfig — https://editorconfig.org
-#
-# Mirrors .gitattributes so editors do NOT introduce CRLF on Windows. A CRLF
-# working-tree copy reads as clean to git (core.autocrlf=true + `* text eol=lf`),
-# but then churns through Spotless / git as a phantom "modified" with an empty
-# diff. .gitattributes stays authoritative for what lands in the repo; this keeps
-# the working tree aligned at save time.
 root = true
 
 [*]
 charset = utf-8
 end_of_line = lf
 
-# Windows batch scripts must stay CRLF, matching `*.bat text eol=crlf` in
-# .gitattributes (e.g. gradlew.bat). Forcing LF here would make them churn.
 [*.bat]
 end_of_line = crlf

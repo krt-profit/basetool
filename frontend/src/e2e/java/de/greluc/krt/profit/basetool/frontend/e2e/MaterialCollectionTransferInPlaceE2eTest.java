@@ -38,22 +38,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the stale row-identity bug class on the material-collection in-place transfer
- * (epic #571, #577): an owner/location change posts {@code POST /inventory/{id}/transfer}, and the
- * backend DELETES the full-amount source item and APPENDS a brand-new target item (its own id +
- * version), returning that target DTO. The page must re-key the kept {@code <tr>} (and its
- * controls) to the new id/version so a follow-up action on the SAME row hits the live item — not
- * the deleted source, which would 404.
+ * E2E regression test: after an in-place full-amount transfer on the material-collection page, the
+ * row must be re-keyed to the newly created target item so a follow-up action hits the live item.
  *
- * <p>The proven bug: the {@code onSuccess} handler assumed a full-amount transfer returned a {@code
- * 204} with no body and removed the row; because the backend actually returns the target DTO, that
- * dead branch never ran, the row kept the deleted source's id, and a subsequent delivered-toggle on
- * that row {@code 404}ed (surfacing an error toast) instead of persisting.
- *
- * <p><b>Drive via UI, verify via API.</b> The seeded row's location is changed through its {@code
- * .location-select}; the outcome is read back from {@code GET
- * /api/v1/orders/{jobOrderId}/material-collection} so the assertions never race the in-place
- * render. A window marker proves no reload happened across the transfer and the follow-up toggle.
+ * <p>Asserts no reload via a window marker and reads the outcome back from the backend.
  */
 @Tag("e2e")
 class MaterialCollectionTransferInPlaceE2eTest {
@@ -73,12 +61,6 @@ class MaterialCollectionTransferInPlaceE2eTest {
   private static BackendSeeder seeder;
   private static Path storageState;
 
-  // Seeded once: a job order, its requested material, and a job-order-linked inventory item
-  // anchored
-  // at the bootstrap E2E Refinery Hub (guaranteed present in the frontend's cached location lookup,
-  // so it renders as the row's selected location). The transfer target is whatever distinct
-  // location
-  // the cached dropdown offers — a freshly created location is NOT guaranteed to be cached.
   private static String jobOrderId;
   private static String sourceItemId;
 
@@ -99,11 +81,7 @@ class MaterialCollectionTransferInPlaceE2eTest {
     storageState =
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
 
-    // Bootstrap catalog location (uex-catalog-seed.sql) — guaranteed in the cached location lookup,
-    // so the row's location dropdown lists it and preselects it as the source.
     String sourceLocationId = seeder.findLocationIdByName(USERNAME, PASSWORD, "E2E Refinery Hub");
-    // Ensure a second location exists so the dropdown can always offer a distinct transfer target,
-    // even if this class is the first to warm the frontend's long-lived location cache.
     seeder.createLocation(USERNAME, PASSWORD, "E2E Collection Transfer Alt Hub");
     String materialId =
         seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Collection Transfer Mat");
@@ -146,8 +124,6 @@ class MaterialCollectionTransferInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId + "/material-collection");
         page.waitForLoadState();
 
-        // Marker on the live document: a full reload wipes it, so its survival proves the transfer
-        // and the follow-up toggle both stayed in place.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         Locator locationSelect =
@@ -155,12 +131,6 @@ class MaterialCollectionTransferInPlaceE2eTest {
         assertThat(locationSelect)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Move the row's full amount to a different location: POST /inventory/{id}/transfer. The
-        // change handler posts in place (krtFetch.write), so the marker must survive. The target is
-        // picked from the dropdown's actual options (a freshly seeded location is not guaranteed in
-        // the frontend's long-cached lookup), choosing one distinct from the selected source
-        // so
-        // the change event fires.
         page.waitForResponse(
             response ->
                 response.url().contains("/inventory/" + sourceItemId + "/transfer")
@@ -174,13 +144,9 @@ class MaterialCollectionTransferInPlaceE2eTest {
             page.evaluate("() => window.__krtNoReload === true"),
             "the transfer must update in place — no page reload");
 
-        // A full-amount transfer leaves exactly the one re-keyed target row in the collection.
         assertEquals(1, entryCount(), "a full-amount transfer leaves exactly one entry");
         boolean deliveredBeforeToggle = firstEntryDelivered();
 
-        // Toggle delivered on the SAME (re-keyed) row WITHOUT a reload. This only persists — and
-        // avoids an error toast — if the row was re-keyed to the new item's id; a stale source id
-        // would PATCH the deleted item and 404.
         page.evaluate(
             "() => { document.querySelectorAll('.notification-toast').forEach((t) => t.remove());"
                 + " }");

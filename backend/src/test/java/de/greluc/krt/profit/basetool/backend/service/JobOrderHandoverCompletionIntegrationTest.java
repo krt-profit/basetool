@@ -49,9 +49,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Reproduction of the JobOrder #40 handover bug: MEMBER (Logistiker) hands over the remaining
- * amounts of TWO materials in a single handover request. The handover must complete the JobOrder
- * without an {@code ObjectOptimisticLockingFailureException}.
+ * Integration test: a Logistiker handing over the remaining amounts of two materials in one request
+ * completes the job order without an {@code ObjectOptimisticLockingFailureException}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -126,8 +125,6 @@ class JobOrderHandoverCompletionIntegrationTest {
           inv1.setMaterial(aslarite);
           inv1.setQuality(800);
           inv1.setAmount(1.835);
-          // Variante C (REQ-INV-027): earmark the entry's full stock to the order via a job-order
-          // slice (cascade-persisted with the entry) instead of the dropped scalar column.
           InventoryAllocations.addJobOrder(inv1, jobOrder, inv1.getAmount(), false);
           inv1 = inventoryItemRepository.save(inv1);
 
@@ -142,8 +139,6 @@ class JobOrderHandoverCompletionIntegrationTest {
           inv2.setMaterial(ouratite);
           inv2.setQuality(900);
           inv2.setAmount(5.730999999999999);
-          // Variante C (REQ-INV-027): earmark the entry's full stock to the order via a job-order
-          // slice (cascade-persisted with the entry) instead of the dropped scalar column.
           InventoryAllocations.addJobOrder(inv2, jobOrder, inv2.getAmount(), false);
           inv2 = inventoryItemRepository.save(inv2);
 
@@ -171,11 +166,8 @@ class JobOrderHandoverCompletionIntegrationTest {
                 new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8, null),
                 new JobOrderHandoverItemCreateDto(f.invItem2Id(), 5.7, null)));
 
-    // When — must NOT throw ObjectOptimisticLockingFailureException
     jobOrderHandoverService.createHandover(f.jobOrderId(), dto);
 
-    // Then — JobOrder must be COMPLETED, both inventory items reduced, both job order materials at
-    // zero
     transactionTemplate.executeWithoutResult(
         status -> {
           JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();

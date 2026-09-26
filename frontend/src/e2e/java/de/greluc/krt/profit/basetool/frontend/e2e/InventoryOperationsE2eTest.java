@@ -43,40 +43,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flows for the squadron Lager (REQ-INV-*): the six inventory operations a logistician
- * drives through the personal-Lager UI ({@code /inventory/my}) plus their guarding edge cases.
+ * Functional flows for the inventory operations on {@code /inventory/my}: einbuchen, ausbuchen,
+ * umbuchen, verkaufen, job-order and mission allocation, the Herkunft picker (REQ-INV-027), and
+ * edge cases (over-booking, no-op transfer, personal entry with allocations).
  *
- * <p>One method per operation — <em>einbuchen</em> (create), <em>ausbuchen</em> (DISCARD, partial
- * and full), <em>umbuchen</em> (TRANSFER), <em>verkaufen</em> (SELL), and the two append-only-safe
- * association edits, <em>zuweisen zu einem Auftrag</em> (job order) and <em>zuweisen zu einem
- * Einsatz</em> (mission) — plus the <em>Herkunft</em> deduct-from picker (REQ-INV-027) in both its
- * modes: the ambiguous one, where it gates a book-out the rest cannot cover and directs the
- * deduction onto a chosen earmark, and the determined one (a single tag, no rest), where it
- * prefills and locks the only field that can ever be valid — and three edge cases: over-booking
- * past the held amount, a no-op transfer to the same user+location, and the cross-field invariant
- * that a personal entry may carry neither a job order nor a mission. The append-only model means
- * TRANSFER and create insert new rows while DISCARD/SELL decrement (and delete at the {@code 1e-4}
- * epsilon), so each scenario uses its <strong>own unique material</strong> to stay isolated in the
- * shared, sequentially-run stack.
- *
- * <p><b>Drive via UI, verify via API.</b> Every mutation goes through the real Thymeleaf form /
- * book-out modal / allocation-chip combobox — i.e. the genuine frontend → backend → DB path. The
- * book-out / transfer / sell outcomes are then asserted by reading the same grouped endpoint the
- * {@code /inventory/my} view itself uses ({@code GET /api/v1/inventory/my-inventory/grouped?…})
- * through {@link BackendSeeder}, which is far more robust than re-expanding the lazily-loaded,
- * grouped tree table and never races the post-write render. The grouped query returns every row the
- * caller owns regardless of the {@code personal} flag, so the seeded non-personal rows surface
- * there. The two allocation scenarios instead assert the rendered chip, since the grouped endpoint
- * no longer carries the per-entry job-order / mission allocation (Variante C, REQ-INV-027).
- *
- * <p><b>Cache-awareness.</b> The create-form material/location dropdowns come from the frontend's
- * long-cached lookups, so — like {@code JobOrderCreateE2eTest} — the create flow selects whatever
- * the dropdown offers and reads the picked id back for verification rather than assuming a
- * freshly-seeded entry is listed. The Umbuchen modal's transfer dropdown is likewise cached, so the
- * same-location edge case anchors its row at the bootstrap-seeded {@code E2E Refinery Hub} (always
- * cached) to make the Umbuchen modal preselect the source as the transfer target. The job-order and
- * mission lookups are <em>not</em> cached, so freshly seeded ones appear in the allocation-chip
- * combobox at once.
+ * <p>Mutations are driven through the UI and verified via the grouped backend endpoint, or via the
+ * rendered chip for allocations. Each scenario uses its own material for isolation. Cached
+ * dropdowns are handled by selecting whatever they offer.
  */
 @Tag("e2e")
 class InventoryOperationsE2eTest {
@@ -99,19 +72,16 @@ class InventoryOperationsE2eTest {
   private static BackendSeeder seeder;
 
   /**
-   * One authenticated session reused across every test in this class. The OIDC login is the suite's
-   * documented flakiness hot-spot, so it runs once here instead of per test; each test still opens
-   * its own {@link BrowserContext} from this storage state, so the flows stay isolated.
+   * Authenticated storage state shared by all tests in this class; each test opens its own {@link
+   * BrowserContext} from it.
    */
   private static Path storageState;
 
-  // Shared reference data (seeded once).
   private static String opsHubLocId;
   private static String refineryHubLocId;
   private static String assignOrderId;
   private static String missionId;
 
-  // Per-scenario material + inventory-item ids (seeded once, one material per scenario).
   private static String discardMatId;
   private static String discardItemId;
   private static String discardAllMatId;
@@ -150,9 +120,6 @@ class InventoryOperationsE2eTest {
   private static String viewStateMatId;
   private static String viewStateItemId;
 
-  // REQ-INV-039 need-label fixture: a job-order material and an order that requests 400 of
-  // it at a 650 floor, with NO stock ever linked — so the outstanding figure stays 400 no
-  // matter which other test in this class ran first.
   private static String needMatId;
   private static String needOrderId;
 
@@ -175,7 +142,6 @@ class InventoryOperationsE2eTest {
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
 
     opsHubLocId = seeder.createLocation(USERNAME, PASSWORD, "E2E Inv Ops Hub");
-    // Bootstrap catalog location (uex-catalog-seed.sql) — guaranteed in the cached location lookup.
     refineryHubLocId = seeder.findLocationIdByName(USERNAME, PASSWORD, "E2E Refinery Hub");
     missionId = seeder.createMission(USERNAME, PASSWORD, "E2E Inv Mission", true);
 
@@ -215,8 +181,6 @@ class InventoryOperationsE2eTest {
         seeder.createJobOrder(
             USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Re-Pick Order", rePickMatId, 650, 100);
 
-    // REQ-INV-039: an order whose need the check-in picker must state. Deliberately left with
-    // no linked stock and never written to by another test, so the label is a fixed 400.
     needMatId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Inv Need Mat");
     needOrderId =
         seeder.createJobOrder(
@@ -228,8 +192,6 @@ class InventoryOperationsE2eTest {
         seeder.createInventoryItem(
             USERNAME, PASSWORD, assignMissionMatId, opsHubLocId, SEED_QUALITY, 100);
 
-    // Deduct-from ("Herkunft") picker fixture: a job-order-eligible 100-SCU row plus an order that
-    // requests it, so the flow can earmark 70 (rest 30) and then book out from the tag.
     herkunftMatId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Inv Herkunft Mat");
     herkunftItemId =
         seeder.createInventoryItem(
@@ -238,8 +200,6 @@ class InventoryOperationsE2eTest {
         seeder.createJobOrder(
             USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Herkunft Order", herkunftMatId, 650, 100);
 
-    // Determined-dimension prefill fixture: a 60-SCU row the flow earmarks *fully* to the single
-    // seeded mission, so that dimension has one tag and no rest and the picker must fill it itself.
     prefillMatId =
         seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Herkunft Prefill Mat");
     prefillItemId =
@@ -251,14 +211,10 @@ class InventoryOperationsE2eTest {
             USERNAME, PASSWORD, overbookMatId, opsHubLocId, SEED_QUALITY, 50);
 
     sameLocMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Same Loc Mat");
-    // Anchored at the cached refinery hub so the book-out modal preselects it as the transfer
-    // target, making an unmodified TRANSFER a same-user+same-location no-op the backend rejects.
     sameLocItemId =
         seeder.createInventoryItem(
             USERNAME, PASSWORD, sameLocMatId, refineryHubLocId, SEED_QUALITY, 50);
 
-    // Isolated row for the tree view-state persistence test: a partial DISCARD leaves the row (and
-    // its item id) in place, so the leaf must resurface after the post-write re-swap.
     viewStateMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv View State Mat");
     viewStateItemId =
         seeder.createInventoryItem(
@@ -290,8 +246,6 @@ class InventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          // Material + location are searchable comboboxes; the enhancer's hidden input keeps the
-          // original id, so the picked value is still read off #materialId.
           E2eSupport.selectComboboxFirstOption(
               page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"));
           String pickedMaterialId = page.locator("#materialId").inputValue();
@@ -301,9 +255,6 @@ class InventoryOperationsE2eTest {
           page.locator("#amount").fill("42");
 
           double before = totalAmount(stacksForMaterial(pickedMaterialId));
-          // #577: book-in is now an X-Requested-With AJAX twin (navigate-after-AJAX on success), so
-          // wait on the XHR POST rather than a document navigation; keep the footer-clear so the
-          // trusted click is not intercepted by the fixed footer.
           page.evaluate(
               "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                   + " 'none'; } }");
@@ -359,13 +310,9 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Umbuchen.</em> Transfers 30 of a 100-SCU row to a different location (same user) through
-   * the dedicated Umbuchen modal's LOCATION mode (#868 moved the transfer out of the Ausbuchen
-   * dialog). The append-only model leaves 70 at the source and inserts a fresh 30 at the
-   * destination, so the material now spans two owned stacks. Also asserts the owner org-unit picker
-   * renders preset to the row's owning unit (REQ-INV-007, #1328): its membership fetch must go
-   * through the frontend's {@code /users/{id}/memberships} proxy — the former direct {@code
-   * /api/v1/users/…} browser call had no frontend route, 404ed, and silently hid the picker.
+   * Umbuchen: transfers 30 of a 100-SCU row to another location, leaving 70 at the source and a new
+   * 30-SCU stack at the destination. Also asserts the owner org-unit picker renders preset to the
+   * row's owning unit (REQ-INV-007).
    */
   @Test
   void umbuchenTransfersStockToAnotherLocation() {
@@ -373,13 +320,8 @@ class InventoryOperationsE2eTest {
         "inventory-umbuchen",
         page -> {
           openUmbuchenModal(page, transferMatId, transferItemId);
-          // #1328/REQ-INV-007: the "Buchen in OrgUnit" picker must render for an owner with at
-          // least one membership (test-admin is seeded into IRIDIUM) and be preset to the row's
-          // current owning org unit. It populates from an async membership fetch, so rely on the
-          // assertion's auto-wait.
           assertThat(page.locator("#umbuchenTargetOwningOrgUnitWrapper")).isVisible();
           assertThat(page.locator("#umbuchenTargetOwningOrgUnitId")).hasValue(IRIDIUM_ID);
-          // LOCATION mode is the Umbuchen modal's default; pick a destination distinct from source.
           String destinationLocationId = selectDifferentUmbuchenLocation(page, opsHubLocId);
           page.locator("#umbuchenAmount").fill("30");
           submitUmbuchenInPlace(page);
@@ -408,11 +350,9 @@ class InventoryOperationsE2eTest {
         page -> {
           openBookOutModal(page, sellMatId, sellItemId);
           Locator sellRadio = page.locator("input[name='type'][value='SELL']");
-          // The SELL radio stays disabled until the modal's async terminals fetch resolves.
           assertThat(sellRadio)
               .isEnabled(new LocatorAssertions.IsEnabledOptions().setTimeout(15_000));
           sellRadio.check();
-          // Index 0 is the disabled "...wählen..." placeholder; index 1 is the seeded terminal.
           page.locator("#terminal").selectOption(new SelectOption().setIndex(1));
           page.locator("#sellAmount").fill("1500");
           page.locator("#amount").fill("30");
@@ -450,19 +390,9 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Re-picking an order that is already on the entry edits its slice.</em> The "+ Zuordnen"
-   * {@code <option>} list drops already-allocated targets in Thymeleaf, which happens at
-   * fragment-<em>render</em> time only: the success handler re-renders the chips and not the
-   * picker, and the actor is excluded from his own live-sync room, so after his own allocation the
-   * order he just earmarked is still on the list. Picking it again used to {@code POST} a duplicate
-   * and take the backend's 400 ("a target appears at most once per entry per dimension",
-   * REQ-INV-027) as a generic "Fehler beim Aktualisieren des Lagers." toast — a dead end reachable
-   * by one user, with no race and no second tab.
-   *
-   * <p>The pick is now resolved against the chips, which <em>are</em> current: an already-allocated
-   * target opens its existing slice in edit mode, prefilled with its amount, and saving issues a
-   * {@code PATCH}. The stale option is asserted deliberately — it is the precondition this test
-   * exists for, so pruning the option list later must fail here rather than pass for a new reason.
+   * Picking an order already allocated on the entry opens its existing slice in edit mode and saves
+   * with a {@code PATCH} instead of posting a duplicate (REQ-INV-027). Asserts the stale option is
+   * still offered, as the test's precondition.
    */
   @Test
   void rePickingAnAllocatedOrderEditsItsSliceInsteadOfPosting() {
@@ -533,25 +463,17 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Herkunft-Picker (REQ-INV-027).</em> The Ausbuchen deduct-from picker both gates and directs
-   * a book-out. Earmarks 70 of a 100-SCU row to a job order (rest 30), opens the book-out modal and
-   * books out 50: with the order input left at 0 the 30 rest cannot cover the 50, so the picker
-   * disables the submit and shows the "assign at least" warning; entering 40 into the order input
-   * satisfies the plan and re-enables it. After the write the row holds 50 and the order chip has
-   * shrunk from 70 to 30 — proving the 40 came out of the chosen tag (not silently from the rest),
-   * the client-side mirror of {@code InventoryCheckoutService.resolveReductionPlan}.
+   * Herkunft picker (REQ-INV-027): with 70 of 100 SCU earmarked, booking out 50 is blocked until 40
+   * is assigned to the order; afterwards the row holds 50 and the order chip shows 30.
    */
   @Test
   void herkunftPickerGatesTheRestAndDeductsFromTheChosenTag() {
     runFlow(
         "inventory-herkunft-picker",
         page -> {
-          // Earmark 70 of the 100-SCU row to the job order (rest = 30).
           openMyInventoryToEntry(page, herkunftMatId, herkunftItemId);
           assignAllocationViaChip(page, herkunftItemId, "JOB_ORDER", herkunftOrderId, "70");
 
-          // Re-open on a fresh page so the book-out modal builds its picker from the persisted
-          // chip.
           openBookOutModal(page, herkunftMatId, herkunftItemId);
           page.locator("input[name='type'][value='DISCARD']").check();
 
@@ -565,23 +487,17 @@ class InventoryOperationsE2eTest {
           Locator warn =
               page.locator("#bookOutModal [data-herkunft-dim='JOB_ORDER'] [data-herkunft-warn]");
 
-          // Book out 50: with the tag at 0 the 30 rest cannot cover it, so the picker gates the
-          // submit and states the minimum that must go to the tag.
           page.locator("#amount").fill("50");
           assertThat(submit).isDisabled();
           assertThat(warn).isVisible();
 
-          // Direct 40 of the 50 to the order tag — the plan is now valid and the submit re-enables.
           orderInput.fill("40");
           assertThat(submit).isEnabled();
 
           submitBookOutInPlace(page);
 
-          // Stock dropped by the full 50 ...
           assertEquals(
               50.0, totalAmount(stacksForMaterial(herkunftMatId)), AMOUNT_DELTA, "100 - 50 = 50");
-          // ... and exactly 40 came out of the order earmark (70 - 40 = 30), not the rest. The
-          // partial book-out leaves the row, so the tree restores and the reduced chip re-renders.
           Locator orderChip =
               page.locator(
                   "div.assoc-split[data-entry-id='"
@@ -590,11 +506,6 @@ class InventoryOperationsE2eTest {
                       + "[data-target-id='"
                       + herkunftOrderId
                       + "']");
-          // 40 of the 50 booked out came from the order tag (70 - 40 = 30), not the rest. The
-          // book-out re-swap re-renders the reduced chip asynchronously, so assert the chip's
-          // data-amount with an auto-retrying matcher rather than reading it once: a slower browser
-          // can otherwise still expose the pre-swap 70 at read time (firefox flake). The pattern
-          // tolerates the Double's rendered forms (30 / 30.0 / 30.000).
           assertThat(orderChip)
               .hasAttribute(
                   "data-amount",
@@ -604,21 +515,15 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Herkunft-Vorbefüllung (REQ-INV-027).</em> A dimension with exactly one earmark tag and no
-   * free rest admits a single applyable plan, so the Umbuchen picker fills that field itself
-   * instead of demanding it. Earmarks the whole 60-SCU row to one mission (rest 0), opens the
-   * Umbuchen modal and asserts the mission field already carries the modal's amount, is not
-   * editable, and leaves the submit enabled with no picker interaction at all; lowering the amount
-   * to 40 re-syncs it. The transfer then moves 40 and shrinks the source's mission chip from 60 to
-   * 20 — proving the prefilled plan really was submitted, since there is no rest it could have come
-   * from instead.
+   * Herkunft prefill (REQ-INV-027): with the whole row earmarked to one mission, the Umbuchen
+   * picker prefills and locks the mission field and re-syncs it on an amount change; transferring
+   * 40 shrinks the mission chip from 60 to 20.
    */
   @Test
   void herkunftPickerPrefillsAndLocksTheOnlyTagWhenThereIsNoRest() {
     runFlow(
         "inventory-herkunft-prefill",
         page -> {
-          // Earmark all 60 to the single mission -> rest 0, so the mission dimension is determined.
           openMyInventoryToEntry(page, prefillMatId, prefillItemId);
           assignAllocationViaChip(page, prefillItemId, "MISSION", missionId, "60");
 
@@ -628,8 +533,6 @@ class InventoryOperationsE2eTest {
               page.locator(
                   dimSelector + " [data-herkunft-input][data-herkunft-target='" + missionId + "']");
 
-          // The modal opens with the full row amount preselected, so the locked field carries it
-          // already and the note states why. Nothing in the picker needs touching to submit.
           assertThat(missionInput).hasValue("60");
           assertThat(missionInput).not().isEditable();
           assertThat(page.locator(dimSelector + " [data-herkunft-auto-note]")).isVisible();
@@ -637,7 +540,6 @@ class InventoryOperationsE2eTest {
           assertThat(page.locator("#umbuchenSubmitBtn")).isEnabled();
 
           String destinationLocationId = selectDifferentUmbuchenLocation(page, opsHubLocId);
-          // Lowering the transferred amount re-syncs the locked field ...
           page.locator("#umbuchenAmount").fill("40");
           assertThat(missionInput).hasValue("40");
           assertThat(page.locator("#umbuchenSubmitBtn")).isEnabled();
@@ -652,9 +554,6 @@ class InventoryOperationsE2eTest {
               amountAtLocation(stacks, destinationLocationId),
               AMOUNT_DELTA,
               "destination receives the transferred 40");
-          // ... and the 40 left the mission earmark (60 - 40 = 20), which only the prefilled plan
-          // can achieve — there is no rest it could have been taken from. The transfer re-swap
-          // re-renders the chip asynchronously, so use the auto-retrying attribute matcher.
           Locator missionChip =
               page.locator(
                   "div.assoc-split[data-entry-id='"
@@ -705,8 +604,6 @@ class InventoryOperationsE2eTest {
         "inventory-transfer-noop",
         page -> {
           openUmbuchenModal(page, sameLocMatId, sameLocItemId);
-          // LOCATION mode is the Umbuchen modal's default; leave target user + location at their
-          // preselected source values, then submit a no-op TRANSFER the backend rejects.
           page.locator("#umbuchenAmount").fill("10");
           submitUmbuchenInPlace(page);
 
@@ -721,14 +618,8 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Restmenge an der Auftragsoption (REQ-INV-039).</em> Splitting a haul across orders used to
-   * mean opening each candidate to see what it still wanted. Picks the material of an order that
-   * requests 400 at a 650 floor and has no stock linked, adds an allocation row, and asserts the
-   * option carries the outstanding figure.
-   *
-   * <p>Then drops the entered quality below the order's floor and asserts the option additionally
-   * carries the marker: such an allocation is allowed (the gate is on the material alone) but the
-   * stock would not reduce that order's need, so a bare number there would mislead.
+   * The check-in order option shows the order's outstanding need (REQ-INV-039), and additionally a
+   * marker when the entered quality is below the order's floor.
    */
   @Test
   void checkInOrderOptionStatesTheOutstandingNeedAndTheQualityFloor() {
@@ -738,7 +629,6 @@ class InventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          // A grade at or above the order's floor: the figure stands on its own.
           page.locator("#quality").fill("700");
           E2eSupport.selectComboboxByValue(
               page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"),
@@ -750,16 +640,12 @@ class InventoryOperationsE2eTest {
               page.locator(
                   "#jobOrderAllocRows [data-alloc-target] option[value='" + needOrderId + "']");
           assertThat(option).hasCount(1);
-          // "#<id> - <handle> (OPEN) · noch 400,000 SCU". Pin the SUFFIX, not a lone number: the
-          // option's own auto-incremented displayId can contain "400", so ".*400.*" would pass with
-          // the label missing entirely. The decimal mark stays out — it is locale-dependent.
           assertThat(option)
               .hasText(
                   Pattern.compile(".*·\\s*noch\\s*400.*"),
                   new LocatorAssertions.HasTextOptions().setTimeout(10_000));
           assertThat(option).not().hasText(Pattern.compile(".*benötigt.*"));
 
-          // Below the floor: the option keeps its figure and gains the marker.
           page.locator("#quality").fill("100");
           assertThat(option)
               .hasText(
@@ -783,11 +669,6 @@ class InventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          // REQ-FE-016: the catalog pickers announce what they search — the material/location
-          // comboboxes must carry their kind-specific placeholder, not the user-picker wording
-          // (which contains neither "material" nor "Ort"/"location" in either locale). Case
-          // insensitivity must come from the CASE_INSENSITIVE flag: Playwright evaluates the
-          // pattern as a JS RegExp in the browser, which rejects Java's inline "(?i)" group.
           assertThat(page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"))
               .hasAttribute(
                   "placeholder", Pattern.compile(".*material.*", Pattern.CASE_INSENSITIVE));
@@ -802,16 +683,12 @@ class InventoryOperationsE2eTest {
           page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
           page.locator("#amount").fill("5");
 
-          // Add a mission earmark via the split-at-check-in UI: index 0 is the placeholder, index 1
-          // the seeded mission.
           page.locator("[data-trigger='inv-input-add-mission']").click();
           page.locator("#missionAllocRows [data-alloc-target]")
               .first()
               .selectOption(new SelectOption().setIndex(1));
           assertThat(page.locator("#missionAllocRows [data-alloc-row]")).hasCount(1);
 
-          // Marking the entry personal hides and clears both allocation sections — a personal entry
-          // can never carry an assignment.
           page.locator("#personal").check();
 
           assertThat(page.locator("#missionAllocGroup"))
@@ -823,13 +700,8 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * REQ-INV-002 view-state persistence: a modal write must not collapse the tree the user was
-   * working in. Expands the material group and its stack (so the leaf is loaded and visible), books
-   * out a partial amount in place, and asserts the same leaf row is visible again <em>without any
-   * manual re-expand</em> — the post-write grouped-table re-swap restores the persisted group +
-   * stack expansion from {@code localStorage} and re-loads the entries. The assertion waits on the
-   * restore-triggered stack-entries GET first, so the leaf is checked against the freshly
-   * re-swapped DOM rather than the pre-swap one.
+   * A partial in-place book-out keeps the expanded group and stack open, with the leaf row visible
+   * again without manual re-expansion (REQ-INV-002).
    */
   @Test
   void inPlaceBookOutKeepsTheExpandedTreeState() {
@@ -844,8 +716,6 @@ class InventoryOperationsE2eTest {
           page.evaluate(
               "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                   + " 'none'; } }");
-          // The book-out re-swaps the grouped table, and the restore re-fetches this stack's
-          // entries; wait for that post-write GET so the leaf is asserted against the restored DOM.
           page.waitForResponse(
               r -> r.url().contains("/stack/entries") && "GET".equals(r.request().method()),
               () -> page.locator("#bookOutSubmitBtn").click());
@@ -854,16 +724,10 @@ class InventoryOperationsE2eTest {
               Boolean.TRUE,
               page.evaluate("window.__krtNoReload === true"),
               "the in-place book-out must not reload the page");
-          // 20 s, not the 5 s default: the re-swap + lazy stack-entries re-fetch is slow on WebKit
-          // under CI load.
           assertThat(page.locator("div.tree-row--leaf[data-item-id='" + viewStateItemId + "']"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         });
   }
-
-  // --------------------------------------------------------------------------------------------
-  // Shared flow scaffolding
-  // --------------------------------------------------------------------------------------------
 
   /** A single UI flow body, run inside a fresh authenticated context with failure diagnostics. */
   @FunctionalInterface
@@ -877,9 +741,8 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Opens a fresh authenticated context + page from the shared storage state, runs {@code flow},
-   * and on any failure dumps a screenshot + HTML under {@code build/e2e/<label>-failure.*} before
-   * rethrowing — the per-test boilerplate every method would otherwise repeat.
+   * Runs {@code flow} in a fresh authenticated context and page; on failure dumps a screenshot and
+   * HTML under {@code build/e2e/<label>-failure.*} and rethrows.
    *
    * @param label artifact-filename prefix used when a flow fails
    * @param flow the UI flow body to execute
@@ -901,26 +764,16 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Navigates to {@code /inventory/my} and expands the material group then its single stack,
-   * waiting for the lazily-fetched entry leaf row to appear. Material is unique per scenario, so
-   * the group / stack / book-out / association selectors all resolve unambiguously by material or
-   * item id.
+   * Navigates to {@code /inventory/my} and expands the material group and its stack until the entry
+   * leaf row appears.
    *
    * @param page the authenticated page
-   * @param materialId the (scenario-unique) material whose group + stack to expand
+   * @param materialId the scenario-unique material whose group and stack to expand
    * @param itemId the seeded inventory item id whose leaf row signals the entries loaded
    */
   private static void openMyInventoryToEntry(Page page, String materialId, String itemId) {
     E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/my");
     page.waitForLoadState();
-    // The Lager tree persists + restores its group / stack expansion per user in localStorage
-    // (REQ-INV-002, restored on DOMContentLoaded), so a material opened earlier in the same flow
-    // comes back already expanded. Each expansion is therefore idempotent: click to open only while
-    // its container is still collapsed, since a blind toggle click on an already-open row would
-    // collapse it (the deterministic failure when this helper ran twice for the same material).
-    // The guard reads the container's computed display, not Playwright visibility: a restored-open
-    // stack is display:block yet momentarily zero-height while its lazy leaf rows fetch, which
-    // isVisible() would misread as hidden and wrongly collapse.
     Locator groupRow = page.locator("div.tree-row--group[data-material-id='" + materialId + "']");
     assertThat(groupRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
     if (isCollapsed(
@@ -934,17 +787,13 @@ class InventoryOperationsE2eTest {
         page, "div.stack-header[data-material-id='" + materialId + "'] + div.tree-stack-entries")) {
       stackHeader.click();
     }
-    // 20 s, not the 5 s default: the lazy stack-entries fetch + render is slow on WebKit under
-    // load.
     assertThat(page.locator("div.tree-row--leaf[data-item-id='" + itemId + "']"))
         .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
   }
 
   /**
-   * Reports whether the Lager tree container matched by {@code selector} is collapsed, reading its
-   * synchronously-set computed {@code display} rather than Playwright visibility. A restored-open
-   * stack is {@code display: block} yet momentarily zero-height while its lazy leaf rows fetch, so
-   * {@code isVisible()} would misread it as hidden; the computed {@code display} is unambiguous.
+   * Reports whether the Lager tree container matched by {@code selector} is collapsed, judged by
+   * its computed {@code display}, not Playwright visibility.
    *
    * @param page the authenticated page
    * @param selector the CSS selector of the group-items / stack-entries container
@@ -961,11 +810,8 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Adds a Variante-C allocation chip to a stack entry via the inline "+ Zuordnen" combobox
-   * (REQ-INV-027): opens the popover of the entry's {@code field} split, picks the target option in
-   * the enhanced searchable combobox by its value, fills the amount and clicks Speichern, waiting
-   * for the in-place {@code POST /inventory/{id}/allocation} to settle. Drops the fixed footer (it
-   * can otherwise intercept the trusted clicks) and asserts the write did not reload the page.
+   * Adds an allocation chip to a stack entry through the "+ Zuordnen" combobox (REQ-INV-027) and
+   * waits for the in-place {@code POST /inventory/{id}/allocation}, asserting no page reload.
    *
    * @param page the authenticated page expanded to the entry (see {@link #openMyInventoryToEntry})
    * @param itemId the entry whose split to edit
@@ -984,9 +830,6 @@ class InventoryOperationsE2eTest {
             + " 'none'; } }");
     split.locator("button[data-trigger='inv-my-assoc-add-open']").click();
     Locator pop = split.locator("[data-assoc-pop]");
-    // The "+ Zuordnen" <select data-krt-combobox> is enhanced into a .krt-combobox: click the
-    // textbox to open the listbox, then pick the option by its data-value (the target UUID, since
-    // the visible label is the display id / mission name, not the id).
     pop.locator(".krt-combobox__input").click();
     pop.locator("li.krt-combobox__option[data-value='" + targetId + "']").click();
     pop.locator("[data-assoc-amount-input]").fill(amount);
@@ -1014,10 +857,8 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Expands to the row (see {@link #openMyInventoryToEntry}) and clicks its Umbuchen (rebook)
-   * button, which opens the dedicated Umbuchen modal in its default LOCATION (transfer) mode
-   * preloaded with that row's id, amount, version and preselected source user + location (#868
-   * moved the transfer out of the Ausbuchen dialog into this modal).
+   * Expands to the row (see {@link #openMyInventoryToEntry}) and opens its Umbuchen modal in
+   * LOCATION mode, preloaded with the row's data.
    *
    * @param page the authenticated page
    * @param materialId the scenario-unique material of the row
@@ -1030,13 +871,8 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Submits the open book-out modal and waits for its in-place AJAX write to settle (#577 part 2:
-   * the book-out posts to {@code /inventory/{id}/transfer} and re-swaps the grouped table on
-   * success, or surfaces a toast on a backend rejection — neither path navigates). Sets the {@code
-   * window.__krtNoReload} marker and drops the {@code position: fixed} footer out of the way (it
-   * can otherwise intercept the trusted click), then waits on the XHR POST so the backend has
-   * provably answered before the caller reads the stock back. Finally asserts the marker survived,
-   * proving the page was never reloaded.
+   * Submits the open book-out modal, waits for its {@code POST /inventory/{id}/transfer} to answer,
+   * and asserts the page was not reloaded.
    *
    * @param page the authenticated page with the book-out modal open and filled
    */
@@ -1055,14 +891,8 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Submits the open Umbuchen modal in its LOCATION (transfer) mode and waits for the in-place AJAX
-   * write to settle. Like the book-out twin (#577 part 2, consolidated in #868), the transfer posts
-   * to {@code /inventory/{id}/transfer} and re-swaps the grouped table on success, or surfaces a
-   * toast on a backend rejection — neither path navigates. Sets the {@code window.__krtNoReload}
-   * marker and drops the {@code position: fixed} footer out of the way (it can otherwise intercept
-   * the trusted click), then waits on the XHR POST so the backend has provably answered before the
-   * caller reads the stock back. Finally asserts the marker survived, proving the page was never
-   * reloaded.
+   * Submits the open Umbuchen modal in LOCATION mode, waits for its {@code POST
+   * /inventory/{id}/transfer} to answer, and asserts the page was not reloaded.
    *
    * @param page the authenticated page with the Umbuchen modal open and filled
    */
@@ -1081,13 +911,7 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Selects, in the Umbuchen modal's transfer-target location combobox, the first option whose
-   * value differs from the source location, and returns that destination id. The picker is a
-   * searchable combobox (the native {@code <select>} is replaced and its options only render into
-   * the {@code role=listbox} while the popup is open), so this opens the popup first and reads each
-   * option's {@code data-value}. Robust to whether the source location is itself listed in the
-   * (cached) option set: a different option always exists because the bootstrap refinery hub is
-   * cached and the source here is a separately-created location.
+   * Selects the first Umbuchen target location that differs from the source and returns its id.
    *
    * @param page the authenticated page with the Umbuchen modal's LOCATION fields visible
    * @param sourceLocationId the row's current (source) location id to avoid
@@ -1109,10 +933,6 @@ class InventoryOperationsE2eTest {
     throw new IllegalStateException(
         "No transfer-target location distinct from the source was offered in the dropdown");
   }
-
-  // --------------------------------------------------------------------------------------------
-  // API verification helpers (read the same grouped endpoint the /inventory/my view uses)
-  // --------------------------------------------------------------------------------------------
 
   /**
    * Fetches the owned ("my") grouped Lager for one material and returns that material's stacks as a

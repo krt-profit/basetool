@@ -22,11 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * A grouped fulfilment-signal-count projection — one row per request carrying how many members have
- * signalled they can supply it. Populated by a JPQL constructor expression so the board list can
- * attach the "N können liefern" count to every request in a single grouped query instead of one
- * count per request (no N+1). Carries only the request id and the count — never any supplier
- * identity, honouring the owner-only-names anonymity rule (REQ-MARKET-019).
+ * Grouped fulfilment-signal count per Materialbörse request, filled by a JPQL constructor
+ * expression; carries no supplier identity (REQ-MARKET-019).
  *
  * @param requestId the request the count belongs to.
  * @param count the number of members who have signalled they can supply that request.

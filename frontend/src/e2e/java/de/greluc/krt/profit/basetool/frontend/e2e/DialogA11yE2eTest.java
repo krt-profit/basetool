@@ -50,32 +50,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * The one dialog contract, checked on every dialog the app renders (FE-SIMP-04 / FE-SIMP-04b,
- * REQ-UI-013, ADR-0177).
+ * Checks the dialog contract on every dialog the app renders (REQ-UI-013, ADR-0177): modal opening,
+ * focus inside, inert background, and closing via Escape and ✕.
  *
- * <p>Every {@code .krt-modal-overlay} is rendered by {@code fragments/modal-wrapper.html} ({@code
- * SingleModalShapeTest} fails the build on one that is not), so every dialog should behave the
- * same: {@code window.krtModal.open} shows it modally, focus moves into it, the page behind it is
- * inert, Escape closes it, and so does its ✕. "Should" is what this test turns into "does". Before
- * 2026-09-23 it drove the hangar's add-ship dialog alone, on the argument that every other dialog
- * shares the code path; five order-detail dialogs whose ✕ closed nothing — and therefore whose
- * Escape closed nothing either — were the counter-example.
- *
- * <p>Two tests:
- *
- * <ul>
- *   <li>{@link #aDialogIsModalClosesOnEscapeReturnsFocusAndReopens} drives one dialog through its
- *       real opener, so focus return to that opener is checked end to end.
- *   <li>{@link #everyDialogFollowsTheContract} seeds one of each detail entity, visits every page
- *       route and the seeded detail pages, and runs the contract on every dialog it finds. Its
- *       coverage is asserted, not printed: every {@code modalId} a template declares must either
- *       have been exercised or be listed in {@link #UNREACHED} with the reason a fresh stack cannot
- *       show it.
- * </ul>
- *
- * <p>The walk renders every page, so it fills the frontend's catalogue caches early in the run.
- * That is safe because every material a create-form test picks is seeded by {@code
- * E2eStackExtension} before any page renders, not by the test class that picks it.
+ * <p>Every declared {@code modalId} must be exercised or listed in {@link #UNREACHED}.
  */
 @Tag("e2e")
 class DialogA11yE2eTest {
@@ -131,11 +109,9 @@ class DialogA11yE2eTest {
           seeder.createJobOrder(
               USERNAME, PASSWORD, IRIDIUM_ID, "E2E Dialog Order", jobMaterial, 650, 100.0);
       SEEDED_DETAILS.add("/orders/" + orderId);
-      // An ITEM order renders two more dialogs (item handover, production record).
       String widget = seeder.seedOrderableItem("E2E Dialog Widget", jobMaterial);
       String itemOrderId =
           seeder.createItemJobOrder(USERNAME, PASSWORD, IRIDIUM_ID, "E2E Dialog Item", widget, 2);
-      // The item handover dialog renders only once something has been manufactured.
       seeder.manufactureItemOrderLineFully(
           USERNAME,
           PASSWORD,
@@ -148,8 +124,6 @@ class DialogA11yE2eTest {
       String orgUnitAccountId =
           seeder.ensureOrgUnitBankAccount(USERNAME, PASSWORD, "E2E Dialog OU Account", IRIDIUM_ID);
       SEEDED_DETAILS.add("/org-unit-bank/accounts/" + orgUnitAccountId);
-      // An own PENDING request renders its per-request edit dialog (ou-req-edit-<id>) on the
-      // org-unit bank page, which the route list already visits.
       seeder.raiseBankDepositRequest(USERNAME, PASSWORD, orgUnitAccountId, 100);
       String hub = seeder.findLocationIdByName(USERNAME, PASSWORD, REFINERY_HUB);
       String refineryMaterial =
@@ -243,11 +217,8 @@ class DialogA11yE2eTest {
   }
 
   /**
-   * Visits every page route and every seeded detail page, and on each runs the contract on every
-   * dialog it renders: opened modally with an {@code <h2>} title, an accessible name and a ✕; focus
-   * inside; Escape closes it; reopened, its ✕ closes it. Collects every finding, then fails once,
-   * and fails as well when a dialog a template declares was neither exercised nor listed in {@link
-   * #UNREACHED}.
+   * Visits every page route and seeded detail page, checks every rendered dialog, and fails once
+   * with all findings, including declared dialogs neither exercised nor in {@link #UNREACHED}.
    */
   @Test
   void everyDialogFollowsTheContract() {
@@ -283,10 +254,6 @@ class DialogA11yE2eTest {
           findings.add(path + ": could not be checked: " + firstLine(failure.getMessage()));
         }
       }
-      // The promotion admin pages render their dialogs only with a squadron pinned; the admin's
-      // default all-squadrons view shows a prompt instead (REQ-UI-013). Pin IRIDIUM through the
-      // app's own switcher, walk them, and unpin again: the pin lives in the server-side session,
-      // which the shared storage state hands to every later class.
       try {
         pinOrgUnit(page, baseUrl, IRIDIUM_ID);
         for (String path : SQUADRON_PAGES) {
@@ -363,8 +330,6 @@ class DialogA11yE2eTest {
             }
             """,
             id);
-    // The probe joins its problems into one string, empty when there are none; anything else
-    // (a null from a probe that threw) is itself a finding, so it is not filtered out here.
     String problems = String.valueOf(shape);
     if (!problems.isEmpty()) {
       findings.add(where + problems);
@@ -476,11 +441,9 @@ class DialogA11yE2eTest {
   }
 
   /**
-   * Every dialog id a template declares: the {@code modalId} of each call of the wrapper, read from
-   * this checkout's templates. An id built as {@code 'literal-' + ${…}} is returned as {@code
-   * literal-*}, a prefix. A fragment that takes its id as a parameter (the bank movement dialog)
-   * declares no id of its own — its callers pass one, and that id is what the walk exercises — so a
-   * bare expression is skipped.
+   * Returns every {@code modalId} the templates pass to the modal wrapper; an id built from {@code
+   * 'literal-' + ${…}} is returned as the prefix {@code literal-*}, and a bare expression is
+   * skipped.
    */
   private static Set<String> declaredDialogIds() {
     Path templates =

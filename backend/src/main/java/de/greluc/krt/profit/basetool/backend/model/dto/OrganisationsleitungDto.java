@@ -24,17 +24,15 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Wire shape for {@link de.greluc.krt.profit.basetool.backend.model.Organisationsleitung} (epic
- * #692, REQ-ORG-014) — the single top-of-hierarchy org unit. Like a Bereich it carries no
- * profit-eligibility or promotion flag, and unlike a Bereich it has <em>no</em> parent (the OL is
- * the root; {@code chk_org_unit_ol_has_no_parent} enforces this at the data layer).
+ * Wire shape for {@link de.greluc.krt.profit.basetool.backend.model.Organisationsleitung}, the
+ * parentless root org unit (REQ-ORG-014).
  *
- * @param id OL identifier; {@code null} on create requests, populated on responses.
- * @param name display name; case-insensitive unique across all org-unit kinds. Required, max 255.
- * @param shorthand short tag; unique across all kinds. Required, max 255.
- * @param description free-form text; nullable.
- * @param active soft-delete flag; server-populated, {@code null} on requests means "no change".
- * @param version optimistic-lock counter; server-populated on create + read, required on update.
+ * @param id the OL id; {@code null} on create
+ * @param name display name; unique across all org-unit kinds, case-insensitively, max 255
+ * @param shorthand short tag; unique across all kinds, max 255
+ * @param description free-form text; nullable
+ * @param active soft-delete flag; server-populated, {@code null} on requests means no change
+ * @param version optimistic-lock version; required on update
  */
 public record OrganisationsleitungDto(
     UUID id,

@@ -32,12 +32,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Ad-hoc verification harness for the owner-review design fixes on the mission detail page against
- * an ALREADY RUNNING local test stack ({@code E2E_BASE_URL} env; self-skipping without {@code
- * MISSION_FIX_CHECK=true}; mission id via {@code MISSION_ID}). Uses a half-4K viewport (1880px) to
- * reproduce the reported clipping: probes the removed Wirtschaft jump card, the crew-board hint
- * readability, the payout-table fit, the Wirtschaft details background, and the visibility of the
- * "Jetzt" buttons. Not part of CI.
+ * Ad-hoc harness that checks the mission detail page's design fixes at an 1880px viewport against
+ * an already running local stack; not part of CI.
+ *
+ * <p>Skipped unless {@code MISSION_FIX_CHECK=true}; reads {@code E2E_BASE_URL} and {@code
+ * MISSION_ID}.
  */
 @Tag("e2e")
 class MissionDesignFixesCheckE2eTest {
@@ -46,11 +45,9 @@ class MissionDesignFixesCheckE2eTest {
   private static Browser browser;
 
   /**
-   * Skips the class unless {@code MISSION_FIX_CHECK=true}, then boots the headless browser of the
-   * configured engine ({@code -Pe2e.browser}) through {@link E2eSupport#launchBrowser}. The
-   * assumption runs <em>before</em> any browser launch: a CI matrix cell installs only its own
-   * engine, so an unconditional launch of a hard-coded one fails the whole class with a {@code
-   * DriverException} instead of skipping it.
+   * Skips the class unless {@code MISSION_FIX_CHECK=true}, then launches the configured browser
+   * engine through {@link E2eSupport#launchBrowser}. The skip check runs first, so a CI cell
+   * without that engine skips instead of failing.
    */
   @BeforeAll
   static void setUp() {
@@ -100,7 +97,6 @@ class MissionDesignFixesCheckE2eTest {
 
       E2eSupport.login(page, baseUrl, "test-admin", "test-admin-pw");
 
-      // 1) Übersicht: no jump cards left.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=ueb");
       page.waitForLoadState();
       page.waitForTimeout(400);
@@ -112,7 +108,6 @@ class MissionDesignFixesCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "fix-ueb.png")));
 
-      // 2) Crew board: legend + drop-hint must render light/regular, not thin gray-2.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       page.waitForTimeout(400);
@@ -129,7 +124,6 @@ class MissionDesignFixesCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "fix-crew.png")));
 
-      // 3+4) Finance: payout table fits without horizontal scroll; details carry a panel surface.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
       page.waitForLoadState();
       page.waitForTimeout(400);
@@ -137,8 +131,6 @@ class MissionDesignFixesCheckE2eTest {
           page.evaluate(
               "() => { const w ="
                   + " document.querySelector('.payout-table')?.closest('.table-responsive');"
-                  // The demo mission has no refinery orders, so the details element may not
-                  // render — verify the selector via a synthetic element in that case.
                   + " let d = document.querySelector('#pane-fin details.hud-details');"
                   + " let synthetic = false;"
                   + " if (!d) { d = document.createElement('details'); d.className = 'hud-details';"
@@ -153,7 +145,6 @@ class MissionDesignFixesCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "fix-fin.png")));
 
-      // 5) Verwaltung: both "Jetzt" buttons fully visible inside their pane.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=verw");
       page.waitForLoadState();
       page.waitForTimeout(400);

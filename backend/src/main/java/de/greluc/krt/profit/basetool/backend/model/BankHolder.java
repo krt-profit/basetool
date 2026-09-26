@@ -37,17 +37,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A player acting as physical custodian of bank money (epic #556, REQ-BANK-003), persisted in the
- * {@code bank_holder} table created by Flyway V151.
+ * A player acting as physical custodian of bank money (REQ-BANK-003).
  *
- * <p>aUEC exists only on Star Citizen player accounts, so every {@link BankPosting} names exactly
- * one holder — the player whose stash physically changes. The registry row links to the basetool
- * {@link User} (one holder per user, V151 unique constraint) but additionally snapshots the {@link
- * #handle} so the ledger stays readable after user deletion ({@code ON DELETE SET NULL}).
- *
- * <p>Holders are never hard-deleted while postings reference them (V153 {@code ON DELETE
- * RESTRICT}); {@code active = false} blocks new postings naming the holder without touching
- * history.
+ * <p>Every {@link BankPosting} names exactly one holder. The row links to at most one {@link User}
+ * and snapshots the {@link #handle} so the ledger stays readable after user deletion. Holders
+ * referenced by postings are never deleted; {@code active = false} blocks new postings instead.
  */
 @Entity
 @Table(name = "bank_holder")
@@ -92,23 +86,17 @@ public class BankHolder extends AbstractEntity<UUID> {
   private boolean active = true;
 
   /**
-   * {@code true} when this holder was auto-created from a bank role (REQ-BANK-029, ADR-0040): the
-   * reconcile auto-deactivates it when the user loses all bank roles. {@code false} marks a
-   * manually registered custodian, which the reconcile never touches. Persisted by V182.
+   * {@code true} when this holder was auto-created from a bank role and is deactivated by the
+   * reconcile once the user loses all bank roles (REQ-BANK-029); {@code false} for a manually
+   * registered custodian, which the reconcile never touches.
    */
   @Column(name = "role_managed", nullable = false)
   private boolean roleManaged = false;
 
   /**
-   * The holder's current display label for every bank surface (REQ-BANK-003): the linked user's
-   * <em>live</em> effective name — their display name, or their username when no display name is
-   * set — while the user still exists, falling back to the frozen {@link #handle} snapshot only
-   * once the user was deleted ({@code user_id} set to NULL). Preferring the live name means the
-   * Halter views, holder selects, custody history and statements always show the user's current
-   * Anzeigename rather than the value captured at registration time, while the deletion-proof
-   * snapshot keeps a deleted user's rows readable. Must be read inside an open persistence context
-   * so the lazy {@link #user} proxy can initialise (callers fetch-join or operate within a
-   * transaction).
+   * Returns the holder's display label (REQ-BANK-003): the linked user's live effective name, or
+   * the {@link #handle} snapshot once the user was deleted. Must be called inside an open
+   * persistence context so the lazy {@link #user} can initialise.
    *
    * @return the linked user's current effective name, or the {@link #handle} snapshot when the user
    *     is gone

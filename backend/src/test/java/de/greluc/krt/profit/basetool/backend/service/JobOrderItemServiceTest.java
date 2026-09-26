@@ -72,9 +72,6 @@ class JobOrderItemServiceTest {
 
   @Test
   void requiredMaterialIdsCollectsMaterialLinesForMaterialOrderAndDerivedForItemOrder() {
-    // REQ-ORDERS-018: the kind-agnostic required-material set. MATERIAL order -> its material
-    // lines;
-    // ITEM order -> the snapshotted per-item materials. Each kind's other collection is empty.
     Material steel = new Material();
     steel.setId(UUID.randomUUID());
     Material gold = new Material();
@@ -104,11 +101,8 @@ class JobOrderItemServiceTest {
     assertThat(service.requiredMaterialIds(itemOrder)).containsExactly(iron.getId());
   }
 
-  // covers REQ-INV-031 (requested game-item set: ITEM order -> distinct line game items)
   @Test
   void requiredGameItemIdsCollectsDistinctLineGameItemsForItemOrder() {
-    // Given an ITEM order with two lines ordering the same weapon plus one ordering a scope, and a
-    // line whose gameItem is unresolved (null) — the null must be skipped, the duplicate collapsed.
     GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
     GameItem scope = gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT);
 
@@ -119,21 +113,17 @@ class JobOrderItemServiceTest {
     itemOrder.addItem(line(scope));
     itemOrder.addItem(line(null));
 
-    // When / Then
     assertThat(service.requiredGameItemIds(itemOrder))
         .containsExactly(weapon.getId(), scope.getId());
   }
 
-  // covers REQ-INV-031 (a MATERIAL order requests no game items => no item-stock link possible)
   @Test
   void requiredGameItemIdsIsEmptyForMaterialOrder() {
-    // Given a MATERIAL order (it has material lines, never item lines)
     Material steel = new Material();
     steel.setId(UUID.randomUUID());
     JobOrder materialOrder = new JobOrder();
     materialOrder.addMaterial(JobOrderMaterial.builder().material(steel).amount(5.0).build());
 
-    // When / Then — empty set = the item-stock link gate rejects every game item for this order
     assertThat(service.requiredGameItemIds(materialOrder)).isEmpty();
   }
 
@@ -152,20 +142,18 @@ class JobOrderItemServiceTest {
 
   @Test
   void buildItemLineDerivesResourceMaterialsScalingByAmountWithQualityDefaultAndOverride() {
-    // Given a weapon blueprint with two RESOURCE ingredients plus an ITEM and an unresolved line.
     GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
     Material steel = material("Steel", QuantityType.SCU);
     Material screws = material("Screws", QuantityType.PIECE);
     Blueprint blueprint = blueprint(weapon);
-    blueprint.addIngredient(resource(steel, 2.5, 650)); // default GOOD (minQuality 650)
-    blueprint.addIngredient(resource(screws, 4.0, null)); // default NONE
+    blueprint.addIngredient(resource(steel, 2.5, 650));
+    blueprint.addIngredient(resource(screws, 4.0, null));
     blueprint.addIngredient(itemIngredient(gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT), 1));
-    blueprint.addIngredient(unresolvedResource(9.0)); // material == null, must be skipped
+    blueprint.addIngredient(unresolvedResource(9.0));
 
     when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
     when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
 
-    // When ordering 3 units, overriding screws to GOOD and leaving steel at its default.
     CreateJobOrderItemLineDto line =
         new CreateJobOrderItemLineDto(
             null,
@@ -177,7 +165,6 @@ class JobOrderItemServiceTest {
             null);
     JobOrderItem built = service.buildItemLine(line);
 
-    // Then only the two resolved RESOURCE materials are snapshotted, scaled by the amount.
     assertThat(built.getAmount()).isEqualTo(3);
     assertThat(built.getDeliveredAmount()).isZero();
     assertThat(built.getMaterials()).hasSize(2);
@@ -196,7 +183,7 @@ class JobOrderItemServiceTest {
     GameItem item = gameItem("Crate", GameItemKind.GENERIC);
     Material bolts = material("Bolts", QuantityType.PIECE);
     Blueprint blueprint = blueprint(item);
-    blueprint.addIngredient(resource(bolts, 2.5, null)); // 2.5 * 3 = 7.5 -> rounds to 8
+    blueprint.addIngredient(resource(bolts, 2.5, null));
 
     when(gameItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
     when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
@@ -211,7 +198,6 @@ class JobOrderItemServiceTest {
 
   @Test
   void buildItemLineRoundsScuQuantitiesAwayFromFloatingPointNoise() {
-    // 0.36 SCU * 5 evaluates to 1.7999999999999998 as a binary double; the snapshot must store 1.8.
     GameItem weapon = gameItem("Longsword", GameItemKind.WEAPON);
     Material iron = material("Iron", QuantityType.SCU);
     Blueprint blueprint = blueprint(weapon);
@@ -232,7 +218,7 @@ class JobOrderItemServiceTest {
   void buildItemLineRejectsBlueprintThatDoesNotProduceTheItem() {
     GameItem ordered = gameItem("Ballista", GameItemKind.WEAPON);
     GameItem other = gameItem("Other", GameItemKind.WEAPON);
-    Blueprint blueprint = blueprint(other); // outputs a different item
+    Blueprint blueprint = blueprint(other);
 
     when(gameItemRepository.findById(ordered.getId())).thenReturn(Optional.of(ordered));
     when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
@@ -258,7 +244,6 @@ class JobOrderItemServiceTest {
 
     List<AggregatedMaterialDto> aggregated = service.aggregateMaterials(order);
 
-    // Two rows: Steel/GOOD = 8.0 (5+3), Steel/NONE = 2.0.
     assertThat(aggregated).hasSize(2);
     AggregatedMaterialDto good =
         aggregated.stream()
@@ -276,7 +261,6 @@ class JobOrderItemServiceTest {
 
   @Test
   void aggregateMaterialsRoundsSummedScuQuantitiesAwayFromFloatingPointNoise() {
-    // 0.1 + 0.2 evaluates to 0.30000000000000004 as a binary double; the aggregate must report 0.3.
     Material steel = material("Steel", QuantityType.SCU);
     stubMapper(steel);
 
@@ -292,8 +276,6 @@ class JobOrderItemServiceTest {
 
   @Test
   void aggregateMaterialsReducesOutstandingDemandByManufacturedUnits() {
-    // A 4-unit line needing 160 SCU Steel total; 1 unit already manufactured leaves 3 → the
-    // outstanding aggregate is only 160 × 3 / 4 = 120 (REQ-ORDERS-025).
     Material steel = material("Steel", QuantityType.SCU);
     stubMapper(steel);
 
@@ -315,8 +297,6 @@ class JobOrderItemServiceTest {
 
   @Test
   void aggregateMaterialsIsZeroForAFullyManufacturedLine() {
-    // Every ordered unit produced → no outstanding material demand, but the bucket row is kept so
-    // its quality/claims stay visible (REQ-ORDERS-025).
     Material steel = material("Steel", QuantityType.SCU);
     stubMapper(steel);
 
@@ -364,7 +344,6 @@ class JobOrderItemServiceTest {
 
   @Test
   void deriveForPreviewRoundsScuQuantitiesAwayFromFloatingPointNoise() {
-    // 0.36 SCU * 5 evaluates to 1.7999999999999998 as a binary double; the preview must show 1.8.
     GameItem weapon = gameItem("Longsword", GameItemKind.WEAPON);
     Material iron = material("Iron", QuantityType.SCU);
     stubMapper(iron);
@@ -381,8 +360,6 @@ class JobOrderItemServiceTest {
 
   @Test
   void deriveForPreviewBridgesNonCraftableItemIngredientIntoMaterials() {
-    // A wiki ITEM ingredient (Beradom, counted in pieces) with no own blueprint but an existing
-    // PIECE material of the same name must surface as a material requirement, not a sub-assembly.
     GameItem weapon = gameItem("Palisade", GameItemKind.WEAPON);
     GameItem beradomItem = gameItem("Beradom", GameItemKind.GENERIC);
     Material beradomMaterial = material("Beradom", QuantityType.PIECE);
@@ -400,14 +377,12 @@ class JobOrderItemServiceTest {
     assertThat(preview.subAssemblies()).isEmpty();
     assertThat(preview.materials()).hasSize(1);
     assertThat(preview.materials().get(0).material().name()).isEqualTo("Beradom");
-    assertThat(preview.materials().get(0).requiredQuantity()).isEqualTo(60.0); // 20 pieces * 3
+    assertThat(preview.materials().get(0).requiredQuantity()).isEqualTo(60.0);
     assertThat(preview.materials().get(0).defaultQuality()).isEqualTo(QualityRequirement.NONE);
   }
 
   @Test
   void deriveForPreviewKeepsCraftableItemAsSubAssemblyAndDoesNotBridge() {
-    // A craftable ITEM ingredient (has its own blueprint) stays an adoptable sub-assembly and is
-    // never bridged to a material, even though the bridge would otherwise look one up.
     GameItem rifle = gameItem("Rifle", GameItemKind.WEAPON);
     GameItem scope = gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT);
     Blueprint blueprint = blueprint(rifle);
@@ -426,8 +401,6 @@ class JobOrderItemServiceTest {
 
   @Test
   void buildItemLineSnapshotsBridgedItemIngredientAsPieceMaterial() {
-    // Persist path: the bridged Beradom requirement is snapshotted onto the order as a PIECE
-    // material alongside the regular RESOURCE materials.
     GameItem weapon = gameItem("Palisade", GameItemKind.WEAPON);
     Material riccite = material("Riccite", QuantityType.SCU);
     GameItem beradomItem = gameItem("Beradom", GameItemKind.GENERIC);
@@ -449,17 +422,14 @@ class JobOrderItemServiceTest {
 
     assertThat(built.getMaterials()).hasSize(2);
     JobOrderItemMaterial ricciteReq = requirementFor(built, riccite);
-    assertThat(ricciteReq.getRequiredQuantity()).isEqualTo(3.0); // 1.5 SCU * 2
+    assertThat(ricciteReq.getRequiredQuantity()).isEqualTo(3.0);
     JobOrderItemMaterial beradomReq = requirementFor(built, beradomMaterial);
-    assertThat(beradomReq.getRequiredQuantity()).isEqualTo(40.0); // 20 pieces * 2, whole
+    assertThat(beradomReq.getRequiredQuantity()).isEqualTo(40.0);
     assertThat(beradomReq.getQualityRequirement()).isEqualTo(QualityRequirement.NONE);
   }
 
-  // covers REQ-ORDERS-032 (an edit re-derives a line in place; booked production is not discarded)
   @Test
   void applyItemLineReDerivesMaterialsInPlaceAndKeepsBookedProduction() {
-    // Given an existing line that already has 6 of 10 units manufactured and 2 delivered, carrying
-    // a stale snapshot (Screws) from the recipe it was created with.
     GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
     Material screws = material("Screws", QuantityType.PIECE);
     Material steel = material("Steel", QuantityType.SCU);
@@ -481,26 +451,20 @@ class JobOrderItemServiceTest {
     when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
     when(blueprintRepository.findById(corrected.getId())).thenReturn(Optional.of(corrected));
 
-    // When re-deriving that same line against the corrected blueprint at an unchanged amount
     service.applyItemLine(
         existing,
         new CreateJobOrderItemLineDto(
             existing.getId(), weapon.getId(), corrected.getId(), 10, List.of(), null, null));
 
-    // Then the snapshot follows the new recipe...
     assertThat(existing.getMaterials()).hasSize(1);
     assertThat(requirementFor(existing, steel).getRequiredQuantity()).isEqualTo(15.0);
     assertThat(existing.getBlueprint()).isSameAs(corrected);
-    // ...while the production counters — the whole point of editing in place — survive untouched.
     assertThat(existing.getManufacturedAmount()).isEqualTo(6);
     assertThat(existing.getDeliveredAmount()).isEqualTo(2);
   }
 
-  // covers REQ-ORDERS-033 (a line whose blueprint drifted away from the ordered item is flagged)
   @Test
   void toItemDtosFlagsLinesWhoseBlueprintNoLongerProducesTheOrderedItem() {
-    // Given two lines: one consistent, one whose blueprint now outputs a different item — exactly
-    // what an SC-Wiki re-point leaves behind, since the pairing is only validated at write time.
     GameItem cooler = gameItem("Cryo-Star SL", GameItemKind.VEHICLE_ITEM);
     GameItem heatSink = gameItem("HeatSink", GameItemKind.VEHICLE_ITEM);
 
@@ -519,13 +483,10 @@ class JobOrderItemServiceTest {
     order.addItem(consistent);
     order.addItem(drifted);
 
-    // When / Then — only the drifted line carries the warning flag.
     assertThat(service.toItemDtos(order))
         .extracting(dto -> dto.id() + ":" + dto.blueprintStale())
         .containsExactlyInAnyOrder(consistent.getId() + ":false", drifted.getId() + ":true");
   }
-
-  // ── helpers ──────────────────────────────────────────────────────────
 
   private void stubMapper(Material material) {
     lenient()

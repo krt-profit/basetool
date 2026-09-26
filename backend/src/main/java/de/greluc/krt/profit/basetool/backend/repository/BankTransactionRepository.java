@@ -29,20 +29,11 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for the append-only {@link BankTransaction} headers (epic #556, ADR-0010).
- * Insert-and-read: <b>no booking fact</b> is ever updated or deleted — a correction is a {@code
- * REVERSAL} transaction, not an {@code UPDATE} (REQ-BANK-004, pinned by {@code ArchitectureTest}).
+ * Spring Data repository for the append-only {@link BankTransaction} headers (ADR-0010). No booking
+ * fact is updated or deleted; a correction is a {@code REVERSAL} (REQ-BANK-004).
  *
- * <p><b>One {@code @Modifying} method exists, and exactly one may.</b> {@link
- * #anonymiseCounterpartyHandle} replaces a departed member's handle snapshot on a granted Art. 17
- * request (REQ-SEC-062), which changes no amount, account, date or posting row — only the name the
- * row displays. It was approved by {@literal @}greluc on 2026-09-16 and is recorded in ADR-0183 as
- * an amendment to ADR-0010's insert-only consequence. {@code ArchitectureTest} names it by its
- * <em>fully qualified</em> signature, so a second mutation here fails the build even if somebody
- * gives it the same method name.
- *
- * <p>The class comment previously said no such method may ever appear, which had already stopped
- * being true when the erasure shipped.
+ * <p>The single permitted {@code @Modifying} method is {@link #anonymiseCounterpartyHandle}, which
+ * changes only the displayed name (REQ-SEC-062, ADR-0183).
  */
 @Repository
 public interface BankTransactionRepository extends JpaRepository<BankTransaction, UUID> {
@@ -57,15 +48,8 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
   boolean existsByReversedTransactionId(UUID reversedTransactionId);
 
   /**
-   * Integrity check (REQ-BANK-020, ADR-0052, #998): ids of {@code TRANSFER} / {@code
-   * HOLDER_TRANSFER} transactions whose account legs do not net to {@code -transfer_fee}. A
-   * fee-free (same-holder) transfer nets to zero; a fee-bearing holder-changing transfer debits the
-   * source the gross (amount + fee) and credits the destination the full entered amount, so its two
-   * account legs net to {@code -transfer_fee}. Since #998 a fee-bearing {@code HOLDER_TRANSFER}
-   * Umbuchung books a single {@code CARTEL} account leg of {@code -fee}, which nets to {@code
-   * -transfer_fee} too; a fee-free Umbuchung books no account leg at all (so it never appears here)
-   * and legacy fee-free rows stay sound. The holder side is checked by {@code
-   * BankHolderPostingRepository.findHolderMovementTransactionsWithNonZeroSum}.
+   * Integrity check (REQ-BANK-020, ADR-0052): ids of {@code TRANSFER} / {@code HOLDER_TRANSFER}
+   * transactions whose account legs do not net to {@code -transfer_fee}.
    *
    * @return the violating transaction ids (empty when sound)
    */
@@ -79,11 +63,8 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
   List<UUID> findTransferTransactionsWithNonZeroSum();
 
   /**
-   * Integrity check (REQ-BANK-020): ids of {@code REVERSAL} transactions whose combined account
-   * legs with the reversed transaction do not cancel per account — the account-side negated mirror
-   * (ADR-0010/0039), so the union of both transactions' account legs nets to zero for every account
-   * they touch. The holder-side mirror is checked by {@code
-   * BankHolderPostingRepository.findReversalTransactionsNotMirroredOnHolderLedger}.
+   * Integrity check (REQ-BANK-020): ids of {@code REVERSAL} transactions whose account legs,
+   * combined with the reversed transaction's, do not cancel per account.
    *
    * @return the violating reversal transaction ids (empty when sound)
    */
@@ -100,11 +81,8 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
   List<UUID> findReversalTransactionsNotMirrored();
 
   /**
-   * Integrity check (REQ-BANK-020): ids of audited transactions that lack their mandatory audit row
-   * (REQ-BANK-012). {@code WIPE_RESET} transactions are excluded by design — a wipe writes a single
-   * summarizing {@code WIPE_RESET_EXECUTED} event for the whole run, not one audit row per
-   * generated {@code WIPE_RESET} transaction; every other transaction type carries its own audit
-   * row that references it.
+   * Integrity check (REQ-BANK-020): ids of transactions lacking their mandatory audit row
+   * (REQ-BANK-012). {@code WIPE_RESET} transactions are excluded.
    *
    * @return the violating transaction ids (empty when every audited type has its row)
    */
@@ -117,13 +95,8 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
   List<UUID> findTransactionsWithoutAuditEvent();
 
   /**
-   * Replaces this member's counterparty handle snapshot with the erasure sentinel, for a granted
-   * Art. 17 request (REQ-SEC-062).
-   *
-   * <p>The booking history is the record the privacy policy names as kept permanently under Art.
-   * 6(1)(f); this is the path by which a member can have their name taken out of it without the
-   * bookings themselves being rewritten. Amounts, dates, accounts and the transaction's own
-   * identity are untouched — the counterparty simply stops being named.
+   * Replaces this member's counterparty handle snapshot with the erasure sentinel for a granted
+   * Art. 17 request (REQ-SEC-062). Amounts, dates and accounts stay untouched.
    *
    * @param userId the member whose handle snapshot is erased
    * @param sentinel {@code HandleAnonymisation#SENTINEL}

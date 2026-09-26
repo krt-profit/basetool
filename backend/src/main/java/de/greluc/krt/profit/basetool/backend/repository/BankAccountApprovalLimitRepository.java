@@ -29,12 +29,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link BankAccountApprovalLimit} — the per-account, per-tier approval
- * ceilings (REQ-BANK-041, V193). Read and written exclusively by the org-unit-aware {@code
- * OrgUnitBankAccessService} seam: the finders are list/lookup shaped (to resolve a requester's
- * applicable limit and to render the settings panel), the upserts go through {@code findBy…} +
- * {@code save}, and the clears are single-row derived deletes (entity-level, so they never
- * bulk-clear the persistence context).
+ * Spring Data repository for {@link BankAccountApprovalLimit}, the per-account, per-tier approval
+ * ceilings (REQ-BANK-041). Used only through {@code OrgUnitBankAccessService}; deletes are
+ * single-row derived deletes.
  */
 @Repository
 public interface BankAccountApprovalLimitRepository
@@ -50,11 +47,10 @@ public interface BankAccountApprovalLimitRepository
   List<BankAccountApprovalLimit> findByAccountId(UUID accountId);
 
   /**
-   * Returns every approval limit of the given accounts in one query — batched for the org-unit bank
-   * card list so the per-account limit resolution needs no per-account N+1 read (REQ-DATA-003).
+   * Returns every approval limit of the given accounts in one query (REQ-DATA-003).
    *
-   * @param accountIds the accounts whose limits to collect; never {@code null}. An empty collection
-   *     yields an empty result.
+   * @param accountIds the accounts whose limits to collect; never {@code null}; empty yields an
+   *     empty result
    * @return the approval limits across the given accounts; never {@code null}
    */
   List<BankAccountApprovalLimit> findByAccountIdIn(Collection<UUID> accountIds);
@@ -74,8 +70,7 @@ public interface BankAccountApprovalLimitRepository
    * Looks up an account's limit of a payload-less kind (the {@code ALL_MEMBERS} bucket).
    *
    * @param accountId the account; never {@code null}
-   * @param granteeKind the grant kind to look up (the {@code ALL_MEMBERS} bucket); never {@code
-   *     null}
+   * @param granteeKind the grant kind to look up; never {@code null}
    * @return the existing limit, or empty
    */
   Optional<BankAccountApprovalLimit> findByAccountIdAndGranteeKind(

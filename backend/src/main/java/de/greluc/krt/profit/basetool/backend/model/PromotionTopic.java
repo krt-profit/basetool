@@ -52,11 +52,6 @@ import lombok.ToString;
 @Builder
 public class PromotionTopic extends AbstractEntity<UUID> {
 
-  // {@code onMethod_ = @__(@Override)} tells Lombok to attach a real {@code @Override} to the
-  // generated {@code getId()} so it is visibly tagged as the implementation of
-  // {@code Persistable.getId()} (CodeQL flags missing override annotations on interface
-  // implementations). The field-level {@code @Getter} wins over the class-level one for this
-  // field so the override marker is attached without disabling Lombok for the rest of the class.
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -72,21 +67,16 @@ public class PromotionTopic extends AbstractEntity<UUID> {
   private int sortOrder;
 
   /**
-   * Squadron that owns this promotion topic. Set at creation time from the caller's active squadron
-   * context and immutable afterwards. Cascades the squadron scope to every child ({@link
-   * PromotionCategory}, {@code PromotionLevelContent}, {@code RankRequirement}, {@code
-   * MemberEvaluation}) which derive their squadron via this reference rather than carrying their
-   * own (Plan §3.2 "no denormalisation"). Kept JPA-nullable for Phase 1 until Flyway V86 tightens
-   * the column to NOT NULL.
+   * Squadron that owns this promotion topic, stamped at creation from the caller's active squadron
+   * context and immutable afterwards. Every child ({@link PromotionCategory}, {@code
+   * PromotionLevelContent}, {@code RankRequirement}, {@code MemberEvaluation}) derives its squadron
+   * scope through this reference.
    */
   @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_squadron_id", nullable = false)
   private Squadron owningSquadron;
 
-  // Excluded from {@code @ToString} because {@code List<PromotionCategory>} is a LAZY association
-  // and the children's own {@code toString()} would either trigger a LazyInitializationException
-  // outside a Hibernate session or recurse back into this topic.
   @ToString.Exclude
   @OneToMany(mappedBy = "topic", cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("sortOrder ASC")

@@ -24,30 +24,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Makes a client- or user-supplied string safe to put in a log line, in all three applications.
+ * Makes a client- or user-supplied string safe to log by removing line-breaking characters and
+ * bounding its length (CWE-117).
  *
- * <p>Who types the text differs per module, and none of them is harmless. In the <b>ingest</b>
- * gateway — the only internet-reachable module — it is the desktop extractor's free-text provenance
- * fields ({@code tool} / {@code toolVersion}). In the <b>backend</b> and the <b>frontend</b> it is
- * an authenticated squadron member, or a guest holding an edit link, typing into a search box, a
- * filter field or a form input. Such text is echoed into log lines (a rejected search term, a
- * validation failure, a relayed backend error), and without this guard a pasted newline followed by
- * a fabricated {@code ERROR ---} prefix would read as a genuine second log line while someone
- * triages an incident (CWE-117). A JSON string may legitimately contain {@code \n}, and neither the
- * logback pattern nor {@link PiiMasker} strips it.
- *
- * <p>Complements the maskers instead of replacing either. {@link PiiMasker} removes <em>secrets and
- * PII</em> from a line that already reached the appender; the backend's and frontend's {@code
- * LogMasker} redacts a <em>known-sensitive value</em> at the call site; this removes
- * <em>structure-breaking characters</em> from free text before it is handed to the logger. A value
- * that is both sensitive and user-supplied needs a masker <em>and</em> this.
- *
- * <p>Sanitising does not make a forbidden value loggable: REQ-OBS-004 still bans callsigns, names,
- * e-mail addresses, tokens and client IPs outright, whatever they were run through first.
- *
- * <p>This class has no dependency of its own, so the backend's ADR-0047 package-cycle rule — which
- * used to pin the backend copy to its {@code support} leaf — is satisfied from outside the backend
- * altogether (ADR-0205).
+ * <p>Complements {@link PiiMasker}, which removes secrets and PII; a sensitive user-supplied value
+ * needs both. Sanitizing does not make a value forbidden by REQ-OBS-004 loggable.
  */
 public final class LogSafe {
 
@@ -63,29 +44,22 @@ public final class LogSafe {
    * and JavaScript-based log consumers treat it as a line terminator, so leaving it in would reopen
    * the very forging vector this class exists to close — just against a different reader.
    */
-  private static final char LINE_SEPARATOR = '\u2028'; // U+2028 LINE SEPARATOR
+  private static final char LINE_SEPARATOR = '\u2028';
 
   /**
    * Unicode PARAGRAPH SEPARATOR (U+2029). Same blind spot as {@link #LINE_SEPARATOR}: not an ISO
    * control, so {@link Character#isISOControl(char)} misses it, yet a line break for the same
    * consumers.
    */
-  private static final char PARAGRAPH_SEPARATOR = '\u2029'; // U+2029 PARAGRAPH SEPARATOR
+  private static final char PARAGRAPH_SEPARATOR = '\u2029';
 
-  private LogSafe() {
-    // Utility holder — not instantiable.
-  }
+  private LogSafe() {}
 
   /**
-   * Returns {@code value} with every line-breaking character replaced by {@code '?'} and the result
-   * capped at {@code maxLength} characters, so a hostile or malformed field can neither inject a
-   * newline into the log nor blow up the line length.
+   * Replaces every line-breaking character, including {@link #LINE_SEPARATOR} and {@link
+   * #PARAGRAPH_SEPARATOR}, with {@code '?'} and caps the result at {@code maxLength} characters.
    *
-   * <p>Line-breaking covers every ISO control character <em>plus</em> {@link #LINE_SEPARATOR} and
-   * {@link #PARAGRAPH_SEPARATOR}, which {@link Character#isISOControl(char)} does not classify as
-   * controls although several log consumers break a line on them — see the two field Javadocs.
-   *
-   * @param value the untrusted input text; {@code null} or blank yields {@value #NONE}
+   * @param value the untrusted input; {@code null} or blank yields {@value #NONE}
    * @param maxLength the maximum number of characters to keep; must be positive
    * @return a single-line, length-bounded rendering safe to log
    */
@@ -107,12 +81,11 @@ public final class LogSafe {
   }
 
   /**
-   * Reports whether {@code c} could end the current log line for some consumer and let the rest of
-   * the value read as a forged next line, covering the ISO controls plus the two Unicode separators
-   * {@link Character#isISOControl(char)} leaves out.
+   * Whether {@code c} can break a log line: an ISO control character or one of the two Unicode
+   * separators {@link Character#isISOControl(char)} excludes.
    *
    * @param c the character to classify
-   * @return {@code true} if {@code c} must be replaced before the value reaches an appender
+   * @return {@code true} if {@code c} must be replaced before logging
    */
   @Contract(pure = true)
   private static boolean isLineBreaking(char c) {

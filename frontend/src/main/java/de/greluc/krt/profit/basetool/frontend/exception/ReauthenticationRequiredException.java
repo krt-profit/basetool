@@ -25,23 +25,13 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.oauth2.client.ClientAuthorizationException;
 
 /**
- * Raised when a frontend &rarr; backend call cannot proceed because the user's Spring session no
- * longer holds a usable OAuth2 token for the {@code keycloak} client registration.
+ * Raised when a frontend-to-backend call cannot proceed because the user's session no longer holds
+ * a usable OAuth2 token for the {@code keycloak} client registration.
  *
- * <p>This is <b>not</b> a backend HTTP failure: it is thrown locally by Spring Security's {@code
- * OAuth2AuthorizedClientManager} (a {@link ClientAuthorizationException}, typically its {@code
- * ClientAuthorizationRequiredException} subtype) <i>before</i> any backend request is sent, when
- * the stored {@code OAuth2AuthorizedClient} is missing or its refresh token was rejected / rotated
- * away. Because it is a {@code RuntimeException} and not an {@code AuthenticationException}, it
- * never reaches {@code SsoReAuthenticationEntryPoint}, so without dedicated handling the page
- * renders empty (or a 500) instead of bouncing the user through a fresh Keycloak login.
- *
- * <p>{@code BackendApiClient} converts the raw {@link ClientAuthorizationException} into this typed
- * exception (see {@link #isReauthSignal(Throwable)}) so the central {@code GlobalExceptionHandler}
- * can map it onto an interactive re-authentication: a {@code 302} redirect to {@link #REAUTH_PATH}
- * for HTML navigations, or a {@code 401} carrying the {@code X-Reauthenticate} header for AJAX
- * callers so the shared {@code krtFetch} client can redirect the browser. See {@code
- * REQ-SEC-012}/ADR-0019.
+ * <p>Thrown locally, before any backend request is sent, when {@code BackendApiClient} detects a
+ * {@link ClientAuthorizationException} (see {@link #isReauthSignal(Throwable)}). {@code
+ * GlobalExceptionHandler} maps it to a redirect to {@link #REAUTH_PATH} for HTML navigations or a
+ * {@code 401} with {@code X-Reauthenticate} for AJAX callers (REQ-SEC-012).
  */
 public class ReauthenticationRequiredException extends RuntimeException {
 

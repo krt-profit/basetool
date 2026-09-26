@@ -18,12 +18,10 @@
 </header>
 <main>
     <div class="greeting hud-box error-container">
-        <!--/* Display status code if available, otherwise 'ERROR' */-->
         <div class="error-code" th:text="${status} ?: 'ERROR'">ERROR</div>
         
         <div class="error-title" th:text="#{error.generic.title}">System Malfunction</div>
         
-        <!--/* Display specific message if available, otherwise generic */-->
         <p class="error-message" th:text="${message} ?: #{error.generic.message}">
             Critical system failure detected. Technical personnel notified.
         </p>

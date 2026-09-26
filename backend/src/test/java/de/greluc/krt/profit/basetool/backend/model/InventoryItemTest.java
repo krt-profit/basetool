@@ -34,8 +34,6 @@ class InventoryItemTest {
 
   @Test
   void roundToScuScaleStripsFloatingPointNoiseBeyondThreeDecimals() {
-    // The exact dirty values observed in production (refinery-sum artefacts in the book-out
-    // dialog).
     assertEquals(37.16, InventoryItem.roundToScuScale(37.160000000000004));
     assertEquals(2.93, InventoryItem.roundToScuScale(2.9299999999999997));
     assertEquals(1.59, InventoryItem.roundToScuScale(1.5899999999999999));
@@ -56,14 +54,11 @@ class InventoryItemTest {
 
   @Test
   void lifecycleCallbackRoundsTheAmountField() {
-    // Given an entity carrying a floating-point artefact
     InventoryItem item = new InventoryItem();
     item.setAmount(37.160000000000004);
 
-    // When the JPA @PrePersist/@PreUpdate hook fires
     item.roundAmountToScuScale();
 
-    // Then the stored amount is clamped to three decimals
     assertEquals(37.16, item.getAmount());
   }
 }

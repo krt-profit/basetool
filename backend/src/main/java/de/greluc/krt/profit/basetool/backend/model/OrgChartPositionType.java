@@ -23,19 +23,11 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The fixed catalogue of functional ranks ("Funktionsränge") a user can hold in the Profit-Bereich
- * org chart. Each value carries the {@link OrgChartScope} it belongs to so {@code OrgChartService}
- * can reject a position whose type does not match the scope it is being placed in (e.g. a {@code
- * SQUADRON_LEAD} dropped into the area leadership, or an {@code AREA_COMMANDER} into a Staffel).
+ * The fixed catalogue of functional ranks ("Funktionsränge") in the Profit-Bereich org chart, each
+ * bound to the {@link OrgChartScope} it may be placed in.
  *
- * <p>The enum names are persisted verbatim via {@link jakarta.persistence.EnumType#STRING} and are
- * referenced literally by the {@code chk_org_chart_scope} / {@code chk_org_chart_parent} CHECK
- * constraints and the partial unique indexes in Flyway migration {@code V136}. Renaming or
- * reordering a constant therefore requires a coordinated migration — keep this enum and the V136
- * literals in lockstep.
- *
- * <p>These ranks are purely descriptive: holding one grants <b>no</b> application permission.
- * Authorization stays with the global roles and the {@code org_unit_membership} flags.
+ * <p>Persisted by name and referenced literally by database CHECK constraints, so a rename needs a
+ * migration. Holding a rank grants no application permission.
  */
 @RequiredArgsConstructor
 public enum OrgChartPositionType {
@@ -74,11 +66,7 @@ public enum OrgChartPositionType {
   /** Commander acting as SK-Leiter — leads a Spezialkommando. One or two per SK. */
   SK_COMMANDER(OrgChartScope.SPECIAL_COMMAND),
 
-  /**
-   * Bereichsleiter — the single head of a Bereich (epic #692, REQ-ORG-026). At most one per Bereich
-   * (the cardinality is scoped to the Bereich's {@code org_unit_id}, unlike the legacy singleton
-   * {@link #AREA_LEAD}).
-   */
+  /** Bereichsleiter — the single head of a Bereich (REQ-ORG-026); at most one per Bereich. */
   BEREICHSLEITER(OrgChartScope.BEREICH),
 
   /** Bereichskoordinator — a Bereich's coordinator. Any number per Bereich. */
@@ -87,11 +75,7 @@ public enum OrgChartPositionType {
   /** Bereichsoperator — a Bereich's operator. Any number per Bereich. */
   BEREICHSOPERATOR(OrgChartScope.BEREICH),
 
-  /**
-   * A member of the Organisationsleitung (epic #692, REQ-ORG-026). Any number — the OL is a body of
-   * several people, mirroring the single {@code is_ol_member} membership flag (no separate OL head
-   * rank).
-   */
+  /** A member of the Organisationsleitung (REQ-ORG-026); any number per OL. */
   OL_MEMBER(OrgChartScope.OL);
 
   private final OrgChartScope scope;

@@ -30,16 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
-/**
- * Pins that a {@code SPECIFIC_USER} selector's target actually reaches the wire.
- *
- * <p>Trivial-looking, and it exists because it was briefly false. ADR-0142 renamed {@code
- * notification_rule_selector.user_sub} to {@code user_id} (#1640) while the DTO property still said
- * {@code userSub}; MapStruct matches by name, so it mapped the property to {@code null}
- * <b>silently</b> and the build stayed green — the admin rule editor would have rendered every
- * {@code SPECIFIC_USER} selector as empty. The names agree again, so nothing bridges them any more;
- * what remains is this test, which is the only thing that would notice if they diverged again.
- */
+/** Verifies that a {@code SPECIFIC_USER} selector's target user reaches the mapped DTO. */
 class NotificationRuleMapperTest {
 
   private final NotificationRuleMapper mapper = Mappers.getMapper(NotificationRuleMapper.class);

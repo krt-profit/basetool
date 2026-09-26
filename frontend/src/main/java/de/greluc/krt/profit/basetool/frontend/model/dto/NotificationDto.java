@@ -24,11 +24,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code NotificationDto}. Lives in the frontend module so the
- * notification page controller can deserialise the REST response without depending on the backend
- * module. Fields and types must stay in lockstep with the backend (mirror-DTO rule); enum-typed
- * backend fields are mirrored as {@link String} so the frontend stays decoupled from the backend
- * enums.
+ * Frontend mirror of the backend {@code NotificationDto}; backend enum fields are carried as {@link
+ * String}.
  *
  * @param id notification id
  * @param type machine type name (resolved to an i18n message by the controller)

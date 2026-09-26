@@ -42,19 +42,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * The "pin, else choose" rejection carries its own stable problem code (REQ-ORG-017, REQ-ORG-023).
- *
- * <p>Why a test for what looks like an exception type swap: the code is the frontend's only
- * branching point, and until 2026-09-16 there was none. Every picker surface fell through to
- * echoing the backend's own English {@code detail} — "User belongs to multiple org units;
- * owningOrgUnitId is required" — straight into a German toast, which is an i18n violation and tells
- * a member neither what is wrong nor what to do. If this rejection ever slides back under the
- * generic {@code BAD_REQUEST}, five surfaces silently regress to that at once and nothing else in
- * the build would notice.
- *
- * <p>Both stamping entry points are exercised. They are separate methods with separate membership
- * lookups that happen to share a tail, and the four-eyes version of this defect is fixing one of
- * them.
+ * Verifies that the "pin, else choose" rejection of both stamping entry points carries its own
+ * stable problem code (REQ-ORG-017, REQ-ORG-023), on which the frontend branches.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitStampingServiceOwnerRequiredTest {
@@ -70,8 +59,6 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @BeforeEach
   void setUp() {
-    // Constructor-wired rather than @InjectMocks-with-reflection: a collaborator that arrives null
-    // fails here as a NullPointerException in a test that was meant to assert a 400.
     service =
         new OrgUnitStampingService(
             requestScopeResolver,
@@ -83,8 +70,6 @@ class OrgUnitStampingServiceOwnerRequiredTest {
     targetUser = new User();
     targetUser.setId(UUID.randomUUID());
 
-    // Two memberships is the whole precondition: with one the auto-stamp resolves it, with none a
-    // different (and correct) BadRequestException fires.
     lenient()
         .when(orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId()))
         .thenReturn(List.of(membership(UUID.randomUUID()), membership(UUID.randomUUID())));
@@ -124,9 +109,6 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @Test
   void theRefusalStaysA400AndIsNotAConflictOrAPermissionFailure() {
-    // The code is new; the contract around it must not move. A member who did not choose has made a
-    // malformed request for their own account, not hit a conflict and not been refused access —
-    // and the frontend branches on status before it branches on code.
     when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.resolveOrgUnitForPickerOutput(targetUser, null))
@@ -137,8 +119,6 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @Test
   void anHonourablePinStillStampsWithoutRefusing() {
-    // The negative that keeps the code honest: REQ-ORG-017 is "pin, ELSE choose". A pinned member
-    // must never see the new message, or it becomes noise on every create form they open.
     UUID pinned = UUID.randomUUID();
     when(orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId()))
         .thenReturn(List.of(membership(pinned), membership(UUID.randomUUID())));

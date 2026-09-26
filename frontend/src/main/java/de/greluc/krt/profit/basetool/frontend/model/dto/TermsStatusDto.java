@@ -23,8 +23,6 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
  * Frontend mirror of the backend's Terms-of-Use consent status (REQ-SEC-028).
  *
  * @param accepted {@code true} when the caller has accepted the version currently in force
- * @param currentVersion content digest of that wording; carried so a mismatch between what the gate
- *     asked about and what the backend recorded is visible in a network trace without needing
- *     server logs
+ * @param currentVersion content digest of that wording, carried for diagnostics
  */
 public record TermsStatusDto(boolean accepted, String currentVersion) {}

@@ -67,16 +67,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the personal marker in the refinery-order store dialog (REQ-INV-035): refinery
- * output can be booked straight into the receiver's private pool instead of the shared squadron
- * stock, so a member no longer has to store it shared and rebook it on {@code /inventory/my}
- * afterwards.
- *
- * <p>Covers the three seams the feature adds on the frontend side: the per-row checkbox rendered by
- * {@code refinery-orders-details.html} and bound to {@code items[i].personal}, the forwarding of
- * that flag into the backend store payload, and the cross-field guard that rejects the
- * contradictory "personal + job order" combination before the backend call (personal stock never
- * carries an allocation) — with its own toast on the classic form path and a 400 on the AJAX twin.
+ * MVC tests for the personal marker in the refinery store dialog (REQ-INV-035): the per-row
+ * checkbox, its forwarding into the backend payload, and the rejection of "personal plus job order"
+ * before the backend call (toast on the form path, 400 on the AJAX twin).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -144,7 +137,6 @@ class RefineryStorePersonalMarkerTest {
 
   @Test
   void storeDialog_RendersAPersonalCheckboxBoundToEachOutputRow() throws Exception {
-    // Given: an order with a single output good, so the store dialog builds exactly one row.
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     RefineryGoodDto good =
@@ -177,7 +169,6 @@ class RefineryStorePersonalMarkerTest {
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);
 
-    // When
     String html =
         mockMvc
             .perform(
@@ -187,9 +178,6 @@ class RefineryStorePersonalMarkerTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: the row carries the checkbox, bound to the indexed form path so a split row can be
-    // reindexed by refinery-orders-details.js, plus Spring's hidden marker that makes an unticked
-    // box arrive as false.
     assertThat(html).as("personal checkbox rendered").contains("id=\"storePersonal_0\"");
     assertThat(html).as("bound to the indexed form path").contains("name=\"items[0].personal\"");
     assertThat(html)
@@ -250,7 +238,6 @@ class RefineryStorePersonalMarkerTest {
   @Test
   void storeOrder_PersonalCombinedWithAJobOrder_FlashesTheDedicatedToastAndReopensTheModal()
       throws Exception {
-    // The no-JS fallback must name the actual reason instead of the generic store-failed toast.
     UUID orderId = UUID.randomUUID();
 
     mockMvc

@@ -27,32 +27,12 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Curated, developer-maintained equivalences between blueprint <em>variant family keys</em> that
- * the structural {@link BlueprintVariantFamilyResolver} cannot merge on its own. The resolver
- * merges a cosmetic variant into its base purely by stripping the quoted nickname (e.g. {@code
- * Fresnel "Molten" Energy LMG} → {@code fresnel energy lmg}); that conservative rule deliberately
- * leaves two residual classes of real same-line products in separate families:
+ * Curated equivalences between blueprint variant family keys that {@link
+ * BlueprintVariantFamilyResolver} cannot merge structurally, such as base-name spelling drift or
+ * unquoted sub-models.
  *
- * <ul>
- *   <li><b>Base-name spelling drift</b> — the SC Wiki spells one family's base inconsistently
- *       across its variants (e.g. {@code Pulse "Blacklist" Pistol} → {@code pulse pistol} but
- *       {@code Pulse "ArcCorp" Laser Pistol} → {@code pulse laser pistol}); the difference is in
- *       the <em>unquoted</em> residue, so quote-stripping cannot reconcile it.
- *   <li><b>Unquoted sub-models</b> — same weapon line, distinguished by an inline personal name or
- *       revision designation rather than a quoted skin (e.g. {@code Salvo Esteban Frag Pistol},
- *       {@code Model II Arclight}).
- * </ul>
- *
- * <p>This layer maps each known <em>alias</em> family key to the <em>canonical</em> family key the
- * family should collapse onto, applied as the final step of {@link
- * BlueprintVariantFamilyResolver#familyKey(String)} so both required-side and owned-side
- * derivations canonicalize identically. Like {@code BlueprintOutputNameOverrides} it is a small,
- * immutable code map — a DB-backed admin table is an explicit non-goal — and it is <b>guarded /
- * self-healing</b>: an entry rewrites only the exact alias key it recognises, so a non-matching
- * (renamed, corrected, or absent) upstream name simply passes through unchanged and the entry
- * quietly becomes a no-op rather than mismerging anything. Each entry is a deliberate game-domain
- * judgement (the two products genuinely share craftability) and is reviewed in code, not at
- * runtime.
+ * <p>Maps each alias family key to its canonical family key; an unrecognised key passes through
+ * unchanged.
  */
 @Component
 public class BlueprintVariantAliasOverrides {
@@ -73,18 +53,10 @@ public class BlueprintVariantAliasOverrides {
   public BlueprintVariantAliasOverrides() {
     Map<String, String> map = new LinkedHashMap<>();
 
-    // ── Base-name spelling drift ──
-    // The Pulse laser pistol's cosmetic variants are inconsistently spelled on the SC Wiki: some
-    // liveries drop the "Laser" base token ("Pulse \"Blacklist\" Pistol" -> "pulse pistol") while
-    // the base and the manufacturer-livery skins keep it ("pulse laser pistol"). Same craftable
-    // family; collapse the truncated spelling onto the full one.
     register(map, "pulse pistol", "pulse laser pistol");
 
-    // ── Unquoted sub-models confirmed to share their base line's craftability ──
-    // Salvo Frag Pistol signature editions: inline personal names, not quoted skins.
     register(map, "salvo esteban frag pistol", "salvo frag pistol");
     register(map, "salvo saeed frag pistol", "salvo frag pistol");
-    // Arclight pistol revision designation ("Model II"), either word order seen in the wild.
     register(map, "model ii arclight", "arclight pistol");
     register(map, "arclight model ii", "arclight pistol");
 
@@ -92,10 +64,7 @@ public class BlueprintVariantAliasOverrides {
   }
 
   /**
-   * Canonicalizes a structural family key: returns the registered canonical family key when {@code
-   * familyKey} is a known alias, otherwise the key unchanged. Called as the last step of {@link
-   * BlueprintVariantFamilyResolver#familyKey(String)}; a {@code null} or unregistered key passes
-   * through verbatim so the conservative structural result wins whenever no curated entry applies.
+   * Returns the canonical family key for a registered alias, otherwise the key unchanged.
    *
    * @param familyKey a structural family key (normalized, quote-stripped), or {@code null}
    * @return the canonical family key for a registered alias, else {@code familyKey} unchanged
@@ -110,12 +79,11 @@ public class BlueprintVariantAliasOverrides {
   }
 
   /**
-   * Registers one alias → canonical mapping in family-key form.
+   * Registers one alias to canonical mapping in family-key form.
    *
    * @param map the map being seeded
-   * @param aliasFamilyKey the family key produced by the structural resolver for the
-   *     variant/spelling that must be folded in
-   * @param canonicalFamilyKey the family key the alias collapses onto (the canonical base)
+   * @param aliasFamilyKey the structural family key to fold in
+   * @param canonicalFamilyKey the family key the alias collapses onto
    */
   private static void register(
       @NotNull Map<String, String> map,

@@ -1,47 +1,3 @@
-# Local-build override. The base docker-compose.yml is image-only — its
-# backend / frontend services pull from GHCR. That is the right default for
-# the production host (and for any environment that should consume CI-built
-# images), but it makes iterating on a Dockerfile or testing an unreleased
-# change painful.
-#
-# This override re-introduces a `build:` block alongside the existing `image:`
-# tag on every Spring-Boot service. Compose semantics: when both are present,
-# `docker compose up` builds locally and tags the result with the image tag,
-# `docker compose pull` still pulls from GHCR, and `docker compose up --build`
-# forces a rebuild.
-#
-# It also wires `develop.watch` on the *-dev services. With Compose v2.22+,
-# `docker compose --profile dev watch` rebuilds the affected image whenever a
-# Java/resource source file changes — saves the manual `up -d --build` cycle.
-# `action: rebuild` (rather than `sync`) is the right choice here because our
-# Dockerfile bakes the JAR at build time; a file-level sync into the running
-# container would not re-run Gradle.
-#
-# Usage examples:
-#   # Iterate on the dev stack with local Dockerfile changes:
-#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
-#       --profile dev up -d --build
-#
-#   # Auto-rebuild on source changes (foreground; Ctrl+C exits):
-#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
-#       --profile dev watch
-#
-#   # Smoke-test a production image build locally without pushing:
-#   IRI_BASETOOL_VERSION=local \
-#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
-#       --profile prod up -d --build
-#
-# Why this is a separate file and not merged into docker-compose.yml:
-#   1. The production host should NEVER have `build:` available — it does not
-#      have the source tree, only the compose file. Keeping the override
-#      separate makes that impossible by construction.
-#   2. CI runs `docker compose config` against docker-compose.yml as a
-#      sanity check before publishing; a `build:` directive that references
-#      a missing context would fail that lint step.
-#   3. The build override is git-tracked, but it never reaches the production
-#      `/var/iri/code/` directory (the bootstrap procedure copies only the
-#      base compose file and the scripts directory).
-
 x-backend-build: &backend-build
   build:
     context: .
@@ -58,10 +14,6 @@ x-frontend-build: &frontend-build
       MODULE: frontend
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
 
-# Watch specs are service-specific (they reference module source roots), so
-# they cannot live in the build anchor — define them inline on the dev
-# services below. Ignored files are limited to known-noisy paths; everything
-# else under the source tree triggers a rebuild on change.
 x-backend-watch: &backend-watch
   develop:
     watch:

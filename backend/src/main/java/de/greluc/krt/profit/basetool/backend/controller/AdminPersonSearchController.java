@@ -45,13 +45,8 @@ public class AdminPersonSearchController {
   private final PersonSearchService personSearchService;
 
   /**
-   * Searches every registered free-text column for the term, case-insensitively.
-   *
-   * <p>The search itself is audit-logged. It is a read rather than a mutation, so it would normally
-   * leave no trace — but it is a read of everything the system knows about a named person, and the
-   * one operation here whose misuse would otherwise be invisible. The payload records the <b>length
-   * of the term and the hit count, never the term itself</b>: the term is somebody's name, and
-   * REQ-AUDIT-001 keeps user free text out of the details payload.
+   * Searches every registered free-text column for the term, case-insensitively. Audit-logged with
+   * the term length and hit count, never the term itself.
    *
    * @param q the name to look for; at least {@link PersonSearchService#MIN_TERM_LENGTH} characters
    * @return the hits, and whether the result was capped

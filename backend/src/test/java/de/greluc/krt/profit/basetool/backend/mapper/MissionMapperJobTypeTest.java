@@ -28,18 +28,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the job type a mission embeds (a participant's planned mission job type) against the
- * standalone {@link JobTypeMapper}: both must publish the Einsatzleiter designation.
- *
- * <p>Found by BE-MOD-05b: under the old {@code unmappedTargetPolicy = IGNORE} the nested mapping in
- * {@link MissionMapper} never fed {@code JobTypeDto.isMissionLead} — the entity property is {@code
- * missionLead}, the DTO component {@code isMissionLead} — so every mission detail shipped it as
- * {@code null} and the facts bar's "Leiter" (REQ-MISSION-013) fell back to the mission owner even
- * when an Einsatzleiter was assigned.
+ * Verifies that the job type embedded in a mission and the standalone {@link JobTypeMapper} both
+ * publish the Einsatzleiter designation (REQ-MISSION-013).
  */
 class MissionMapperJobTypeTest {
 
-  // None of the mappers MissionMapper uses is reached by the job-type mapping.
   private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null);
 
   private static JobType jobType(boolean missionLead, boolean leadershipRole) {
