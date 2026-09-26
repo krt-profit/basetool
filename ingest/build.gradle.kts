@@ -47,6 +47,7 @@ dependencies {
   testImplementation(libs.okhttp3.tls)
   testImplementation(libs.testcontainers.junit)
   testImplementation(libs.archunit.core)
+  testImplementation(libs.json.schema.validator)
   testImplementation(project(":test-support"))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -54,4 +55,23 @@ dependencies {
 tasks.javadoc {
   options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
   destinationDir = project.file("docs/javadoc")
+}
+
+val exchangeBaseline = layout.buildDirectory.dir("exchange-baseline")
+
+tasks.test {
+  inputs
+    .dir(layout.projectDirectory.dir("../docs/exchange"))
+    .withPropertyName("exchangeContractFixtures")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  inputs
+    .files(exchangeBaseline)
+    .withPropertyName("exchangeContractBaseline")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  val baseline = exchangeBaseline
+  jvmArgumentProviders.add(
+    CommandLineArgumentProvider {
+      listOf("-Dexchange.baseline=" + baseline.get().asFile.absolutePath)
+    }
+  )
 }
