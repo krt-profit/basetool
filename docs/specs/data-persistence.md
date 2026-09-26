@@ -445,6 +445,9 @@ create does not. (`AdminLocationsPageControllerTest`): the visibility / home-loc
 
 ### REQ-DATA-008 — User deletion reassigns or clears every `app_user` FK that lacks an `ON DELETE` clause
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Every exchange table with a user foreign key (installations, journal, deny list, external refs, revocations, change sequence) declares its deletion handling, and `UserDeletionForeignKeyIntegrityTest` serves it. Ships with WP 3.1–3.3 (#2083).
+
 `UserDeletionService.deleteUser(userId)` removes an ex-member (only users already gone from Keycloak).
 **The precondition is verified twice**: against the persisted `in_keycloak` flag *and*, because that
 flag is only a cached mirror that a swallowed sync error can leave stale at `false`, against Keycloak

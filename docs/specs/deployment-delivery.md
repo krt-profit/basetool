@@ -968,6 +968,9 @@ certificate rotation*, *Token rotation*
 
 ### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Before the first exchange release, `maxmemory` rises from 384 MB to a fixed **768 MB** and the container limit to **1024 MB** (ADR-0221, owner decision 2026-09-26), checked against host RAM; the Redis memory alerts follow. It is a gated production write (WP 2.1, #2092).
+
 The Redis instance backing Spring Session (frontend) and the ingest handoff staging runs with a
 durability and memory posture matched to a store whose loss forces users to re-login — **not** a
 throwaway cache (Redis is session-store only, ADR-0074):

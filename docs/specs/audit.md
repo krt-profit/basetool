@@ -26,6 +26,9 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Three `AuditDomain` values join the nine: „Verbundene Anwendungen“ (registry changes, revocations, undo, mass-change confirmations), **Blueprints** and **Hangar** (every channel). The viewer, which also shows the Bank, grows from ten tabs to thirteen, and CLAUDE.md's audited-area list follows. Ships with WP 1.1 (#2098) and WP 3.1 (#2083).
+
 Every state-mutating activity in the nine areas writes exactly **one** row to an **append-only**
 audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated except
 by the Art. 17 handle anonymisation of REQ-SEC-062, which overwrites the name snapshots in place;
@@ -407,6 +410,9 @@ sweep"; that was true when written and is no longer.
 [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md)
 
 ### REQ-AUDIT-005 — The trail records which client a mutation came through
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> On the ingest relay hop the audit row names the external client asserted by the gateway (`X-Exchange-Client`) instead of `none`, with the vocabulary taken from the client registry (REQ-XCH-010, ADR-0217). Existing rows keep „Ohne Client (System)“. Ships with WP 3.1 (#2083), live before the first registry entry.
 
 Every row **either** audit trail writes carries the **originating client**: which client software
 the request that caused the mutation was made from, stored in `audit_event.client_id` and

@@ -28,6 +28,7 @@
 | **Member, browser** | in | Interactive use of every feature, over one authenticated session | The primary actor |
 | **Member, Android app** | in | The same data, over `api.profit-base.online` with its own vhost, rate limits and deny rules; sign-in against Keycloak on the app origin (ADR-0166) | A separate repository (`basetool-android`) with its own release cycle |
 | **Desktop extractor** | in | Refinery work orders read from screenshots and blueprints read from the game log, as JSON `POST`s to the ingest gateway (`/v1/refinery-extract`, `/v1/blueprint-preview`) | A separate repository (`basetool-sc-extractor`); **a restricted interface**, not an open API |
+| **Approved external clients** *(planned, epic #2078)* | both | The member's own blueprints, personal Lager lots and ships, both ways, plus a read-only anonymised demand feed, over `/exchange/v1/**` on the ingest gateway — consent per capability, DPoP-bound tokens, a database client registry ([`external-exchange.md`](../specs/external-exchange.md), ADR-0216) | Third-party desktop tools (VerseKit first) and, after its migration, the extractor; programs on the member's PC that we do not build |
 | **Discord** | both | OAuth2 social login, guild membership, in-guild role and nickname — all asked by the Keycloak SPI, fail-closed; the applications never call Discord | An identity the organisation already uses; the tool does not own it |
 | **Keycloak** | — | *Inside* the boundary as a deployed component, but *outside* the applications: they never see a credential | See §5 |
 | **UEX** | out | Commodity and item prices, the universe's locations, vehicles, refinery methods and yields (`integration/UexClient`) | Third-party game-economy data |
@@ -74,6 +75,9 @@ does not have to.
 - **Public API access.** The ingest interface publishes an OpenAPI document so the official
   extractor can be built against a stable contract (`REQ-INGEST-010`); that is documentation of a
   restricted interface, not an invitation — only approved clients are served (`REQ-INGEST-011`).
+  The planned exchange API (epic #2078) keeps that line: it opens a narrow, capability-scoped
+  contract to clients approved one by one in a public issue and PR, never the backend API
+  (ADR-0216).
 - **Handover and location of traded goods.** The Materialbörse matches offers to requests and then
   gets out of the way; where and when members meet stays off-tool and private, on purpose.
 - **Payment of any kind.** The Kartellbank is a ledger of in-game currency. No real money, no

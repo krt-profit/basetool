@@ -36,6 +36,12 @@ Beyond roles there are three mechanisms that are easy to miss:
   shape (ADR-0139 amendment 1). Production completed the rollout on 2026-09-25: each service on
   its own leaf since v1.12.0, every anchor the CA alone since step 4 the same evening.
 
+- **Approved external clients act with less than the member** *(planned, epic #2078)* — a client
+  reaches only `/exchange/v1/**` on the ingest gateway, with consent per capability and DPoP-bound
+  tokens; behind the relay the member holds a reduced exchange authentication, never their stored
+  roles, and every write is journaled, undoable and bounded by a mass-change guard
+  ([`external-exchange.md`](../specs/external-exchange.md), ADR-0216 … ADR-0218).
+
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.
 

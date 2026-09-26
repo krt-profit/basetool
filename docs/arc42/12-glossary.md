@@ -64,6 +64,11 @@ worth reading even if you know the domain.
 | **Edge** | The nginx container terminating TLS for the four public names, behind the haproxy front end. **acme** is a separate container that issues and renews the certificates it serves. |
 | **Ingest** | The internet-facing gateway module for the desktop extractor. Owns no database; relays to the backend internally. |
 | **Handoff** | The single-use Redis entry through which ingest passes a matched draft to the member's browser for review. |
+| **Exchange API** *(planned)* | `/exchange/v1/**` on the ingest gateway: the capability-scoped contract through which approved external clients sync the member's own data (`REQ-XCH-*`, ADR-0216). Not the backend API. |
+| **Capability** *(planned)* | An OAuth scope such as `exchange.stock.write` — what an external client is approved for and a member consents to. |
+| **Installation** *(planned)* | One external client on one PC, identified by its DPoP key thumbprint; revoked one by one. |
+| **Lot** *(planned)* | The exchange's stock unit: material + location + quality + „gestohlen" over a member's personal Lager rows, across org-unit pools. Not a Lager row and not a Lager stack. |
+| **Tombstone** *(planned)* | The 90-day record of a removal in the exchange's change feed, saying who removed the entry. |
 | **Restore drill** | The weekly job that restores the **latest snapshot** into a throwaway PostgreSQL and scores seven artifacts. It reports on the *snapshot*, never on the host. |
 | **Conformance suite** | `check-conformance.py` — invariants asserted against a **running host**, because the recurring defect class is configuration that is correct on disk and not in force in the process. |
 

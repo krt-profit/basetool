@@ -60,6 +60,9 @@ not a new write path.
 
 ### REQ-INGEST-001 — Dedicated gateway, minimal forward-only surface
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The route table gains `/exchange/v1/**` (REQ-XCH-001). `ActingMemberFilter.ACTING_PATHS` stays an explicit list and grows by the exchange routes one by one, never by a prefix (ADR-0216). The gateway then keeps idempotency results and daily quotas in Redis and a little policy logic (REQ-XCH-020, REQ-XCH-023). The legacy `/v1/*` routes end at the go-live (REQ-XCH-033). Until WP 3.2 (#2082) ships, the text below is current.
+
 A new standalone service (the `ingest` gateway) is the only new internet-reachable
 surface. It exposes **exactly two** endpoints, one per existing import draft:
 refinery-extract and blueprint-preview. Each endpoint validates the caller's JWT and calls
@@ -233,6 +236,9 @@ device-grant client per [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md
 
 ### REQ-INGEST-003 — Short-lived single-use Redis handoff
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The handoff staging also carries staged mass changes (a new `HandoffKind`, REQ-XCH-021) with its own size cap and per-subject slot, so a staged change set never evicts a pending extractor draft. Ships with WP 3.2 (#2082).
+
 The non-persisted draft returned by the backend is staged in Redis under a key derived from
 `(sub, handoffId)`. The `handoffId` is cryptographically unguessable (≥ 128 bits of
 entropy). The entry has a short TTL (~30 minutes) and is **single-use**: the first successful
@@ -305,6 +311,9 @@ empty, the per-subject index stays at exactly the cap using the `RPUSH` answer i
 `GlobalExceptionHandler#handleStagingUnavailable`, `IngestStagingUnavailable` alert · **Issues:** #642
 
 ### REQ-INGEST-004 — Browser pre-fill, review-before-commit preserved
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Drafts keep review-before-commit (REQ-XCH-019). The member's own blueprints, personal Lager lots and ships become writable directly through the exchange, journaled and undoable (REQ-XCH-015…-017, REQ-XCH-022, ADR-0218). Ships with WP 4.1–4.4.
 
 The extractor opens the matching basetool page with `?handoff=<id>`
 (`/refinery-orders/create?handoff=<id>` and the blueprint equivalent). If the user has no
@@ -399,6 +408,9 @@ defaults and property names), `FilterOrderTest` (rate limit before the payload c
 `RateLimitProperties` · **Issues:** #642, security audit INGEST-DOS-1 / INGEST-RATELIMIT-1
 
 ### REQ-INGEST-006 — Egress is opt-in; the CLI stays offline
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> From its migration release (WP 5.1, #2088) the SC Extractor may sync blueprints directly, opt-in, through `exchange.blueprints.write`.
 
 Data leaves the user's machine **only** when the user explicitly clicks Send in the
 extractor GUI. There is no background sync, no auto-send, and no telemetry. Saving the JSON
@@ -539,6 +551,9 @@ counter) · **Code:** `BotProtectionFilter`, `MetricNames` (`BOT_BLOCKED` + `rul
 
 ### REQ-INGEST-010 — Published API contract for the extractor
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The exchange routes get their own authoritative OpenAPI 3.1 document, `ingest/src/main/resources/api/exchange-v1.openapi.json`, served statically and anonymously at `/exchange/v1/openapi.json` (REQ-XCH-011). Ships with WP 0.2 (#2080) and WP 3.2 (#2082).
+
 The gateway's two endpoints are the contract a **separately developed, separately released** client
 (the `basetool-sc-extractor` desktop app) codes against, so that contract is published as a
 committed OpenAPI document — `ingest/src/main/resources/api/openapi.json`, the module's single
@@ -568,6 +583,9 @@ unreachable from a deployed environment; the committed file is the contract, not
 `application-prod.yml`
 
 ### REQ-INGEST-011 — Client-identity gate: approved clients only
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Approved clients move into a database registry managed by `ADMIN` and mirrored fail-closed (REQ-XCH-003, ADR-0217). The „ingest persists nothing“ containment argument is replaced by journal, undo and the mass-change guard (ADR-0218). The public-client caveat applies to every third-party client. Until WP 3.1 / 3.2 ship, the allowlist below is current.
 
 The ingest interface is restricted to client software the basetool developer (@greluc) has
 explicitly approved. This is a control over **which program** calls the gateway; it does **not**
@@ -701,6 +719,9 @@ audit-only, log sanitisation, no echo-back) · **Code:** `ClientIdentityFilter`,
 `IngestUnknownClient` and `IngestAudienceGateOff`
 
 ### REQ-INGEST-012 — DPoP is validated at the gateway, and never relayed
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> On `/exchange/**` DPoP becomes **required**, not only accepted (REQ-XCH-006). The legacy routes keep the behaviour below until they end. Ships with WP 3.2 (#2082).
 
 The extractor presents its access token to the gateway under the **`DPoP` scheme with a proof**, and
 the gateway validates that proof itself (Spring Security `.dPoP()`). Sender-constraining pays here

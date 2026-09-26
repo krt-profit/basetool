@@ -250,6 +250,20 @@ not happened.
   release rollback to 1.11.0 or older now needs step 4 undone first — above all the Discord
   precheck's truststore, or that guard fails open again without an outage to notice it by.
 
+## 11.7a Accepted risks of the planned exchange API
+
+Decided by the owner on 2026-09-26 for epic #2078 and written down so they are not rediscovered as
+bugs ([`external-exchange.md`](../specs/external-exchange.md), threat model):
+
+- **No repo-reviewed capability ceiling.** The client registry lives in the database and one admin
+  click grants write access; a taken-over admin or client maintainer account abuses it at once. The
+  controls are detection and reversal — the „Verbundene Anwendungen" audit area, an alert on every
+  registry change, journal and undo, suspension (ADR-0217).
+- **Unsigned client releases.** Code signing is recommended, not required.
+- **Device-code phishing** is countered, not prevented (RFC 8628 §5.4).
+- **A sync book-out can lower or remove Materialbörse offers**, and undo does not restore them.
+- **The minimum-version gate is cooperative**; it stops honest old releases only.
+
 ## 11.8 Smaller, known, and deliberately left
 
 - **A fifth certificate directory** (`keycloak.<domain>`) is carried and served by nothing, left
