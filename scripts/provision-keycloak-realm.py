@@ -107,7 +107,8 @@ class ClientSpec:
 
     `fields` are converged on every run; `create_only` is written only on creation. List fields
     are unions: missing entries are added, extra ones reported, and `withheld_*` entries removed
-    wherever found.
+    wherever found. `value_env` names the environment variable that supplies a confidential
+    client's credential; only that name is ever printed.
     """
 
     client_id: str
@@ -131,7 +132,7 @@ class ClientSpec:
     env_doc_hint: str = ""
     frozen_by_dpop_policy: bool = False
     unmanaged_fields: set[str] = field(default_factory=set)
-    secret_env: str | None = None
+    value_env: str | None = None
 
 
 def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: bool,
@@ -220,7 +221,7 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             },
             unmanaged_fields=(set() if frontend_client
                               else {"publicClient", "clientAuthenticatorType"}),
-            secret_env="KEYCLOAK_FRONTEND_CLIENT_SECRET" if frontend_confidential else None,
+            value_env="KEYCLOAK_FRONTEND_CLIENT_SECRET" if frontend_confidential else None,
             env_vars_to_fill=(["KEYCLOAK_FRONTEND_CLIENT_SECRET"] if frontend_confidential
                               else []),
             env_doc_hint=" (the frontend's confidential login, ADR-0001)",
@@ -690,18 +691,18 @@ class Planner:
         uuid = live["id"]
         field_diff = {k: v for k, v in spec.fields.items()
                       if k not in spec.unmanaged_fields and not _equal(v, live.get(k))}
-        if spec.secret_env and "publicClient" in field_diff and _normalise(
+        if spec.value_env and "publicClient" in field_diff and _normalise(
                 live.get("publicClient")) == "true":
-            if not os.environ.get(spec.secret_env):
+            if not os.environ.get(spec.value_env):
                 self.problems.append(
-                    f"{spec.client_id}: switching it to confidential needs ${spec.secret_env} in "
+                    f"{spec.client_id}: switching it to confidential needs ${spec.value_env} in "
                     f"this process's environment -- the value the frontend has in the host .env "
                     f"-- or Keycloak and the frontend would hold different secrets. Nothing about "
                     f"this client is written.")
             else:
                 self.followup_notes.append(
                     f"'{spec.client_id}' becomes confidential with the secret from "
-                    f"${spec.secret_env} (not printed). The frontend must already send that value "
+                    f"${spec.value_env} (not printed). The frontend must already send that value "
                     f"(docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).")
         attributes = live.get("attributes") or {}
         attribute_diff = {k: v for k, v in spec.attributes.items()
@@ -716,8 +717,8 @@ class Planner:
         for key, value in field_diff.items():
             changes.append(Change(f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> "
                                   f"{_normalise(value)}", lambda: None, frozen))
-        if spec.secret_env and "publicClient" in field_diff:
-            changes.append(Change(f"~ secret: set from ${spec.secret_env} (the value is not "
+        if spec.value_env and "publicClient" in field_diff:
+            changes.append(Change(f"~ secret: set from ${spec.value_env} (the value is not "
                                   f"printed)", lambda: None, frozen))
         for key, value in attribute_diff.items():
             changes.append(Change(f"~ attribute {key}: {attributes.get(key, '<absent>')} -> "
@@ -813,15 +814,15 @@ class Planner:
                    "webOrigins": list(spec.web_origins),
                    "defaultClientScopes": list(spec.default_scopes),
                    "optionalClientScopes": list(spec.optional_scopes)}
-        if spec.secret_env and os.environ.get(spec.secret_env):
-            payload["secret"] = os.environ[spec.secret_env]
+        if spec.value_env and os.environ.get(spec.value_env):
+            payload["secret"] = os.environ[spec.value_env]
         self.kc.write("create", "clients", payload, f"client '{spec.client_id}' created")
-        if spec.env_vars_to_fill and not (spec.secret_env and os.environ.get(spec.secret_env)):
+        if spec.env_vars_to_fill and not (spec.value_env and os.environ.get(spec.value_env)):
             print(f"  NOTE: {self._confidential_client_note(spec)}")
 
     def _update_client(self, spec: ClientSpec, planned_live: dict) -> None:
         live = self.find_client(spec.client_id) or planned_live
-        switching_to_confidential = (spec.secret_env is not None
+        switching_to_confidential = (spec.value_env is not None
                                      and _normalise(live.get("publicClient")) == "true"
                                      and not spec.fields.get("publicClient", True))
         payload = dict(live)
@@ -837,7 +838,7 @@ class Planner:
             if o not in spec.withheld_web_origins]
         payload = _redact(payload)
         if switching_to_confidential:
-            payload["secret"] = os.environ[spec.secret_env]
+            payload["secret"] = os.environ[spec.value_env]
         self.kc.write("update", f"clients/{live['id']}", payload,
                       f"client '{spec.client_id}' updated")
 

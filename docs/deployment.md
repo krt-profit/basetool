@@ -271,7 +271,8 @@ health check is healthy and the exporter reports `redis_up 1`. A release rollbac
 > another user, another command, a `key` or `channel` reason, an `auth` refusal — is a real finding.
 
 **Render and apply** (as root, from `/`; `${UCTL}` / `${UPOD}` from
-[Shell conventions](#shell-conventions-used-below)):
+[Shell conventions](#shell-conventions-used-below)). The renderer writes a new file owner-only (`0600`, it holds password
+hashes); rendering onto an existing file keeps that file's mode and owner:
 
 ```bash
 cd /

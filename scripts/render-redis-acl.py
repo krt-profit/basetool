@@ -27,6 +27,7 @@ import contextlib
 import hashlib
 import os
 import re
+import stat
 import sys
 import tempfile
 from typing import Sequence
@@ -143,18 +144,28 @@ def render(template: str, env: dict[str, str]) -> str:
 
 
 def write_atomically(path: str, content: str) -> None:
-    """Replace ``path`` with ``content`` in one rename, mode ``0644``.
+    """Replace ``path`` with ``content`` in one rename.
+
+    An existing target keeps its mode and, when running as root, its owner, so the file redis reads
+    stays readable to it. A new file is owner-only (``0600``): it holds password hashes.
 
     Args:
         path: the target file.
         content: what it must contain.
     """
     directory = os.path.dirname(os.path.abspath(path))
+    try:
+        existing = os.stat(path)
+    except FileNotFoundError:
+        existing = None
     fd, tmp = tempfile.mkstemp(prefix=".users.acl.", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(content)
-        os.chmod(tmp, 0o644)
+        if existing is not None:
+            os.chmod(tmp, stat.S_IMODE(existing.st_mode))
+            if hasattr(os, "geteuid") and os.geteuid() == 0:
+                os.chown(tmp, existing.st_uid, existing.st_gid)
         os.replace(tmp, path)
     except BaseException:
         if os.path.exists(tmp):
