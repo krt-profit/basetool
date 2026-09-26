@@ -59,10 +59,10 @@ class AuditPdfTitleKeysTest {
    */
   private static @NotNull Properties load(@NotNull String bundle) throws IOException {
     Properties properties = new Properties();
-    try (InputStream in =
-        AuditPdfTitleKeysTest.class.getClassLoader().getResourceAsStream(bundle)) {
-      assertThat(in).as(bundle).isNotNull();
-      properties.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+    InputStream in = AuditPdfTitleKeysTest.class.getClassLoader().getResourceAsStream(bundle);
+    assertThat(in).as(bundle).isNotNull();
+    try (InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+      properties.load(reader);
     }
     return properties;
   }
