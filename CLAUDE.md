@@ -367,7 +367,7 @@ repository — main, test and e2e sources alike ([ADR-0214](docs/adr/0214-code-c
 - **What stays:** Javadoc (and, under the same rules, JSDoc and Python docstrings), the licence
   header, and tool directives with no prose after them (`// @ts-check`, `/* global */`,
   `/* exported */`, `eslint-disable…`, `# shellcheck disable=|source=|shell=`, `# hadolint ignore=`,
-  `# noqa`, `# pragma: no cover`, `# zizmor: ignore[…]`, `// lgtm[…]` (CodeQL), `# image-pin-gate: ignore-file`, Thymeleaf `/*[[…]]*/` and `<!--/*/ … /*/-->`).
+  `# noqa`, `# pragma: no cover`, `# zizmor: ignore[…]`, `# image-pin-gate: ignore-file`, Thymeleaf `/*[[…]]*/` and `<!--/*/ … /*/-->`).
 - **Javadoc is short, precise and carries no history.** One summary sentence, a contract sentence
   only when a caller needs it, then the tags. No dates, PR or issue numbers, "previously" / "now" /
   "used to", migration or incident stories, rationale essays or pointers to other comments; a bare

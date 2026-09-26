@@ -26,7 +26,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.User;
@@ -41,8 +40,8 @@ import org.springframework.security.web.SecurityFilterChain;
  * ADR-0072).
  *
  * <p>Ordered before {@link SecurityConfig}, it accepts only an in-memory basic-auth scrape user
- * (never a JWT), denies everything when no credentials are configured, and is stateless without
- * CSRF.
+ * (never a JWT), denies everything when no credentials are configured, and is stateless; CSRF stays
+ * on and never fires for a {@code GET} scrape.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -69,8 +68,6 @@ public class MonitoringScrapeSecurityConfig {
   public SecurityFilterChain monitoringScrapeFilterChain(@NotNull HttpSecurity http)
       throws Exception {
     http.securityMatcher(PROMETHEUS_PATH)
-        // lgtm[java/spring-disabled-csrf-protection]
-        .csrf(AbstractHttpConfigurer::disable)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 

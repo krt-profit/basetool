@@ -312,7 +312,6 @@ public class SecurityConfig {
     TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : userId -> true;
 
     if (isTest) {
-      // lgtm[java/spring-disabled-csrf-protection]
       http.csrf(
           org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer
               ::disable);

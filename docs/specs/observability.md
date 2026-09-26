@@ -608,8 +608,10 @@ it is invisible until something waits on the container's health.
   stack therefore expose nothing.
 - Only the scrape identity counts: a valid Keycloak JWT (backend/ingest) or a logged-in
   browser session (frontend) must **not** grant access to the metrics payload.
-- The scrape chain is stateless (no session, no CSRF token, no request cache) so a 30-second
-  scrape interval creates no session state; a scrape response never carries `Set-Cookie`.
+- The scrape chain is stateless (no session, no request cache) so a 30-second scrape interval
+  creates no session state; a scrape response never carries `Set-Cookie`. CSRF protection stays
+  on: a `GET` scrape never triggers it and never generates a token, and any state-changing request
+  on the path is refused with 403. *(Amended 2026-09-26: CSRF used to be disabled on this chain.)*
 - `/actuator/health` is **unauthenticated at the app** (`permitAll`) so the container health check
   can reach it over `localhost` inside the container — but it is **not internet-reachable**: the
   same `location /actuator { return 404; }` edge deny that hides `/actuator/prometheus` also hides

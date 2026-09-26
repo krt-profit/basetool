@@ -27,7 +27,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.User;
@@ -69,8 +68,6 @@ public class MonitoringScrapeSecurityConfig {
   public SecurityFilterChain monitoringScrapeFilterChain(@NotNull HttpSecurity http)
       throws Exception {
     http.securityMatcher(PROMETHEUS_PATH)
-        // lgtm[java/spring-disabled-csrf-protection]
-        .csrf(AbstractHttpConfigurer::disable)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 

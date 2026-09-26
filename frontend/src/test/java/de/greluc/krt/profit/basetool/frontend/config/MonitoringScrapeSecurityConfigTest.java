@@ -24,6 +24,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -87,6 +88,17 @@ class MonitoringScrapeSecurityConfigTest {
         .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
         .andExpect(content().string(containsString("application=\"basetool-frontend\"")))
         .andExpect(content().string(containsString("cache=\"squadronCatalogue\"")));
+  }
+
+  /**
+   * A state-changing request is refused by CSRF even with the scrape identity, and sets no cookie.
+   */
+  @Test
+  void shouldRejectPostWithValidBasicCredentialsByCsrf() throws Exception {
+    mockMvc
+        .perform(post(PROMETHEUS).with(httpBasic("metrics-scraper", "test-scrape-password")))
+        .andExpect(status().isForbidden())
+        .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
   }
 
   @Test
