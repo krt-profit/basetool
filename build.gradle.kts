@@ -289,7 +289,10 @@ subprojects {
       isIgnoreFailures = false
       maxWarnings = 0
     }
-    tasks.matching { it.name == "checkstyleTest" }.configureEach { enabled = false }
+    tasks
+      .withType<Checkstyle>()
+      .matching { it.name != "checkstyleMain" }
+      .configureEach { configFile = rootProject.file("config/checkstyle/javadoc_position.xml") }
   }
 
   plugins.withId("com.diffplug.spotless") {
