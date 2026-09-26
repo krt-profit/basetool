@@ -34,6 +34,9 @@
 
 ### Fixed
 
+- **Frontend: Meldungen und Formulardaten nach einer Weiterleitung gehen nicht mehr verloren.** Die
+  Session-Allow-List (`enforce`) verwarf die `CopyOnWriteArrayList`, in der Spring die Flash-Attribute
+  ablegt; die Klasse steht jetzt namentlich auf der Liste (REQ-SEC-067).
 - **Deploy: ein neues Keycloak-Provider-JAR meldet erst Erfolg, wenn die ganze App wieder läuft.**
   Der Keycloak-Neustart startet über `Requires=` Backend, Frontend und Ingest mit neu; `deploy.sh`
   wartet jetzt auf alle und stellt sonst das vorige JAR wieder her (`DeployFailed`), statt Erfolg zu

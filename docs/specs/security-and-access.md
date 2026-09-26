@@ -3294,7 +3294,7 @@ Redis, which three services reach (APPSEC-05, improvement audit 2026-09-22).
 | `com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap` — exact name | a nested ID-token claim (`realm_access`) as Nimbus decodes it |
 | `com.nimbusds.oauth2.sdk.util.OrderedJSONObject` — exact name | a token-response JSON object as the Nimbus OAuth 2.0 SDK parses it, inside the stored authorized client (added 2026-09-23: under `enforce` its refusal dropped `AUTHORIZED_CLIENTS` and looped every E2E login) |
 | `org.springframework.security.*` | security context, OAuth2 login and authorized-client state, CSRF token, saved request (the Security Jackson modules add their own exact types on top) |
-| `org.springframework.web.servlet.FlashMap`, `org.springframework.util.LinkedMultiValueMap`, direct members of `org.springframework.validation` | a redirect's flash attributes; `validation.beanvalidation` is **not** covered |
+| `org.springframework.web.servlet.FlashMap`, `java.util.concurrent.CopyOnWriteArrayList`, `org.springframework.util.LinkedMultiValueMap` — exact names; direct members of `org.springframework.validation` | a redirect's flash attributes, in the `CopyOnWriteArrayList` Spring's `SessionFlashMapManager` stores them in (added 2026-09-26); `validation.beanvalidation` and the rest of `java.util.concurrent` are **not** covered |
 | `de.greluc.krt.profit.basetool.frontend.model.*` | the application's own forms and DTOs, flashed across a redirect |
 | `CONTAINER_WRITTEN_FINAL_SESSION_TYPES` | Tomcat's WebSocket binding listener (REQ-SEC-049) |
 
@@ -3309,6 +3309,12 @@ A new session attribute of a type outside the list is a change to this table, in
 > exposed; the E2E stack, which runs `enforce`, was. The parity sample now takes its ID token from
 > the real Nimbus decoder and Spring's OIDC claim conversion rather than a hand-built map, which is
 > how the gap was missed.
+
+> [!warning] Corrected 2026-09-26 — flash attributes were dropped under `enforce`
+> Spring's `SessionFlashMapManager` keeps the flash maps in a `java.util.concurrent.CopyOnWriteArrayList`,
+> which the `java.util` entry does not cover. Production, on `enforce` since 2026-09-25, refused it
+> and dropped every redirect's flash attributes (toasts, re-shown forms). The parity sample held
+> them in an `ArrayList`; it now lets `SessionFlashMapManager` write them itself.
 
 **Three modes**, `app.session.type-allow-list` / `APP_SESSION_TYPE_ALLOW_LIST`:
 

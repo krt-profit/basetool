@@ -47,9 +47,11 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -64,6 +66,7 @@ import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializ
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.SerializationException;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextImpl;
@@ -90,6 +93,7 @@ import org.springframework.security.web.savedrequest.DefaultSavedRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.FlashMap;
+import org.springframework.web.servlet.support.SessionFlashMapManager;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -173,6 +177,23 @@ class SessionTypeAllowListTest {
   }
 
   @Test
+  void theFlashMapsSpringStoresAreReadUnderEnforce() {
+    FlashMap flash = new FlashMap();
+    flash.setTargetRequestPath("/inventory");
+    flash.put("successToast", "inventory.saved");
+    Object stored = flashMapsAsSpringStoresThem(flash);
+
+    Object back = enforcing.deserialize(enforcing.serialize(stored));
+
+    assertThat(stored).isInstanceOf(CopyOnWriteArrayList.class);
+    assertThat(back).isInstanceOf(CopyOnWriteArrayList.class);
+    assertThat(((List<?>) back).getFirst())
+        .isInstanceOf(FlashMap.class)
+        .extracting(value -> ((FlashMap) value).get("successToast"))
+        .isEqualTo("inventory.saved");
+  }
+
+  @Test
   void theSecurityContextKeepsItsPrincipalAndAuthorities() {
     SecurityContextImpl context =
         (SecurityContextImpl) realisticSession().get("SPRING_SECURITY_CONTEXT");
@@ -244,6 +265,8 @@ class SessionTypeAllowListTest {
     "java.time.Instant,true",
     "java.util.logging.FileHandler,false",
     "java.util.concurrent.ConcurrentHashMap,false",
+    "java.util.concurrent.CopyOnWriteArrayList,true",
+    "java.util.concurrent.CopyOnWriteArraySet,false",
     "org.springframework.validation.FieldError,true",
     "org.springframework.validation.beanvalidation.LocalValidatorFactoryBean,false",
     "org.springframework.web.servlet.FlashMap,true",
@@ -516,8 +539,8 @@ class SessionTypeAllowListTest {
     session.put("authorizationRequest", authorizationRequest);
     session.put("csrfToken", new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value"));
     session.put("savedRequest", new DefaultSavedRequest(original));
-    session.put("flashMaps", new ArrayList<>(List.of(flash)));
-    session.put("flashMapsWithErrors", new ArrayList<>(List.of(flashWithErrors)));
+    session.put("flashMaps", flashMapsAsSpringStoresThem(flash));
+    session.put("flashMapsWithErrors", flashMapsAsSpringStoresThem(flashWithErrors));
     session.put("rolesSyncedAt", now.toEpochMilli());
     Map<String, Object> createdEvent = new HashMap<>();
     createdEvent.put("creationTime", now.toEpochMilli());
@@ -531,6 +554,20 @@ class SessionTypeAllowListTest {
     session.put("welcomeMessageShown", true);
     session.put("wsBindingListener", new WsHttpSessionBindingListener("a-session-id"));
     return session;
+  }
+
+  /**
+   * Saves a flash map through Spring's own {@link SessionFlashMapManager} and returns the session
+   * attribute it wrote, so the fixture holds the container type Spring really stores.
+   *
+   * @param flash the flash map a redirecting handler hands over.
+   * @return the value of Spring's flash-map session attribute.
+   */
+  private static Object flashMapsAsSpringStoresThem(FlashMap flash) {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/inventory");
+    new SessionFlashMapManager().saveOutputFlashMap(flash, request, new MockHttpServletResponse());
+    return Objects.requireNonNull(request.getSession())
+        .getAttribute(SessionFlashMapManager.class.getName() + ".FLASH_MAPS");
   }
 
   /**
