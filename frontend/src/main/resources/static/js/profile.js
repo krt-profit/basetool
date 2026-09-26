@@ -33,7 +33,7 @@
         });
     }
 
-    function bindInPlaceSave(formId, buildPayload) {
+    function bindInPlaceSave(formId, buildPayload, onSaved) {
         const form = document.getElementById(formId);
         if (!form) {
             return;
@@ -57,6 +57,9 @@
                 onSuccess(body) {
                     if (body) {
                         syncAllVersions(body.version);
+                        if (onSaved) {
+                            onSaved(form, body);
+                        }
                     }
                 },
             });
@@ -84,6 +87,25 @@
             version,
         };
     });
+
+    bindInPlaceSave(
+        'profile-rsi-handle-form',
+        function (form, version) {
+            /** @type {HTMLInputElement | null} */
+            const input = form.querySelector('#rsiHandle');
+            return {
+                rsiHandle: input ? input.value : '',
+                version,
+            };
+        },
+        function (form, body) {
+            /** @type {HTMLInputElement | null} */
+            const input = form.querySelector('#rsiHandle');
+            if (input) {
+                input.value = body.rsiHandle || '';
+            }
+        },
+    );
 
     const DELETION_URL = '/profile/deletion-request';
 

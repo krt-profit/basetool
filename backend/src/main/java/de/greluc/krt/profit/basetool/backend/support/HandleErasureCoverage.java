@@ -133,6 +133,7 @@ public final class HandleErasureCoverage {
           removed("app_user.email", "The account row itself is deleted."),
           removed("app_user.description", "The account row itself is deleted."),
           removed("app_user.discord_guild_nickname", "The account row itself is deleted."),
+          removed("app_user.rsi_handle", "The account row itself is deleted."),
           removed(
               "deletion_request.decision_note",
               "deletion_request.user_id is ON DELETE CASCADE, so the request that asked for the"

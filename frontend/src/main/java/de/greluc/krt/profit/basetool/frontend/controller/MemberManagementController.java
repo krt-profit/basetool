@@ -91,6 +91,10 @@ public class MemberManagementController {
           List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>>
       MEMBERSHIP_OPTION_LIST_TYPE = new ParameterizedTypeReference<>() {};
 
+  /** Response type for the admin-only {@code /users/{id}/rsi-handle} read. */
+  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
 
@@ -222,6 +226,18 @@ public class MemberManagementController {
     try {
       UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
       model.addAttribute("user", user);
+
+      String memberRsiHandle = null;
+      try {
+        Map<String, Object> handle =
+            backendApiClient.get("/api/v1/users/" + id + "/rsi-handle", STRING_OBJECT_MAP_TYPE);
+        if (handle != null && handle.get("rsiHandle") != null) {
+          memberRsiHandle = String.valueOf(handle.get("rsiHandle"));
+        }
+      } catch (Exception ex) {
+        log.debug("Failed to load the RSI handle for the member-edit page", ex);
+      }
+      model.addAttribute("memberRsiHandle", memberRsiHandle);
 
       try {
         List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>

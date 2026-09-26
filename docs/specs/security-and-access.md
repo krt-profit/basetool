@@ -3939,7 +3939,9 @@ one event type.
 ### REQ-SEC-058 — Art. 15 / Art. 20 data export
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> The export gains the exchange's member-linked tables (installations, journal, deny list, external refs, revocations, change sequence), the „gestohlen“ marker of Lager rows and the optional RSI handle. Ships with WP 1.3, 1.4 and 3.1–3.3.
+> The export gains the exchange's member-linked tables (installations, journal, deny list, external refs, revocations, change sequence) and the „gestohlen“ marker of Lager rows. Ships with WP 1.3 and 3.1–3.3.
+>
+> *The optional RSI handle is in since WP 1.4 (REQ-SEC-072, 2026-09-26): the account section lists it, and as a name spelling it is scrubbed from other members' free text.*
 
 Every member MUST be able to export their own data from the application, and an admin MUST be able
 to export another account's for a request from somebody who cannot sign in.
@@ -4281,7 +4283,9 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 ### REQ-SEC-060 — Admin Personensuche across every free-text surface
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> The person search's coverage guard must serve every new member-linked table; the RSI handle is deliberately **not** searchable. Ships with WP 1.4 and 3.1–3.3.
+> The person search's coverage guard must serve every new member-linked table. Ships with WP 3.1–3.3.
+>
+> *The RSI handle is searchable since WP 1.4 (REQ-SEC-072). Corrected 2026-09-26: this callout said it would deliberately not be; the owner decided to treat it as a name spelling, so that a rectification or an erasure reaches it like any other name.*
 
 An admin MUST be able to find **every** place a given name appears, case-insensitively, across every
 free-text surface of the application.
@@ -4384,7 +4388,9 @@ aggregates.
 ### REQ-SEC-061 — Self-service deletion is a request an admin decides
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> Erasure covers the exchange's member-linked tables and the RSI handle. Ships with WP 1.4 and 3.1–3.3.
+> Erasure covers the exchange's member-linked tables. Ships with WP 3.1–3.3.
+>
+> *The RSI handle is covered since WP 1.4 (REQ-SEC-072): it goes with the account row.*
 
 A member MUST be able to ask, in the application, for their account to be erased (Art. 17 GDPR).
 The request lands in an admin queue; it is **never** carried out by the member's own click.
@@ -4491,7 +4497,9 @@ from a statute rather than from operational taste.
 ### REQ-SEC-062 — A granted Art. 17 request anonymises the surviving handle snapshots
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> Anonymisation covers the exchange's member-linked tables and the RSI handle. Ships with WP 1.4 and 3.1–3.3.
+> Anonymisation covers the exchange's member-linked tables. Ships with WP 3.1–3.3.
+>
+> *The RSI handle is covered since WP 1.4 (REQ-SEC-072): as a name spelling, its occurrences in the handle snapshots are anonymised like the username's.*
 
 When an admin grants the member's wish, the member's handle MUST be replaced by a sentinel in
 **every** place a handle snapshot survives an account deletion. Rows are **not** removed and no fact
@@ -4529,9 +4537,10 @@ reachable for an *already deleted* account — and it can over-match, since a ha
 key, which is why the admin reviews the Personensuche hits (REQ-SEC-060) before granting.
 
 **Every spelling, not the effective name alone.** `getEffectiveName()` is `displayName ?: username`,
-so each text-matched update runs once per stored spelling — username, display name and Discord guild
-nickname. A handover typed with the member's nickname is as likely as one typed with their display
-name, and the search registry already treats all three as places a person is named.
+so each text-matched update runs once per stored spelling — username, display name, Discord guild
+nickname and, since 2026-09-26, the RSI handle (REQ-SEC-072). A handover typed with the member's
+nickname is as likely as one typed with their display name, and the search registry already treats
+all four as places a person is named.
 
 > [!important] The set was widened after review, and it is gate-enforced now
 > Corrected 2026-09-16 (and again 2026-09-17, when the three payload columns named below were taken
@@ -4900,6 +4909,59 @@ a working copy; the runbook now carries that form. A release rollback to 1.11.0 
 `basetool-ca.crt`, and `iri-cert-expiry` reports the CA's expiry once that file is the CA ·
 **Runbook:** [`deployment.md` &rarr; Internal TLS](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)
 · **ADR:** [ADR-0211](../adr/0211-each-internal-service-holds-its-own-leaf-from-a-private-ca.md) · **Related:** REQ-SEC-014, REQ-OPS-016, REQ-OBS-008, REQ-INGEST-001
+
+### REQ-SEC-072 — A member may store their RSI handle, and only they and ADMIN see it
+
+A member MAY store **one RSI handle** on their own profile. It exists so a connected application can
+ask whether a game log belongs to the signed-in member (REQ-XCH-031) and warn before an alt account's
+data lands on the main profile; the Basetool never discloses the stored handle to such a client.
+
+- **Shape and uniqueness.** Optional; 3 to 60 letters, digits, underscores or hyphens (the RSI
+  handle alphabet), trimmed, a blank value clears it. **Unique across members, case-insensitively**
+  (`ux_app_user_rsi_handle_lower`), so one handle is never attached to two profiles — and, since it
+  is a spelling the erasure matches on (below), it may not be another account's username or display
+  name either, nor may a display name be another account's RSI handle. The member's **own** username
+  is allowed, and is the common case.
+- **Who edits, who sees.** Only the member, on their own profile (`/api/v1/users/me/rsi-handle`;
+  the app gets the same field with WP 1.5). `ADMIN` reads it on the member page
+  (`GET /api/v1/users/{id}/rsi-handle`), read-only, for support on a mismatch. It is in **no shared
+  DTO**: no peer, officer or logistician view carries it.
+- **Never disclosed by accident.** Not in a log line (`User.toString` excludes it), not in an audit
+  payload, and the refusal of a taken handle (`409 DUPLICATE_ENTITY`) never names it — the member
+  learns *that* it is taken, not by whom.
+- **A name spelling** (owner decision 2026-09-26). `HandleSpellings` lists it beside username,
+  display name and Discord guild nickname, so the Personensuche finds it (REQ-SEC-060), the export
+  lists it in the member's account section and scrubs it from other members' free text
+  (REQ-SEC-058), and a granted erasure anonymises its occurrences in the handle snapshots
+  (REQ-SEC-062); the column itself goes with the account row (REQ-SEC-061).
+- **Account merge** (REQ-SEC-046): the source's handle moves onto a survivor that has none;
+  otherwise the survivor's wins and the source's is dropped.
+
+**Acceptance criteria**
+
+- [x] A member stores, reads and clears their own handle; the response carries the new user-row
+  version.
+- [x] A handle another account carries in any case, or another account's username or display name,
+  is refused with `409 DUPLICATE_ENTITY`, and the response does not contain it; a concurrent claim
+  that slips past the check hits the unique index and is refused the same way.
+- [x] A handle outside the shape is refused (`400` from the backend, `422 VALIDATION` from the web
+  relay before the backend); the schema refuses it too.
+- [x] `ADMIN` reads a member's handle; an officer is refused `403`; the shared user record does not
+  carry it.
+- [x] The merge carries a lone handle onto the survivor and drops the source's when both carry one.
+- [x] The profile card saves in place (REQ-FE-001), with a no-script form post beside it.
+
+**Enforced by:** `UserServiceRsiHandleTest`, `UserRsiHandleIntegrationTest`,
+`UserAccountMergeServiceTest`, `HandleSpellingCoverageTest`, `PersonSearchCoverageTest`,
+`HandleErasureCoverageTest`, `DataExportScrubCoverageTest`, `ExternalContractTest`,
+`ApiVhostAnonymousSurfaceTest`, `ProfileRsiHandleMvcTest`, `MemberManagementControllerTest`,
+`ProfileRsiHandleInPlaceE2eTest` · **Code:** `V246__add_rsi_handle_to_app_user.sql`, `User`,
+`UserService#updateUserRsiHandle`, `UserRepository#existsOtherAccountWithName`, `UserController`,
+`UserAccountMergeService`, `HandleSpellings`, `PersonSearchTargets`, `DataExportSections`,
+`HandleErasureCoverage`, frontend `ProfileRsiHandleProxyController`, `ProfileController`,
+`MemberManagementController`, `profile.html`, `profile.js`, `member-edit.html` · **Record:**
+[`docs/privacy/processing-activities.md`](../privacy/processing-activities.md) (A1) · **Related:**
+REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
 
 ## Out of scope
 
