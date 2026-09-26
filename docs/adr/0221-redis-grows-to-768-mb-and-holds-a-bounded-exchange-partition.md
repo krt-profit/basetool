@@ -40,6 +40,10 @@ and the ingest user has `SET` and `EXPIRE` on `ingest:*` but no `GET` or `INCR`.
 - Sessions keep their room: the whole exchange budget is under a tenth of the new ceiling.
 - The Redis memory alerts and the container sizing in the compose files and Quadlet units move with
   the change; the enlargement is a production write and goes through the owner's approval.
+- The sum of all container memory limits rises from 14 000 MiB to 14 512 MiB, above ADR-0085's
+  ~14 GB review trigger on the 16 GB host. The owner accepted that on 2026-09-26: limits are
+  ceilings, and Redis's measured resident set is a few dozen megabytes; the price is less reserve
+  in the case where every container peaks at once.
 - A client that tries to fill Redis is refused, not other members' logins.
 
 ## Alternatives considered
