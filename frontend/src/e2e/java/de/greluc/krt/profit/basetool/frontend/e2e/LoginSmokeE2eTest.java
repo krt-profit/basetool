@@ -59,6 +59,12 @@ class LoginSmokeE2eTest {
   /** Keycloak password of the seeded synthetic test user (throwaway, test realm only). */
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
+  /**
+   * Time, in milliseconds, from the credential POST leaving the browser to the landing back on the
+   * frontend; the submit's own retry budget is spent before this clock starts.
+   */
+  private static final double REDIRECT_TIMEOUT_MILLIS = 30_000;
+
   private static Playwright playwright;
   private static Browser browser;
 
@@ -101,15 +107,16 @@ class LoginSmokeE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/oauth2/authorization/keycloak");
 
-        page.waitForSelector("#username");
-        page.fill("#username", USERNAME);
-        page.fill("#password", PASSWORD);
-        page.click("#kc-login");
+        int submitClicks = E2eSupport.submitKeycloakLogin(page, USERNAME, PASSWORD);
+        long submittedNanos = System.nanoTime();
 
         page.waitForURL(
-            url -> url.startsWith(baseUrl), new Page.WaitForURLOptions().setTimeout(30_000));
+            url -> url.startsWith(baseUrl),
+            new Page.WaitForURLOptions().setTimeout(REDIRECT_TIMEOUT_MILLIS));
 
-        long elapsedMillis = (System.nanoTime() - startNanos) / 1_000_000L;
+        long landedNanos = System.nanoTime();
+        long elapsedMillis = (landedNanos - startNanos) / 1_000_000L;
+        long redirectMillis = (landedNanos - submittedNanos) / 1_000_000L;
 
         List<Cookie> cookies = context.cookies();
         boolean hasSessionCookie =
@@ -120,8 +127,14 @@ class LoginSmokeE2eTest {
         context.storageState(new BrowserContext.StorageStateOptions().setPath(storageState));
 
         System.out.printf(
-            "[E2E] login OK in %d ms | landing=%s | __Host-SESSION cookie=%s | storageState=%s%n",
-            elapsedMillis, page.url(), hasSessionCookie, storageState.toAbsolutePath());
+            "[E2E] login OK in %d ms (credential POST to landing %d ms, submit clicks %d) |"
+                + " landing=%s | __Host-SESSION cookie=%s | storageState=%s%n",
+            elapsedMillis,
+            redirectMillis,
+            submitClicks,
+            page.url(),
+            hasSessionCookie,
+            storageState.toAbsolutePath());
 
         assertTrue(
             page.url().startsWith(baseUrl),
