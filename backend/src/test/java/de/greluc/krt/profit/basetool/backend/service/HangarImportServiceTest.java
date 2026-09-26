@@ -22,10 +22,14 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -71,6 +75,7 @@ class HangarImportServiceTest {
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private UserRepository userRepository;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AuditService auditService;
 
   private HangarImportService hangarImportService;
 
@@ -80,7 +85,12 @@ class HangarImportServiceTest {
   void setUp() {
     hangarImportService =
         new HangarImportService(
-            shipRepository, shipTypeRepository, userRepository, objectMapper, ownerScopeService);
+            shipRepository,
+            shipTypeRepository,
+            userRepository,
+            objectMapper,
+            ownerScopeService,
+            auditService);
     de.greluc.krt.profit.basetool.backend.model.Squadron stubSquadron =
         new de.greluc.krt.profit.basetool.backend.model.Squadron();
     stubSquadron.setId(UUID.randomUUID());
@@ -119,6 +129,13 @@ class HangarImportServiceTest {
     assertThat(result.skippedShips()).isEmpty();
     assertThat(result.duplicateShips()).isEmpty();
     verify(shipRepository, times(2)).save(any(Ship.class));
+    verify(auditService)
+        .record(
+            eq(AuditEventType.HANGAR_IMPORTED),
+            isNull(),
+            isNull(),
+            eq(userId),
+            argThat(d -> d.toString().contains("created=2")));
   }
 
   @Test
@@ -238,6 +255,7 @@ class HangarImportServiceTest {
     assertThat(result.importedCount()).isEqualTo(0);
     assertThat(result.duplicateCount()).isEqualTo(3);
     verify(shipRepository, never()).save(any(Ship.class));
+    verifyNoInteractions(auditService);
   }
 
   @Test

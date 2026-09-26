@@ -55,16 +55,16 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Unit tests for {@link AdminAuditLogPageController}: the nine-way tab routing (bank vs the eight
- * generic areas), the adaptation of both DTO shapes into the uniform {@link AuditRowView}, the
- * per-tab export endpoint + event-type list, and the in-place fragment selector (REQ-AUDIT-002).
+ * Unit tests for {@link AdminAuditLogPageController}: the tab routing (bank vs the generic areas),
+ * the adaptation of both DTO shapes into the uniform {@link AuditRowView}, the per-tab export
+ * endpoint + event-type list, and the in-place fragment selector (REQ-AUDIT-002).
  */
 @SuppressWarnings("unchecked")
 class AdminAuditLogPageControllerTest {
 
   /**
-   * The nine non-bank area tabs, mirroring the controller's private domain list. Every generic
-   * audit event type the backend can emit must be offered by one of these tabs.
+   * The non-bank area tabs, mirroring the controller's private domain list. Every generic audit
+   * event type the backend can emit must be offered by one of these tabs.
    */
   private static final List<String> GENERIC_DOMAINS =
       List.of(
@@ -76,7 +76,8 @@ class AdminAuditLogPageControllerTest {
           "OPERATION",
           "ROLE",
           "PROMOTION",
-          "MARKET");
+          "MARKET",
+          "HANGAR");
 
   private BackendApiClient backendApiClient;
   private AdminAuditLogPageController controller;
@@ -291,8 +292,7 @@ class AdminAuditLogPageControllerTest {
 
   /**
    * The generic-area audit event types the backend can emit, read from the {@code
-   * AuditEventDto.eventType} enum in the committed openapi document, across all nine non-bank
-   * domains.
+   * AuditEventDto.eventType} enum in the committed openapi document, across all non-bank domains.
    *
    * @return the produced generic audit event-type names
    * @throws Exception when the spec cannot be located or parsed

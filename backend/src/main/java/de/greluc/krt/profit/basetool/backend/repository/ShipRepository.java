@@ -55,10 +55,13 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @return how many fitted ships were cleared; ships already unfitted are not counted
    */
   @Modifying(clearAutomatically = true)
-  @Query("UPDATE Ship s SET s.fitted = false WHERE " + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
-  void resetAllFittedScoped(
+  @Query(
+      "UPDATE Ship s SET s.fitted = false WHERE s.fitted = true AND "
+          + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
+  int resetAllFittedScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);

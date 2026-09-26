@@ -149,6 +149,16 @@ class AuditLogE2eTest {
             Boolean.TRUE,
             page.evaluate("() => window.__krtNoReload === true"),
             "Filtering by client must update in place — no page reload.");
+
+        page.locator("[data-testid='audit-tab-HANGAR']").click();
+        page.waitForLoadState();
+        assertThat(page).hasURL(Pattern.compile(".*[?&]domain=HANGAR.*"));
+        assertThat(page.locator("[data-testid='audit-panel']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(
+                page.locator(
+                    "[data-testid='audit-filter-event'] option[value='HANGAR_SHIP_CREATED']"))
+            .hasCount(1);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "audit-log-viewer");
         throw failure;
