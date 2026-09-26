@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
@@ -30,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.FleetviewImportResponseDt
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,6 +72,7 @@ public class HangarImportService {
   private final UserRepository userRepository;
   private final ObjectMapper objectMapper;
   private final OwnerScopeService ownerScopeService;
+  private final AuditService auditService;
 
   /**
    * Parses an uploaded ship-export JSON file and adds every resolvable ship missing from the user's
@@ -187,6 +190,17 @@ public class HangarImportService {
         importedCount,
         alreadySufficientCount,
         skippedShips.size());
+
+    if (importedCount > 0) {
+      auditService.record(
+          AuditEventType.HANGAR_IMPORTED,
+          null,
+          null,
+          userId,
+          AuditDetails.of("created", importedCount)
+              .with("alreadyPresent", alreadySufficientCount)
+              .with("unmatched", skippedShips.size()));
+    }
 
     return new FleetviewImportResponseDto(
         importedCount, skippedShips.size(), alreadySufficientCount, skippedShips, List.of());

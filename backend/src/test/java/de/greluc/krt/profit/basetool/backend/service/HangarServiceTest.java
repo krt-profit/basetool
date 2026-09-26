@@ -23,11 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -63,6 +68,7 @@ class HangarServiceTest {
   @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
   @Mock private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService ownerScopeService;
   @Mock private ShipMapper shipMapper;
+  @Mock private AuditService auditService;
 
   @InjectMocks private HangarService hangarService;
 
@@ -125,9 +131,13 @@ class HangarServiceTest {
     Ship ship2 = new Ship();
     ship2.setId(shipId2);
 
+    Mission mission = new Mission();
+    mission.setId(UUID.randomUUID());
+    mission.setName("Op Aurora");
     de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
         new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
     unit.setShip(ship1);
+    unit.setMission(mission);
 
     when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship1, ship2));
     when(missionUnitRepository.findByShipId(shipId1)).thenReturn(List.of(unit));
@@ -139,6 +149,15 @@ class HangarServiceTest {
     assertNull(unit.getShip(), "MissionUnit.ship should be null after unlink");
     verify(entityManager, times(1)).flush();
     verify(shipRepository, times(1)).deleteAll(List.of(ship1, ship2));
+    verify(auditService)
+        .record(
+            eq(AuditEventType.MISSION_UNIT_UPDATED),
+            eq(mission.getId()),
+            eq("Op Aurora"),
+            isNull(),
+            any());
+    verify(auditService)
+        .record(eq(AuditEventType.HANGAR_EMPTIED), isNull(), isNull(), eq(userId), any());
   }
 
   @Test
@@ -151,6 +170,7 @@ class HangarServiceTest {
     verify(missionUnitRepository, never()).findByShipId(any());
     verify(shipRepository, never()).deleteAll(anyList());
     verify(entityManager, never()).flush();
+    verifyNoInteractions(auditService);
   }
 
   @Test
@@ -198,6 +218,90 @@ class HangarServiceTest {
     hangarService.updateShip(userId, shipId, request);
 
     verify(shipRepository, times(1)).save(ship);
+    verify(auditService)
+        .record(eq(AuditEventType.HANGAR_SHIP_UPDATED), eq(shipId), any(), eq(userId), any());
+  }
+
+  @Test
+  void updateShip_withNoChangedField_recordsNothing() {
+    UUID userId = UUID.randomUUID();
+    UUID shipId = UUID.randomUUID();
+    UUID typeId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(userId);
+    ShipType type = new ShipType();
+    type.setId(typeId);
+    Ship ship = new Ship();
+    ship.setId(shipId);
+    ship.setOwner(owner);
+    ship.setShipType(type);
+    ship.setName("Test");
+    ship.setInsurance("LTI");
+    when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
+    when(shipTypeRepository.findById(typeId)).thenReturn(Optional.of(type));
+    when(shipRepository.save(any(Ship.class))).thenReturn(ship);
+
+    hangarService.updateShip(
+        userId, shipId, new ShipRequestDto("Test", typeId, "LTI", null, false, null, null));
+
+    verifyNoInteractions(auditService);
+  }
+
+  @Test
+  void deleteShip_detachesUnitsAndRecordsBothTrails() {
+    UUID userId = UUID.randomUUID();
+    UUID shipId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(userId);
+    ShipType type = new ShipType();
+    type.setName("Cutlass Black");
+    Ship ship = new Ship();
+    ship.setId(shipId);
+    ship.setOwner(owner);
+    ship.setShipType(type);
+    ship.setName("Private free-text name");
+    Mission mission = new Mission();
+    mission.setId(UUID.randomUUID());
+    mission.setName("Op Aurora");
+    de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
+        new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
+    unit.setId(UUID.randomUUID());
+    unit.setShip(ship);
+    unit.setMission(mission);
+    when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
+    when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of(unit));
+
+    hangarService.deleteShip(userId, shipId);
+
+    assertNull(unit.getShip());
+    verify(auditService)
+        .record(
+            eq(AuditEventType.MISSION_UNIT_UPDATED),
+            eq(mission.getId()),
+            eq("Op Aurora"),
+            isNull(),
+            any());
+    verify(auditService)
+        .record(
+            eq(AuditEventType.HANGAR_SHIP_DELETED),
+            eq(shipId),
+            eq("Cutlass Black"),
+            eq(userId),
+            argThat(d -> d.toString().contains("detachedUnits=1")));
+  }
+
+  @Test
+  void resetAllFittedStatus_recordsOnlyWhenShipsChanged() {
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(0, 4);
+
+    hangarService.resetAllFittedStatus();
+    verifyNoInteractions(auditService);
+
+    hangarService.resetAllFittedStatus();
+    verify(auditService)
+        .record(eq(AuditEventType.HANGAR_FITTED_RESET), isNull(), isNull(), isNull(), any());
   }
 
   @Test
@@ -344,6 +448,9 @@ class HangarServiceTest {
 
     assertEquals(3, updated);
     verify(shipRepository, times(1)).setLocationForOwner(userId, location);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.HANGAR_HOME_LOCATION_SET), eq(locationId), any(), eq(userId), any());
   }
 
   @Test

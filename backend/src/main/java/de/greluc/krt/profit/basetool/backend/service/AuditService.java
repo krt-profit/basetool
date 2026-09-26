@@ -180,6 +180,7 @@ public class AuditService {
       case ROLE -> AuditEventType.ROLE_AUDIT_PURGED;
       case PROMOTION -> AuditEventType.PROMOTION_AUDIT_PURGED;
       case MARKET -> AuditEventType.MARKET_AUDIT_PURGED;
+      case HANGAR -> AuditEventType.HANGAR_AUDIT_PURGED;
     };
   }
 
