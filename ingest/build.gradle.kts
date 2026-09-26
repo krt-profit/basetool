@@ -47,6 +47,7 @@ dependencies {
   testImplementation(libs.okhttp3.tls)
   testImplementation(libs.testcontainers.junit)
   testImplementation(libs.archunit.core)
+  testImplementation(libs.json.schema.validator)
   testImplementation(project(":test-support"))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
