@@ -17,6 +17,10 @@
 
 ### Changed
 
+- **Redis: 768 MB Speichergrenze in einem 1024-MB-Container (vorher 384 / 512 MB).** Platz für den
+  begrenzten Speicherbereich der geplanten Exchange-Schnittstelle (höchstens 64 MB), ohne dass
+  Sitzungen enger werden (ADR-0221). Wirkt auf Produktion erst mit dem Release und seinen
+  Quadlet-Units.
 - **Blueprint-Import: Namen mit Klassen-Kürzeln eines Sprachpakets werden direkt zugeordnet.**
   Sprachpakete wie StarStrings oder das deutsche Paket schreiben Klasse, Größe und Grad in den
   Item-Namen („Sth/2/C Cirrus", „[STH-S2-C] Cirrus", „Cirrus (S2 C Stealth)"). Der Import entfernt
