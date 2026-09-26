@@ -643,7 +643,7 @@ Active offers and active requests are exported as the gauges
 `basetool_material_exchange_active_count` / `basetool_material_request_open_count`
 (`BusinessMetricsCollector`; REQ-OBS-011 in [`observability.md`](observability.md)). The `MARKET`
 audit domain is deliberately excluded from the `AuditDomainSilenceAnomaly` alert
-(`monitoring/prometheus/alerts/business.yml`) because board traffic is bursty.
+(`monitoring/prometheus/alerts/business.yml`, a 30-day window) because board traffic is bursty.
 
 ## Out of scope
 

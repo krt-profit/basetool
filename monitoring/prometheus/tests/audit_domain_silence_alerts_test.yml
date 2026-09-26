@@ -8,45 +8,45 @@ tests:
     interval: 1h
     input_series:
       - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
-        values: "0+1x403"
+        values: "0+1x803"
       - series: 'up{job="basetool-backend", instance="backend:11261"}'
-        values: "1x403"
+        values: "1x803"
     alert_rule_test:
-      - eval_time: 360h
+      - eval_time: 760h
         alertname: AuditDomainSilenceAnomaly
         exp_alerts: []
 
-  - name: fires - alerted domain silent for 14d
+  - name: fires - alerted domain silent for 30d
     interval: 1h
     input_series:
       - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
-        values: "0+1x2 2x400"
+        values: "0+1x2 2x800"
       - series: 'up{job="basetool-backend", instance="backend:11261"}'
-        values: "1x403"
+        values: "1x803"
     alert_rule_test:
-      - eval_time: 360h
+      - eval_time: 760h
         alertname: AuditDomainSilenceAnomaly
         exp_alerts:
           - exp_labels:
               severity: warning
               domain: JOB_ORDER
             exp_annotations:
-              summary: "Audit domain silent 14d (JOB_ORDER)"
-              description: "The JOB_ORDER audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+              summary: "Audit domain silent 30d (JOB_ORDER)"
+              description: "The JOB_ORDER audit domain recorded zero events in 30 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
 
-  - name: silent - ROLE quiet for 14d is an ordinary quiet fortnight
+  - name: silent - ROLE quiet for 30d is an ordinary quiet month
     interval: 1h
     input_series:
       - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="ROLE"}'
-        values: "0+1x2 2x400"
+        values: "0+1x2 2x800"
       - series: 'up{job="basetool-backend", instance="backend:11261"}'
-        values: "1x403"
+        values: "1x803"
     alert_rule_test:
-      - eval_time: 360h
+      - eval_time: 760h
         alertname: AuditDomainSilenceAnomaly
         exp_alerts: []
 
-  - name: silent - ROLE stays exempt far beyond the 14d window
+  - name: silent - ROLE stays exempt far beyond the 30d window
     interval: 1h
     input_series:
       - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="ROLE"}'
@@ -62,28 +62,64 @@ tests:
     interval: 1h
     input_series:
       - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="FUTURE_AREA"}'
-        values: "0+1x2 2x400"
+        values: "0+1x2 2x800"
       - series: 'up{job="basetool-backend", instance="backend:11261"}'
-        values: "1x403"
+        values: "1x803"
     alert_rule_test:
-      - eval_time: 360h
+      - eval_time: 760h
         alertname: AuditDomainSilenceAnomaly
         exp_alerts:
           - exp_labels:
               severity: warning
               domain: FUTURE_AREA
             exp_annotations:
-              summary: "Audit domain silent 14d (FUTURE_AREA)"
-              description: "The FUTURE_AREA audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+              summary: "Audit domain silent 30d (FUTURE_AREA)"
+              description: "The FUTURE_AREA audit domain recorded zero events in 30 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
 
   - name: silent - backend down suppresses the alert
     interval: 1h
     input_series:
       - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
-        values: "0+1x2 2x400"
+        values: "0+1x2 2x800"
       - series: 'up{job="basetool-backend", instance="backend:11261"}'
-        values: "0x403"
+        values: "0x803"
     alert_rule_test:
-      - eval_time: 360h
+      - eval_time: 760h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []
+
+  - name: silent - an alerted domain quiet for a fortnight no longer fires
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
+        values: "0+1x2 2x800"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x803"
+    alert_rule_test:
+      - eval_time: 400h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []
+
+  - name: silent - HANGAR is exempt
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="HANGAR"}'
+        values: "0+1x2 2x800"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x803"
+    alert_rule_test:
+      - eval_time: 760h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []
+
+  - name: silent - BLUEPRINT is exempt
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="BLUEPRINT"}'
+        values: "0+1x2 2x800"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x803"
+    alert_rule_test:
+      - eval_time: 760h
         alertname: AuditDomainSilenceAnomaly
         exp_alerts: []
