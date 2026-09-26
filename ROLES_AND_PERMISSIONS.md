@@ -381,7 +381,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 |:-----------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Be logged in (`isAuthenticated()`)                                                 |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Own profile / `GET /me`, active OrgUnit context (`/me/active-org-unit`)            |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Own settings: description, payout preference, blueprint sharing, announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Own settings: description, payout preference, blueprint sharing, RSI handle (REQ-SEC-072), announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Own notifications + SSE stream (`/notifications/**`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Terms of Use status + consent (`/terms/status`, `POST /terms/acceptance`; consent refused for `ROLE_INGEST_GATEWAY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted below Logistician, and `/{id}` of a member of a foreign Staffel always peer-redacted for a non-admin; the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
@@ -743,6 +743,7 @@ row — a Bereichsleiter's organisational OL seat (REQ-ROLE-005) does not count.
 | Terms-of-Use acceptance overview (`/api/v1/admin/terms/**`, `/admin/terms`), notification rules (`/api/v1/notification-rules/**`), default blueprints (`/api/v1/admin/default-blueprints/**`), P4K game-data import (`/api/v1/admin/import/p4k/**`), UEX data (`/admin/uex-data`) — all `hasRole('ADMIN')` |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Hard-delete a user account** (`DELETE /api/v1/users/{id}`, `hasRole('ADMIN')`) — irreversible, and only for an account already gone from Keycloak                                                                                        |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Consolidate a duplicate account** (`POST /api/v1/users/{id}/consolidate`, `hasRole('ADMIN')`) — the path names the account dissolved, the body the one kept                                                                              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Read a member's RSI handle, read-only on the member page (`GET /api/v1/users/{id}/rsi-handle`, `hasRole('ADMIN')`, REQ-SEC-072) — no other role and no shared DTO carries it |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 > **Hard-deleting a user is admin-only and irreversible** (REQ-DATA-008). It is refused for an
 > account still present in Keycloak — the guard re-verifies that against Keycloak itself rather than

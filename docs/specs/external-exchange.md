@@ -509,7 +509,7 @@ offers changed).
 ### REQ-XCH-031 — The account check answers match, mismatch or unknown — never the handle
 
 `POST /exchange/v1/me/account-check {handle}` compares the handle with the optional RSI handle on
-the member's profile, case-insensitively, and answers `match`, `mismatch` or `unknown` (no handle
+the member's profile (REQ-SEC-072, stored since WP 1.4), case-insensitively, and answers `match`, `mismatch` or `unknown` (no handle
 stored). It never returns or logs the stored handle and is rate-limited tightly.
 
 **Status:** planned — WP 3.4 (#2106)

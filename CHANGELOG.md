@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Profil: optionales RSI-Handle.** Mitglieder können ihr RSI-Handle im Profil hinterlegen; es ist
+  nur für sie selbst und Admins sichtbar, eindeutig über alle Konten und dient später verbundenen
+  Anwendungen zur Prüfung, ob ein Spiel-Log zum Konto gehört (REQ-SEC-072, Migration `V246`).
 - **Audit-Log: neuer Bereich „Hangar".** Jede Änderung an Schiffen — anlegen, bearbeiten,
   löschen, Hangar leeren, Import, „Alle unfitted", Heimatstandort, auch aus der App und durch
   Admins — landet im Audit-Log (neuer Tab); wird ein Schiff gelöscht, protokolliert die Mission das

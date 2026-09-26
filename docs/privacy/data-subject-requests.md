@@ -118,8 +118,8 @@ at all: deleting the rows would take a counterparty's own evidence with it. It l
 in both trails, and it runs **before** the account is deleted — the id-matched updates only reach
 rows while the foreign key the deletion nulls out still points at the account.
 
-It matches on **every spelling the account carries** — username, display name and Discord guild
-nickname — because a handover or a job-order contact was typed by hand and whoever typed it wrote
+It matches on **every spelling the account carries** — username, display name, Discord guild
+nickname and the optional RSI handle (REQ-SEC-072) — because a handover or a job-order contact was typed by hand and whoever typed it wrote
 whichever name they use for the person.
 
 > [!warning] The text-matched columns can over-match, so review the hits first

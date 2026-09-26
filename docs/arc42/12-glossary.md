@@ -55,6 +55,7 @@ worth reading even if you know the domain.
 | **Live sync** | A *peer's* change propagating to other viewers over `/ws/sync` (the app: a backend SSE stream), fanned across replicas by Redis pub/sub. Not the same thing as live update, and both are required. |
 | **Discord-Registrierung / approval queue** | A self-service sign-up through Discord waits here as `PENDING` and sees nothing until an admin approves, rejects or links it to an existing account. |
 | **Löschantrag** | A member's request to have their account deleted, decided in the admin area (GDPR erasure). |
+| **RSI-Handle** | A member's optional Star Citizen account handle, entered on their own profile, unique across members and seen only by them and `ADMIN` (REQ-SEC-072). It counts as one of the member's names for the Personensuche and the erasure, and it is what a connected application's account check compares against, without ever getting it back. |
 | **Quadlet** | systemd's declarative container units (`.container`, `.network`, `.volume`), generated here from the compose files. A container is a systemd service. |
 | **Rootless** | Containers run under an unprivileged user's systemd instance, with no root daemon and no socket. |
 | **subuid translation** | A container uid *N* appears on the host as `subuid_base + N − 1` (base 100000 here). See §7.1 — this is the single most common source of "the container cannot read its own file". |
