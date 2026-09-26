@@ -2491,12 +2491,6 @@ public final class BackendSeeder {
   }
 
   /**
-   * Builds an HTTP client that trusts only the committed test CA (ADR-0139), with hostname
-   * verification left on.
-   *
-   * @return an HTTP client trusting only the test CA
-   */
-  /**
    * An HTTP client trusting only the committed test CA, for callers outside the seeder that talk to
    * the stack — {@code ServedBuildCheck} reads the frontend's landing page with it. The CA signed
    * the frontend's leaf as well, and that leaf names {@code localhost} too.
@@ -2510,6 +2504,12 @@ public final class BackendSeeder {
         .build();
   }
 
+  /**
+   * Builds a TLS context that trusts only the committed test CA (ADR-0139), with hostname
+   * verification left on.
+   *
+   * @return a TLS context trusting only the test CA
+   */
   private static SSLContext backendCertContext() {
     try {
       KeyStore keyStore = KeyStore.getInstance("PKCS12");

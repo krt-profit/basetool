@@ -401,8 +401,6 @@ dependencies {
   "e2eCompileOnly"(libs.jetbrains.annotations)
 }
 
-tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
-
 val playwrightInstall =
   tasks.register<JavaExec>("playwrightInstall") {
     group = "verification"

@@ -117,10 +117,6 @@ class ExternalContractTest {
   }
 
   /**
-   * The contract set: every operation the Android app consumes, matching the paths the API vhost
-   * allow-lists, recorded from the generated document.
-   */
-  /**
    * The nginx include that decides what the internet can reach through the API vhost (ADR-0162).
    */
   private static final String ALLOW_LIST = "docker/edge/include/api-allowlist.conf";
@@ -241,10 +237,6 @@ class ExternalContractTest {
           "missionRest");
 
   /**
-   * Response fields promised by every operation returning a {@code MissionDto}, since the app maps
-   * them through one shared mapper. {@code user} identifies the caller's own participant row.
-   */
-  /**
    * What a step row promises, for all five writes that answer with the Ablauf.
    *
    * <p>{@code meta} is the line under the title and {@code done} is the tick; a row without an
@@ -260,6 +252,10 @@ class ExternalContractTest {
    */
   private static final Set<String> OBJECTIVE_ROW = Set.of("id", "title", "kind");
 
+  /**
+   * Response fields promised by every operation returning a {@code MissionDto}, since the app maps
+   * them through one shared mapper. {@code user} identifies the caller's own participant row.
+   */
   private static final Set<String> MISSION_DETAIL =
       Set.of(
           "id",
@@ -287,6 +283,10 @@ class ExternalContractTest {
           "objectives",
           "frequencies");
 
+  /**
+   * The contract set: every operation the Android app consumes, matching the paths the API vhost
+   * allow-lists, recorded from the generated document.
+   */
   private static final List<ContractOperation> CONTRACT =
       List.of(
           new ContractOperation(
