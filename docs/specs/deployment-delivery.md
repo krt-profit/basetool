@@ -2235,6 +2235,18 @@ there.
   with the Admin Console path to its generated secret and the `.env` variables that need it.
 - **Built-in Keycloak objects are never touched**; realm-wide hardening stays in
   `KEYCLOAK_HARDENING_RUNBOOK.md`.
+- **Approved third-party clients come from one template** (2026-09-26, `REQ-XCH-005`,
+  ADR-0217): every entry of `scripts/keycloak/external-clients.json` is created and converged as a
+  public device-grant client with consent, DPoP-bound tokens, a 30/90-day offline session, `basic`
+  as its only default scope and the ten `exchange.*` scopes plus `offline_access` as optional ones;
+  what the template never offers is withheld wherever found. The realm pins the device code's
+  lifespan and polling interval and the `krt-theme` login theme.
+- **A fresh realm is in shape after one run.** Keycloak 26 keeps its own
+  `backchannel.logout.session.required` when a client is created, so the provisioner writes the
+  attributes a create did not store right after it. *(Corrected 2026-09-26: until then an apply on
+  an empty realm of the pinned 26.7.4 image failed its verification on `basetool-frontend` and only
+  a second apply converged it; the stub did not model the behaviour, so the self-test stayed green.
+  Found against a throwaway local Keycloak while building WP 2.2.)*
 
 **Acceptance**
 
@@ -2247,6 +2259,10 @@ there.
 - [ ] `provision-keycloak-realm.test.sh` section 8: against a realm still carrying the three retired
   entries, the plan removes exactly those (plus the DPoP detach/re-attach the app's scope removal
   needs) and a second apply is empty.
+- [x] Sections 13–15: the exchange scopes and the third-party template are built, an existing
+  third-party client loses what the template withholds, and a malformed client list is refused
+  before the realm is read; the stub keeps Keycloak's own `backchannel.logout.session.required` on
+  creation like the real server, and the first apply still verifies clean.
 
 **Enforced by:** `scripts/provision-keycloak-realm.py` · `scripts/provision-keycloak-realm.test.sh`
 (`.github/workflows/keycloak-provisioner.yml`) · `scripts/keycloak-config-snapshot.sql` ·

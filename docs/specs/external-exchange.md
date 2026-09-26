@@ -136,9 +136,12 @@ The clients are created by `scripts/provision-keycloak-realm.py`, never by hand.
 
 **Acceptance**
 
-- [ ] The provisioner's self-test covers the third-party template and the SC Extractor's exchange
-  scopes, and removes `extractor-ingest` from the extractor client only after its migration.
-- [ ] The theme renders both pages with the phishing warning.
+- [x] The provisioner's self-test covers the third-party template (withheld scopes removed from an
+  existing client too, 30/90-day offline session, owner decision 2026-09-26) and the SC Extractor's
+  exchange scopes (`scripts/provision-keycloak-realm.test.sh`, sections 13–15).
+- [ ] The extractor client loses `extractor-ingest` once the extractor has migrated (WP 5.1 / go-live).
+- [x] The theme renders both pages with the phishing warning (`login-oauth-grant.ftl`,
+  `login-oauth2-device-verify-user-code.ftl`).
 - [x] Keycloak 26.7.4's behaviour is observed (WP 0.4, 2026-09-26, a throwaway local Keycloak of the
   pinned image, owner decision to observe locally): a device login joins the browser SSO session
   (same `sid`); a web logout ends it and the next refresh fails `invalid_grant` unless the client
@@ -147,7 +150,7 @@ The clients are created by `scripts/provision-keycloak-realm.py`, never by hand.
   the consent page on every login, also when consent exists; access and refresh tokens carry
   `cnf.jkt`, and a refresh without a DPoP proof is refused.
 
-**Status:** behaviour observed — WP 0.4; provisioning planned — WP 2.2 (#2081)
+**Status:** behaviour observed — WP 0.4; template, scopes and theme pages — WP 2.2 (#2081); the extractor's `extractor-ingest` removal — WP 5.1
 
 ### REQ-XCH-006 — DPoP is required on every exchange route
 
@@ -179,7 +182,7 @@ is always shown after the registered client name. The backend keeps `exchange_in
 ### REQ-XCH-008 — Revocation takes effect on the next request
 
 Disconnecting **one installation** puts its key thumbprint on a persistent deny list (database,
-mirrored to Redis, kept at least as long as a client session can live); every token bound to that
+mirrored to Redis, kept at least as long as a client session can live — 90 days, ADR-0217 amendment); every token bound to that
 key is refused (`401 INSTALLATION_REVOKED`) whatever its `iat`, and reconnecting needs a new key.
 Disconnecting **a whole client** removes the member's Keycloak consent for it (for a first-party
 client without consent: ends its client and offline sessions) and stores a revocation timestamp per (client,

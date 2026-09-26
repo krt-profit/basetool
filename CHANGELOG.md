@@ -14,6 +14,11 @@
 
 ### Changed
 
+- **Keycloak: Vorlage für freigegebene Drittanwendungen (Exchange-API).** Der Realm-Provisioner legt
+  die zehn `exchange.*`-Scopes und jede Anwendung aus `scripts/keycloak/external-clients.json` nach einer
+  Vorlage an (Gerätelogin, Einwilligung, DPoP, 30/90 Tage Offline-Sitzung); das Login-Theme bekommt eine
+  eigene Einwilligungs- und Geräte-Seite mit Phishing-Warnung (REQ-XCH-005).
+
 - **Redis: 768 MB Speichergrenze in einem 1024-MB-Container (vorher 384 / 512 MB).** Platz für den
   begrenzten Speicherbereich der geplanten Exchange-Schnittstelle (höchstens 64 MB), ohne dass
   Sitzungen enger werden (ADR-0221). Wirkt auf Produktion erst mit dem Release und seinen
@@ -41,6 +46,10 @@
   einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
 
 ### Fixed
+
+- **Keycloak-Provisioner: ein frischer Realm ist nach dem ersten Lauf in Form.** Keycloak 26 übergeht
+  beim Anlegen eines Clients `backchannel.logout.session.required`; der Provisioner setzt das Attribut
+  jetzt direkt danach, statt erst beim zweiten Lauf (REQ-OPS-033).
 
 - **Audit-Log der Materialbörse: der PDF-Export scheiterte.** Der Titel des PDFs fehlte in allen
   drei Backend-Sprachdateien, sodass der Export des Materialbörse-Tabs mit einem Fehler abbrach; ein
