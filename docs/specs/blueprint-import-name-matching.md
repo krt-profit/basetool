@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-26.
 > **Owner area:** INV · **Related ADRs:** [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 > (its additive-v1 evolution rule is mirrored by REQ-INV-014),
 > [ADR-0033](../adr/0033-scmdb-net-export-and-structural-tag-matching.md) (scmdb.net export +
@@ -104,10 +104,17 @@ fields appear without a version bump and must never break the import.
 
 One such extractor field is `additionalSourceFolders` (`List<String>`, nullable, default `null`):
 the extra game-channel folders the extractor scanned beside its primary `sourceFolder`
-(currently the `HOTFIX` sibling of `LIVE`). Because the extractor encodes defaults, the key is
+(the `HOTFIX` sibling of a picked `LIVE`, and since extractor 2026-09-26 also the `LIVE` sibling of
+a picked `HOTFIX`). Because the extractor encodes defaults, the key is
 always present in its exports — as JSON `null` when only the primary folder was scanned. The
 field is mirrored on `BlueprintExportFileDto` for contract explicitness but is provenance only;
 the import does not consume it.
+
+The extractor also added a per-entry `localizationKey` (`String`, nullable): set only when the game
+wrote a raw localisation key instead of a name, in which case the extractor has already replaced
+`productName` with that key's value from the member's installed `global.ini`. The entry DTO ignores
+unknown fields (`@JsonIgnoreProperties(ignoreUnknown = true)` on `BlueprintExportEntryDto`), so the
+import tolerates it and does not read it.
 
 The **scmdb.net export** is a manually-curated checklist rather than a `Game.log` capture, so its
 `blueprints` entries differ from the watcher / extractor shape and the parser adapts to them at the
@@ -335,6 +342,48 @@ precedence), `BlueprintFuzzyMatcherTest#topSuggestions_stillCatchesAGermanCapaci
 · **Code:**
 [`V228__seed_german_ammo_capacity_blueprint_aliases.sql`](../../backend/src/main/resources/db/migration/V228__seed_german_ammo_capacity_blueprint_aliases.sql),
 `BlueprintImportService#resolveViaAlias` (unchanged) · **Issue:** [#1485](https://github.com/krt-profit/basetool/issues/1485)
+
+### REQ-INV-050 — Localisation-pack class tags are removed before a second name attempt
+
+Community localisation packs replace the game's `global.ini` and write an item's class, size and
+grade **into its name**; the vanilla game never does (its English `global.ini` in `Data.p4k` has no
+such tag on any of 9,615 `item_Name…` values, checked 2026-09-26). The name the extractor exports is
+therefore pack-dependent — `Cirrus` arrives as `Sth/2/C Cirrus` (MrKraken's StarStrings, 23 of 177
+distinct names in the owner's own log corpus), `[STH-S2-C] Cirrus` (a „Smart Citizen" English pack)
+or `Cirrus (S2 C Stealth)` (the German pack) — and the exact match misses.
+
+When the tag, exact-name and alias steps all miss, `BlueprintImportService#resolve` removes **one**
+leading and **one** trailing pack tag (`BlueprintPackTags`) and repeats the exact-name and alias
+steps on the rest. A hit is `MATCHED` (or `MATCHED_BY_ALIAS`); the entry keeps its external name. A
+miss runs the fuzzy matcher on the untagged name. `BlueprintNameNormalizer` is **not** widened
+(REQ-INV-006): stored `product_key`s stay exactly as they are.
+
+The shapes are a **closed list**, each taken from a real pack file, never guessed:
+
+| Shape | Example | Source |
+| --- | --- | --- |
+| `Xxx/n/G ` prefix, class `Civ/Mil/Ind/Sth/Cmp` | `Sth/2/C Cirrus` | StarStrings; the extractor's own corpus |
+| `[XXX-Sn-G] ` prefix, class as above or `BRK` | `[STH-S2-C] Cirrus` | „Smart Citizen" English pack |
+| `[E-Sn] ` / `[P-Sn] ` / `[B-Sn] ` / `[D-Sn] ` / `[IR-Sn] ` / `[EM-Sn] ` / `[CS-Sn] ` prefix, and `[E] ` / `[P] ` / `[B] ` / `[D] ` / `[Sn] ` | `[E-S1] Omnisky III Cannon` | the same pack |
+| ` (Xxx/n/G)` suffix | `Citadel (Ind/2/B)` | VerseKit's name injection and the SC Deutsch Launcher, per VerseKit's source |
+| ` (Sn G Civilian/Military/Industrial/Stealth/Competition)` suffix | `Cirrus (S2 C Stealth)` | German pack (SC Deutsch Launcher) |
+
+CIG's own placeholders (`[PH] …`) and genuine name parts such as `(30 cap)` or `(TR4)` are not
+pack tags and are never removed; a name that would be left empty is not touched.
+
+**Acceptance**
+
+- [ ] A name carrying one of the listed tags resolves to the untagged catalogue product as
+  `MATCHED`, and through a learned alias of the untagged name as `MATCHED_BY_ALIAS`.
+- [ ] A tagged name with no untagged hit gets fuzzy suggestions computed on the untagged name.
+- [ ] Untagged names, `[PH]` placeholders, capacity suffixes and a bare tag are left alone.
+- [ ] `BlueprintNameNormalizer` and every stored `product_key` are unchanged.
+
+**Enforced by:** `BlueprintPackTagsTest`, `BlueprintImportServiceTest`
+(`preview_matchesAPackTaggedNameByItsUntaggedName`,
+`preview_matchesAPackTaggedNameThroughTheAliasOfItsUntaggedName`,
+`preview_aTaggedNameWithoutAnUntaggedMatchIsSuggestedFromTheUntaggedName`) · **Code:**
+`BlueprintPackTags`, `BlueprintImportService#resolve`
 
 ## Out of scope
 

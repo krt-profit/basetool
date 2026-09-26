@@ -10,6 +10,11 @@
 
 ### Changed
 
+- **Blueprint-Import: Namen mit Klassen-Kürzeln eines Sprachpakets werden direkt zugeordnet.**
+  Sprachpakete wie StarStrings oder das deutsche Paket schreiben Klasse, Größe und Grad in den
+  Item-Namen („Sth/2/C Cirrus", „[STH-S2-C] Cirrus", „Cirrus (S2 C Stealth)"). Der Import entfernt
+  genau diese belegten Formen und versucht Name und Alias erneut, statt nur einen Vorschlag
+  anzubieten; gespeicherte Produkt-Schlüssel bleiben unverändert (REQ-INV-050).
 - **CI: ein Dependabot-Image-Bump in den Compose-Dateien bringt seine Quadlet-Units selbst mit.**
   `dependabot-compose.yml` löst die Digests neu auf, erzeugt `quadlet/` neu und committet das Ergebnis
   auf den Dependabot-Branch, sodass kein Bump mehr mit veralteten Units gemergt wird (ADR-0215).

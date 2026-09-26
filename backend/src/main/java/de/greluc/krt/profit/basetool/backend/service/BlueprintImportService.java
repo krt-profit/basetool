@@ -59,7 +59,8 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <ol>
  *   <li>{@link #previewImport(String, MultipartFile)} resolves each entry by structural tag, exact
- *       name, alias, then fuzzy suggestion, without persisting anything.
+ *       name, alias, the untagged name (REQ-INV-050), then fuzzy suggestion, without persisting
+ *       anything.
  *   <li>{@link #applyImport(String, List)} creates the chosen owned-blueprint rows and learns an
  *       alias for every manual pick.
  * </ol>
@@ -277,8 +278,9 @@ public class BlueprintImportService {
   }
 
   /**
-   * Resolves one entry by structural tag (REQ-INV-019), exact name, alias, then fuzzy match; the
-   * owned flag is applied later by the caller.
+   * Resolves one entry by structural tag (REQ-INV-019), exact name, alias, the same two without a
+   * localisation pack's class tag (REQ-INV-050), then fuzzy match; the owned flag is applied later
+   * by the caller.
    *
    * @param entry the parsed name, tag and acquisition suggestion
    * @param productByKey master products by normalized key
@@ -324,9 +326,31 @@ public class BlueprintImportService {
           List.of());
     }
 
+    String untagged = BlueprintPackTags.strip(entry.externalName());
+    if (untagged != null) {
+      ResolvedProduct viaUntagged = productByKey.get(normalizer.normalize(untagged));
+      if (viaUntagged != null) {
+        return new Resolution(
+            entry.externalName(),
+            BlueprintImportStatus.MATCHED,
+            viaUntagged,
+            entry.suggestedAcquiredAt(),
+            List.of());
+      }
+      ResolvedProduct viaUntaggedAlias = resolveViaAlias(untagged, productByKey);
+      if (viaUntaggedAlias != null) {
+        return new Resolution(
+            entry.externalName(),
+            BlueprintImportStatus.MATCHED_BY_ALIAS,
+            viaUntaggedAlias,
+            entry.suggestedAcquiredAt(),
+            List.of());
+      }
+    }
+
     List<BlueprintImportSuggestionDto> suggestions =
         fuzzyMatcher.topSuggestions(
-            normalized,
+            untagged != null ? normalizer.normalize(untagged) : normalized,
             allProducts,
             BlueprintFuzzyMatcher.DEFAULT_LIMIT,
             BlueprintFuzzyMatcher.DEFAULT_THRESHOLD);
