@@ -969,7 +969,7 @@ certificate rotation*, *Token rotation*
 ### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> Before the first exchange release, `maxmemory` rises from 384 MB to a fixed **768 MB** and the container limit to **1024 MB** (ADR-0221, owner decision 2026-09-26), checked against host RAM; the Redis memory alerts follow. It is a gated production write (WP 2.1, #2092).
+> Since WP 2.1 (#2092) the repository carries `maxmemory` **768mb** in a **1024M** container (ADR-0221, owner decision 2026-09-26) — the exchange's bounded 64 MB partition plus headroom. It reaches production with the next release and its Quadlet units; that rollout is an owner-approved production step and must precede the first exchange release.
 
 The Redis instance backing Spring Session (frontend) and the ingest handoff staging runs with a
 durability and memory posture matched to a store whose loss forces users to re-login — **not** a
@@ -984,7 +984,7 @@ throwaway cache (Redis is session-store only, ADR-0074):
   The probe was corrected instead (see the observability bullet below). Both files live on the
   `/var/iri/redis` bind mount and are **excluded from off-site backups** (REQ-OPS-010 — sessions transparently re-login). The
   `appendfsync always` mode (one fsync per write, the pre-M-7 pathology) is deliberately **not** used.
-- **Bounded memory — explicit ceiling below the cgroup.** `--maxmemory 384mb` sits below the 512 MB
+- **Bounded memory — explicit ceiling below the cgroup.** `--maxmemory 768mb` (ADR-0221; 384mb until WP 2.1 of epic #2078) sits below the 1024 MB
   container limit, leaving copy-on-write headroom for the RDB / AOF-rewrite forks and fragmentation,
   so Redis manages the boundary itself instead of ceding it to the kernel OOM-killer. Raised from
   `192mb` / 256 MB by ADR-0085 for the 5000-account session index; this requirement kept quoting the
@@ -1014,15 +1014,15 @@ posture has ever had on the **primary** durability layer.
 **Acceptance**
 
 - [ ] Both redis command lines in `docker-compose.yml` set `--appendonly yes --appendfsync everysec`,
-  `--save "60 1"`, `--maxmemory 384mb`, and `--maxmemory-policy noeviction`; the prod override keeps
+  `--save "60 1"`, `--maxmemory 768mb`, and `--maxmemory-policy noeviction`; the prod override keeps
   `--aclfile` and the two lines carry identical persistence/memory flags and
   `--notify-keyspace-events Egx`.
-- [ ] `--maxmemory` (384mb) is strictly below the container memory limit (512M) so a snapshot /
+- [ ] `--maxmemory` (768mb) is strictly below the container memory limit (1024M) so a snapshot /
   AOF-rewrite fork has copy-on-write headroom.
 - [ ] The eviction policy is `noeviction`; no `allkeys-*` / `volatile-*` policy is configured.
 - [ ] `RedisMemoryHigh`, `RedisEvictions`, `RedisRdbStale`, `RedisRdbSaveFailing` and
   `RedisAofWriteFailing` exist in `infrastructure.yml` and their descriptions match this posture
-  (384mb maxmemory, noeviction semantics, AOF-primary durability).
+  (768mb maxmemory, noeviction semantics, AOF-primary durability).
 - [ ] `RedisRdbStale` carries the `and redis_rdb_changes_since_last_save > 0` guard, so an idle store
   with an ageing snapshot does not page. Pinned by
   `monitoring/prometheus/tests/redisrdbstale_idle_guard_test.yml`.
@@ -1161,8 +1161,10 @@ the 7-day production peaks ending 2026-08-03 (#937); "2026-09-13" rows are the C
 under real use, whose stall is `throttled seconds / throttled periods`. A CPU quota is a burst
 ceiling (rule 5), so its headroom is the stall it removes, not a multiple.
 
-**Sum of memory limits** (recomputed 2026-09-25 from the declared values): app 9792 MiB +
-monitoring 4208 MiB = **14 000 MiB (13.67 GiB)**, under ADR-0085's ~14 GB trigger. The 2026-09-13
+**Sum of memory limits** (recomputed 2026-09-26 from the declared values): app 10 304 MiB +
+monitoring 4208 MiB = **14 512 MiB (14.17 GiB)**, **above** ADR-0085's ~14 GB trigger since Redis
+went to 1024M (ADR-0221) — accepted by the owner on 2026-09-26 as rule 7 requires, recorded in
+ADR-0085's status line. It was 14 000 MiB (13.67 GiB) on 2026-09-25. The 2026-09-13
 figure of 4368 MiB monitoring still counted `cadvisor` (128M) and the docker-socket proxy (32M),
 both removed 2026-09-22. CPU quotas total 17.0 vCPU on 8 physical (overcommit is intended).
 
@@ -1187,8 +1189,8 @@ both removed 2026-09-22. CPU quotas total 17.0 vCPU on 8 physical (overcommit is
 | backend     | `MaxRAMPercentage` / `InitialRAMPercentage` | 57 / 35              | heap 684 committed / 647 used; overhead 438 MB (nonheap 230 + other native 208, 2026-07-25)                       | ceiling 1167 MB = 1.7× committed; 1167 + 438 = 1605 MB = 78 % of limit; initial 717 MB     |
 | backend     | `cpus`                                      | 3.0                  | 2026-09-13: 19.2 s over 418 events in 13 h (46 ms stall)                                                          | burst ceiling                                                                              |
 | backend     | Hikari `maximum-pool-size` (application-prod.yml) | 100            | active peak 10, total 30, pending 0, timeouts 0, acquire max 0.444 s                                              | ~10× demand; kept for the ADR-0078 live-update burst; re-open only if pending stays 0 through one |
-| redis       | `memory`                                    | 512M                 | `rss` peak 28.5 MB (5.6 %)                                                                                        | above `maxmemory` for the RDB/AOF-rewrite fork's copy-on-write pages                       |
-| redis       | `maxmemory` (`noeviction`)                  | 384mb                | used peak 7.07 MB (1.8 %), 8191 keys, 0 evictions; linear projection to 5000 accounts ≈ 43 MB                      | ~9× the projection; at the ceiling writes are refused (ADR-0079)                           |
+| redis       | `memory`                                    | 1024M                | `rss` peak 28.5 MB (at the 512M limit then)                                                                       | above `maxmemory` for the RDB/AOF-rewrite fork's copy-on-write pages                       |
+| redis       | `maxmemory` (`noeviction`)                  | 768mb                | used peak 7.07 MB (1.8 %), 8191 keys, 0 evictions; linear projection to 5000 accounts ≈ 43 MB                      | the session projection plus the exchange's 64 MB budget, with room (ADR-0221); at the ceiling writes are refused (ADR-0079) |
 | redis       | `cpus`                                      | 1.0                  | 545 s throttled in 7 days (0.661 % average); use 0.015 cores at peak                                              | burst room for the single-threaded loop plus AOF/RDB threads                               |
 | frontend    | `memory`                                    | 1792M                | heap 529 committed (2026-07-25), 493 committed / 472 used (#937); overhead ~406–420 MB                            | at HotSpot's 1792 MB server-class line (ADR-0175); G1 is also set explicitly               |
 | frontend    | `MaxRAMPercentage` / `InitialRAMPercentage` | 50 / 35              | as above                                                                                                          | ceiling 896 MB = 1.7× committed; 896 + ~420 = 73 % of limit; initial 627 MB                |

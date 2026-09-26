@@ -239,7 +239,7 @@ x-backend: &backend-template
 
 x-redis: &redis-template
   image: redis:8-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
-  command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+  command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: unless-stopped
   logging: *default-logging
   security_opt:
@@ -255,7 +255,7 @@ x-redis: &redis-template
   deploy:
     resources:
       limits:
-        memory: 512M
+        memory: 1024M
         cpus: '1.0'
         pids: 512
   healthcheck:
@@ -380,7 +380,7 @@ services:
     <<: *redis-template
     profiles: ["prod"]
     container_name: redis
-    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
+    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
     volumes:
       - /var/iri/redis:/data
       - ${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}:/etc/redis/users.acl:ro
