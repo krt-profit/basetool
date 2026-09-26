@@ -279,7 +279,7 @@ area (the 2026-09-12 edge and 2026-09-16 acme gaps).
 **Under Quadlet the units are part of the delivered definition.** The compose files stay the source:
 `scripts/generate-quadlet.py` generates `quadlet/systemd/` and `quadlet/env.d/*.env.tmpl` from them,
 both are committed, and `repo-lint.yml` (`quadlet-drift`) fails a change whose units no longer match
-the compose files. On a config change `deploy.sh` renders one environment file per service from the
+the compose files. A Dependabot compose bump regenerates them on its own branch (REQ-OPS-035). On a config change `deploy.sh` renders one environment file per service from the
 host's `.env` (`scripts/render-env-d.py`, which refuses to write a half-rendered set), installs every
 unit the bundle names into the service user's delivery directory
 (`/etc/containers/systemd/users/<uid>/`), **stops** a unit the bundle no longer names before removing
@@ -2289,6 +2289,46 @@ that has no entry at all, before it is used.
 **Decision:** [ADR-0208](../adr/0208-gradle-verifies-every-dependency-against-a-committed-sha-256.md)
 · **Related:** REQ-OPS-025 (the SBOMs describing what these artifacts become), REQ-OPS-021 (one
 image build per commit)
+
+### REQ-OPS-035 — A Dependabot compose bump carries its regenerated units
+
+Dependabot's `docker-compose` ecosystem edits `docker-compose*.yml` only, while production runs the
+Quadlet units generated from them (REQ-OPS-004). A compose image bump is therefore **completed on its
+own branch before it can merge**: `.github/workflows/dependabot-compose.yml` re-resolves each digest the
+bump pins to the index its tag names now, regenerates `quadlet/` with `scripts/generate-quadlet.py`,
+fixes the documented monitoring pins with `scripts/check-monitoring-image-pins.sh --fix`, and commits
+the result onto the Dependabot branch.
+
+- **Only a compose bump is completed.** The run refuses a branch holding any commit that is not
+  Dependabot's (compose files only) or the `basetool-release` App's, and any merge commit; a refused or
+  failed run leaves the PR red on `Repository gates`, as before.
+- **The commit triggers the required checks.** It is created with a `basetool-release` App token
+  (`contents: write`) read from the Dependabot secret `RELEASE_APP_PRIVATE_KEY`, through
+  `createCommitOnBranch`, so GitHub signs it; `GITHUB_TOKEN` is never used for it, because its commits
+  trigger no workflow.
+- **It passes the DCO check as a bot commit**: its author `basetool-release[bot]` is in `dco.yml`'s bot
+  list, and its `Signed-off-by` matches the author.
+- **A digest that cannot be resolved is kept and warned about**, never dropped; the workflow never
+  adds or removes a file.
+- **No `pull_request_target` or `workflow_run` trigger** is used for it.
+
+**Acceptance**
+
+- [ ] A Dependabot PR that bumps a compose image gains one `basetool-release[bot]` commit updating the
+  affected `quadlet/systemd/*.container` files (and any documented monitoring pin), and `Repository
+  gates` is green on the new head without a human commit.
+- [ ] A second run on the completed head commits nothing.
+- [ ] A Dependabot branch carrying a human commit or a merge commit is refused with an error naming
+  the commit.
+- [x] `dependabot_compose_followup.py --selftest` passes in `repo-lint.yml` (`quadlet-drift`).
+
+**Enforced by:** `.github/workflows/dependabot-compose.yml` ·
+`.github/scripts/dependabot_compose_followup.py` · `.github/scripts/create_signed_commit.py` ·
+`.github/workflows/dco.yml` (`bot_emails`) · `repo-lint.yml` (`quadlet-drift`,
+`monitoring-image-pins`) · **Decision:**
+[ADR-0215](../adr/0215-a-dependabot-compose-bump-carries-its-regenerated-units.md) · **Runbook:**
+`docs/deployment.md` → *Dependabot image bumps* · **Related:** REQ-OPS-004 (the units as the delivered
+definition)
 
 ## Open questions
 

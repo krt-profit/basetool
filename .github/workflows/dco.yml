@@ -51,6 +51,7 @@ jobs:
             'renovate[bot]@users.noreply.github.com'
             '49699333+dependabot[bot]@users.noreply.github.com'
             '41898282+github-actions[bot]@users.noreply.github.com'
+            '332641749+basetool-release[bot]@users.noreply.github.com'
           )
 
           failed=0

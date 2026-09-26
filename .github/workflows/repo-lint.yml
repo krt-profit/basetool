@@ -139,6 +139,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/generate-quadlet.test.sh
 
+      - name: quadlet-drift / Self-test the Dependabot compose follow-up
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/dependabot_compose_followup.py --selftest
+
       - name: probe-vs-allowlist / Check the edge probe against the vhost allow-list
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_probe_against_allowlist.py
