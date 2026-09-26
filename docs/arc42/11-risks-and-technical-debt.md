@@ -185,6 +185,19 @@ until then the risk is bounded, named and watched, which is the most this layer 
   at least seven days before a rollout step found it (2026-09-25, fixed the same day). No alert reads
   that line — `KeycloakErrorRateHigh`, whose comment names this very path, counts `ERROR` lines, and
   this is one `WARN` per start. The runbook's verify step now reads it; an alert is not built.
+- **A drift re-apply could destroy the only rollback anchor.** A re-apply of the deployed release
+  ("drift: frontend: no container") saved the deployed pin over `previous-digest-pin.yml` — and, with
+  the unit files gone, the deployed tree over `config-previous/`. Had that re-apply failed its gate,
+  the „rollback" would have restored the same release, paged `DeployRolledBack`, and the release
+  before it would have been unreachable by any automatic path. No failed re-apply has happened on
+  production; the 2026-09-25 17:43 re-apply succeeded, but by the code it ran it also copied the
+  v1.12.0 pin over the anchor (not read on the host). **Fixed in the
+  repository** (ADR-0083 amended 2026-09-25, `REQ-OPS-003`): a re-apply rotates no anchor, and a
+  failed one rolls nothing back and pages `DeployHealthRestartFailing`. **Closes** when the role's
+  `--tags deploy,scripts` run has put it on production. Until the next release after that, the host's
+  `previous-digest-pin.yml` may still name v1.12.0 itself rather than v1.11.0 — read it before relying
+  on an automatic rollback, and see the `promote.yml` rollback in
+  [`deployment.md`](../deployment.md) for going back further.
 
 ## 11.7 Security hardening decided but not yet carried out
 

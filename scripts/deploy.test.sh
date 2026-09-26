@@ -928,8 +928,9 @@ scenario_drift_respects_backoff() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 8: drift re-apply whose health gate fails. Must roll back, record
-# the failure for the backoff, and exit non-zero.
+# Scenario 8: drift re-apply whose health gate fails. Must record the failure
+# for the backoff and exit non-zero — and, since 2026-09-25, must NOT roll back:
+# the target is the deployed release (the anchor scenarios further down).
 # ---------------------------------------------------------------------------
 scenario_drift_reapply_fails() {
   echo "Scenario: drift re-apply fails health gate (must record failure)"
@@ -942,7 +943,7 @@ scenario_drift_reapply_fails() {
   run_deploy -- "${fake[@]}" "FAKE_PS_backend=" "FAKE_UP_RC=1" || rc=$?
   assert_exit 1 "$rc" "a failed drift re-apply exits non-zero"
   assert_contains "health check failed" "the health-gate failure is reported"
-  assert_contains "recorded health-check failure #1" "the failure feeds the backoff"
+  assert_contains "recorded re-apply failure #1" "the failure feeds the backoff"
   if grep -qF "${MARKER} 1 " "${T_STATE_DIR}/failed.digests" 2>/dev/null; then
     record 1 "failed.digests records the target marker with count 1"
   else
@@ -3319,6 +3320,238 @@ scenario_mixed_drift_does_not_stamp_an_unhealthy_stack_healthy() {
   rm -rf "${tmp}"
 }
 
+# ---------------------------------------------------------------------------
+# A drift re-apply is not a release: it never rotates the rollback anchors (2026-09-25).
+#
+# The host runs release N, and the anchors name N-1: the previous pin record, config-previous/ and
+# the previous provider JAR. A drift ("drift: frontend: no container") re-applies N. Until the fix
+# that re-apply copied N's pin over previous-digest-pin.yml on the way -- and, on a host whose unit
+# files were gone, snapshotted N's tree over config-previous/. When its gate then failed, the
+# "rollback" restored N, stamped DeployRolledBack for a release that had shipped, and N-1 was gone as
+# a rollback anchor. Against the deployer before the fix the first, second and fourth scenario below
+# fail; the third guards the other direction -- a real release still rotates the anchor.
+#
+# anchor_host <tmp> -- heal_host (converged on N, marker N, live JAR "OLD jar") plus anchors that
+# name N-1.
+# ---------------------------------------------------------------------------
+anchor_host() {
+  heal_host "$1"
+  local svc ref
+  {
+    printf 'services:\n'
+    for svc in backend frontend ingest; do
+      case "${svc}" in
+        backend) ref="ghcr.io/krt-profit/basetool-backend@${DIG_BACKEND_OLD}" ;;
+        frontend) ref="ghcr.io/krt-profit/basetool-frontend@${DIG_FRONTEND_OLD}" ;;
+        ingest) ref="ghcr.io/krt-profit/basetool-ingest@${DIG_INGEST_OLD}" ;;
+      esac
+      printf '  %s:\n    image: %s\n' "${svc}" "${ref}"
+    done
+  } > "${T_STATE_DIR}/previous-digest-pin.yml"
+  seed_release_tree "${T_STATE_DIR}/config-previous" "N-1"
+  echo "N-1 jar" > "${T_STATE_DIR}/keycloak-spi-previous.jar"
+}
+
+# seed_release_tree <dir> <label> -- a config tree whose every file names the release it belongs to,
+# with the unit files the host has, so it is a complete definition.
+seed_release_tree() {
+  local t="$1" label="$2" u
+  mkdir -p "${t}/docker/acme" "${t}/docker/edge" "${t}/monitoring/prometheus" "${t}/quadlet/systemd"
+  echo "${label} acme" > "${t}/docker/acme/publish-loop.sh"
+  echo "${label} edge" > "${t}/docker/edge/nginx.conf"
+  echo "${label} prometheus" > "${t}/monitoring/prometheus/prometheus.yml"
+  for u in "${T_UNIT_DIR}"/*.container; do
+    if [[ -e "${u}" ]]; then
+      cp "${u}" "${t}/quadlet/systemd/"
+    fi
+  done
+}
+
+# assert_anchors_keep_previous <prefix> -- every rollback anchor still names N-1.
+assert_anchors_keep_previous() {
+  local p="$1"
+  if grep -q "@${DIG_BACKEND_OLD}\$" "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null \
+     && ! grep -q "@${DIG_BACKEND}\$" "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null; then
+    record 1 "${p}: previous-digest-pin.yml still names N-1"
+  else
+    record 0 "${p}: previous-digest-pin.yml still names N-1 (it says: $(grep 'image:' "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null | head -n 1))"
+  fi
+  assert_file_says "${T_STATE_DIR}/config-previous/docker/edge/nginx.conf" "N-1 edge" \
+    "${p}: config-previous/ still holds N-1"
+  assert_file_says "${T_STATE_DIR}/keycloak-spi-previous.jar" "N-1 jar" \
+    "${p}: keycloak-spi-previous.jar still holds N-1"
+}
+
+# assert_no_deploy_stamp <metric> <description> -- deploy.prom carries no non-zero stamp for it.
+assert_no_deploy_stamp() {
+  if grep -q "^${1} [1-9]" "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 0 "$2"
+  else
+    record 1 "$2"
+  fi
+}
+
+# assert_failed_record <marker> <count> <description> -- failed.digests holds that target and count.
+assert_failed_record() {
+  if grep -qF "${1} ${2} " "${T_STATE_DIR}/failed.digests" 2>/dev/null; then
+    record 1 "$3"
+  else
+    record 0 "$3 (failed.digests: $(cat "${T_STATE_DIR}/failed.digests" 2>/dev/null || echo '<none>'))"
+  fi
+}
+
+scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back() {
+  echo "Scenario: a drift re-apply that fails its gate keeps the anchors on N-1, rolls nothing back, pages no DeployRolledBack"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  anchor_host "${tmp}"
+  printf 'frontend\n' > "${T_DOWN}"
+  mapfile -t fake < <(spi_env)
+  # The frontend container is gone and does not come back on the release the host runs.
+  run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
+  assert_exit 1 "$rc" "re-apply fails: the run fails"
+  assert_contains "drift: frontend: no container" "re-apply fails: the drift is reported"
+  assert_contains "re-applying" "re-apply fails: the re-apply path is taken"
+  assert_contains "on a re-apply of the deployed release — not rolling back" "re-apply fails: the log says nothing is rolled back"
+  assert_contains "did not come up, in start order: [frontend]" "re-apply fails: ...and names what did not come up"
+  assert_excludes "rolled back to previous digest pin" "re-apply fails: no rollback to itself is claimed"
+  assert_excludes "rollback ALSO failed" "re-apply fails: ...and none is attempted"
+  assert_excludes "deploy successful" "re-apply fails: success is never reported"
+  assert_anchors_keep_previous "re-apply fails"
+  assert_pin_binds backend "${DIG_BACKEND}" "re-apply fails: backend stays bound to the deployed release, not to N-1"
+  if grep -q "@${DIG_BACKEND}\$" "${T_STATE_DIR}/current-digest-pin.yml" 2>/dev/null; then
+    record 1 "re-apply fails: the pin record still names the deployed release"
+  else
+    record 0 "re-apply fails: the pin record still names the deployed release"
+  fi
+  assert_marker "${MARKER}" "re-apply fails: the marker still names the deployed release"
+  assert_no_deploy_stamp basetool_deploy_last_rollback_timestamp "re-apply fails: no DeployRolledBack stamp"
+  assert_no_deploy_stamp basetool_deploy_last_failure_timestamp \
+    "re-apply fails: no DeployFailed stamp either (the release had shipped)"
+  assert_health_stamp basetool_deploy_last_health_restart_failed_timestamp yes \
+    "re-apply fails: the gauge DeployHealthRestartFailing reads is stamped"
+  assert_health_stamp basetool_deploy_last_stack_healthy_timestamp no "re-apply fails: the healthy heartbeat is not stamped"
+  assert_contains "recorded re-apply failure #1" "re-apply fails: the failure is recorded"
+  assert_failed_record "${MARKER}" 1 "re-apply fails: the backoff record is keyed to the deployed target"
+
+  # Five minutes later, inside the backoff: a quiet skip, not another attempt.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
+  assert_exit 0 "$rc" "re-apply fails: the next tick inside the backoff window is a quiet skip"
+  assert_contains "in backoff window" "re-apply fails: ...and says it is backing off"
+  assert_count '^systemctl --user (start|restart|stop) ' 0 "re-apply fails: nothing is started while backing off"
+  assert_anchors_keep_previous "re-apply fails, backed off"
+  rm -rf "${tmp}"
+}
+
+scenario_reapply_that_succeeds_keeps_the_anchors() {
+  echo "Scenario: a drift re-apply that succeeds leaves every rollback anchor on N-1"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  anchor_host "${tmp}"
+  printf 'frontend\n' > "${T_DOWN}"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" || rc=$?
+  assert_exit 0 "$rc" "re-apply succeeds: the run succeeds"
+  assert_contains "re-applying" "re-apply succeeds: the re-apply path is taken"
+  assert_contains "deploy successful" "re-apply succeeds: success is reported"
+  assert_contains "${T_STATE_DIR}/previous-digest-pin.yml keeps the previous release as the rollback anchor" \
+    "re-apply succeeds: the log says the pin anchor is kept"
+  assert_starts frontend 1 "re-apply succeeds: frontend is started once"
+  assert_anchors_keep_previous "re-apply succeeds"
+  assert_pin_binds frontend "${DIG_FRONTEND}" "re-apply succeeds: frontend is bound to the deployed release"
+  assert_marker "${MARKER}" "re-apply succeeds: the marker is unchanged"
+  assert_no_deploy_stamp basetool_deploy_last_rollback_timestamp "re-apply succeeds: no rollback stamp"
+  rm -rf "${tmp}"
+}
+
+scenario_release_after_a_reapply_rotates_the_anchor_to_the_deployed_release() {
+  echo "Scenario: a real release after a failed drift re-apply rotates the anchor to N, and its rollback lands on N"
+  local tmp rc=0 dig_next
+  tmp="$(mktmp)"
+  anchor_host "${tmp}"
+  printf 'frontend\n' > "${T_DOWN}"
+  mapfile -t fake < <(spi_env)
+  # Tick 1: the re-apply fails, as above.
+  run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
+  assert_exit 1 "$rc" "release after re-apply: the re-apply fails first"
+
+  # Tick 2: release N+1 is promoted (a new backend), and its backend does not come up.
+  dig_next="$(hexdig beef5)"
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_REMOTE_BACKEND=${dig_next}" "FAKE_UNHEALTHY_DIGEST=${dig_next}" || rc=$?
+  assert_exit 1 "$rc" "release after re-apply: the failed release fails the run"
+  assert_excludes "drift:" "release after re-apply: a change of target is a release, not a drift"
+  if grep -q "@${DIG_BACKEND}\$" "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null; then
+    record 1 "release after re-apply: previous-digest-pin.yml now names N, the release that was deployed"
+  else
+    record 0 "release after re-apply: previous-digest-pin.yml now names N, the release that was deployed ($(grep 'image:' "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null | head -n 1))"
+  fi
+  assert_contains "rolled back to previous digest pin successfully" "release after re-apply: the rollback reaches health"
+  assert_pin_binds backend "${DIG_BACKEND}" "release after re-apply: the rollback lands on N, not on N-1 and not on N+1"
+  assert_metric_set basetool_deploy_last_rollback_timestamp "release after re-apply: a real rollback does page DeployRolledBack"
+  assert_failed_record "${dig_next}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}" 1 \
+    "release after re-apply: the backoff now holds N+1, and the re-apply's record is gone"
+  rm -rf "${tmp}"
+}
+
+scenario_reapply_of_lost_units_keeps_config_previous() {
+  echo "Scenario: a re-apply that re-delivers the config (unit files gone) keeps config-previous/ on N-1 and restores nothing when it fails"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  anchor_host "${tmp}"
+  write_rsync_stub
+  seed_release_tree "${T_COMPOSE_DIR}" "N"
+  local bundle="${tmp}/bundle"
+  seed_release_tree "${bundle}" "N"
+  echo "# promoted compose" > "${bundle}/docker-compose.yml"
+  # The unit files are gone, drop-ins and all; the marker and the registry still name N.
+  rm -rf "${T_UNIT_DIR}"
+  mkdir -p "${T_UNIT_DIR}"
+  mapfile -t fake < <(spi_env)
+
+  # Tick 1: the config re-delivery dies in the acme mirror, like the host's did on 2026-09-25.
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_RSYNC_FAIL_RULES=config-stage=>/docker/acme" || rc=$?
+  assert_exit 23 "$rc" "lost units, failed: the tick exits with rsync's code"
+  assert_contains "no Quadlet units on this host" "lost units, failed: the empty unit directory stages the bundle"
+  assert_contains "re-applying" "lost units, failed: ...on the re-apply path"
+  assert_contains "${T_STATE_DIR}/config-previous keeps the previous release as the rollback anchor" \
+    "lost units, failed: the deployed tree is not snapshotted over the anchor"
+  assert_anchors_keep_previous "lost units, failed"
+  assert_file_says "${T_COMPOSE_DIR}/docker/edge/nginx.conf" "N edge" \
+    "lost units, failed: the live tree stays the deployed release -- N-1 is not restored under it"
+  assert_excludes "restoring previous host config" "lost units, failed: no restore is attempted"
+  if [[ ! -f "${T_STATE_DIR}/config-apply.incomplete" ]]; then
+    record 1 "lost units, failed: no incomplete-apply marker (the tree is one release)"
+  else
+    record 0 "lost units, failed: no incomplete-apply marker (the tree is one release)"
+  fi
+  assert_no_deploy_stamp basetool_deploy_last_failure_timestamp "lost units, failed: no DeployFailed stamp"
+  assert_health_stamp basetool_deploy_last_health_restart_failed_timestamp yes \
+    "lost units, failed: the restore-failed gauge is stamped"
+  assert_failed_record "${MARKER}" 1 "lost units, failed: the backoff record is keyed to the deployed target"
+
+  # The operator fixes the owner and retries now.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy --force -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" || rc=$?
+  assert_exit 0 "$rc" "lost units, forced: the re-apply succeeds"
+  if [[ -f "${T_UNIT_DIR}/backend.container" ]]; then
+    record 1 "lost units, forced: the units are back"
+  else
+    record 0 "lost units, forced: the units are back"
+  fi
+  assert_anchors_keep_previous "lost units, forced"
+  if [[ ! -f "${T_STATE_DIR}/config-apply.incomplete" && ! -f "${T_STATE_DIR}/failed.digests" ]]; then
+    record 1 "lost units, forced: no incomplete-apply marker and no failure record remain"
+  else
+    record 0 "lost units, forced: no incomplete-apply marker and no failure record remain"
+  fi
+  rm -rf "${tmp}"
+}
+
 scenario_spi_and_apps_move_in_one_restart_window
 scenario_apps_only_restart_each_unit_once
 scenario_spi_only_is_the_whole_apply
@@ -3335,6 +3568,11 @@ scenario_heal_that_fails_is_recorded_after_the_wait
 scenario_missing_frontend_and_ingest_are_started_not_restarted
 scenario_missing_backend_is_started_not_restarted
 scenario_mixed_drift_does_not_stamp_an_unhealthy_stack_healthy
+
+scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back
+scenario_reapply_that_succeeds_keeps_the_anchors
+scenario_release_after_a_reapply_rotates_the_anchor_to_the_deployed_release
+scenario_reapply_of_lost_units_keeps_config_previous
 
 scenario_config_mirror_failure_is_recorded_and_undone
 scenario_config_restore_failure_keeps_the_anchor

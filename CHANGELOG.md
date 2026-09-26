@@ -21,6 +21,11 @@
   wartet jetzt auf alle und stellt sonst das vorige JAR wieder her (`DeployFailed`), statt Erfolg zu
   melden, während Frontend und Ingest noch ohne Container sind. Wirkt erst nach einem Lauf der
   Ansible-Rolle (`--tags deploy,scripts`).
+- **Deploy: ein Drift-Re-Apply überschreibt den Rollback-Anker nicht mehr.** Stellt `deploy.sh`
+  dasselbe Release wieder her (z. B. „frontend: no container"), bleiben voriger Pin, `config-previous/`
+  und voriges JAR beim Vorgänger; scheitert es, wird nichts zurückgerollt und
+  `DeployHealthRestartFailing` statt eines falschen `DeployRolledBack` gemeldet. Wirkt erst nach einem
+  Lauf der Ansible-Rolle (`--tags deploy,scripts`).
 
 ## [v1.12.0](https://github.com/krt-profit/basetool/releases/tag/v1.12.0) - 2026-09-25
 

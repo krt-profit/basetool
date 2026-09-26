@@ -156,6 +156,26 @@ the stateful-infra gate holds back (REQ-OPS-006) leaves no pin behind. A restore
 is reported as an inconsistent tree, and `config-apply.incomplete` stops the next tick from
 snapshotting that tree over `config-previous/`.
 
+**The rollback anchors move only with the target.** `previous-digest-pin.yml`, `config-previous/`
+(the previous units with it) and `keycloak-spi-previous.jar` name the release *before* the deployed
+one, and nothing else on the host remembers it. Only a run whose target differs from the last
+deployed one rotates them. A drift re-apply of the deployed release (REQ-OPS-013) rewrites the pin,
+and on a host whose unit files are gone the config too, but it saves no pin, takes no snapshot and
+writes no `config-apply.incomplete`. A re-apply that fails — at its health gate or before it — rolls
+nothing back, because its target *is* the deployed release: it leaves the release and the anchors
+where they are, records the failure in the bad-digest backoff (keyed to the deployed target), and
+stamps `basetool_deploy_last_health_restart_failed_timestamp` (`DeployHealthRestartFailing`, "the
+running release could not be restored") rather than a deploy outcome. `DeployRolledBack` therefore
+means a rollback to a different release, always.
+
+> [!bug] Added 2026-09-25 — a re-apply rotated the anchors until then
+> The pin save ran on every apply, so a drift re-apply ("drift: frontend: no container") copied the
+> deployed pin over `previous-digest-pin.yml`, and a host with no unit files snapshotted the deployed
+> tree over `config-previous/`. If that re-apply then failed its gate, the „rollback" restored the
+> release it was already on, fired `DeployRolledBack` for a release that had shipped, and the real
+> previous release was gone as an anchor. Replayed by `scripts/deploy.test.sh`
+> (`scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back` and the three after it).
+
 > [!bug] Added 2026-09-25 — this path was silent until then
 > v1.11.0 met a root-owned `/var/iri/code/docker/acme`. Every tick from 12:25 to 12:35 mirrored three
 > subtrees, died on rsync exit 23 inside `mirror_dir`, and ended under `set -e` with no FATAL line, no
@@ -190,8 +210,15 @@ snapshotting that tree over `config-previous/`.
 - [ ] A directory the apply would mirror into that the deploy account does not own or cannot write
   is refused before the snapshot and before any mirror, with a line naming the path; a release held
   back by the stateful-infra gate writes no digest pin.
+- [ ] A drift re-apply of the deployed release — successful or not, with or without a config
+  re-delivery — leaves `previous-digest-pin.yml`, `config-previous/` and
+  `keycloak-spi-previous.jar` naming the release before it, and writes no `config-apply.incomplete`.
+- [ ] A failed drift re-apply restores nothing, writes neither `basetool_deploy_last_rollback_timestamp`
+  nor `basetool_deploy_last_failure_timestamp`, records the deployed target in the bad-digest backoff
+  and stamps `basetool_deploy_last_health_restart_failed_timestamp`. A later release rotates the
+  anchor to the deployed release, and its rollback lands there.
 
-**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `assert_config_tree_writable`,
+**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `REAPPLY` / `record_reapply_failure`, `assert_config_tree_writable`,
 `restore_previous_config_tree`) · `scripts/lib/container-runtime.sh`
 (`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`) · `frontend/src/main/resources/application.yml`
 (`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · `scripts/deploy.test.sh` · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Troubleshooting*
@@ -435,7 +462,10 @@ distinguishes two classes, and the case where both occur:
 
 - **Structural** — a missing container, or one on a non-target image: the release is wrong, so the
   run falls through to the normal apply path (verify, pin, pull, apply), still honouring the
-  bad-digest backoff so a persistently-failing target does not flap every tick.
+  bad-digest backoff so a persistently-failing target does not flap every tick. It re-applies the
+  **same** release, so it is not a release: it rotates no rollback anchor, and a re-apply that fails
+  rolls nothing back — it is recorded in that backoff and as `DeployHealthRestartFailing`, never as
+  `DeployRolledBack` or `DeployFailed` (REQ-OPS-003, since 2026-09-25).
 - **Health only** — every divergent container is on the target image but not healthy: the release
   is right and the runtime is sick, so `deploy.sh` restarts **only** those services, with no pull,
   no signature re-verification and no release rollback, throttled by its own backoff
@@ -552,7 +582,8 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
   requires — and a drift re-apply that leaves an unhealthy at-target container alone stamps no
   healthy heartbeat.
 - [ ] A drift re-apply of a target inside the bad-digest backoff window is skipped like any
-  other re-apply of that target; a failed drift re-apply records the failure for the backoff.
+  other re-apply of that target; a failed drift re-apply records the failure for the backoff,
+  stamps the `deploy-health.prom` failure gauge, and does not roll back (REQ-OPS-003).
 - [ ] `deploy.sh --check-only` over a drifted stack reports "would re-apply" and applies
   nothing.
 - [ ] A container inside its healthcheck start period does not trigger a drift re-apply (but a
