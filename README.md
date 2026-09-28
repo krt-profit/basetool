@@ -44,28 +44,38 @@ The full permission model is in [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS
 ### High-level architecture
 
 ```
-┌──────────────┐         ┌─────────────┐         ┌──────────────┐          ┌──────────────┐          ┌───────────────────┐
-│   Browser    │ ──SSO──►│   Keycloak  │◄────────│   Backend    │◄──relay──│    Ingest    │◄──token──│ Desktop Extractor │
-│              │         │  (OIDC IdP) │  JWT    │ (REST, JPA)  │ internal │(edge gateway)│  calls   │  + exchange apps  │
-└──────┬───────┘         └─────────────┘         └──────┬───────┘          └──────────────┘  (HTTPS) └───────────────────┘
-       │                                                 │
-       │                ┌─────────────┐                  │
-       └───HTML/CSS────►│  Frontend   │──WebClient──────►│
-                        │ (Thymeleaf) │   bearer-token   │
-                        └──────┬──────┘                  │
-                               │                         │
-                               ▼                         ▼
-                         ┌─────────┐               ┌──────────┐
-                         │  Redis  │               │ Postgres │
-                         │(session)│               │  (data)  │
-                         └─────────┘               └──────────┘
+   Browser                     Android app            SC Extractor · VerseKit
+      │                             │                 (approved exchange clients)
+      │ HTTPS                       │ HTTPS                       │ HTTPS, DPoP-bound tokens
+      ▼                             ▼                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ edge — haproxy (TCP) → nginx: TLS, one vhost per public name, rate limits, deny rules   │
+└─────┬───────────────────────────────┬─────────────────────────┬─────────────────┬───────┘
+      │ profit-base.online            │ api.                    │ ingest.         │ /auth
+      ▼                               ▼                         ▼                 ▼
+┌─────────────┐   WebClient    ┌──────────────┐  relay   ┌──────────────┐  ┌─────────────┐
+│  Frontend   │ ─── bearer ──► │   Backend    │ ◄─────── │    Ingest    │  │  Keycloak   │
+│ (Thymeleaf) │                │ (REST, JPA)  │ internal │ exchange API │  │ OIDC · SPI  │
+└─────────────┘                └──────┬───────┘          └──────────────┘  │ KRT theme   │
+                                      │                                    └──────┬──────┘
+                              ┌───────┴──────┐                                    │
+                              ▼              ▼                                    ▼
+                       ┌────────────┐  ┌────────────┐                      ┌─────────────┐
+                       │ PostgreSQL │  │   Redis    │ ◄── frontend,        │ PostgreSQL  │
+                       │ db-backend │  │            │     ingest           │ db-keycloak │
+                       └────────────┘  └────────────┘                      └─────────────┘
 ```
 
-- **Backend** — REST API only (`/api/v1/...`), Spring Boot on Java 25, JPA / Flyway / PostgreSQL. Never serves HTML.
-- **Frontend** — Thymeleaf-rendered UI calling the backend via a centrally-configured, Resilience4j-wrapped WebClient. No business logic of its own; no direct database or Keycloak Admin API access.
-- **Keycloak** — OAuth2 / OIDC identity provider with a custom KRT theme and a `keycloak-spi` provider JAR (Discord login, the guild/role login gate, the `basetool-exchange` admin extension that ends one client inside shared sessions (ADR-0226) and the `krt-freemarker` login forms that show the device code on the consent page (ADR-0228)).
-- **Redis** — Spring Session store (sessions survive frontend restarts), the live-sync and notification pub/sub, the ingest handoffs, the exchange registry mirror and the gateway's byte-bounded exchange partition (ADR-0221).
-- **Ingest** — the internet-facing gateway for approved client software, the SC Extractor included: the exchange API `/exchange/v1/**`, reads, writes and drafts ([`docs/specs/external-exchange.md`](docs/specs/external-exchange.md)); the extractor's former `/v1` routes were removed on 2026-09-28. It owns no database and relays token-authenticated requests to the backend over the internal network, so no client ever reaches the backend itself. (The backend's only internet path is the default-deny API vhost for the Android app, ADR-0135.) **Restricted interface:** only client software explicitly approved by the basetool developer (@greluc) may use it — enforced technically through the client registry at the gateway (`REQ-XCH-002/-003`) and binding on users through section 4 of the Terms of Use (`REQ-SEC-027`, [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md)).
+The drawing shows the request path. Beside it, the frontend, backend and ingest reach Keycloak for the login, token validation and their own service tokens, and the backend alone uses the Keycloak Admin API. The building blocks are described in [arc42 §5](docs/arc42/05-building-block-view.md), and their deployment in [§7](docs/arc42/07-deployment-view.md).
+
+- **Edge** — a host-level haproxy forwards TCP to the rootless nginx `edge` with a PROXY v2 header (ADR-0187). nginx terminates TLS for `profit-base.online` (with Keycloak under `/auth`), `api.`, `ingest.` and `grafana.profit-base.online`, and applies per-vhost rate limits and deny-by-default rules. An `acme` (lego) container renews the certificates.
+- **Frontend** — the Thymeleaf-rendered UI. It calls the backend via a centrally-configured, Resilience4j-wrapped WebClient with the member's bearer token and keeps its sessions in Redis. Live updates reach the browser over `/ws/sync` and an SSE stream. No business logic of its own, and no direct database or Keycloak Admin API access.
+- **Backend** — REST API only (`/api/v1/...`), Spring Boot on Java 25, JPA / Flyway / PostgreSQL. It never serves HTML and is the only component with the domain database. It fetches game data from [UEX](https://uexcorp.space/) and the Star Citizen wiki. Its only internet path is the default-deny `api.` vhost for the Android app (ADR-0135).
+- **Ingest** — the internet-facing gateway for approved client software, the SC Extractor included: the exchange API `/exchange/v1/**` with reads, writes and drafts ([`docs/specs/external-exchange.md`](docs/specs/external-exchange.md)). The extractor's former `/v1` routes were removed on 2026-09-28. The gateway owns no database. It relays token-authenticated requests to the backend over the internal network under its own service identity, so no client ever reaches the backend itself. **Restricted interface:** only client software explicitly approved by the basetool developer (@greluc) may use it. This is enforced technically through the client registry at the gateway (`REQ-XCH-002/-003`) and binds users through section 4 of the Terms of Use (`REQ-SEC-027`, [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md)). The approved clients are listed in [`docs/legal/approved-clients.md`](docs/legal/approved-clients.md).
+- **Keycloak** — the OAuth2 / OIDC identity provider, with its own PostgreSQL, the KRT theme and a `keycloak-spi` provider JAR. The SPI provides the Discord login and its guild/role gate, the `basetool-exchange` admin extension that ends one client inside shared sessions (ADR-0226), and the `krt-freemarker` login forms that show the device code on the consent page (ADR-0228). Exchange clients sign in with the device grant, per-capability consent and DPoP-bound tokens.
+- **Redis** — Spring Session store (sessions survive frontend restarts), the live-sync and notification pub/sub, the ingest handoffs, the exchange registry mirror and the gateway's byte-bounded exchange partition (ADR-0221). One instance serves frontend, backend and ingest, each with its own ACL user.
+- **Monitoring** — Prometheus, Alertmanager, Loki, Tempo, Grafana (the only monitoring component with a public route) and the blackbox and data-store exporters, plus Alloy and node-exporter as host services ([`monitoring/`](monitoring/)).
+- **Runtime** — production runs every container as rootless Podman under Quadlet units on a single host ([`quadlet/`](quadlet/)), pulling signed images promoted from GitHub Container Registry. Local development and the test stacks use Docker Compose.
 
 The tenant unit is the **OrgUnit** — a Staffel (`SQUADRON`), Spezialkommando (`SPECIAL_COMMAND`), Bereich (`BEREICH`) or Organisationsleitung (`ORGANISATIONSLEITUNG`), the latter two stacked above the Staffeln/SKs. Staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder) carry an `owning_org_unit_id` (nullable for deliberate *ownerless* rows). Job Orders are scoped separately via `responsible_org_unit_id` (the processing unit, governs visibility) and `requesting_org_unit_id` (the customer). See [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) for the full per-aggregate scope model.
 
