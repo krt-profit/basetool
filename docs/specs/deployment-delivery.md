@@ -971,9 +971,12 @@ certificate rotation*, *Token rotation*
 > [!note] Planned — the production rollout (epic #2078, WP 2.1, #2092)
 > Built in the repository: both command lines below carry `--maxmemory 768mb` in a 1024M container
 > (ADR-0221), sized for the exchange's bounded 64 MB partition (REQ-XCH-023) plus headroom. Still
-> to come: as of 2026-09-27 no release tag carries it. It reaches production with the next release
-> and its Quadlet units, an owner-approved production step that must precede the first exchange
-> release.
+> to come: no release tag carries it yet. It reaches production **with** the release that carries the
+> exchange (1.13.0, planned 2026-09-29): its Quadlet unit restarts Redis in that release's restart
+> window, with the exchange still switched off. An application rollback to an earlier release
+> restores that release's unit, and with it `384mb` in 512 MB. *Corrected 2026-09-28:* this said the
+> resize was a production step that had to precede the first exchange release, which the unit makes
+> impossible (ADR-0221 amendment 2).
 
 The Redis instance backing Spring Session (frontend) and the ingest handoff staging — and, for the
 exchange, the backend's registry mirror, revocations and key deny list under `exchange:*` and the
@@ -1174,7 +1177,10 @@ ceiling (rule 5), so its headroom is the stall it removes, not a multiple.
 **Sum of memory limits** (recomputed 2026-09-26 from the declared values): app 10 304 MiB +
 monitoring 4208 MiB = **14 512 MiB (14.17 GiB)**, **above** ADR-0085's ~14 GB trigger since Redis
 went to 1024M (ADR-0221) — accepted by the owner on 2026-09-26 as rule 7 requires, recorded in
-ADR-0085's status line. It was 14 000 MiB (13.67 GiB) on 2026-09-25. The 2026-09-13
+ADR-0085's status line. It was 14 000 MiB (13.67 GiB) on 2026-09-25. On the production host,
+where `alloy` (512M) and `node-exporter` (32M) are host services without a container limit, the
+18 Quadlet units' `Memory=` lines sum to **13 968 MiB** with Redis at 1024M (13 456 MiB before it;
+read on production 2026-09-28, ADR-0221 amendment 2). The 2026-09-13
 figure of 4368 MiB monitoring still counted `cadvisor` (128M) and the docker-socket proxy (32M),
 both removed 2026-09-22. CPU quotas total 17.0 vCPU on 8 physical (overcommit is intended).
 

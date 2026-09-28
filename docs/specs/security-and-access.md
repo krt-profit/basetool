@@ -4755,7 +4755,10 @@ template is the reference) · **Code:** `keycloak-theme/krt-theme/login/login.ft
 
 > [!note] Planned — rendering the exchange lines on production (epic #2078, WP 2.1, #2092)
 > The template below carries the exchange's key families (ADR-0221). Re-rendering and loading it on
-> production is a gated write that must precede the first exchange release.
+> production is a gated write that must precede the release carrying the exchange (1.13.0, planned
+> 2026-09-29): from that release on the gateway reads `exchange:registry` every 30 s as
+> `basetool-ingest`, and the old rules refuse it (`RedisAclDenials`). Earlier releases run unchanged
+> on the new rules, so the ACL stays in place on an application rollback.
 
 Redis holds the frontend's sessions — OAuth2 access **and refresh** tokens included — the live-sync
 and notification fan-out, and the ingest handoff. Backend, frontend and ingest used to reach it as

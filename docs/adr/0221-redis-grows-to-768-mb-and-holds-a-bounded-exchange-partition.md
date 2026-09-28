@@ -2,8 +2,8 @@
 
 - **Status:** Accepted — owner gate G0 of epic [#2078](https://github.com/krt-profit/basetool/issues/2078),
   taken with the merge of #2111 and #2112 (2026-09-26); implemented on main by 2026-09-28 (the Redis size #2115, the partition and the
-  ACL rows with epic #2078); the production resize and ACL render follow with the go-live
-  ([#2092](https://github.com/krt-profit/basetool/issues/2092)). Amends [ADR-0085](0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md) (the
+  ACL rows with epic #2078); the production ACL render precedes the go-live release and the resize
+  arrives with it ([#2092](https://github.com/krt-profit/basetool/issues/2092), amendment 2). Amends [ADR-0085](0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md) (the
   Redis ceiling) and [ADR-0207](0207-each-service-reaches-redis-as-its-own-acl-user.md) (two new key
   families in the ACL).
 - **Date:** 2026-09-26
@@ -81,3 +81,25 @@ Decision 2's "counted exactly" overstated it: the per-entry charge for the sets'
 fixed estimate, so the budget bounds the exchange's data within a known margin rather than
 measuring Redis's memory byte for byte. A quota counter is created with its expiry by `SET NX EX`
 before its `INCR`, so it can no longer lose its expiry (second review, L8).
+
+## Amendment 2 (2026-09-28) — the resize arrives with the release, and leaves with a rollback
+
+**Status:** accepted · **Spec:** `REQ-OPS-018` · **Runbook:** `docs/EXCHANGE_GO_LIVE_RUNBOOK.md`
+
+Decision 1 placed the resize „before the first exchange release". It cannot be a step of its own:
+`--maxmemory 768mb` and `Memory=1024M` are lines of the generated `redis.container` unit, and units
+reach production only with a release. The release that carries them is the one that carries the
+exchange, so the resize lands in its deploy — Redis restarts once, in the release's restart window,
+with the exchange still switched off and its registry empty. The ACL render (decision 3) is what has
+to come first: from that release on the gateway reads `exchange:registry` every 30 s.
+
+The go-live plan also said Redis's size „stays" on an application rollback. It does not: a promotion
+of an earlier release restores that release's units, so Redis returns to `384mb` in 512 MB and
+restarts again. The rendered ACL does stay; the earlier releases run unchanged on it.
+
+The container-limit sum in the consequences is the compose files' figure, 14 512 MiB. The production
+host runs Quadlet units, and there `alloy` (512 MiB in the compose file) and `node-exporter` (32 MiB)
+are host services without a container limit, so the 18 units' `Memory=` lines sum to **13 968 MiB**
+with Redis at 1024 MB (13 456 MiB before; read on production 2026-09-28). Both figures are right for
+what they count; the host's own ceiling is the unit sum, and alloy and node-exporter still use host
+memory outside it.
