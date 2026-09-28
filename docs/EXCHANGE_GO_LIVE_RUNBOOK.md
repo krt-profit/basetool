@@ -182,8 +182,9 @@ after the VerseKit approval, on a later date. Until S11 the exchange stays dorma
 ## 3. TO BE READ — production values, all read-only
 
 Each command changes nothing and prints no secret. The coordinator read everything that needs no
-`podman exec` on **2026-09-28** (marked below); the `podman exec`-based reads (R5, R6's `INFO`, R9,
-R12, R16) are treated as gated and stay **TO BE READ on the day**, with the owner's yes. Re-run the
+`podman exec` on **2026-09-28** (marked below); the `podman exec`-based reads are treated as gated.
+With the owner's yes the same day it also read R6's `INFO`, R16 and part of R12; R5, R9 and R12's full
+snapshot stay **TO BE READ on the day**, with the owner's yes. Re-run the
 others on 2026-09-29 before S1; any answer other than the expected one stops the step that depends
 on it.
 
@@ -194,17 +195,17 @@ on it.
 | R3 | Installed scripts vs `main` | `sha256sum /var/iri/code/scripts/{deploy.sh,render-env-d.py,render-redis-acl.py,redis-users.acl.tmpl}` — compare on the workstation with `git show origin/main:scripts/<file> \| sha256sum` | equal → S1 can be skipped; different → S1 · *Read 2026-09-28:* all four differ from `origin/main` (the host's template equals v1.12.0's byte for byte) → **S1 is needed**. |
 | R4 | The live ACL file | `stat -c '%U:%G %a %i' /var/iri/redis/users.acl; grep -c '^user default ' /var/iri/redis/users.acl; grep -c '>' /var/iri/redis/users.acl` | `root:root 644 <inode>`; `1`; `0` · *Read 2026-09-28:* `root:root 644`, inode 708; `1`; `0`. |
 | R5 | The live ACL grants | `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL DRYRUN basetool-backend SET exchange:registry x'` and `… ACL DRYRUN basetool-ingest EVALSHA 0000000000000000000000000000000000000000 1 ingest:xch:probe` | before S3: both refused, naming the key or the command; after S3: `OK` · **TO BE READ on the day** (exec-based — treated as gated, with the owner's yes). |
-| R6 | Redis memory now and at its peak | `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin INFO memory' \| grep -E '^(used_memory\|used_memory_peak\|used_memory_rss\|maxmemory):'`; Grafana → Explore: `max_over_time(redis_memory_used_bytes[30d])`, `max_over_time(redis_memory_used_rss_bytes[30d])`, `redis_memory_max_bytes` | peak well under 384 MB (`maxmemory` 402653184 until S6) `INFO memory` · **TO BE READ on the day** (exec-based, gated); the PromQL through the Grafana UI (no host listener on 9090/3000). |
+| R6 | Redis memory now and at its peak | `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin INFO memory' \| grep -E '^(used_memory\|used_memory_peak\|used_memory_rss\|maxmemory):'`; Grafana → Explore: `max_over_time(redis_memory_used_bytes[30d])`, `max_over_time(redis_memory_used_rss_bytes[30d])`, `redis_memory_max_bytes` | peak well under 384 MB (`maxmemory` 402653184 until S6) · *Read 2026-09-28 (owner-approved exec):* `used_memory_human:4.26M`, `used_memory_peak_human:4.55M` (since the last Redis start), `maxmemory_human:384.00M`. The 30-day PromQL peak only through the Grafana UI — Prometheus answers `401` inside its own container and has no host listener. |
 | R7 | Host RAM headroom | `free -m`; Grafana → Explore: `min_over_time(node_memory_MemAvailable_bytes[30d])`, `node_memory_MemTotal_bytes`; `grep -h '^Memory=' /etc/containers/systemd/users/${IRI_UID}/*.container` | the 30-day minimum of available memory well above the 512 MiB the Redis limit grows by · *Read 2026-09-28:* 15 345 MiB total, 10 587 MiB available, no swap; unit `Memory=` sum 13 456 MiB today, **13 968 MiB** with Redis at 1024M. |
 | R8 | Exchange and ingest switches in `.env` | `grep -cE '^APP_EXCHANGE_MIRROR_ENABLED=' $ENVF; grep -cE '^IRI_INGEST_LEGACY_ENDPOINTS_ENABLED=' $ENVF; grep -c '^IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor$' $ENVF; grep -cE '^IRI_INGEST_CLIENT_AUDIT_ONLY=(true\|"true")$' $ENVF; grep -cE '^IRI_INGEST_PUBLIC_BASE_URL=https://ingest\.profit-base\.online$' $ENVF; grep -cE '^APP_INVENTORY_STOLEN_MARKING_ENABLED=' $ENVF` | `0`, `0`, `1`, `0`, `1`, `0` · *Read 2026-09-28:* exactly as expected — **both new ingest start-up guards pass**. |
 | R9 | The same, as the running ingest sees it | `for v in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY APP_INGEST_PUBLIC_BASE_URL; do printf '%s=' $v; ${UPOD} exec ingest printenv $v; done` | `basetool-sc-extractor`, `false`, `https://ingest.profit-base.online` · **TO BE READ on the day** (exec-based, gated). |
 | R10 | Android floor | `grep -E '^APP_ANDROID_(MINIMUM\|LATEST)_VERSION_CODE=[0-9]+$' $ENVF`; off the host: `curl -s https://api.profit-base.online/api/v1/app/version-policy` | `16` / `16` (vault *Android App*, 2026-09-25) · *Read 2026-09-28:* 16 / 16. |
 | R11 | Redis users in `.env` | `grep -cE '^REDIS_(BACKEND\|INGEST\|FRONTEND)_USERNAME=' $ENVF; grep -c '^REDIS_DEFAULT_USER=off$' $ENVF` | `3`; `1` (APPSEC-04 done 2026-09-25) · *Read 2026-09-28:* `3`; `1`. |
-| R12 | Keycloak realm shape (extractor, exchange scopes, provisioner client) | the snapshot read below the table | extractor `consent=f`, `dpop.bound.access.tokens=false`, default scopes incl. `extractor-ingest` and `extractor-ingest-only`; **no** `exchange.*` scope; no `versekit`, no `basetool-provisioner` · **TO BE READ on the day** (exec-based, gated). |
+| R12 | Keycloak realm shape (extractor, exchange scopes, provisioner client) | the snapshot read below the table | extractor `consent=f`, `dpop.bound.access.tokens=false`, default scopes incl. `extractor-ingest` and `extractor-ingest-only`; **no** `exchange.*` scope; no `versekit`, no `basetool-provisioner` · *Read 2026-09-28 in part (owner-approved exec):* realm login theme `krt-theme`, 0 `exchange.*` client scopes, 0 `versekit` clients. The full snapshot (the extractor's consent, DPoP and scope rows) **TO BE READ on the day**. |
 | R13 | Last backup | `systemctl show iri-backup.service -p Result -p ExecMainExitTimestamp` | `success`, today 04:15 · *Read 2026-09-28:* `success`, 2026-09-28 04:17:40 UTC — re-read on the day. |
 | R14 | Extractor traffic to plan the announcement | Grafana → Basetool operations → panel 45 „Ingest calls/hour by client", last 7 days | how many sends a day the switch-off interrupts |
 | R15 | Firing alerts baseline | Grafana → Alerting | written down before S1 |
-| R16 | Rows the release's migrations touch (their duration) | the query below the table | `inventory_item` rows (V247 rebuilds two indexes on it **without `CONCURRENTLY`**, blocking its writes while it runs — inside the deploy window); personal blueprints that are also default blueprints (V255's backfill `UPDATE` writes one `exchange_change` row, source `system`, for each); Flyway tip `245` · **TO BE READ on the day** (exec-based, gated). |
+| R16 | Rows the release's migrations touch (their duration) | the query below the table | `inventory_item` rows (V247 rebuilds two indexes on it **without `CONCURRENTLY`**, blocking its writes while it runs — inside the deploy window); personal blueprints that are also default blueprints (V255's backfill `UPDATE` writes one `exchange_change` row, source `system`, for each); Flyway tip `245` · *Read 2026-09-28 (owner-approved exec):* Flyway tip `245`; `inventory_item` 416 rows; 688 personal × default blueprint rows — V247's rebuild and V255's backfill are trivial at this size. Re-run on the day. |
 | R17 | Alloy on the host | `rpm -q alloy` | the version the new `config.alloy` (structured metadata `client_id`, `route`) runs on · *Read 2026-09-28:* `alloy-1.19.2-1.x86_64`. |
 
 R16 — read-only, on `db-backend`:
@@ -662,8 +663,8 @@ files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
   confidential since 2026-09-25, and a run with that flag plans nothing for it.
 - **Expected:** `[DRY RUN — nothing is written]`, `exit=2`, and only these changes (the exact list is
   **TO BE READ** from this output — anything else: stop and ask):
-  - realm: whatever of `oauth2DeviceCodeLifespan` 600, `oauth2DevicePollingInterval` 5 and
-    `loginTheme` `krt-theme` production does not have yet;
+  - realm: whatever of `oauth2DeviceCodeLifespan` 600 and `oauth2DevicePollingInterval` 5 production
+    does not have yet (`loginTheme` is already `krt-theme`, read 2026-09-28);
   - ten client scopes `exchange.connect` … `exchange.drafts.refinery` created, each with the
     `aud-basetool-ingest` mapper and a `${xchConsent…}` consent text;
   - `basetool-sc-extractor` (H1, #2201, #2179): `consentRequired` false → true;
