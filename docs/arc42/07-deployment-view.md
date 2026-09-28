@@ -75,7 +75,9 @@ Consequences worth stating:
   service and SHA-256 hashes only, and is applied live with `ACL LOAD` (REQ-SEC-068, ADR-0207).
   The backend writes the `exchange:*` family (the client registry mirror) and ingest may only read
   it (ADR-0221); the mirror is written only once `APP_EXCHANGE_MIRROR_ENABLED=true`, which must
-  wait until the rendered ACL carries that grant.
+  wait until the rendered ACL carries that grant. *On production both since the go-live of
+  2026-09-28: the ACL rendered with the `exchange:*` grants, the mirror on, and ingest serving
+  `/exchange/v1/**` as the internet-facing exchange endpoint.*
   The unit carries `--notify-keyspace-events Egx` and an unauthenticated `PING` health probe, so
   neither depends on which ACL users exist.
 - **Each service mounts its own keystore and an internal truststore** — `/run/secrets/keystore.p12`
