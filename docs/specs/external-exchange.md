@@ -317,7 +317,10 @@ pages use the Basetool theme; the device page warns to enter only codes created 
 A `verification_uri_complete` link skips the device page, so for a device login the consent page
 carries the same warning and shows the user code for the member to compare with the one on their PC,
 and clients show only the bare `verification_uri` (REQ-XCH-027; owner decision 2026-09-27, security
-review 2 of #2092, M1). The clients are created by `scripts/provision-keycloak-realm.py`, never by hand.
+review 2 of #2092, M1). The page after a successful device login does not end the member's way:
+it offers „Zum Basetool" to the public origin and „Tab schließen", and when the browser refuses to
+close a tab no script opened, it says to close it by hand (owner decision 2026-09-28). The clients
+are created by `scripts/provision-keycloak-realm.py`, never by hand.
 
 The first-party SC Extractor is held to the same shape once it has migrated (security finding H1,
 owner decision 2026-09-27): its client `basetool-sc-extractor` requires consent, binds access and
@@ -355,6 +358,10 @@ accepted. The provisioner applied this on production only **after** the legacy s
   (`login-oauth2-device-verify-user-code.ftl`). *Corrected 2026-09-27:* this item said „both pages",
   but `login-oauth-grant.ftl` carries no warning, and a `verification_uri_complete` link goes
   straight to it (security review 2 of #2092, M1).
+- [x] The success page of a device login offers „Zum Basetool" (`krtHomeUrl`, `/`) and „Tab
+  schließen" (`info.ftl`, `js/krt-close-tab.js`, no inline handler); the button stays hidden without
+  script, and the hand-close hint appears only when the tab is still open after the click. The E2E
+  device login asserts the link, the visible button and the hidden hint on every exchange connection.
 - [x] For a device login the consent page shows the phishing warning and the user code, asserted on
   both pages by a theme test. *Keycloak 26.7.4 hands the consent page no user code
   (`OAuthGrantBean` holds the session code, the client and the scopes), so `keycloak-spi`'s login
