@@ -5,8 +5,10 @@
 > `REQ-XCH-023`, `REQ-XCH-033`), together with the coupled release of the „gestohlen" marker and the
 > Android app (#2096, #2097) and the SC Extractor's move to the exchange (#2088, security finding H1).
 > Written 2026-09-28 against `main` at `26ff2b6c7`, the #2092 body and the owner's extractor order of
-> 2026-09-27 (issue comment 5858785595). **No host was read for it**: every value only production can
-> tell is marked **TO BE READ** and comes with the read-only command that establishes it. Freeze it as
+> 2026-09-27 (issue comment 5858785595). Its author read no host: the values production gave on
+> 2026-09-28 (the coordinator's reads, three of them `podman exec` with the owner's yes) are marked
+> „read 2026-09-28", and every value still open is marked **TO BE READ** with the read-only command
+> that establishes it. Freeze it as
 > a historical record once executed; [`deployment.md`](deployment.md) stays the living procedure.
 >
 > **Release date: 2026-09-29, version 1.13.0** (owner decisions, 2026-09-28). **Scope that day:
