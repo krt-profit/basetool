@@ -251,8 +251,8 @@ not happened.
 ## 11.7a Accepted risks of the exchange API
 
 Decided by the owner on 2026-09-26 for epic #2078 and written down so they are not rediscovered as
-bugs ([`external-exchange.md`](../specs/external-exchange.md), threat model). The exchange is built
-and its global switch stays off until the go-live; the risks hold from then on.
+bugs ([`external-exchange.md`](../specs/external-exchange.md), threat model). The exchange is live
+since the go-live of 2026-09-28, so these risks hold now.
 
 - **No repo-reviewed capability ceiling.** The client registry lives in the database, not in the
   repository: one admin click grants a client write access. A taken-over admin account grants it

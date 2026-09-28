@@ -8,8 +8,12 @@
 > 2026-09-27 (issue comment 5858785595). Its author read no host: the values production gave on
 > 2026-09-28 (the coordinator's reads, three of them `podman exec` with the owner's yes) are marked
 > „read 2026-09-28", and every value still open is marked **TO BE READ** with the read-only command
-> that establishes it. Freeze it as
-> a historical record once executed; [`deployment.md`](deployment.md) stays the living procedure.
+> that establishes it. [`deployment.md`](deployment.md) stays the living procedure.
+>
+> **Executed and frozen (2026-09-28).** S1–S16 ran on 2026-09-28 with release 1.13.0, 1.13.1
+> removed the legacy routes the same evening, and S17 created VerseKit's Keycloak client and
+> registry entry; S18 was not needed. This document is now the historical record of that
+> rollout and is not updated further.
 >
 > **Release date: 2026-09-28, version 1.13.0** (owner decisions, 2026-09-28; moved forward from 2026-09-29 the same day). **Scope that day:
 > S1–S16** — the release and the extractor switch, H1 closed without creating the `versekit` client
@@ -113,7 +117,7 @@ so the comparison afterwards is against a baseline.
 | 90-day retention sweep for disconnected installations and revocations | on `main` (#2247, REQ-XCH-035), resting on the 90-day session cap (#2246, applied at S15); no host step |
 | SC Extractor 2.10.0 | on the extractor's `main`, **unreleased**; latest release v2.9.1; its PRs #76 (sign-in refusal message) and #77 (release notes) merge before the tag (S13) |
 | Android app with #190–#200 | release PR basetool-android#201 prepared: `versionCode` 17, `versionName` 0.4.0 (owner, 2026-09-28); latest release v0.3.1 (`versionCode` 16) |
-| VerseKit | **not approved**: `docs/legal/approved-clients.md` lists only the SC Extractor (#2245), while `scripts/keycloak/external-clients.json` already lists `versekit` — hence S15's empty client list |
+| VerseKit | **not approved**: `docs/legal/approved-clients.md` lists only the SC Extractor (#2245), while `scripts/keycloak/external-clients.json` already lists `versekit` — hence S15's empty client list · *Later the same day:* approved by #2273 with eight capabilities; its Keycloak client created on production (S17) |
 | Production host (read 2026-09-28, §3) | v1.12.0; installed scripts differ from `main` → S1 needed; the first two of the three new ingest guards pass (R8 reads the third); 10 587 of 15 345 MiB available; Alloy 1.19.2; last backup success |
 | Load test of the feed/changes routes | done on the sandbox (#2251); all seven findings fixed and merged (#2256–#2259) |
 | Final security review (G5) | done — GO; every finding fixed and merged (#2250, #2252, #2253); the owner's `v*` tag ruleset is a GitHub setting outside this runbook |
@@ -897,10 +901,20 @@ the command itself still needs its yes). Right after S15, in the same provisione
   provisioner run with the real `external-clients.json` (S10's procedure without
   `--external-clients`: session, dry run showing only the `versekit` client, apply, empty second run,
   clean-up — each write with its own yes). Open to **all members at once**, no pilot group.
-- **Values:** Client-ID `versekit`; Name `VerseKit`; Berechtigungen `exchange.connect`,
-  `exchange.blueprints.read`, `exchange.blueprints.write`; Mindestversion **TO BE DECIDED** — the
-  first sync-capable VerseKit release from #2089; contact URL from the approval issue (its privacy
-  statement and security contact, `https`); limits empty.
+- **Values:** Client-ID `versekit`; Name `VerseKit`; Berechtigungen — all eight the approval PR
+  (#2273) lists: `exchange.connect`, `exchange.blueprints.read`, `exchange.blueprints.write`,
+  `exchange.stock.read`, `exchange.stock.write`, `exchange.hangar.read`, `exchange.hangar.write`,
+  `exchange.demand.read`; Mindestversion `3.60.0`; contact URL
+  `https://github.com/Xharig/VerseKit/blob/main/SECURITY.en.md`; limits empty.
+- **Owner decisions of 2026-09-28:** all eight capabilities at once, although v3.60.0 requests only
+  `exchange.connect` and the two blueprint scopes — S18 is therefore not needed. The token-at-rest
+  check on a Windows and a Linux build is waived: `v3.60.0` differs from the reviewed
+  `v3.60.0-rc7` (`593f59f8`) only in `sc_bp_watcher.py`'s update-check threading, the self-test and
+  the changelogs; no module of the exchange client changed.
+- **Keycloak half, done 2026-09-28** with the owner running each write: the provisioner with
+  `--external-clients` naming only `versekit` planned exactly its client and scopes, `--apply`
+  created it (`exit=0`), the second dry run planned nothing, the session files and `/root/kc-realm`
+  were removed and `basetool-provisioner` was deleted.
 - **Verify:** the row „Freigegeben"; the VerseKit author's first connection shows under
   *Installations created/day*; a member's new-connection notification arrives.
 - **Watch:** as S15, per client `versekit`; plus `ExchangeRemoveSpike`, `ExchangeGuardStorm`
@@ -909,6 +923,9 @@ the command itself still needs its yes). Right after S15, in the same provisione
   client release*).
 
 ### S18 — Widen VerseKit, one capability group at a time
+
+**Not needed:** S17 granted all eight capabilities at once (owner decision, 2026-09-28). The
+procedure below stays as the way to widen a later client step by step.
 
 **PRODUCTION WRITE — needs @greluc's explicit per-action yes, per group** (admin UI, „Bearbeiten",
 confirm „Berechtigungen erweitern?"), each only after the previous group ran quietly and each
@@ -939,6 +956,11 @@ release after 1.13.0 and needs **no host step**: the rendered `env.d/ingest.env`
 carrying the five variables, and lines left in `.env` are harmless (removing them is an optional
 tidy-up and a production write of its own). From that release on, **S14's rollback and §8 step 4 are
 impossible**; an old extractor gets `401` or `404` instead of the German update hint.
+
+**Shipped in 1.13.1**, promoted on 2026-09-28 (run 36474309013); the deploy tick restarted
+`keycloak`, `backend`, `ingest` and `frontend` at 19:48–19:49 UTC, all four healthy with no WARN or
+ERROR in the first minutes, and both removed routes answer an untokened `POST` with `403` — the
+answer any unknown path gets without a token.
 
 ---
 
