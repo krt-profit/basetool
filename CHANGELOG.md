@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Keycloak-Theme: Die Seite nach einer Geräte-Anmeldung führt weiter.** Statt nur „Sie können
+  dieses Browser-Fenster schließen" bietet sie „Zum Basetool" und „Tab schließen"; lässt der Browser
+  das Schließen nicht zu, erklärt sie, wie es von Hand geht (REQ-XCH-005).
+
 ## [v1.13.1](https://github.com/krt-profit/basetool/releases/tag/v1.13.1) - 2026-09-28
 
 ### Changed

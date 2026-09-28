@@ -142,7 +142,8 @@ final class ExchangeE2eSupport {
    * form, a code form nor a consent form is left (REQ-XCH-005, REQ-XCH-027).
    *
    * <p>Asserts that the code page shows the phishing warning and that the consent page shows its
-   * warning and exactly this login's user code, and that both pages were reached.
+   * warning and exactly this login's user code, that both pages were reached, and that the success
+   * page offers the way to the Basetool and the close-tab button.
    *
    * @param browser the browser
    * @param login the started device login, whose bare verification page and user code are used
@@ -181,6 +182,9 @@ final class ExchangeE2eSupport {
           } else {
             assertTrue(codePageSeen, "the bare verification page asked for the user code");
             assertTrue(consentPageSeen, "the device login reached the consent page");
+            assertThat(page.locator("#krt-home-link")).hasAttribute("href", "/");
+            assertThat(page.locator("#krt-close-tab")).isVisible();
+            assertThat(page.locator("#krt-close-tab-hint")).isHidden();
             return;
           }
         }

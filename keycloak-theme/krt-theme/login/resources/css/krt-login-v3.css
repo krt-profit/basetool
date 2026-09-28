@@ -1005,3 +1005,32 @@ input[type="checkbox"]:focus-visible,
     fill: currentColor;
     flex-shrink: 0;
 }
+
+.krt-info-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.krt-info-actions a.krt-button {
+    display: block;
+    box-sizing: border-box;
+    text-align: center;
+    text-decoration: none;
+}
+
+.krt-info-actions .krt-button-secondary {
+    margin-top: 0;
+}
+
+.krt-info-actions [hidden] {
+    display: none !important;
+}
+
+.krt-info-hint {
+    margin: 0;
+    color: var(--color-gray-1);
+    font-size: 0.875rem;
+    text-align: center;
+}
