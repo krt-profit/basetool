@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Star-Citizen-Links: VerseKit zeigt auf die neue Adresse.** Die Karte führt jetzt zu
+  versekit.xharig.com (REQ-UI-025).
 - **Keycloak-Theme: Die Seite nach einer Geräte-Anmeldung führt weiter.** Statt nur „Sie können
   dieses Browser-Fenster schließen" bietet sie „Zum Basetool" und „Tab schließen"; lässt der Browser
   das Schließen nicht zu, erklärt sie, wie es von Hand geht (REQ-XCH-005).

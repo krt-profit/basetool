@@ -1295,7 +1295,7 @@ collect the addresses from Discord.
   - **Handel & Fracht** — uexcorp.space, sc-cargo.space, sc-hauling.tools, hauler.thespacecoder.space
   - **Schiffe & Ausrüstung** — erkul.games/calculator, spviewer.eu, fleetyards.net, ccugame.app,
     maps.adi.sc
-  - **Datenbanken & Crafting** — cstone.space, scmdb.net, sc-craft.tools, xharig.github.io/VerseKit
+  - **Datenbanken & Crafting** — cstone.space, scmdb.net, sc-craft.tools, versekit.xharig.com
   - **Universum & Community** — verseguide.com, ueexi.com, star-citizen-characters.com,
     daymarrally.com
 - **How a link reads.** A `.card` per site: the site's own logo (48 px), its name, the host it leads

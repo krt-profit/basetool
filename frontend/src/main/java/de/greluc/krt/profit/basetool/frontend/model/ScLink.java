@@ -48,8 +48,7 @@ public enum ScLink {
   CORNERSTONE("cornerstone", "https://cstone.space/", "cstone.png", ScLinkCategory.DATABASES),
   SCMDB("scmdb", "https://scmdb.net/", "scmdb.svg", ScLinkCategory.DATABASES),
   SC_CRAFT("scCraft", "https://sc-craft.tools/", "sc-craft.png", ScLinkCategory.DATABASES),
-  VERSEKIT(
-      "versekit", "https://xharig.github.io/VerseKit/", "versekit.png", ScLinkCategory.DATABASES),
+  VERSEKIT("versekit", "https://versekit.xharig.com/", "versekit.png", ScLinkCategory.DATABASES),
   VERSEGUIDE("verseguide", "https://verseguide.com/", "verseguide.png", ScLinkCategory.UNIVERSE),
   UEEXI("ueexi", "https://ueexi.com/", "ueexi.svg", ScLinkCategory.UNIVERSE),
   SC_CHARACTERS(

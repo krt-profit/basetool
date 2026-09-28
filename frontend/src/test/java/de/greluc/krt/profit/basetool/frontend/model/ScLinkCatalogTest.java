@@ -65,7 +65,7 @@ class ScLinkCatalogTest {
   @Test
   void theHostDropsALeadingWww() {
     assertThat(ScLink.SPVIEWER.displayHost()).isEqualTo("spviewer.eu");
-    assertThat(ScLink.VERSEKIT.displayHost()).isEqualTo("xharig.github.io");
+    assertThat(ScLink.VERSEKIT.displayHost()).isEqualTo("versekit.xharig.com");
   }
 
   @Test
