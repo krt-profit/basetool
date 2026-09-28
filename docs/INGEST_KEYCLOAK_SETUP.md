@@ -54,10 +54,13 @@ row by row against production's configuration snapshot of **2026-09-22**
 
 |         Object          |                                                                                              State                                                                                               |
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `basetool-sc-extractor` | public, no secret, device grant on, direct access grants off, service accounts off, `fullScopeAllowed: false`; default scopes include `extractor-ingest` **and** `extractor-ingest-only`. Carried the unused standard flow with `http://127.0.0.1/*` + `http://localhost/*` in the 2026-09-22 snapshot — **retired by owner decision 2026-09-22** (step 1); whether a later production apply already removed it is **to be confirmed at the go-live dry run** (`EXCHANGE_GO_LIVE_RUNBOOK.md`, S10). Since the go-live apply (S15, 2026-09-28) the client is exchange-only (H1): consent, DPoP-bound tokens, both ingest scopes withheld |
+| `basetool-sc-extractor` | public, no secret, device grant on, standard flow and direct access grants off, service accounts off, `fullScopeAllowed: false`. Since the go-live apply (S15, 2026-09-28) exchange-only (H1): consent, DPoP-bound tokens, `basic` as the only default scope, its exchange scopes and `offline_access` optional, both ingest scopes withheld. *Corrected 2026-09-28:* this row listed both ingest scopes as defaults and left the standard flow's removal to be confirmed; every provisioner dry run on production that day reported the client in shape |
+| `versekit`              | approved third-party client (#2273), created on production on 2026-09-28 by the provisioner with a list naming only it: public, device grant only, consent, DPoP-bound tokens, `basic` as the only default scope, the ten `exchange.*` scopes and `offline_access` optional, no mapper, `krt-theme`, 30/90-day sessions |
+| `exchange.*` scopes     | ten client scopes, each with the `aud-basetool-ingest` mapper and a theme consent text; on production since S15 |
+| `offline_access`        | a composite of `default-roles-iri` (hand fix 2026-09-28, then the provisioner); offered only to `basetool-sc-extractor` and approved third-party clients, withheld from `basetool-frontend`, `backend-service`, `basetool-ingest-gateway` and `grafana`, and no realm default client scope (applied 2026-09-28, ADR-0202 amendment 5) |
 | `basetool-ingest-gateway` | confidential, service account only (standard flow and direct access grants off), empty redirect/origin lists — the gateway's own identity for the hop to the backend (step 9); still carries both ingest scopes, inherited from the realm defaults at creation (hardening step 9b leaves that to its own audience needs) |
 | `basetool-frontend`     | carries `extractor-ingest` (so its relayed token has `aud=basetool-backend`), **not** `extractor-ingest-only`                                                                                    |
-| `basetool-android`      | carries **both** ingest scopes as defaults, inherited from the realm defaults when it was provisioned — so an app token has `aud=basetool-ingest` and `extractor-ingest-only` in `scope`, and only the gateway's `azp` allowlist (step 7c) keeps it out of ingest. **Retired by owner decision 2026-09-22** (`REQ-INGEST-011`): the app requests neither scope and never calls ingest; whether a later production apply already removed them is **to be confirmed at the go-live dry run** (`EXCHANGE_GO_LIVE_RUNBOOK.md`, S10). Its own `aud=basetool-backend` mapper stays and is what the backend checks |
+| `basetool-android`      | carries neither ingest scope: both were inherited from the realm defaults at provisioning and **retired by owner decision 2026-09-22** (`REQ-INGEST-011`), and the provisioner's production apply of 2026-09-23 removed them. The app never calls ingest. Its own `aud=basetool-backend` mapper stays and is what the backend checks. *Corrected 2026-09-28:* this row still described both scopes as present and kept out of ingest only by the `/v1` allowlist, which is gone; the provisioner dry runs that day reported the client in shape |
 | `extractor-ingest`      | audience mapper `aud-basetool-backend` → `basetool-backend`; `include.in.token.scope: false`; no longer a realm default scope (hardening step 9, 2026-09-09)                                     |
 | `extractor-ingest-only` | audience mapper `aud-basetool-ingest` → `basetool-ingest`; `include.in.token.scope: true`; no longer a realm default scope                                                                       |
 | Realm                   | `revokeRefreshToken: false` (step 4); client policies: only `krt-mobile-dpop`, scoped to `basetool-android` by its marker role — none applies to the extractor (step 8)                         |
@@ -236,17 +239,17 @@ DPoP policy alone is the safe partial rollback for the Android client.
 
 ### Withholding `offline_access` from the first-party clients
 
-**Production step, not applied yet** (owner decision 2026-09-28, ADR-0202 amendment 5,
-`REQ-OPS-033`). Every member holds `offline_access` through `default-roles-iri` since the hand fix
+**Applied on production on 2026-09-28** (owner decision the same day, ADR-0202 amendment 5,
+`REQ-OPS-033`); the steps below stay as the procedure for another realm. Every member holds `offline_access` through `default-roles-iri` since the hand fix
 of 2026-09-28, so any client that offers the scope could be issued an offline token for a member.
 A provisioner with this change withholds the scope from every first-party client except the
 extractor, and takes it off the realm's default client scopes so a client created by hand does not
 inherit it. It is a production write: the dry run needs the session, the apply needs the owner's
 explicit yes to that command.
 
-- **Session and dry run:** the sequence above, steps 1–4, with the empty client list the go-live
-  used (`--external-clients /root/kc-realm/keycloak/none.json`, content `[]`) until the owner
-  approves a third-party client. Pass `--grafana-origin https://<Grafana's public origin>` only if
+- **Session and dry run:** the sequence above, steps 1–4, with the client list of the approved
+  third-party clients (`scripts/keycloak/external-clients.json`; the go-live used an empty list,
+  `[]`, before VerseKit's approval). Pass `--grafana-origin https://<Grafana's public origin>` only if
   that dry run then plans nothing else for `grafana`; without the flag `grafana` is left alone and
   keeps the scope.
 - **Expected dry run:** exit `2`, and exactly these planned lines — the first under the
@@ -981,15 +984,15 @@ installs must update.
 
 - [ ] `basetool-sc-extractor` is **public**, has **no secret**, ROPC **off**, service
   accounts **off**, web origins **empty**.
-- [ ] Device grant only: standard flow off and no redirect URIs (decided 2026-09-22; production
-  until the provisioner is applied there: still on, see step 1).
+- [ ] Device grant only: standard flow off and no redirect URIs (decided 2026-09-22; applied on
+  production 2026-09-23).
 - [ ] `extractor-ingest-only` is on no browser client — never on `basetool-frontend`, not on
   `basetool-android` (decided 2026-09-22), and since the go-live (S15) not on
   `basetool-sc-extractor` either. The gateway carries it, inherited at its creation; since the `/v1`
   routes were removed (2026-09-28) no client's token needs it, because the exchange scopes stamp
   `aud=basetool-ingest` themselves.
-- [ ] `aud=basetool-backend` verified on **both** the extractor token and the frontend token
-  **before** the validator is enabled.
+- [ ] `aud=basetool-backend` verified on the frontend token **before** the validator is enabled,
+  and **absent** from every extractor and third-party token (H1, since the go-live).
 - [ ] Refresh-token rotation + reuse-detection **off** realm-wide (`"revokeRefreshToken": false`) —
   disabled 2026-06-18 because it revoked the server-rendered frontend BFF's sessions (REQ-SEC-012,
   ADR-0019 amendment #4).
