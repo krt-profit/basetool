@@ -12,6 +12,14 @@
   SC Extractor und zugelassene Drittanwendungen behalten ihn (ADR-0202 Amendment 5, REQ-OPS-033).
   Für Mitglieder ändert sich nichts.
 
+- **Datenaustausch: VerseKit ist zugelassen.** `docs/legal/approved-clients.md` führt VerseKit ab
+  Version 3.60.0 mit acht Berechtigungen (#2272, #2273); Mitglieder können es unter
+  „Verbundene Anwendungen" verbinden.
+
+- **Backend: Handeln für ein Mitglied nur noch über die Austausch-Routen.** Das Ingest-Gateway darf
+  `X-Ingest-On-Behalf-Of` nur noch auf `/api/v1/exchange/**` setzen; die früheren Import-Endpunkte
+  lehnen den Header ab (REQ-SEC-029).
+
 ### Removed
 
 - **Ingest-Gateway: die alten SC-Extractor-Endpunkte sind entfernt.** `/v1/refinery-extract` und
@@ -138,7 +146,8 @@
 - **Datenaustausch: Bewerbung für Fremd-Anwendungen.** `docs/exchange/onboarding.md` und
   `docs/exchange/client-security.md` beschreiben Kriterien und Sicherheitsanforderungen, eine
   Issue-Vorlage nimmt Bewerbungen auf, und `docs/legal/approved-clients.md` ist das öffentliche
-  Verzeichnis zugelassener Anwendungen (noch leer; REQ-XCH-002, REQ-XCH-027).
+  Verzeichnis zugelassener Anwendungen (erster Eintrag: der SC Extractor; REQ-XCH-002,
+  REQ-XCH-027).
 
 - **Datenaustausch: Änderungsprotokoll.** Jede Änderung an persönlichen Blueprints, am persönlichen
   Lager und an Schiffen – auch über Sammelaktionen und Standard-Blueprints – wird mit ihrer Quelle
