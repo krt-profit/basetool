@@ -161,9 +161,12 @@ production it needs the owner's per-action approval, on testing it is the owner'
 
 ```bash
 cd /
-install -d -m 0700 /root/kc-realm
-# 1. copy BOTH scripts next to each other — the realm provisioner imports the mobile one
+install -d -m 0700 /root/kc-realm /root/kc-realm/keycloak
+# 1. copy BOTH scripts next to each other — the realm provisioner imports the mobile one — and the
+#    approved-client list into keycloak/ beside them: the provisioner reads it from there by default
+#    and stops with "cannot read the third-party client list" without it (or pass --external-clients)
 install -m 0700 provision-keycloak-realm.py provision-keycloak-mobile-client.py /root/kc-realm/
+install -m 0600 keycloak/external-clients.json /root/kc-realm/keycloak/
 # 2. open a kcadm session: the KCCFG/kc/KCADM definitions and the truststore + credentials
 #    commands of docs/keycloak/README.md, "Runbook — provisioning the mobile client", steps 1-2
 # 3. the rollback basis

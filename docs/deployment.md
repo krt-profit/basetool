@@ -531,7 +531,9 @@ Nothing is deployed yet: `:stable` still names the previous release.
 > [!note] A release whose PRs need more than this path gets its own runbook
 > When a release carries host steps, ordering constraints or switches beyond the promotion below,
 > they are collected per release from an audit of its PRs: **1.11.0** →
-> [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md).
+> [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md); the **External
+> Client Exchange go-live** (#2092, the first release after 1.12.0) →
+> [`EXCHANGE_GO_LIVE_RUNBOOK.md`](EXCHANGE_GO_LIVE_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
