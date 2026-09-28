@@ -9,6 +9,16 @@
 > tell is marked **TO BE READ** and comes with the read-only command that establishes it. Freeze it as
 > a historical record once executed; [`deployment.md`](deployment.md) stays the living procedure.
 >
+> **Release date: 2026-09-29, version 1.13.0** (owner decisions, 2026-09-28). **Scope that day:
+> S1–S16** — the release and the extractor switch, H1 closed without creating the `versekit` client
+> (S15 runs with an empty client list) and the extractor client's not-before (S16). VerseKit (S17,
+> S18) follows only after its approval, with a separately approved provisioner run first. The terms of use
+> and privacy texts (branch `claude/golive-terms-privacy`) and the 90-day retention sweep for
+> disconnected installations and revocations (branch `claude/exchange-retention-sweep`) are built in
+> parallel and ship in the same release; neither needs a host step. The Flyway and configuration
+> analysis of 2026-09-28 (the coordinator's `golive-flyway.md` / `golive-flyway-config.md`) is folded
+> in below.
+>
 > **Every step that writes is a production write.** It waits for @greluc's explicit yes, in chat, to
 > that exact command (CLAUDE.md → *Production host access*). Nothing in this document is approval —
 > not the order, not a „go ahead" given for an earlier step.
@@ -86,21 +96,23 @@ so the comparison afterwards is against a baseline.
 
 ---
 
-## 1. Where things stand (2026-09-28, from the repositories)
+## 1. Where things stand (2026-09-28, the day before the release)
 
 | Piece | State |
 |---|---|
 | Exchange code (gateway, backend layer, registry, audit domains, admin and member pages, admin bulk undo) | on `main`; E2E incl. the exchange flows green (run 36400316929 at `26ff2b6c7`) |
 | Redis 768 MB / 1024 MB (ADR-0221, #2115) | in the units on `main` — `quadlet/systemd/redis.container`: `--maxmemory 768mb`, `Memory=1024M` |
 | Redis ACL rows (`exchange:*`, `ingest:xch:*`, `+eval +evalsha +zrem +zscore`) | in `scripts/redis-users.acl.tmpl` on `main`; **not rendered on production** |
-| Flyway `V246`–`V257` | on `main`; the latest release, **v1.12.0, ends at `V245`** |
+| Flyway `V246`–`V257` | on `main`; the latest release, **v1.12.0, ends at `V245`**; proven forward-compatible with v1.12.0 (§8, step 3) |
 | Keycloak: `exchange.*` scopes, `versekit`, the extractor's H1 shape, #2179 | in `scripts/provision-keycloak-realm.py` on `main`; **not applied on production** |
 | keycloak-spi (ADR-0226 admin extension `basetool-exchange`, ADR-0228 login forms `krt-freemarker`) | on `main`; reaches production with the next release's provider JAR |
-| **Terms change** (`terms.list_4_1_5`, REQ-SEC-027/-028) | **not built** — the three backend bundles still carry the v1.12.0 text (see §10, gap 1) |
-| **Privacy notice** for approved clients (REQ-XCH-002, third box) | **not built** (see §10, gap 1) |
+| Terms change (`terms.list_4_1_5`, REQ-SEC-027/-028) | being built on `claude/golive-terms-privacy`; ships in this release — every member re-consents once at S6; no host step |
+| Privacy notice for approved clients (REQ-XCH-002, third box) | the same branch; ships in this release; no host step |
+| 90-day retention sweep for disconnected installations and revocations | being built on `claude/exchange-retention-sweep`; ships in this release; no host step |
 | SC Extractor 2.10.0 | on the extractor's `main`, **unreleased**; latest release v2.9.1 |
 | Android app with #190–#196 | on the app's `main` at `versionCode` 16, **unreleased**; latest release v0.3.1 (`versionCode` 16) |
 | VerseKit | **not approved**: `docs/legal/approved-clients.md` lists no client, while `scripts/keycloak/external-clients.json` already lists `versekit` |
+| Production host (read 2026-09-28, §3) | v1.12.0; installed scripts differ from `main` → S1 needed; both new ingest guards pass; 10 587 of 15 345 MiB available; Alloy 1.19.2; last backup success |
 | Load test of the feed/changes routes | **open** (#2092 pre-flight) |
 | Final security review (G5) | **open** |
 
@@ -129,9 +141,10 @@ exchange rollout of #2092.
 | S12 | Admin page: registry entry `basetool-sc-extractor` | PRODUCTION WRITE (admin UI) | nothing |
 | S13 | Publish SC Extractor 2.10.0 | GitHub (extractor repo) | — |
 | S14 | Switch the legacy `/v1` endpoints off | PRODUCTION WRITE | ingest (~30 s) |
-| S15 | Provisioner **apply** (H1, #2179, exchange scopes, `versekit`) | PRODUCTION WRITE | nothing |
-| S16 | Admin page: registry entry `versekit` | PRODUCTION WRITE (admin UI) | nothing |
-| S17 | Widen VerseKit: stock → org demand → hangar, one at a time | PRODUCTION WRITE (admin UI) each | nothing |
+| S15 | Provisioner **apply** with an empty client list (H1, #2179, exchange scopes; **no** `versekit`) | PRODUCTION WRITE | nothing |
+| S16 | Not-before on `basetool-sc-extractor` — ends every extractor session issued before S15 | PRODUCTION WRITE | nothing |
+| S17 | Admin page: registry entry `versekit` | PRODUCTION WRITE (admin UI) | nothing |
+| S18 | Widen VerseKit: stock → org demand → hangar, one at a time | PRODUCTION WRITE (admin UI) each | nothing |
 
 The constraints that fix it:
 
@@ -153,35 +166,52 @@ The constraints that fix it:
   gap to minutes: S10's dry run is done before S13, so S15 is only the apply.
 - **S12 before S14.** Once the registry lists `basetool-sc-extractor`, `/v1` still admits it only
   because `IRI_INGEST_ALLOWED_CLIENT_IDS` names it too (review 2, L1) — keep that value.
-- **S15 creates `versekit` only when it is listed** in `external-clients.json` — see S10 for running
-  it without VerseKit when the approval PR is not merged yet. S16 needs both the approval and the
-  Keycloak client.
+- **S15 runs with an empty client list** (owner decision 2026-09-28): it closes H1 without creating
+  `versekit`. VerseKit gets its Keycloak client in a later provisioner run with the real list —
+  dry run and apply, each with its own yes — after its approval PR is merged; S17 needs both.
+- **This is the #2092 extractor comment's order, not the body's.** The body applies the provisioner
+  before the registry entry and the switch-off; the owner follows the comment and corrects the body
+  to match (2026-09-28).
+
+**When.** **2026-09-29: S1–S16** — S1–S4 in the morning, S5–S6 (release 1.13.0), then S7–S9 once
+the app release is published, then S10–S16 in one sitting (S13–S15 back to back). **S17–S18** only
+after the VerseKit approval, on a later date. Until S11 the exchange stays dormant.
 
 ---
 
 ## 3. TO BE READ — production values, all read-only
 
-Each command is a standing read (CLAUDE.md → *Production host access*): it changes nothing, prints
-no secret. Run them the day of the go-live, before S1; any answer other than the expected one stops
-the step that depends on it.
+Each command changes nothing and prints no secret. The coordinator read everything that needs no
+`podman exec` on **2026-09-28** (marked below); the `podman exec`-based reads (R5, R6's `INFO`, R9,
+R12, R16) are treated as gated and stay **TO BE READ on the day**, with the owner's yes. Re-run the
+others on 2026-09-29 before S1; any answer other than the expected one stops the step that depends
+on it.
 
 | # | What | Command (host, root, from `/`, prelude loaded) | Expected |
 |---|---|---|---|
-| R1 | Deployed release | `${UPOD} inspect backend frontend ingest --format '{{.Name}} {{.ImageName}}'` and `cat /var/lib/iri/last-deployed.digests` | v1.12.0 digests |
-| R2 | Deploy health and ownership | `tail -5 /var/log/iri-deploy.log; systemctl is-active iri-deploy.timer; find /var/iri/code/docker /var/iri/code/keycloak-theme /var/iri/code/monitoring /var/iri/code/quadlet ! -user deploy \| head` | last run `deploy successful` or no change; `active`; **no** path printed (the 1.11.0 lesson) |
-| R3 | Installed scripts vs `main` | `sha256sum /var/iri/code/scripts/{deploy.sh,render-env-d.py,render-redis-acl.py,redis-users.acl.tmpl}` — compare on the workstation with `git show origin/main:scripts/<file> \| sha256sum` | equal → S1 can be skipped; different → S1 |
-| R4 | The live ACL file | `stat -c '%U:%G %a %i' /var/iri/redis/users.acl; grep -c '^user default ' /var/iri/redis/users.acl; grep -c '>' /var/iri/redis/users.acl` | `root:root 644 <inode>`; `1`; `0` |
-| R5 | The live ACL grants | `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL DRYRUN basetool-backend SET exchange:registry x'` and `… ACL DRYRUN basetool-ingest EVALSHA 0000000000000000000000000000000000000000 1 ingest:xch:probe` | before S3: both refused, naming the key or the command; after S3: `OK` |
-| R6 | Redis memory now and at its peak | `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin INFO memory' \| grep -E '^(used_memory\|used_memory_peak\|used_memory_rss\|maxmemory):'`; Grafana → Explore: `max_over_time(redis_memory_used_bytes[30d])`, `max_over_time(redis_memory_used_rss_bytes[30d])`, `redis_memory_max_bytes` | peak well under 384 MB (`maxmemory` 402653184 until S6) |
-| R7 | Host RAM headroom | `free -m`; Grafana → Explore: `min_over_time(node_memory_MemAvailable_bytes[30d])`, `node_memory_MemTotal_bytes`; `grep -h '^Memory=' /etc/containers/systemd/users/${IRI_UID}/*.container` | the 30-day minimum of available memory well above the 512 MiB the Redis limit grows by |
-| R8 | Exchange and ingest switches in `.env` | `grep -cE '^APP_EXCHANGE_MIRROR_ENABLED=' $ENVF; grep -cE '^IRI_INGEST_LEGACY_ENDPOINTS_ENABLED=' $ENVF; grep -c '^IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor$' $ENVF; grep -cE '^IRI_INGEST_CLIENT_AUDIT_ONLY=(true\|"true")$' $ENVF; grep -cE '^IRI_INGEST_PUBLIC_BASE_URL=https://ingest\.profit-base\.online$' $ENVF; grep -cE '^APP_INVENTORY_STOLEN_MARKING_ENABLED=' $ENVF` | `0`, `0`, `1`, `0`, `1`, `0` |
-| R9 | The same, as the running ingest sees it | `for v in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY APP_INGEST_PUBLIC_BASE_URL; do printf '%s=' $v; ${UPOD} exec ingest printenv $v; done` | `basetool-sc-extractor`, `false`, `https://ingest.profit-base.online` |
-| R10 | Android floor | `grep -E '^APP_ANDROID_(MINIMUM\|LATEST)_VERSION_CODE=[0-9]+$' $ENVF`; off the host: `curl -s https://api.profit-base.online/api/v1/app/version-policy` | `16` / `16` (vault *Android App*, 2026-09-25) |
-| R11 | Redis users in `.env` | `grep -cE '^REDIS_(BACKEND\|INGEST\|FRONTEND)_USERNAME=' $ENVF; grep -c '^REDIS_DEFAULT_USER=off$' $ENVF` | `3`; `1` (APPSEC-04 done 2026-09-25) |
-| R12 | Keycloak realm shape (extractor, exchange scopes, provisioner client) | the snapshot read below the table | extractor `consent=f`, `dpop.bound.access.tokens=false`, default scopes incl. `extractor-ingest` and `extractor-ingest-only`; **no** `exchange.*` scope; no `versekit`, no `basetool-provisioner` |
-| R13 | Last backup | `systemctl show iri-backup.service -p Result -p ExecMainExitTimestamp` | `success`, today 04:15 |
+| R1 | Deployed release | `${UPOD} inspect backend frontend ingest --format '{{.Name}} {{.ImageName}}'` and `cat /var/lib/iri/last-deployed.digests` | v1.12.0 digests · *Read 2026-09-28:* the v1.12.0 digests of `last-deployed.digests`. |
+| R2 | Deploy health and ownership | `tail -5 /var/log/iri-deploy.log; systemctl is-active iri-deploy.timer; find /var/iri/code/docker /var/iri/code/keycloak-theme /var/iri/code/monitoring /var/iri/code/quadlet ! -user deploy \| head` | last run `deploy successful` or no change; `active`; **no** path printed (the 1.11.0 lesson) · *Read 2026-09-28:* last tick 09:53:32 UTC „no change — already at target digests (running stack verified)", timer active, no foreign-owned path. |
+| R3 | Installed scripts vs `main` | `sha256sum /var/iri/code/scripts/{deploy.sh,render-env-d.py,render-redis-acl.py,redis-users.acl.tmpl}` — compare on the workstation with `git show origin/main:scripts/<file> \| sha256sum` | equal → S1 can be skipped; different → S1 · *Read 2026-09-28:* all four differ from `origin/main` (the host's template equals v1.12.0's byte for byte) → **S1 is needed**. |
+| R4 | The live ACL file | `stat -c '%U:%G %a %i' /var/iri/redis/users.acl; grep -c '^user default ' /var/iri/redis/users.acl; grep -c '>' /var/iri/redis/users.acl` | `root:root 644 <inode>`; `1`; `0` · *Read 2026-09-28:* `root:root 644`, inode 708; `1`; `0`. |
+| R5 | The live ACL grants | `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL DRYRUN basetool-backend SET exchange:registry x'` and `… ACL DRYRUN basetool-ingest EVALSHA 0000000000000000000000000000000000000000 1 ingest:xch:probe` | before S3: both refused, naming the key or the command; after S3: `OK` · **TO BE READ on the day** (exec-based — treated as gated, with the owner's yes). |
+| R6 | Redis memory now and at its peak | `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin INFO memory' \| grep -E '^(used_memory\|used_memory_peak\|used_memory_rss\|maxmemory):'`; Grafana → Explore: `max_over_time(redis_memory_used_bytes[30d])`, `max_over_time(redis_memory_used_rss_bytes[30d])`, `redis_memory_max_bytes` | peak well under 384 MB (`maxmemory` 402653184 until S6) `INFO memory` · **TO BE READ on the day** (exec-based, gated); the PromQL through the Grafana UI (no host listener on 9090/3000). |
+| R7 | Host RAM headroom | `free -m`; Grafana → Explore: `min_over_time(node_memory_MemAvailable_bytes[30d])`, `node_memory_MemTotal_bytes`; `grep -h '^Memory=' /etc/containers/systemd/users/${IRI_UID}/*.container` | the 30-day minimum of available memory well above the 512 MiB the Redis limit grows by · *Read 2026-09-28:* 15 345 MiB total, 10 587 MiB available, no swap; unit `Memory=` sum 13 456 MiB today, **13 968 MiB** with Redis at 1024M. |
+| R8 | Exchange and ingest switches in `.env` | `grep -cE '^APP_EXCHANGE_MIRROR_ENABLED=' $ENVF; grep -cE '^IRI_INGEST_LEGACY_ENDPOINTS_ENABLED=' $ENVF; grep -c '^IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor$' $ENVF; grep -cE '^IRI_INGEST_CLIENT_AUDIT_ONLY=(true\|"true")$' $ENVF; grep -cE '^IRI_INGEST_PUBLIC_BASE_URL=https://ingest\.profit-base\.online$' $ENVF; grep -cE '^APP_INVENTORY_STOLEN_MARKING_ENABLED=' $ENVF` | `0`, `0`, `1`, `0`, `1`, `0` · *Read 2026-09-28:* exactly as expected — **both new ingest start-up guards pass**. |
+| R9 | The same, as the running ingest sees it | `for v in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY APP_INGEST_PUBLIC_BASE_URL; do printf '%s=' $v; ${UPOD} exec ingest printenv $v; done` | `basetool-sc-extractor`, `false`, `https://ingest.profit-base.online` · **TO BE READ on the day** (exec-based, gated). |
+| R10 | Android floor | `grep -E '^APP_ANDROID_(MINIMUM\|LATEST)_VERSION_CODE=[0-9]+$' $ENVF`; off the host: `curl -s https://api.profit-base.online/api/v1/app/version-policy` | `16` / `16` (vault *Android App*, 2026-09-25) · *Read 2026-09-28:* 16 / 16. |
+| R11 | Redis users in `.env` | `grep -cE '^REDIS_(BACKEND\|INGEST\|FRONTEND)_USERNAME=' $ENVF; grep -c '^REDIS_DEFAULT_USER=off$' $ENVF` | `3`; `1` (APPSEC-04 done 2026-09-25) · *Read 2026-09-28:* `3`; `1`. |
+| R12 | Keycloak realm shape (extractor, exchange scopes, provisioner client) | the snapshot read below the table | extractor `consent=f`, `dpop.bound.access.tokens=false`, default scopes incl. `extractor-ingest` and `extractor-ingest-only`; **no** `exchange.*` scope; no `versekit`, no `basetool-provisioner` · **TO BE READ on the day** (exec-based, gated). |
+| R13 | Last backup | `systemctl show iri-backup.service -p Result -p ExecMainExitTimestamp` | `success`, today 04:15 · *Read 2026-09-28:* `success`, 2026-09-28 04:17:40 UTC — re-read on the day. |
 | R14 | Extractor traffic to plan the announcement | Grafana → Basetool operations → panel 45 „Ingest calls/hour by client", last 7 days | how many sends a day the switch-off interrupts |
 | R15 | Firing alerts baseline | Grafana → Alerting | written down before S1 |
+| R16 | Rows the release's migrations touch (their duration) | the query below the table | `inventory_item` rows (V247 rebuilds two indexes on it **without `CONCURRENTLY`**, blocking its writes while it runs — inside the deploy window); personal blueprints that are also default blueprints (V255's backfill `UPDATE` writes one `exchange_change` row, source `system`, for each); Flyway tip `245` · **TO BE READ on the day** (exec-based, gated). |
+| R17 | Alloy on the host | `rpm -q alloy` | the version the new `config.alloy` (structured metadata `client_id`, `route`) runs on · *Read 2026-09-28:* `alloy-1.19.2-1.x86_64`. |
+
+R16 — read-only, on `db-backend`:
+
+```bash
+${UPOD} exec db-backend sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p 15432 -Atc "SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY; SELECT count(*) FROM inventory_item; SELECT count(*) FROM personal_blueprint pb JOIN default_blueprint d ON d.product_key = pb.product_key; SELECT max(version::int) FROM flyway_schema_history WHERE success;"'
+```
 
 R12 — `scripts/keycloak-config-snapshot.sql` (read-only by its first statement, secrets excluded) against `db-keycloak`, from PowerShell in a checkout, the carriage returns stripped:
 
@@ -195,20 +225,22 @@ R12 — `scripts/keycloak-config-snapshot.sql` (read-only by its first statement
 
 ## 4. Before the first host step (no host write)
 
-1. **Merge what the release must carry** — see §10, gap 1: the terms change (`terms.list_4_1_5` in
-   `messages.properties`, `_de`, `_en`, linking `docs/legal/approved-clients.md`) and the privacy
-   notice's approved-client paragraph (frontend `privacy.*`, DE and EN), with the wiki page
-   „Nutzungsbedingungen". Without them the go-live release ships no terms change and no member
-   re-consents; with them every member re-consents once at S6.
+1. **Merge the two parallel PRs before S5** — `claude/golive-terms-privacy` (the terms change
+   `terms.list_4_1_5` in `messages.properties`, `_de`, `_en`, linking
+   `docs/legal/approved-clients.md`; the privacy notice's approved-client paragraph; the wiki page
+   „Nutzungsbedingungen") and `claude/exchange-retention-sweep` (the 90-day sweep of disconnected
+   installations and revocations). Neither needs a host step. If either adds a migration, it joins
+   `V246`–`V257` in S6 and in R16's reading; re-check it against §8, step 3.
 2. **Open boxes of #2092** the owner decides on before S5: the load test of the feed/changes routes
-   on the testing host or the sandbox (never production), the final security review (G5), the
-   forward-compatibility of `V246`–`V257` with v1.12.0 (read on `main`: all additive, new columns
-   nullable or with a default, `V252`'s triggers fall back to `system` when
-   `basetool.change_source` is unset — **not run** against a v1.12.0 backend), and the CHANGELOG line
-   on the audit/metric attribution (`none` → real client ids; old rows stay „Ohne Client (System)").
-3. **Have the three artefacts ready**: the extractor's 2.10.0 tag commit (TO BE DECIDED — the
+   on the testing host or the sandbox (never production), the final security review (G5), and the
+   CHANGELOG line on the audit/metric attribution (`none` → real client ids; old rows stay „Ohne
+   Client (System)"). The forward-compatibility box is settled: v1.12.0's backend suite (76 tests,
+   15 classes) ran green against a schema `main`'s Flyway had migrated to `V257`, with v1.12.0's
+   Flyway validating („Successfully validated 255 migrations", tip 257, `*:future` ignored) and
+   Hibernate `validate` passing; the row caveats are in §8, step 3.
+3. **Have the artefacts ready**: the extractor's 2.10.0 tag commit (TO BE DECIDED — the
    extractor's `main` is at `28a815d`, #75), the Android release PR bumping `versionCode` to **17**
-   (TO BE DECIDED: its `versionName`), and — for S16 — the VerseKit approval (public issue plus the
+   (TO BE DECIDED: its `versionName`), and — for S17 — the VerseKit approval (public issue plus the
    merged PR to `docs/legal/approved-clients.md`) with its first sync-capable version.
 4. **Draft the announcements** (§9) and schedule the two short outages (S6, S8/S9).
 
@@ -219,7 +251,7 @@ R12 — `scripts/keycloak-config-snapshot.sql` (read-only by its first statement
 ### S1 — Install the new ACL renderer and template
 
 **PRODUCTION WRITE — needs @greluc's explicit per-action yes.** Skip it when R3 shows every file
-equal to `main`.
+equal to `main` — read 2026-09-28: they differ, so **S1 is needed**.
 
 - **Target:** production host, `/var/iri/code/scripts/` (root-owned). **Changes:** `deploy.sh`,
   `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/*.sh`, `render-env-d.py`,
@@ -345,10 +377,9 @@ until S9; `IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor` and audit-only o
 ### S5 — Cut the release
 
 GitHub, no host change. [`deployment.md` → Cutting a release](deployment.md#cutting-a-release):
-*Actions → Release · Prepare* with version **TO BE DECIDED** (v1.12.0 is the latest; this is at least
-a minor, e.g. `1.13.0`) → merge the `chore(release): vX.Y.Z` PR → `release-publish.yml` tags it with the
+*Actions → Release · Prepare* with version **`1.13.0`** (owner decision 2026-09-28) → merge the `chore(release): v1.13.0` PR → `release-publish.yml` tags it with the
 `basetool-release` App token → the tag run of `release-images.yml` re-tags backend, frontend, ingest,
-`config` and `keycloak-spi` as `:X.Y.Z`. Confirm all five exist before S6 (the promote refuses
+`config` and `keycloak-spi` as `:1.13.0`. Confirm all five exist before S6 (the promote refuses
 otherwise). Everything on `main` at the merge is in the release — re-check any PR that lands after
 this runbook against §2 and §10.
 
@@ -367,14 +398,45 @@ yes).
     on the new JAR and the new `krt-theme` pages before backend.
   - **Redis** restarts with `--maxmemory 768mb` in a 1024 MB container (ADR-0221, REQ-OPS-018); the
     AOF keeps every session.
-  - **Flyway** runs `V246`–`V257` before the new backend serves: RSI handle, `stolen` columns,
-    the registry (switch **off**, registry **empty**), installations and revocations, catalogue name
-    keys, the change feed with its triggers, the journal, ship links, blueprint provenance, bulk undo
-    and two notification rules.
+  - **Flyway** runs `V246`–`V257` (plus whatever the two parallel PRs add) before the new backend
+    serves: RSI handle, `stolen` columns, the registry (switch **off**, registry **empty**),
+    installations and revocations, catalogue name keys, the change feed with its triggers, the
+    journal, ship links, blueprint provenance, bulk undo and two notification rules. **V247**
+    rebuilds two stack-key indexes on `inventory_item` and `job_order_handover_item` without
+    `CONCURRENTLY` — writes to them block while it runs (R16 sizes it; the app is down anyway).
+    **V255**'s backfill `UPDATE` runs after V252's triggers exist, so it writes one
+    `exchange_change` row (source `system`) per personal blueprint that is also a default blueprint —
+    expected and harmless.
+  - **Ingest has two new start-up guards under `prod`**: `PublicBaseUrlGuard` (a blank
+    `IRI_INGEST_PUBLIC_BASE_URL`) and `LegacyClientGateGuard` (while the legacy endpoints are on, an
+    empty `IRI_INGEST_ALLOWED_CLIENT_IDS` or `IRI_INGEST_CLIENT_AUDIT_ONLY=true`). Either refuses the
+    ingest start, the health gate fails, and the **whole release rolls back** — R8/R9 before S4 are
+    the protection.
+  - **Monitoring arrives with the bundle** (reconciled without gating; Prometheus, blackbox and the
+    host `alloy.service` restart for their config): **19 new alerts** — `apps.yml`:
+    `ExchangeDpopProofsFailing`, `IngestDpopReplayCacheFull`, `ExchangeDpopProofLimitSustained`;
+    `business.yml`: `ExchangeRegistryChanged`, `ExchangeMirrorWriteFailed`, `ExchangeBudgetHigh`,
+    `ExchangeRelayFailing`, `ExchangeClientRefusalsSpike`, `ExchangeRegistryUnreadableAtGateway`,
+    `ExchangeRegistryMirrorStaleAtGateway`, `ExchangeRegistryReconcileStale`, `ExchangeRemoveSpike`,
+    `ExchangeGuardStorm`, `ExchangeInstallationSurge`, `ExchangeBulkUndoFailed`,
+    `ExchangeUnknownClient`, `ExchangeRelayHeaderForged`, `ExchangeGateRefusing`,
+    `ExchangeDepartureIncomplete`; **four changed queries** — `ScheduledJobStale` adds
+    `exchange_change_retention` (nightly 03:30 UTC), `IdentityProviderUnavailable` no longer counts
+    `dpop_store_full`, `AuditDomainSilenceAnomaly` looks at 30 days and skips `HANGAR`, `BLUEPRINT`,
+    `CONNECTED_APPS`, `BlackboxProbeFailed` covers `blackbox-http-401`; **two new probes** —
+    `https://ingest.profit-base.online/exchange/v1/openapi.json` (2xx, job `blackbox-http`) and
+    `https://ingest.profit-base.online/exchange/v1` (exactly 401, new job `blackbox-http-401`, new
+    module `http_401`), both flapping until the new ingest is up; **dashboards** — new „Exchange"
+    (`basetool-exchange`, 22 panels), „Basetool operations" 64 → 76 panels; **Alloy** attaches
+    `client_id` and `route` as structured metadata, not labels. Images: Grafana moves from
+    `grafana/grafana-oss:13.0.2` to `grafana/grafana:13.2.2` (it migrates `grafana.db` at start),
+    Prometheus 3.15.0, redis-exporter 1.92.0, lego 5.5.2.
+  - **The edge** is recreated for the new `api.*` allowlist entries („Mein Lager", org unit,
+    „gestohlen", RSI handle); `edge-deny-probe.yml`'s new rows turn green once the release is live.
   - **The exchange stays dormant**: the mirror is written (S4), the switch is off, the registry
     empty — the gateway answers every exchange call `503 EXCHANGE_DISABLED`. The legacy `/v1`
     routes work as before. Marking is off (`canMarkStolen` false).
-  - **Terms** — only if §4.1 merged: every member re-consents at the next page load, and every
+  - **Terms** — every member re-consents at the next page load, and every
     SC Extractor pauses until its member has (the backend refuses on-behalf-of imports without
     consent). Android v0.3.1 has no global re-consent handler (#2097's #194 ships with S7): an open
     app shows errors until it is restarted after the member re-consented on the web.
@@ -385,7 +447,7 @@ yes).
 - **Command** (workstation, on `main`):
 
   ```bash
-  gh workflow run promote.yml -f version=X.Y.Z
+  gh workflow run promote.yml -f version=1.13.0
   ```
 
   then approve the `production` deployment in GitHub, and on the host:
@@ -412,12 +474,14 @@ yes).
   journalctl CONTAINER_NAME=keycloak --since -15min -o cat | grep -E 'krt-freemarker|basetool-exchange|ERROR' | head
   ```
 
-  Expected: the three digests the promote run tagged `:X.Y.Z` (the page footer shows vX.Y.Z; the OCI
+  Expected: the three digests the promote run tagged `:1.13.0` (the page footer shows v1.13.0; the OCI
   version label may read `main`, cosmetic — 1.11.0 runbook §9); twelve rows
   `246|t` … `257|t`; `f` and `0`; `maxmemory` / `805306368`; `1073741824`; `1`; `true`; `Exchange
-  registry mirror enabled (key=exchange:registry)`; Keycloak logs no `ERROR` (it may name the two
-  provider ids in a `KC-SERVICES0047` warning for an internal SPI — if not, S15's device login is
-  the functional proof of both).
+  registry mirror enabled (key=exchange:registry)`; Keycloak logs `Login forms provider krt-freemarker
+  registered with order 100` and a `KC-SERVICES0047` warning for the internal SPI, and no `ERROR`.
+  `krt-freemarker` replaces the default login forms provider for **every** Keycloak page, so the
+  web sign-in below is its real test; S15's device login tests the consent page. Ingest logs no
+  `IllegalStateException` from `PublicBaseUrlGuard` or `LegacyClientGateGuard`.
 
   Off the host:
 
@@ -435,11 +499,17 @@ yes).
   and `ExchangeRegistryReconcileStale` are armed from now on and must stay silent), *Registry clients
   by status* empty; Basetool operations — panel 71 „Legacy extractor endpoints" switch `1`, no 410s;
   panel 51 and `ApiUnknownClient` silent; `ExchangeMirrorWriteFailed`, `IngestUnknownClient`,
-  `IngestAudienceGateOff` silent; Loki `{app="backend-stdout"} |= "ERROR"` and
+  `IngestAudienceGateOff` silent; `SessionTypeOutsideAllowList` and `SessionValueDropsSustained`
+  silent (the allow-list runs `enforce`, and the release adds a session-held object, the
+  connected-apps confirmation); Blackbox — both new probes green, `BlackboxProbeFailed` silent;
+  Grafana shows the „Exchange" dashboard; the first `exchange_change_retention` run after 03:30 UTC
+  keeps `ScheduledJobStale` silent; Loki `{app="backend-stdout"} |= "ERROR"` and
   `{app="ingest-stdout"} |= "NOPERM"` empty.
 - **Rollback:** lock-step, never per service — `gh workflow run promote.yml -f version=1.12.0`
-  (§8). `V246`–`V257` stay. It also puts back v1.12.0's units, so Redis returns to 384 MB / 512 MB and
-  restarts again.
+  (§8, step 3). `V246`–`V257` stay and the schema is compatible, but v1.12.0 then runs **degraded**
+  (the admin notification-rules page and some audit pages answer 500) — **prefer rolling forward**
+  with a fix. It also puts back v1.12.0's units, so Redis returns to 384 MB / 512 MB and restarts
+  again.
 
 ---
 
@@ -524,11 +594,11 @@ Console (SSH tunnel, [`deployment.md` → Keycloak Admin Console via SSH tunnel]
 confidential, service-account roles only, `realm-management` → `manage-clients` + `manage-realm`),
 files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
 
-- **VerseKit decides which list the run uses.** `scripts/keycloak/external-clients.json` on `main`
-  lists `versekit`, so a run with it **creates the VerseKit client**. That is right only once the
-  approval PR to `docs/legal/approved-clients.md` is merged. If it is not, and H1 cannot wait, run
-  with an empty list (`--external-clients /root/kc-realm/keycloak/none.json`, content `[]`) and repeat
-  S10/S15 with the real list after the approval.
+- **The run uses an empty client list** (owner decision 2026-09-28).
+  `scripts/keycloak/external-clients.json` on `main` lists `versekit`, and a run with it would
+  **create the VerseKit client** before its approval. S10 and S15 therefore pass
+  `--external-clients /root/kc-realm/keycloak/none.json` (content `[]`); VerseKit's client comes
+  with a later, separately approved dry run and apply with the real list.
 - **Copy the scripts** (PowerShell, in a clean checkout of the release tag; the files are LF):
 
   ```powershell
@@ -540,7 +610,7 @@ files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
 
   The realm provisioner imports the mobile one **and** reads `keycloak/external-clients.json` beside
   itself by default — copying only the two scripts ends in `cannot read the third-party client list`
-  before anything is read. Without VerseKit: `printf '[]\n' > /root/kc-realm/keycloak/none.json`.
+  before anything is read. On the host, the empty list: `printf '[]\n' > /root/kc-realm/keycloak/none.json`.
 - **Open the session** (host; [`keycloak/README.md` → provisioning](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android)):
 
   ```bash
@@ -566,7 +636,7 @@ files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
   from the Admin Console) — type them, never paste them into a transcript. Never retry a failing
   login blindly: the realm locks after five failures (vault *Keycloak* → *Administering the realm
   with kcadm*).
-- **Rollback basis** (holds client secrets — stays on the host, `0700`, deleted at S15's end):
+- **Rollback basis** (holds client secrets — stays on the host, `0700`, deleted at S16's end):
 
   ```bash
   kc get clients -r iri                   > /root/kc-realm/clients.before.json
@@ -581,12 +651,13 @@ files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
   ```bash
   export KEYCLOAK_FRONTEND_CLIENT_SECRET="$(sed -n 's/^KEYCLOAK_FRONTEND_CLIENT_SECRET=//p' /var/iri/code/.env | tail -1)"
   python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
-    --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential
+    --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential \
+    --external-clients /root/kc-realm/keycloak/none.json
   echo "exit=$?"
   unset KEYCLOAK_FRONTEND_CLIENT_SECRET
   ```
 
-  (append `--external-clients /root/kc-realm/keycloak/none.json` without VerseKit). Every production
+  Every production
   run passes `--frontend-client confidential` with the secret: production's frontend client is
   confidential since 2026-09-25, and a run with that flag plans nothing for it.
 - **Expected:** `[DRY RUN — nothing is written]`, `exit=2`, and only these changes (the exact list is
@@ -602,11 +673,11 @@ files under `/root/kc-realm/`, and a kcadm session file on the Keycloak tmpfs.
     `web-origins`, `acr` withheld; optional scopes the five extractor exchange scopes plus
     `offline_access`, the rest withheld; the loopback redirect URIs and the code flow gone if still
     there;
-  - `versekit` created from the template (only with the real list).
+  - **no** `versekit` line (the empty list); if one appears, the flag is missing — stop.
   No line may touch `basetool-frontend`'s type or secret, `basetool-android`, `backend-service` or
   `basetool-ingest-gateway`. `[only on this realm]` may list `basetool-provisioner` and `grafana`.
 - **Watch:** nothing moves — a dry run only reads.
-- **Rollback:** nothing to roll back in the realm; if S15 will not follow the same day, run S15's
+- **Rollback:** nothing to roll back in the realm; if S15 will not follow the same day, run S16's
   clean-up block now.
 
 ### S11 — Switch the exchange on
@@ -703,33 +774,25 @@ every extractor token is; the approval must name it.
   ```bash
   export KEYCLOAK_FRONTEND_CLIENT_SECRET="$(sed -n 's/^KEYCLOAK_FRONTEND_CLIENT_SECRET=//p' /var/iri/code/.env | tail -1)"
   python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
-    --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential --apply
+    --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential \
+    --external-clients /root/kc-realm/keycloak/none.json --apply
   echo "exit=$?"
   python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
-    --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential
+    --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential \
+    --external-clients /root/kc-realm/keycloak/none.json
   echo "exit=$?"
   unset KEYCLOAK_FRONTEND_CLIENT_SECRET
   ```
-
-  (both with `--external-clients /root/kc-realm/keycloak/none.json` if S10 used it).
 - **Expected:** `[apply]`, `[verify] re-planning …`, `Applied. A second run reports no changes.`,
   `exit=0`; the second (dry) run: `The realm is in the production shape. Nothing to do.`, `exit=0`.
   `exit=3` with `[manual]` means a service-account role to assign by hand — none is expected.
-- **Clean up** (same sitting):
-
-  ```bash
-  sudo -u iri podman exec keycloak rm -f /opt/keycloak/data/tmp/kcadm.config /opt/keycloak/data/tmp/truststore.p12
-  rm -rf /root/kc-realm
-  ```
-
-  then delete `basetool-provisioner` in the Admin Console. `clients.before.json` holds client
-  secrets; a later rollback starts from a fresh `kc get`.
+- **Keep the session open** for S16; the clean-up is at S16's end.
 - **Verify:**
   - R12 again: `client|basetool-sc-extractor|…|consent=t…`,
     `clientattr|basetool-sc-extractor|dpop.bound.access.tokens=true`, `scopeuse|basetool-sc-extractor|basic|default`,
     five `exchange.*` and `offline_access` as `optional`, **no** `extractor-ingest` /
-    `extractor-ingest-only` row for the extractor; ten `scope|exchange.…` rows; `client|versekit`
-    only with the real list; no `basetool-provisioner`.
+    `extractor-ingest-only` row for the extractor; ten `scope|exchange.…` rows; **no**
+    `client|versekit`; `basetool-provisioner` present until S16's clean-up.
   - **A real device login** with 2.10.0 on the owner's PC: the browser opens once, the device page
     warns and shows the code, the **consent page lists the five capabilities and the user code**
     (ADR-0228), the extractor asks for the installation's name, a blueprint send lands as a draft;
@@ -742,21 +805,62 @@ every extractor token is; the approval must name it.
   (a release day can trip it — read it, do not suspend reflexively), `ExchangeUnknownClient`,
   `ExchangeRelayFailing`, `ExchangeGateRefusing`, `ExchangeBudgetHigh`, `ApiUnknownClient` silent;
   Keycloak dashboard — no `LOGIN_ERROR` burst.
-- **Owner decision, optional (its own yes):** S15 does not end the extractor sessions issued before
-  it. What a pre-go-live refresh token yields after the apply is not tested here; to cut every one of
-  them — a phished one included — set the client's not-before: Admin Console → *Clients →
-  basetool-sc-extractor → Advanced → Revocation → Set to now*. Every member logs in once anyway with
-  2.10.0.
 - **Rollback:** §8, steps 2 and 4. It re-opens H1 only if `extractor-ingest` is restored — never do
   that.
 
-### S16 — Registry entry `versekit`
+### S16 — Not-before on the extractor client
+
+**PRODUCTION WRITE — needs @greluc's explicit per-action yes** (owner decision 2026-09-28 to do it;
+the command itself still needs its yes). Right after S15, in the same provisioner session.
+
+- **Target:** Keycloak client `basetool-sc-extractor`, its `notBefore`. **Changes:** every token of
+  that client issued before this second — access, refresh and offline tokens, a phished one
+  included — is refused from now on; S15 alone does not end them. Every extractor, 2.10.0
+  installations that logged in between S13 and S15 included, asks for one new device login.
+  **Restarts:** nothing.
+- **Precondition:** S15 verified (R12 shows the H1 shape); the S10 session still valid (else repeat
+  `config credentials`); the members' post of §9.3 out.
+- **Command:**
+
+  ```bash
+  CID=$(kc get clients -r iri -q clientId=basetool-sc-extractor --fields id --format csv --noquotes)
+  echo "$CID"
+  kc get clients/$CID -r iri --fields clientId,notBefore
+  kc update clients/$CID -r iri -s "notBefore=$(date +%s)"
+  kc get clients/$CID -r iri --fields clientId,notBefore
+  ```
+
+- **Expected:** one UUID; `notBefore` `0` before (TO BE READ — anything else was set by hand
+  earlier); after the update the current epoch second.
+- **Verify:** an extractor session from before S15 gets `invalid_grant` on its next refresh and the
+  extractor opens a new device login; a fresh device login right afterwards works (its token is
+  issued after the not-before). Keycloak's event log shows the refused refreshes
+  (`sudo -u iri podman logs --since 10m keycloak 2>&1 | grep -c REFRESH_TOKEN_ERROR` rises).
+- **Watch:** Keycloak dashboard — a short burst of refresh errors and then device logins;
+  Exchange — *Installations created/day* rises as extractors reconnect; `ExchangeInstallationSurge`
+  may fire on this day for `basetool-sc-extractor` (expected — read it, do not suspend reflexively).
+- **Rollback:** `kc update clients/$CID -r iri -s notBefore=0` re-admits tokens issued before
+  (Keycloak compares a token's issue time with the value; nothing was deleted) — **not verified**,
+  and it re-opens exactly what S16 closes.
+- **Clean up** (end of the sitting):
+
+  ```bash
+  sudo -u iri podman exec keycloak rm -f /opt/keycloak/data/tmp/kcadm.config /opt/keycloak/data/tmp/truststore.p12
+  rm -rf /root/kc-realm
+  ```
+
+  then delete `basetool-provisioner` in the Admin Console. `clients.before.json` holds client
+  secrets; a later rollback starts from a fresh `kc get`.
+
+### S17 — Registry entry `versekit`
 
 **PRODUCTION WRITE — needs @greluc's explicit per-action yes** (admin UI).
 
 - **Precondition:** VerseKit approved — public issue and the **merged** PR adding it to
-  `docs/legal/approved-clients.md` with its capabilities; the Keycloak client exists (S15 with the
-  real list; else S10/S15 again). Open to **all members at once**, no pilot group.
+  `docs/legal/approved-clients.md` with its capabilities; its Keycloak client created by a
+  provisioner run with the real `external-clients.json` (S10's procedure without
+  `--external-clients`: session, dry run showing only the `versekit` client, apply, empty second run,
+  clean-up — each write with its own yes). Open to **all members at once**, no pilot group.
 - **Values:** Client-ID `versekit`; Name `VerseKit`; Berechtigungen `exchange.connect`,
   `exchange.blueprints.read`, `exchange.blueprints.write`; Mindestversion **TO BE DECIDED** — the
   first sync-capable VerseKit release from #2089; contact URL from the approval issue (its privacy
@@ -768,7 +872,7 @@ every extractor token is; the approval must name it.
 - **Rollback:** „Sperren"; for a bad release, the minimum version (vault *Blocking a bad exchange
   client release*).
 
-### S17 — Widen VerseKit, one capability group at a time
+### S18 — Widen VerseKit, one capability group at a time
 
 **PRODUCTION WRITE — needs @greluc's explicit per-action yes, per group** (admin UI, „Bearbeiten",
 confirm „Berechtigungen erweitern?"), each only after the previous group ran quietly and each
@@ -805,7 +909,29 @@ Fastest first; each is its own production write with its own yes.
    is first taken out of `external-clients.json` (a third-party client) — for the extractor there is
    no such switch.
 3. **Application rollback** — `gh workflow run promote.yml -f version=1.12.0`, lock-step.
-   `V246`–`V257` stay (Flyway does not roll back; all additive). What else goes back with it:
+   **Prefer rolling forward**: v1.12.0 runs on the new schema but **degraded**, and nothing short of
+   a data write repairs that.
+   - **The schema is compatible** — proven 2026-09-28: v1.12.0's backend suite ran green (76 tests)
+     against a schema migrated to `V257`; its Flyway validates („Successfully validated 255
+     migrations", tip 257) and Hibernate `validate` passes; its writes fire V252's triggers without
+     failing (source `system`). `V246`–`V257` stay (Flyway does not roll back).
+   - **Rows break v1.12.0 reads:** the seeded rules of V251 and V257 carry notification event types
+     v1.12.0 has no enum constant for (`EXCHANGE_INSTALLATION_CONNECTED`,
+     `EXCHANGE_BULK_UNDO_APPLIED`), so the **admin notification-rules page answers 500** from the
+     moment the migrations ran — rule evaluation still works. Once the new release has written an
+     audit event of a new type in a domain v1.12.0 knows — `INVENTORY_ORG_UNIT_CHANGED`,
+     `INVENTORY_BULK_ORG_UNIT_CHANGED`, `INVENTORY_STOLEN_*` (Lager), `MARKET_OFFER_REDUCED`,
+     `MARKET_OFFER_REMOVED` (Materialbörse) — **the Lager and Materialbörse audit tabs and exports
+     answer 500** when they page over it. After S11, a member holding an
+     `EXCHANGE_INSTALLATION_CONNECTED` or `EXCHANGE_BULK_UNDO_APPLIED` notification cannot read their
+     notifications. Rows of the new domains (`HANGAR`, `BLUEPRINT`, `CONNECTED_APPS`) are harmless:
+     v1.12.0 filters by domain in SQL.
+   - Deleting the two rule rows (ids `62200000-0000-0000-0000-00000000000d` and `…0e`, with their
+     `notification_rule_selector` rows) and re-typing the new audit and notification rows would
+     repair a long rollback, but it is a production write each, and a roll-forward would not re-seed
+     the rules — **not recommended**.
+
+   What else goes back with it:
    Redis to 384 MB in 512 MB (the previous units; redis restarts again — check R6's figure first, a
    Redis above 384 MB refuses writes under `noeviction`); the SPI jar (the disconnect extension
    answers `404`, which the backend of 1.12.0 does not call anyway); the terms text (members
@@ -844,38 +970,38 @@ Fastest first; each is its own production write with its own yes.
 
 In German, in the forum (vault *Announcing a release*), in three posts:
 
-1. **Before S6** — the outage window; **once**, every member confirms the changed terms of use at the
-   next sign-in (only with §4.1); until a member has, their SC Extractor pauses; the Android app
+1. **Before S6 (2026-09-29)** — the outage window; **once**, every member confirms the changed terms
+   of use at the next sign-in; until a member has, their SC Extractor pauses; the Android app
    may show errors until restarted after confirming.
 2. **With S7–S9** — the new app version, then „Update erforderlich" for older builds after the
    floor rises (about one minute of outage), then „gestohlen" in „Mein Lager".
-3. **With S13–S15** — SC Extractor 2.10.0 is required; old versions show the update hint; after the
+3. **With S13–S16** — SC Extractor 2.10.0 is required; old versions show the update hint; after the
    update the first send opens the browser **once**, with a consent page listing what the extractor
    may do and the code to compare, and asks for a name for this PC; one new login, nothing else.
-   Later, with S16: VerseKit can be connected under „Verbundene Anwendungen".
+   Later, with S17: VerseKit can be connected under „Verbundene Anwendungen".
 
 ---
 
 ## 10. Gaps and contradictions found while writing this (2026-09-28)
 
-1. **The terms change and the privacy notice are not built.** #2092 expects both „in the go-live
-   release", REQ-SEC-027's callout says the clause changes at the go-live, REQ-XCH-002's third box is
-   open — but `terms.list_4_1_5` is unchanged since v1.12.0 in all three bundles, no `privacy.*` key
-   mentions approved clients, and no PR is open. A release cut today ships the exchange without them.
-2. **„Enlarge Redis before the release" cannot be a separate step.** ADR-0221 and REQ-OPS-018 place
+1. **The terms change and the privacy notice were not built** when this was first written; *resolved
+   2026-09-28*: both are being built on `claude/golive-terms-privacy` and ship in this release (§4.1).
+   No longer a blocker.
+2. **„Enlarge Redis before the release" cannot be a separate step.** ADR-0221 and REQ-OPS-018 placed
    the resize before the first exchange release, but it lives in the unit, and the next release is
    both the resize and the exchange release. Handled here by landing it in S6 with the exchange
-   dormant. A separate earlier resize would need a hand-made drop-in (drift) or a release cut
-   without the exchange, which `main` cannot produce.
+   dormant. *Corrected 2026-09-28:* ADR-0221 (amendment 2), REQ-OPS-018 and REQ-SEC-068 now say so.
 3. **The coupled sequence's „server release" and the exchange's „release" are the same release** —
    everything since v1.12.0 is on `main` together.
 4. **#2092's body and the extractor comment disagree on the order.** The body applies the
    provisioner (its step 4) before the registry entry and the switch-off; the comment — H1 — after
-   the switch-off. This runbook follows the comment, which leaves a window (S13–S15) where 2.10.0
+   the switch-off. This runbook follows the comment (owner decision 2026-09-28; the owner corrects
+   the #2092 body to match), which leaves a window (S13–S15) where 2.10.0
    cannot sync and a shorter one (S14–S15) where no extractor can; the provisioner has no way to give
    the extractor its exchange scopes without withholding the ingest scopes in the same run.
 5. **„Redis size and ACL stay" is not true under an application rollback.** A promotion of 1.12.0
-   restores its units: Redis goes back to 384 MB / 512 MB and restarts.
+   restores its units: Redis goes back to 384 MB / 512 MB and restarts. *Corrected 2026-09-28* in
+   ADR-0221 and REQ-OPS-018.
 6. **`INGEST_KEYCLOAK_SETUP.md`'s provisioner procedure fails as written.** It copies only the two
    scripts; the realm provisioner reads `keycloak/external-clients.json` beside itself and stops with
    `cannot read the third-party client list` (reproduced 2026-09-28). Corrected there in the same
@@ -887,13 +1013,16 @@ In German, in the forum (vault *Announcing a release*), in three posts:
    on every client it manages; the rollback's „Keycloak client disable" is undone by the next run.
 9. **The kcadm truststore step is untested** since internal TLS step 3 (v1.12.0) — S10 is its first
    production run.
-10. **Sessions issued before S15 are not ended by it** — see S15's optional not-before; whether a
-    pre-go-live extractor refresh token still yields `aud=basetool-backend` after the scope change is
-    untested.
-11. **Minor:** `INGEST_KEYCLOAK_SETUP.md` → *Configured state* still says the extractor „still carries"
+10. **Sessions issued before S15 are not ended by it** — *decided 2026-09-28:* S16 sets the extractor
+    client's not-before, so the question whether such a refresh token still yields
+    `aud=basetool-backend` no longer matters.
+11. **Minor:** `INGEST_KEYCLOAK_SETUP.md` → *Configured state* said the extractor „still carries"
     the loopback redirect URIs and the app both ingest scopes, „removed on the provisioner's next
-    production apply", while the 2026-09-25 APPSEC-07 dry run planned only the frontend's type — R12
-    settles it. The unit limits sum to 13 968 MiB while ADR-0221 records 14 512 MiB. No environment
+    production apply", while the 2026-09-25 APPSEC-07 dry run planned only the frontend's type — now
+    marked „to be confirmed at the go-live dry run" (S10, R12). The Quadlet units' limits sum to
+    13 968 MiB where ADR-0221 records the compose files' 14 512 MiB — the difference is `alloy` (512M)
+    and `node-exporter` (32M), host services on the Quadlet host; recorded in ADR-0221 amendment 2
+    and the sizing ledger. No environment
     variable the new code reads is missing from the `env.d` templates: the ones not in a template
     (`APP_EXCHANGE_MIRROR_RECONCILE_INTERVAL`, `APP_EXCHANGE_CONNECTED_APPS_WEB_CLIENT_IDS`,
     `APP_INGEST_MAX_HANDOFF_BYTES`, `APP_INGEST_MAX_HANDOFFS_PER_SUBJECT`) all have defaults.
