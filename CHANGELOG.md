@@ -6,6 +6,13 @@
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
+### Security
+
+- **Jackson auch in Keycloak-SPI, `logging-support` und den Gradle-Plugins angehoben.** Dort lagen
+  noch `jackson-databind` 2.21.5, 3.1.5 und 2.22.1 (CVE-2026-68497, CVE-2026-19032,
+  CVE-2026-83557), jetzt 2.21.6, 3.1.6 und 2.22.2. Die Images von Backend, Frontend und Ingest
+  waren seit v1.13.4 nicht betroffen.
+
 ## [v1.13.4](https://github.com/krt-profit/basetool/releases/tag/v1.13.4) - 2026-09-29
 
 ### Security

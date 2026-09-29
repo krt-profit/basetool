@@ -22,6 +22,7 @@ dependencies {
   compileOnly(platform(libs.netty41.bom))
   compileOnly(platform(libs.protobuf3.bom))
   compileOnly(platform(libs.opentelemetry.bom))
+  compileOnly(platform(libs.jackson2.bom))
 
   testImplementation(platform(libs.junit.bom))
   testImplementation(libs.junit.jupiter)
@@ -35,5 +36,6 @@ dependencies {
   testImplementation(platform(libs.netty41.bom))
   testImplementation(platform(libs.protobuf3.bom))
   testImplementation(platform(libs.opentelemetry.bom))
+  testImplementation(platform(libs.jackson2.bom))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

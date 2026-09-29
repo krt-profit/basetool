@@ -1,7 +1,15 @@
 import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
 
-buildscript { dependencies { constraints { classpath(libs.handlebars) } } }
+buildscript {
+  dependencies {
+    constraints {
+      classpath(libs.handlebars)
+      classpath(libs.jackson2.plugins.databind)
+      classpath(libs.jackson3.databind)
+    }
+  }
+}
 
 plugins {
   java
