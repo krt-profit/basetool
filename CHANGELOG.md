@@ -4,9 +4,10 @@
 
 ### Changed
 
-- **Star-Citizen-Links: 16 neue Seiten und die Sektion „Offizielles".** Neun Seiten von Roberts Space
-  Industries (u. a. Roadmap, Status, Ship Matrix, Starmap) bilden die neue Sektion; dazu kommen
-  SC Trading, der Holoviewer, SystemSeven, zwei Wikis, SCDL und SC-Links.org (REQ-UI-025).
+- **Star-Citizen-Links: 20 neue Seiten und die Sektion „Offizielles".** Zwölf Seiten von Roberts Space
+  Industries (u. a. Roadmap, Status, Ship Matrix, Starmap, Galactapedia) bilden die neue Sektion;
+  dazu kommen SC Trading, der Holoviewer, SystemSeven, drei Wikis, SCDL und SC-Links.org
+  (REQ-UI-025).
 - **Star-Citizen-Links: VerseKit zeigt auf die neue Adresse.** Die Karte führt jetzt zu
   versekit.xharig.com (REQ-UI-025).
 - **Keycloak-Theme: Die Seite nach einer Geräte-Anmeldung führt weiter.** Statt nur „Sie können

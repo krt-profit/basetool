@@ -1290,19 +1290,20 @@ them in one place so nobody has to collect the addresses from Discord.
   member sees. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
   since every account is at least a member, that is „every member". Not on the public surface: an
   anonymous caller is sent to the login like on every other page.
-- **What.** Thirty-five links in six sections, in this order:
+- **What.** Thirty-nine links in six sections, in this order:
   - **Organisation** — das-kartell.org, krt-opsec.de
   - **Offizielles** / Official — robertsspaceindustries.com, its Spectrum community
     (`/spectrum/community/SC`), the roadmap, issue-council, status and public-telemetry
-    pages, the ship matrix, the loaner ship matrix (support article) and the ARK starmap
+    pages, the ship matrix, the loaner ship matrix (support article), the ARK starmap, the
+    comm-link news, the Galactapedia and the RSI knowledge base
   - **Handel & Fracht** — uexcorp.space, sc-cargo.space, sc-hauling.tools, hauler.thespacecoder.space,
     sc-trading.kamille.ovh
   - **Schiffe & Ausrüstung** — erkul.games/calculator, spviewer.eu, fleetyards.net,
     starcitizen-community.de/holoviewer, ccugame.app, maps.adi.sc
   - **Datenbanken & Crafting** — cstone.space, scmdb.net, sc-craft.tools, versekit.xharig.com
   - **Universum & Community** — verseguide.com, ueexi.com, star-citizen-characters.com,
-    daymarrally.com, systemseven.gg, star-citizen.wiki, starcitizen.tools, sc-deutsch-launcher.de,
-    sc-links.org
+    daymarrally.com, systemseven.gg, star-citizen.wiki, starcitizen.tools, starcitizen.fandom.com,
+    sc-deutsch-launcher.de, sc-links.org
 - **How a link reads.** A `.card` per site: the site's own logo (48 px), its name, the host it leads
   to, and a one- or two-sentence description in the UI language. The whole card is the link; it opens
   in a new tab with `rel="noopener noreferrer"`, and says so to screen readers. A closing line states
@@ -1310,7 +1311,7 @@ them in one place so nobody has to collect the addresses from Discord.
 - **Logos are local copies.** Each site's favicon or touch icon is stored under
   `static/images/sc-links/` — PNGs normalised to 96 × 96 on a transparent square, three sites as
   SVG; sites of one operator may share a logo file. The CSP's `img-src 'self' data:` forbids hotlinking, and a hotlinked logo would
-  also send every member's address to thirty-five third parties on each visit. A shipped SVG carries no
+  also send every member's address to thirty-nine third parties on each visit. A shipped SVG carries no
   script, event handler, `foreignObject` or external reference.
 - **The catalogue is code.** `ScLink` (key, address, logo, section) and `ScLinkCategory` are enums;
   names and descriptions are i18n keys `scLinks.link.<key>.name` / `.description`. Changing the list

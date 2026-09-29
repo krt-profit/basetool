@@ -37,6 +37,11 @@ public enum ScLink {
       "dasKartell", "https://das-kartell.org/", "das-kartell.png", ScLinkCategory.ORGANISATION),
   KRT_OPSEC("krtOpsec", "https://krt-opsec.de/", "krt-opsec.png", ScLinkCategory.ORGANISATION),
   RSI("rsi", "https://robertsspaceindustries.com/", "rsi.png", ScLinkCategory.OFFICIAL),
+  COMM_LINK(
+      "commLink",
+      "https://robertsspaceindustries.com/comm-link",
+      "rsi.png",
+      ScLinkCategory.OFFICIAL),
   SPECTRUM(
       "spectrum",
       "https://robertsspaceindustries.com/spectrum/community/SC",
@@ -77,6 +82,16 @@ public enum ScLink {
       "https://robertsspaceindustries.com/en/starmap",
       "rsi.png",
       ScLinkCategory.OFFICIAL),
+  GALACTAPEDIA(
+      "galactapedia",
+      "https://robertsspaceindustries.com/galactapedia",
+      "galactapedia.png",
+      ScLinkCategory.OFFICIAL),
+  RSI_KNOWLEDGE_BASE(
+      "rsiKnowledgeBase",
+      "https://support.robertsspaceindustries.com/hc/en-us",
+      "rsi.png",
+      ScLinkCategory.OFFICIAL),
   UEX("uex", "https://uexcorp.space/", "uex.png", ScLinkCategory.TRADE),
   SC_TRADING(
       "scTrading",
@@ -115,6 +130,11 @@ public enum ScLink {
       "scWikiDe",
       "https://star-citizen.wiki/Star_Citizen_Wiki",
       "sc-wiki-de.png",
+      ScLinkCategory.UNIVERSE),
+  SC_WIKI_FANDOM(
+      "scWikiFandom",
+      "https://starcitizen.fandom.com/wiki/Star_Citizen_Wiki",
+      "sc-wiki-fandom.png",
       ScLinkCategory.UNIVERSE),
   SC_TOOLS("scTools", "https://starcitizen.tools/", "sc-tools.svg", ScLinkCategory.UNIVERSE),
   SCDL(

@@ -78,6 +78,7 @@ class ScLinkCatalogTest {
     assertThat(ScLinkCategory.OFFICIAL.links())
         .containsExactly(
             ScLink.RSI,
+            ScLink.COMM_LINK,
             ScLink.SPECTRUM,
             ScLink.ISSUE_COUNCIL,
             ScLink.RSI_ROADMAP,
@@ -85,7 +86,9 @@ class ScLinkCatalogTest {
             ScLink.RSI_TELEMETRY,
             ScLink.SHIP_MATRIX,
             ScLink.LOANER_SHIP_MATRIX,
-            ScLink.ARK_STARMAP);
+            ScLink.ARK_STARMAP,
+            ScLink.GALACTAPEDIA,
+            ScLink.RSI_KNOWLEDGE_BASE);
     assertThat(ScLinkCategory.OFFICIAL.links())
         .allSatisfy(link -> assertThat(link.displayHost()).endsWith("robertsspaceindustries.com"));
   }
