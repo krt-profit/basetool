@@ -31,6 +31,7 @@ import org.jetbrains.annotations.Unmodifiable;
 @RequiredArgsConstructor
 public enum ScLinkCategory {
   ORGANISATION("organisation"),
+  OFFICIAL("official"),
   TRADE("trade"),
   SHIPS("ships"),
   DATABASES("databases"),

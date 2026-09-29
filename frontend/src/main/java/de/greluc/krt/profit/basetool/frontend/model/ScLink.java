@@ -36,13 +36,64 @@ public enum ScLink {
   DAS_KARTELL(
       "dasKartell", "https://das-kartell.org/", "das-kartell.png", ScLinkCategory.ORGANISATION),
   KRT_OPSEC("krtOpsec", "https://krt-opsec.de/", "krt-opsec.png", ScLinkCategory.ORGANISATION),
+  RSI("rsi", "https://robertsspaceindustries.com/", "rsi.png", ScLinkCategory.OFFICIAL),
+  SPECTRUM(
+      "spectrum",
+      "https://robertsspaceindustries.com/spectrum/community/SC",
+      "spectrum.png",
+      ScLinkCategory.OFFICIAL),
+  ISSUE_COUNCIL(
+      "issueCouncil",
+      "https://issue-council.robertsspaceindustries.com/",
+      "rsi-tools.png",
+      ScLinkCategory.OFFICIAL),
+  RSI_ROADMAP(
+      "rsiRoadmap",
+      "https://robertsspaceindustries.com/roadmap/release-view",
+      "rsi-tools.png",
+      ScLinkCategory.OFFICIAL),
+  RSI_STATUS(
+      "rsiStatus",
+      "https://status.robertsspaceindustries.com/",
+      "rsi-status.png",
+      ScLinkCategory.OFFICIAL),
+  RSI_TELEMETRY(
+      "rsiTelemetry",
+      "https://robertsspaceindustries.com/en/telemetry",
+      "rsi.png",
+      ScLinkCategory.OFFICIAL),
+  SHIP_MATRIX(
+      "shipMatrix",
+      "https://robertsspaceindustries.com/en/ship-matrix",
+      "rsi.png",
+      ScLinkCategory.OFFICIAL),
+  LOANER_SHIP_MATRIX(
+      "loanerShipMatrix",
+      "https://support.robertsspaceindustries.com/hc/en-us/articles/360003093114-Loaner-Ship-Matrix",
+      "rsi.png",
+      ScLinkCategory.OFFICIAL),
+  ARK_STARMAP(
+      "arkStarmap",
+      "https://robertsspaceindustries.com/en/starmap",
+      "rsi.png",
+      ScLinkCategory.OFFICIAL),
   UEX("uex", "https://uexcorp.space/", "uex.png", ScLinkCategory.TRADE),
+  SC_TRADING(
+      "scTrading",
+      "https://sc-trading.kamille.ovh/trading/",
+      "sc-trading.png",
+      ScLinkCategory.TRADE),
   SC_CARGO("scCargo", "https://sc-cargo.space/", "sc-cargo.png", ScLinkCategory.TRADE),
   SC_HAULING("scHauling", "https://sc-hauling.tools/", "sc-hauling.png", ScLinkCategory.TRADE),
   HAULER("hauler", "https://hauler.thespacecoder.space/", "hauler.png", ScLinkCategory.TRADE),
   ERKUL("erkul", "https://erkul.games/calculator", "erkul.png", ScLinkCategory.SHIPS),
   SPVIEWER("spviewer", "https://www.spviewer.eu/", "spviewer.png", ScLinkCategory.SHIPS),
   FLEETYARDS("fleetyards", "https://fleetyards.net/", "fleetyards.png", ScLinkCategory.SHIPS),
+  SC_HOLOVIEWER(
+      "scHoloviewer",
+      "https://starcitizen-community.de/holoviewer",
+      "sc-holoviewer.png",
+      ScLinkCategory.SHIPS),
   CCU_GAME("ccuGame", "https://ccugame.app/", "ccugame.png", ScLinkCategory.SHIPS),
   ADI_MAPS("adiMaps", "https://maps.adi.sc/", "adi-maps.png", ScLinkCategory.SHIPS),
   CORNERSTONE("cornerstone", "https://cstone.space/", "cstone.png", ScLinkCategory.DATABASES),
@@ -57,7 +108,21 @@ public enum ScLink {
       "sc-characters.png",
       ScLinkCategory.UNIVERSE),
   DAYMAR_RALLY(
-      "daymarRally", "https://www.daymarrally.com/", "daymar-rally.png", ScLinkCategory.UNIVERSE);
+      "daymarRally", "https://www.daymarrally.com/", "daymar-rally.png", ScLinkCategory.UNIVERSE),
+  SYSTEM_SEVEN(
+      "systemSeven", "https://systemseven.gg/", "systemseven.png", ScLinkCategory.UNIVERSE),
+  SC_WIKI_DE(
+      "scWikiDe",
+      "https://star-citizen.wiki/Star_Citizen_Wiki",
+      "sc-wiki-de.png",
+      ScLinkCategory.UNIVERSE),
+  SC_TOOLS("scTools", "https://starcitizen.tools/", "sc-tools.svg", ScLinkCategory.UNIVERSE),
+  SCDL(
+      "scdl",
+      "https://www.sc-deutsch-launcher.de/",
+      "sc-deutsch-launcher.png",
+      ScLinkCategory.UNIVERSE),
+  SC_LINKS_ORG("scLinksOrg", "https://sc-links.org/", "sc-links-org.png", ScLinkCategory.UNIVERSE);
 
   /** Suffix of the message keys {@code scLinks.link.<key>.name} and {@code .description}. */
   @NotNull private final String key;
