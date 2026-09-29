@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
+
 ## [v1.13.4](https://github.com/krt-profit/basetool/releases/tag/v1.13.4) - 2026-09-29
 
 ### Security
