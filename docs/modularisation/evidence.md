@@ -870,7 +870,8 @@ public methods) is used by 46 classes in 17 domains.
 
 ### `ownerScopeService` methods referenced from SpEL
 
-18 of 55 public method names.
+18 of the 54 distinct public method names (56 public methods; `canSeeJobOrder` and
+`canSeeRefineryOrder` are overloaded).
 
 | Method | Refs | Method | Refs |
 | --- | ---: | --- | ---: |
