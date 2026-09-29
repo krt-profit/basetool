@@ -87,7 +87,7 @@ public class ExchangeClientSessionResource {
             userSession,
             client,
             session.getContext().getUri(),
-            session.getContext().getRequestHeaders());
+            session.getContext().getHttpRequest().getHttpHeaders());
         ended++;
       }
     }

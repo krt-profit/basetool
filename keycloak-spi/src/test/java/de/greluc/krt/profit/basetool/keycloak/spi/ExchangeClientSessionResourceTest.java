@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.keycloak.http.HttpRequest;
 import org.keycloak.models.AuthenticatedClientSessionModel;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakContext;
@@ -77,7 +78,9 @@ class ExchangeClientSessionResourceTest {
     when(auth.users()).thenReturn(users);
     when(session.users()).thenReturn(userProvider);
     when(session.sessions()).thenReturn(sessions);
-    when(session.getContext()).thenReturn(mock(KeycloakContext.class));
+    KeycloakContext context = mock(KeycloakContext.class);
+    when(context.getHttpRequest()).thenReturn(mock(HttpRequest.class));
+    when(session.getContext()).thenReturn(context);
     when(userProvider.getUserById(realm, USER_ID)).thenReturn(user);
     when(realm.getClientByClientId(CLIENT_ID)).thenReturn(client);
     when(client.getId()).thenReturn(CLIENT_UUID);
