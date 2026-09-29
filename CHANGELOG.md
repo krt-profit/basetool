@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Jackson auf 2.21.6 und 3.1.6 angehoben.** Schließt CVE-2026-68497 (HIGH) in `jackson-databind`
+  für Backend, Frontend und Ingest.
+
+## [v1.13.3](https://github.com/krt-profit/basetool/releases/tag/v1.13.3) - 2026-09-29
+
 ### Changed
 
 - **Build-Warnungen bereinigt.** Keycloak-SPI, Größenlimit-Filter und mehrere Tests nutzen keine veralteten oder ungeprüften Aufrufe mehr.
