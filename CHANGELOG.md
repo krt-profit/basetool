@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.13.4](https://github.com/krt-profit/basetool/releases/tag/v1.13.4) - 2026-09-29
+
 ### Security
 
 - **Jackson auf 2.21.6 und 3.1.6 angehoben.** Schließt CVE-2026-68497 (HIGH) in `jackson-databind`
