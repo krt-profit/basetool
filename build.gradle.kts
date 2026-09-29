@@ -201,6 +201,10 @@ subprojects {
     extra["tomcat.version"] = "11.0.25"
 
     extra["netty.version"] = "4.2.18.Final"
+
+    extra["jackson-2-bom.version"] = "2.21.6"
+
+    extra["jackson-bom.version"] = "3.1.6"
   }
 
   plugins.withId("jacoco") {
