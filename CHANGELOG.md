@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Star-Citizen-Links: Das Fandom-Wiki entfällt.** Es ist stark veraltet (REQ-UI-025).
+
 ## [v1.13.2](https://github.com/krt-profit/basetool/releases/tag/v1.13.2) - 2026-09-29
 
 ### Changed

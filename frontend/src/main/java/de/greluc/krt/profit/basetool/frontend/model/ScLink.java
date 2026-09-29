@@ -131,11 +131,6 @@ public enum ScLink {
       "https://star-citizen.wiki/Star_Citizen_Wiki",
       "sc-wiki-de.png",
       ScLinkCategory.UNIVERSE),
-  SC_WIKI_FANDOM(
-      "scWikiFandom",
-      "https://starcitizen.fandom.com/wiki/Star_Citizen_Wiki",
-      "sc-wiki-fandom.png",
-      ScLinkCategory.UNIVERSE),
   SC_TOOLS("scTools", "https://starcitizen.tools/", "sc-tools.svg", ScLinkCategory.UNIVERSE),
   SCDL(
       "scdl",
