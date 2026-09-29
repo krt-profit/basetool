@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -35,6 +36,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -65,7 +67,37 @@ class ScLinkCatalogTest {
   @Test
   void theHostDropsALeadingWww() {
     assertThat(ScLink.SPVIEWER.displayHost()).isEqualTo("spviewer.eu");
-    assertThat(ScLink.VERSEKIT.displayHost()).isEqualTo("xharig.github.io");
+    assertThat(ScLink.VERSEKIT.displayHost()).isEqualTo("versekit.xharig.com");
+  }
+
+  @Test
+  void theOfficialSectionFollowsTheOrganisationAndHoldsTheRsiSites() {
+    assertThat(ScLinkCategory.values())
+        .startsWith(ScLinkCategory.ORGANISATION, ScLinkCategory.OFFICIAL);
+    assertThat(ScLinkCategory.OFFICIAL.getKey()).isEqualTo("official");
+    assertThat(ScLinkCategory.OFFICIAL.links())
+        .containsExactly(
+            ScLink.RSI,
+            ScLink.COMM_LINK,
+            ScLink.SPECTRUM,
+            ScLink.ISSUE_COUNCIL,
+            ScLink.RSI_ROADMAP,
+            ScLink.RSI_STATUS,
+            ScLink.RSI_TELEMETRY,
+            ScLink.SHIP_MATRIX,
+            ScLink.LOANER_SHIP_MATRIX,
+            ScLink.ARK_STARMAP,
+            ScLink.GALACTAPEDIA,
+            ScLink.RSI_KNOWLEDGE_BASE);
+    assertThat(ScLinkCategory.OFFICIAL.links())
+        .allSatisfy(link -> assertThat(link.displayHost()).endsWith("robertsspaceindustries.com"));
+  }
+
+  @Test
+  void systemSevenSitsDirectlyBesideDaymarRally() {
+    List<ScLink> universe = ScLinkCategory.UNIVERSE.links();
+    assertThat(universe.indexOf(ScLink.SYSTEM_SEVEN))
+        .isEqualTo(universe.indexOf(ScLink.DAYMAR_RALLY) + 1);
   }
 
   @Test
@@ -88,6 +120,19 @@ class ScLinkCatalogTest {
       Set<String> shipped =
           files.map(path -> path.getFileName().toString()).collect(Collectors.toSet());
       assertThat(shipped).isEqualTo(referenced);
+    }
+  }
+
+  @Test
+  void everyPngLogoIsA96PixelSquare() throws IOException {
+    for (ScLink link : ScLink.values()) {
+      if (!link.getIcon().endsWith(".png")) {
+        continue;
+      }
+      BufferedImage image = ImageIO.read(ICON_DIR.resolve(link.getIcon()).toFile());
+      assertThat(image).as(link.getIcon()).isNotNull();
+      assertThat(image.getWidth()).as(link.getIcon()).isEqualTo(96);
+      assertThat(image.getHeight()).as(link.getIcon()).isEqualTo(96);
     }
   }
 

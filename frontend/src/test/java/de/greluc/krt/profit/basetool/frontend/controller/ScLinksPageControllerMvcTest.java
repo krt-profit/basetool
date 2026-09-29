@@ -73,6 +73,7 @@ class ScLinksPageControllerMvcTest {
 
     assertThat(html)
         .contains("Star-Citizen-Links")
+        .contains("Offizielles")
         .contains("Handel &amp; Fracht")
         .contains("/css/pages/sc-links.css");
     for (ScLink link : ScLink.values()) {
@@ -95,7 +96,10 @@ class ScLinksPageControllerMvcTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).contains("Star Citizen links").contains("Ships &amp; equipment");
+    assertThat(html)
+        .contains("Star Citizen links")
+        .contains("Official")
+        .contains("Ships &amp; equipment");
   }
 
   @Test
