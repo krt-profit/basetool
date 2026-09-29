@@ -1006,22 +1006,28 @@ input[type="checkbox"]:focus-visible,
     flex-shrink: 0;
 }
 
+#kc-info-message .instruction {
+    margin: 0 0 24px;
+}
+
 .krt-info-actions {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     margin-top: 24px;
 }
 
-.krt-info-actions a.krt-button {
+.krt-info-actions a.krt-button,
+.krt-info-actions .krt-button-secondary {
     display: block;
     box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: 14px 15px;
+    border: 1px solid var(--color-primary) !important;
+    line-height: 1.2;
     text-align: center;
-    text-decoration: none;
-}
-
-.krt-info-actions .krt-button-secondary {
-    margin-top: 0;
+    text-decoration: none !important;
 }
 
 .krt-info-actions [hidden] {
