@@ -2,14 +2,18 @@
 
 ## [Unreleased]
 
+## [v1.13.2](https://github.com/krt-profit/basetool/releases/tag/v1.13.2) - 2026-09-29
+
 ### Changed
 
 - **Star-Citizen-Links: 20 neue Seiten und die Sektion „Offizielles".** Zwölf Seiten von Roberts Space
   Industries (u. a. Roadmap, Status, Ship Matrix, Starmap, Galactapedia) bilden die neue Sektion;
   dazu kommen SC Trading, der Holoviewer, SystemSeven, drei Wikis, SCDL und SC-Links.org
   (REQ-UI-025).
+
 - **Star-Citizen-Links: VerseKit zeigt auf die neue Adresse.** Die Karte führt jetzt zu
   versekit.xharig.com (REQ-UI-025).
+
 - **Keycloak-Theme: Die Seite nach einer Geräte-Anmeldung führt weiter.** Statt nur „Sie können
   dieses Browser-Fenster schließen" bietet sie „Zum Basetool" und „Tab schließen"; lässt der Browser
   das Schließen nicht zu, erklärt sie, wie es von Hand geht (REQ-XCH-005).
