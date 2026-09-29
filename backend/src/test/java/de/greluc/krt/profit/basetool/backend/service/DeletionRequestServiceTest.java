@@ -160,7 +160,8 @@ class DeletionRequestServiceTest {
   void aConcurrentRaiseResolvesToTheWinningRow() {
     DeletionRequest winner = pending(false);
     when(deletionRequestRepository.findByUserIdAndStatus(USER, DeletionRequestStatus.PENDING))
-        .thenReturn(Optional.empty(), Optional.of(winner));
+        .thenReturn(Optional.empty())
+        .thenReturn(Optional.of(winner));
     when(deletionRequestRepository.saveAndFlush(any()))
         .thenThrow(new DataIntegrityViolationException("uq_deletion_request_one_pending_per_user"));
 

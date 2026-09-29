@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.never;
@@ -40,6 +39,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.ParameterizedTypeReference;
@@ -114,9 +114,12 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
 
     verify(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class));
-    verify(backendApiClient, never()).get(startsWith("/api/v1/users?"), any(Class.class));
     verify(backendApiClient, never())
-        .get(startsWith("/api/v1/users?"), any(ParameterizedTypeReference.class));
+        .get(startsWith("/api/v1/users?"), ArgumentMatchers.<Class<Object>>any());
+    verify(backendApiClient, never())
+        .get(
+            startsWith("/api/v1/users?"),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any());
   }
 
   @Test

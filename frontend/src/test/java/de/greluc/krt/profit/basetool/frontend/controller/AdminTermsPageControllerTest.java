@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
@@ -36,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.ParameterizedTypeReference;
@@ -145,7 +145,8 @@ class AdminTermsPageControllerTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void rendersTheFailureStateWhenTheBackendIsUnreachable() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(
+            anyString(), ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenThrow(new BackendServiceException("backend down", null, 503));
 
     mockMvc
@@ -170,7 +171,7 @@ class AdminTermsPageControllerTest {
   private String requestedUri() {
     ArgumentCaptor<String> captor = ArgumentCaptor.captor();
     verify(backendApiClient, atLeastOnce())
-        .get(captor.capture(), any(ParameterizedTypeReference.class));
+        .get(captor.capture(), ArgumentMatchers.<ParameterizedTypeReference<Object>>any());
     return captor.getAllValues().stream()
         .filter(uri -> uri.startsWith("/api/v1/admin/terms"))
         .findFirst()

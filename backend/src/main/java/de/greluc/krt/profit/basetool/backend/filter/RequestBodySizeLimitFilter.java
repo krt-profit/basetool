@@ -210,7 +210,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
             + correlationId
             + "\"}";
     byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-    response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
+    response.setStatus(HttpStatus.CONTENT_TOO_LARGE.value());
     response.setHeader("Content-Type", "application/problem+json");
     response.setHeader("X-Correlation-Id", correlationId);
     response.setContentLength(bytes.length);

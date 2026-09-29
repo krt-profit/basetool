@@ -161,8 +161,8 @@ class ExchangeIdempotencyFilterTest {
   @Test
   void aRequestThatRacedTheFirstReplaysItsAnswerUnderTheLock() throws Exception {
     when(idempotency.find(namespace()))
+        .thenReturn(Optional.empty())
         .thenReturn(
-            Optional.empty(),
             Optional.of(
                 new ExchangeIdempotency.Stored(
                     ExchangeIdempotency.fingerprint(
@@ -186,9 +186,8 @@ class ExchangeIdempotencyFilterTest {
   @Test
   void aRequestThatRacedTheFirstWithAnotherBodyIsRefusedUnderTheLock() throws Exception {
     when(idempotency.find(namespace()))
-        .thenReturn(
-            Optional.empty(),
-            Optional.of(new ExchangeIdempotency.Stored("other", 200, null, "{}")));
+        .thenReturn(Optional.empty())
+        .thenReturn(Optional.of(new ExchangeIdempotency.Stored("other", 200, null, "{}")));
 
     write(KEY, null)
         .andExpect(status().isUnprocessableContent())
