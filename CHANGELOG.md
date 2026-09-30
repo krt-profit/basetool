@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Keycloak: Fehler-Events stehen im Log auf INFO statt WARN.** Ein Discord-Callback ohne Login-Cookie (`cookie_not_found`) ist ein Client-Zustand und verstopfte die WARN-Ansicht; die Zeilen und die Event-Metriken bleiben erhalten (`KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__ERROR_LEVEL`).
+
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
 ### Security
