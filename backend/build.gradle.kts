@@ -1,4 +1,11 @@
-buildscript { dependencies { constraints { classpath(libs.commons.lang3) } } }
+buildscript {
+  dependencies {
+    constraints {
+      classpath(libs.commons.lang3)
+      classpath(libs.jackson3.databind)
+    }
+  }
+}
 
 plugins {
   java

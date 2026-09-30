@@ -1,4 +1,11 @@
-buildscript { dependencies { constraints { classpath(libs.plexus.utils) } } }
+buildscript {
+  dependencies {
+    constraints {
+      classpath(libs.plexus.utils)
+      classpath(libs.jackson2.plugins.databind)
+    }
+  }
+}
 
 plugins {
   id("idea")
@@ -197,14 +204,16 @@ subprojects {
       jvmArgs("--enable-native-access=ALL-UNNAMED")
       systemProperty("spring.profiles.active", "dev")
     }
+  }
 
+  plugins.withId("io.spring.dependency-management") {
     extra["tomcat.version"] = "11.0.25"
 
     extra["netty.version"] = "4.2.18.Final"
 
-    extra["jackson-2-bom.version"] = "2.21.6"
+    extra["jackson-2-bom.version"] = libs.versions.jackson2.get()
 
-    extra["jackson-bom.version"] = "3.1.6"
+    extra["jackson-bom.version"] = libs.versions.jackson3.get()
   }
 
   plugins.withId("jacoco") {
