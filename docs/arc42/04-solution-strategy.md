@@ -6,12 +6,25 @@ them.
 ## 4.1 Split the UI from the API, and give the split a single seam
 
 The **backend** serves `/api/v1/...` and never HTML. The **frontend** renders Thymeleaf and holds
-no business logic; it reaches the backend through exactly one class, `service.BackendApiClient`.
+no business logic; it reaches the backend through `service.BackendApiClient` and the `webClient`
+bean beneath it (`config.WebClientConfig`): one filter chain with the OAuth2 bearer relay, the
+correlation, org-unit, locale and client-IP relays and the Resilience4j chain (ADR-0032), and on
+top of it the error mapping and the catalogue cache. Three further client beans do what that chain
+cannot: the anonymous terms client (same resilience chain, no bearer), the notification SSE relay
+and the live-sync subscription probe (neither carries the resilience filters, by design).
 
 The point is not layering for its own sake — it is that the backend can then be kept off the
-internet, that the Android app and the web UI consume the *same* contract, and that every outbound
-call passes one place where timeouts, retries, circuit breaking and bulkheads are configured.
-ArchUnit tests enforce the direction so the seam cannot quietly grow a second one.
+internet, that the Android app and the web UI consume the *same* contract, and that timeouts,
+retries, circuit breaking and bulkheads are configured in one place. ArchUnit tests enforce the
+direction: the frontend holds no JPA and no JDBC.
+
+*Corrected 2026-09-29:* this section said the frontend reaches the backend "through exactly one
+class" and that ArchUnit keeps the seam from growing a second one. Eleven controllers (byte
+downloads, multipart uploads, bulk deletes, one `Flux` listing) inject the `webClient` bean
+directly — they keep the filter chain but lose `BackendApiClient`'s error mapping — and no ArchUnit
+rule confines backend calls to the seam. The
+[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) (§5.9, G-17) brings those
+controllers back onto the kernel and adds the missing rule.
 
 *Trade-off accepted:* the frontend hand-mirrors the backend's DTOs rather than sharing a module,
 so a contract change has to be made twice. Two gates watch for drift (`FrontendDtoContractTest`,
@@ -24,9 +37,10 @@ approved one, relays over the internal network to the backend under its own serv
 stages the returned draft in Redis for a one-time browser pickup — saving happens later, in the
 browser, through the ordinary create path. It also fronts the exchange API for approved
 third-party clients — token and DPoP gate, registry gate, limits, idempotency and the Redis budget —
-whose writes the backend applies directly through the domain services (§5.5, ADR-0216); only
-drafts go through the browser pickup. It exists so that the surface an unauthenticated
-internet can reach is a small module with one job, rather than the module that holds every table.
+whose writes the backend applies directly through the domain services, the stock book-in excepted,
+which writes the Lager's rows itself (§5.5, ADR-0216); only drafts go through the browser pickup.
+It exists so that the surface an unauthenticated internet can reach is a small module with one job,
+rather than the module that holds every table.
 
 ## 4.3 Let Keycloak own identity, and centralise authorisation on `@PreAuthorize`
 

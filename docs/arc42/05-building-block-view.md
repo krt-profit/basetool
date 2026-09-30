@@ -77,12 +77,20 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 
 | Package | What lives there |
 | --- | --- |
-| `controller` | Thymeleaf page and fragment endpoints; AJAX mutation endpoints that return fragments |
-| `service` | `BackendApiClient` — the single seam — plus view-shaping services |
-| `view` / `model` | View models and the hand-mirrored DTO records |
+| `controller` | Thymeleaf page and fragment endpoints; AJAX mutation endpoints that return fragments; the domain-specific view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, …) |
+| `service` | `BackendApiClient` and its catalogue cache, `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
+| `model` | The hand-mirrored DTO records (`model.dto`) and the form objects (`model.form`) |
+| `view` | `MoneyFormat` |
 | `websocket` | `/ws/sync`, the handler and the Redis fanout |
-| `config` | WebClient, Resilience4j, Redis session, Reactor context propagation |
+| `config` | WebClient, Resilience4j, Redis session, Reactor context propagation, security, the layout model |
+| `oss` | The open-source licence report |
 | `support` / `validation` / `exception` / `health` / `logging` / `metrics` | As on the backend |
+
+*Corrected 2026-09-29:* this table called `BackendApiClient` "the single seam" (see §4.1), placed
+view-shaping services in `service` and view models in `view`; the view shaping lives in
+`controller`, and `view` holds one class. The
+[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) (§5.9) proposes the per-domain
+package tree that replaces this layout.
 
 **One trap lives here and is worth naming in an architecture document**, because it is invisible
 from the code that suffers from it: `WebClient.exchange()` runs on a Reactor-Netty worker thread,
@@ -139,7 +147,7 @@ decisions in ADR-0216 … ADR-0221 and ADR-0224 … ADR-0228.
 | backend | `config.ActingMemberFilter`, `ExchangeGate`, `ExchangeInstallationService`, `ExchangeConnectionRetentionTask` | The acting member's reduced authentication, `@exchangeGate` re-checking every capability, installations, revocations and departures; disconnected installations and revocations deleted after 90 days (REQ-XCH-035) |
 | backend | Change feed (`V252`, `ChangeSourceTransactionManager`, `ExchangeFeedReader`) | Trigger-written key log with the writer, tombstones, cursors, the 90-day retention (ADR-0224) |
 | backend | Journal (`V253`, `ExchangeJournalService`) | Every written entry before and after, 90 days |
-| backend | Write services for blueprints, stock and ships (ship links `V254`) | Plan a change set, ask `ExchangeMassChangeGuard`, write through the domain's own services, journal each entry; `ExchangeLiveSync` after commit |
+| backend | Write services for blueprints, stock and ships (ship links `V254`) | Plan a change set, ask `ExchangeMassChangeGuard`, write, journal each entry; `ExchangeLiveSync` after commit. Ships and blueprints are written through the hangar's and the blueprint domain's own services; stock takes the Lager's lot locks through `InventoryItemRepository` and books out through the Lager's book-out, but books in by creating the `InventoryItem` row and its audit event itself |
 | backend | `ExchangeUndoService`, `ExchangeMassChangeService` | The member's undo, and the confirmation of a held mass change |
 | backend | Bulk undo (`ExchangeBulkUndoService`, `ExchangeBulkUndoRunner`, `ExchangeBulkUndoStep`, `AdminExchangeBulkUndoController`, `V256`) | An admin's undo of one client for every member: suspends the client, then one member per transaction on the single-thread `exchangeBulkUndoExecutor`; runs and skipped entries kept 90 days (ADR-0227) |
 | backend | `ExchangeResolveService`, `ExchangeDemandService`, `ExchangeDraftService` | Catalogue resolve through the web import's matching, the anonymised org demand, review drafts |
@@ -147,6 +155,11 @@ decisions in ADR-0216 … ADR-0221 and ADR-0224 … ADR-0228.
 | frontend | Admin „Verbundene Anwendungen" (`/admin/exchange-clients`) | The registry and the global switch; a client's undo for every member with its runs |
 | keycloak-spi | `ExchangeClientSessionResourceProviderFactory` (`basetool-exchange`) | Ends one client inside a member's shared user sessions when the member disconnects it (ADR-0226, REQ-XCH-008) |
 | keycloak-spi | `DeviceConsentLoginFormsProviderFactory` (`krt-freemarker`) | Hands a device login's user code to the consent page, beside the phishing warning (ADR-0228, REQ-XCH-005) |
+
+*Corrected 2026-09-29:* the write-services row said every exchange write goes "through the domain's
+own services". The stock book-in does not: it is a second write path into the Lager, which the
+[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) (§5.3, §7.5) routes through the
+inventory module's command API.
 
 ## 5.6 The monitoring plane
 
