@@ -319,3 +319,23 @@ since the go-live of 2026-09-28, so these risks hold now.
   version, re-checks those classes and renders one device consent page (the sandbox smoke test
   asserts the warning and the code). A silently changed default-provider rule would leave the
   consent page without the code but still working.
+
+## 11.9 The domains are coupled inside correct layers — opened 2026-09-29
+
+The layers are acyclic and guarded (ADR-0047); the business domains are not. The backend is cut by
+technical layer, 1,383 of its 1,389 types are `public`, and 21 of its 23 non-kernel domains form one
+strongly connected component: 1,565 cross-domain class edges, 206 of them a service using another
+domain's repository. Lager rows are created by three foreign domains, GDPR deletion and merge
+touch fourteen, and the access hubs (`OwnerScopeService`, `AccessGateService`) decide for nine.
+
+**Cost.** No domain can be changed, tested or reasoned about alone; any class can bypass another
+domain's rules through its repository, and a second write path into an aggregate (the exchange's
+stock book-in; the job-order production book-in that APPSEC-01 of the September audit caught
+writing into foreign stock) is found by review or not at all. Many security gates are
+keyed on package names, class names or paths, so a refactor could disarm them without failing a
+build.
+
+**Closing it** is the [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md): package per
+domain with a published API, Spring Modulith and a frozen ArchUnit baseline in test scope, guards
+that make every name-keyed gate fail loudly before anything moves, and later Gradle modules for the
+exchange and the bank.
