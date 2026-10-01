@@ -103,6 +103,9 @@
 
 ### Fixed
 
+- **Organigramm: Entfernen eines OL-Mitglieds löscht die Grand-Admiral-Zuordnung zuverlässig.** War die
+  Organisationsleitung bereits als Hibernate-Proxy geladen, blieb die Zuordnung stehen; das Setzen und
+  Entfernen des Grand Admirals scheiterte in diesem Fall ebenfalls.
 - **Datenaustausch: das Gateway holt nach einer Abweisung seines eigenen Tokens ein neues.** Lehnt
   das Backend das Dienstkonto-Token des Ingest-Gateways ab (`401`/`403` ohne Austausch-Code),
   verwirft das Gateway es, sodass die nächste Anfrage ein frisches holt, statt bis zum Ablauf
