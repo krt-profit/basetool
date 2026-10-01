@@ -641,6 +641,21 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
+  void multiplexedSubscribe_probeRejectsTheToken_deniesAndClosesTheSocketForAFreshHandshake()
+      throws Exception {
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY_TOKEN_REJECTED);
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+
+    subscribe(bob, operationTopic());
+
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+    assertThat(lastBroadcast(bob).get("reason").asString())
+        .isEqualTo(MetricNames.SUBSCRIBE_DENY_INDETERMINATE);
+    assertThat(bob.closeStatus).isEqualTo(LiveSyncWebSocketHandler.TOKEN_EXPIRED);
+  }
+
+  @Test
   void multiplexedSubscribe_tokenStillValid_isAuthorizedNormally() throws Exception {
     FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
     bob.attributes.put(

@@ -108,10 +108,10 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
-  void authorize_401_failsClosed() {
+  void authorize_401_rejectsTheToken() {
     server.enqueue(new MockResponse().setResponseCode(401));
     assertThat(authorizer.authorize(operationTopic, TOKEN, PIN))
-        .isEqualTo(Decision.DENY_INDETERMINATE);
+        .isEqualTo(Decision.DENY_TOKEN_REJECTED);
   }
 
   @Test
@@ -143,11 +143,11 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
-  void authorize_missionPresence_401_failsClosed() {
+  void authorize_missionPresence_401_rejectsTheToken() {
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(401));
     Decision decision = authorizer.authorize(mission, TOKEN, PIN);
-    assertThat(decision).isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(decision).isEqualTo(Decision.DENY_TOKEN_REJECTED);
     assertThat(decision.denied()).isTrue();
   }
 
@@ -274,11 +274,11 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
-  void authorize_globalCapability401_failsClosed() {
+  void authorize_globalCapability401_rejectsTheToken() {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
     server.enqueue(new MockResponse().setResponseCode(401));
 
-    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY_TOKEN_REJECTED);
   }
 
   @Test

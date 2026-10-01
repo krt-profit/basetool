@@ -71,13 +71,17 @@ public class LiveSyncSubscriptionAuthorizer {
      * token or authorities, saturated executor) for a class that needs a check; indicates a backend
      * or token availability problem, not a permission verdict.
      */
-    DENY_INDETERMINATE;
+    DENY_INDETERMINATE,
+    /**
+     * Refusal because the backend answered 401 to the probe: the handshake token was rejected, so
+     * the socket's snapshot is stale and the caller closes the socket for a fresh handshake.
+     */
+    DENY_TOKEN_REJECTED;
 
     /**
      * Checks whether this verdict refuses the subscribe.
      *
-     * @return {@code true} for {@link #DENY} and {@link #DENY_INDETERMINATE}, {@code false} for
-     *     {@link #ALLOW}
+     * @return {@code true} for every verdict except {@link #ALLOW}
      */
     public boolean denied() {
       return this != ALLOW;
@@ -267,6 +271,10 @@ public class LiveSyncSubscriptionAuthorizer {
             "Live-sync subscribe denied for topic {} (backend {})", topic.canonical(), status);
         return Decision.DENY;
       }
+      if (status == 401) {
+        log.debug("Live-sync probe for topic {} rejected the handshake token", topic.canonical());
+        return Decision.DENY_TOKEN_REJECTED;
+      }
       log.debug(
           "Live-sync subscribe indeterminate on backend status {} for topic {}",
           status,
@@ -317,6 +325,9 @@ public class LiveSyncSubscriptionAuthorizer {
             topic.canonical(),
             status);
         return Decision.DENY;
+      }
+      if (status == 401) {
+        return Decision.DENY_TOKEN_REJECTED;
       }
       log.debug(
           "Live-sync capability probe indeterminate on backend status {} for topic {}",

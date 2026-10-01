@@ -26,6 +26,9 @@
         const SOCKET_CAP_CLOSE_CODE = 4029;
         const TERMS_GATE_CLOSE_CODE = 4003;
         const DENY_REASON_INDETERMINATE = 'indeterminate';
+        const RESUBSCRIBE_BASE_MS = 1000;
+        const RESUBSCRIBE_MAX_MS = 30000;
+        const RESUBSCRIBE_MAX_ATTEMPTS = 5;
         const topics = Object.create(null);
         const publishBuffer = [];
         /** @type {WebSocket | null} */
@@ -81,7 +84,8 @@
         function onOpen() {
             reconnectDelay = RECONNECT_BASE_MS;
             Object.keys(topics).forEach(function (t) {
-                if (topics[t].state !== 'denied') {
+                if (topics[t].state !== 'denied' || topics[t].deniedAttempts > 0) {
+                    topics[t].deniedAttempts = 0;
                     topics[t].state = 'pending';
                     rawSend({ type: 'subscribe', topic: t });
                 }
@@ -90,6 +94,31 @@
                 const p = publishBuffer.shift();
                 rawSend({ type: 'changed', topic: p.topic, sections: p.sections });
             }
+        }
+
+        function clearResubscribe(entry) {
+            if (entry.resubscribeTimer) {
+                window.clearTimeout(entry.resubscribeTimer);
+                entry.resubscribeTimer = null;
+            }
+        }
+
+        function scheduleResubscribe(topic, entry) {
+            clearResubscribe(entry);
+            const ceiling = Math.min(
+                RESUBSCRIBE_MAX_MS,
+                RESUBSCRIBE_BASE_MS * Math.pow(2, entry.deniedAttempts),
+            );
+            entry.deniedAttempts += 1;
+            const wait = RESUBSCRIBE_BASE_MS + Math.random() * ceiling;
+            entry.resubscribeTimer = window.setTimeout(function () {
+                entry.resubscribeTimer = null;
+                if (topics[topic] !== entry || entry.state !== 'idle' || !isOpen()) {
+                    return;
+                }
+                entry.state = 'pending';
+                rawSend({ type: 'subscribe', topic });
+            }, wait);
         }
 
         function onMessage(ev) {
@@ -105,6 +134,8 @@
             }
             if (msg.type === 'subscribed') {
                 const wasAcked = entry.ackedOnce;
+                entry.deniedAttempts = 0;
+                clearResubscribe(entry);
                 entry.state = 'subscribed';
                 entry.ackedOnce = true;
                 if (typeof entry.handlers.onSubscribed === 'function') {
@@ -115,11 +146,12 @@
                 }
             } else if (msg.type === 'denied') {
                 const retryable =
-                    msg.reason === DENY_REASON_INDETERMINATE && !entry.deniedRetryUsed;
-                if (retryable) {
-                    entry.deniedRetryUsed = true;
-                }
+                    msg.reason === DENY_REASON_INDETERMINATE &&
+                    entry.deniedAttempts < RESUBSCRIBE_MAX_ATTEMPTS;
                 entry.state = retryable ? 'idle' : 'denied';
+                if (retryable) {
+                    scheduleResubscribe(msg.topic, entry);
+                }
                 if (typeof entry.handlers.onDenied === 'function') {
                     entry.handlers.onDenied();
                 }
@@ -151,6 +183,7 @@
                 reconnectDelay = RECONNECT_MAX_MS;
             }
             Object.keys(topics).forEach(function (t) {
+                clearResubscribe(topics[t]);
                 if (topics[t].state !== 'denied') {
                     topics[t].state = 'pending';
                 }
@@ -179,7 +212,12 @@
                 }
                 const entry =
                     topics[topic] ||
-                    (topics[topic] = { state: 'idle', ackedOnce: false, deniedRetryUsed: false });
+                    (topics[topic] = {
+                        state: 'idle',
+                        ackedOnce: false,
+                        deniedAttempts: 0,
+                        resubscribeTimer: null,
+                    });
                 entry.handlers = handlers || {};
                 ensureSocket();
                 if (isOpen()) {
@@ -188,6 +226,7 @@
                 }
                 return {
                     unsubscribe() {
+                        clearResubscribe(entry);
                         delete topics[topic];
                     },
                 };

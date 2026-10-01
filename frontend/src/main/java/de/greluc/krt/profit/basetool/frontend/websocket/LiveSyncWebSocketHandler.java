@@ -239,8 +239,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   public static final String ATTR_TOKEN_EXPIRES_AT = "livesync.tokenExpiresAt";
 
   /**
-   * Close status {@code 4401} for a socket whose captured token and authorities have lapsed; the
-   * client reconnects, and the new handshake refreshes both before its topics are re-subscribed.
+   * Close status {@code 4401} for a socket whose captured token and authorities have lapsed or
+   * whose token a probe saw rejected (401); the client reconnects, and the new handshake refreshes
+   * both before its topics are re-subscribed.
    */
   static final CloseStatus TOKEN_EXPIRED = new CloseStatus(4401, "token expired");
 
@@ -749,6 +750,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       String reason = denyReason(decision);
       sendControlFrame(session, "denied", topic.canonical(), reason);
       subscribeCounter(topic, MetricNames.OUTCOME_DENIED, reason).increment();
+      if (decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_TOKEN_REJECTED) {
+        closeQuietly(session, TOKEN_EXPIRED);
+      }
       return;
     }
     WebSocketSession decorated = decorated(session);
@@ -780,9 +784,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   @NotNull
   private static String denyReason(@NotNull LiveSyncSubscriptionAuthorizer.Decision decision) {
-    return decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE
-        ? MetricNames.SUBSCRIBE_DENY_INDETERMINATE
-        : MetricNames.SUBSCRIBE_DENY_AUTHZ;
+    return decision == LiveSyncSubscriptionAuthorizer.Decision.DENY
+        ? MetricNames.SUBSCRIBE_DENY_AUTHZ
+        : MetricNames.SUBSCRIBE_DENY_INDETERMINATE;
   }
 
   /**

@@ -2095,10 +2095,11 @@ affected. Both `07` dashboard panels aggregate with `sum by (topic_class, outcom
 `sum by (reason)` and therefore keep working unchanged — but neither yet **surfaces** the new deny
 split, which is the outstanding follow-up. The same two literals now also travel **on the wire** in
 the `denied` control frame, so the browser can treat `indeterminate` as retryable: it re-subscribes
-that topic **exactly once** across the whole socket lifetime (`authz` stays terminal). Reading the
-series accordingly — a single transient infrastructure fault can contribute up to **two**
-`outcome="denied", reason="indeterminate"` samples per topic, never more, and the retry is per-topic
-one-shot rather than per-reconnect.
+that topic up to **5 times** with a jittered exponential delay (`authz` stays terminal); the budget
+is restored by a successful subscribe or a new socket. Reading the series accordingly — a single
+transient infrastructure fault can contribute up to **six** `outcome="denied",
+reason="indeterminate"` samples per topic and socket, and a probe `401` also closes the socket with
+`4401` (the reconnect re-subscribes with a fresh handshake).
 `basetool_livesync_socket_rejected_total{reason}` (`reason` = `user_cap`; a `/ws/sync`
 socket refused at connect because the user is already at the per-user socket cap — F2/#1243, no
 `topic_class` because a rejected socket has bound no topic; plotted alongside the relay drops on the

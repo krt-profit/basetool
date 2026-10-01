@@ -282,7 +282,13 @@ admission without a verdict is a class authorized by the socket's authentication
 verdict is `ALLOW` anyway. Because the handshake token and authorities are a snapshot, a
 `subscribe` on a socket whose recorded token expiry has passed (5 s skew) closes the socket with
 code `4401`; the client reconnects, the handshake refreshes token and authorities, and the topics
-are re-subscribed. The publish side, the bounds and the rest of the decision are unchanged.
+are re-subscribed. A probe that answers 401 on a live socket (a token revoked before its expiry)
+takes the same path: the subscribe is denied and the socket is closed with `4401`. For any other
+indeterminate outcome the client re-subscribes the topic itself, up to 5 times with a jittered
+exponential delay (1 s plus a random share of 1 s doubling to 30 s), so a transient backend fault
+does not cost the tab its live updates; a successful subscribe or a new socket restores the budget,
+and an `authz` deny stays terminal. The publish side, the bounds and the rest of the decision are
+unchanged.
 
 ## Alternatives considered
 

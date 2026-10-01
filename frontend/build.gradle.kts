@@ -678,6 +678,18 @@ val testGenApiTypes =
     outputs.upToDateWhen { false }
   }
 
+val testLiveSyncJs =
+  tasks.register<NodeTask>("testLiveSyncJs") {
+    group = "verification"
+    description = "Regression tests for the live-sync socket script (static/js/krt-live-sync.js)."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-live-sync.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-live-sync.test.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-live-sync.js"))
+    outputs.upToDateWhen { false }
+  }
+
 tasks.named("check").configure {
   dependsOn(
     lintCss,
@@ -688,5 +700,6 @@ tasks.named("check").configure {
     prettierCheck,
     typecheckJs,
     testGenApiTypes,
+    testLiveSyncJs,
   )
 }

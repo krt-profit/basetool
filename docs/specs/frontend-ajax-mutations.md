@@ -1294,7 +1294,10 @@ authenticated read the page itself performs (table above), checked asynchronousl
 container thread; an explicit 403/404 denies. **Every other outcome fails closed** (since
 2026-10-01, ADR-0094 amendment): a `401`, a `5xx`, a probe timeout or transport error, a missing or
 already-expired captured token, missing captured authorities for a role-gated room and a saturated
-authorizer executor all answer `denied` with reason `indeterminate`, which the client retries once.
+authorizer executor all answer `denied` with reason `indeterminate`. The client re-subscribes such a
+topic itself, at most 5 times with a jittered exponential delay (1 s plus up to 1 s, doubling to 30 s),
+restoring the budget on a successful subscribe or a new socket (`krt-live-sync.test.mjs`); a probe
+`401` on a live socket additionally closes it with `4401` so the reconnect brings a fresh handshake.
 This holds for every resource probe (`mission`, `operation`, `order`, `refinery-order`, `bank:{id}`),
 the `orders` capability probe (which also denies on 403/404) and the locally role-gated rooms. The
 **only** rooms admitted without a verdict are those authorized by the socket's authentication alone
