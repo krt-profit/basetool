@@ -163,6 +163,22 @@ FAKE
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'skopeo %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+if [[ "$*" == *--config* ]]; then
+  case "$*" in
+    *basetool-backend@*)      r="${FAKE_REV_BACKEND:-rev-one}" ;;
+    *basetool-frontend@*)     r="${FAKE_REV_FRONTEND:-rev-one}" ;;
+    *basetool-ingest@*)       r="${FAKE_REV_INGEST:-rev-one}" ;;
+    *basetool-config@*)       r="${FAKE_REV_CONFIG:-rev-one}" ;;
+    *basetool-keycloak-spi@*) r="${FAKE_REV_KCSPI:-rev-one}" ;;
+    *) exit 1 ;;
+  esac
+  if [[ "${r}" == "none" ]]; then
+    printf '{"config":{"Labels":{}}}\n'
+  else
+    printf '{"config":{"Labels":{"org.opencontainers.image.revision":"%s"}}}\n' "${r}"
+  fi
+  exit 0
+fi
 case "$*" in
   *basetool-backend:*)      d="${FAKE_REMOTE_BACKEND}" ;;
   *basetool-frontend:*)     d="${FAKE_REMOTE_FRONTEND}" ;;
@@ -939,6 +955,82 @@ scenario_signature_verified_on_apply() {
   rm -rf "${tmp}"
 }
 
+scenario_mixed_release_is_refused() {
+  echo "Scenario: a target set whose images are built from different commits is refused"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_REV_FRONTEND=rev-two" || rc=$?
+  assert_exit 1 "$rc" "a mixed release fails the deploy"
+  assert_contains "is not one release" "the refusal names the mixed set"
+  assert_contains "frontend is built from rev-two but backend from rev-one" "the refusal names the diverging image"
+  assert_no_docker "podman pull" "nothing is pulled for a mixed release"
+  assert_no_apply "the stack is not recreated for a mixed release"
+  if [[ -e "${T_STATE_DIR}/failed.digests" ]]; then
+    record 0 "a mixed release is not recorded as a bad target, so the next tick retries without backoff"
+  else
+    record 1 "a mixed release is not recorded as a bad target, so the next tick retries without backoff"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_missing_revision_label_is_refused() {
+  echo "Scenario: an image without a readable revision label is refused"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_REV_INGEST=none" || rc=$?
+  assert_exit 1 "$rc" "an unlabelled image fails the deploy"
+  assert_contains "ingest (" "the refusal names the unlabelled image"
+  assert_no_apply "the stack is not recreated"
+  rm -rf "${tmp}"
+}
+
+scenario_one_release_deploys() {
+  echo "Scenario: images that share one revision deploy"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "one release deploys"
+  assert_contains "all target images share one source revision" "the gate reports one release"
+  assert_docker "${APPLIED}" "the stack is applied"
+  rm -rf "${tmp}"
+}
+
+scenario_mixed_release_break_glass() {
+  echo "Scenario: IRI_REQUIRE_ONE_RELEASE=false deploys a mixed set and says so"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_REV_FRONTEND=rev-two" "IRI_REQUIRE_ONE_RELEASE=false" || rc=$?
+  assert_exit 0 "$rc" "the break-glass deploys"
+  assert_contains "release-revision gate DISABLED" "the bypass is announced"
+  assert_no_docker "skopeo inspect --config" "no label is read when the gate is off"
+  rm -rf "${tmp}"
+}
+
+scenario_mixed_release_check_only_fails() {
+  echo "Scenario: --check-only reports a mixed release"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy --check-only -- "${fake[@]}" "FAKE_REV_BACKEND=rev-two" || rc=$?
+  assert_exit 1 "$rc" "check-only exits non-zero for a mixed release"
+  assert_contains "is not one release" "check-only names the mixed set"
+  rm -rf "${tmp}"
+}
+
 scenario_signature_failure_aborts() {
   echo "Scenario: a failed signature verification aborts before pull/apply"
   local tmp rc=0
@@ -1189,6 +1281,11 @@ scenario_monitoring_reconcile_disabled_when_running
 scenario_monitoring_flag_read_from_env_file
 scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
+scenario_mixed_release_is_refused
+scenario_missing_revision_label_is_refused
+scenario_one_release_deploys
+scenario_mixed_release_break_glass
+scenario_mixed_release_check_only_fails
 scenario_transient_verify_failure_retries
 scenario_signature_identity_is_anchored
 scenario_break_glass_skips_verify

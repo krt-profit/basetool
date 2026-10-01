@@ -49,7 +49,7 @@ tests:
               severity: critical
             exp_annotations:
               summary: "No container metrics: fewer than 10 named containers are reporting"
-              description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. The source is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer (`systemctl status iri-container-metrics.timer`, /var/iri/monitoring/textfile/containers.prom)."
+              description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the cgroup-fed container alerts (working-set, OOM, CPU throttle) are silently blind. The restart-loop alert reads a different source and has its own guard, ContainerStartTimeMissing. The source is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer (`systemctl status iri-container-metrics.timer`, /var/iri/monitoring/textfile/containers.prom)."
 
   - name: fires - one of the seven core containers stops reporting
     interval: 1m

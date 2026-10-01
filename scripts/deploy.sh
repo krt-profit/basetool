@@ -36,6 +36,7 @@ COSIGN_IDENTITY_REGEXP="${IRI_COSIGN_IDENTITY_REGEXP:-^https://github\\.com/${CO
 COSIGN_OIDC_ISSUER="${IRI_COSIGN_OIDC_ISSUER:-https://token.actions.githubusercontent.com}"
 COSIGN_VERIFY_ATTEMPTS="${IRI_COSIGN_VERIFY_ATTEMPTS:-3}"
 COSIGN_VERIFY_DELAY="${IRI_COSIGN_VERIFY_DELAY:-5}"
+REQUIRE_ONE_RELEASE="${IRI_REQUIRE_ONE_RELEASE:-true}"
 COSIGN_SEARCH_PATH="${IRI_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosign/bin}"
 VERIFY_LAST_ERROR=""
 
@@ -123,6 +124,8 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_COSIGN_VERIFY_ATTEMPTS=3   (verify retries; a registry/Sigstore blip must
                                   not read as an untrusted image)
   IRI_COSIGN_VERIFY_DELAY=5      (first retry delay in seconds, then doubling)
+  IRI_REQUIRE_ONE_RELEASE=true   (refuse a target set whose images do not share one
+                                  org.opencontainers.image.revision; false = break-glass)
   DOCKER_CONFIG=/var/lib/iri/.docker   (the registry credential cosign reads
                                         and skopeo shares via
                                         REGISTRY_AUTH_FILE; under STATE_DIR
@@ -540,6 +543,50 @@ verify_digest_or_die() {
   fi
   write_deploy_metric failure
   fail "SECURITY: cosign signature verification failed for ${label} (${ref}) after ${COSIGN_VERIFY_ATTEMPTS} attempts — refusing to deploy an unverified/untrusted image (expected identity: ${COSIGN_IDENTITY_REGEXP}); last cosign error: ${VERIFY_LAST_ERROR:-<none>}"
+}
+
+release_revision_problem() {
+  local label ref revision first_label="" first_revision=""
+  local -a pairs=(
+    "backend|${BACKEND_IMAGE}@${BACKEND_DIGEST}"
+    "frontend|${FRONTEND_IMAGE}@${FRONTEND_DIGEST}"
+    "ingest|${INGEST_IMAGE}@${INGEST_DIGEST}"
+  )
+  [[ -n "${CONFIG_DIGEST}" ]] && pairs+=("config|${CONFIG_IMAGE}@${CONFIG_DIGEST}")
+  [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && pairs+=("keycloak-spi|${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}")
+  local pair
+  for pair in "${pairs[@]}"; do
+    label="${pair%%|*}"
+    ref="${pair#*|}"
+    revision="$(rt_image_revision "${ref}")" || revision=""
+    if [[ -z "${revision}" ]]; then
+      echo "${label} (${ref}) carries no readable org.opencontainers.image.revision label"
+      return 0
+    fi
+    log "  ${label}: built from ${revision}" >&2
+    if [[ -z "${first_revision}" ]]; then
+      first_label="${label}"
+      first_revision="${revision}"
+    elif [[ "${revision}" != "${first_revision}" ]]; then
+      echo "${label} is built from ${revision} but ${first_label} from ${first_revision}"
+      return 0
+    fi
+  done
+  return 0
+}
+
+assert_one_release_or_die() {
+  if [[ "${REQUIRE_ONE_RELEASE}" != "true" ]]; then
+    log "WARNING: release-revision gate DISABLED (IRI_REQUIRE_ONE_RELEASE=false) — NOT comparing the images' source revisions"
+    return 0
+  fi
+  local problem
+  problem="$(release_revision_problem)"
+  if [[ -n "${problem}" ]]; then
+    write_deploy_metric failure
+    fail "the ${TARGET_TAG} set is not one release: ${problem} — a promotion is probably still in progress or was interrupted; refusing to deploy a mixed release, the next tick retries (IRI_REQUIRE_ONE_RELEASE=false is the break-glass)"
+  fi
+  log "release revision: all target images share one source revision"
 }
 
 check_only_verify_one() {
@@ -1112,6 +1159,13 @@ if [[ "${CHECK_ONLY}" == "true" ]]; then
   if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]]; then
     check_only_verify_one "keycloak-spi" "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}" || co_rc=1
   fi
+  if [[ "${co_rc}" -eq 0 && "${REAPPLY_REQUESTED}" != "true" && "${REQUIRE_ONE_RELEASE}" == "true" ]]; then
+    rev_problem="$(release_revision_problem)"
+    if [[ -n "${rev_problem}" ]]; then
+      log "check-only: the ${TARGET_TAG} set is not one release: ${rev_problem}"
+      co_rc=1
+    fi
+  fi
   if [[ "${co_rc}" -eq 0 ]]; then
     log "check-only: all signatures verified OK"
   else
@@ -1219,6 +1273,10 @@ verify_digest_or_die "frontend" "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}"
 verify_digest_or_die "ingest"   "${INGEST_IMAGE}@${INGEST_DIGEST}"
 [[ -n "${CONFIG_DIGEST}" ]]       && verify_digest_or_die "config"       "${CONFIG_IMAGE}@${CONFIG_DIGEST}"
 [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && verify_digest_or_die "keycloak-spi" "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
+
+if [[ "${REAPPLY_REQUESTED}" != "true" ]]; then
+  assert_one_release_or_die
+fi
 
 export RT_PIN_FILE="${PIN_FILE_CURRENT}"
 export RT_PIN_FILE_PREVIOUS="${PIN_FILE_PREVIOUS}"
