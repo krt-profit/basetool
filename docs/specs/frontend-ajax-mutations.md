@@ -123,6 +123,22 @@ use `support.MutationResponseHelper.mutate(…)` for the `try → successToast /
 redirect` flash pattern. Handler-specific form re-population and `409`/concurrency-conflict branching
 stay in the handler (the helper carries only the generic toast).
 
+**Every backend call of a controller goes through `BackendApiClient`.** A call shape the typed verbs
+do not cover — a multipart upload, a binary download, a bodiless delete, a collected `Flux`, a
+per-request timeout — uses `BackendApiClient#execute(method, uri, request, decode)`, which builds the
+request on the same authenticated `webClient` and maps every failure exactly like `get`/`post`: an
+RFC 7807 refusal becomes a `BackendServiceException` (status and `code`), a connection failure a
+`504`, an unusable OAuth2 token the `ReauthenticationRequiredException` that
+`GlobalExceptionHandler` turns into the re-authentication redirect (HTML) or `401` +
+`X-Reauthenticate` (JSON), and each failure increments
+`basetool_backend_client_errors_total`. A controller never injects the raw `WebClient`
+(`ArchitectureTest#noControllerHoldsARawWebClient`; the notification page's SSE relay is the one
+exception). A proxy whose caller reads only the HTTP status (a `fetch` that tests `response.ok`, a
+download link) wraps the call in `BackendErrorResponses.withBackendStatus`, so the refusal reaches the
+caller with the backend's status in JSON and HTML form alike; `BackendErrorResponses.relay` lets the
+re-authentication signal through instead of answering `500`. Tests:
+`BackendApiClientExecuteTest`, `RelayedBackendStatusMvcTest`.
+
 **App-wide double-submit guard (#1133).** The shared submit orchestration disables the triggering
 submit button for the whole in-flight round-trip and re-enables it when the request settles (success
 / error / network), so a double-click cannot fire a second duplicate write — a silent duplicate

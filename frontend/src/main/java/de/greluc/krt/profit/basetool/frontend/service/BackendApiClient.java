@@ -407,6 +407,32 @@ public class BackendApiClient {
   }
 
   /**
+   * Runs a backend call whose shape the typed verbs do not cover — a multipart upload, a binary or
+   * bodiless response, a collected {@code Flux}, a per-request timeout — through the authenticated
+   * client and the same error mapping, logging and {@code basetool_backend_client_errors_total}
+   * accounting as every other call.
+   *
+   * <p>The caller builds the request on the supplied authenticated {@link WebClient} and chooses
+   * how the response is decoded; every failure surfaces as {@link BackendServiceException} or
+   * {@link ReauthenticationRequiredException}, never as a raw {@link WebClientResponseException}.
+   *
+   * @param method the HTTP verb, used only as the log field and the {@code method} metric label
+   * @param uri the backend path, used only in log lines and exception messages
+   * @param request builds the request on the authenticated client, up to (not including) {@code
+   *     retrieve()}
+   * @param decode turns the {@code retrieve()} spec into the body {@link Mono}
+   * @param <R> the decoded body type
+   * @return the decoded body, or {@code null} when the backend returned none
+   */
+  public <R> R execute(
+      @NotNull HttpMethod method,
+      @NotNull String uri,
+      @NotNull Function<WebClient, WebClient.RequestHeadersSpec<?>> request,
+      @NotNull Function<WebClient.ResponseSpec, Mono<R>> decode) {
+    return exchange(method, uri, () -> request.apply(webClient), decode);
+  }
+
+  /**
    * Attaches {@code body} to a write request, or leaves the request body-less when it is {@code
    * null} — the POST/PUT/PATCH "empty payload" convention.
    *

@@ -15,6 +15,13 @@
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
+### Fixed
+
+- **Downloads, Importe und „Alles löschen" bei abgelaufener Anmeldung.** Elf Proxy-Controller (PDF-/Datenexporte,
+  P4K-, Hangar- und Blueprint-Import, Hangar-/Lager-„Alles löschen") umgingen die gemeinsame Fehlerbehandlung:
+  eine abgelaufene Sitzung führte zu einem Fehler 500 statt zur erneuten Anmeldung, und die Fehler wurden nicht
+  gezählt. Sie laufen jetzt über `BackendApiClient`; ein nicht erreichbares Backend meldet 504 statt 500.
+
 ### Security
 
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über

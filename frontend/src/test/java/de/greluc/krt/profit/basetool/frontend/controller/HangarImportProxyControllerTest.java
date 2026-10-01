@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -64,7 +65,7 @@ class HangarImportProxyControllerTest {
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("hangar.import.error.tooLarge", Locale.getDefault(), TOO_LARGE_MESSAGE);
-    controller = new HangarImportProxyController(webClient, messages);
+    controller = new HangarImportProxyController(RealBackendApiClient.over(webClient), messages);
   }
 
   @AfterEach
@@ -222,7 +223,7 @@ class HangarImportProxyControllerTest {
   }
 
   @Test
-  void importFleetview_onConnectionFailure_wrapsAs500() throws Exception {
+  void importFleetview_onConnectionFailure_isATimeout() throws Exception {
     server.shutdown();
 
     MultipartFile file =
@@ -232,7 +233,7 @@ class HangarImportProxyControllerTest {
     ResponseStatusException ex =
         assertThrows(ResponseStatusException.class, () -> controller.importFleetview(file));
 
-    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
+    assertEquals(HttpStatus.GATEWAY_TIMEOUT, ex.getStatusCode());
   }
 
   @Test

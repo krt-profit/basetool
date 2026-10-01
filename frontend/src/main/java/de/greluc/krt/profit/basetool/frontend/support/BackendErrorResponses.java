@@ -19,15 +19,19 @@
 
 package de.greluc.krt.profit.basetool.frontend.support;
 
+import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -60,8 +64,9 @@ public final class BackendErrorResponses {
 
   /**
    * Runs an AJAX handler's backend call and maps failures uniformly: a {@link
-   * BackendServiceException} is logged at DEBUG and relayed via {@link #propagateBackendError}, any
-   * other exception is logged at ERROR and answered with an empty {@code 500}.
+   * BackendServiceException} is logged at DEBUG and relayed via {@link #propagateBackendError}, a
+   * {@link ReauthenticationRequiredException} propagates to the global handler, any other exception
+   * is logged at ERROR and answered with an empty {@code 500}.
    *
    * @param log the calling controller's logger
    * @param operation a short label of the attempted operation for the log line
@@ -76,9 +81,32 @@ public final class BackendErrorResponses {
     } catch (BackendServiceException e) {
       log.debug("{} failed (status {}): {}", operation, e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
+    } catch (ReauthenticationRequiredException e) {
+      throw e;
     } catch (Exception e) {
       log.error("{} failed unexpectedly", operation, e);
       return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Runs a backend call from a proxy whose callers read the HTTP status (a {@code fetch} that tests
+   * {@code response.ok}, a download link): a {@link BackendServiceException} is rethrown as a
+   * {@link ResponseStatusException} with the backend's status, so the global handler answers with
+   * that status for JSON and HTML callers alike. A {@link ReauthenticationRequiredException} and
+   * every other exception propagate unchanged.
+   *
+   * @param call the backend call, normally through {@code BackendApiClient#execute}
+   * @param <T> the call's result type
+   * @return the call's result
+   * @throws ResponseStatusException carrying the backend status when the backend call failed
+   */
+  public static <T> T withBackendStatus(@NotNull Supplier<T> call) {
+    try {
+      return call.get();
+    } catch (BackendServiceException e) {
+      throw new ResponseStatusException(
+          HttpStatusCode.valueOf(e.getStatusCode()), "The backend request failed.", e);
     }
   }
 

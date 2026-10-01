@@ -1989,7 +1989,8 @@ gauge permanently `NaN`, silently disarming the alert that then consumed it, #11
 consumer is `ActiveSessionsRunaway`, and it is **not** a presence signal — see the
 `SsePushChannelDead` guard note above), and
 `basetool_backend_client_errors_total{reason,method}` counter at the
-`BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
+`BackendApiClient` failure funnels, which include `BackendApiClient#execute` — the multipart,
+binary, bodiless and collected-`Flux` proxies of the controllers (REQ-FE-002). `reason` is a fixed **local** enumeration
 (`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
 failure branch — never the backend's response-body code, which could be arbitrary — and `method`
 is the HTTP verb. **The branch is chosen by what failed, not by the HTTP status on the exception.**
