@@ -72,4 +72,15 @@ class MonitoringScrapePropertiesTest {
 
     assertThat(properties.isConfigured()).isFalse();
   }
+
+  @Test
+  void thePasswordIsNeverPrinted() {
+    MonitoringScrapeProperties properties = new MonitoringScrapeProperties();
+    properties.setUsername("metrics-scraper");
+    properties.setPassword("test-scrape-password");
+
+    assertThat(properties.toString())
+        .contains("metrics-scraper")
+        .doesNotContain("test-scrape-password");
+  }
 }

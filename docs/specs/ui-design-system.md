@@ -54,7 +54,12 @@ components in `krt-components.css`.
   declares the same 48 tokens in `colors_and_type.css` (krt-profit/design-system#4, submodule at
   `06e47e5`); all 48 values were compared and are identical, case aside.
 
-**Enforced by:** design review, plus one lint rule: `declaration-property-value-disallowed-list`
+- [x] Every fallback-free `var(--token)` in `static/css` names a custom property that a stylesheet,
+  a script or a template declares; an undefined one silently drops its declaration (the material
+  demand search header was transparent on `--color-black`, `bank.css` named `--color-text`).
+  `CustomPropertyExistenceTest` fails the build on one; its allow-list is empty.
+
+**Enforced by:** design review, `CustomPropertyExistenceTest`, plus one lint rule: `declaration-property-value-disallowed-list`
 in `frontend/.stylelintrc.json` and `.stylelintrc.templates.json` fails `:frontend:lintCss` /
 `:frontend:lintCssInline` on a hex fallback inside `var()` (2026-09-22), and an override applies
 `color-no-hex` to `materials-overview.css` (2026-09-23). Otherwise the web-asset

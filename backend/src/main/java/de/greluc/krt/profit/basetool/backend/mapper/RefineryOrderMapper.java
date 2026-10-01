@@ -117,6 +117,7 @@ public interface RefineryOrderMapper {
    */
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "owningOrgUnit", ignore = true)
+  @Mapping(target = "storedAt", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   RefineryOrder toEntity(RefineryOrderDto dto);

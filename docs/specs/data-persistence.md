@@ -989,6 +989,27 @@ must name it, which the `command:` / `Exec=` line does, taking effect on the nex
 **Decision:** [ADR-0174](../adr/0174-the-authorities-cache-ttl-is-an-operational-knob.md) (the
 investigation this came out of)
 
+### REQ-DATA-019 — a user search fragment matches literally in a JPQL `LIKE`
+
+A user-supplied search fragment is passed through `LikePatterns.escape` before it is bound into a
+`LIKE`, **and** the JPQL predicate carries an explicit `ESCAPE '\'`. The second half is
+load-bearing: Hibernate renders a `LIKE` without an `ESCAPE` clause on PostgreSQL as
+`like … escape ''`, which switches the escape character off, so an escaped `\%` then matches a
+literal backslash and the search finds nothing. The blueprint-backed catalogue searches (blueprint
+product search, the item-order picker, the Lager item catalogue, and the admin blueprint list)
+follow both halves; other queries listed under *Open* below still carry only the first.
+
+**Acceptance**
+
+- [x] `%` and `_` in a blueprint product, orderable-item or bookable-item search match literally
+  (`BlueprintRepositoryLikeEscapeTest`); the three service callers escape their input.
+- [ ] Every other JPQL `LIKE` whose caller escapes (`LocationRepository`, `MaterialRepository`,
+  `UserRepository`, `MissionRepository`, `OperationRepository`, `ShipRepository`, the exchange
+  repositories) gets the same `ESCAPE '\'`. **Open.**
+
+**Code:** `LikePatterns`, `BlueprintRepository`, `BlueprintProductService`, `JobOrderItemService`,
+`InventoryItemCatalogService`
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
