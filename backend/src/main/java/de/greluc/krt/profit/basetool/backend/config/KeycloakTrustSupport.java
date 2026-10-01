@@ -37,8 +37,9 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
  * SSL bundle's truststore, for the backend's calls to the internal Keycloak connector
  * (REQ-SEC-014).
  *
- * <p>Hostname verification stays on, so the pinned certificate must carry {@code dns:keycloak} in
- * its SAN.
+ * <p>The client speaks HTTP/1.1 and is bounded by the connect and read timeouts of {@link
+ * RestClientConfig}. Hostname verification stays on, so the pinned certificate must carry {@code
+ * dns:keycloak} in its SAN.
  */
 public final class KeycloakTrustSupport {
 
@@ -71,8 +72,15 @@ public final class KeycloakTrustSupport {
       tmf.init(truststore);
       SSLContext sslContext = SSLContext.getInstance("TLS");
       sslContext.init(null, tmf.getTrustManagers(), null);
-      HttpClient httpClient = HttpClient.newBuilder().sslContext(sslContext).build();
-      return new JdkClientHttpRequestFactory(httpClient);
+      HttpClient httpClient =
+          HttpClient.newBuilder()
+              .version(HttpClient.Version.HTTP_1_1)
+              .connectTimeout(RestClientConfig.CONNECT_TIMEOUT)
+              .sslContext(sslContext)
+              .build();
+      JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+      factory.setReadTimeout(RestClientConfig.READ_TIMEOUT);
+      return factory;
     } catch (NoSuchSslBundleException ex) {
       return null;
     } catch (GeneralSecurityException ex) {

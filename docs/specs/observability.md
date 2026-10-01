@@ -78,6 +78,13 @@ shown or logged: for a relay it is the `WebClientResponseException` message, whi
 backend URL. **Enforced by:** `RelayedBackendStatusMvcTest` (every relay, through the real advice,
 against `MockWebServer`).
 
+**A `BackendServiceException` keeps its status for HTML callers too.** `handleBackendServiceException`
+answered an XHR/JSON caller with the backend status but a navigation or a plain `fetch` with the
+`error/error` view at status `200`, so a `fetch` that tests `response.ok` (the handover-report
+download) took the error page for the document. It now returns a `ModelAndView` carrying the status,
+like the `ResponseStatusException` handler; a status HTTP has no name for falls back to `500`.
+**Enforced by:** `BackendErrorPageStatusMvcTest`, `GlobalExceptionHandlerTest`.
+
 A call **short-circuited by an open circuit breaker** (`CallNotPermittedException`) is logged at
 `DEBUG`, never `WARN`. The one-time breaker state transition (`ResilienceEventLogger.onStateTransition`,
 `WARN`) plus the `basetool_backend_client_errors_total{reason="circuit_open"}` counter and the
@@ -2004,7 +2011,8 @@ gauge permanently `NaN`, silently disarming the alert that then consumed it, #11
 consumer is `ActiveSessionsRunaway`, and it is **not** a presence signal — see the
 `SsePushChannelDead` guard note above), and
 `basetool_backend_client_errors_total{reason,method}` counter at the
-`BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
+`BackendApiClient` failure funnels, which include `BackendApiClient#execute` — the multipart,
+binary, bodiless and collected-`Flux` proxies of the controllers (REQ-FE-002). `reason` is a fixed **local** enumeration
 (`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
 failure branch — never the backend's response-body code, which could be arbitrary — and `method`
 is the HTTP verb. **The branch is chosen by what failed, not by the HTTP status on the exception.**
@@ -2259,6 +2267,13 @@ A fifth frontend session meter came with the session type allow-list (REQ-SEC-06
   `SessionTypeOutsideAllowList` (`sum by (mode) (increase(…[1h])) > 0`, no `for`, warning) — a rate
   threshold would never see the single report-mode step. Pinned by
   `monitoring/prometheus/tests/session_type_allow_list_alert_test.yml`.
+- `basetool_session_type_allow_list_mode{mode}` — gauge (`SessionTypeAllowListModeMetric`), one series
+  per mode (`off` / `report` / `enforce`, a closed set), `1` on the mode the frontend process resolved
+  from `app.session.type-allow-list` and `0` on the others. The refusal counter above is silent in
+  `enforce` while nothing is refused, so it cannot tell "enforcing" from "never read"; this gauge
+  can: `basetool_session_type_allow_list_mode{mode="enforce"} == 1` per frontend instance proves the
+  setting reached the process, as the startup line `Session type allow-list mode: ENFORCE` does for
+  one start only. No alert: a mode is a configuration, not a fault.
 
 Two frontend meters were added by the 2026-08 logging audit:
 
@@ -3145,6 +3160,12 @@ has an identity to gate a write on at all:
   delete: it is a resource server with an identity to gate on, and its permit-all chain is narrow
   enough that the mutator never reaches it. Widening that matcher to `/actuator/**` would silently
   un-gate the write — `ManagementPortIsolationTest` asserts it stays 401/403 on the management port.
+  The main chain's cookie CSRF protection is on in prod, so `/actuator/loggers/**` is listed in
+  `SecurityConfig.CSRF_EXEMPT_PATHS` beside `/api/v1/**` (bearer-only, stateless); without that
+  entry the documented bearer `POST` answered 403 for lack of a CSRF token. The `test` profile
+  disables CSRF, which hid this; `ActuatorLoggersCsrfArmedTest` re-arms it via
+  `app.security.csrf.armed-in-test` and proves an admin write needs no CSRF token while anonymous
+  and non-admin callers stay refused.
 - **dev / test / e2e — unchanged, full control.** No management port is configured, the
   `application-prod.yml` files are never loaded, so all three modules keep the runtime write. The
   backend's `ROLE_ADMIN` matcher lives in `SecurityConfig` and is profile-independent, so it applies

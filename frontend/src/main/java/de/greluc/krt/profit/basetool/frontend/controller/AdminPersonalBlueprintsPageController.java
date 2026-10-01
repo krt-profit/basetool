@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
@@ -39,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,6 +50,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -66,8 +67,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -92,7 +91,6 @@ public class AdminPersonalBlueprintsPageController {
       PERSONAL_BLUEPRINT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   private final BackendApiClient backendApiClient;
-  private final WebClient webClient;
 
   /**
    * Renders the admin Blueprints page: a user picker and, once a user is selected, their owned
@@ -230,45 +228,50 @@ public class AdminPersonalBlueprintsPageController {
    * @param userSub target user's Keycloak {@code sub}
    * @param file the uploaded blueprint export JSON
    * @return the per-name resolution preview, or the relayed refusal
-   * @throws ResponseStatusException 500 on an unexpected error
+   * @throws ResponseStatusException 500 when the upload cannot be read
    */
   @PostMapping(value = "/{userSub}/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseBody
   public ResponseEntity<Object> previewImport(
       @PathVariable UUID userSub, @RequestParam("file") @NotNull MultipartFile file) {
+    byte[] bytes;
     try {
-      byte[] bytes = file.getBytes();
-      String filename =
-          file.getOriginalFilename() != null ? file.getOriginalFilename() : "blueprints.json";
-      MultipartBodyBuilder builder = new MultipartBodyBuilder();
-      builder
-          .part(
-              "file",
-              new ByteArrayResource(bytes) {
-                @Override
-                public String getFilename() {
-                  return filename;
-                }
-              })
-          .contentType(MediaType.APPLICATION_OCTET_STREAM);
-
-      return ResponseEntity.ok(
-          webClient
-              .post()
-              .uri("/api/v1/admin/personal-blueprints/" + userSub + "/import/preview")
-              .contentType(MediaType.MULTIPART_FORM_DATA)
-              .body(BodyInserters.fromMultipartData(builder.build()))
-              .retrieve()
-              .bodyToMono(BlueprintImportPreviewDto.class)
-              .block());
-    } catch (WebClientResponseException e) {
-      log.warn("Admin import preview proxy: backend answered {}", e.getStatusCode());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Admin import preview proxy: unexpected error", e);
+      bytes = file.getBytes();
+    } catch (IOException e) {
+      log.error("Admin import preview proxy: the upload could not be read", e);
       throw new ResponseStatusException(
           HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred during import preview.");
     }
+    String filename =
+        file.getOriginalFilename() != null ? file.getOriginalFilename() : "blueprints.json";
+    MultipartBodyBuilder builder = new MultipartBodyBuilder();
+    builder
+        .part(
+            "file",
+            new ByteArrayResource(bytes) {
+              @Override
+              public String getFilename() {
+                return filename;
+              }
+            })
+        .contentType(MediaType.APPLICATION_OCTET_STREAM);
+    String uri = "/api/v1/admin/personal-blueprints/" + userSub + "/import/preview";
+
+    return relay(
+        log,
+        "Admin blueprint import preview for user " + userSub,
+        () ->
+            ResponseEntity.ok(
+                backendApiClient.execute(
+                    HttpMethod.POST,
+                    uri,
+                    webClient ->
+                        webClient
+                            .post()
+                            .uri(uri)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .body(BodyInserters.fromMultipartData(builder.build())),
+                    spec -> spec.bodyToMono(BlueprintImportPreviewDto.class))));
   }
 
   /**

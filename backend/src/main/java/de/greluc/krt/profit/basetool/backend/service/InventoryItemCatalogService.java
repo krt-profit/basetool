@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -53,7 +54,7 @@ public class InventoryItemCatalogService {
   @NotNull
   public Page<InventoryGameItemReferenceDto> findBookableItems(
       String search, @NotNull Pageable pageable) {
-    String q = search != null && !search.isBlank() ? search.strip() : "";
+    String q = search != null && !search.isBlank() ? LikePatterns.escape(search.strip()) : "";
     return blueprintRepository
         .findItemsWithActiveBlueprint(q, pageable)
         .map(inventoryItemMapper::gameItemToReferenceDto);

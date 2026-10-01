@@ -122,8 +122,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   @Query(
       """
       SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL
-      AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%'))
-      OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')))
+      AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+      OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\')
       """)
   Page<Blueprint> searchActive(@Param("q") String q, Pageable pageable);
 
@@ -168,7 +168,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi AND
           b.scwikiDeletedAt IS NULL AND i.kind =
           de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE
-          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
+          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """,
       countQuery =
           """
@@ -176,7 +176,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           EXISTS (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi
           AND b.scwikiDeletedAt IS NULL AND i.kind =
           de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE
-          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
+          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """)
   Page<GameItem> findOrderableItems(@Param("q") String q, Pageable pageable);
 
@@ -194,13 +194,13 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           SELECT gi FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi
           LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
           (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL)
-          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
+          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """,
       countQuery =
           """
           SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi WHERE
           EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS
-          NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
+          NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """)
   Page<GameItem> findItemsWithActiveBlueprint(@Param("q") String q, Pageable pageable);
 
@@ -216,7 +216,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id)
       FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
       WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
-      AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%'))
+      AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
       """)
   List<BlueprintProductRow> findActiveProductRows(@Param("q") String q);
 

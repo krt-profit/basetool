@@ -122,6 +122,15 @@ class BlueprintProductServiceTest {
   }
 
   @Test
+  void searchProducts_escapesLikeMetacharactersInTheQuery() {
+    when(blueprintRepository.findActiveProductRows("100\\%\\_a\\\\b")).thenReturn(List.of());
+
+    service.searchProducts("100%_a\\b", 25, SUB);
+
+    verify(blueprintRepository).findActiveProductRows("100\\%\\_a\\\\b");
+  }
+
+  @Test
   void searchProducts_sortsAlphabeticallyAndCapsToLimit() {
     when(blueprintRepository.findActiveProductRows(""))
         .thenReturn(

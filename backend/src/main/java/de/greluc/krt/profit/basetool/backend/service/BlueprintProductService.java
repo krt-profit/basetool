@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeRe
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -314,7 +315,8 @@ public class BlueprintProductService {
   @NotNull
   private Map<String, ProductAccumulator> buildProductMap(String q) {
     Map<String, ProductAccumulator> map = new LinkedHashMap<>();
-    for (BlueprintProductRow row : blueprintRepository.findActiveProductRows(q)) {
+    for (BlueprintProductRow row :
+        blueprintRepository.findActiveProductRows(LikePatterns.escape(q))) {
       if (row.outputName() == null) {
         continue;
       }

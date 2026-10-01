@@ -19,17 +19,19 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -45,9 +47,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
@@ -58,11 +57,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RestController
 @RequestMapping("/api/proxy/org-units/bank")
 @RequiredArgsConstructor
-@Slf4j
 public class OrgUnitBankProxyController {
 
   private final BackendApiClient backendApiClient;
-  private final WebClient webClient;
 
   /**
    * Forwards a new booking request raised by an officer/lead against their overseen org unit's
@@ -403,35 +400,27 @@ public class OrgUnitBankProxyController {
             .queryParam("from", from)
             .queryParam("to", to)
             .toUriString();
-    try {
-      byte[] pdf =
-          webClient
-              .get()
-              .uri(uri)
-              .headers(
-                  h -> {
-                    if (userTimeZone != null && !userTimeZone.isBlank()) {
-                      h.set("X-User-Time-Zone", userTimeZone);
-                    }
-                  })
-              .retrieve()
-              .bodyToMono(byte[].class)
-              .block();
-      HttpHeaders headers = new HttpHeaders();
-      headers.setContentType(MediaType.APPLICATION_PDF);
-      headers.setContentDispositionFormData("attachment", "kontoauszug-" + id + ".pdf");
-      return ResponseEntity.ok().headers(headers).body(pdf);
-    } catch (WebClientResponseException e) {
-      log.warn("Org-unit statement proxy: backend returned {} for {}", e.getStatusCode(), uri);
-      throw new ResponseStatusException(e.getStatusCode(), "Could not generate the statement.");
-    } catch (ResponseStatusException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Org-unit statement proxy: unexpected error for {}", uri, e);
-      throw new ResponseStatusException(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "An unexpected error occurred generating the statement.");
-    }
+    byte[] pdf =
+        withBackendStatus(
+            () ->
+                backendApiClient.execute(
+                    HttpMethod.GET,
+                    uri,
+                    webClient ->
+                        webClient
+                            .get()
+                            .uri(uri)
+                            .headers(
+                                h -> {
+                                  if (userTimeZone != null && !userTimeZone.isBlank()) {
+                                    h.set("X-User-Time-Zone", userTimeZone);
+                                  }
+                                }),
+                    spec -> spec.bodyToMono(byte[].class)));
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_PDF);
+    headers.setContentDispositionFormData("attachment", "kontoauszug-" + id + ".pdf");
+    return ResponseEntity.ok().headers(headers).body(pdf);
   }
 
   /**
