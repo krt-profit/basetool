@@ -67,7 +67,7 @@ Every operation carries one tier, marked on the handler and emitted into the doc
 | Tier | What it holds | When it may break |
 | --- | --- | --- |
 | **T0** | The version gate, the SPI endpoint, the 14 exchange relay operations and, by recommendation, the three stream operations (below) | Never; a T0 break fails every build |
-| **T1** — the app contract | Every operation a released app build calls, minus T0. Today the frozen set stands for it (234 verb+path pairs, the T0 members the app uses included); it must be derived from the app's own call list instead, because the frozen set misses operations the app calls (*Findings*) | Only in a declared hard-cut wave: a ledger line, a new app release published first, the floor raised once the re-cut release is verified healthy (or with the release itself, if the floor becomes release-bound — O-07) |
+| **T1** — the app contract | Every operation a released app build calls, minus T0. Today the frozen set stands for it (234 verb+path pairs, the T0 members the app uses included); it must be derived from the app's own call list instead, because the frozen set misses operations the app calls (*Findings*) | Only in a declared hard-cut wave: a ledger line, a new app release published first, the floor raised once the re-cut release is verified healthy (or with the release itself, once the floor is release-bound — D-11) |
 | **T2** — web only | Everything else | Freely, with the atomic deploy of frontend and backend; guarded by the frontend contract tests and the call-existence test G-14 |
 
 **T0, member by member.**
@@ -220,7 +220,7 @@ and its admin sub-trees to their owners.
   `/org-units/members/**` and `/announcements/*/read` in the same change, or 10 paths and 13
   operations fall to a storable cache directive. `PendingApprovalAccessFilter` keeps
   `/users/me/registration-status`, which does not move.
-- **Storage (open decision O-08):** `defaultPayoutPreference` and `shareBlueprintsGlobally` are
+- **Storage (decided as D-17 of the plan):** `defaultPayoutPreference` and `shareBlueprintsGlobally` are
   columns of the one `User` row and share its `@Version`. Moving only the paths keeps a
   cross-domain lock and writes through identity's module API. Moving the columns into mission- and
   blueprint-owned tables with their own versions is the real separation and the finer lock the
@@ -359,7 +359,7 @@ leaves the `/inventory/**` no-store family.
 **Pros** the order screen reads catalogue data from the catalogue; one game-item catalogue instead of
 two. **Cons** two DTOs merge, and the field union is still to be decided. **Risks → guards** the lost
 role requirement → G-03 lifts it into the annotation before the move; the cache class of the new
-catalogue read is decided explicitly (O-09). **Effort** S.
+catalogue read is decided explicitly (D-18). **Effort** S.
 
 ### Catalogue
 
@@ -381,7 +381,7 @@ one read-only edge family, one cache policy and one tag, but costs 14 app-frozen
 
 **Consequences.** **App:** none. **Edge:** none. **Backend:** the yields leave the
 `/refinery-orders/**` no-store family for the `no-cache, must-revalidate` default — catalogue data,
-acceptable, but decided explicitly (O-09). The P4K and sync-report trees come under the
+acceptable, but decided explicitly (D-18). The P4K and sync-report trees come under the
 `/api/v1/*/admin/**` matcher and keep their `hasRole('ADMIN')` gates. When the catalogue is cut, its
 eight dual-use DTOs (`FrequencyType`, `JobType`, `Location`, `MaterialCategory`, `Material`,
 `RefiningMethod`, `StarSystem`, `Terminal`) get request records, and its nine write bodies without
@@ -527,11 +527,12 @@ change. **Risks → guards** none beyond the wave checklist. **Effort** S.
   `/materials/search` are twins of their collection `GET` like `/missions/search` and fold the same
   way under P5 when their domain is next cut; they are not in the measured set, and the materials
   one is app-frozen.
-- **Open: the exchange administration.** 14 web-only operations under
-  `/api/v1/admin/exchange-clients/**`, `/api/v1/admin/exchange-undo-runs/**` and
+- **The exchange administration** (decided 2026-10-01, D-12 of the plan). 14 web-only operations
+  under `/api/v1/admin/exchange-clients/**`, `/api/v1/admin/exchange-undo-runs/**` and
   `/api/v1/admin/exchange-settings` are not part of the measured cut. Their P2 home cannot be
-  `/api/v1/exchange/admin/**`, which is the frozen relay prefix. Until a home is chosen (open
-  decision O-14 of the plan), `/api/v1/admin/**` stays as a URL rule beside `/api/v1/*/admin/**`.
+  `/api/v1/exchange/admin/**`, which is the frozen relay prefix; they move to
+  `/api/v1/connected-apps/admin/**` in wave 1, and until then `/api/v1/admin/**` stays as a URL
+  rule beside `/api/v1/*/admin/**`.
 
 ## Security deltas and guards
 
@@ -594,7 +595,7 @@ gates of the moved operations.
    | `/inventory/item-catalog` | `/game-items` | 1 |
 
    The first ten are member data and must stay `no-store`; the last two are catalogue data, decided
-   explicitly (O-09). Guard: G-07, a runtime test that every `GET` of a no-store family answers
+   explicitly (D-18). Guard: G-07, a runtime test that every `GET` of a no-store family answers
    `private, no-store`.
 2. **Cache upgrade: 22 paths** move up to `no-store` — 12 identity admin paths, 8 blueprint and
    personal-inventory admin paths, 2 notification-rule paths. The safe direction, but a behaviour
@@ -721,7 +722,7 @@ step 0 comes shortly before the promotion, not days before it. Raising the floor
 would close the window between steps 1 and 3 and save one outage minute, but it is unsafe while the
 floor lives in `.env`: a health-gate rollback would restore the old backend with the raised floor
 (*Rollback caveats*). The window is the price of that safety; a release-bound floor removes both
-(O-07).
+(D-11).
 
 ### Rollback caveats
 
@@ -730,12 +731,12 @@ floor lives in `.env`: a health-gate rollback would restore the old backend with
   cut in the other direction.
 - After step 3, a rollback re-renders `env.d` from the raised `.env` (`deploy.sh:352`): the old
   backend would run with floor N+1, which walls old apps while the new app finds its paths gone, so
-  no app version works. The rollback runbook therefore reverts the floor first (part of O-07), and
+  no app version works. The rollback runbook therefore reverts the floor first (part of D-11), and
   a defect found after step 3 is better fixed forward.
 - Any deploy that renders `env.d` between an `.env` edit and its intended moment applies the floor
   early — the reason S8 edits and applies in one supervised step.
 
-### Closing the gaps — open decision O-07
+### Closing the gaps — decided as D-11
 
 Three gaps are known: the app reads the policy once per process and fails open, so apps already
 running, and apps started during a restart, run against the new API without a wall until their next
@@ -798,7 +799,7 @@ what wave 1 already needs.
 - **Unique schema names.** A test that every `components.schemas` name belongs to exactly one
   exposed Java type or an explicit `@Schema(name = …)`; `Op`, `Provenance` and `Skipped` get explicit
   names. `use-fqn` is not switched on: it would rename all 489 schemas and every generated app model.
-- **Error-code registry.** Per-module `ProblemCode` enums (plan §5.5, O-01); the document's
+- **Error-code registry.** Per-module `ProblemCode` enums (plan §5.5, D-09); the document's
   `ProblemDetail` gains `code`, `correlationId` and `fieldErrors`; a test that every code the
   handler, the filters and the exceptions produce is registered; the app generates its constants
   from it. `code` stays a string with a documented value list, not a required enum, or
@@ -827,7 +828,7 @@ the backend and frontend change of its domain.
 | **Total** | | **161 (74)** | |
 
 Wave 1 carries all 22 cache upgrades and introduces the `/api/v1/*/admin/**` matcher; wave 2 carries
-ten of the twelve cache downgrades and needs O-08 decided, although the column move itself may follow
+ten of the twelve cache downgrades and its storage decision is D-17 (the columns move with their owner), although the column move may follow
 in the owning domain's wave; wave 3 re-keys `finance-entry-create`; wave 4 needs the bank seam rules
 re-keyed; wave 5 needs the item catalogue's URL-only gate lifted. Every T1 wave costs every member
 one forced update, so waves 5 and 6 can share one app release when both are ready.
@@ -848,7 +849,7 @@ once; two items may follow until wave 2, the first T1 wave, as their rows say:
 | G-21 no mixed release | frontend and backend of one wave must deploy together |
 | G-23 ledger and app call list | the call list before G-08; the ledger before wave 2, the first T1 wave |
 | One tag per domain, unique schema names, generator assertions, error-code registry, mandatory baseline | a per-domain review surface, a correct document and a previous-release comparison that cannot skip |
-| An app release with O-07 (a) | at least one release before wave 2, so running apps notice the cut |
+| An app release with the policy re-read of D-11 | at least one release before wave 2, so running apps notice the cut |
 
 ## Findings about today's API
 
@@ -899,7 +900,7 @@ fields REQ-API-004 calls the contract; 429 is documented on one operation althou
 limiters answer it on all of `/api/**`. Codes are string literals — about 50 in the exception
 package plus four in filters — with no registry, unlike the exchange's. The app once listened for
 `TERMS_ACCEPTANCE_REQUIRED` while the server sends `TERMS_NOT_ACCEPTED`. → the error-code registry,
-O-01.
+D-09.
 
 **Pagination, search and naming diverge from REQ-API-005.** One mapping takes a `Pageable`
 (`AdminTermsController`), 67 take `page` and `size` through `PaginationUtil`, 75 return a

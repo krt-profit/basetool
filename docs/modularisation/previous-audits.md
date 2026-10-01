@@ -32,7 +32,8 @@ plan: domain separation first (owner decisions D-01 … D-08, §2), only final J
 - *Priority* — P0 (most urgent) to P3 as the September audit graded them. "Then → now" gives the
   audit's grade and the grade of the work that remains; "closed" means nothing remains.
 - *References* — § numbers are sections of the plan; G-, D- and O- identifiers are its guards
-  (§6.1), decisions (§2) and open decisions (§13). Paths are repository-relative. In Java source
+  (§6.1), decisions (§2) and the former open decisions (§13, all decided on 2026-10-01). Paths are
+  repository-relative. In Java source
   paths `…/` stands for the package root of the module the path starts with:
   `de/greluc/krt/profit/basetool/` followed by `backend/`, `frontend/`, `ingest/`, `keycloak/spi/`
   or `testsupport/`. Line numbers are exact for `95e945326` and drift with later commits.
@@ -553,7 +554,8 @@ Every finding that is not DONE or not CONFIRMED, grouped by the priority of the 
 - **PSB-09 — Finish the literal-fallback class and fix the i18n gate's blind spots** (FE-SIMP-03).
   The recursive walk is part of G-20.
 - **PSB-10 — A per-domain type-check ratchet** (FE-MOD-03); raising `ecmaVersion` is a separate
-  question that needs a browser baseline first. Adopted in §8.2, with the baseline as O-06.
+  question that needs a browser baseline first. Adopted in §8.2, with the baseline decided as D-16
+  (Baseline 2025, ES2025).
 - **PSB-11 — Actions cache budget** (CI-01): keep the newest Gradle entry per key family and warn
   above 8 GiB, keeping the janitor's fork guard.
 - **PSB-12 — Hash the remaining CI tool fetches** (CI-SEC-12).
@@ -768,7 +770,7 @@ SpEL bean names, a failure mode that shows only at runtime (G-04).
 
 | ID | Item | Status | Verdict | Why and evidence |
 | --- | --- | --- | --- | --- |
-| S783-PAGECAP | Lower the 100,000 page-size ceiling | OPEN | REPRIORITISED | Still `MAX_PAGE_SIZE = 100_000` (`backend/src/main/java/…/web/PaginationUtil.java:45`) on an internet-reachable API (ADR-0135), and module-local ceilings drift (500, 200); a kernel page policy with a lower default and tested opt-outs (O-09). |
+| S783-PAGECAP | Lower the 100,000 page-size ceiling | OPEN | REPRIORITISED | Still `MAX_PAGE_SIZE = 100_000` (`backend/src/main/java/…/web/PaginationUtil.java:45`) on an internet-reachable API (ADR-0135), and module-local ceilings drift (500, 200); a kernel page policy with a lower default and tested opt-outs (D-18). |
 | S783-AUD | JWT audience validation stays opt-in | SUPERSEDED | DROPPED | Replaced by the fail-closed start-up check. |
 
 ### API security audit of 2026-08-25 (#1672)
@@ -781,7 +783,7 @@ consistency item left.
 | S1672-AUDASSERT | Fail-closed start-up invariant for the expected audiences | DONE | DROPPED | Implemented as APPSEC-08. |
 | S1672-BUDGET | Per-subject GET budget for aggregation reads | PARTIAL | CONFIRMED | Per-subject buckets cover writes, SSE and live-sync connects and export segments (`backend/src/main/java/…/config/SubjectRateLimitingFilter.java:57-63`); plain reads stay per IP, an accepted risk. Expensive new module reads must carry an export path segment. |
 | S1672-LIKE | Route `BlueprintProductService.searchProducts` through `LikePatterns.escape` | OPEN | CONFIRMED | The query reaches `LIKE` unescaped (`backend/src/main/java/…/repository/BlueprintRepository.java:125-126,219`); informational — a wildcard only broadens matches in the global catalogue. The verification round found the same gap in the order and inventory item-catalogue searches; all three are defect S-08 of §9. |
-| S1672-031 | `no-store` families of REQ-SEC-031 (fixed; at risk) | PARTIAL | CONFIRMED | 14 path patterns (`backend/src/main/java/…/filter/NoStoreApiScopes.java:42-55`); `/api/v1/admin`, `/exchange`, `/orders`, `/material-exchange`, `/material-requests`, `/leitung` and `/org-chart` are unclassified and new paths default to storable; their sensitivity needs a review (G-07, O-09). |
+| S1672-031 | `no-store` families of REQ-SEC-031 (fixed; at risk) | PARTIAL | CONFIRMED | 14 path patterns (`backend/src/main/java/…/filter/NoStoreApiScopes.java:42-55`); `/api/v1/admin`, `/exchange`, `/orders`, `/material-exchange`, `/material-requests`, `/leitung` and `/org-chart` are unclassified and new paths default to storable; their sensitivity needs a review (G-07, D-18). |
 | S1672-040 | Redaction of nested user records, REQ-SEC-040 (fixed; at risk) | DONE | ADJUSTED | Fixed for the ship owner inside assigned units (`backend/src/main/java/…/support/MissionPeerRedactor.java:118-160`); the tests go case by case, with no reflective walk (PRV-10). |
 
 ### API security audit of 2026-08-30 (#1724)
@@ -919,10 +921,10 @@ the September fixes included:
 | Tenant services wired to the scope gate (#783 era) | `backend/src/test/java/…/ArchitectureTest.java:978,1036` | Simple-name whitelists miss split or renamed services; `OperationPayoutService` is already missing | G-05 |
 | One on-behalf predicate for four write paths (#1724) | `AccessGateService`, `OwnerScopeService` | Per-module copies recreate "a fix never generalised to its siblings" | Access policies on the scope kernel with the differential verdict test (§5.4) |
 | Book-in check before any lookup (APPSEC-01, REQ-INV-032) | `backend/src/main/java/…/service/JobOrderItemProductionService.java:321-334` | Moving the check behind a lookup in an inventory API opens an existence oracle | Red line (§6); a 403 test per foreign entry point (§7.5) |
-| `no-store` for the listed API families (#1672, REQ-SEC-031) | `backend/src/main/java/…/filter/NoStoreApiScopes.java:42-55` | New or moved paths default to storable | G-07, O-09 |
+| `no-store` for the listed API families (#1672, REQ-SEC-031) | `backend/src/main/java/…/filter/NoStoreApiScopes.java:42-55` | New or moved paths default to storable | G-07, D-18 |
 | Per-subject budget for exports (APPSEC-10, REQ-SEC-033) | `backend/src/main/java/…/config/SubjectRateLimitingFilter.java:95` | A re-cut path loses its export segment | G-07 |
 | Audit row in the business transaction (REQ-AUDIT-001) | `AuditService.record`, `MANDATORY` | Conversion to an after-commit event | G-12; red line (§6) |
-| SpEL gates on security beans (all audits; #783 H1) | 155 bean references in `@PreAuthorize` (§4.2 of the plan recounts 166) | A renamed or moved bean answers every gated call with HTTP 400, only at runtime | G-04; O-10 |
+| SpEL gates on security beans (all audits; #783 H1) | 155 bean references in `@PreAuthorize` (§4.2 of the plan recounts 166) | A renamed or moved bean answers every gated call with HTTP 400, only at runtime | G-04; D-19 |
 | Session allow-list (APPSEC-05, ADR-0206) | `frontend/src/main/java/…/config/SessionTypeAllowList.java:86-87` | Moved session-held classes are dropped under `enforce`; a wider prefix weakens the control | G-16; O-02 |
 | Client-IP and locale relay on parallel reads (#1109, #1130) | `frontend/src/main/java/…/service/ParallelPageLoader.java:68-73` | A new `ThreadLocal` is not captured — the locale already is not | Phase 0.4 (`ContextSnapshotFactory`); G-17 |
 | One resilience and relay chain (ADR-0032) | the filtered `webClient` bean | A module builds its own client and loses the bearer, org-unit, IP and locale relays and resilience | G-17 |
@@ -950,7 +952,7 @@ is listed with where the plan adopts it.
   and Spring Modulith in test scope (D-02).
 - **PRV-02 — Resolve every `@PreAuthorize` SpEL bean reference in a context test.** Parse each
   expression and assert that the bean exists and has the method with that arity. *Adopted* as G-04;
-  how an evaluation failure is reported is open decision O-10.
+  an evaluation failure stays a counted and alerted 400 (D-19).
 - **PRV-03 — Make the 21 cross-domain `MANDATORY` hops explicit module ports.** Methods of the
   target module are documented as joining the caller's transaction, reactions run in that
   transaction, and audit stays a direct call. *Adopted in changed form*: command APIs with
@@ -964,7 +966,7 @@ is listed with where the plan adopts it.
   *Adopted* in Phase 0.4 (`ParallelPageLoader` on `ContextSnapshotFactory`).
 - **PRV-06 — A completeness test for REQ-SEC-031.** Every backend `GET` path matches the `no-store`
   list or a reviewed list of revalidatable families. *Adopted* in G-07; the classification of the
-  unlisted families is open decision O-09.
+  unlisted families is decided as D-18.
 - **PRV-07 — Per-domain frontend facades on the one transport core** (J-R05 revisited). Controllers
   of a domain use only its facade; only `WebClientConfig` builds clients; streaming proxies go
   behind a core method or on an allow-list; `TermsDocumentClientUsageTest` is keyed on the bean; no
@@ -972,7 +974,7 @@ is listed with where the plan adopts it.
   classes over `BackendApiClient`, then HTTP interface clients on the same bean (§5.9, F1–F3),
   guarded by G-17; ADR-0032 and arc42 §4.1 are amended.
 - **PRV-08 — A shared page policy.** A kernel policy with a lower default ceiling and explicit,
-  tested opt-outs replaces the 100,000 ceiling and the module-local caps. *Open* as decision O-09.
+  tested opt-outs replaces the 100,000 ceiling and the module-local caps. *Adopted* as D-18.
 - **PRV-09 — Split `support` into a shared kernel and domain-internal code.** *Adopted* in Phase 1
   (§7.3); the leaf rule's message stops sending shared logic there.
 - **PRV-10 — Make PII leaks unrepresentable.** A reflective test that fills every nested `UserDto`
