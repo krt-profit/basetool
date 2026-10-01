@@ -78,6 +78,13 @@ shown or logged: for a relay it is the `WebClientResponseException` message, whi
 backend URL. **Enforced by:** `RelayedBackendStatusMvcTest` (every relay, through the real advice,
 against `MockWebServer`).
 
+**A `BackendServiceException` keeps its status for HTML callers too.** `handleBackendServiceException`
+answered an XHR/JSON caller with the backend status but a navigation or a plain `fetch` with the
+`error/error` view at status `200`, so a `fetch` that tests `response.ok` (the handover-report
+download) took the error page for the document. It now returns a `ModelAndView` carrying the status,
+like the `ResponseStatusException` handler; a status HTTP has no name for falls back to `500`.
+**Enforced by:** `BackendErrorPageStatusMvcTest`, `GlobalExceptionHandlerTest`.
+
 A call **short-circuited by an open circuit breaker** (`CallNotPermittedException`) is logged at
 `DEBUG`, never `WARN`. The one-time breaker state transition (`ResilienceEventLogger.onStateTransition`,
 `WARN`) plus the `basetool_backend_client_errors_total{reason="circuit_open"}` counter and the
@@ -528,6 +535,21 @@ level and all three modules. "Names" includes the Keycloak `preferred_username` 
 the `PiiMasker` only scrubs JWTs, e-mail-shaped strings and token keywords, so a bare handle
 would reach the appenders verbatim — log the user's `sub` UUID instead (the row id is in the
 same UUID space and is not PII).
+
+**No log line carries a name-derived token either.** A hash of the principal name (for example
+`String#hashCode`) is reversible against a known member list, so it is no pseudonym: the `isLogistician`
+helpers and `BackendRoleSyncFilter` log without any user tag, and a line that must correlate a user
+relies on the `userId` MDC field. **Enforced by:** `LogisticianCheckLogPrivacyTest` and
+`BackendRoleSyncFilterTest`.
+
+**A value object that holds a credential redacts it in `toString()`.** The scrape credentials
+(`MonitoringScrapeProperties` in all three apps) print the password as `<redacted>`, and the
+Keycloak SPI's `Brokered` record prints presence flags only, because the Keycloak JVM has no masker.
+`PiiMasker` additionally masks the value after `password`, `passwd` or `secret` followed by `:` or `=`.
+**Enforced by:** `MonitoringScrapePropertiesTest` (each app), `BrokeredToStringTest`, `PiiMaskerTest`, and a ratchet
+(`CredentialFieldRatchetTest` in backend, frontend, ingest and keycloak-spi, rule in `CredentialFieldRule`): a type with a
+`password` / `secret` / `token` / `apiKey`-named `String` or byte field must be on a reviewed list, and a listed class
+must declare its own, non-Lombok `toString()`.
 
 **A session id is a token.** Whoever holds a Spring session id holds the session and the OAuth2
 tokens stored in it, so it is never logged verbatim either. Where a line needs to correlate the
@@ -1989,7 +2011,8 @@ gauge permanently `NaN`, silently disarming the alert that then consumed it, #11
 consumer is `ActiveSessionsRunaway`, and it is **not** a presence signal — see the
 `SsePushChannelDead` guard note above), and
 `basetool_backend_client_errors_total{reason,method}` counter at the
-`BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
+`BackendApiClient` failure funnels, which include `BackendApiClient#execute` — the multipart,
+binary, bodiless and collected-`Flux` proxies of the controllers (REQ-FE-002). `reason` is a fixed **local** enumeration
 (`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
 failure branch — never the backend's response-body code, which could be arbitrary — and `method`
 is the HTTP verb. **The branch is chosen by what failed, not by the HTTP status on the exception.**
@@ -2245,6 +2268,13 @@ A fifth frontend session meter came with the session type allow-list (REQ-SEC-06
   `SessionTypeOutsideAllowList` (`sum by (mode) (increase(…[1h])) > 0`, no `for`, warning) — a rate
   threshold would never see the single report-mode step. Pinned by
   `monitoring/prometheus/tests/session_type_allow_list_alert_test.yml`.
+- `basetool_session_type_allow_list_mode{mode}` — gauge (`SessionTypeAllowListModeMetric`), one series
+  per mode (`off` / `report` / `enforce`, a closed set), `1` on the mode the frontend process resolved
+  from `app.session.type-allow-list` and `0` on the others. The refusal counter above is silent in
+  `enforce` while nothing is refused, so it cannot tell "enforcing" from "never read"; this gauge
+  can: `basetool_session_type_allow_list_mode{mode="enforce"} == 1` per frontend instance proves the
+  setting reached the process, as the startup line `Session type allow-list mode: ENFORCE` does for
+  one start only. No alert: a mode is a configuration, not a fault.
 
 Two frontend meters were added by the 2026-08 logging audit:
 
@@ -3131,6 +3161,12 @@ has an identity to gate a write on at all:
   delete: it is a resource server with an identity to gate on, and its permit-all chain is narrow
   enough that the mutator never reaches it. Widening that matcher to `/actuator/**` would silently
   un-gate the write — `ManagementPortIsolationTest` asserts it stays 401/403 on the management port.
+  The main chain's cookie CSRF protection is on in prod, so `/actuator/loggers/**` is listed in
+  `SecurityConfig.CSRF_EXEMPT_PATHS` beside `/api/v1/**` (bearer-only, stateless); without that
+  entry the documented bearer `POST` answered 403 for lack of a CSRF token. The `test` profile
+  disables CSRF, which hid this; `ActuatorLoggersCsrfArmedTest` re-arms it via
+  `app.security.csrf.armed-in-test` and proves an admin write needs no CSRF token while anonymous
+  and non-admin callers stay refused.
 - **dev / test / e2e — unchanged, full control.** No management port is configured, the
   `application-prod.yml` files are never loaded, so all three modules keep the runtime write. The
   backend's `ROLE_ADMIN` matcher lives in `SecurityConfig` and is profile-independent, so it applies

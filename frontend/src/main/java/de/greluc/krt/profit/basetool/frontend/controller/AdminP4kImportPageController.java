@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.P4kImportJobDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -26,11 +28,10 @@ import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -46,31 +47,25 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Mono;
 
 /**
  * Admin-only controller for the {@code /admin/p4k-import} page: uploads a JSON catalog extracted
  * from the Star Citizen game files as an asynchronous backend import job, polls its preview and
  * applies it.
  *
- * <p>Every action proxies to {@code /api/v1/admin/import/p4k/jobs}; a backend {@link
- * WebClientResponseException} is relayed with its status, any other failure as 500.
+ * <p>Every action proxies to {@code /api/v1/admin/import/p4k/jobs} through {@link
+ * BackendApiClient#execute}, so a backend refusal is mapped like any other backend call.
  */
 @Controller
 @UsesLayoutModel
 @RequestMapping("/admin/p4k-import")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-@Slf4j
 public class AdminP4kImportPageController {
 
   /** Backend base path for the async import jobs. */
   private static final String JOBS_URI = "/api/v1/admin/import/p4k/jobs";
-
-  private final WebClient webClient;
 
   private final BackendApiClient backendApiClient;
 
@@ -115,16 +110,18 @@ public class AdminP4kImportPageController {
         .contentType(MediaType.APPLICATION_OCTET_STREAM);
 
     P4kImportJobDto job =
-        execute(
+        withBackendStatus(
             () ->
-                webClient
-                    .post()
-                    .uri(JOBS_URI)
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(BodyInserters.fromMultipartData(builder.build()))
-                    .retrieve()
-                    .bodyToMono(P4kImportJobDto.class),
-            "enqueue preview");
+                backendApiClient.execute(
+                    HttpMethod.POST,
+                    JOBS_URI,
+                    webClient ->
+                        webClient
+                            .post()
+                            .uri(JOBS_URI)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .body(BodyInserters.fromMultipartData(builder.build())),
+                    spec -> spec.bodyToMono(P4kImportJobDto.class)));
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(job);
   }
 
@@ -137,15 +134,13 @@ public class AdminP4kImportPageController {
   @ResponseBody
   @NotNull
   public List<P4kImportJobDto> listJobs() {
-    return execute(
+    return withBackendStatus(
         () ->
-            webClient
-                .get()
-                .uri(JOBS_URI)
-                .retrieve()
-                .bodyToFlux(P4kImportJobDto.class)
-                .collectList(),
-        "list jobs");
+            backendApiClient.execute(
+                HttpMethod.GET,
+                JOBS_URI,
+                webClient -> webClient.get().uri(JOBS_URI),
+                spec -> spec.bodyToFlux(P4kImportJobDto.class).collectList()));
   }
 
   /**
@@ -158,14 +153,16 @@ public class AdminP4kImportPageController {
   @ResponseBody
   @NotNull
   public P4kImportJobDto getJob(@PathVariable("id") @NotNull UUID id) {
-    return execute(
+    return withBackendStatus(
         () ->
-            webClient
-                .get()
-                .uri(uriBuilder -> uriBuilder.path(JOBS_URI + "/{id}").build(id))
-                .retrieve()
-                .bodyToMono(P4kImportJobDto.class),
-        "get job");
+            backendApiClient.execute(
+                HttpMethod.GET,
+                JOBS_URI + "/{id}",
+                webClient ->
+                    webClient
+                        .get()
+                        .uri(uriBuilder -> uriBuilder.path(JOBS_URI + "/{id}").build(id)),
+                spec -> spec.bodyToMono(P4kImportJobDto.class)));
   }
 
   /**
@@ -182,19 +179,21 @@ public class AdminP4kImportPageController {
       @PathVariable("id") @NotNull UUID id,
       @RequestParam(value = "seedNew", defaultValue = "false") boolean seedNew) {
     P4kImportJobDto job =
-        execute(
+        withBackendStatus(
             () ->
-                webClient
-                    .post()
-                    .uri(
-                        uriBuilder ->
-                            uriBuilder
-                                .path(JOBS_URI + "/{id}/apply")
-                                .queryParam("seedNew", seedNew)
-                                .build(id))
-                    .retrieve()
-                    .bodyToMono(P4kImportJobDto.class),
-            "apply job");
+                backendApiClient.execute(
+                    HttpMethod.POST,
+                    JOBS_URI + "/{id}/apply",
+                    webClient ->
+                        webClient
+                            .post()
+                            .uri(
+                                uriBuilder ->
+                                    uriBuilder
+                                        .path(JOBS_URI + "/{id}/apply")
+                                        .queryParam("seedNew", seedNew)
+                                        .build(id)),
+                    spec -> spec.bodyToMono(P4kImportJobDto.class)));
     backendApiClient.evict(
         CacheDomain.MATERIAL,
         CacheDomain.MANUFACTURER,
@@ -215,31 +214,6 @@ public class AdminP4kImportPageController {
     } catch (Exception e) {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "The uploaded file could not be read.");
-    }
-  }
-
-  /**
-   * Blocks on a backend call, turning a {@link WebClientResponseException} into a {@link
-   * ResponseStatusException} of the same status without the backend body, and any other failure
-   * into a 500.
-   *
-   * @param call the WebClient call producing the result mono
-   * @param op a short label for diagnostic logging
-   * @param <T> the relayed body type
-   * @return the decoded body
-   */
-  private <T> T execute(@NotNull Supplier<Mono<T>> call, @NotNull String op) {
-    try {
-      return call.get().block();
-    } catch (WebClientResponseException e) {
-      log.warn("P4K import proxy ({}): backend {} — {}", op, e.getStatusCode(), e.getMessage());
-      throw new ResponseStatusException(e.getStatusCode(), "The P4K import request was rejected.");
-    } catch (ResponseStatusException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("P4K import proxy ({}): unexpected error", op, e);
-      throw new ResponseStatusException(
-          HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred during the P4K import.");
     }
   }
 }

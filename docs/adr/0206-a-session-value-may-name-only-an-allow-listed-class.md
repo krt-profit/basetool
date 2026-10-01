@@ -48,11 +48,11 @@ production's real sessions before it refuses anything.
    `de.greluc.krt.profit.basetool.frontend.model.*`, and `CONTAINER_WRITTEN_FINAL_SESSION_TYPES`. The
    builder is handed to `SecurityJacksonModules`, which adds Spring Security's exact types on top.
 2. **Three modes**, `app.session.type-allow-list` / `APP_SESSION_TYPE_ALLOW_LIST`: `off` (the old
-   validator byte for byte), `report` (**default** — everything is read as before, a class outside the
+   validator byte for byte), `report` (opt-in — everything is read as before, a class outside the
    list is counted on `basetool_session_type_refused_total{mode="report"}` and named once in a `WARN`)
    and `enforce` (such a class is refused, the attribute is dropped by `FaultTolerantSessionSerializer`
-   and repaired on the same request, ADR-0157). The mode is parsed leniently and a typo falls back to
-   `report`.
+   and repaired on the same request, ADR-0157). The mode is parsed leniently and a missing or mistyped value falls back to
+   `enforce`, the default (changed from `report` when the code default followed production).
 3. **The hook is one method.** `AllowListBuilder` subclasses Jackson's builder so that the `build()`
    `SecurityJacksonModules` calls itself produces `AllowListValidator`, which overrides only
    `validateSubType` — the step where everything the matchers did not allow ends up. The builder is
