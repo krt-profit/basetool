@@ -529,6 +529,21 @@ the `PiiMasker` only scrubs JWTs, e-mail-shaped strings and token keywords, so a
 would reach the appenders verbatim — log the user's `sub` UUID instead (the row id is in the
 same UUID space and is not PII).
 
+**No log line carries a name-derived token either.** A hash of the principal name (for example
+`String#hashCode`) is reversible against a known member list, so it is no pseudonym: the `isLogistician`
+helpers and `BackendRoleSyncFilter` log without any user tag, and a line that must correlate a user
+relies on the `userId` MDC field. **Enforced by:** `LogisticianCheckLogPrivacyTest` and
+`BackendRoleSyncFilterTest`.
+
+**A value object that holds a credential redacts it in `toString()`.** The scrape credentials
+(`MonitoringScrapeProperties` in all three apps) print the password as `<redacted>`, and the
+Keycloak SPI's `Brokered` record prints presence flags only, because the Keycloak JVM has no masker.
+`PiiMasker` additionally masks the value after `password`, `passwd` or `secret` followed by `:` or `=`.
+**Enforced by:** `MonitoringScrapePropertiesTest` (each app), `BrokeredToStringTest`, `PiiMaskerTest`, and a ratchet
+(`CredentialFieldRatchetTest` in backend, frontend, ingest and keycloak-spi, rule in `CredentialFieldRule`): a type with a
+`password` / `secret` / `token` / `apiKey`-named `String` or byte field must be on a reviewed list, and a listed class
+must declare its own, non-Lombok `toString()`.
+
 **A session id is a token.** Whoever holds a Spring session id holds the session and the OAuth2
 tokens stored in it, so it is never logged verbatim either. Where a line needs to correlate the
 requests of one session, it logs `SessionIdFingerprint.of(…)` — the first 12 hex characters of the

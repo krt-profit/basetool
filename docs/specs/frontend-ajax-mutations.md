@@ -205,8 +205,13 @@ are nested inside their render function.
 - [ ] No page defines its own HTML escaper.
 - [ ] `setTrustedHtml` / `replaceWithTrustedHtml` are called only with the body of a same-origin
   fragment response, never with a string assembled in script.
+- [x] A translated message an inline script needs is emitted by `th:inline="javascript"` as a
+  JavaScript string literal (`/*[[#{key}]]*/ ""`), never as `"[[#{key}]]"` in a plain script, where
+  Thymeleaf HTML-escapes it (`'` arrives as `&#39;`). `MembersPageMessagesRenderTest` renders
+  `/members` in DE and EN with a quote- and ampersand-laden translation.
 
-**Enforced by:** `:frontend:lintJs` (`no-unsanitized/method`, `no-unsanitized/property`) + review of
+**Enforced by:** `:frontend:lintJs` (`no-unsanitized/method`, `no-unsanitized/property`),
+`MembersPageMessagesRenderTest` + review of
 the trusted-helper call sites · **Code:** `escape-html.js`, `krt-fetch.js` (`setTrustedHtml`,
 `replaceWithTrustedHtml`, `swap`), `eslint.config.mjs`
 

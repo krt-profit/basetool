@@ -164,16 +164,6 @@
                                     th:text="${mis.plannedStartTime != null} ? |${mis.name} - ${#temporals.format(mis.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mis.name}"></option>
                         </select>
                     </div>
-
-                    <div class="form-group flex-2 mb-0">
-                        <label for="status" th:text="#{refineryorder.form.status}">Status</label>
-                        <select id="status" th:field="*{status}">
-                            <option value="OPEN" th:text="#{refineryorder.status.OPEN}">Offen</option>
-                            <option value="IN_PROGRESS" th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</option>
-                            <option value="COMPLETED" th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</option>
-                            <option value="CANCELED" th:text="#{refineryorder.status.CANCELED}">Abgebrochen</option>
-                        </select>
-                    </div>
                 </div>
 
                 <div class="material-row mt-1-5">

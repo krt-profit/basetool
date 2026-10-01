@@ -645,6 +645,28 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
+    void clientSuppliedServerManagedFields_areIgnoredOnCreate() {
+      stubUserAndLocation();
+      when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      User stranger = new User();
+      stranger.setId(OTHER_USER_ID);
+      RefineryOrder incoming = freshOrderWithLocation();
+      incoming.setId(UUID.randomUUID());
+      incoming.setVersion(7L);
+      incoming.setOwner(stranger);
+      incoming.setStatus(RefineryOrderStatus.COMPLETED);
+      incoming.setStoredAt(Instant.now());
+
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
+
+      assertEquals(RefineryOrderStatus.OPEN, result.getStatus());
+      assertNull(result.getStoredAt());
+      assertNull(result.getId());
+      assertNull(result.getVersion());
+      assertSame(owner, result.getOwner());
+    }
+
+    @Test
     void startedAtNull_defaultsToInstantNow() {
       stubUserAndLocation();
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -731,6 +753,41 @@ class RefineryOrderServiceLifecycleTest {
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false);
+
+      verify(refineryOrderRepository).save(existing);
+    }
+
+    @Test
+    void storedOrder_cannotBeReopenedByUpdate() {
+      RefineryOrder existing = newSavedOrder();
+      existing.setStatus(RefineryOrderStatus.COMPLETED);
+      existing.setStoredAt(java.time.Instant.now());
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setStatus(RefineryOrderStatus.OPEN);
+
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () -> service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false));
+      assertEquals("error.refinery_order.stored_status_locked", ex.getMessage());
+      assertEquals(RefineryOrderStatus.COMPLETED, existing.getStatus());
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void storedOrder_keepingItsStatus_canStillBeUpdated() {
+      RefineryOrder existing = newSavedOrder();
+      existing.setStatus(RefineryOrderStatus.COMPLETED);
+      existing.setStoredAt(java.time.Instant.now());
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setStatus(RefineryOrderStatus.COMPLETED);
+
+      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
 
       verify(refineryOrderRepository).save(existing);
     }
