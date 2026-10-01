@@ -52,6 +52,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Renders {@code /members} in both locales and asserts that the message dictionary its inline
@@ -60,6 +61,8 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 class MembersPageMessagesRenderTest {
+
+  private static final JsonMapper JSON = JsonMapper.builder().build();
 
   private static final Map<String, String> CONSTANT_TO_KEY =
       Map.ofEntries(
@@ -169,28 +172,14 @@ class MembersPageMessagesRenderTest {
     }
   }
 
+  /**
+   * Decodes a string literal the way a JavaScript engine reads it; the literal Thymeleaf emits is
+   * JSON-compatible, so the JSON reader does the unescaping.
+   *
+   * @param literal a double-quoted string literal
+   * @return the string value the literal denotes
+   */
   private static String unescapeJs(String literal) {
-    String body = literal.substring(1, literal.length() - 1);
-    StringBuilder out = new StringBuilder();
-    for (int i = 0; i < body.length(); i++) {
-      char c = body.charAt(i);
-      if (c != '\\' || i + 1 >= body.length()) {
-        out.append(c);
-        continue;
-      }
-      char next = body.charAt(++i);
-      if (next == 'u' && i + 4 < body.length()) {
-        out.append((char) Integer.parseInt(body.substring(i + 1, i + 5), 16));
-        i += 4;
-      } else {
-        out.append(
-            switch (next) {
-              case 'n' -> '\n';
-              case 't' -> '\t';
-              default -> next;
-            });
-      }
-    }
-    return out.toString();
+    return JSON.readValue(literal, String.class);
   }
 }
