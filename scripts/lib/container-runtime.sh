@@ -152,6 +152,14 @@ rt_resolve_digest() {
   printf '%s' "${out}" | sed -n 's/.*"Digest"[[:space:]]*:[[:space:]]*"\(sha256:[a-f0-9]\{64\}\)".*/\1/p' | head -1
 }
 
+rt_image_revision() {
+  local ref="$1" out
+  command -v skopeo >/dev/null 2>&1 || rt_die "skopeo is not installed; it is how an image label is read without pulling"
+  out="$(skopeo inspect --config "docker://${ref}" 2>/dev/null)" || return 1
+  printf '%s' "${out}" | tr -d '\n' \
+    | sed -n 's/.*"org\.opencontainers\.image\.revision"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+}
+
 rt_login() {
   local registry="$1" user="$2" pwfile="$3"
   ${RT_CLI} login "${registry}" --username "${user}" --password-stdin < "${pwfile}" || return 1

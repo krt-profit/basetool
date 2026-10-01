@@ -166,14 +166,14 @@ jobs:
           fi
           echo "Production promotion of '${VERSION}' approved — proceeding to re-tag :stable."
 
-  promote:
-    name: Promote ${{ matrix.module }}
+  verify:
+    name: Verify ${{ matrix.module }}
     needs: approve
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      packages: write
+      packages: read
 
     strategy:
       fail-fast: true
@@ -194,10 +194,122 @@ jobs:
           sparse-checkout: .github/actions
           persist-credentials: false
 
-      - name: Verify and re-tag as :stable
+      - name: Verify the source digest
         uses: ./.github/actions/retag-verified-digest
         with:
           module: ${{ matrix.module }}
+          source-tag: ${{ inputs.version }}
+          target-tag: stable
+          verify-only: 'true'
+
+  same-revision:
+    name: One release, five artifacts
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Require one source revision across all five artifacts
+        env:
+          REGISTRY_HOST: ${{ env.REGISTRY }}
+          OWNER: ${{ env.IMAGE_OWNER }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          REV_JQ='[.[] | .config.Labels["org.opencontainers.image.revision"]] | map(select(. != null)) | unique | .[0] // ""'
+
+          revisions=""
+          first_module=""
+          first_revision=""
+          for module in backend frontend ingest config keycloak-spi; do
+            image="${REGISTRY_HOST}/${OWNER}/basetool-${module}"
+            revision=""
+            for attempt in 1 2 3; do
+              if revision=$(docker buildx imagetools inspect "${image}:${VERSION}" --format '{{json .Image}}' | jq -r "$REV_JQ"); then
+                if [ -n "$revision" ]; then break; fi
+              fi
+              sleep $((attempt * 5))
+            done
+            if [ -z "$revision" ]; then
+              echo "::error::basetool-${module}:${VERSION} carries no org.opencontainers.image.revision label; refusing to promote an artifact whose source commit cannot be shown" >&2
+              exit 1
+            fi
+            echo "basetool-${module}: ${revision}"
+            if [ -z "$first_revision" ]; then
+              first_module="$module"
+              first_revision="$revision"
+            elif [ "$revision" != "$first_revision" ]; then
+              echo "::error::basetool-${module}:${VERSION} is built from ${revision} but basetool-${first_module}:${VERSION} from ${first_revision}; a release is five artifacts of one commit, and :stable must never mix them" >&2
+              exit 1
+            fi
+          done
+
+  promote:
+    name: Promote all five artifacts
+    needs: same-revision
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout the shared promotion action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+
+      - name: Re-tag basetool-config as :stable
+        uses: ./.github/actions/retag-verified-digest
+        with:
+          module: config
+          source-tag: ${{ inputs.version }}
+          target-tag: stable
+
+      - name: Re-tag basetool-keycloak-spi as :stable
+        uses: ./.github/actions/retag-verified-digest
+        with:
+          module: keycloak-spi
+          source-tag: ${{ inputs.version }}
+          target-tag: stable
+
+      - name: Re-tag basetool-backend as :stable
+        uses: ./.github/actions/retag-verified-digest
+        with:
+          module: backend
+          source-tag: ${{ inputs.version }}
+          target-tag: stable
+
+      - name: Re-tag basetool-ingest as :stable
+        uses: ./.github/actions/retag-verified-digest
+        with:
+          module: ingest
+          source-tag: ${{ inputs.version }}
+          target-tag: stable
+
+      - name: Re-tag basetool-frontend as :stable
+        uses: ./.github/actions/retag-verified-digest
+        with:
+          module: frontend
           source-tag: ${{ inputs.version }}
           target-tag: stable
 
