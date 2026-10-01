@@ -74,12 +74,12 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
           """
           SELECT new de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto(l.id,
           l.name) FROM Location l WHERE l.hidden = false AND (cast(:q as string) IS NULL
-          OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
+          OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           """,
       countQuery =
           """
           SELECT COUNT(l) FROM Location l WHERE l.hidden = false AND (cast(:q as string) IS NULL
-          OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
+          OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           """)
   Page<LocationReferenceDto> searchReference(@Param("q") String q, Pageable pageable);
 

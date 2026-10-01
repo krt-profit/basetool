@@ -204,6 +204,47 @@ class UserScopedQueriesDataTest {
     return userRepository.save(user);
   }
 
+  /** A {@code %} or {@code _} in an escaped search fragment matches literally. */
+  @Test
+  void searchScoped_treatsPercentAndUnderscoreLiterally() {
+    User percent = createNamed(PREFIX + "lit%one-");
+    User plain = createNamed(PREFIX + "litXone-");
+    User underscore = createNamed(PREFIX + "lit_two-");
+    createNamed(PREFIX + "litYtwo-");
+    flushAndClear();
+
+    assertThat(searchIds(PREFIX + "lit\\%one")).containsExactly(percent.getId());
+    assertThat(searchIds(PREFIX + "lit\\_two")).containsExactly(underscore.getId());
+    assertThat(searchIds(PREFIX + "litxone")).containsExactly(plain.getId());
+    assertThat(
+            userRepository.searchScopedList(PREFIX + "lit\\%one", null).stream()
+                .map(User::getId)
+                .toList())
+        .containsExactly(percent.getId());
+    assertThat(
+            userRepository
+                .searchScopedReferences(PREFIX + "lit\\_two", null, PageRequest.of(0, 50))
+                .getContent()
+                .stream()
+                .map(UserReferenceDto::id)
+                .toList())
+        .containsExactly(underscore.getId());
+  }
+
+  private List<UUID> searchIds(String escapedFragment) {
+    return userRepository
+        .searchScoped(escapedFragment, null, PageRequest.of(0, 50))
+        .map(User::getId)
+        .getContent();
+  }
+
+  private User createNamed(String usernamePrefix) {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername(usernamePrefix + UUID.randomUUID());
+    return userRepository.save(user);
+  }
+
   /** Flushes the seeded rows (firing the membership-kind trigger) then clears the context. */
   private void flushAndClear() {
     entityManager.flush();

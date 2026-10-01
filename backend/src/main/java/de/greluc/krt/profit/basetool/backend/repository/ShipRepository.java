@@ -250,8 +250,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN FETCH s.owningOrgUnit
           WHERE s.owner.id = :ownerId
           AND (cast(:search as string) IS NULL
-          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))
-          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))
+          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
           ) ORDER BY
           LOWER(COALESCE(m.name, '')) ASC,
           LOWER(COALESCE(st.name, '')) ASC,
@@ -272,8 +272,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN st.manufacturer m
           WHERE s.owner.id = :ownerId
           AND (cast(:search as string) IS NULL
-          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))
-          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))
+          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
           )
           """)
   Page<Ship> findByOwnerIdFiltered(
@@ -335,10 +335,10 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           WHERE
           """
               + ScopeSpecifications.SHIP_SCOPE_TRIPLE
-              + " AND (cast(:query as string) IS NULL"
-              + "  OR LOWER(s.shipType.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
-              + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
-              + " ) GROUP BY s.shipType ORDER BY s.shipType.name ASC",
+              + " AND (cast(:query as string) IS NULL  OR LOWER(s.shipType.name) LIKE"
+              + " LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\'  OR LOWER(m.name)"
+              + " LIKE LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\' ) GROUP BY"
+              + " s.shipType ORDER BY s.shipType.name ASC",
       countQuery =
           """
           SELECT COUNT(DISTINCT s.shipType)
@@ -346,10 +346,9 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           WHERE
           """
               + ScopeSpecifications.SHIP_SCOPE_TRIPLE
-              + " AND (cast(:query as string) IS NULL"
-              + "  OR LOWER(s.shipType.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
-              + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
-              + " )")
+              + " AND (cast(:query as string) IS NULL  OR LOWER(s.shipType.name) LIKE"
+              + " LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\'  OR LOWER(m.name)"
+              + " LIKE LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\' )")
   Page<Object[]> countShipsByType(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,

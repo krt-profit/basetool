@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -159,6 +161,44 @@ class ShipRepositoryPersonalHangarTest {
                 .stream()
                 .map(Ship::getName))
         .containsExactly("theirs");
+  }
+
+  @Test
+  void searchFilters_treatPercentAndUnderscoreLiterally() {
+    Manufacturer maker = newManufacturer("LikeMaker-773", "LM773");
+    ShipType percent = newShipType("Lit%Hull-773", maker);
+    ShipType plain = newShipType("LitXHull-773", maker);
+    ShipType underscore = newShipType("Lit_Hull-773", maker);
+    ShipType other = newShipType("LitYHull-773", maker);
+    saveShip("s-pct", percent, "LTI", false, area18);
+    saveShip("s-plain", plain, "LTI", false, area18);
+    saveShip("s-und", underscore, "LTI", false, area18);
+    saveShip("s-other", other, "LTI", false, area18);
+
+    assertThat(ownShips("lit\\%hull")).containsExactly("s-pct");
+    assertThat(ownShips("lit\\_hull")).containsExactly("s-und");
+    assertThat(ownShips("litxh")).containsExactly("s-plain");
+    assertThat(overviewTypes("lit\\%hull")).containsExactly(percent);
+    assertThat(overviewTypes("lit\\_hull")).containsExactly(underscore);
+    assertThat(overviewTypes("litxh")).containsExactly(plain);
+  }
+
+  private List<String> ownShips(String escapedFragment) {
+    return shipRepository
+        .findByOwnerIdFiltered(owner.getId(), escapedFragment, PageRequest.of(0, 50))
+        .getContent()
+        .stream()
+        .map(Ship::getName)
+        .toList();
+  }
+
+  private List<Object> overviewTypes(String escapedFragment) {
+    return shipRepository
+        .countShipsByType(true, null, Set.of(), escapedFragment, PageRequest.of(0, 50))
+        .getContent()
+        .stream()
+        .<Object>map(row -> row[0])
+        .toList();
   }
 
   private User newUser(String username) {

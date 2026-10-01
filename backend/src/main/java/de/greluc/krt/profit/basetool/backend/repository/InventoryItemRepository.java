@@ -1097,12 +1097,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @EntityGraph(attributePaths = {"material", "gameItem", "location"})
   @Query(
-      "SELECT i FROM InventoryItem i LEFT JOIN i.material m LEFT JOIN i.gameItem gi "
-          + "WHERE i.user.id = :userId "
-          + "AND (:query IS NULL OR LOWER(m.name) LIKE :query OR LOWER(gi.name) LIKE :query) "
-          + "AND ((:includeMaterial = TRUE AND i.gameItem IS NULL) "
-          + "OR (:includeItem = TRUE AND i.gameItem IS NOT NULL)) "
-          + "ORDER BY COALESCE(m.name, gi.name) ASC")
+      "SELECT i FROM InventoryItem i LEFT JOIN i.material m LEFT JOIN i.gameItem gi WHERE i.user.id"
+          + " = :userId AND (:query IS NULL OR LOWER(m.name) LIKE :query ESCAPE '\\' OR"
+          + " LOWER(gi.name) LIKE :query ESCAPE '\\') AND ((:includeMaterial = TRUE AND i.gameItem"
+          + " IS NULL) OR (:includeItem = TRUE AND i.gameItem IS NOT NULL)) ORDER BY"
+          + " COALESCE(m.name, gi.name) ASC")
   List<InventoryItem> findReleasableForUser(
       @Param("userId") UUID userId,
       @Param("query") String query,

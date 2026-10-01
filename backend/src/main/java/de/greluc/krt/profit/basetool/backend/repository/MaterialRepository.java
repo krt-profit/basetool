@@ -70,7 +70,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
           """
           SELECT m FROM Material m LEFT JOIN FETCH m.refinedMaterial WHERE m.isVisible = true
           AND (cast(:q as string) IS NULL
-              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
+              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           AND (:jobOrderOnly = false OR m.isJobOrder = true)
           AND (:rawOnly = false OR m.type = :rawType OR m.isManualRawMaterial = true)
           """,
@@ -78,7 +78,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
           """
           SELECT COUNT(m) FROM Material m WHERE m.isVisible = true
           AND (cast(:q as string) IS NULL
-              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
+              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')) ESCAPE '\\')
           AND (:jobOrderOnly = false OR m.isJobOrder = true)
           AND (:rawOnly = false OR m.type = :rawType OR m.isManualRawMaterial = true)
           """)
@@ -219,7 +219,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       LEFT JOIN m.category c
       JOIN MaterialPrice p ON p.material = m
       WHERE (cast(:name as string) IS NULL
-          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:name as string), '%')))
+          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:name as string), '%')) ESCAPE '\\')
       AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL)
       GROUP BY m.id, m.name, c.id, c.name, c.version,
           m.isIllegal, m.isVolatileQt, m.isVolatileTime
