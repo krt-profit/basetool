@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -138,7 +139,7 @@ public class OrgUnitBankProxyController {
       @PathVariable @NotNull String roleCode,
       @RequestBody(required = false) @Nullable Map<String, Object> body) {
     return postMap(
-        "/api/v1/org-units/bank/accounts/" + id + "/visibility/role/" + roleCode,
+        "/api/v1/org-units/bank/accounts/" + id + "/visibility/role/" + requireRoleCode(roleCode),
         emptyIfNull(body));
   }
 
@@ -153,7 +154,8 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> removeRoleVisibility(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
-    return deleteMap("/api/v1/org-units/bank/accounts/" + id + "/visibility/role/" + roleCode);
+    return deleteMap(
+        "/api/v1/org-units/bank/accounts/" + id + "/visibility/role/" + requireRoleCode(roleCode));
   }
 
   /**
@@ -242,7 +244,11 @@ public class OrgUnitBankProxyController {
       @PathVariable @NotNull String roleCode,
       @RequestBody @NotNull Map<String, Object> body) {
     return putMap(
-        "/api/v1/org-units/bank/accounts/" + id + "/approval-limit/role/" + roleCode, body);
+        "/api/v1/org-units/bank/accounts/"
+            + id
+            + "/approval-limit/role/"
+            + requireRoleCode(roleCode),
+        body);
   }
 
   /**
@@ -256,7 +262,11 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> clearRoleApprovalLimit(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
-    return deleteMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/role/" + roleCode);
+    return deleteMap(
+        "/api/v1/org-units/bank/accounts/"
+            + id
+            + "/approval-limit/role/"
+            + requireRoleCode(roleCode));
   }
 
   /**
@@ -460,6 +470,23 @@ public class OrgUnitBankProxyController {
   private Map<String, Object> deleteMap(@NotNull String uri) {
     Map<String, Object> response = backendApiClient.delete(uri, Map.class);
     return response == null ? Map.of() : response;
+  }
+
+  /**
+   * Checks that a role bucket path segment has the shape of an enum literal before it enters a
+   * backend URI (REQ-SEC-051).
+   *
+   * @param roleCode the raw path segment
+   * @return {@code roleCode} unchanged
+   * @throws ResponseStatusException {@code 400} when the value is not an upper-case constant name
+   */
+  @NotNull
+  private static String requireRoleCode(@NotNull String roleCode) {
+    String checked = RelayParams.constantNameOrNull(roleCode);
+    if (checked == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Malformed role code");
+    }
+    return checked;
   }
 
   /**

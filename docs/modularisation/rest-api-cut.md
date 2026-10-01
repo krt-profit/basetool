@@ -134,7 +134,7 @@ family to the app and freezing it remain one decision (ADR-0136).
   (`GET /inventory/item-catalog` with `q`, `GET /orders/item-catalog` with `search`) and the user
   attributes (`PUT /users/{id}/attributes` and `PUT /admin/users/{id}/attributes`, the latter
   without a caller).
-- **The public API vhost admits 259 documented operations**, against 234 app-frozen verb+path pairs.
+- **The public API vhost admits 259 documented operations**, against 234 app-frozen verb+path pairs. Since 2026-10-01 the vhost also admits, and the frozen set holds, `POST /api/v1/operations` (B-02: the app's Operation create answered 404 at the edge), a method-scoped admission that keeps `GET` on the collection refused.
 
 | Domain | Controllers | Operations | Writes | App-frozen | First segments |
 | --- | ---: | ---: | ---: | ---: | --- |

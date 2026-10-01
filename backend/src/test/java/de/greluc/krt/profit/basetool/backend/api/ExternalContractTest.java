@@ -1520,6 +1520,8 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/operations/{id}", "put", Set.of(), Set.of("name", "status", "version")),
           new ContractOperation(
+              "/api/v1/operations", "post", Set.of("id"), Set.of("name", "status")),
+          new ContractOperation(
               "/api/v1/orders/lookup",
               "get",
               Set.of("id", "displayId", "handle", "requiredMaterialIds", "requiredGameItemIds")),
@@ -1964,6 +1966,8 @@ class ExternalContractTest {
           Map.entry("BulkRebookRequest.mode", Set.of("LOCATION", "PERSONALIZE", "DEPERSONALIZE")),
           Map.entry("InventoryAllocationWriteDto.field", Set.of("JOB_ORDER", "MISSION")),
           Map.entry("CreateClaimDto.qualityRequirement", Set.of("GOOD", "NONE")),
+          Map.entry(
+              "OperationCreateDto.status", Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELED")),
           Map.entry(
               "OperationUpdateDto.status", Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELED")));
 

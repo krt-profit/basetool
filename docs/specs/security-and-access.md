@@ -2605,7 +2605,12 @@ does not have to be the only thing that does. Under operations the write that ma
 naming that one path rather than widening the family, because the guard is verb-blind by design.
 Later phases opened more writes the same way (the participation writes, the Einsatz planning set,
 and a **method-scoped** `PUT` on `/operations/<uuid>` and `/orders/<uuid>` that keeps `DELETE` on
-both shut).
+both shut). `POST /api/v1/operations` (the Android app raises an Operation with it) is the first
+**collection** write: the path is admitted for every verb by the allow-list, but `$krt_collection_post`
+answers `404` for any verb but `POST` on exactly `/api/v1/operations` — so `GET` on the collection,
+`PUT`/`DELETE` and `/api/v1/operations/`, `/api/v1/operationsX` stay refused as before — and only the
+`POST` clears the read-only family. `scripts/check-edge-allowlist-behaviour.sh` runs the real nginx
+against that matrix in CI.
 
 **A refusal by this vhost is `404` or `405`, and which one is decided by order, not by family.** The
 allow-list's default deny runs first; the read-only guard runs after it. A path that is on no
@@ -3474,6 +3479,8 @@ narrowed against the allowlist the page itself renders, before it is relayed.
 | a Spring sort specification                             | `RelayParams.sortSpecOrNull`, relayed as a `{sort}` URI-template variable (the personal inventory listing did `URLEncoder.encode` first, so the comma went out as `%252C`) | REQ-API-005's backend field whitelist |
 | free text (`q`, the list pages' `search`)               | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
 | the mission / operation list period (`start`, `end`)    | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `MissionController#searchMissions`, `OperationController`                                                              |
+| an announcement id, a member id on the promotion eligibility fragment | `UUID`                           | `UserController#updateReadAnnouncement`, `PromotionEligibilityController`                                             |
+| a bank role bucket (`roleCode`), a default-blueprint id | `RelayParams.constantNameOrNull` (enum-literal shape, else `400`), `UUID` | `BankApprovalLimitService` role buckets, `AdminDefaultBlueprintController` |
 | the mission list `status`                               | narrowed to `PLANNED`/`ACTIVE`/`COMPLETED`/`CANCELLED` | the backend's mission status vocabulary                                                                          |
 | a star-system name (`starSystemNames`)                  | a `WebClient` URI-template variable            | REQ-UI-014's materials-matrix relay                                                                                    |
 
