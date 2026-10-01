@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKin
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -399,7 +400,7 @@ public class JobOrderItemService {
    */
   @NotNull
   public Page<GameItemReferenceDto> findOrderableItems(String search, @NotNull Pageable pageable) {
-    String q = search != null && !search.isBlank() ? search.strip() : "";
+    String q = search != null && !search.isBlank() ? LikePatterns.escape(search.strip()) : "";
     return blueprintRepository.findOrderableItems(q, pageable).map(this::gameItemRef);
   }
 

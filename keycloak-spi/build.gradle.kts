@@ -24,6 +24,7 @@ dependencies {
   testImplementation(platform(libs.junit.bom))
   testImplementation(libs.junit.jupiter)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.archunit.core) { exclude(group = "org.slf4j") }
   testImplementation(libs.mockito.junit.jupiter)
   "mockitoAgent"(libs.mockito.core)
   testImplementation(libs.keycloak.server.spi)

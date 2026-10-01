@@ -1431,9 +1431,8 @@ public class JobOrderWriteController {
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
     log.debug(
-        "JobOrder: Checking logistician status for user u-{}. Original authorities: {}."
+        "JobOrder: Checking logistician status. Original authorities: {}."
             + " Reachable authorities: {}",
-        Integer.toHexString(java.util.Objects.hashCode(principal.getName())),
         authorities,
         reachableAuthorities);
     boolean result =

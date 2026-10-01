@@ -943,6 +943,12 @@ ${UCTL} restart frontend.service                        # blocks until healthy; 
 journalctl CONTAINER_NAME=frontend --since -5m -o cat | grep 'Session type allow-list mode'   # ... mode: ENFORCE
 ```
 
+**Reading the effective mode** (no write needed): Grafana → Explore → Prometheus,
+`basetool_session_type_allow_list_mode == 1` returns one series per frontend instance whose `mode`
+label is the mode the process runs with (`enforce`, `report` or `off`). The refusal counter cannot
+show this, because it stays silent while nothing is refused. The same fact appears once per start as
+the Loki line `Session type allow-list mode: …` (`{app="frontend"} |= "Session type allow-list mode"`).
+
 **Expected effect:** none a member can see. Nobody is signed out by the restart, and every value the
 parity test and the E2E suite (which runs `enforce`) cover reads identically. Watch for an hour:
 `SessionTypeOutsideAllowList` and `SessionValueDropsSustained` stay silent, and

@@ -678,8 +678,21 @@ val testGenApiTypes =
     outputs.upToDateWhen { false }
   }
 
+val testPromotionCsvEscape =
+  tasks.register<NodeTask>("testPromotionCsvEscape") {
+    group = "verification"
+    description = "Regression tests for the promotion CSV export's formula-injection escaper."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/promotion-csv-escape.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/promotion-csv-escape.test.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/promotion-manage.js"))
+    outputs.upToDateWhen { false }
+  }
+
 tasks.named("check").configure {
   dependsOn(
+    testPromotionCsvEscape,
     lintCss,
     lintCssInline,
     lintProbeJs,

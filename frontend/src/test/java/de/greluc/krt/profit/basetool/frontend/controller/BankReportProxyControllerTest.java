@@ -28,13 +28,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -54,7 +55,12 @@ class BankReportProxyControllerTest {
   @Mock private WebClient.RequestHeadersSpec<?> requestHeadersSpec;
   @Mock private WebClient.ResponseSpec responseSpec;
 
-  @InjectMocks private BankReportProxyController controller;
+  private BankReportProxyController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller = new BankReportProxyController(RealBackendApiClient.over(webClient));
+  }
 
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})

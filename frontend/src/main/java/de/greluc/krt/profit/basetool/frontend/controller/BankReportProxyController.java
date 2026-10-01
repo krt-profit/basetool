@@ -19,14 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,9 +38,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
@@ -49,10 +48,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RestController
 @RequestMapping("/api/proxy/bank")
 @RequiredArgsConstructor
-@Slf4j
 public class BankReportProxyController {
 
-  private final WebClient webClient;
+  private final BackendApiClient backendApiClient;
 
   /**
    * Proxies the account statement download for a caller-chosen period.
@@ -103,35 +101,27 @@ public class BankReportProxyController {
    */
   private ResponseEntity<byte[]> fetchPdf(
       @NotNull String uri, String userTimeZone, @NotNull String filename) {
-    try {
-      byte[] pdf =
-          webClient
-              .get()
-              .uri(uri)
-              .headers(
-                  h -> {
-                    if (userTimeZone != null && !userTimeZone.isBlank()) {
-                      h.set("X-User-Time-Zone", userTimeZone);
-                    }
-                  })
-              .retrieve()
-              .bodyToMono(byte[].class)
-              .block();
+    byte[] pdf =
+        withBackendStatus(
+            () ->
+                backendApiClient.execute(
+                    HttpMethod.GET,
+                    uri,
+                    webClient ->
+                        webClient
+                            .get()
+                            .uri(uri)
+                            .headers(
+                                h -> {
+                                  if (userTimeZone != null && !userTimeZone.isBlank()) {
+                                    h.set("X-User-Time-Zone", userTimeZone);
+                                  }
+                                }),
+                    spec -> spec.bodyToMono(byte[].class)));
 
-      HttpHeaders headers = new HttpHeaders();
-      headers.setContentType(MediaType.APPLICATION_PDF);
-      headers.setContentDispositionFormData("attachment", filename);
-      return ResponseEntity.ok().headers(headers).body(pdf);
-    } catch (WebClientResponseException e) {
-      log.warn("Bank report proxy: backend returned {} for {}", e.getStatusCode(), uri);
-      throw new ResponseStatusException(e.getStatusCode(), e.getMessage());
-    } catch (ResponseStatusException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Bank report proxy: unexpected error for {}", uri, e);
-      throw new ResponseStatusException(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "An unexpected error occurred while generating the bank report.");
-    }
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_PDF);
+    headers.setContentDispositionFormData("attachment", filename);
+    return ResponseEntity.ok().headers(headers).body(pdf);
   }
 }

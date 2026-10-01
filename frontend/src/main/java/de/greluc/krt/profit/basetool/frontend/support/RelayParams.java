@@ -44,6 +44,9 @@ public final class RelayParams {
   private static final Pattern SORT_SPEC =
       Pattern.compile("[A-Za-z0-9_.]{1,64}(?:,(?:asc|desc|ASC|DESC))?");
 
+  /** An upper-case constant name such as an enum literal: {@code KOMMANDOLEITER}. */
+  private static final Pattern CONSTANT_NAME = Pattern.compile("[A-Z][A-Z0-9_]{0,63}");
+
   /** Non-instantiable holder of static relay-parameter checks. */
   private RelayParams() {}
 
@@ -77,6 +80,21 @@ public final class RelayParams {
   public static @Nullable String oneOfOrNull(
       @Nullable String raw, @NotNull Collection<String> allowed) {
     if (raw == null || raw.isBlank() || !allowed.contains(raw)) {
+      return null;
+    }
+    return raw;
+  }
+
+  /**
+   * Returns {@code raw} when it has the shape of an upper-case constant name (an enum literal such
+   * as a role bucket), otherwise {@code null}.
+   *
+   * @param raw the raw parameter value, may be {@code null} or blank
+   * @return {@code raw} when it matches {@code [A-Z][A-Z0-9_]{0,63}}, otherwise {@code null}
+   */
+  @Contract(value = "null -> null", pure = true)
+  public static @Nullable String constantNameOrNull(@Nullable String raw) {
+    if (raw == null || !CONSTANT_NAME.matcher(raw).matches()) {
       return null;
     }
     return raw;
