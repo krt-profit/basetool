@@ -2605,7 +2605,12 @@ does not have to be the only thing that does. Under operations the write that ma
 naming that one path rather than widening the family, because the guard is verb-blind by design.
 Later phases opened more writes the same way (the participation writes, the Einsatz planning set,
 and a **method-scoped** `PUT` on `/operations/<uuid>` and `/orders/<uuid>` that keeps `DELETE` on
-both shut).
+both shut). `POST /api/v1/operations` (the Android app raises an Operation with it) is the first
+**collection** write: the path is admitted for every verb by the allow-list, but `$krt_collection_post`
+answers `404` for any verb but `POST` on exactly `/api/v1/operations` — so `GET` on the collection,
+`PUT`/`DELETE` and `/api/v1/operations/`, `/api/v1/operationsX` stay refused as before — and only the
+`POST` clears the read-only family. `scripts/check-edge-allowlist-behaviour.sh` runs the real nginx
+against that matrix in CI.
 
 **A refusal by this vhost is `404` or `405`, and which one is decided by order, not by family.** The
 allow-list's default deny runs first; the read-only guard runs after it. A path that is on no

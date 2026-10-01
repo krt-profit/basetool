@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android: Operation anlegen funktioniert.** Die API-Domain lässt jetzt genau `POST /api/v1/operations` durch
+  (zuvor 404); `GET`, `PUT`, `DELETE` und ähnliche Pfade bleiben gesperrt. Der Aufruf ist Teil des eingefrorenen
+  App-Vertrags.
+
 ### Changed
 
 - **Deploy: nur ein Release auf einmal.** Die Promotion prüft alle fünf Artefakte und ihren gemeinsamen Quell-Commit, bevor sie `:stable` verschiebt; `deploy.sh` verweigert einen Satz aus verschiedenen Commits und versucht es im nächsten Tick erneut. Notausgang: `IRI_REQUIRE_ONE_RELEASE=false`.
