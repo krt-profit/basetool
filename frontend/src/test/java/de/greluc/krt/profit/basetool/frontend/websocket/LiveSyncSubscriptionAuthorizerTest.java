@@ -108,27 +108,31 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
-  void authorize_401_failsOpen() {
+  void authorize_401_failsClosed() {
     server.enqueue(new MockResponse().setResponseCode(401));
-    assertThat(authorizer.authorize(operationTopic, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(operationTopic, TOKEN, PIN))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
   }
 
   @Test
-  void authorize_5xx_failsOpen() {
+  void authorize_5xx_failsClosed() {
     server.enqueue(new MockResponse().setResponseCode(503));
-    assertThat(authorizer.authorize(operationTopic, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(operationTopic, TOKEN, PIN))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
   }
 
   @Test
-  void authorize_nullToken_allowsWithoutProbing() {
-    assertThat(authorizer.authorize(operationTopic, null, PIN)).isEqualTo(Decision.ALLOW);
+  void authorize_nullToken_failsClosedWithoutProbing() {
+    assertThat(authorizer.authorize(operationTopic, null, PIN))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
     assertThat(server.getRequestCount()).isZero();
   }
 
   @Test
-  void authorize_transportError_failsOpen() throws Exception {
+  void authorize_transportError_failsClosed() throws Exception {
     server.shutdown();
-    assertThat(authorizer.authorize(operationTopic, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(operationTopic, TOKEN, PIN))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
   }
 
   @Test
@@ -238,19 +242,74 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
-  void authorize_globalCapabilityProbeFails_failsOpen() {
+  void authorize_globalCapabilityProbeFails_failsClosed() {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
     server.enqueue(new MockResponse().setResponseCode(503));
 
-    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY_INDETERMINATE);
   }
 
   @Test
-  void authorize_globalCapabilityNullToken_allowsWithoutProbing() {
+  void authorize_globalCapabilityNullToken_failsClosedWithoutProbing() {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
 
-    assertThat(authorizer.authorize(orders, null, PIN)).isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(orders, null, PIN)).isEqualTo(Decision.DENY_INDETERMINATE);
     assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
+  void authorize_globalCapability403_denies() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(new MockResponse().setResponseCode(403));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
+  void authorize_globalCapability404_denies() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(new MockResponse().setResponseCode(404));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
+  void authorize_globalCapability401_failsClosed() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(new MockResponse().setResponseCode(401));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY_INDETERMINATE);
+  }
+
+  @Test
+  void authorize_authenticationOnlyClass_allowsWithoutTokenOrProbe() {
+    assertThat(authorizer.authorize(LiveSyncTopic.parse("missions"), null, null))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(LiveSyncTopic.parse("materialboard"), null, null))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
+  void indeterminate_isClosedForEveryClassThatNeedsACheck_andOpenOnlyForAuthenticationOnly() {
+    for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
+      boolean authenticationOnly =
+          topicClass == LiveSyncTopicClass.MATERIALBOARD
+              || topicClass == LiveSyncTopicClass.INVENTORY_ALL
+              || topicClass == LiveSyncTopicClass.MISSIONS_LIST
+              || topicClass == LiveSyncTopicClass.REFINERY
+              || topicClass == LiveSyncTopicClass.ORG_STRUCTURE;
+      assertThat(topicClass.needsCheck()).isEqualTo(!authenticationOnly);
+    }
+  }
+
+  @Test
+  void authorize_bankAccountPrimaryIndeterminate_failsClosedWithoutTryingTheFallback() {
+    LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(503));
+
+    assertThat(authorizer.authorize(bank, TOKEN, PIN)).isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(server.getRequestCount()).isEqualTo(1);
   }
 
   @Test
@@ -312,9 +371,10 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
-  void authorize_bankStaffNullAuthorities_failsOpen() {
+  void authorize_bankStaffNullAuthorities_failsClosed() {
     LiveSyncTopic staff = LiveSyncTopic.parse("bank");
-    assertThat(authorizer.authorize(staff, TOKEN, PIN, null)).isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(staff, TOKEN, PIN, null))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
   }
 
   @Test

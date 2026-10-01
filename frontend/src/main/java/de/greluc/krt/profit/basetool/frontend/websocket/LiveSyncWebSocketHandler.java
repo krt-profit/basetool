@@ -231,6 +231,22 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   static final int TERMS_CONSENT_REQUIRED_CODE = 4003;
 
+  /**
+   * Session-attribute key ({@link Instant}) holding the expiry of the access token captured at
+   * handshake. A subscribe on a socket whose token has lapsed closes the socket with {@link
+   * #TOKEN_EXPIRED}. Public so the interceptor can populate it.
+   */
+  public static final String ATTR_TOKEN_EXPIRES_AT = "livesync.tokenExpiresAt";
+
+  /**
+   * Close status {@code 4401} for a socket whose captured token and authorities have lapsed; the
+   * client reconnects, and the new handshake refreshes both before its topics are re-subscribed.
+   */
+  static final CloseStatus TOKEN_EXPIRED = new CloseStatus(4401, "token expired");
+
+  /** Safety margin before the token's expiry from which a subscribe already counts as lapsed. */
+  private static final Duration TOKEN_EXPIRY_SKEW = Duration.ofSeconds(5);
+
   /** Maximum close-reason length in UTF-8 bytes, the most a close frame can carry. */
   private static final int MAX_CLOSE_REASON_BYTES = 123;
 
@@ -307,7 +323,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * @param meterRegistry the registry the gauges and relay counters bind to
    * @param authorizer authorizes a {@code /ws/sync} subscribe to a topic
    * @param authExecutor runs subscribe-authorization probes off the container thread; a {@link
-   *     RejectedExecutionException} fails the subscribe open
+   *     RejectedExecutionException} resolves the subscribe as indeterminate
    */
   public LiveSyncWebSocketHandler(
       @NotNull LiveSyncPresenceService presenceService,
@@ -335,7 +351,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * @param meterRegistry the registry the gauges and relay counters bind to
    * @param authorizer authorizes a {@code /ws/sync} subscribe to a topic
    * @param authExecutor runs subscribe-authorization probes off the container thread; a {@link
-   *     RejectedExecutionException} fails the subscribe open
+   *     RejectedExecutionException} resolves the subscribe as indeterminate
    * @param nanoClock monotonic nanosecond source ({@link System#nanoTime()} in production)
    */
   LiveSyncWebSocketHandler(
@@ -607,7 +623,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   /**
    * Handles a {@code subscribe} frame: validates the topic, applies the rate limit, topic cap and
    * idempotency, then authorizes asynchronously on {@link #authExecutor}; a saturated executor
-   * fails the subscribe open.
+   * resolves the subscribe as indeterminate.
    *
    * @param session the subscribing session
    * @param node the parsed {@code subscribe} frame
@@ -637,6 +653,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       sendControlFrame(session, "subscribed", topic.canonical());
       return;
     }
+    if (tokenLapsed(session)) {
+      closeQuietly(session, TOKEN_EXPIRED);
+      return;
+    }
     if (subs.size() >= MAX_TOPICS_PER_SESSION) {
       droppedCounter(topic, MetricNames.DROPPED_TOPIC_CAP).increment();
       sendControlFrame(session, "denied", topic.canonical());
@@ -652,7 +672,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
           () -> authorizeAndRegister(session, topic, token, pin, authorities, subject));
     } catch (RejectedExecutionException e) {
       LiveSyncSubscriptionAuthorizer.Decision verdict =
-          LiveSyncSubscriptionAuthorizer.failOpen(topic);
+          LiveSyncSubscriptionAuthorizer.indeterminate(topic);
       droppedCounter(topic, MetricNames.DROPPED_AUTHORIZE_SATURATED).increment();
       log.warn(
           "Live-sync subscribe access check for topic {} was not scheduled (auth executor"
@@ -665,8 +685,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Runs the subscribe-authorization probe and applies its verdict; an unexpected exception
-   * resolves via {@link LiveSyncSubscriptionAuthorizer#failOpen(LiveSyncTopic)}, and a fail-closed
-   * indeterminate verdict is logged at WARN.
+   * resolves via {@link LiveSyncSubscriptionAuthorizer#indeterminate(LiveSyncTopic)}, and a
+   * fail-closed indeterminate verdict is logged at WARN.
    *
    * @param session the subscribing session
    * @param topic the topic being authorized
@@ -692,7 +712,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
             topic.canonical());
       }
     } catch (RuntimeException e) {
-      decision = LiveSyncSubscriptionAuthorizer.failOpen(topic);
+      decision = LiveSyncSubscriptionAuthorizer.indeterminate(topic);
       if (decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE) {
         log.warn(
             "Live-sync subscribe to topic {} failed closed: its access check threw",
@@ -700,7 +720,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
             e);
       } else {
         log.debug(
-            "Live-sync subscribe access check threw for {} (failing open by class)",
+            "Live-sync subscribe access check threw for authentication-only topic {}",
             topic.canonical(),
             e);
       }
@@ -923,6 +943,32 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static Set<String> subscriptions(@NotNull WebSocketSession session) {
     Object value = session.getAttributes().get(ATTR_SUBSCRIPTIONS);
     return value instanceof Set ? (Set<String>) value : null;
+  }
+
+  /**
+   * Reports whether the access token captured at handshake has expired, or is about to within
+   * {@link #TOKEN_EXPIRY_SKEW}; a socket without a recorded expiry is never lapsed here.
+   *
+   * @param session the session
+   * @return {@code true} when the captured token and authorities are stale
+   */
+  private static boolean tokenLapsed(@NotNull WebSocketSession session) {
+    return session.getAttributes().get(ATTR_TOKEN_EXPIRES_AT) instanceof Instant expiresAt
+        && !Instant.now().plus(TOKEN_EXPIRY_SKEW).isBefore(expiresAt);
+  }
+
+  /**
+   * Closes a session with the given status, tolerating one that is already gone.
+   *
+   * @param session the session to close
+   * @param status the close status carrying the client's reconnect instruction
+   */
+  private static void closeQuietly(@NotNull WebSocketSession session, @NotNull CloseStatus status) {
+    try {
+      session.close(status);
+    } catch (IOException | RuntimeException e) {
+      log.debug("Live-sync socket close with {} failed", status.getCode(), e);
+    }
   }
 
   /**

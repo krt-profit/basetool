@@ -17,6 +17,9 @@
 
 ### Security
 
+- **Live-Sync-Abo schlägt bei unklarem Ergebnis fehl, statt zu öffnen.** Bei 401, 5xx, Timeout, fehlendem Token
+  oder voller Prüfwarteschlange wird ein Abo nun abgelehnt (der Tab versucht es einmal erneut); Sockets mit
+  abgelaufenem Token werden geschlossen und verbinden sich mit frischem Token neu.
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
   Identity-Provider-Mapper), CVE-2026-14781, CVE-2026-19608 und CVE-2026-93999 (deaktivierte Clients im
   Token), dazu den Geräte-Login für brute-force-gesperrte Konten sowie Jackson und Netty im

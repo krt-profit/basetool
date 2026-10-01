@@ -39,9 +39,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * the access token and org-unit pin captured at the handshake as explicit headers.
  *
  * <p>Resource-scoped classes probe {@link LiveSyncTopicClass#authProbePath()}: 2xx allows, 403 or
- * 404 denies, anything else is resolved by {@link #failOpen(LiveSyncTopic)} (open, except closed
- * for presence-enabled classes). Global classes either require a {@link
- * LiveSyncTopicClass#capabilityField} or are authorized by the socket's authentication alone.
+ * 404 denies, anything else (401, 5xx, timeout, transport error, missing token) is resolved by
+ * {@link #indeterminate(LiveSyncTopic)}, which fails closed. Global classes either require a {@link
+ * LiveSyncTopicClass#capabilityField} (same rules), a local role check, or are authorized by the
+ * socket's authentication alone; only the last group is ever admitted without a verdict, because
+ * its verdict is {@link Decision#ALLOW} by definition.
  */
 @Slf4j
 @Component
@@ -54,7 +56,10 @@ public class LiveSyncSubscriptionAuthorizer {
    * once. Callers use {@link #denied()}.
    */
   public enum Decision {
-    /** The subscribe is authorized (or failed open on an indeterminate outcome). */
+    /**
+     * The subscribe is authorized, including a class authorized by the socket's authentication
+     * alone.
+     */
     ALLOW,
     /**
      * The subscribe is refused by an explicit authorization denial — a backend 403/404, a withheld
@@ -62,8 +67,9 @@ public class LiveSyncSubscriptionAuthorizer {
      */
     DENY,
     /**
-     * Refusal because the outcome was indeterminate and the topic class is presence-enabled, so it
-     * fails closed; indicates a backend or token availability problem, not a permission verdict.
+     * Refusal because the outcome was indeterminate (401, 5xx, timeout, transport error, missing
+     * token or authorities, saturated executor) for a class that needs a check; indicates a backend
+     * or token availability problem, not a permission verdict.
      */
     DENY_INDETERMINATE;
 
@@ -79,22 +85,23 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * Returns the verdict for an indeterminate authorization outcome: open for a non-presence class,
-   * closed for a presence-enabled one ({@link LiveSyncTopicClass#MISSION}), whose snapshot would
-   * disclose who is editing.
+   * Returns the verdict for an indeterminate authorization outcome: closed for every class that
+   * needs a check (a backend probe, a capability, a local role or the socket's own subject), open
+   * only for a class authorized by the socket's authentication alone, whose verdict is {@link
+   * Decision#ALLOW} regardless.
    *
    * @param topic the topic whose class decides the fail direction
-   * @return {@link Decision#ALLOW} for a non-presence class, {@link Decision#DENY_INDETERMINATE}
-   *     for a presence one
+   * @return {@link Decision#DENY_INDETERMINATE} for a class that needs a check, {@link
+   *     Decision#ALLOW} for an authentication-only class
    */
   @NotNull
-  static Decision failOpen(@NotNull LiveSyncTopic topic) {
-    return topic.topicClass().presenceEnabled() ? Decision.DENY_INDETERMINATE : Decision.ALLOW;
+  static Decision indeterminate(@NotNull LiveSyncTopic topic) {
+    return topic.topicClass().needsCheck() ? Decision.DENY_INDETERMINATE : Decision.ALLOW;
   }
 
   /**
    * Hard bound on a single authorization probe. A probe that has not answered within this window is
-   * abandoned and the subscribe fails open, so one slow/hung backend read cannot pin an
+   * abandoned and the subscribe fails closed, so one slow/hung backend read cannot pin an
    * auth-executor thread indefinitely.
    */
   private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(3);
@@ -111,12 +118,12 @@ public class LiveSyncSubscriptionAuthorizer {
    * LiveSyncTopicClass#capabilityField()}, and socket authentication alone otherwise.
    *
    * @param topic the parsed topic being subscribed to
-   * @param accessToken the access token captured at handshake, or {@code null} (then fails open)
+   * @param accessToken the access token captured at handshake, or {@code null} (then a class that
+   *     needs a probe fails closed)
    * @param activeOrgUnitId the org-unit pin captured at handshake, relayed as {@code
    *     X-Active-Org-Unit-Id}, or {@code null}
-   * @return {@link Decision#ALLOW}, including every fail-open case; {@link Decision#DENY} on an
-   *     explicit 403/404 or withheld capability; or {@link Decision#DENY_INDETERMINATE} when a
-   *     presence-enabled class failed closed
+   * @return {@link Decision#ALLOW}; {@link Decision#DENY} on an explicit 403/404 or withheld
+   *     capability; or {@link Decision#DENY_INDETERMINATE} when the outcome was indeterminate
    */
   @NotNull
   public Decision authorize(
@@ -132,10 +139,10 @@ public class LiveSyncSubscriptionAuthorizer {
    * @param accessToken the access token captured at handshake, or {@code null}
    * @param activeOrgUnitId the org-unit pin captured at handshake, or {@code null}
    * @param authorities the authorities captured at handshake, or {@code null} (then a role-gated
-   *     room fails open)
-   * @return {@link Decision#ALLOW}, including every fail-open case; {@link Decision#DENY} on an
-   *     explicit backend refusal, withheld capability or missing role; or {@link
-   *     Decision#DENY_INDETERMINATE} when a presence-enabled class failed closed
+   *     room fails closed)
+   * @return {@link Decision#ALLOW}; {@link Decision#DENY} on an explicit backend refusal, withheld
+   *     capability or missing role; or {@link Decision#DENY_INDETERMINATE} when the outcome was
+   *     indeterminate
    */
   @NotNull
   public Decision authorize(
@@ -156,9 +163,9 @@ public class LiveSyncSubscriptionAuthorizer {
    * @param authorities the authorities captured at handshake, or {@code null}
    * @param subject the socket's own user id captured at handshake, or {@code null} (then a personal
    *     room is refused)
-   * @return {@link Decision#ALLOW}, including every fail-open case of a shared room; {@link
-   *     Decision#DENY} on an explicit refusal, a missing role or a personal room of someone else;
-   *     or {@link Decision#DENY_INDETERMINATE} when a presence-enabled class failed closed
+   * @return {@link Decision#ALLOW}; {@link Decision#DENY} on an explicit refusal, a missing role or
+   *     a personal room of someone else; or {@link Decision#DENY_INDETERMINATE} when the outcome
+   *     was indeterminate
    */
   @NotNull
   public Decision authorize(
@@ -173,7 +180,7 @@ public class LiveSyncSubscriptionAuthorizer {
     Set<String> requiredAnyRole = topic.topicClass().requiredAnyRole();
     if (requiredAnyRole != null) {
       if (authorities == null) {
-        return failOpen(topic);
+        return indeterminate(topic);
       }
       for (String role : requiredAnyRole) {
         if (authorities.contains(role)) {
@@ -191,7 +198,7 @@ public class LiveSyncSubscriptionAuthorizer {
       return Decision.ALLOW;
     }
     if (accessToken == null || accessToken.isBlank()) {
-      return failOpen(topic);
+      return indeterminate(topic);
     }
     if (topic.resourceId() != null) {
       String resource = topic.resourceId().toString();
@@ -234,7 +241,7 @@ public class LiveSyncSubscriptionAuthorizer {
 
   /**
    * Runs a single per-resource authorization read: a 2xx allows, an explicit 403/404 denies,
-   * anything else (401/5xx/timeout/transport) fails open.
+   * anything else (401/5xx/timeout/transport) is indeterminate and fails closed.
    *
    * @param topic the topic (for logging)
    * @param uri the resolved resource read URI
@@ -261,23 +268,19 @@ public class LiveSyncSubscriptionAuthorizer {
         return Decision.DENY;
       }
       log.debug(
-          "Live-sync subscribe indeterminate on transient backend status {} for topic {}",
+          "Live-sync subscribe indeterminate on backend status {} for topic {}",
           status,
           topic.canonical());
-      return failOpen(topic);
+      return indeterminate(topic);
     } catch (RuntimeException e) {
-      log.debug(
-          "Live-sync subscribe access probe failed for topic {} (fail-open direction by"
-              + " class)",
-          topic.canonical(),
-          e);
-      return failOpen(topic);
+      log.debug("Live-sync subscribe access probe failed for topic {}", topic.canonical(), e);
+      return indeterminate(topic);
     }
   }
 
   /**
-   * Runs a capability read and requires {@code field} to be {@code true}; a withheld capability
-   * denies, and a failed read fails open.
+   * Runs a capability read and requires {@code field} to be {@code true}; a withheld capability or
+   * an explicit 403/404 denies, and any other failed read is indeterminate and fails closed.
    *
    * @param topic the topic, for logging
    * @param path the capabilities endpoint
@@ -306,12 +309,23 @@ public class LiveSyncSubscriptionAuthorizer {
         return Decision.DENY;
       }
       return Decision.ALLOW;
-    } catch (RuntimeException e) {
+    } catch (WebClientResponseException e) {
+      int status = e.getStatusCode().value();
+      if (status == 403 || status == 404) {
+        log.debug(
+            "Live-sync subscribe denied for global topic {} (backend {})",
+            topic.canonical(),
+            status);
+        return Decision.DENY;
+      }
       log.debug(
-          "Live-sync capability probe failed for topic {} (fail-open direction by class)",
-          topic.canonical(),
-          e);
-      return failOpen(topic);
+          "Live-sync capability probe indeterminate on backend status {} for topic {}",
+          status,
+          topic.canonical());
+      return indeterminate(topic);
+    } catch (RuntimeException e) {
+      log.debug("Live-sync capability probe failed for topic {}", topic.canonical(), e);
+      return indeterminate(topic);
     }
   }
 

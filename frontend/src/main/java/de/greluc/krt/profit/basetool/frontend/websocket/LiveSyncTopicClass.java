@@ -473,4 +473,14 @@ public enum LiveSyncTopicClass {
   public boolean selfOnly() {
     return selfOnly;
   }
+
+  /**
+   * Reports whether a subscribe needs an authorization check beyond the socket's own
+   * authentication: a backend probe, a local role check or the personal-room subject check.
+   *
+   * @return {@code false} only for a class authorized by the socket's authentication alone
+   */
+  public boolean needsCheck() {
+    return authProbePath != null || requiredAnyRole != null || selfOnly;
+  }
 }

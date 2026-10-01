@@ -44,9 +44,9 @@ tests:
               reason: throttled
             exp_annotations:
               summary: "Live-sync relay dropping frames on mission (throttled)"
-              description: "The live-sync relay dropped more than 3 frames in an hour on topic class mission for reason throttled, sustained for 15m — peers on that surface are silently missing updates. Prod baseline for this counter is zero over 21d, so any sustained stream is anomalous. `throttled`/`topic_throttled`: a client or a room is exceeding its token bucket (misbehaving client, or a genuinely hot room needing a wider bound). `send_failed`: sockets breaking mid-write — check the reverse proxy's WebSocket timeouts. `topic_cap`: a client subscribing past its per-session topic cap (client bug). `authorize_saturated`: the subscribe-authorization executor is saturated and subscribes are failing OPEN — a subscribe was admitted without an authorization check, so treat it as security-relevant and check backend latency."
+              description: "The live-sync relay dropped more than 3 frames in an hour on topic class mission for reason throttled, sustained for 15m — peers on that surface are silently missing updates. Prod baseline for this counter is zero over 21d, so any sustained stream is anomalous. `throttled`/`topic_throttled`: a client or a room is exceeding its token bucket (misbehaving client, or a genuinely hot room needing a wider bound). `send_failed`: sockets breaking mid-write — check the reverse proxy's WebSocket timeouts. `topic_cap`: a client subscribing past its per-session topic cap (client bug). `authorize_saturated`: the subscribe-authorization executor is saturated and subscribes are failing CLOSED (refused as indeterminate, so those tabs lose live updates for the topic) — check backend latency."
 
-  - name: fires - authorize_saturated fail-open stream
+  - name: fires - authorize_saturated fail-closed stream
     interval: 1m
     input_series:
       - series: 'basetool_presence_relay_dropped_total{job="basetool-frontend", topic_class="order_detail", reason="authorize_saturated"}'
@@ -61,7 +61,7 @@ tests:
               reason: authorize_saturated
             exp_annotations:
               summary: "Live-sync relay dropping frames on order_detail (authorize_saturated)"
-              description: "The live-sync relay dropped more than 3 frames in an hour on topic class order_detail for reason authorize_saturated, sustained for 15m — peers on that surface are silently missing updates. Prod baseline for this counter is zero over 21d, so any sustained stream is anomalous. `throttled`/`topic_throttled`: a client or a room is exceeding its token bucket (misbehaving client, or a genuinely hot room needing a wider bound). `send_failed`: sockets breaking mid-write — check the reverse proxy's WebSocket timeouts. `topic_cap`: a client subscribing past its per-session topic cap (client bug). `authorize_saturated`: the subscribe-authorization executor is saturated and subscribes are failing OPEN — a subscribe was admitted without an authorization check, so treat it as security-relevant and check backend latency."
+              description: "The live-sync relay dropped more than 3 frames in an hour on topic class order_detail for reason authorize_saturated, sustained for 15m — peers on that surface are silently missing updates. Prod baseline for this counter is zero over 21d, so any sustained stream is anomalous. `throttled`/`topic_throttled`: a client or a room is exceeding its token bucket (misbehaving client, or a genuinely hot room needing a wider bound). `send_failed`: sockets breaking mid-write — check the reverse proxy's WebSocket timeouts. `topic_cap`: a client subscribing past its per-session topic cap (client bug). `authorize_saturated`: the subscribe-authorization executor is saturated and subscribes are failing CLOSED (refused as indeterminate, so those tabs lose live updates for the topic) — check backend latency."
 
   - name: fires - persistent section-key skew at low volume
     interval: 5m

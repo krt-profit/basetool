@@ -270,6 +270,20 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
   peers it exists for. So `LiveSyncSectionMapParityTest` pins the surviving client call's keys
   against the target room's whitelist *and* asserts the server-owned ones are absent.
 
+## Amendment 2026-10-01 — subscribe authorization fails closed
+
+The "open for a non-presence class" fail direction of the Decision section is **withdrawn**
+(audit S-06). An indeterminate outcome — a 401, a 5xx, a probe timeout or transport error, a
+missing or expired captured token, missing captured authorities for a role-gated room, a saturated
+authorizer executor — now refuses the subscribe with reason `indeterminate` for **every** class
+that needs a check (`LiveSyncTopicClass#needsCheck`: a backend probe, a capability, a local role or
+the personal-room subject); the `orders` capability probe also denies on 403/404. The one remaining
+admission without a verdict is a class authorized by the socket's authentication alone, whose
+verdict is `ALLOW` anyway. Because the handshake token and authorities are a snapshot, a
+`subscribe` on a socket whose recorded token expiry has passed (5 s skew) closes the socket with
+code `4401`; the client reconnects, the handshake refreshes token and authorities, and the topics
+are re-subscribed. The publish side, the bounds and the rest of the decision are unchanged.
+
 ## Alternatives considered
 
 - **Per-resource sockets (straight generalization of ADR-0031).** Rejected: cannot express

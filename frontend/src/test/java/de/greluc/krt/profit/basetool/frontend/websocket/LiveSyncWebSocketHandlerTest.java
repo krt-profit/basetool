@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +41,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.security.Principal;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -553,7 +555,7 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void multiplexedSubscribe_executorSaturated_failsOpenAndCounts() throws Exception {
+  void multiplexedSubscribe_executorSaturated_failsClosedAndCounts() throws Exception {
     SimpleMeterRegistry reg2 = new SimpleMeterRegistry();
     LiveSyncPresenceService svc2 = new LiveSyncPresenceService(reg2);
     LiveSyncSubscriptionAuthorizer denyAll = mock(LiveSyncSubscriptionAuthorizer.class);
@@ -582,7 +584,7 @@ class LiveSyncWebSocketHandlerTest {
     saturated.handleTextMessage(
         bob, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"" + operationTopic() + "\"}"));
 
-    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("subscribed");
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
     var counter =
         reg2.find(MetricNames.PRESENCE_RELAY_DROPPED)
             .tag(MetricNames.TAG_REASON, MetricNames.DROPPED_AUTHORIZE_SATURATED)
@@ -609,7 +611,7 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void multiplexedSubscribe_authorizerThrows_failsOpen() throws Exception {
+  void multiplexedSubscribe_probeClassAuthorizerThrows_failsClosed() throws Exception {
     LiveSyncSubscriptionAuthorizer throwing = mock(LiveSyncSubscriptionAuthorizer.class);
     when(throwing.authorize(any(), any(), any(), any(), any()))
         .thenThrow(new IllegalStateException("probe blew up"));
@@ -618,7 +620,49 @@ class LiveSyncWebSocketHandlerTest {
     LiveSyncWebSocketHandler h =
         new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, throwing, Runnable::run);
 
-    String topic = operationTopic();
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    h.afterConnectionEstablished(bob);
+    h.handleTextMessage(bob, subscribeFrame(operationTopic()));
+
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+  }
+
+  @Test
+  void multiplexedSubscribe_subscribeAfterTokenExpiry_closesTheSocketForReconnect()
+      throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    bob.attributes.put(
+        LiveSyncWebSocketHandler.ATTR_TOKEN_EXPIRES_AT, Instant.now().minusSeconds(1));
+
+    subscribe(bob, operationTopic());
+
+    assertThat(bob.closeStatus).isEqualTo(LiveSyncWebSocketHandler.TOKEN_EXPIRED);
+    verify(authorizer, never()).authorize(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void multiplexedSubscribe_tokenStillValid_isAuthorizedNormally() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    bob.attributes.put(
+        LiveSyncWebSocketHandler.ATTR_TOKEN_EXPIRES_AT, Instant.now().plusSeconds(120));
+
+    subscribe(bob, operationTopic());
+
+    assertThat(bob.closeStatus).isNull();
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("subscribed");
+  }
+
+  @Test
+  void multiplexedSubscribe_authenticationOnlyClassAuthorizerThrows_staysOpen() throws Exception {
+    LiveSyncSubscriptionAuthorizer throwing = mock(LiveSyncSubscriptionAuthorizer.class);
+    when(throwing.authorize(any(), any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("probe blew up"));
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, throwing, Runnable::run);
+
+    String topic = "missions";
     FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
     h.afterConnectionEstablished(bob);
     h.handleTextMessage(bob, subscribeFrame(topic));
@@ -627,8 +671,8 @@ class LiveSyncWebSocketHandlerTest {
     bob.sent.clear();
     FakeSession alice = multiplexedSession(oidcUser("user-1", "Alice"));
     h.afterConnectionEstablished(alice);
-    h.handleTextMessage(alice, changedFrame(topic, "overview"));
-    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("overview");
+    h.handleTextMessage(alice, changedFrame(topic, "list"));
+    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("list");
   }
 
   @Test
@@ -1204,7 +1248,8 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void multiplexedSubscribe_authorizerThrowsOnFailOpenClass_staysAtDebug() throws Exception {
+  void multiplexedSubscribe_authorizerThrowsOnAuthenticationOnlyClass_staysAtDebug()
+      throws Exception {
     LiveSyncSubscriptionAuthorizer throwing = mock(LiveSyncSubscriptionAuthorizer.class);
     when(throwing.authorize(any(), any(), any(), any(), any()))
         .thenThrow(new IllegalStateException("probe blew up"));
@@ -1216,7 +1261,7 @@ class LiveSyncWebSocketHandlerTest {
     FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
     h.afterConnectionEstablished(bob);
     logAppender.list.clear();
-    h.handleTextMessage(bob, subscribeFrame(operationTopic()));
+    h.handleTextMessage(bob, subscribeFrame("missions"));
 
     assertThat(logAppender.list).noneMatch(e -> e.getLevel().isGreaterOrEqual(Level.WARN));
   }

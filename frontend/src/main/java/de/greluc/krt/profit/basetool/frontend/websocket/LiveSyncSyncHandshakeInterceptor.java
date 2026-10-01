@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.TermsGateHandoff;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -53,8 +54,9 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
  * token, the active-org-unit pin ({@link ActiveSquadronContext}) and the caller's authorities. The
  * token is obtained through the single-flight authorized-client manager, so an expired one is
  * refreshed before it is captured (REQ-SEC-012). It also relays the consent gate's mark via {@link
- * #relayTermsGate}. A missing token or pin never blocks the handshake; the affected subscribes fail
- * open, or closed for a presence-enabled class.
+ * #relayTermsGate}. A missing or already expired token never blocks the handshake and is not
+ * captured; subscribes that need a backend probe then fail closed. The token's expiry is recorded
+ * so the handler can end the socket once the token and authorities are stale.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -116,8 +118,15 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
                         HttpServletResponse.class.getName(), servletResponse.getServletResponse())
                     .build());
         if (client != null && client.getAccessToken() != null) {
-          attributes.put(
-              LiveSyncWebSocketHandler.ATTR_ACCESS_TOKEN, client.getAccessToken().getTokenValue());
+          Instant expiresAt = client.getAccessToken().getExpiresAt();
+          if (expiresAt == null || expiresAt.isAfter(Instant.now())) {
+            attributes.put(
+                LiveSyncWebSocketHandler.ATTR_ACCESS_TOKEN,
+                client.getAccessToken().getTokenValue());
+            if (expiresAt != null) {
+              attributes.put(LiveSyncWebSocketHandler.ATTR_TOKEN_EXPIRES_AT, expiresAt);
+            }
+          }
         }
       }
     } catch (RuntimeException e) {

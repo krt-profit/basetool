@@ -1291,13 +1291,22 @@ operation forwards nothing.
 
 **Authorization is asymmetric by design (ADR-0094).** *Subscribing* to a topic requires the same
 authenticated read the page itself performs (table above), checked asynchronously off the WS
-container thread; an explicit 403/404 denies, transient failures and authorizer saturation fail
-open (safe: no data rides the socket, every fragment re-fetch re-authorizes per viewer) — except for
-the presence-enabled `mission` class, which fails **closed** because its snapshot names the editors.
-The probes carry the bearer captured at the handshake, and the handshake obtains it through the
-single-flight authorized-client manager (REQ-SEC-012), which **refreshes a lapsed access token**
-first: a tab that reconnects after sitting idle past the token's lifespan would otherwise probe with
-an expired token, get a `401`, and lose the mission room to the fail-closed rule.
+container thread; an explicit 403/404 denies. **Every other outcome fails closed** (since
+2026-10-01, ADR-0094 amendment): a `401`, a `5xx`, a probe timeout or transport error, a missing or
+already-expired captured token, missing captured authorities for a role-gated room and a saturated
+authorizer executor all answer `denied` with reason `indeterminate`, which the client retries once.
+This holds for every resource probe (`mission`, `operation`, `order`, `refinery-order`, `bank:{id}`),
+the `orders` capability probe (which also denies on 403/404) and the locally role-gated rooms. The
+**only** rooms admitted without a verdict are those authorized by the socket's authentication alone
+(`materialboard`, `inventory`, `missions`, `refinery`, `org-structure`): no data rides the socket and
+every fragment re-fetch re-authorizes per viewer, so their verdict is `ALLOW` by definition
+(`LiveSyncTopicClass#needsCheck`). The probes carry the bearer captured at the handshake, and the
+handshake obtains it through the single-flight authorized-client manager (REQ-SEC-012), which
+**refreshes a lapsed access token** first and records its expiry (an already-expired token is not
+captured). A `subscribe` on a socket whose captured token has lapsed (5 s skew) closes the socket
+with code `4401` before any probe; the client reconnects, the new handshake refreshes token and
+authorities, and the topics are re-subscribed — so a long-lived tab keeps live updates, and a
+revoked role or session cannot ride a stale handshake indefinitely.
 *Publishing* a `changed` frame requires only an authenticated socket, a known topic, the topic
 class's section whitelist and the per-session token bucket — **no subscription**: a requester
 creating an order must be able to signal the staff queue it may not read, and an org-unit owner
