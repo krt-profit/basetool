@@ -27,6 +27,11 @@
 
 ### Fixed
 
+- **Backend-Fehler auf Seiten und Downloads tragen den richtigen HTTP-Status.** Die Fehlerseite für eine
+  Backend-Ablehnung kam bei Navigation oder einfachem `fetch` mit Status 200 statt 404/403/409/…; ein Download, der
+  `response.ok` prüft (Übergabeprotokoll), hätte die Fehlerseite als Dokument gespeichert. AJAX-Antworten
+  (JSON) waren schon korrekt.
+
 - **Android: Operation anlegen funktioniert.** Die API-Domain lässt jetzt genau `POST /api/v1/operations` durch
   (zuvor 404); `GET`, `PUT`, `DELETE` und ähnliche Pfade bleiben gesperrt. Der Aufruf ist Teil des eingefrorenen
   App-Vertrags.
@@ -74,14 +79,18 @@
 - **Keycloak-Verbindung von Backend und Ingest mit Zeitlimits.** Der an das Zertifikat gepinnte Client
   (Admin-API und JWKS-Abruf) wartete unbegrenzt auf Keycloak; er nutzt jetzt 5 s Verbindungs- und
   30 s (Ingest 10 s) Lese-Timeout.
+
 - **Lager- und Hangar-Rollenprüfung zusätzlich an den Endpunkten.** 13 Lager- und 2 Hangar-Endpunkte
   waren nur über die URL-Regel geschützt; dieselbe Rollenprüfung steht jetzt auch an der Methode, die
   URL-Regel bleibt. Wer Zugriff hat, ändert sich nicht.
+
 - **Katalogsuchen behandeln `%` und `_` wörtlich.** Die Produktsuche der Blaupausen sowie die
   Artikelauswahl für Aufträge und Lager übergaben Eingaben ungeschützt an `LIKE`; die Blaupausen-Abfragen
   setzen zusätzlich `ESCAPE`, ohne das Hibernate das Escape-Zeichen abschaltet.
+
 - **Log-Level zur Laufzeit wieder per Bearer-Token änderbar.** `POST /actuator/loggers/**` scheiterte
   in Produktion am CSRF-Schutz mit 403; der Pfad ist jetzt wie `/api/v1/**` ausgenommen.
+
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
   Zertifikate liest, fällt nicht mehr auf ein ungepinntes PostgreSQL-Image zurück; ohne lesbaren
   `@sha256:`-Pin endet der Lauf mit `FATAL`, `BackupStaleOrMissing` greift weiter.

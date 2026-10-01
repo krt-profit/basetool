@@ -138,7 +138,9 @@ class GlobalExceptionHandlerTest {
 
     Object result = handler.handleBackendServiceException(ex, htmlRequest(), model);
 
-    assertEquals("error/error", result);
+    ModelAndView page = assertInstanceOf(ModelAndView.class, result);
+    assertEquals("error/error", page.getViewName());
+    assertEquals(HttpStatus.FORBIDDEN, page.getStatus());
     assertEquals("error.403.title", model.getAttribute("error"));
     assertEquals("error.forbidden", model.getAttribute("message"));
     assertEquals("403", model.getAttribute("status"));
@@ -591,7 +593,9 @@ class GlobalExceptionHandlerTest {
 
     Object result = handler.handleBackendServiceException(ex, htmlRequest(), model);
 
-    assertEquals("error/error", result);
+    ModelAndView page = assertInstanceOf(ModelAndView.class, result);
+    assertEquals("error/error", page.getViewName());
+    assertEquals(HttpStatus.FORBIDDEN, page.getStatus());
     assertEquals("error.forbidden.unauthenticated", model.getAttribute("message"));
     assertEquals(Boolean.TRUE, model.getAttribute("unauthenticated"));
   }
