@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android: Operation anlegen funktioniert.** Die API-Domain lässt jetzt genau `POST /api/v1/operations` durch
+  (zuvor 404); `GET`, `PUT`, `DELETE` und ähnliche Pfade bleiben gesperrt. Der Aufruf ist Teil des eingefrorenen
+  App-Vertrags.
+
 ### Changed
 
 - **Keycloak 26.8.0.** Neues Image `quay.io/keycloak/keycloak:26.8`; Provider-JAR, Theme und Realm laufen
