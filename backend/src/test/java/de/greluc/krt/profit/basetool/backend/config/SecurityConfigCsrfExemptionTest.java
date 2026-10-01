@@ -70,6 +70,7 @@ class SecurityConfigCsrfExemptionTest {
         "/api/v1/missions/00000000-0000-4000-8000-00000000cafe/join",
         "/api/v1/operations/00000000-0000-4000-8000-00000000cafe/payouts/paid-out",
         "/internal/discord/link",
+        "/actuator/loggers/de.greluc.krt.profit.basetool",
       })
   @DisplayName("a bearer-only write is never refused for a missing CSRF token")
   void bearerWritesAreExempt(String uri) {

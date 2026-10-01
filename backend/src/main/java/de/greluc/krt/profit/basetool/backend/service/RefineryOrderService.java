@@ -89,6 +89,7 @@ public class RefineryOrderService {
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final JobOrderRepository jobOrderRepository;
+  private final JobOrderItemService jobOrderItemService;
   private final RefineryYieldRepository refineryYieldRepository;
   private final OwnerScopeService ownerScopeService;
   private final AuditService auditService;
@@ -259,7 +260,8 @@ public class RefineryOrderService {
 
   /**
    * Persists a new refinery order owned by the given user, validating every referenced id and that
-   * the location hosts a refinery.
+   * the location hosts a refinery. The order is always created {@code OPEN} and unstored; a
+   * client-supplied status is ignored.
    *
    * @param userId owner id
    * @param order transient entity with shallow id-only references
@@ -278,6 +280,8 @@ public class RefineryOrderService {
       @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
     order.setId(null);
     order.setVersion(null);
+    order.setStatus(RefineryOrderStatus.OPEN);
+    order.setStoredAt(null);
 
     User user = Entities.require(userRepository.findById(userId), "error.user.not_found");
 
@@ -374,6 +378,7 @@ public class RefineryOrderService {
    * @throws AccessDeniedException when the caller is neither owner nor logistician
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
+   * @throws BadRequestException when the order is already stored and the status would change
    * @throws MissionParticipantRequiredException when the mission is changed to one the owner does
    *     not take part in (REQ-SEC-042)
    */
@@ -393,6 +398,12 @@ public class RefineryOrderService {
             || order.getOwner().getId() == null
             || !order.getOwner().getId().equals(userId))) {
       throw new AccessDeniedException("Access denied: You do not own this refinery order");
+    }
+
+    if (order.getStoredAt() != null
+        && details.getStatus() != null
+        && details.getStatus() != order.getStatus()) {
+      throw new BadRequestException("error.refinery_order.stored_status_locked");
     }
 
     if (details.getLocation() != null && details.getLocation().getId() != null) {
@@ -549,7 +560,8 @@ public class RefineryOrderService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the order or any
    *     referenced id is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the order is
-   *     already stored, has no output goods, or an item combines {@code personal} with a job order
+   *     already stored, has no output goods, an item combines {@code personal} with a job order, or
+   *     an item names a job order that does not require its material
    */
   @Transactional
   public void storeRefineryOrder(
@@ -559,7 +571,7 @@ public class RefineryOrderService {
       boolean isLogistician) {
     RefineryOrder order = getRefineryOrder(orderId);
 
-    if (order.getStatus() == RefineryOrderStatus.COMPLETED) {
+    if (order.getStoredAt() != null || order.getStatus() == RefineryOrderStatus.COMPLETED) {
       throw new BadRequestException("error.refinery_order.already_stored");
     }
 
@@ -620,6 +632,7 @@ public class RefineryOrderService {
             Entities.require(
                 jobOrderRepository.findById(itemDto.jobOrderId()),
                 () -> "JobOrder not found: " + itemDto.jobOrderId());
+        assertMaterialRequiredByJobOrder(mat, jobOrder);
       }
 
       final OrgUnit owningOrgUnit =
@@ -662,6 +675,7 @@ public class RefineryOrderService {
     }
 
     order.setStatus(RefineryOrderStatus.COMPLETED);
+    order.setStoredAt(Instant.now());
     refineryOrderRepository.save(order);
     auditService.record(
         AuditEventType.REFINERY_ORDER_STORED,
@@ -670,6 +684,26 @@ public class RefineryOrderService {
         order.getOwner() != null ? order.getOwner().getId() : null,
         AuditDetails.of("items", dto.items().size())
             .with("status", previousStatus + "->COMPLETED"));
+  }
+
+  /**
+   * Rejects earmarking refinery output for a job order that does not require its material, as the
+   * inventory create path does (REQ-ORDERS-018).
+   *
+   * @param material the output material being booked
+   * @param jobOrder the order the new inventory row is earmarked for
+   * @throws BadRequestException when the order does not require the material
+   */
+  private void assertMaterialRequiredByJobOrder(
+      @NotNull Material material, @NotNull JobOrder jobOrder) {
+    if (!jobOrderItemService.requiredMaterialIds(jobOrder).contains(material.getId())) {
+      throw new BadRequestException(
+          "Material "
+              + material.getId()
+              + " is not required by job order "
+              + jobOrder.getId()
+              + "; an inventory item can only be linked to an order that needs its material.");
+    }
   }
 
   /**

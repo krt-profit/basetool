@@ -33,6 +33,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>E-mail addresses become {@code ***@***.***}.
  *   <li>Values after {@code bearer}, {@code token}, {@code session-id} or {@code authorization}
  *       followed by a separator become {@code ***}.
+ *   <li>Values after {@code password}, {@code passwd} or {@code secret} followed by {@code :} or
+ *       {@code =} become {@code ***}.
  * </ul>
  *
  * <p>Replacements contain no quotes or backslashes, so masked JSON stays valid.
@@ -47,8 +49,18 @@ public final class PiiMasker {
       "(?i)(bearer\\s+|(?:token|session[-_]?id|authorization)"
           + "(?:\\s*[:=]\\s*|\\s+)(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.+/=]+)";
 
+  private static final String CREDENTIAL_PATTERN =
+      "(?i)((?:password|passwd|secret)[\"']?\\s*[:=]\\s*[\"']?)([^\\s,;\"'&)\\]}]+)";
+
   private static final Pattern PII_PATTERN =
-      Pattern.compile(JWT_PATTERN + "|" + EMAIL_PATTERN + "|" + KEYWORD_TOKEN_PATTERN);
+      Pattern.compile(
+          JWT_PATTERN
+              + "|"
+              + EMAIL_PATTERN
+              + "|"
+              + KEYWORD_TOKEN_PATTERN
+              + "|"
+              + CREDENTIAL_PATTERN);
 
   private PiiMasker() {}
 
@@ -79,6 +91,8 @@ public final class PiiMasker {
         matcher.appendReplacement(sb, "***@***.***");
       } else if (matcher.group(3) != null && matcher.group(4) != null) {
         matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(3)) + "***");
+      } else if (matcher.group(5) != null && matcher.group(6) != null) {
+        matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(5)) + "***");
       }
     }
     matcher.appendTail(sb);

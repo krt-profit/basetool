@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Unit tests for {@link BackendErrorResponses}: the shared {@code problem+json} relay shape and the
@@ -137,5 +140,58 @@ class BackendErrorResponsesTest {
             ArgumentMatchers.anyString(),
             ArgumentMatchers.eq("risky thing"),
             ArgumentMatchers.eq(boom));
+  }
+
+  /** The re-authentication signal reaches the global handler instead of becoming an empty 500. */
+  @Test
+  void relay_letsTheReauthenticationSignalThrough() {
+    Logger log = mock(Logger.class);
+    ReauthenticationRequiredException signal =
+        new ReauthenticationRequiredException("token unusable", null);
+
+    assertThatThrownBy(
+            () ->
+                BackendErrorResponses.relay(
+                    log,
+                    "risky thing",
+                    () -> {
+                      throw signal;
+                    }))
+        .isSameAs(signal);
+    verifyNoInteractions(log);
+  }
+
+  /** A backend refusal reaches a status-reading caller with the backend's status. */
+  @Test
+  void withBackendStatus_rethrowsARefusalWithTheBackendStatus() {
+    BackendServiceException refusal =
+        new BackendServiceException("conflict", null, 409, "CONFLICT", null, List.of(), null);
+
+    assertThatThrownBy(
+            () ->
+                BackendErrorResponses.withBackendStatus(
+                    () -> {
+                      throw refusal;
+                    }))
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> assertThat(e.getStatusCode().value()).isEqualTo(409))
+        .hasCause(refusal);
+  }
+
+  /** A result and the re-authentication signal pass through {@code withBackendStatus} untouched. */
+  @Test
+  void withBackendStatus_passesResultAndReauthenticationThrough() {
+    assertThat(BackendErrorResponses.withBackendStatus(() -> "ok")).isEqualTo("ok");
+    ReauthenticationRequiredException signal =
+        new ReauthenticationRequiredException("token unusable", null);
+
+    assertThatThrownBy(
+            () ->
+                BackendErrorResponses.withBackendStatus(
+                    () -> {
+                      throw signal;
+                    }))
+        .isSameAs(signal);
   }
 }

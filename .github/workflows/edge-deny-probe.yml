@@ -105,6 +105,7 @@ jobs:
           done
 
           probe POST /api/v1/orders 401
+          probe POST /api/v1/operations 401
 
           probe GET "/api/v1/inventory/material/00000000-0000-4000-8000-00000000cafe" 401
           probe GET /api/v1/orders/item-catalog 401

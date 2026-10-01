@@ -728,6 +728,10 @@ out) — so neither edge that reaches it is cleartext:
   `keycloak-trust` Spring SSL bundle (mirrors the frontend/ingest `backend-trust` approach, audit
   finding M-13). Unlike the relay clients that pin `backend-trust` without a hostname check, the
   admin client keeps **hostname verification ON**, so the cert's SAN MUST include `dns:keycloak`.
+  The pinned request factory (`KeycloakTrustSupport`, shared by the admin client and the internal
+  JWKS decoder) speaks HTTP/1.1 and is bounded by the connect and read timeouts of
+  `RestClientConfig` (5 s / 30 s), so a hung Keycloak cannot hold a request thread unbounded; the
+  ingest copy uses 5 s / 10 s.
   *(Corrected 2026-09-22, ADR-0204: this used to say the JDK `HttpClient` cannot disable hostname
   verification per client. Its API cannot, but a trust manager can — JSSE does endpoint
   identification inside an `X509ExtendedTrustManager` — and that is how the ingest relay, now on the
@@ -2605,7 +2609,12 @@ does not have to be the only thing that does. Under operations the write that ma
 naming that one path rather than widening the family, because the guard is verb-blind by design.
 Later phases opened more writes the same way (the participation writes, the Einsatz planning set,
 and a **method-scoped** `PUT` on `/operations/<uuid>` and `/orders/<uuid>` that keeps `DELETE` on
-both shut).
+both shut). `POST /api/v1/operations` (the Android app raises an Operation with it) is the first
+**collection** write: the path is admitted for every verb by the allow-list, but `$krt_collection_post`
+answers `404` for any verb but `POST` on exactly `/api/v1/operations` — so `GET` on the collection,
+`PUT`/`DELETE` and `/api/v1/operations/`, `/api/v1/operationsX` stay refused as before — and only the
+`POST` clears the read-only family. `scripts/check-edge-allowlist-behaviour.sh` runs the real nginx
+against that matrix in CI.
 
 **A refusal by this vhost is `404` or `405`, and which one is decided by order, not by family.** The
 allow-list's default deny runs first; the read-only guard runs after it. A path that is on no
@@ -3408,10 +3417,10 @@ A new session attribute of a type outside the list is a change to this table, in
 **Three modes**, `app.session.type-allow-list` / `APP_SESSION_TYPE_ALLOW_LIST`:
 
 - `off` — the permissive validator of before, byte for byte; the escape hatch.
-- `report` (**default**, and what a merge deploys) — every value is read exactly as before; a class
+- `report` (opt-in) — every value is read exactly as before; a class
   outside the list is counted on `basetool_session_type_refused_total{mode="report"}` and named once
   in a `WARN`.
-- `enforce` — a class outside the list is refused; `FaultTolerantSessionSerializer` drops that one
+- `enforce` (**default**) — a class outside the list is refused; `FaultTolerantSessionSerializer` drops that one
   attribute (REQ-SEC-049/050 — it is repaired on the same request), the member keeps the rest of the
   session. Production is switched to it by the owner once the report counter has stayed at zero
   ([`deployment.md` → *Session type allow-list*](../deployment.md#session-type-allow-list-report-then-enforce));
@@ -3432,7 +3441,9 @@ touches no stored session and needs no migration.
   instantiated, dropped as an unreadable attribute and counted on both counters.
 - [ ] Under `report` that same value is read and reported; under `off` it is read and not reported.
 - [ ] A subpackage of an allowed JDK or Spring package is not allowed by the parent entry.
-- [ ] A mistyped mode falls back to `report`, never to a failed startup.
+- [x] A missing or mistyped mode falls back to `enforce`, never to a failed startup or a weaker
+  check; `application.yml`, the `@Value` default, `docker-compose.yml` and the Quadlet env template
+  all default to it (`SessionTypeAllowListTest#theShippedDefaultIsEnforce`).
 - [ ] The E2E stack runs with `enforce`, so every login, refresh, flash redirect and live-sync
   handshake in the suite is a session read under the strictest mode.
 - [x] Production runs `enforce`. _(2026-09-25, 17:58 UTC, owner-approved: `APP_SESSION_TYPE_ALLOW_LIST=enforce`
@@ -3469,9 +3480,11 @@ narrowed against the allowlist the page itself renders, before it is relayed.
 | `from`, `to`, `before`                                  | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `AuditAdminController`, `BankAccountController`, `OrgUnitBankController`                                               |
 | `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `MemberEvaluationController`, `UserController` |
 | `eventType`, `clientId`, `source`, the board `sort` key | narrowed to the rendered option list           | the page's own `<select>`                                                                                              |
-| a Spring sort specification                             | `RelayParams.sortSpecOrNull`                   | REQ-API-005's backend field whitelist                                                                                  |
+| a Spring sort specification                             | `RelayParams.sortSpecOrNull`, relayed as a `{sort}` URI-template variable (the personal inventory listing did `URLEncoder.encode` first, so the comma went out as `%252C`) | REQ-API-005's backend field whitelist |
 | free text (`q`, the list pages' `search`)               | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
 | the mission / operation list period (`start`, `end`)    | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `MissionController#searchMissions`, `OperationController`                                                              |
+| an announcement id, a member id on the promotion eligibility fragment | `UUID`                           | `UserController#updateReadAnnouncement`, `PromotionEligibilityController`                                             |
+| a bank role bucket (`roleCode`), a default-blueprint id | `RelayParams.constantNameOrNull` (enum-literal shape, else `400`), `UUID` | `BankApprovalLimitService` role buckets, `AdminDefaultBlueprintController` |
 | the mission list `status`                               | narrowed to `PLANNED`/`ACTIVE`/`COMPLETED`/`CANCELLED` | the backend's mission status vocabulary                                                                          |
 | a star-system name (`starSystemNames`)                  | a `WebClient` URI-template variable            | REQ-UI-014's materials-matrix relay                                                                                    |
 
@@ -3737,6 +3750,15 @@ the member surface. The E2E realm contradicted this until then: `test-bank-emplo
 refusal on the mission list. A fixture that models an impossible account shape produces findings
 about a cohort that does not exist. That is the structural half of this requirement, and it is why
 the roster sync had to be fixed in the same change:
+
+**The member-surface role gates sit on the handlers, not only in the URL rules.** The thirteen
+squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
+mission, grouped, stack-entries and item-catalog reads, `POST /` and the four `bulk-*` writes) carry
+`@PreAuthorize(INVENTORY_ACCESS)` — ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER — and
+`HangarController`'s squadron overview and home-location bulk edit carry `@PreAuthorize(HANGAR_ACCESS)`
+— `HANGAR_READ`, `HANGAR_WRITE` or `ROLE_ADMIN`. Both repeat the `SecurityConfig` URL rule, which
+stays as defence in depth, so a later path move cannot drop the gate silently.
+`LiftedRoleGatesTest` evaluates each annotation on its own with the real role hierarchy.
 
 > [!warning] The composite-blind sync was the precondition, not a detail
 > `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member
