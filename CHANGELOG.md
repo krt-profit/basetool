@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Betriebsmodus der Session-Typprüfung als Metrik.** Das Frontend meldet den wirksamen Modus
+  (`off`/`report`/`enforce`) als `basetool_session_type_allow_list_mode`; so ist nach einem Rollout
+  sichtbar, dass `enforce` im Prozess angekommen ist.
+
 ### Changed
 
 - **Deploy: nur ein Release auf einmal.** Die Promotion prüft alle fünf Artefakte und ihren gemeinsamen Quell-Commit, bevor sie `:stable` verschiebt; `deploy.sh` verweigert einen Satz aus verschiedenen Commits und versucht es im nächsten Tick erneut. Notausgang: `IRI_REQUIRE_ONE_RELEASE=false`.
@@ -11,12 +17,49 @@
   Datenbank). Die Mindestversionen für Netty, OpenTelemetry und Jackson im SPI-Build entfallen,
   Keycloak bringt selbst neuere mit (Protobuf bleibt angehoben). Der Tag-Wechsel ist betreibergesteuert: vorher frisches Backup, ein
   Zurückrollen heißt Datenbank wiederherstellen; laufende Anmeldungen müssen einmal neu beginnen.
+  
 - **Keycloak-Log ohne Daueralarm.** Die „Full scope allowed"-Warnung (je Token-Anfrage) und der veraltete
   Sticky-Session-Schalter sind abgestellt.
+  
 - **Keycloak: Fehler-Events stehen im Log auf INFO statt WARN.** Ein Discord-Callback ohne Login-Cookie (`cookie_not_found`) ist ein Client-Zustand und verstopfte die WARN-Ansicht; die Zeilen und die Event-Metriken bleiben erhalten (`KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__ERROR_LEVEL`).
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
+### Fixed
+
+- **Backend-Fehler auf Seiten und Downloads tragen den richtigen HTTP-Status.** Die Fehlerseite für eine
+  Backend-Ablehnung kam bei Navigation oder einfachem `fetch` mit Status 200 statt 404/403/409/…; ein Download, der
+  `response.ok` prüft (Übergabeprotokoll), hätte die Fehlerseite als Dokument gespeichert. AJAX-Antworten
+  (JSON) waren schon korrekt.
+
+- **Android: Operation anlegen funktioniert.** Die API-Domain lässt jetzt genau `POST /api/v1/operations` durch
+  (zuvor 404); `GET`, `PUT`, `DELETE` und ähnliche Pfade bleiben gesperrt. Der Aufruf ist Teil des eingefrorenen
+  App-Vertrags.
+
+- **Downloads, Importe und „Alles löschen" bei abgelaufener Anmeldung.** Elf Proxy-Controller (PDF-/Datenexporte,
+  P4K-, Hangar- und Blueprint-Import, Hangar-/Lager-„Alles löschen") umgingen die gemeinsame Fehlerbehandlung:
+  eine abgelaufene Sitzung führte zu einem Fehler 500 statt zur erneuten Anmeldung, und die Fehler wurden nicht
+  gezählt. Sie laufen jetzt über `BackendApiClient`; ein nicht erreichbares Backend meldet 504 statt 500.
+
+- **Raffinerieauftrag: Einlagern nur einmal.** Ein bereits eingelagerter Auftrag lässt sich weder per Bearbeiten wieder öffnen noch ein zweites Mal einlagern (keine doppelten Lagerzeilen und Audit-Einträge). Beim Einlagern wird außerdem geprüft, dass der gewählte Auftrag das Material benötigt (Migration V259, REQ-REFINERY-022). Neue Aufträge entstehen immer als „Offen“; ein mitgeschickter Status wird ignoriert, das Erstellformular bietet keine Statuswahl mehr.
+
+- **Materialbedarf: Suchkopf der Materialauswahl ist wieder deckend schwarz.** Zwei Farbwerte der Oberfläche
+  (Materialbedarf-Suche, Kontogruppen-Titel der Bank) verwiesen auf nicht existierende Design-Tokens; ein Test
+  prüft künftig jedes `var(--…)`.
+
+- **Mitgliederliste: Dialogtexte werden als JavaScript-Text ausgegeben.** Löschen-, Sync- und
+  Zusammenführen-Dialog bekamen ihre Übersetzungen HTML-maskiert; ein Anführungszeichen in einer
+  Übersetzung hätte `&quot;` angezeigt.
+
+- **Mein Inventar: Sortierung mit Richtung erreicht das Backend unverfälscht.** Die Sortierangabe wurde doppelt
+  kodiert und nie ausgewertet; sie läuft jetzt über `RelayParams` und eine URI-Variable.
+
+### Security
+
+- **Session-Typ-Allowlist: `enforce` ist jetzt überall die Vorgabe.** Code, `application.yml`, Compose und
+  Quadlet-Vorlage standen noch auf `report`, Produktion setzte `enforce` per `.env`. `report` ist nur noch
+  ausdrücklich wählbar; ein fehlender oder falsch geschriebener Wert fällt auf `enforce` zurück.
+  
 - **Mutation-Testing-Lauf prüft jetzt auf Vollständigkeit.** Ein beim Job-Timeout abgebrochener Backend-Lauf
   galt mit seinem Teilbericht als grün; jetzt scheitert der Lauf bei abgebrochenem PIT-Schritt oder fehlendem
   `</mutations>`. Timeout 60 → 120 Minuten (Backend kam zweimal in Folge nicht in 60 durch).
@@ -25,7 +68,28 @@
   und wurde still blind, wenn dieser keine Container-Serien mehr lieferte; der neue Alarm meldet das. Der Text
   von `ContainerMetricsMissing` nennt den Crash-Loop-Alarm nicht mehr.
 
-### Security
+- **Keine Namens-Hashes mehr im Log.** Frontend-Logzeilen zur Rollenprüfung und zum Rollenabgleich tragen kein aus dem Benutzernamen abgeleitetes Kürzel mehr.
+
+- **Zugangsdaten verschwinden aus `toString()` und Logs.** Das Scrape-Passwort (Frontend, Ingest) und das Discord-Token im Keycloak-SPI werden nicht mehr ausgegeben; der Log-Maskierer erfasst zusätzlich `password=` und `secret=`.
+
+- **CSV-Export der Beförderungsmatrix neutralisiert Formeln.** Zellen, die mit `=`, `+`, `-`, `@`, Tab oder Zeilenumbruch beginnen, erhalten ein führendes `'`.
+
+- **Browser-IDs werden vor dem Backend-Aufruf geprüft.** Ankündigungs-ID, Mitglieds-ID des Beförderungsfragments, Standard-Blueprint-ID und der Rollen-Code der Bankkonten-Sichtbarkeit und -Limits müssen die erwartete Form haben, sonst antwortet das Frontend mit 400, ohne das Backend zu rufen.
+
+- **Keycloak-Verbindung von Backend und Ingest mit Zeitlimits.** Der an das Zertifikat gepinnte Client
+  (Admin-API und JWKS-Abruf) wartete unbegrenzt auf Keycloak; er nutzt jetzt 5 s Verbindungs- und
+  30 s (Ingest 10 s) Lese-Timeout.
+
+- **Lager- und Hangar-Rollenprüfung zusätzlich an den Endpunkten.** 13 Lager- und 2 Hangar-Endpunkte
+  waren nur über die URL-Regel geschützt; dieselbe Rollenprüfung steht jetzt auch an der Methode, die
+  URL-Regel bleibt. Wer Zugriff hat, ändert sich nicht.
+
+- **Katalogsuchen behandeln `%` und `_` wörtlich.** Die Produktsuche der Blaupausen sowie die
+  Artikelauswahl für Aufträge und Lager übergaben Eingaben ungeschützt an `LIKE`; die Blaupausen-Abfragen
+  setzen zusätzlich `ESCAPE`, ohne das Hibernate das Escape-Zeichen abschaltet.
+
+- **Log-Level zur Laufzeit wieder per Bearer-Token änderbar.** `POST /actuator/loggers/**` scheiterte
+  in Produktion am CSRF-Schutz mit 403; der Pfad ist jetzt wie `/api/v1/**` ausgenommen.
 
 - **Keycloak-Verbindung von Backend und Ingest mit Zeitlimits.** Der an das Zertifikat gepinnte Client
   (Admin-API und JWKS-Abruf) wartete unbegrenzt auf Keycloak; er nutzt jetzt 5 s Verbindungs- und
@@ -41,13 +105,16 @@
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
   Zertifikate liest, fällt nicht mehr auf ein ungepinntes PostgreSQL-Image zurück; ohne lesbaren
   `@sha256:`-Pin endet der Lauf mit `FATAL`, `BackupStaleOrMissing` greift weiter.
+
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
   Identity-Provider-Mapper), CVE-2026-14781, CVE-2026-19608 und CVE-2026-93999 (deaktivierte Clients im
   Token), dazu den Geräte-Login für brute-force-gesperrte Konten sowie Jackson und Netty im
   Keycloak-Image.
+
 - **Jackson auf 2.21.7 und 3.1.7 angehoben** (Gradle-Plugins 2.22.3). Schließt CVE-2026-91776 und
   CVE-2026-91777 (beide HIGH) in `jackson-databind` für Backend, Frontend, Ingest, Keycloak-SPI und
   `logging-support`.
+
 - **Jackson auch in Keycloak-SPI, `logging-support` und den Gradle-Plugins angehoben.** Dort lagen
   noch `jackson-databind` 2.21.5, 3.1.5 und 2.22.1 (CVE-2026-68497, CVE-2026-19032,
   CVE-2026-83557), jetzt 2.21.6, 3.1.6 und 2.22.2. Die Images von Backend, Frontend und Ingest

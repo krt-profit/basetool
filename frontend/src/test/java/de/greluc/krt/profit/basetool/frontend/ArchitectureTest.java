@@ -37,6 +37,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
@@ -123,6 +124,37 @@ class ArchitectureTest {
 
     assertThat(present).containsAll(PUBLIC_BY_DESIGN);
   }
+
+  /**
+   * Verifies that no controller holds a raw {@code WebClient}: a backend call from a controller
+   * goes through {@code BackendApiClient}, whose error mapping, re-authentication signal and {@code
+   * basetool_backend_client_errors_total} accounting a raw client bypasses. The notification page,
+   * which opens the long-lived SSE relay on its own client, is the one exception.
+   */
+  @Test
+  void noControllerHoldsARawWebClient() {
+    List<String> offenders =
+        controllers().stream()
+            .filter(c -> !RAW_WEB_CLIENT_CONTROLLERS.contains(c.getSimpleName()))
+            .filter(
+                c ->
+                    c.getAllFields().stream()
+                        .anyMatch(f -> f.getRawType().isEquivalentTo(WebClient.class)))
+            .map(JavaClass::getSimpleName)
+            .sorted()
+            .toList();
+
+    assertThat(offenders)
+        .as("controllers that inject a WebClient instead of BackendApiClient")
+        .isEmpty();
+    assertThat(controllers().stream().map(JavaClass::getSimpleName).toList())
+        .as("the raw-WebClient allow-list names only controllers that exist")
+        .containsAll(RAW_WEB_CLIENT_CONTROLLERS);
+  }
+
+  /** The controllers allowed to depend on a raw {@code WebClient}: the SSE relay page. */
+  private static final Set<String> RAW_WEB_CLIENT_CONTROLLERS =
+      Set.of("NotificationPageController");
 
   /**
    * Verifies that every view controller opts into the layout model via {@code @UsesLayoutModel}.

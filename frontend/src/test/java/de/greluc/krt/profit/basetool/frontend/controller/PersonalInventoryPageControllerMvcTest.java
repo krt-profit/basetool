@@ -106,6 +106,45 @@ class PersonalInventoryPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"krt-pi-modal\""))));
   }
 
+  /**
+   * A sort with a direction travels as the {@code {sort}} URI variable, so the backend client
+   * encodes the comma exactly once instead of receiving a pre-encoded {@code %2C} it encodes again.
+   */
+  @Test
+  @WithMockUser
+  void view_relaysASortWithADirectionAsAUriVariable() throws Exception {
+    PageResponse<PersonalInventoryItemDto> empty =
+        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(empty);
+
+    mockMvc
+        .perform(get("/personal-inventory").param("sort", "productName,desc"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> variables = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), variables.capture());
+    assertEquals("/api/v1/personal-inventory?size=50&sort={sort}", uriCaptor.getValue());
+    assertEquals("productName,desc", variables.getValue());
+  }
+
+  /** A sort that is not a well-formed specification is dropped, never relayed. */
+  @Test
+  @WithMockUser
+  void view_dropsAMalformedSort() throws Exception {
+    PageResponse<PersonalInventoryItemDto> empty =
+        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+
+    mockMvc
+        .perform(get("/personal-inventory").param("sort", "a&admin=true,asc"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
+    assertEquals("/api/v1/personal-inventory?size=50", uriCaptor.getValue());
+  }
+
   @Test
   @WithMockUser
   void uexSearch_passesMultiWordQueryAsUriVariable() throws Exception {

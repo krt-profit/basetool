@@ -84,6 +84,15 @@ public class GlobalExceptionHandler {
   /**
    * Renders an i18n-resolved error page (or JSON toast snippet for XHR clients) from an RFC-7807
    * problem returned by the backend, preserving the correlation id for cross-tier debugging.
+   *
+   * <p>Both forms carry the backend's HTTP status, so a {@code fetch} that tests {@code
+   * response.ok} and a browser navigation see the failure as one.
+   *
+   * @param ex the backend failure
+   * @param request the current request, used to decide JSON-vs-HTML
+   * @param model the model the HTML error page renders from
+   * @return a JSON {@link ResponseEntity} for XHR callers, or a {@link ModelAndView} of the {@code
+   *     error/error} page carrying the status otherwise
    */
   @ExceptionHandler(BackendServiceException.class)
   public Object handleBackendServiceException(
@@ -135,7 +144,7 @@ public class GlobalExceptionHandler {
     if (ex.getCorrelationId() != null) {
       model.addAttribute("correlationId", ex.getCorrelationId());
     }
-    return "error/error";
+    return new ModelAndView("error/error", model.asMap(), status);
   }
 
   /**
