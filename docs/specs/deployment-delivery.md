@@ -2338,8 +2338,8 @@ that has no entry at all, before it is used.
   `dependency-submission.yml` alone runs lenient — it ships nothing, and its action injects an
   init-script plugin the file does not describe.
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
-- **`-sources.jar` and `-javadoc.jar` are trusted** by pattern: IDE downloads, never on a build
-  classpath.
+- **`-sources.jar`, `-javadoc.jar` and the Gradle distribution's `gradle-<version>-src.zip` are
+  trusted** by pattern: IDE downloads, never on a build classpath.
 - **The change that alters the graph carries the regenerated file**, produced by
   `GRADLE_USER_HOME="$(mktemp -d)" ./gradlew --write-verification-metadata sha256 help build :frontend:compileE2eJava`
   ([`CONTRIBUTING.md`](../../CONTRIBUTING.md) → *Dependency verification*). A catalog bump without it
