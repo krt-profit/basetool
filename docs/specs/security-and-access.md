@@ -3742,6 +3742,15 @@ refusal on the mission list. A fixture that models an impossible account shape p
 about a cohort that does not exist. That is the structural half of this requirement, and it is why
 the roster sync had to be fixed in the same change:
 
+**The member-surface role gates sit on the handlers, not only in the URL rules.** The thirteen
+squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
+mission, grouped, stack-entries and item-catalog reads, `POST /` and the four `bulk-*` writes) carry
+`@PreAuthorize(INVENTORY_ACCESS)` — ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER — and
+`HangarController`'s squadron overview and home-location bulk edit carry `@PreAuthorize(HANGAR_ACCESS)`
+— `HANGAR_READ`, `HANGAR_WRITE` or `ROLE_ADMIN`. Both repeat the `SecurityConfig` URL rule, which
+stays as defence in depth, so a later path move cannot drop the gate silently.
+`LiftedRoleGatesTest` evaluates each annotation on its own with the real role hierarchy.
+
 > [!warning] The composite-blind sync was the precondition, not a detail
 > `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member
 > holding `KRT Member` only through the composite came back with an empty set on every nightly run.

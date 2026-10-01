@@ -20,6 +20,9 @@
 - **Keycloak-Verbindung von Backend und Ingest mit Zeitlimits.** Der an das Zertifikat gepinnte Client
   (Admin-API und JWKS-Abruf) wartete unbegrenzt auf Keycloak; er nutzt jetzt 5 s Verbindungs- und
   30 s (Ingest 10 s) Lese-Timeout.
+- **Lager- und Hangar-Rollenprüfung zusätzlich an den Endpunkten.** 13 Lager- und 2 Hangar-Endpunkte
+  waren nur über die URL-Regel geschützt; dieselbe Rollenprüfung steht jetzt auch an der Methode, die
+  URL-Regel bleibt. Wer Zugriff hat, ändert sich nicht.
 - **Katalogsuchen behandeln `%` und `_` wörtlich.** Die Produktsuche der Blaupausen sowie die
   Artikelauswahl für Aufträge und Lager übergaben Eingaben ungeschützt an `LIKE`; die Blaupausen-Abfragen
   setzen zusätzlich `ESCAPE`, ohne das Hibernate das Escape-Zeichen abschaltet.
