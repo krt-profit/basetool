@@ -229,7 +229,6 @@ jobs:
 
           REV_JQ='[.[] | .config.Labels["org.opencontainers.image.revision"]] | map(select(. != null)) | unique | .[0] // ""'
 
-          revisions=""
           first_module=""
           first_revision=""
           for module in backend frontend ingest config keycloak-spi; do
