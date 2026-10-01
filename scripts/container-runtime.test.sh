@@ -704,14 +704,17 @@ expect_out "...but a pinned bundle copy behind it still is" podman \
 expect_out "an unreadable unit refuses with a FATAL and a non-zero exit" podman \
   'RT_UNIT_DIR='"${WORK}"'/nowhere; { rt_require_pinned_image backup "" db-backend '"${WORK}"'/nowhere; echo survived; } 2>&1' \
   'refusing to run with an unpinned image'
+# shellcheck disable=SC2016
 expect_no_call "...and no container is started for it" podman \
   'RT_UNIT_DIR='"${WORK}"'/nowhere rt_require_pinned_image backup "" db-backend '"${WORK}"'/nowhere; rt_read_mount x "${RT_PINNED_IMAGE}" true' 'run '
+# shellcheck disable=SC2016
 expect_out "a pinned unit is resolved into RT_PINNED_IMAGE" podman \
   'rt_require_pinned_image backup "" db-backend '"${WORK}"'/nowhere; echo "got=${RT_PINNED_IMAGE}"' \
   'got=docker.io/postgres:18-alpine@sha256:dddd'
 expect_out "an unpinned override is refused" podman \
   '{ rt_require_pinned_image backup docker.io/library/postgres:18-alpine db-backend '"${WORK}"'/bundle; echo survived; } 2>&1' \
   'is not digest-pinned'
+# shellcheck disable=SC2016
 expect_out "a pinned override is honoured" podman \
   'rt_require_pinned_image backup docker.io/x/y@sha256:'"$(printf 'e%.0s' $(seq 1 64))"' db-backend; echo "got=${RT_PINNED_IMAGE}"' \
   'got=docker.io/x/y@sha256:eeee'
@@ -733,6 +736,7 @@ run_job() {
   : > "$LOG"
   rm -f "${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
   [[ -n "$unit" ]] && printf '%s\n' "$unit" > "${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
+  # shellcheck disable=SC2031
   PATH="${SCRIPT_BIN}:${PATH}" RT_BACKEND=podman RT_UNIT_DIR="${WORK}/nowhere" RT_STARTUP_WAIT=0 \
     IRI_COMPOSE_DIR="${SCRIPT_COMPOSE}" IRI_BACKUP_ENV="${WORK}/backup.env" IRI_STATE_DIR="${WORK}/state" \
     IRI_BACKUP_DIR="${WORK}/backupdir" TEXTFILE_DIR="${WORK}/textfile" \

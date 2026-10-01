@@ -439,7 +439,7 @@ rt_is_digest_pinned() {
   [[ "${1:-}" =~ @sha256:[0-9a-f]{64}$ ]]
 }
 
-RT_PINNED_IMAGE=""
+export RT_PINNED_IMAGE=""
 
 rt_require_pinned_image() {
   local label="$1" override="$2" svc="$3" fallback="${4:-}" ref
