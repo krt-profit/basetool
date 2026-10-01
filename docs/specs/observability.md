@@ -539,7 +539,10 @@ relies on the `userId` MDC field. **Enforced by:** `LogisticianCheckLogPrivacyTe
 (`MonitoringScrapeProperties` in all three apps) print the password as `<redacted>`, and the
 Keycloak SPI's `Brokered` record prints presence flags only, because the Keycloak JVM has no masker.
 `PiiMasker` additionally masks the value after `password`, `passwd` or `secret` followed by `:` or `=`.
-**Enforced by:** `MonitoringScrapePropertiesTest` (each app), `BrokeredToStringTest`, `PiiMaskerTest`.
+**Enforced by:** `MonitoringScrapePropertiesTest` (each app), `BrokeredToStringTest`, `PiiMaskerTest`, and a ratchet
+(`CredentialFieldRatchetTest` in backend, frontend, ingest and keycloak-spi, rule in `CredentialFieldRule`): a type with a
+`password` / `secret` / `token` / `apiKey`-named `String` or byte field must be on a reviewed list, and a listed class
+must declare its own, non-Lombok `toString()`.
 
 **A session id is a token.** Whoever holds a Spring session id holds the session and the OAuth2
 tokens stored in it, so it is never logged verbatim either. Where a line needs to correlate the

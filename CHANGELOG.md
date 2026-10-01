@@ -20,7 +20,7 @@
 - **Keine Namens-Hashes mehr im Log.** Frontend-Logzeilen zur Rollenprüfung und zum Rollenabgleich tragen kein aus dem Benutzernamen abgeleitetes Kürzel mehr.
 - **Zugangsdaten verschwinden aus `toString()` und Logs.** Das Scrape-Passwort (Frontend, Ingest) und das Discord-Token im Keycloak-SPI werden nicht mehr ausgegeben; der Log-Maskierer erfasst zusätzlich `password=` und `secret=`.
 - **CSV-Export der Beförderungsmatrix neutralisiert Formeln.** Zellen, die mit `=`, `+`, `-`, `@`, Tab oder Zeilenumbruch beginnen, erhalten ein führendes `'`.
-- **Browser-IDs werden vor dem Backend-Aufruf geprüft.** Die Ankündigungs-ID und die Mitglieds-ID des Beförderungsfragments müssen UUIDs sein, sonst antwortet das Frontend mit 400, ohne das Backend zu rufen.
+- **Browser-IDs werden vor dem Backend-Aufruf geprüft.** Ankündigungs-ID, Mitglieds-ID des Beförderungsfragments, Standard-Blueprint-ID und der Rollen-Code der Bankkonten-Sichtbarkeit und -Limits müssen die erwartete Form haben, sonst antwortet das Frontend mit 400, ohne das Backend zu rufen.
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
   Identity-Provider-Mapper), CVE-2026-14781, CVE-2026-19608 und CVE-2026-93999 (deaktivierte Clients im
   Token), dazu den Geräte-Login für brute-force-gesperrte Konten sowie Jackson und Netty im
