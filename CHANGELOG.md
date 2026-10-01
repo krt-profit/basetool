@@ -23,6 +23,8 @@
 - **Mitgliederliste: Dialogtexte werden als JavaScript-Text ausgegeben.** Löschen-, Sync- und
   Zusammenführen-Dialog bekamen ihre Übersetzungen HTML-maskiert; ein Anführungszeichen in einer
   Übersetzung hätte `&quot;` angezeigt.
+- **Mein Inventar: Sortierung mit Richtung erreicht das Backend unverfälscht.** Die Sortierangabe wurde doppelt
+  kodiert und nie ausgewertet; sie läuft jetzt über `RelayParams` und eine URI-Variable.
 
 ### Security
 
