@@ -131,7 +131,7 @@ def parse_annotations(buf):
 CONSTANTS = {}
 
 def load_constants():
-    pat = re.compile(r"static\s+final\s+String\s+(\w+)\s*=\s*((?:\"(?:[^\"\\]|\\.)*\"\s*\+?\s*|[A-Z_][\w.]*\s*\+?\s*)+);")
+    pat = re.compile(r"static\s+final\s+String\s+(\w+)\s*=\s*((?:\"\"\"[\s\S]*?\"\"\"|\"(?:[^\"\\]|\\.)*\"|[A-Z_][\w.]*)(?:\s*\+\s*(?:\"\"\"[\s\S]*?\"\"\"|\"(?:[^\"\\]|\\.)*\"|[A-Z_][\w.]*))*)\s*;")
     for root, _, files in os.walk(PKG):
         for f in files:
             if not f.endswith(".java"):

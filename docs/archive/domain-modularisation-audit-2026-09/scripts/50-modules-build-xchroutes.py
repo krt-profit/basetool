@@ -6,12 +6,12 @@ REPO = r"$REPO"
 ROOT = os.path.join(REPO, "backend", "src", "main", "java", "de", "greluc", "krt", "profit", "basetool", "backend", "controller", "exchange")
 
 CLASS_MAP = re.compile(r'@RequestMapping\(\s*(?:value\s*=\s*|path\s*=\s*)?"([^"]+)"')
-CLASS_PRE = re.compile(r'@PreAuthorize\(\s*((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+)\)\s*(?:@[A-Za-z]+\s*)*public\s+class', re.S)
+CLASS_PRE = re.compile(r'@PreAuthorize\(\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)\s*\)\s*(?:@[A-Za-z]+\s*)*public\s+class', re.S)
 METHOD = re.compile(
     r'((?:@[A-Za-z]+(?:\((?:[^()]|\([^()]*\))*\))?\s*)+)'
     r'public\s+([^\s(][^(]*?)\s+(\w+)\s*\(((?:[^()]|\([^()]*\))*)\)', re.S)
 MAP = re.compile(r'@(Get|Post|Put|Delete|Patch)Mapping(?:\(\s*((?:[^()]|\([^()]*\))*)\))?')
-PRE = re.compile(r'@PreAuthorize\(\s*((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+)\)', re.S)
+PRE = re.compile(r'@PreAuthorize\(\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)\s*\)', re.S)
 BODY = re.compile(r'@RequestBody\s+(?:@\w+(?:\([^)]*\))?\s+)*([\w.<>, ?]+?)\s+\w+\s*(?:,|$)')
 
 rows = []
