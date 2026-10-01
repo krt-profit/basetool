@@ -15,6 +15,12 @@
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
+### Fixed
+
+- **Materialbedarf: Suchkopf der Materialauswahl ist wieder deckend schwarz.** Zwei Farbwerte der Oberfläche
+  (Materialbedarf-Suche, Kontogruppen-Titel der Bank) verwiesen auf nicht existierende Design-Tokens; ein Test
+  prüft künftig jedes `var(--…)`.
+
 ### Security
 
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
