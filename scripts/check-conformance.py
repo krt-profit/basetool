@@ -78,6 +78,7 @@ REQUIRED_CONTAINER_SERIES = (
     "basetool_container_pids_max",
     "basetool_container_oom_kills_total",
     "basetool_container_cpu_usage_seconds_total",
+    "basetool:container:start_time_seconds",
 )
 
 NEVER_A_CLIENT = (

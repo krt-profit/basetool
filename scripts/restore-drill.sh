@@ -16,7 +16,6 @@ BACKUP_DIR="${IRI_BACKUP_DIR:-/var/iri/backup}"
 WORK_BASE="${BACKUP_DIR}/restore-drill"
 BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
 COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
-DRILL_IMAGE_FALLBACK="docker.io/library/postgres:18-alpine"
 DRILL_IMAGE="${IRI_DRILL_IMAGE:-}"
 CONTAINER="iri-restore-drill"
 READY_TIMEOUT="${IRI_DRILL_READY_TIMEOUT:-60}"
@@ -71,14 +70,9 @@ write_drill_metrics() {
 rt_detect
 rt_wait_for_startup
 log "container runtime: ${RT_BACKEND}"
-if [[ -z "${DRILL_IMAGE}" ]]; then
-  if DRILL_IMAGE="$(rt_unit_image db-backend "${COMPOSE_DIR}/quadlet/systemd")"; then
-    log "drill image: ${DRILL_IMAGE} (db-backend's own pin)"
-  else
-    DRILL_IMAGE="${DRILL_IMAGE_FALLBACK}"
-    log "WARN: no Image= readable in db-backend.container -- falling back to the unpinned ${DRILL_IMAGE}"
-  fi
-fi
+rt_require_pinned_image "restore drill" "${DRILL_IMAGE}" db-backend "${COMPOSE_DIR}/quadlet/systemd"
+DRILL_IMAGE="${RT_PINNED_IMAGE}"
+log "drill image: ${DRILL_IMAGE}"
 command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic; ansible role: 10-packages.yml)"
 command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone; ansible role: 10-packages.yml)"
 
