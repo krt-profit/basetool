@@ -36,9 +36,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Proves that the escaped fragments {@link LikePatterns#escape(String)} produces match literally
- * in the three blueprint-backed catalogue searches: {@code %} and {@code _} must not act as
- * wildcards.
+ * Proves that the escaped fragments {@link LikePatterns#escape(String)} produces match literally in
+ * the three blueprint-backed catalogue searches: {@code %} and {@code _} must not act as wildcards.
  */
 @SpringBootTest
 @ActiveProfiles("test")

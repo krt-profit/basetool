@@ -108,9 +108,7 @@ public class SecurityConfig {
    * Paths exempt from cookie-based CSRF, because this stateless chain authenticates only with a
    * bearer JWT, which a browser never attaches by itself.
    */
-  static final String[] CSRF_EXEMPT_PATHS = {
-    "/api/v1/**", "/internal/**", "/actuator/loggers/**"
-  };
+  static final String[] CSRF_EXEMPT_PATHS = {"/api/v1/**", "/internal/**", "/actuator/loggers/**"};
 
   /**
    * Re-arms CSRF under the {@code test} profile for a single test class.
@@ -284,8 +282,8 @@ public class SecurityConfig {
    * @param http the Spring Security builder
    * @param jwtAuthenticationConverter the converter from {@link #jwtAuthenticationConverter}
    * @param env the environment; the {@code test} profile disables CSRF and stands the consent gate
-   *     down unless {@link #TERMS_GATE_ARMED_IN_TEST} re-arms it; {@link #CSRF_ARMED_IN_TEST}
-   *     keeps CSRF on
+   *     down unless {@link #TERMS_GATE_ARMED_IN_TEST} re-arms it; {@link #CSRF_ARMED_IN_TEST} keeps
+   *     CSRF on
    * @param securityProblemResponseHandler renders filter-level 401/403 as problem+json
    * @param messageSource localizes the 403 bodies of the refusing filters
    * @param problemResponseFactory assembles the RFC&nbsp;7807 body for those filters
