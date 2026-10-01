@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchRe
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBulkDeleteResultDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -76,8 +76,8 @@ class AdminPersonalBlueprintsControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    backendApiClient = mock(BackendApiClient.class);
-    controller = new AdminPersonalBlueprintsPageController(backendApiClient, webClient);
+    backendApiClient = RealBackendApiClient.mockExecutingOver(webClient);
+    controller = new AdminPersonalBlueprintsPageController(backendApiClient);
   }
 
   @AfterEach

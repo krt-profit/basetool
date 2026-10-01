@@ -68,14 +68,31 @@ import org.springframework.web.multipart.MultipartFile;
  * the third-party ship-export JSON import.
  *
  * <p>{@code /my-ships} derives the owner from the JWT; {@code /users/{userId}/ships} is ADMIN-only.
- * The class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052) and is ANDed with
- * the URL rule requiring {@code HANGAR_READ}, {@code HANGAR_WRITE} or {@code ROLE_ADMIN}.
+ * The class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052); the squadron
+ * overview and the home-location bulk edit carry {@link #HANGAR_ACCESS} on the method, which the
+ * URL rule repeats.
  */
 @RestController
 @RequestMapping("/api/v1/hangar")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class HangarController {
+
+  /**
+   * Authority gate of the squadron overview and the home-location bulk edit: {@code HANGAR_READ},
+   * {@code HANGAR_WRITE} or {@code ROLE_ADMIN}, the same set as the {@code /api/v1/hangar/**} URL
+   * rule.
+   */
+  static final String HANGAR_ACCESS =
+      "hasAnyAuthority('"
+          + Permissions.HANGAR_READ
+          + "','"
+          + Permissions.HANGAR_WRITE
+          + "','"
+          + Roles.ROLE_PREFIX
+          + Roles.ADMIN
+          + "')";
+
   private final HangarService hangarService;
   private final HangarImportService hangarImportService;
   private final UserService userService;
@@ -137,6 +154,7 @@ public class HangarController {
    * @return paged overview DTOs
    */
   @GetMapping("/squadron-overview")
+  @PreAuthorize(HANGAR_ACCESS)
   @Transactional(readOnly = true)
   public PageResponse<SquadronShipOverviewDto> getSquadronOverview(
       @RequestParam(required = false) Integer page,
@@ -327,7 +345,7 @@ public class HangarController {
     @ApiResponse(responseCode = "401", description = "Not authenticated")
   })
   @PostMapping("/ships/home-location")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize(HANGAR_ACCESS)
   @Transactional
   public SetHomeLocationResponseDto setHomeLocationForMyShips(
       @AuthenticationPrincipal Jwt jwt,

@@ -277,6 +277,24 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
    * @param username the brokered Discord username, or {@code null}
    * @param email the brokered Discord e-mail, or {@code null}
    */
-  record Brokered(
-      @Nullable String accessToken, @Nullable String username, @Nullable String email) {}
+  record Brokered(@Nullable String accessToken, @Nullable String username, @Nullable String email) {
+
+    /**
+     * Describes which fields are present without revealing any value, so a logged instance never
+     * carries the token, the username or the e-mail.
+     *
+     * @return the record name with a presence flag per field
+     */
+    @Override
+    @NotNull
+    public String toString() {
+      return "Brokered[accessToken="
+          + (accessToken != null)
+          + ", username="
+          + (username != null)
+          + ", email="
+          + (email != null)
+          + "]";
+    }
+  }
 }

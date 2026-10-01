@@ -153,6 +153,50 @@ class ConnectedAppsConfirmControllerMvcTest {
   }
 
   @Test
+  void aBrowserSuppliedChangeSetOrStagingTimeIsNeverBelieved() throws Exception {
+    Instant stagedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    stubStaged(stagedAt);
+    MockHttpSession session = new MockHttpSession();
+    when(backendApiClient.post(anyString(), any(), eq(ConnectedAppMassChangeResultDto.class)))
+        .thenReturn(new ConnectedAppMassChangeResultDto("VerseKit", "blueprints", true, 1, 0, 0));
+    String hostile =
+        "{\"handoffId\":\""
+            + HANDOFF
+            + "\",\"clientId\":\"other\",\"installationKey\":\"x\",\"resource\":\"stock\","
+            + "\"changeSet\":\"{\\\"ops\\\":[]}\",\"stagedAt\":\""
+            + Instant.now().plusSeconds(3600)
+            + "\"}";
+
+    stepWith("load", session, hostile).andExpect(status().isOk());
+    stepWith("apply", session, hostile).andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/connected-apps/mass-changes/confirm"),
+            eq(request(stagedAt)),
+            eq(ConnectedAppMassChangeResultDto.class));
+  }
+
+  @Test
+  void aBrowserSuppliedFreshStagingTimeDoesNotRescueAnExpiredKeptChangeSet() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    Instant stale =
+        Instant.now().minus(ConnectedAppsConfirmRelayController.STAGING_LIFETIME).minusSeconds(1);
+    session.setAttribute(
+        ConnectedAppsConfirmRelayController.SESSION_KEY,
+        new HashMap<>(
+            Map.of(HANDOFF, JsonMapper.builder().build().writeValueAsString(request(stale)))));
+
+    stepWith(
+            "apply",
+            session,
+            "{\"handoffId\":\"" + HANDOFF + "\",\"stagedAt\":\"" + Instant.now() + "\"}")
+        .andExpect(status().isNotFound());
+
+    verify(backendApiClient, never()).post(anyString(), any(), any());
+  }
+
+  @Test
   void nothingIsAppliedWithoutALoadOrAfterADiscard() throws Exception {
     MockHttpSession session = new MockHttpSession();
     step("apply", session).andExpect(status().isNotFound());
@@ -260,12 +304,18 @@ class ConnectedAppsConfirmControllerMvcTest {
 
   private ResultActions step(@NotNull String step, @NotNull MockHttpSession session)
       throws Exception {
+    return stepWith(step, session, "{\"handoffId\":\"" + HANDOFF + "\"}");
+  }
+
+  private ResultActions stepWith(
+      @NotNull String step, @NotNull MockHttpSession session, @NotNull String body)
+      throws Exception {
     return mockMvc.perform(
         post("/connected-apps/confirm/" + step)
             .session(session)
             .header("X-Requested-With", "XMLHttpRequest")
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"handoffId\":\"" + HANDOFF + "\"}")
+            .content(body)
             .with(member())
             .with(csrf()));
   }

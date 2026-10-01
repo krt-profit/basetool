@@ -152,7 +152,7 @@
 
 </main>
 <script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('member-search');
         const filterForm = document.getElementById('members-filter-form');
@@ -212,17 +212,17 @@
         }
     });
 
-    const MSG_DELETE_TITLE = "[[#{members.delete.title}]]";
-    const MSG_DELETE_CONFIRM = "[[#{members.delete_confirm}]]";
-    const MSG_DELETE_LABEL = "[[#{members.delete}]]";
-    const MSG_CANCEL_LABEL = "[[#{general.cancel}]]";
-    const MSG_DELETE_SUCCESS = "[[#{success.user.delete}]]";
-    const MSG_DELETE_ERROR = "[[#{error.user.delete}]]";
-    const MSG_SYNC_SUCCESS = "[[#{members.sync.success}]]";
-    const MSG_SYNC_ERROR = "[[#{members.sync.error}]]";
-    const MSG_CONSOLIDATE_SUCCESS = "[[#{success.user.consolidate}]]";
-    const MSG_CONSOLIDATE_ERROR = "[[#{error.user.consolidate}]]";
-    const MSG_CONSOLIDATE_NO_TARGET = "[[#{error.user.consolidate.no_target}]]";
+    const MSG_DELETE_TITLE = /*[[#{members.delete.title}]]*/ "";
+    const MSG_DELETE_CONFIRM = /*[[#{members.delete_confirm}]]*/ "";
+    const MSG_DELETE_LABEL = /*[[#{members.delete}]]*/ "";
+    const MSG_CANCEL_LABEL = /*[[#{general.cancel}]]*/ "";
+    const MSG_DELETE_SUCCESS = /*[[#{success.user.delete}]]*/ "";
+    const MSG_DELETE_ERROR = /*[[#{error.user.delete}]]*/ "";
+    const MSG_SYNC_SUCCESS = /*[[#{members.sync.success}]]*/ "";
+    const MSG_SYNC_ERROR = /*[[#{members.sync.error}]]*/ "";
+    const MSG_CONSOLIDATE_SUCCESS = /*[[#{success.user.consolidate}]]*/ "";
+    const MSG_CONSOLIDATE_ERROR = /*[[#{error.user.consolidate}]]*/ "";
+    const MSG_CONSOLIDATE_NO_TARGET = /*[[#{error.user.consolidate.no_target}]]*/ "";
 
     function refreshMembersResults() {
         const container = document.getElementById('members-results');

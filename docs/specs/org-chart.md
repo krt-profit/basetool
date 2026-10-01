@@ -335,7 +335,9 @@ the free-text holder is a descriptive chart entry and is not audited.
 - [ ] `PUT …/grand-admiral` designates the user (auto-adding OL membership when needed), is
   idempotent, and holds the org-wide singleton; `DELETE …/grand-admiral` vacates and leaves the OL
   membership intact.
-- [ ] Removing the Grand Admiral's OL membership vacates the post (no dangling designation).
+- [x] Removing the Grand Admiral's OL membership vacates the post (no dangling designation), also
+  when the OL is already loaded as a Hibernate proxy (`removeOlMember`, `removeGrandAdmiral` and the
+  designation paths unproxy it; `OrgUnitMembershipServiceProxyIntegrationTest`).
 - [ ] The holder's rights are exactly an OL member's — no `MembershipRole` / cascade / converter
   change.
 - [ ] A free-text Grand Admiral (a `displayName`, no account) renders at the top with the "no
