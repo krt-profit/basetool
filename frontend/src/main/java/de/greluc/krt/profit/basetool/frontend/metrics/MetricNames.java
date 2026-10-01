@@ -145,6 +145,13 @@ public final class MetricNames {
   public static final String SESSION_TYPE_REFUSED = "basetool.session.type.refused";
 
   /**
+   * Gauge {@code basetool_session_type_allow_list_mode}, tag {@code mode} ({@code off} / {@code
+   * report} / {@code enforce}): {@code 1} on the series naming the effective {@code
+   * app.session.type-allow-list} mode of this process and {@code 0} on the others (REQ-SEC-067).
+   */
+  public static final String SESSION_TYPE_ALLOW_LIST_MODE = "basetool.session.type.allow.list.mode";
+
+  /**
    * Counter {@code basetool_session_unmappable_total}, tag {@code missing_key}: a non-empty Redis
    * session hash lacking a field {@code RedisSessionMapper} requires, served as no session
    * (REQ-SEC-063).
