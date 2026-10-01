@@ -75,7 +75,8 @@ production still carries them.
 
 ### 0.1 What this was written against
 
-Production pins `quay.io/keycloak/keycloak:26.7` by digest (26.7.4 by its label since 2026-09-16) —
+The repository pins `quay.io/keycloak/keycloak:26.8` by digest (26.8.0 by its label since the upgrade of
+2026-10-01; production ran 26.7.4 before it) —
 declared in `docker-compose.yml` and carried into the generated Quadlet unit
 `quadlet/systemd/keycloak.container`. Every field name, menu label and endpoint below was read out
 of the **26.7.0 sources**, not from memory:
@@ -95,7 +96,9 @@ of the **26.7.0 sources**, not from memory:
 | A client the wizard creates carries `fullScopeAllowed = true`                                                                                                                                   | `RepresentationToModel#defaultFullScopeAllowed` @ 26.7.0 (`isNew && !consentRequired`)                                                                                                                                                                  |
 
 If the realm is upgraded past 26.7, re-check the three items marked **⚠ version-sensitive** below
-before running them.
+before running them. Re-checked against the 26.8.0 sources on 2026-10-01: `RealmEventsConfigRepresentation` is unchanged
+between 26.7.4 and 26.8.0, and a new client still defaults `fullScopeAllowed` the same way
+(`defaultFullScopeAllowed`); the PKCE step and the other claims were not re-read and stay 26.7.0 facts.
 
 ### 0.2 Three things the previous version of this runbook got wrong
 

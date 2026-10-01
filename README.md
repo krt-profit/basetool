@@ -294,7 +294,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 - **Build** — Gradle 9 (Kotlin DSL), versions in the `gradle/libs.versions.toml` catalog, updates surfaced by refreshVersions
 - **Database** — PostgreSQL 18, schema owned by Flyway (Hibernate `ddl-auto=validate`)
 - **Session store** — Redis 8 (`spring-session-data-redis`)
-- **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.7)
+- **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.8)
 - **Frontend** — Thymeleaf + Spring Security OAuth2 Client, WebClient wrapped with Resilience4j (Timeout, Retry, CircuitBreaker, Bulkhead)
 - **Outbound HTTP in backend and ingest** — blocking `RestClient` on the JDK HTTP client; neither module carries WebFlux (ADR-0204)
 - **API docs** — SpringDoc / OpenAPI; each REST-serving module ships its committed contract as its documentation artifact — `backend/src/main/resources/api/openapi.json`, and for ingest `exchange-v1.openapi.json` (the exchange contract, also served anonymously at `/exchange/v1/openapi.json`)

@@ -1043,8 +1043,13 @@ not gated and applies on the next tick.
 
 To take a gated upgrade: do the component's upgrade work first, then
 `cd / && sudo -u deploy /var/iri/code/scripts/deploy.sh --force`. For Keycloak that is checking the
-provider JAR against the new version and that the keystore still carries `dns:keycloak`. For a
-**Postgres major** no procedure is written yet — the running cluster will not start on a newer
+provider JAR against the new version and that the keystore still carries `dns:keycloak`. A Keycloak
+**minor** also migrates the `keycloak` database schema in place on its first start, and Keycloak does
+not support rolling that back (upgrading guide, *Preparing for an upgrade*): take a fresh backup
+first ([`backup.md`](backup.md)), and treat a rollback after the migration as a restore of that
+dump, because moving the image back does not undo the migration. Logins that are in flight at the
+restart must begin again, and the migration has a 30-minute timeout by default
+(`--transaction-setup-timeout`). For a **Postgres major** no procedure is written yet — the running cluster will not start on a newer
 major, so plan it as its own change (a dump and restore into a fresh data directory, the mechanism
 [`backup.md`](backup.md) already restores with) before promoting it.
 
