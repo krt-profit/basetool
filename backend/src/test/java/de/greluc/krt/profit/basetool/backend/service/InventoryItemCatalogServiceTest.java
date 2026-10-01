@@ -83,4 +83,15 @@ class InventoryItemCatalogServiceTest {
     verify(blueprintRepository, org.mockito.Mockito.times(2))
         .findItemsWithActiveBlueprint("", pageable);
   }
+
+  @Test
+  void findBookableItems_escapesLikeMetacharactersInTheSearch() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(blueprintRepository.findItemsWithActiveBlueprint("50\\%\\_x", pageable))
+        .thenReturn(Page.empty(pageable));
+
+    service.findBookableItems(" 50%_x ", pageable);
+
+    verify(blueprintRepository).findItemsWithActiveBlueprint("50\\%\\_x", pageable);
+  }
 }

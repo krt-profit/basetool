@@ -451,6 +451,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: scripts/check-edge-nginx.sh
 
+      - name: edge-allowlist / Check the API allow-list's method gating against a live nginx
+        if: ${{ !cancelled() }}
+        run: scripts/check-edge-allowlist-behaviour.sh
+
       - name: acme-publish / Check acme certificate publishing
         if: ${{ !cancelled() }}
         run: scripts/check-acme-publish.sh

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -42,7 +43,8 @@ class AuditReportProxyControllerTest {
   private static final Instant TO = Instant.parse("2026-02-01T00:00:00Z");
 
   private final WebClient webClient = mock(WebClient.class);
-  private final AuditReportProxyController controller = new AuditReportProxyController(webClient);
+  private final AuditReportProxyController controller =
+      new AuditReportProxyController(RealBackendApiClient.over(webClient));
 
   @Test
   void pdfExport_rejectsUnknownDomain() {

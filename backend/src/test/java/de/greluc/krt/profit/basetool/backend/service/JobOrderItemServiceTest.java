@@ -71,6 +71,18 @@ class JobOrderItemServiceTest {
   @InjectMocks private JobOrderItemService service;
 
   @Test
+  void findOrderableItemsEscapesLikeMetacharactersInTheSearch() {
+    org.springframework.data.domain.Pageable pageable =
+        org.springframework.data.domain.PageRequest.of(0, 20);
+    when(blueprintRepository.findOrderableItems("50\\%\\_x", pageable))
+        .thenReturn(org.springframework.data.domain.Page.empty(pageable));
+
+    service.findOrderableItems(" 50%_x ", pageable);
+
+    org.mockito.Mockito.verify(blueprintRepository).findOrderableItems("50\\%\\_x", pageable);
+  }
+
+  @Test
   void requiredMaterialIdsCollectsMaterialLinesForMaterialOrderAndDerivedForItemOrder() {
     Material steel = new Material();
     steel.setId(UUID.randomUUID());

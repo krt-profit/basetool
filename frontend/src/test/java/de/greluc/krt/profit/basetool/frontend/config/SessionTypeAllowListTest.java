@@ -61,7 +61,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.SerializationException;
@@ -341,16 +346,38 @@ class SessionTypeAllowListTest {
     "ENFORCE,ENFORCE",
     " report ,REPORT",
     "off,OFF",
-    "enforced,REPORT",
-    "'',REPORT"
+    "enforced,ENFORCE",
+    "'',ENFORCE"
   })
-  void theModeParsesLenientlyAndFallsBackToReport(String raw, SessionTypeAllowList.Mode expected) {
+  void theModeParsesLenientlyAndFallsBackToEnforce(String raw, SessionTypeAllowList.Mode expected) {
     assertThat(SessionTypeAllowList.Mode.parse(raw)).isEqualTo(expected);
   }
 
   @Test
-  void aMissingModeFallsBackToReport() {
-    assertThat(SessionTypeAllowList.Mode.parse(null)).isEqualTo(SessionTypeAllowList.Mode.REPORT);
+  void aMissingModeFallsBackToEnforce() {
+    assertThat(SessionTypeAllowList.Mode.parse(null)).isEqualTo(SessionTypeAllowList.Mode.ENFORCE);
+  }
+
+  /**
+   * With no environment variable and no override, the shipped configuration resolves to enforce.
+   */
+  @Test
+  void theShippedDefaultIsEnforce() throws Exception {
+    StandardEnvironment environment = new StandardEnvironment();
+    List<PropertySource<?>> sources =
+        new YamlPropertySourceLoader()
+            .load("application", new ClassPathResource("application.yml"));
+    sources.forEach(environment.getPropertySources()::addLast);
+    assertThat(environment.getProperty("app.session.type-allow-list"))
+        .as("application.yml default")
+        .isEqualTo("enforce");
+
+    String annotation =
+        RedisSessionConfig.class
+            .getDeclaredField("typeAllowListValue")
+            .getAnnotation(Value.class)
+            .value();
+    assertThat(annotation).as("RedisSessionConfig @Value default").endsWith(":enforce}");
   }
 
   /**

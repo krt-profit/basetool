@@ -58,6 +58,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
@@ -336,6 +337,7 @@ public class OrgUnitMembershipService {
     orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
     orgUnitRepository
         .findById(organisationsleitungId)
+        .map(u -> Hibernate.unproxy(u, OrgUnit.class))
         .filter(
             u -> u instanceof Organisationsleitung o && userId.equals(o.getGrandAdmiralUserId()))
         .ifPresent(
@@ -457,8 +459,11 @@ public class OrgUnitMembershipService {
    */
   private Organisationsleitung requireOrganisationsleitung(@NotNull UUID organisationsleitungId) {
     OrgUnit ol =
-        Entities.require(
-            orgUnitRepository.findById(organisationsleitungId), "Organisationsleitung not found");
+        Hibernate.unproxy(
+            Entities.require(
+                orgUnitRepository.findById(organisationsleitungId),
+                "Organisationsleitung not found"),
+            OrgUnit.class);
     if (!(ol instanceof Organisationsleitung organisationsleitung)) {
       throw new BadRequestException(
           "Org unit " + organisationsleitungId + " is not the Organisationsleitung");

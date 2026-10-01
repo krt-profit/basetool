@@ -86,14 +86,30 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Reads take a {@code catalog} parameter defaulting to {@link InventoryCatalog#MATERIAL}; {@code
  * catalog=ITEM} rejects the material-only filters with 400 (REQ-INV-029, REQ-INV-031). The
- * class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052) and is ANDed with the
- * URL rule requiring ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER.
+ * class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052); the endpoints outside
+ * {@code /my-inventory} and the owner-checked item routes carry {@link #INVENTORY_ACCESS} on the
+ * method, which the URL rule repeats.
  */
 @RestController
 @RequestMapping("/api/v1/inventory")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class InventoryItemController {
+
+  /**
+   * Role gate of the squadron-wide inventory endpoints: ADMIN, OFFICER, LOGISTICIAN (implied by the
+   * first two) or KRT_MEMBER, the same set as the {@code /api/v1/inventory/**} URL rule.
+   */
+  static final String INVENTORY_ACCESS =
+      "hasAnyRole('"
+          + Roles.ADMIN
+          + "','"
+          + Roles.OFFICER
+          + "','"
+          + Roles.LOGISTICIAN
+          + "','"
+          + Roles.KRT_MEMBER
+          + "')";
 
   /** Default page size for a stack-entries drill-down when the caller does not specify one. */
   private static final int STACK_ENTRIES_DEFAULT_SIZE = 20;
@@ -142,6 +158,7 @@ public class InventoryItemController {
    * @return paged aggregated DTOs
    */
   @GetMapping("/aggregated")
+  @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public PageResponse<AggregatedInventoryDto> getAggregatedInventory(
       @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog,
@@ -176,6 +193,7 @@ public class InventoryItemController {
    * @return paged inventory items
    */
   @GetMapping("/material/{materialId}")
+  @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getInventoryByMaterial(
       @PathVariable @NotNull UUID materialId,
@@ -200,6 +218,7 @@ public class InventoryItemController {
    * @return paged inventory rows stocking that game item
    */
   @GetMapping("/game-item/{gameItemId}")
+  @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getInventoryByGameItem(
       @PathVariable @NotNull UUID gameItemId,
@@ -394,6 +413,7 @@ public class InventoryItemController {
    * @return paged inventory items
    */
   @GetMapping("/all")
+  @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getAllInventory(
       @RequestParam(required = false) List<UUID> materialIds,
@@ -441,6 +461,7 @@ public class InventoryItemController {
    * @return the mission's inventory items
    */
   @GetMapping("/mission/{missionId}")
+  @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getMissionInventory(@PathVariable @NotNull UUID missionId) {
     return inventoryItemService.getMissionInventory(missionId);
@@ -463,6 +484,7 @@ public class InventoryItemController {
    * @return grouped DTOs
    */
   @GetMapping("/all/grouped")
+  @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public List<GroupedInventoryDto> getAllGroupedInventory(
       @RequestParam(required = false) List<UUID> materialIds,
@@ -541,6 +563,7 @@ public class InventoryItemController {
    * @return one page of the stack's entries, oldest-first
    */
   @GetMapping("/all/stack/entries")
+  @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getAllStackEntries(
       @RequestParam(required = false) UUID materialId,
@@ -589,6 +612,7 @@ public class InventoryItemController {
    * @return paged bookable game-item references
    */
   @GetMapping("/item-catalog")
+  @PreAuthorize(INVENTORY_ACCESS)
   @Operation(
       summary = "List bookable game items",
       description =
@@ -696,7 +720,7 @@ public class InventoryItemController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize(INVENTORY_ACCESS)
   public InventoryItemDto createInventoryItem(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid InventoryItemCreateDto dto) {
     return inventoryItemService.createInventoryItem(dto, userService.getUserIdFromJwt(jwt));
@@ -792,7 +816,7 @@ public class InventoryItemController {
   })
   @PostMapping("/bulk-checkout")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize(INVENTORY_ACCESS)
   public void bulkCheckout(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid BulkCheckoutRequest request) {
     inventoryItemService.bulkCheckout(request, userService.getUserIdFromJwt(jwt));
@@ -856,7 +880,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "404", description = "One or more rows not found")
   })
   @PostMapping("/bulk-org-unit")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize(INVENTORY_ACCESS)
   public BulkOrgUnitChangeResultDto bulkChangeOrgUnit(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid BulkOrgUnitChangeRequest request) {
     return inventoryOrgUnitChangeService.bulkChangeOrgUnit(
@@ -921,7 +945,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Marking switched off")
   })
   @PostMapping("/bulk-stolen")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize(INVENTORY_ACCESS)
   public BulkStolenMarkResultDto bulkMarkStolen(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid BulkStolenMarkRequest request) {
     return inventoryStolenMarkService.bulkMark(request, userService.getUserIdFromJwt(jwt));
@@ -951,7 +975,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "404", description = "One or more rows, or a target, not found")
   })
   @PostMapping("/bulk-rebook")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize(INVENTORY_ACCESS)
   public BulkRebookResultDto bulkRebook(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid BulkRebookRequest request) {
     return inventoryItemService.bulkRebook(request, userService.getUserIdFromJwt(jwt));

@@ -1111,9 +1111,8 @@ public class JobOrderPageController {
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
     log.debug(
-        "JobOrder: Checking logistician status for user u-{}. Original authorities: {}."
+        "JobOrder: Checking logistician status. Original authorities: {}."
             + " Reachable authorities: {}",
-        Integer.toHexString(Objects.hashCode(principal.getName())),
         authorities,
         reachableAuthorities);
     boolean result =

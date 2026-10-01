@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
@@ -66,7 +67,7 @@ class DataExportProxyControllerTest {
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     controller =
         new DataExportProxyController(
-            webClient,
+            RealBackendApiClient.over(webClient),
             new AppHttpProperties(
                 Duration.ofSeconds(3),
                 Duration.ofSeconds(5),
@@ -166,12 +167,12 @@ class DataExportProxyControllerTest {
   }
 
   @Test
-  void anUnreachableBackendIs500AndNotAnUnhandledException() throws Exception {
+  void anUnreachableBackendIsATimeoutAndNotAnUnhandledException() throws Exception {
     server.shutdown();
 
     ResponseStatusException ex = assertThrows(ResponseStatusException.class, controller::pdf);
 
-    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
+    assertEquals(HttpStatus.GATEWAY_TIMEOUT, ex.getStatusCode());
   }
 
   /**

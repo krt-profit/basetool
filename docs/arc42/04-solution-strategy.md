@@ -20,11 +20,12 @@ direction: the frontend holds no JPA and no JDBC.
 
 *Corrected 2026-09-29:* this section said the frontend reaches the backend "through exactly one
 class" and that ArchUnit keeps the seam from growing a second one. Eleven controllers (byte
-downloads, multipart uploads, bulk deletes, one `Flux` listing) inject the `webClient` bean
-directly — they keep the filter chain but lose `BackendApiClient`'s error mapping — and no ArchUnit
-rule confines backend calls to the seam. The
-[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) (§5.9, G-17) brings those
-controllers back onto the kernel and adds the missing rule.
+downloads, multipart uploads, bulk deletes, one `Flux` listing) injected the `webClient` bean
+directly and lost `BackendApiClient`'s error mapping: an expired refresh token answered `500`
+instead of the re-authentication flow, and the failure was not counted. Since 2026-10-01 they call
+`BackendApiClient#execute` (same bean, same request shapes), and
+`ArchitectureTest#noControllerHoldsARawWebClient` keeps controllers off the raw client; the
+notification page's SSE relay is the one exception.
 
 *Trade-off accepted:* the frontend hand-mirrors the backend's DTOs rather than sharing a module,
 so a contract change has to be made twice. Two gates watch for drift (`FrontendDtoContractTest`,

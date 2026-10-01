@@ -23,12 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.P4kImportJobDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -63,8 +64,8 @@ class AdminP4kImportPageControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    backendApiClient = mock(BackendApiClient.class);
-    controller = new AdminP4kImportPageController(webClient, backendApiClient);
+    backendApiClient = spy(RealBackendApiClient.over(webClient));
+    controller = new AdminP4kImportPageController(backendApiClient);
   }
 
   @AfterEach
