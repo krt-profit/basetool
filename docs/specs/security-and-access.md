@@ -3408,10 +3408,10 @@ A new session attribute of a type outside the list is a change to this table, in
 **Three modes**, `app.session.type-allow-list` / `APP_SESSION_TYPE_ALLOW_LIST`:
 
 - `off` — the permissive validator of before, byte for byte; the escape hatch.
-- `report` (**default**, and what a merge deploys) — every value is read exactly as before; a class
+- `report` (opt-in) — every value is read exactly as before; a class
   outside the list is counted on `basetool_session_type_refused_total{mode="report"}` and named once
   in a `WARN`.
-- `enforce` — a class outside the list is refused; `FaultTolerantSessionSerializer` drops that one
+- `enforce` (**default**) — a class outside the list is refused; `FaultTolerantSessionSerializer` drops that one
   attribute (REQ-SEC-049/050 — it is repaired on the same request), the member keeps the rest of the
   session. Production is switched to it by the owner once the report counter has stayed at zero
   ([`deployment.md` → *Session type allow-list*](../deployment.md#session-type-allow-list-report-then-enforce));
@@ -3432,7 +3432,9 @@ touches no stored session and needs no migration.
   instantiated, dropped as an unreadable attribute and counted on both counters.
 - [ ] Under `report` that same value is read and reported; under `off` it is read and not reported.
 - [ ] A subpackage of an allowed JDK or Spring package is not allowed by the parent entry.
-- [ ] A mistyped mode falls back to `report`, never to a failed startup.
+- [x] A missing or mistyped mode falls back to `enforce`, never to a failed startup or a weaker
+  check; `application.yml`, the `@Value` default, `docker-compose.yml` and the Quadlet env template
+  all default to it (`SessionTypeAllowListTest#theShippedDefaultIsEnforce`).
 - [ ] The E2E stack runs with `enforce`, so every login, refresh, flash redirect and live-sync
   handshake in the suite is a session read under the strictest mode.
 - [x] Production runs `enforce`. _(2026-09-25, 17:58 UTC, owner-approved: `APP_SESSION_TYPE_ALLOW_LIST=enforce`

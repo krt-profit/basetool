@@ -892,8 +892,8 @@ systemctl start iri-deploy.timer
 ### Session type allow-list: report, then enforce
 
 The frontend reads a stored session value only if the class it names is on `SessionTypeAllowList`
-(REQ-SEC-067, ADR-0206). It ships in **`report`** mode — every value is read exactly as before,
-and a class outside the list is only counted and logged. Switching production to **`enforce`** is a
+(REQ-SEC-067, ADR-0206). It ships in **`enforce`** mode (the default since the report-first rollout ended); **`report`** is an explicit opt-in that reads every value as before and
+only counts and logs a class outside the list. Switching a host between the two is a
 `.env` change plus a frontend restart: a production write, so it waits for the owner's yes.
 
 > [!note] Applied on production 2026-09-25, 17:58 UTC — after ~5 hours of report data, not a week
@@ -902,7 +902,7 @@ and a class outside the list is only counted and logged. Switching production to
 > 1.11.0 went live (12:40 UTC) — about five hours of ordinary use, **not** the seven days the
 > precondition asks for, so the classes that only a rarer path writes are covered by the parity
 > test and the E2E suite (which runs `enforce`) rather than by production evidence. `.env` had no
-> `APP_SESSION_TYPE_ALLOW_LIST` line (the template defaulted to `report`); one line
+> `APP_SESSION_TYPE_ALLOW_LIST` line (the template then defaulted to `report`); one line
 > `APP_SESSION_TYPE_ALLOW_LIST=enforce` was appended, the render changed only `frontend.env`, and
 > the frontend logged `Session type allow-list mode: ENFORCE` with no refusal afterwards. **The
 > watch that replaces the missing days:** `SessionTypeOutsideAllowList` and
@@ -944,7 +944,7 @@ parity test and the E2E suite (which runs `enforce`) cover reads identically. Wa
 outside the list turn up after all, that one attribute is dropped once per session and repaired on
 the same request (REQ-SEC-050) — the member keeps the login.
 
-**Rollback:** edit the line back to `APP_SESSION_TYPE_ALLOW_LIST=report` (or delete it), render
+**Rollback:** edit the line to `APP_SESSION_TYPE_ALLOW_LIST=report` (deleting it now means `enforce`), render
 `env.d/` again with the same command and `${UCTL} restart frontend.service`. No stored session is
 touched either way: the mode governs reading only. `off` restores the pre-list validator exactly, for
 the case where the reporting itself misbehaves.
