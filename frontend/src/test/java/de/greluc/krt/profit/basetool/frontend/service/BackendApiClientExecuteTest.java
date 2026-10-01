@@ -143,8 +143,8 @@ class BackendApiClientExecuteTest {
     BackendServiceException ex =
         assertThrows(BackendServiceException.class, () -> call.apply(client));
 
-    assertEquals(status, ex.getStatusCode());
-    assertEquals(code, ex.getProblemCode());
+    assertEquals(status, ex.getStatusCode(), name + " status");
+    assertEquals(code, ex.getProblemCode(), name + " problem code");
     assertEquals(
         1.0d,
         meterRegistry
@@ -195,7 +195,8 @@ class BackendApiClientExecuteTest {
         new BackendApiClient(failing, failing, meterRegistry, new NoOpCacheManager());
 
     assertThrows(ReauthenticationRequiredException.class, () -> call.apply(reauthClient));
-    assertEquals(0, server.getRequestCount(), "the call must not reach the backend");
+    assertEquals(
+        0, server.getRequestCount(), name + " (" + method + ") must not reach the backend");
   }
 
   /** A refused connection is the same timeout as for every other call, counted as such. */
