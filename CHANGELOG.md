@@ -2,12 +2,6 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **Android: Operation anlegen funktioniert.** Die API-Domain lässt jetzt genau `POST /api/v1/operations` durch
-  (zuvor 404); `GET`, `PUT`, `DELETE` und ähnliche Pfade bleiben gesperrt. Der Aufruf ist Teil des eingefrorenen
-  App-Vertrags.
-
 ### Changed
 
 - **Deploy: nur ein Release auf einmal.** Die Promotion prüft alle fünf Artefakte und ihren gemeinsamen Quell-Commit, bevor sie `:stable` verschiebt; `deploy.sh` verweigert einen Satz aus verschiedenen Commits und versucht es im nächsten Tick erneut. Notausgang: `IRI_REQUIRE_ONE_RELEASE=false`.
@@ -26,6 +20,15 @@
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
 ### Fixed
+
+- **Android: Operation anlegen funktioniert.** Die API-Domain lässt jetzt genau `POST /api/v1/operations` durch
+  (zuvor 404); `GET`, `PUT`, `DELETE` und ähnliche Pfade bleiben gesperrt. Der Aufruf ist Teil des eingefrorenen
+  App-Vertrags.
+
+- **Downloads, Importe und „Alles löschen" bei abgelaufener Anmeldung.** Elf Proxy-Controller (PDF-/Datenexporte,
+  P4K-, Hangar- und Blueprint-Import, Hangar-/Lager-„Alles löschen") umgingen die gemeinsame Fehlerbehandlung:
+  eine abgelaufene Sitzung führte zu einem Fehler 500 statt zur erneuten Anmeldung, und die Fehler wurden nicht
+  gezählt. Sie laufen jetzt über `BackendApiClient`; ein nicht erreichbares Backend meldet 504 statt 500.
 
 - **Raffinerieauftrag: Einlagern nur einmal.** Ein bereits eingelagerter Auftrag lässt sich weder per Bearbeiten wieder öffnen noch ein zweites Mal einlagern (keine doppelten Lagerzeilen und Audit-Einträge). Beim Einlagern wird außerdem geprüft, dass der gewählte Auftrag das Material benötigt (Migration V259, REQ-REFINERY-022). Neue Aufträge entstehen immer als „Offen“; ein mitgeschickter Status wird ignoriert, das Erstellformular bietet keine Statuswahl mehr.
 
@@ -54,22 +57,27 @@
   und wurde still blind, wenn dieser keine Container-Serien mehr lieferte; der neue Alarm meldet das. Der Text
   von `ContainerMetricsMissing` nennt den Crash-Loop-Alarm nicht mehr.
 
-### Security
-
 - **Keine Namens-Hashes mehr im Log.** Frontend-Logzeilen zur Rollenprüfung und zum Rollenabgleich tragen kein aus dem Benutzernamen abgeleitetes Kürzel mehr.
+
 - **Zugangsdaten verschwinden aus `toString()` und Logs.** Das Scrape-Passwort (Frontend, Ingest) und das Discord-Token im Keycloak-SPI werden nicht mehr ausgegeben; der Log-Maskierer erfasst zusätzlich `password=` und `secret=`.
+
 - **CSV-Export der Beförderungsmatrix neutralisiert Formeln.** Zellen, die mit `=`, `+`, `-`, `@`, Tab oder Zeilenumbruch beginnen, erhalten ein führendes `'`.
+
 - **Browser-IDs werden vor dem Backend-Aufruf geprüft.** Ankündigungs-ID, Mitglieds-ID des Beförderungsfragments, Standard-Blueprint-ID und der Rollen-Code der Bankkonten-Sichtbarkeit und -Limits müssen die erwartete Form haben, sonst antwortet das Frontend mit 400, ohne das Backend zu rufen.
+
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
   Zertifikate liest, fällt nicht mehr auf ein ungepinntes PostgreSQL-Image zurück; ohne lesbaren
   `@sha256:`-Pin endet der Lauf mit `FATAL`, `BackupStaleOrMissing` greift weiter.
+
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
   Identity-Provider-Mapper), CVE-2026-14781, CVE-2026-19608 und CVE-2026-93999 (deaktivierte Clients im
   Token), dazu den Geräte-Login für brute-force-gesperrte Konten sowie Jackson und Netty im
   Keycloak-Image.
+
 - **Jackson auf 2.21.7 und 3.1.7 angehoben** (Gradle-Plugins 2.22.3). Schließt CVE-2026-91776 und
   CVE-2026-91777 (beide HIGH) in `jackson-databind` für Backend, Frontend, Ingest, Keycloak-SPI und
   `logging-support`.
+
 - **Jackson auch in Keycloak-SPI, `logging-support` und den Gradle-Plugins angehoben.** Dort lagen
   noch `jackson-databind` 2.21.5, 3.1.5 und 2.22.1 (CVE-2026-68497, CVE-2026-19032,
   CVE-2026-83557), jetzt 2.21.6, 3.1.6 und 2.22.2. Die Images von Backend, Frontend und Ingest

@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedHashMap;
@@ -29,6 +32,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.AbstractResource;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -40,8 +44,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -66,7 +68,7 @@ public class HangarImportProxyController {
   /** Filename sent to the backend when the browser supplied none. */
   private static final String FALLBACK_FILENAME = "shiplist.json";
 
-  private final WebClient webClient;
+  private final BackendApiClient backendApiClient;
 
   /** Resolves the localized {@code 413} message for an oversized upload. */
   private final MessageSource messageSource;
@@ -103,8 +105,8 @@ public class HangarImportProxyController {
 
   /**
    * Forwards a multipart upload to the backend: refuses one above {@link #MAX_IMPORT_BYTES} unread,
-   * streams an accepted one, maps a {@link WebClientResponseException} to a {@link
-   * ResponseStatusException} with the backend's status and any other failure to {@code 500}.
+   * streams an accepted one through {@link BackendApiClient#execute}, which maps a backend failure
+   * like any other backend call.
    *
    * @param file uploaded multipart file
    * @param backendPath relative path on the backend (without host) to forward to
@@ -119,36 +121,36 @@ public class HangarImportProxyController {
           MAX_IMPORT_BYTES);
       return tooLarge();
     }
-    try {
-      String originalFilename =
-          file.getOriginalFilename() != null ? file.getOriginalFilename() : FALLBACK_FILENAME;
-
-      MultipartBodyBuilder builder = new MultipartBodyBuilder();
-      builder
-          .part("file", new StreamedUpload(file, originalFilename))
-          .contentType(MediaType.APPLICATION_OCTET_STREAM);
-
-      Map<?, ?> result =
-          webClient
-              .post()
-              .uri(backendPath)
-              .contentType(MediaType.MULTIPART_FORM_DATA)
-              .body(BodyInserters.fromMultipartData(builder.build()))
-              .retrieve()
-              .bodyToMono(Map.class)
-              .block();
-
-      return ResponseEntity.ok(result);
-    } catch (WebClientResponseException e) {
-      log.warn("Hangar import proxy: backend returned {} — {}", e.getStatusCode(), e.getMessage());
-      throw new ResponseStatusException(e.getStatusCode(), e.getMessage());
-    } catch (ResponseStatusException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Hangar import proxy: unexpected error", e);
+    try (InputStream probe = file.getInputStream()) {
+      probe.available();
+    } catch (IOException e) {
+      log.error("Hangar import proxy: the upload could not be read", e);
       throw new ResponseStatusException(
           HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred during import.");
     }
+    String originalFilename =
+        file.getOriginalFilename() != null ? file.getOriginalFilename() : FALLBACK_FILENAME;
+
+    MultipartBodyBuilder builder = new MultipartBodyBuilder();
+    builder
+        .part("file", new StreamedUpload(file, originalFilename))
+        .contentType(MediaType.APPLICATION_OCTET_STREAM);
+
+    Map<?, ?> result =
+        withBackendStatus(
+            () ->
+                backendApiClient.execute(
+                    HttpMethod.POST,
+                    backendPath,
+                    webClient ->
+                        webClient
+                            .post()
+                            .uri(backendPath)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .body(BodyInserters.fromMultipartData(builder.build())),
+                    spec -> spec.bodyToMono(Map.class)));
+
+    return ResponseEntity.ok(result);
   }
 
   /**
