@@ -20,6 +20,9 @@
 - **Materialbedarf: Suchkopf der Materialauswahl ist wieder deckend schwarz.** Zwei Farbwerte der Oberfläche
   (Materialbedarf-Suche, Kontogruppen-Titel der Bank) verwiesen auf nicht existierende Design-Tokens; ein Test
   prüft künftig jedes `var(--…)`.
+- **Mitgliederliste: Dialogtexte werden als JavaScript-Text ausgegeben.** Löschen-, Sync- und
+  Zusammenführen-Dialog bekamen ihre Übersetzungen HTML-maskiert; ein Anführungszeichen in einer
+  Übersetzung hätte `&quot;` angezeigt.
 
 ### Security
 
