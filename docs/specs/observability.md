@@ -2821,6 +2821,10 @@ therefore alerts on:
   Restarts" panel already used `changes()`; locked by `tests/containerrestartloop_changes_test.yml`).
   The rule reads the normalised `basetool:container:start_time_seconds` (fed on the Podman host by
   `podman_container_started_seconds` joined onto `podman_container_info`), like the dashboard panel.
+  That source is the podman exporter, not the cgroup collector, so `ContainerMetricsMissing` does not
+  guard it: **`ContainerStartTimeMissing`** (critical, fewer than 10 containers or `absent()`, 10 m)
+  does, and the conformance `container-metrics` check lists the series too
+  (`tests/containerstarttimemissing_test.yml`).
   It read cAdvisor's `container_start_time_seconds` until 2026-09-22 — recorded that morning as a
   known gap, because with cAdvisor removed the series had no producer and the rule could not fire:
   the dead-alert shape this requirement exists for. Its test was rewritten on the Podman shape in

@@ -694,6 +694,72 @@ expect_out "the generated db-backend unit carries a digest the backup can use" p
   '@sha256:'
 
 say ""
+say "== the helper image fails closed: no digest pin, no run (S-09) =="
+mkdir -p "${WORK}/unpinned" "${WORK}/empty"
+printf '[Container]\nImage=docker.io/library/postgres:18-alpine\n' > "${WORK}/unpinned/db-backend.container"
+expect_out "an unpinned tag in the unit is not an answer" podman \
+  'RT_UNIT_DIR='"${WORK}"'/unpinned rt_unit_image db-backend '"${WORK}"'/nowhere; echo "rc=$?"' 'rc=1'
+expect_out "...but a pinned bundle copy behind it still is" podman \
+  'RT_UNIT_DIR='"${WORK}"'/unpinned rt_unit_image db-backend '"${WORK}"'/bundle' '@sha256:bbbb'
+expect_out "an unreadable unit refuses with a FATAL and a non-zero exit" podman \
+  'RT_UNIT_DIR='"${WORK}"'/nowhere; { rt_require_pinned_image backup "" db-backend '"${WORK}"'/nowhere; echo survived; } 2>&1' \
+  'refusing to run with an unpinned image'
+# shellcheck disable=SC2016
+expect_no_call "...and no container is started for it" podman \
+  'RT_UNIT_DIR='"${WORK}"'/nowhere rt_require_pinned_image backup "" db-backend '"${WORK}"'/nowhere; rt_read_mount x "${RT_PINNED_IMAGE}" true' 'run '
+# shellcheck disable=SC2016
+expect_out "a pinned unit is resolved into RT_PINNED_IMAGE" podman \
+  'rt_require_pinned_image backup "" db-backend '"${WORK}"'/nowhere; echo "got=${RT_PINNED_IMAGE}"' \
+  'got=docker.io/postgres:18-alpine@sha256:dddd'
+expect_out "an unpinned override is refused" podman \
+  '{ rt_require_pinned_image backup docker.io/library/postgres:18-alpine db-backend '"${WORK}"'/bundle; echo survived; } 2>&1' \
+  'is not digest-pinned'
+# shellcheck disable=SC2016
+expect_out "a pinned override is honoured" podman \
+  'rt_require_pinned_image backup docker.io/x/y@sha256:'"$(printf 'e%.0s' $(seq 1 64))"' db-backend; echo "got=${RT_PINNED_IMAGE}"' \
+  'got=docker.io/x/y@sha256:eeee'
+expect_out "a truncated digest is not a pin" podman \
+  'rt_is_digest_pinned docker.io/x/y@sha256:abc; echo "rc=$?"' 'rc=1'
+
+SCRIPT_BIN="${WORK}/script-bin"
+mkdir -p "${SCRIPT_BIN}"
+cp "${BIN}/podman" "${SCRIPT_BIN}/podman"
+printf '#!%s\necho running\n' "$(command -v bash)" > "${SCRIPT_BIN}/systemctl"
+chmod +x "${SCRIPT_BIN}/systemctl"
+SCRIPT_COMPOSE="${WORK}/compose"
+mkdir -p "${SCRIPT_COMPOSE}/quadlet/systemd" "${WORK}/state"
+: > "${SCRIPT_COMPOSE}/.env"
+: > "${WORK}/backup.env"
+
+run_job() {
+  local job="$1" unit="$2"
+  : > "$LOG"
+  rm -f "${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
+  [[ -n "$unit" ]] && printf '%s\n' "$unit" > "${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
+  # shellcheck disable=SC2031
+  PATH="${SCRIPT_BIN}:${PATH}" RT_BACKEND=podman RT_UNIT_DIR="${WORK}/nowhere" RT_STARTUP_WAIT=0 \
+    IRI_COMPOSE_DIR="${SCRIPT_COMPOSE}" IRI_BACKUP_ENV="${WORK}/backup.env" IRI_STATE_DIR="${WORK}/state" \
+    IRI_BACKUP_DIR="${WORK}/backupdir" TEXTFILE_DIR="${WORK}/textfile" \
+    bash "${HERE}/${job}.sh" 2>&1
+}
+PIN="Image=docker.io/postgres:18-alpine@sha256:$(printf 'a%.0s' $(seq 1 64))"
+for job in backup restore-drill; do
+  got="$(run_job "$job" "")"; rc=$?
+  if [[ $rc -ne 0 && "$got" == *"refusing to run with an unpinned image"* ]] && ! grep -q ' run ' "$LOG"; then
+    ok "${job}.sh refuses to start when db-backend's pin is unreadable"
+  else bad "${job}.sh with no unit: rc=${rc} out='${got}'"; fi
+  got="$(run_job "$job" "Image=docker.io/library/postgres:18-alpine")"; rc=$?
+  if [[ $rc -ne 0 && "$got" == *"refusing to run with an unpinned image"* ]] && ! grep -q ' run ' "$LOG"; then
+    ok "${job}.sh refuses an unpinned tag"
+  else bad "${job}.sh with an unpinned tag: rc=${rc} out='${got}'"; fi
+  got="$(run_job "$job" "$PIN")"
+  if [[ "$got" == *"image: docker.io/postgres:18-alpine@sha256:aaaa"* ]]; then
+    ok "${job}.sh proceeds past the image check with a pinned digest"
+  else bad "${job}.sh with a pinned unit did not get past the image check: '${got}'"; fi
+done
+if [[ ! -e "${WORK}/textfile/backup.prom" ]]; then ok "a refused backup writes no success metric, so BackupStaleOrMissing keeps counting"; else bad "a refused backup wrote backup.prom"; fi
+
+say ""
 say "== the weekly TSDB snapshot is asked from inside prometheus (OPS-SEC-02) =="
 expect_call "the snapshot is requested through exec into prometheus" podman \
   'rt_prometheus_snapshot' 'exec prometheus sh -c'
