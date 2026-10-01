@@ -6,7 +6,8 @@ without ever committing secrets or PII. Last reviewed: 2026-09-22.
 
 ## The realm at a glance
 
-As of the 2026-09-09 snapshot. Keycloak 26.7 (`quay.io/keycloak/keycloak:26.7`, pinned by digest),
+As of the 2026-09-09 snapshot (the version moved to Keycloak 26.8 on 2026-10-01; the realm values
+below were not re-read). Keycloak 26.8 (`quay.io/keycloak/keycloak:26.8`, pinned by digest),
 serving under `/auth` on the web origin since ADR-0166; in production it runs as the Quadlet unit
 `quadlet/systemd/keycloak.container` (rootless Podman, **read-only root filesystem**, `start`
 without `--import-realm` — the Keycloak database, not `realm-export.json`, is the source of truth).

@@ -4,12 +4,23 @@
 
 ### Changed
 
+- **Keycloak 26.8.0.** Neues Image `quay.io/keycloak/keycloak:26.8`; Provider-JAR, Theme und Realm laufen
+  unverändert. Brute-Force-Sperren bleiben jetzt über einen Neustart erhalten (Login-Fehler liegen in der
+  Datenbank). Die Mindestversionen für Netty, OpenTelemetry und Jackson im SPI-Build entfallen,
+  Keycloak bringt selbst neuere mit (Protobuf bleibt angehoben). Der Tag-Wechsel ist betreibergesteuert: vorher frisches Backup, ein
+  Zurückrollen heißt Datenbank wiederherstellen; laufende Anmeldungen müssen einmal neu beginnen.
+- **Keycloak-Log ohne Daueralarm.** Die „Full scope allowed"-Warnung (je Token-Anfrage) und der veraltete
+  Sticky-Session-Schalter sind abgestellt.
 - **Keycloak: Fehler-Events stehen im Log auf INFO statt WARN.** Ein Discord-Callback ohne Login-Cookie (`cookie_not_found`) ist ein Client-Zustand und verstopfte die WARN-Ansicht; die Zeilen und die Event-Metriken bleiben erhalten (`KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__ERROR_LEVEL`).
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
 ### Security
 
+- **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
+  Identity-Provider-Mapper), CVE-2026-14781, CVE-2026-19608 und CVE-2026-93999 (deaktivierte Clients im
+  Token), dazu den Geräte-Login für brute-force-gesperrte Konten sowie Jackson und Netty im
+  Keycloak-Image.
 - **Jackson auf 2.21.7 und 3.1.7 angehoben** (Gradle-Plugins 2.22.3). Schließt CVE-2026-91776 und
   CVE-2026-91777 (beide HIGH) in `jackson-databind` für Backend, Frontend, Ingest, Keycloak-SPI und
   `logging-support`.
