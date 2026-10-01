@@ -505,6 +505,7 @@ function pmRefreshLastEvaluatedFor(userId) {
 function pmCsvEscape(value) {
     if (value === null || value === undefined) return '';
     let s = String(value);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
     if (
         s.indexOf('"') !== -1 ||
         s.indexOf(',') !== -1 ||
