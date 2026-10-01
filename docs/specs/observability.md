@@ -78,6 +78,13 @@ shown or logged: for a relay it is the `WebClientResponseException` message, whi
 backend URL. **Enforced by:** `RelayedBackendStatusMvcTest` (every relay, through the real advice,
 against `MockWebServer`).
 
+**A `BackendServiceException` keeps its status for HTML callers too.** `handleBackendServiceException`
+answered an XHR/JSON caller with the backend status but a navigation or a plain `fetch` with the
+`error/error` view at status `200`, so a `fetch` that tests `response.ok` (the handover-report
+download) took the error page for the document. It now returns a `ModelAndView` carrying the status,
+like the `ResponseStatusException` handler; a status HTTP has no name for falls back to `500`.
+**Enforced by:** `BackendErrorPageStatusMvcTest`, `GlobalExceptionHandlerTest`.
+
 A call **short-circuited by an open circuit breaker** (`CallNotPermittedException`) is logged at
 `DEBUG`, never `WARN`. The one-time breaker state transition (`ResilienceEventLogger.onStateTransition`,
 `WARN`) plus the `basetool_backend_client_errors_total{reason="circuit_open"}` counter and the
