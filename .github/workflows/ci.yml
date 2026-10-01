@@ -30,6 +30,7 @@ jobs:
         uses: ./.github/actions/setup-jdk-gradle
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Fetch the previous release's API contract
         continue-on-error: true

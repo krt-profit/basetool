@@ -68,6 +68,7 @@ jobs:
         uses: ./.github/actions/setup-jdk-gradle
         with:
           cache-read-only: 'true'
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Tidy historical CHANGELOG drift
         run: python3 .claude/skills/release-notes/scripts/reconcile_changelog.py --write
