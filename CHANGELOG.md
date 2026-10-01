@@ -21,6 +21,9 @@
   Identity-Provider-Mapper), CVE-2026-14781, CVE-2026-19608 und CVE-2026-93999 (deaktivierte Clients im
   Token), dazu den Geräte-Login für brute-force-gesperrte Konten sowie Jackson und Netty im
   Keycloak-Image.
+- **Jackson auf 2.21.7 und 3.1.7 angehoben** (Gradle-Plugins 2.22.3). Schließt CVE-2026-91776 und
+  CVE-2026-91777 (beide HIGH) in `jackson-databind` für Backend, Frontend, Ingest, Keycloak-SPI und
+  `logging-support`.
 - **Jackson auch in Keycloak-SPI, `logging-support` und den Gradle-Plugins angehoben.** Dort lagen
   noch `jackson-databind` 2.21.5, 3.1.5 und 2.22.1 (CVE-2026-68497, CVE-2026-19032,
   CVE-2026-83557), jetzt 2.21.6, 3.1.6 und 2.22.2. Die Images von Backend, Frontend und Ingest
