@@ -15,6 +15,10 @@
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
+- **Mutation-Testing-Lauf prüft jetzt auf Vollständigkeit.** Ein beim Job-Timeout abgebrochener Backend-Lauf
+  galt mit seinem Teilbericht als grün; jetzt scheitert der Lauf bei abgebrochenem PIT-Schritt oder fehlendem
+  `</mutations>`. Timeout 60 → 120 Minuten (Backend kam zweimal in Folge nicht in 60 durch).
+
 ### Security
 
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
