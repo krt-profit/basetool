@@ -115,6 +115,42 @@ class LiveSyncSyncHandshakeInterceptorTest {
     assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_ACCESS_TOKEN)).isEqualTo("tok-123");
   }
 
+  @Test
+  void recordsTheTokenExpiryForTheHandlersLapseCheck() {
+    Instant expiresAt = Instant.now().plusSeconds(300);
+    OAuth2AuthorizedClient client = mock(OAuth2AuthorizedClient.class);
+    when(client.getAccessToken())
+        .thenReturn(
+            new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                "tok-123",
+                Instant.now().minusSeconds(1),
+                expiresAt));
+    when(authorizedClientManager.authorize(any())).thenReturn(client);
+
+    interceptor.beforeHandshake(request, response, wsHandler, attributes);
+
+    assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_TOKEN_EXPIRES_AT)).isEqualTo(expiresAt);
+  }
+
+  @Test
+  void doesNotCaptureAnAlreadyExpiredToken() {
+    OAuth2AuthorizedClient client = mock(OAuth2AuthorizedClient.class);
+    when(client.getAccessToken())
+        .thenReturn(
+            new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                "stale",
+                Instant.now().minusSeconds(600),
+                Instant.now().minusSeconds(300)));
+    when(authorizedClientManager.authorize(any())).thenReturn(client);
+
+    interceptor.beforeHandshake(request, response, wsHandler, attributes);
+
+    assertThat(attributes).doesNotContainKey(LiveSyncWebSocketHandler.ATTR_ACCESS_TOKEN);
+    assertThat(attributes).doesNotContainKey(LiveSyncWebSocketHandler.ATTR_TOKEN_EXPIRES_AT);
+  }
+
   /**
    * The token comes from the authorized-client manager, handed the handshake's servlet request and
    * response, so an expired token is refreshed single-flight before it is captured.

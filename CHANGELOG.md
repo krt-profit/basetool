@@ -96,6 +96,10 @@
 - **Log-Level zur Laufzeit wieder per Bearer-Token änderbar.** `POST /actuator/loggers/**` scheiterte
   in Produktion am CSRF-Schutz mit 403; der Pfad ist jetzt wie `/api/v1/**` ausgenommen.
 
+- **Live-Sync-Abo schlägt bei unklarem Ergebnis fehl, statt zu öffnen.** Bei 401, 5xx, Timeout, fehlendem Token
+  oder voller Prüfwarteschlange wird ein Abo nun abgelehnt; der Tab abonniert bis zu fünfmal mit wachsender
+  Wartezeit neu. Sockets mit abgelaufenem oder abgelehntem Token werden geschlossen und verbinden sich
+  mit frischem Token neu.
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
   Zertifikate liest, fällt nicht mehr auf ein ungepinntes PostgreSQL-Image zurück; ohne lesbaren
   `@sha256:`-Pin endet der Lauf mit `FATAL`, `BackupStaleOrMissing` greift weiter.

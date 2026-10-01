@@ -426,7 +426,7 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
   client-supplied values arriving at socket rate.
 - **Live-sync subscribe verdicts** — an explicit backend 403/404 deny and a withheld capability stay
   `DEBUG` in `LiveSyncSubscriptionAuthorizer` (routine authorization outcomes). The **fail-closed
-  indeterminate** deny (a 401/5xx/null-token probe on a presence-enabled class) and the previously
+  indeterminate** deny (a 401/5xx/timeout/null-token probe, or a saturated executor, on any class that needs a check) and the previously
   **unlogged** `RejectedExecutionException` executor-saturation branch are `WARN`, one line each,
   emitted by whichever component produced the verdict — `completeSubscribe` deliberately logs nothing
   so the same denial cannot be reported twice.
@@ -2107,10 +2107,10 @@ where co-presence is rare, so panel 29 stays the backstop for a section-key skew
 The tool-wide live-sync relay adds five more meters: `basetool_livesync_subscriptions{topic_class}`
 (open `/ws/sync` subscriptions per topic class — the live per-surface load denominator),
 `basetool_livesync_subscribe_total{topic_class,outcome,reason}` (`outcome` = `allowed` / `denied`,
-the subscribe-authorization verdict; a saturated-executor fail-open is instead a
+the subscribe-authorization verdict; a saturated executor also lands as an
 `authorize_saturated` relay drop). The `reason` tag (2026-08) splits the denial into `authz` — an
 explicit backend 403/404 or a withheld capability — and `indeterminate`, the fail-**closed** verdict
-for a 401/5xx/null-token probe on a presence-enabled class, which is an infrastructure fault dressed
+for a 401/5xx/timeout/null-token probe or a saturated executor (any class that needs a check, since 2026-10-01), which is an infrastructure fault dressed
 as a permission decision and must be readable as such. Micrometer rejects the same meter name
 registered with differing tag-key sets, so the `outcome="allowed"` series carries `reason="none"`;
 the wire value is unchanged from the existing login-reason literal, so no dashboard or alert is
@@ -2118,10 +2118,11 @@ affected. Both `07` dashboard panels aggregate with `sum by (topic_class, outcom
 `sum by (reason)` and therefore keep working unchanged — but neither yet **surfaces** the new deny
 split, which is the outstanding follow-up. The same two literals now also travel **on the wire** in
 the `denied` control frame, so the browser can treat `indeterminate` as retryable: it re-subscribes
-that topic **exactly once** across the whole socket lifetime (`authz` stays terminal). Reading the
-series accordingly — a single transient infrastructure fault can contribute up to **two**
-`outcome="denied", reason="indeterminate"` samples per topic, never more, and the retry is per-topic
-one-shot rather than per-reconnect.
+that topic up to **5 times** with a jittered exponential delay (`authz` stays terminal); the budget
+is restored by a successful subscribe or a new socket. Reading the series accordingly — a single
+transient infrastructure fault can contribute up to **six** `outcome="denied",
+reason="indeterminate"` samples per topic and socket, and a probe `401` also closes the socket with
+`4401` (the reconnect re-subscribes with a fresh handshake).
 `basetool_livesync_socket_rejected_total{reason}` (`reason` = `user_cap`; a `/ws/sync`
 socket refused at connect because the user is already at the per-user socket cap — F2/#1243, no
 `topic_class` because a rejected socket has bound no topic; plotted alongside the relay drops on the
