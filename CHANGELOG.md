@@ -65,6 +65,17 @@
 
 - **Browser-IDs werden vor dem Backend-Aufruf geprüft.** Ankündigungs-ID, Mitglieds-ID des Beförderungsfragments, Standard-Blueprint-ID und der Rollen-Code der Bankkonten-Sichtbarkeit und -Limits müssen die erwartete Form haben, sonst antwortet das Frontend mit 400, ohne das Backend zu rufen.
 
+- **Keycloak-Verbindung von Backend und Ingest mit Zeitlimits.** Der an das Zertifikat gepinnte Client
+  (Admin-API und JWKS-Abruf) wartete unbegrenzt auf Keycloak; er nutzt jetzt 5 s Verbindungs- und
+  30 s (Ingest 10 s) Lese-Timeout.
+- **Lager- und Hangar-Rollenprüfung zusätzlich an den Endpunkten.** 13 Lager- und 2 Hangar-Endpunkte
+  waren nur über die URL-Regel geschützt; dieselbe Rollenprüfung steht jetzt auch an der Methode, die
+  URL-Regel bleibt. Wer Zugriff hat, ändert sich nicht.
+- **Katalogsuchen behandeln `%` und `_` wörtlich.** Die Produktsuche der Blaupausen sowie die
+  Artikelauswahl für Aufträge und Lager übergaben Eingaben ungeschützt an `LIKE`; die Blaupausen-Abfragen
+  setzen zusätzlich `ESCAPE`, ohne das Hibernate das Escape-Zeichen abschaltet.
+- **Log-Level zur Laufzeit wieder per Bearer-Token änderbar.** `POST /actuator/loggers/**` scheiterte
+  in Produktion am CSRF-Schutz mit 403; der Pfad ist jetzt wie `/api/v1/**` ausgenommen.
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
   Zertifikate liest, fällt nicht mehr auf ein ungepinntes PostgreSQL-Image zurück; ohne lesbaren
   `@sha256:`-Pin endet der Lauf mit `FATAL`, `BackupStaleOrMissing` greift weiter.
@@ -146,6 +157,9 @@
 
 ### Fixed
 
+- **Organigramm: Entfernen eines OL-Mitglieds löscht die Grand-Admiral-Zuordnung zuverlässig.** War die
+  Organisationsleitung bereits als Hibernate-Proxy geladen, blieb die Zuordnung stehen; das Setzen und
+  Entfernen des Grand Admirals scheiterte in diesem Fall ebenfalls.
 - **Datenaustausch: das Gateway holt nach einer Abweisung seines eigenen Tokens ein neues.** Lehnt
   das Backend das Dienstkonto-Token des Ingest-Gateways ab (`401`/`403` ohne Austausch-Code),
   verwirft das Gateway es, sodass die nächste Anfrage ein frisches holt, statt bis zum Ablauf

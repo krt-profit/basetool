@@ -728,6 +728,10 @@ out) — so neither edge that reaches it is cleartext:
   `keycloak-trust` Spring SSL bundle (mirrors the frontend/ingest `backend-trust` approach, audit
   finding M-13). Unlike the relay clients that pin `backend-trust` without a hostname check, the
   admin client keeps **hostname verification ON**, so the cert's SAN MUST include `dns:keycloak`.
+  The pinned request factory (`KeycloakTrustSupport`, shared by the admin client and the internal
+  JWKS decoder) speaks HTTP/1.1 and is bounded by the connect and read timeouts of
+  `RestClientConfig` (5 s / 30 s), so a hung Keycloak cannot hold a request thread unbounded; the
+  ingest copy uses 5 s / 10 s.
   *(Corrected 2026-09-22, ADR-0204: this used to say the JDK `HttpClient` cannot disable hostname
   verification per client. Its API cannot, but a trust manager can — JSSE does endpoint
   identification inside an `X509ExtendedTrustManager` — and that is how the ingest relay, now on the
@@ -3746,6 +3750,15 @@ the member surface. The E2E realm contradicted this until then: `test-bank-emplo
 refusal on the mission list. A fixture that models an impossible account shape produces findings
 about a cohort that does not exist. That is the structural half of this requirement, and it is why
 the roster sync had to be fixed in the same change:
+
+**The member-surface role gates sit on the handlers, not only in the URL rules.** The thirteen
+squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
+mission, grouped, stack-entries and item-catalog reads, `POST /` and the four `bulk-*` writes) carry
+`@PreAuthorize(INVENTORY_ACCESS)` — ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER — and
+`HangarController`'s squadron overview and home-location bulk edit carry `@PreAuthorize(HANGAR_ACCESS)`
+— `HANGAR_READ`, `HANGAR_WRITE` or `ROLE_ADMIN`. Both repeat the `SecurityConfig` URL rule, which
+stays as defence in depth, so a later path move cannot drop the gate silently.
+`LiftedRoleGatesTest` evaluates each annotation on its own with the real role hierarchy.
 
 > [!warning] The composite-blind sync was the precondition, not a detail
 > `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member
