@@ -1,5 +1,5 @@
-> **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29; nothing is
-> implemented yet. Last reviewed: 2026-09-29.
+> **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29, every
+> open decision on 2026-10-01; nothing is implemented yet. Last reviewed: 2026-10-01.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0032, ADR-0047, ADR-0060,
 > ADR-0065, ADR-0136, ADR-0205, ADR-0206, ADR-0214, ADR-0216, ADR-0219, ADR-0223 · **Specs:**
 > REQ-API-\*, REQ-SEC-\*, REQ-AUDIT-001, REQ-DATA-\*, REQ-FE-\*, REQ-XCH-\*
@@ -21,8 +21,8 @@ refuses code that reaches past that API. It is the report of a whole-repository 
   APIs — and two secondary ones: use modern, final language features where they pay off, and
   re-evaluate the findings of the previous audits under today's rules. It names every change with
   its implementation, pros, cons, risks and regressions, and the guard that catches a regression.
-- **What it is not.** Nothing is implemented. Sections 2 and 13 separate what is decided from what
-  still needs the owner.
+- **What it is not.** Nothing is implemented. Section 2 lists every decision; section 13 maps the
+  former open decisions onto them.
 - **Scope.** All modules of `basetool`: `backend`, `frontend`, `ingest`, `keycloak-spi`,
   `keycloak-theme`, `logging-support`, `test-support`, the build and the delivery path. Sibling
   repositories are out of scope, except the Android app's forced-update path, which the API cut
@@ -39,7 +39,7 @@ refuses code that reaches past that API. It is the report of a whole-repository 
   package-level module inside one Gradle project unless the text says *Gradle module*. *Kernel* is
   the small shared code every module may use.
 
-## 2 Decisions taken (owner, 2026-09-29)
+## 2 Decisions taken (owner, 2026-09-29 and 2026-10-01)
 
 | # | Decision | What it means |
 | --- | --- | --- |
@@ -51,6 +51,20 @@ refuses code that reaches past that API. It is the report of a whole-repository 
 | D-06 | **Previous audits** | The July 2026 modularity audit and the September 2026 improvement audit are re-evaluated in full; the earlier focused audits only for items that were deferred, rejected or left open, plus fixes a domain split could put at risk. Sibling-repository findings are listed, not re-verified. |
 | D-07 | **Security defects found along the way are fixed first, separately** | The confirmed defects of §9 are fixed in their own pull requests before the refactor starts. |
 | D-08 | **Report form** | This document and its appendices in the repository, plus a plan note in the knowledge base. |
+| D-09 | **Error model** (was O-01, decided 2026-10-01) | A sealed kernel of generic kinds, one non-sealed `DomainProblem` base that module exceptions extend, one `ProblemCode` enum per module, a registry test for unique codes, and the codes documented in OpenAPI (§5.5). |
+| D-10 | **Exact session allow-list** (was O-02, decided 2026-10-01) | The frontend session deserializer admits an exact, test-derived list of session-bound types instead of the `…frontend.model.` prefix, in its own release before the frontend move; ADR-0206 is amended (§5.9, F2). |
+| D-11 | **Release-bound minimum app version** (was O-07, decided 2026-10-01) | The minimum version becomes a reviewed default in the release's own configuration, so it deploys and rolls back with the API it protects; the host `.env` value stays only as an emergency override. With it: the app re-reads the policy on resume and after an unexpected 404 (shipped before the first cut), retired paths answer `APP_UPDATE_REQUIRED`, and cuts are announced and made at low usage. REQ-API-010 is amended first (§5.10). |
+| D-12 | **Exchange administration under `/api/v1/connected-apps/admin/**`** (was O-14, decided 2026-10-01) | The 14 exchange-administration operations move there in the web-only wave; `/api/v1/admin/**` is then retired as a URL rule in favour of `/api/v1/*/admin/**`. |
+| D-13 | **Error Prone + NullAway** (was O-03, decided 2026-10-01) | A compile-time nullness gate on the JetBrains annotations, starting with the module API packages and widening from there (§8.1). |
+| D-14 | **`_` for unused variables, empty catch blocks included** (was O-04, decided 2026-10-01) | ADR-0214 and Checkstyle's `EmptyCatchBlock` pattern are amended to accept `catch (… _)`; not in keycloak-spi, whose Java 21 bytecode has no unnamed variables (§8.1). |
+| D-15 | **No `default` over a project enum** (was O-05, decided 2026-10-01) | Switches over project enums are exhaustive without `default` unless they handle a deliberate subset; an ADR and a line in the Java conventions (§8.1). |
+| D-16 | **Browser baseline "Baseline 2025" (ES2025) and Trusted Types** (was O-06, decided 2026-10-01) | Floor at least Chrome 122, Firefox 131, Safari/iOS 18.4 (the iterator helpers; single 2025 features need newer releases); type check and ESLint raised to ES2025 once TypeScript 7 is proven to accept the `ES2025` lib; Trusted Types report-only first, then enforced (§8.2). |
+| D-17 | **Member settings move with their owner** (was O-08, decided 2026-10-01) | The payout-preference and blueprint-sharing columns move from the user table into tables of the owning modules, each with its own version, by a Flyway migration with data transfer in that domain's wave. |
+| D-18 | **Every API family classified; a kernel page policy** (was O-09, decided 2026-10-01) | Every family is classified explicitly as `no-store` or revalidatable, with a test that catches an unclassified one (REQ-SEC-031); a kernel page policy replaces the 100,000 ceiling with a lower default, set by measurement, and explicit, tested opt-outs. |
+| D-19 | **SpEL evaluation failures stay a fail-closed 400, counted and alerted** (was O-10, decided 2026-10-01) | A metric counts them and a Prometheus rule alerts on them; the problem-code contract is unchanged. |
+| D-20 | **`MissionParticipant.orgUnits` becomes lazy** (was O-11, decided 2026-10-01) | Loaded through an entity graph where it is needed, the load paths pinned by N+1 tests. |
+| D-21 | **CI reuses the configuration cache** (was O-12, decided 2026-10-01) | The owner adds the encryption key as a repository secret; pull requests read the cache, `main` writes it; the workflow change follows the secret. |
+| D-22 | **The raw evidence is kept** (was O-13, decided 2026-10-01) | Reports, finding data and scripts, sanitised, in [`docs/archive/domain-modularisation-audit-2026-09/`](archive/domain-modularisation-audit-2026-09/README.md). |
 
 ## 3 Summary
 
@@ -310,7 +324,8 @@ The sixteen cross-domain write families, with the mechanism each gets, are liste
   it never decides for `/hangar/admin/**` and `/personal-inventory/admin/**` (nothing would widen —
   all 51 admin operations carry `hasRole('ADMIN')` themselves — but the fence would be void there).
   The 14 exchange-administration operations cannot move under the frozen `/api/v1/exchange/**`;
-  until their home is decided (O-14), `/api/v1/admin/**` stays as a rule beside the new one.
+  they move to `/api/v1/connected-apps/admin/**` (D-12), and `/api/v1/admin/**` stays as a rule
+  beside the new one only until the last of them has left.
 - **Nested paths keep the gate on the child.** An operation moved under a parent path
   (`/missions/{missionId}/finance-entries/{entryId}`) is still authorized on the child — today
   `canEditFinanceEntry(#entryId, …)` — and a child of another parent answers 404 after the scope
@@ -323,13 +338,13 @@ The sealed `AppException` permits 13 subclasses, six of them domain exceptions, 
 `AppExceptionKind` holds domain codes. A sealed class cannot permit a subclass in another package in
 a class-path application, so today's shape cannot follow the domains.
 
-Recommended target (open decision O-01, §13): a **sealed kernel of generic kinds** (not found,
+Target (decided 2026-10-01, D-09): a **sealed kernel of generic kinds** (not found,
 conflict, validation, access, unavailable) plus **one non-sealed abstract `DomainProblem` base** in
 the kernel that module exceptions extend; codes become a `ProblemCode` interface implemented by one
 enum per module; a registry test collects every implementation and asserts unique codes against a
 committed list; the OpenAPI document gains `code`, `correlationId` and `fieldErrors` with the known
 values as a documented list. `GlobalExceptionHandler` and `ErrorDisclosurePolicy` stay the single
-place that decides what a response discloses. Alternative: keep every exception type in the kernel
+place that decides what a response discloses. Rejected: keep every exception type in the kernel
 package and seal it (no domain ownership, no code documentation).
 
 ### 5.6 Persistence
@@ -418,7 +433,7 @@ de.greluc.krt.profit.basetool.frontend
   of the package. The 72 untyped `Map` responses and 78 `Map` request bodies are typed per domain.
 - **Session values.** Session-bound types (about eleven flashed forms and DTOs) are enumerated
   exactly, derived by a closure test, instead of admitted by the `frontend.model.` prefix — which
-  narrows the admitted application classes from 325 to about 20 (open decision O-02).
+  narrows the admitted application classes from 325 to about 20 (decided 2026-10-01, D-10).
 - **Templates and assets** move into per-domain folders; `Roles` stays in a stable kernel package or
   becomes a template bean; scripts get IIFE namespaces per domain and an ESLint
   `no-implicit-globals` ratchet; a boundary text test forbids one domain's page from linking another
@@ -452,12 +467,14 @@ and app outage. The order matters: raising the floor together with the release i
 health-gate rollback re-renders the environment from the same `.env` and brings the old backend back
 with the raised floor, and then no app version works. The safe sequence per wave is therefore:
 publish app N+1 → deploy the re-cut release (the edge is reconciled with the new allow-list at the
-end of the same deploy) → verify it healthy → raise the floor (S8). Its gaps (open decision O-07):
-between the deploy and the floor raise, old apps run against the new API without the wall; the app
-reads the policy once per process and fails open, so apps already running keep going until their
-next cold start. The cleaner design is a **release-bound floor** — the minimum version as a reviewed
-default in the release's own configuration, so it deploys and rolls back together with the API it
-protects, with the host value kept only as an emergency override.
+end of the same deploy) → verify it healthy → raise the floor (S8). Its gaps: between the deploy
+and the floor raise, old apps run against the new API without the wall; the app reads the policy
+once per process and fails open, so apps already running keep going until their next cold start.
+The owner therefore decided (2026-10-01, D-11) on a **release-bound floor** — the minimum version as
+a reviewed default in the release's own configuration, so it deploys and rolls back together with
+the API it protects, with the host value kept only as an emergency override — together with the
+app's re-read on resume and after an unexpected 404 and the `APP_UPDATE_REQUIRED` answer of retired
+paths. The S8 sequence above holds only until the release-bound floor is in place.
 
 **Machinery the cut needs first** (Phase 0): ADR-0136, REQ-API-001, REQ-API-009 and REQ-API-010
 amended for the hard cut; a declared-break ledger that lists every removed or changed frozen
@@ -559,7 +576,7 @@ A pull request that moves or re-cuts a domain states, and its reviewer confirms:
 Every framework the plan adds passes the existing supply-chain gates: GPL-compatible licence
 (Licensee), a regenerated `gradle/verification-metadata.xml` with an empty `GRADLE_USER_HOME`
 (ADR-0208), the SBOM, the vulnerability scan. Spring Modulith stays in test scope, so nothing is
-added to an image; Error Prone and NullAway (if decided, O-03) are compile-time only. OpenRewrite is
+added to an image; Error Prone and NullAway (D-13) are compile-time only. OpenRewrite is
 run from an uncommitted init script with the last freely published versions and never becomes part
 of the build (§10).
 
@@ -579,13 +596,13 @@ audit found.
 
 | Step | Content | Why first |
 | --- | --- | --- |
-| 0.1 ADRs | New: target architecture C and module rules; module interaction styles (§5.3); enforcement tooling (ArchUnit + Modulith in test scope, frozen module baseline); hard cut with forced update; error model (O-01). Amended: ADR-0047 (module cycles frozen, layer cycles per module), ADR-0065 (access policies per domain), ADR-0020/0028 (seam rules re-keyed — owner approval), ADR-0032 (single filter chain, typed clients), ADR-0136 (retirement by hard cut), ADR-0206 (exact session list, O-02), ADR-0223 (corrections, §8.1) | CLAUDE.md: a requirement is amended before code diverges from it |
+| 0.1 ADRs | New: target architecture C and module rules; module interaction styles (§5.3); enforcement tooling (ArchUnit + Modulith in test scope, frozen module baseline); hard cut with forced update and the release-bound minimum version (D-11); error model (D-09). Amended: ADR-0047 (module cycles frozen, layer cycles per module), ADR-0065 (access policies per domain), ADR-0020/0028 (seam rules re-keyed — owner approval), ADR-0032 (single filter chain, typed clients), ADR-0136 (retirement by hard cut), ADR-0206 (exact session list, D-10), ADR-0223 (corrections, §8.1) | CLAUDE.md: a requirement is amended before code diverges from it |
 | 0.2 Backend guards | G-01 … G-07, G-10, G-12, G-19, G-22 | The refactor must not be able to weaken a gate unnoticed |
 | 0.3 Module map | Domain map as a checked-in artefact; ArchUnit `modules()` rule plus `FreezingArchRule` baseline (150 violations); Spring Modulith spike (`verify()` under ArchUnit 1.5.1, `explicitly-annotated` detection, `Documenter` output) and then `ModularityTest` | Stops new coupling from day one; measures progress |
 | 0.4 Frontend guards | G-13 … G-17; `ParallelPageLoader` on `ContextSnapshotFactory` (fixes the missing locale relay); the three kernel shapes (byte download with headers and per-call timeout, multipart upload, `Flux`) so the eleven bypassing controllers return to the kernel | Typed clients and the package move inherit whatever the kernel does |
 | 0.5 Exchange guards | G-18; ingest re-package by concern (§5.11); keycloak-spi registrations test | The only contract that must not move |
 | 0.6 Build and CI guards | G-20, G-21; `@SpringBootTest` profile unification (BLD-PERF-03, 191 of 231 classes carry `@ActiveProfiles("test")` although Gradle forces it) | Test-context count and coverage floors decide how painful every later step is |
-| 0.7 API machinery | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (O-07) | The first hard-cut wave depends on all of it |
+| 0.7 API machinery | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
 
 ### 7.3 Phase 1 — behaviour-free inversions and re-homings
 
@@ -651,7 +668,7 @@ domain stays a package.
 | --- | --- |
 | F0 | Guards (Phase 0.4) |
 | F1 | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
-| F2 | Exact session allow-list in its own release (O-02) |
+| F2 | Exact session allow-list in its own release (D-10) |
 | F3 | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
@@ -661,7 +678,7 @@ domain stays a package.
 Each wave is one domain's cut ([appendix](modularisation/rest-api-cut.md)), shipped together with the
 backend and frontend change of that domain in one release (frontend and backend deploy in one
 restart window), with a new app release published first and the minimum version raised once the
-re-cut release is verified healthy — or, with a release-bound floor (O-07), by the release itself.
+re-cut release is verified healthy — or, once the floor is release-bound (D-11), by the release itself.
 Suggested order by risk and app impact: web-only moves first (admin sub-trees, notification rules,
 the demonstration ping), then identity and org units, mission, bank, job orders and the game-item
 catalogue, and the small rest (Materialbörse, hangar, refinery, typed settings). The T0 tier never
@@ -683,11 +700,11 @@ features only, no preview flags) stands; every proposal below uses final feature
 
 | Proposal | Pros | Cons and risks | Guard | Effort |
 | --- | --- | --- | --- | --- |
-| **Exhaustive enum switches.** Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (O-05) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
+| **Exhaustive enum switches.** Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (decided, D-15) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
 | **Enum predicates instead of `==` chains.** `OrgUnitKind` is compared 43 times in 19 files; add behaviour on the enum as `switch (this)` without `default` (precedent `OperationStatus.canTransitionTo`), with a `values()` test per predicate; the same for `FinanceType` in payout arithmetic | Tenancy rules stated once, as the kernel's API | Each site's current fail-open or fail-closed behaviour must be kept exactly — one predicate per rule, never two rules merged | Access-gate and scope tests | M |
 | **Sealed types where they are legal.** Exhaustive `switch` over the exchange's private sealed `Planned` types (two are read with `if/else` without `else`, so a new variant is silently dropped); name the last constant instead of `default` in three exchange switches; the exchange's resource and operation vocabulary as one enum mapped at the boundary (the mass-change capability is chosen from a string with `default -> HANGAR_WRITE` today, which Bean Validation happens to shield) | No silently dropped external write; no path can default to a capability | Must keep the external contract byte-identical | Exchange contract tests; a test that an unknown value never reaches the capability choice | S |
 | **Never seal across packages or entities.** Sealed hierarchies stay inside one package (class-path rule) and never cover JPA entities (a Hibernate proxy cannot subclass a sealed class) | Avoids a refactor dead end | — | javac | — |
-| **Unnamed variables `_`** (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches only after an ADR-0214 amendment and a Checkstyle `EmptyCatchBlock` pattern change (O-04); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |
+| **Unnamed variables `_`** (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |
 | **`ScopedValue`** (final in 25) for the backend's `ChangeSource.ON_BEHALF` `ThreadLocal`, which attributes exchange writes in the change feed; the frontend holders stay `ThreadLocal` (ADR-0223 decision 4) | A binding cannot leak into a reused thread | ADR-0223 amendment | `ChangeSourceTransactionManager` integration test | S |
 | **Records** for the last three `@Data` request classes and one hand-written carrier; defensive `List.copyOf` only for records that become cached, shared or module-API values; redaction DTOs keep their canonical constructors | Immutability where values cross a boundary | `List.copyOf` rejects `null` elements | Contract tests; `toString` ratchet (G-22) | S |
 | **Small idioms**: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
@@ -698,14 +715,14 @@ features only, no preview flags) stands; every proposal below uses final feature
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac
-`--add-exports`, slower compilation, Lombok interplay to be proven on one module. Decision O-03.
+`--add-exports`, slower compilation, Lombok interplay to be proven on one module. Decided 2026-10-01 (D-13).
 JSpecify stays out for now (ADR-0192).
 
 ### 8.2 JavaScript, CSS, HTML
 
 | Proposal | Pros | Cons and risks | Guard |
 | --- | --- | --- | --- |
-| **Document the browser baseline** (O-06). The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; "Baseline widely available" covers ES2024. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2024 | Every other modern-feature decision needs this answer; today an ES2024 API in an unchecked file passes every gate | Too high a floor strands old iOS devices | `typecheckJs`, `lintJs`, the E2E browser matrix |
+| **Document the browser baseline — decided: "Baseline 2025", ES2025** (D-16). The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; the decided floor is at least Chrome 122, Firefox 131, Safari/iOS 18.4 (iterator helpers; `Promise.try`, `RegExp.escape` and `Float16Array` need newer releases), which brings Set methods, iterator helpers, popover and same-document view transitions. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2025 once TypeScript 7 is proven to accept the `ES2025` lib; write the floor into `ui-design-system.md` and REQ-FE-018 | Every other modern-feature decision needs this answer; today a newer API in an unchecked file passes every gate | Members who cannot update iOS to 18.4 or later lose functions; the rejected alternative was "Baseline widely available" (ES2024, Safari 17.4) | `typecheckJs`, `lintJs`, the E2E browser matrix |
 | **ESLint core autofix rules** (`prefer-template` for 664 concatenations, `prefer-arrow-callback`, `prefer-object-has-own`, `radix`, `logical-assignment-operators`); `?.`/`??` by hand while a file opts into `@ts-check` (the semantics differ for falsy values) | Consistent modern code with no new dependency | About 1,800 sites; conflicts with in-flight branches | `lintJs`, `typecheckJs`, E2E |
 | **Type-check ratchet per domain folder**; the three largest scripts (mission detail, bank, order detail — 20 % of all JavaScript) split before they are checked | Null safety reaches the files that change most | Cast churn in DOM-heavy code | A folder is "migrated" only when fully checked |
 | **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect) | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, E2E |
@@ -807,7 +824,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | Spring API versioning | Not now | Under a hard cut there are never two versions to negotiate; path versioning is load-bearing for the edge and the path lists |
 | Spring Framework 7 resilience annotations | Adopt `@ConcurrencyLimit` narrowly | A bound on outbound fan-out under virtual threads; retries stay explicit |
 | **OpenRewrite** `ChangePackage`/`ChangeType` | Use locally, never commit | They rewrite imports and class names in YAML and properties values, Spring XML and `META-INF/services`, which makes package moves mechanical. Newer plugin and core versions are published only to an authenticated repository and the migration recipes are under a source-available licence; a credentialed repository in `settings.gradle.kts` would break `FAIL_ON_PROJECT_REPOS` and dependency verification. Run the Apache-licensed recipes with the last freely published versions (plugin 7.41.0, core 8.90.4) from an uncommitted init script; never run `UpgradeToJava25` (it converts dangling doc comments into block comments, against ADR-0214). They do not touch SpEL, Thymeleaf, string literals or persisted ids — the move checklist does |
-| **Error Prone + NullAway** | Recommended (O-03) | A compile-time nullness gate that works with the JetBrains annotations; closes arc42 §11.4 |
+| **Error Prone + NullAway** | Adopt (D-13) | A compile-time nullness gate that works with the JetBrains annotations; closes arc42 §11.4 |
 | JPMS (`module-info.java`) | Reject | No Spring, Boot, Modulith or Hibernate jar ships a module descriptor; the Java AOT cache forbids the `--add-opens` a module-path deployment would need |
 | Separate deployable services (option D) | Reject | Twelve write families and 206 audit writes need the caller's transaction; one host, one maintainer |
 | Hibernate `@Audited`, Jakarta Data repositories | Reject | Personal data outside the GDPR flow; stateless repositories do not fit the concurrency rules |
@@ -873,43 +890,45 @@ Full tables, per finding with status, evidence and verdict:
 | A typed client built on the wrong `WebClient` | 401s, lost tenancy header, lost resilience | Medium | G-17 |
 | Exchange behaviour drifts | 502 at the gateway, external clients broken | Medium | G-18 |
 | A mixed release during a re-cut | Every call of a domain 404s | Low per tick, real per promotion | G-21 |
-| Old app versions keep running against a re-cut API | Broken screens until the next cold start | Certain for running apps | O-07 options |
-| A raised minimum version survives a rollback of the release | No app version works | Real if the floor is raised with the deploy | Release-bound floor, or raise it only after the release is verified healthy (O-07) |
+| Old app versions keep running against a re-cut API | Broken screens until the next cold start | Certain for running apps | D-11: the app re-reads the policy, `APP_UPDATE_REQUIRED` |
+| A raised minimum version survives a rollback of the release | No app version works | Real if the floor is raised with the deploy | Release-bound floor (D-11); until it is in place, raise the floor only after the release is verified healthy |
 | Coverage and mutation gates weaken silently | Weaker quality gates | High for Gradle modules | G-20, G-24 |
 | Cached catalogue entities mutated in place | Stale or wrong catalogue data after a failed write | Medium once services split | G-19 |
 | Test-context explosion from module-scoped tests | CI time | Medium | BLD-PERF-03 first; security beans stay real in shared contexts |
 
-## 13 Open decisions
+## 13 Decisions that were open
 
-| ID | Decision | Recommendation |
+| ID | Decision | Outcome |
 | --- | --- | --- |
-| O-01 | Error model (§5.5) | Sealed generic kernel + non-sealed `DomainProblem` base + per-module `ProblemCode` enums + registry test + documented codes |
-| O-02 | Frontend session allow-list | Exact, test-derived list of session-bound types (325 admitted application classes become about 20); ADR-0206 amendment, own release before the frontend move |
-| O-03 | Error Prone + NullAway | Adopt, starting with the module API packages |
-| O-04 | `_` for empty catch blocks | Yes for lambdas and pattern components now; for empty catches only with an ADR-0214 amendment |
-| O-05 | Switch policy | No `default` over a project enum unless it handles a deliberate subset; ADR, and a line in the Java conventions |
-| O-06 | Browser baseline | "Baseline widely available", ES2024; Trusted Types report-only, then enforced |
-| O-07 | The forced-update mechanics | A release-bound minimum version (a reviewed default in the release's configuration that deploys and rolls back with the API it protects; the host value only as an emergency override). Plus: (a) the app re-reads the policy on resume and after an unexpected 404, shipped before the first cut; (c) retired paths answer a stable `APP_UPDATE_REQUIRED` problem; (d) cut at low usage and announce; (b) a static policy file at the edge during restarts only if (a) proves insufficient. Without the release-bound floor: raise the floor only after the re-cut release is verified healthy, and let the rollback runbook revert it |
-| O-08 | Storage of member settings that move out of identity (payout preference, blueprint sharing) | Move the columns to the owning modules with their own version (finer lock), in that domain's wave |
-| O-09 | `no-store` for the unlisted families and a lower page-size ceiling | Classify every family explicitly (REQ-SEC-031); a kernel page policy with a lower default ceiling and explicit, tested opt-outs |
-| O-10 | SpEL evaluation failures | Keep the fail-closed 400 but count and alert on it, or map it to 500 with an ERROR (a change of REQ-API problem codes) |
-| O-11 | `MissionParticipant.orgUnits` is the one eager cross-domain collection | Make it lazy with an entity graph, or record why it must stay eager |
-| O-12 | CI configuration-cache reuse | Add the encryption key as a secret with read-only caches on pull requests, or record that reuse stays off |
-| O-13 | Keep the raw evidence of this audit | Decide whether the per-analysis reports are committed as a frozen snapshot; the appendices carry the essential tables either way |
-| O-14 | Home of the 14 exchange-administration operations (`/api/v1/admin/exchange-clients/**`, `…/exchange-undo-runs/**`, `…/exchange-settings`) | They cannot move under the frozen relay prefix `/api/v1/exchange/**`. Candidates: the exchange's member root, `/api/v1/connected-apps/admin/**`, or a root of their own; until decided, `/api/v1/admin/**` stays as a rule beside `/api/v1/*/admin/**` |
+| O-01 | Error model (§5.5) | **Decided 2026-10-01 as recommended — D-09** |
+| O-02 | Frontend session allow-list | **Decided 2026-10-01 as recommended — D-10** |
+| O-03 | Error Prone + NullAway | **Decided 2026-10-01 as recommended — D-13** |
+| O-04 | `_` for empty catch blocks | **Decided 2026-10-01 — D-14:** `_` also in empty catch blocks, with the ADR-0214 amendment |
+| O-05 | Switch policy | **Decided 2026-10-01 as recommended — D-15** |
+| O-06 | Browser baseline | **Decided 2026-10-01 — D-16:** Baseline 2025 (ES2025); Trusted Types report-only, then enforced |
+| O-07 | The forced-update mechanics | **Decided 2026-10-01 as recommended — D-11.** Still open inside it: (b), a static policy file at the edge during restarts, only if the app's re-read proves insufficient |
+| O-08 | Storage of member settings that move out of identity (payout preference, blueprint sharing) | **Decided 2026-10-01 as recommended — D-17** |
+| O-09 | `no-store` for the unlisted families and a lower page-size ceiling | **Decided 2026-10-01 as recommended — D-18** |
+| O-10 | SpEL evaluation failures | **Decided 2026-10-01 — D-19:** fail-closed 400, counted and alerted |
+| O-11 | `MissionParticipant.orgUnits` is the one eager cross-domain collection | **Decided 2026-10-01 as recommended — D-20** |
+| O-12 | CI configuration-cache reuse | **Decided 2026-10-01 as recommended — D-21** |
+| O-13 | Keep the raw evidence of this audit | **Decided 2026-10-01 — D-22:** kept in `docs/archive/` |
+| O-14 | Home of the 14 exchange-administration operations | **Decided 2026-10-01 — D-12:** `/api/v1/connected-apps/admin/**` |
 
 ## 14 Documents to write or amend
 
 - **New ADRs:** target architecture and module rules (D-01); module interaction styles; enforcement
-  tooling and the frozen module baseline (D-02); hard cut with forced update (D-04); error model
-  (O-01); per-domain access policies over the scope kernel.
+  tooling and the frozen module baseline (D-02); hard cut with forced update and the release-bound
+  minimum version (D-04, D-11); error model (D-09); per-domain access policies over the scope
+  kernel; Error Prone and NullAway (D-13); the switch policy (D-15); the browser baseline and
+  Trusted Types (D-16).
 - **Amended ADRs:** ADR-0020/0028 (seam rules re-keyed; owner approval), ADR-0032 (single filter
   chain, typed clients), ADR-0047 (module cycles frozen, layer cycles per module), ADR-0060 (separate
   request and response types mandatory at each domain's cut), ADR-0065 (policies per domain),
   ADR-0069 (IIFE namespaces), ADR-0135 (edge include generated from the contract set), ADR-0136
-  (retirement by hard cut), ADR-0206 (O-02), ADR-0212 (its instruction to add a comment contradicts
-  ADR-0214), ADR-0214 (O-04, if decided), ADR-0216 (the relay surface as the exchange's internal
-  published API), ADR-0223 (§8.1), ADR-0229 (the lot-lock protocol moves into inventory).
+  (retirement by hard cut), ADR-0206 (D-10), ADR-0212 (its instruction to add a comment contradicts
+  ADR-0214), ADR-0214 (D-14: `_` in empty catch blocks), ADR-0216 (the relay surface as the
+  exchange's internal published API), ADR-0223 (§8.1), ADR-0229 (the lot-lock protocol moves into inventory).
 - **Requirements:** REQ-API-001/009/010 (hard cut), REQ-API-002/003/004/005/007 (the conventions as
   they are enforced), REQ-SEC-031 (every family classified), REQ-SEC (bean-reference integrity,
   authorization placement), REQ-DATA (table ownership, one Flyway location), REQ-DATA-007 (cached

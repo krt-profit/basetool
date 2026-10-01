@@ -44,6 +44,7 @@ section number, not because it describes the system today.
 | [`ANDROID_API_EXPOSURE_PLAN.md`](ANDROID_API_EXPOSURE_PLAN.md) | Exposing `/api/v1` to the Android app | Shipped 2026-08-21 |
 | [`MEMBERS_ONLY_PLAN.md`](MEMBERS_ONLY_PLAN.md) | Removing every anonymous and guest access | Shipped 2026-09-06 |
 | [`WIRE_PROTOCOL_EVALUATION.md`](WIRE_PROTOCOL_EVALUATION.md) | Whether to leave REST/JSON (an analysis) | Decided 2026-09-10 → ADR-0161 |
+| [`domain-modularisation-audit-2026-09/`](domain-modularisation-audit-2026-09/README.md) | The raw evidence of the domain modularisation audit (reports, finding data, scripts) | Frozen 2026-10-01; the living plan is [`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) |
 | [`MGMT_VPN_PLAN.md`](MGMT_VPN_PLAN.md) | Management access over WireGuard | **Not carried out** beyond its inventory; closed 2026-07-08 |
 | [`PODMAN_MIGRATION_PLAN.md`](PODMAN_MIGRATION_PLAN.md) | Rootless Podman under Quadlet on a rebuilt host | Cut over 2026-09-22 |
 | [`PODMAN_HOST_BOOTSTRAP.md`](PODMAN_HOST_BOOTSTRAP.md) | The host bootstrap, step by step | Superseded by the Ansible role (ADR-0188) |
