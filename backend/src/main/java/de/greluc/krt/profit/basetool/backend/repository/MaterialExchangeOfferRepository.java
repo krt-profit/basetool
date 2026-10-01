@@ -73,10 +73,10 @@ public interface MaterialExchangeOfferRepository
           WHERE o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
             AND (:onlyMine = false OR ow.id = :viewerId)
             AND (:query IS NULL
-                 OR LOWER(m.name) LIKE :query
-                 OR LOWER(o.itemName) LIKE :query
-                 OR LOWER(ow.username) LIKE :query
-                 OR LOWER(ow.displayName) LIKE :query)
+                 OR LOWER(m.name) LIKE :query ESCAPE '\\'
+                 OR LOWER(o.itemName) LIKE :query ESCAPE '\\'
+                 OR LOWER(ow.username) LIKE :query ESCAPE '\\'
+                 OR LOWER(ow.displayName) LIKE :query ESCAPE '\\')
             AND (:minQuality = 0 OR ii.quality >= :minQuality)
             AND (:excludeStolen = false OR ii.id IS NULL OR ii.stolen = false)
             AND (:minAmount IS NULL
@@ -98,10 +98,10 @@ public interface MaterialExchangeOfferRepository
           WHERE o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
             AND (:onlyMine = false OR ow.id = :viewerId)
             AND (:query IS NULL
-                 OR LOWER(m.name) LIKE :query
-                 OR LOWER(o.itemName) LIKE :query
-                 OR LOWER(ow.username) LIKE :query
-                 OR LOWER(ow.displayName) LIKE :query)
+                 OR LOWER(m.name) LIKE :query ESCAPE '\\'
+                 OR LOWER(o.itemName) LIKE :query ESCAPE '\\'
+                 OR LOWER(ow.username) LIKE :query ESCAPE '\\'
+                 OR LOWER(ow.displayName) LIKE :query ESCAPE '\\')
             AND (:minQuality = 0 OR ii.quality >= :minQuality)
             AND (:excludeStolen = false OR ii.id IS NULL OR ii.stolen = false)
             AND (:minAmount IS NULL

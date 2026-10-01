@@ -222,8 +222,8 @@ public interface UserRepository
    */
   @Query(
       """
-      SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
-      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS
+      SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
+      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND (:scopeSquadronIds IS
       NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
       ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS
       (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
@@ -242,8 +242,8 @@ public interface UserRepository
   @EntityGraph(attributePaths = {"roles"})
   @Query(
       """
-      SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
-      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS
+      SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
+      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND (:scopeSquadronIds IS
       NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
       ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS
       (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
@@ -269,8 +269,8 @@ public interface UserRepository
           SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,
           u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
           '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE
-          (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
-          LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS
+          (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
+          LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND (:scopeSquadronIds IS
           NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
           ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS
           (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
@@ -280,7 +280,7 @@ public interface UserRepository
       countQuery =
           """
           SELECT COUNT(u) FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query,
-          '%')) OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND
+          '%')) ESCAPE '\\' OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND
           (:scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE
           ms.user.id = u.id AND ms.kind =
           de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1

@@ -84,6 +84,11 @@
   waren nur über die URL-Regel geschützt; dieselbe Rollenprüfung steht jetzt auch an der Methode, die
   URL-Regel bleibt. Wer Zugriff hat, ändert sich nicht.
 
+- **Suchfelder finden `%` und `_` wörtlich.** In Standorten, Materialien, Nutzern, Missionen,
+  Operationen, Schiffen (Hangar und Staffel-Übersicht), Materialbörse und Lager-Auswahl fand ein
+  maskiertes Suchzeichen nichts mehr; die Abfragen setzen jetzt `ESCAPE`. Die Staffel-Hangar-Übersicht
+  maskierte die Eingabe bisher gar nicht.
+
 - **Katalogsuchen behandeln `%` und `_` wörtlich.** Die Produktsuche der Blaupausen sowie die
   Artikelauswahl für Aufträge und Lager übergaben Eingaben ungeschützt an `LIKE`; die Blaupausen-Abfragen
   setzen zusätzlich `ESCAPE`, ohne das Hibernate das Escape-Zeichen abschaltet.

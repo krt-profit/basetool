@@ -2377,9 +2377,10 @@ account-side twin of the user-picker scaling switch (REQ-FE-011, ADR-0089) and i
   filter runs in the repository (`findAllFiltered` / `findGrantedToFiltered`, the management and
   grant-scoped variants) as a `LOWER(name/accountNo) LIKE LOWER(CONCAT('%', :query, '%'))` predicate
   plus `status IN … AND type IN …`. The query is a **bound parameter** (SQL-injection-safe) and is
-  deliberately **not** `LikePatterns`-escaped — plain `LIKE` does not honour the backslash escape in
-  this Hibernate/PostgreSQL setup, so escaping would only *hide* an account whose name contains a
-  literal `%`/`_`; a caller's `%`/`_` therefore act as harmless LIKE wildcards on this
+  deliberately **not** `LikePatterns`-escaped — a `LIKE` without an `ESCAPE` clause is rendered as
+  `escape ''` here, so escaping would only *hide* an account whose name contains a literal `%`/`_`
+  (the other searches add `ESCAPE '\'`, REQ-DATA-019; this one keeps its documented wildcard
+  behaviour); a caller's `%`/`_` therefore act as harmless LIKE wildcards on this
   bank-employee-gated read (a blank query normalises to the match-all `LIKE '%%'`). The listing stays
   **caller-scoped** exactly as before
   (management sees all, an employee only their granted accounts, REQ-BANK-010) and **balances stay

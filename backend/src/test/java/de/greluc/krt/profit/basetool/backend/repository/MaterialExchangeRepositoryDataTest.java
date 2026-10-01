@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import static de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.support.MaterialExchangeQueryParams;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -428,6 +430,62 @@ class MaterialExchangeRepositoryDataTest {
 
     assertThatThrownBy(() -> offerRepository.saveAndFlush(bad))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  /** A {@code %} or {@code _} in the board's text filter matches literally, not as a wildcard. */
+  @Test
+  void findBoard_textFilterTreatsPercentAndUnderscoreLiterally() {
+    User owner = persistUser("boersen-like");
+    MaterialExchangeOffer percent =
+        persistOffer(persistItem(owner, "Lit%Pct", 500, 10.0), owner, ACTIVE);
+    MaterialExchangeOffer plain =
+        persistOffer(persistItem(owner, "LitXPct", 500, 10.0), owner, ACTIVE);
+    MaterialExchangeOffer underscore =
+        persistOffer(persistItem(owner, "Lit_Und", 500, 10.0), owner, ACTIVE);
+    persistOffer(persistItem(owner, "LitYUnd", 500, 10.0), owner, ACTIVE);
+    entityManager.flush();
+
+    assertThat(board(owner, "lit%pct")).containsExactly(percent);
+    assertThat(board(owner, "lit_und")).containsExactly(underscore);
+    assertThat(board(owner, "litxp")).containsExactly(plain);
+  }
+
+  /** The releasable-stock picker matches a {@code %} or {@code _} literally as well. */
+  @Test
+  void findReleasableForUser_textFilterTreatsPercentAndUnderscoreLiterally() {
+    User owner = persistUser("boersen-picker");
+    InventoryItem percent = persistItem(owner, "Pick%Pct", 500, 10.0);
+    persistItem(owner, "PickXPct", 500, 10.0);
+    InventoryItem underscore = persistItem(owner, "Pick_Und", 500, 10.0);
+    persistItem(owner, "PickYUnd", 500, 10.0);
+    entityManager.flush();
+
+    assertThat(releasable(owner, "pick%pct")).containsExactly(percent);
+    assertThat(releasable(owner, "pick_und")).containsExactly(underscore);
+    assertThat(releasable(owner, "pickxp")).hasSize(1);
+  }
+
+  private List<InventoryItem> releasable(User owner, String query) {
+    return inventoryItemRepository.findReleasableForUser(
+        owner.getId(),
+        MaterialExchangeQueryParams.normalizeQuery(query),
+        true,
+        true,
+        PageRequest.of(0, 20));
+  }
+
+  private List<MaterialExchangeOffer> board(User owner, String query) {
+    return offerRepository
+        .findBoard(
+            owner.getId(),
+            true,
+            MaterialExchangeQueryParams.normalizeQuery(query),
+            0,
+            null,
+            "qual",
+            false,
+            PageRequest.of(0, 20))
+        .getContent();
   }
 
   /** Persists a minimal user with a unique username. */
