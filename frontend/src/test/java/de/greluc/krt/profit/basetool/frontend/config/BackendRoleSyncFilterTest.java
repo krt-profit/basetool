@@ -191,6 +191,35 @@ class BackendRoleSyncFilterTest {
   }
 
   @Test
+  void roleSync_neverLogsPrincipalNameOrItsHash() throws Exception {
+    Logger logger = (Logger) LoggerFactory.getLogger(BackendRoleSyncFilter.class);
+    Level original = logger.getLevel();
+    logger.setLevel(Level.DEBUG);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      when(backendApiClient.get(USERS_ME, UserDto.class))
+          .thenThrow(new RuntimeException("backend down"));
+
+      filter.doFilterInternal(request, response, chain);
+
+      String name = "user-1";
+      String hash = Integer.toHexString(name.hashCode());
+      assertThat(appender.list).isNotEmpty();
+      assertThat(appender.list)
+          .allSatisfy(
+              e -> {
+                assertThat(e.getFormattedMessage()).doesNotContain(name);
+                assertThat(e.getFormattedMessage()).doesNotContain(hash);
+              });
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(original);
+    }
+  }
+
+  @Test
   void pendingApproval_nonExemptPath_redirectsToWaitingPage() throws Exception {
     when(request.getContextPath()).thenReturn("");
     when(request.getRequestURI()).thenReturn("/dashboard");

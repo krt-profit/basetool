@@ -100,7 +100,7 @@ app:
   session:
     anonymous-timeout: ${APP_SESSION_ANONYMOUS_TIMEOUT:30m}
     authenticated-timeout: ${APP_SESSION_AUTHENTICATED_TIMEOUT:720h}
-    type-allow-list: ${APP_SESSION_TYPE_ALLOW_LIST:report}
+    type-allow-list: ${APP_SESSION_TYPE_ALLOW_LIST:enforce}
     configure-keyspace-notifications: true
   ui:
     notification-duration: 5000
