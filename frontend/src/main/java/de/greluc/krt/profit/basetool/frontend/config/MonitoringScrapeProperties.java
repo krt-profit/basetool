@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import lombok.Data;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -57,5 +58,22 @@ public class MonitoringScrapeProperties {
    */
   public boolean isConfigured() {
     return username != null && !username.isBlank() && password != null && !password.isBlank();
+  }
+
+  /**
+   * Describes the properties without the password, so a logged or printed instance never carries
+   * it.
+   *
+   * @return the class name with the username and the password shown only as configured or blank
+   */
+  @Override
+  @NotNull
+  public String toString() {
+    boolean hasPassword = password != null && !password.isBlank();
+    return "MonitoringScrapeProperties[username="
+        + username
+        + ", password="
+        + (hasPassword ? "<redacted>" : "")
+        + "]";
   }
 }
