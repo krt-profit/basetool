@@ -736,6 +736,41 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
+    void storedOrder_cannotBeReopenedByUpdate() {
+      RefineryOrder existing = newSavedOrder();
+      existing.setStatus(RefineryOrderStatus.COMPLETED);
+      existing.setStoredAt(java.time.Instant.now());
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setStatus(RefineryOrderStatus.OPEN);
+
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () -> service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false));
+      assertEquals("error.refinery_order.stored_status_locked", ex.getMessage());
+      assertEquals(RefineryOrderStatus.COMPLETED, existing.getStatus());
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void storedOrder_keepingItsStatus_canStillBeUpdated() {
+      RefineryOrder existing = newSavedOrder();
+      existing.setStatus(RefineryOrderStatus.COMPLETED);
+      existing.setStoredAt(java.time.Instant.now());
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setStatus(RefineryOrderStatus.COMPLETED);
+
+      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+
+      verify(refineryOrderRepository).save(existing);
+    }
+
+    @Test
     void throwsAccessDenied_whenNonLogisticianIsNotOwner() {
       RefineryOrder existing = newSavedOrder();
       when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));

@@ -97,6 +97,7 @@ class RefineryOrderServiceTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderItemService jobOrderItemService;
   @Mock private RefineryYieldRepository refineryYieldRepository;
   @Mock private OwnerScopeService ownerScopeService;
 
@@ -152,6 +153,58 @@ class RefineryOrderServiceTest {
             () -> refineryOrderService.storeRefineryOrder(OWNER_ID, ORDER_ID, dto, false));
 
     assertEquals("error.refinery_order.already_stored", ex.getMessage());
+  }
+
+  @Test
+  void shouldRefuseStoringAnOrderThatCarriesTheStoredMarker_evenWhenReopened() {
+    order.setStatus(RefineryOrderStatus.OPEN);
+    order.setStoredAt(java.time.Instant.now());
+    when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                refineryOrderService.storeRefineryOrder(
+                    OWNER_ID,
+                    ORDER_ID,
+                    new RefineryOrderStoreDto(List.of(item(null, null))),
+                    false));
+
+    assertEquals("error.refinery_order.already_stored", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void shouldMarkTheOrderStoredWhenStoring() {
+    stubLookupsForSingleItem();
+
+    refineryOrderService.storeRefineryOrder(
+        OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false);
+
+    assertTrue(order.getStoredAt() != null);
+  }
+
+  @Test
+  void shouldRefuseEarmarkingForAJobOrderThatDoesNotRequireTheMaterial() {
+    stubLookupsForSingleItem();
+    de.greluc.krt.profit.basetool.backend.model.JobOrder jobOrder =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    jobOrder.setId(JOB_ORDER_ID);
+    when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            refineryOrderService.storeRefineryOrder(
+                OWNER_ID,
+                ORDER_ID,
+                new RefineryOrderStoreDto(List.of(item(null, JOB_ORDER_ID))),
+                false));
+
+    verify(inventoryItemRepository, never()).save(any());
   }
 
   @Nested
