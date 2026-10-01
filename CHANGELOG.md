@@ -15,6 +15,13 @@
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
+### Fixed
+
+- **Backend-Fehler auf Seiten und Downloads tragen den richtigen HTTP-Status.** Die Fehlerseite für eine
+  Backend-Ablehnung kam bei Navigation oder einfachem `fetch` mit Status 200 statt 404/403/409/…; ein Download, der
+  `response.ok` prüft (Übergabeprotokoll), hätte die Fehlerseite als Dokument gespeichert. AJAX-Antworten
+  (JSON) waren schon korrekt.
+
 ### Security
 
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
