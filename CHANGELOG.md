@@ -17,6 +17,11 @@
 
 ### Security
 
+- **Keycloak-Verbindung von Backend und Ingest mit Zeitlimits.** Der an das Zertifikat gepinnte Client
+  (Admin-API und JWKS-Abruf) wartete unbegrenzt auf Keycloak; er nutzt jetzt 5 s Verbindungs- und
+  30 s (Ingest 10 s) Lese-Timeout.
+- **Log-Level zur Laufzeit wieder per Bearer-Token änderbar.** `POST /actuator/loggers/**` scheiterte
+  in Produktion am CSRF-Schutz mit 403; der Pfad ist jetzt wie `/api/v1/**` ausgenommen.
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
   Identity-Provider-Mapper), CVE-2026-14781, CVE-2026-19608 und CVE-2026-93999 (deaktivierte Clients im
   Token), dazu den Geräte-Login für brute-force-gesperrte Konten sowie Jackson und Netty im

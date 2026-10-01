@@ -3126,6 +3126,12 @@ has an identity to gate a write on at all:
   delete: it is a resource server with an identity to gate on, and its permit-all chain is narrow
   enough that the mutator never reaches it. Widening that matcher to `/actuator/**` would silently
   un-gate the write — `ManagementPortIsolationTest` asserts it stays 401/403 on the management port.
+  The main chain's cookie CSRF protection is on in prod, so `/actuator/loggers/**` is listed in
+  `SecurityConfig.CSRF_EXEMPT_PATHS` beside `/api/v1/**` (bearer-only, stateless); without that
+  entry the documented bearer `POST` answered 403 for lack of a CSRF token. The `test` profile
+  disables CSRF, which hid this; `ActuatorLoggersCsrfArmedTest` re-arms it via
+  `app.security.csrf.armed-in-test` and proves an admin write needs no CSRF token while anonymous
+  and non-admin callers stay refused.
 - **dev / test / e2e — unchanged, full control.** No management port is configured, the
   `application-prod.yml` files are never loaded, so all three modules keep the runtime write. The
   backend's `ROLE_ADMIN` matcher lives in `SecurityConfig` and is profile-independent, so it applies

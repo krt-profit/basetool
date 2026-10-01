@@ -728,6 +728,10 @@ out) — so neither edge that reaches it is cleartext:
   `keycloak-trust` Spring SSL bundle (mirrors the frontend/ingest `backend-trust` approach, audit
   finding M-13). Unlike the relay clients that pin `backend-trust` without a hostname check, the
   admin client keeps **hostname verification ON**, so the cert's SAN MUST include `dns:keycloak`.
+  The pinned request factory (`KeycloakTrustSupport`, shared by the admin client and the internal
+  JWKS decoder) speaks HTTP/1.1 and is bounded by the connect and read timeouts of
+  `RestClientConfig` (5 s / 30 s), so a hung Keycloak cannot hold a request thread unbounded; the
+  ingest copy uses 5 s / 10 s.
   *(Corrected 2026-09-22, ADR-0204: this used to say the JDK `HttpClient` cannot disable hostname
   verification per client. Its API cannot, but a trust manager can — JSSE does endpoint
   identification inside an `X509ExtendedTrustManager` — and that is how the ingest relay, now on the
