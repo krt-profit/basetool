@@ -19,6 +19,14 @@ inputs:
       from a cache an earlier run wrote (zizmor `cache-poisoning`).
     required: false
     default: 'false'
+  cache-encryption-key:
+    description: >
+      Passed to setup-gradle as `cache-encryption-key`: the base64 AES key that encrypts the
+      configuration-cache data kept in the Actions cache. A composite action cannot read secrets, so
+      each workflow passes the GRADLE_ENCRYPTION_KEY repository secret; an empty value (a fork pull
+      request) leaves the key unset.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -34,3 +42,4 @@ runs:
       with:
         cache-read-only: ${{ inputs.cache-read-only }}
         cache-disabled: ${{ inputs.cache-disabled }}
+        cache-encryption-key: ${{ inputs.cache-encryption-key }}
