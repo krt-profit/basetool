@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeRequestInterestCount;
+import de.greluc.krt.profit.basetool.backend.support.MaterialExchangeQueryParams;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -246,6 +247,41 @@ class MaterialExchangeRequestRepositoryDataTest {
         interestRepository.deleteByRequestIdAndInterestedUserId(request.getId(), supplierA.getId());
     assertThat(removed).isEqualTo(1L);
     assertThat(interestRepository.countByRequestId(request.getId())).isEqualTo(1L);
+  }
+
+  /** A {@code %} or {@code _} in the board's text filter matches literally, not as a wildcard. */
+  @Test
+  void findBoard_textFilterTreatsPercentAndUnderscoreLiterally() {
+    User owner = persistUser("gesuch-like");
+    MaterialExchangeRequest percent =
+        persistMaterialRequest(
+            owner, persistMaterial("Lit%Pct"), 500, 10.0, MaterialExchangeRequestStatus.ACTIVE);
+    MaterialExchangeRequest plain =
+        persistMaterialRequest(
+            owner, persistMaterial("LitXPct"), 500, 10.0, MaterialExchangeRequestStatus.ACTIVE);
+    MaterialExchangeRequest underscore =
+        persistMaterialRequest(
+            owner, persistMaterial("Lit_Und"), 500, 10.0, MaterialExchangeRequestStatus.ACTIVE);
+    persistMaterialRequest(
+        owner, persistMaterial("LitYUnd"), 500, 10.0, MaterialExchangeRequestStatus.ACTIVE);
+    entityManager.flush();
+
+    assertThat(board(owner, "lit%pct")).containsExactly(percent);
+    assertThat(board(owner, "lit_und")).containsExactly(underscore);
+    assertThat(board(owner, "litxp")).containsExactly(plain);
+  }
+
+  private List<MaterialExchangeRequest> board(User owner, String query) {
+    return requestRepository
+        .findBoard(
+            owner.getId(),
+            true,
+            MaterialExchangeQueryParams.normalizeQuery(query),
+            0,
+            null,
+            "qual",
+            PageRequest.of(0, 20))
+        .getContent();
   }
 
   /** Persists a minimal user with a unique username. */

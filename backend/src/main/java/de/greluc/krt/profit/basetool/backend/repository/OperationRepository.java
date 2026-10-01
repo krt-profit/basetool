@@ -159,11 +159,11 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
       "SELECT o FROM Operation o WHERE "
           + ScopeSpecifications.OPERATION_SCOPE_PREDICATE
           + " AND (CAST(:query AS string) IS NULL OR o.name ILIKE CONCAT('%', CAST(:query AS"
-          + " string), '%') OR CAST(o.description AS string) ILIKE CONCAT('%', CAST(:query AS"
-          + " string), '%')) AND (CAST(o.status AS string) IN (:status)) AND (CAST(:start AS"
-          + " timestamp) IS NULL OR (SELECT MIN(m.plannedStartTime) FROM Mission m WHERE"
-          + " m.operation = o) >= :start) AND (CAST(:end AS timestamp) IS NULL OR (SELECT"
-          + " MAX(m.plannedEndTime) FROM Mission m WHERE m.operation = o) <= :end)")
+          + " string), '%') ESCAPE '\\' OR CAST(o.description AS string) ILIKE CONCAT('%',"
+          + " CAST(:query AS string), '%') ESCAPE '\\') AND (CAST(o.status AS string) IN (:status))"
+          + " AND (CAST(:start AS timestamp) IS NULL OR (SELECT MIN(m.plannedStartTime) FROM"
+          + " Mission m WHERE m.operation = o) >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
+          + " (SELECT MAX(m.plannedEndTime) FROM Mission m WHERE m.operation = o) <= :end)")
   Page<Operation> searchOperations(
       @Param("query") String query,
       @Param("start") Instant start,

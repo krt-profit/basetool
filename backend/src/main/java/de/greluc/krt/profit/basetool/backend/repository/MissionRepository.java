@@ -175,11 +175,12 @@ public interface MissionRepository
       "SELECT m FROM Mission m WHERE "
           + ScopeSpecifications.MISSION_SCOPE_PREDICATE
           + " AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
-          + " string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS"
-          + " string), '%')) AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >="
-          + " :start) AND (CAST(:end AS timestamp) IS NULL OR m.plannedStartTime <= :end) AND"
-          + " (m.status IN (:status)) AND (:isInternal IS NULL OR m.isInternal = :isInternal) AND"
-          + " (CAST(:operationId AS uuid) IS NULL OR m.operation.id = :operationId)")
+          + " string), '%') ESCAPE '\\' OR CAST(m.description AS string) ILIKE CONCAT('%',"
+          + " CAST(:query AS string), '%') ESCAPE '\\') AND (CAST(:start AS timestamp) IS NULL OR"
+          + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
+          + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
+          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operation.id"
+          + " = :operationId)")
   Page<Mission> searchMissions(
       @Param("query") String query,
       @Param("start") Instant start,
