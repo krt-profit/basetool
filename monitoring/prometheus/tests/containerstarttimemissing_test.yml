@@ -1,0 +1,149 @@
+rule_files:
+  - ../alerts/containers-runtime.yml
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: quiet - ten containers report start times, none restarting
+    interval: 1m
+    input_series:
+      - series: 'podman_container_info{id="a01",name="backend",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a01",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a02",name="frontend",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a02",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a03",name="ingest",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a03",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a04",name="keycloak",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a04",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a05",name="db-backend",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a05",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a06",name="db-keycloak",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a06",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a07",name="redis",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a07",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a08",name="edge",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a08",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a09",name="prometheus",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a09",pod_id="",pod_name=""}'
+        values: "1000x30"
+      - series: 'podman_container_info{id="a10",name="grafana",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a10",pod_id="",pod_name=""}'
+        values: "1000x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerStartTimeMissing
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ContainerRestartLoop
+        exp_alerts: []
+
+  - name: fires - the exporter answers but emits no container series
+    interval: 1m
+    input_series:
+      - series: 'up{job="podman-exporter"}'
+        values: "1x30"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: ContainerStartTimeMissing
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ContainerStartTimeMissing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "No container start times: ContainerRestartLoop is blind"
+              description: "Fewer than 10 name-labelled containers report basetool:container:start_time_seconds (or none at all), so ContainerRestartLoop cannot fire. The source is the prometheus-podman-exporter (podman_container_started_seconds joined onto podman_container_info), not the cgroup collector that ContainerMetricsMissing guards: check the podman-exporter container, its socket access and TargetDown."
+
+  - name: fires - fewer than ten containers report start times
+    interval: 1m
+    input_series:
+      - series: 'podman_container_info{id="a01",name="backend",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x30"
+      - series: 'podman_container_started_seconds{id="a01",pod_id="",pod_name=""}'
+        values: "1000x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerStartTimeMissing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "No container start times: ContainerRestartLoop is blind"
+              description: "Fewer than 10 name-labelled containers report basetool:container:start_time_seconds (or none at all), so ContainerRestartLoop cannot fire. The source is the prometheus-podman-exporter (podman_container_started_seconds joined onto podman_container_info), not the cgroup collector that ContainerMetricsMissing guards: check the podman-exporter container, its socket access and TargetDown."
+
+  - name: fires - a restart loop on the podman exporter's series, while the guard stays quiet
+    interval: 1m
+    input_series:
+      - series: 'podman_container_info{id="b01",name="backend",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="b01",pod_id="",pod_name=""}'
+        values: "1000+60x40"
+      - series: 'podman_container_info{id="a02",name="frontend",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a02",pod_id="",pod_name=""}'
+        values: "1000x40"
+      - series: 'podman_container_info{id="a03",name="ingest",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a03",pod_id="",pod_name=""}'
+        values: "1000x40"
+      - series: 'podman_container_info{id="a04",name="keycloak",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a04",pod_id="",pod_name=""}'
+        values: "1000x40"
+      - series: 'podman_container_info{id="a05",name="db-backend",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a05",pod_id="",pod_name=""}'
+        values: "1000x40"
+      - series: 'podman_container_info{id="a06",name="db-keycloak",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a06",pod_id="",pod_name=""}'
+        values: "1000x40"
+      - series: 'podman_container_info{id="a07",name="redis",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a07",pod_id="",pod_name=""}'
+        values: "1000x40"
+      - series: 'podman_container_info{id="a08",name="edge",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a08",pod_id="",pod_name=""}'
+        values: "1000x40"
+      - series: 'podman_container_info{id="a09",name="prometheus",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a09",pod_id="",pod_name=""}'
+        values: "1000x40"
+      - series: 'podman_container_info{id="a10",name="grafana",image="x",pod_id="",pod_name="",ports=""}'
+        values: "1x40"
+      - series: 'podman_container_started_seconds{id="a10",pod_id="",pod_name=""}'
+        values: "1000x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ContainerStartTimeMissing
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: ContainerRestartLoop
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              name: backend
+            exp_annotations:
+              summary: "Container restart loop: backend"
+              description: "Container backend restarted more than 3 times in 15 minutes."
