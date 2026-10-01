@@ -116,6 +116,13 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   @Column(nullable = false)
   private RefineryOrderStatus status = RefineryOrderStatus.OPEN;
 
+  /**
+   * When the order's output was booked into inventory, or {@code null} while it has not been. Set
+   * only by the store operation and never cleared; a stored order can be neither stored again nor
+   * have its status changed by an update.
+   */
+  private Instant storedAt;
+
   @OneToMany(mappedBy = "refineryOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   @ToString.Exclude
   private Set<@Valid RefineryGood> goods = new HashSet<>();

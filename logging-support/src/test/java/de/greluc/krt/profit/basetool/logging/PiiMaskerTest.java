@@ -291,4 +291,35 @@ class PiiMaskerTest {
       assertEquals("guestEditToken=***", PiiMasker.mask("guestEditToken=abcDEF123"));
     }
   }
+
+  @Nested
+  class CredentialKeywordTests {
+
+    @Test
+    void passwordEquals_valueReplaced() {
+      assertEquals("password=***", PiiMasker.mask("password=hunter2!x"));
+    }
+
+    @Test
+    void secretColonSpace_valueReplaced_restOfLineKept() {
+      assertEquals(
+          "client_secret: *** for realm", PiiMasker.mask("client_secret: s3cr3t for realm"));
+    }
+
+    @Test
+    void passwordInsideToString_valueReplaced() {
+      assertEquals("Props[user=a, password=***]", PiiMasker.mask("Props[user=a, password=pw1]"));
+    }
+
+    @Test
+    void jsonPassword_valueReplacedAndQuotesKept() {
+      assertEquals("{\"password\":\"***\"}", PiiMasker.mask("{\"password\":\"pw1\"}"));
+    }
+
+    @Test
+    void passwordWithoutSeparator_leftAlone() {
+      String text = "password reset requested; secret santa list; PasswordEncoder bean";
+      assertEquals(text, PiiMasker.mask(text));
+    }
+  }
 }

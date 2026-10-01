@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
@@ -77,7 +78,7 @@ class PersonalBlueprintImportProxyControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    backendApiClient = mock(BackendApiClient.class);
+    backendApiClient = RealBackendApiClient.mockExecutingOver(webClient);
     ingestHandoffService = mock(IngestHandoffService.class);
     StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage(
@@ -86,7 +87,7 @@ class PersonalBlueprintImportProxyControllerTest {
         PersonalBlueprintImportProxyController.TOO_LARGE_KEY, Locale.getDefault(), "Zu gross.");
     controller =
         new PersonalBlueprintImportProxyController(
-            webClient, backendApiClient, ingestHandoffService, messages);
+            backendApiClient, ingestHandoffService, messages);
   }
 
   /**

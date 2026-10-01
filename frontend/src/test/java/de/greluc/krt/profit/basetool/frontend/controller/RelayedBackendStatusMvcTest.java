@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
@@ -56,10 +58,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.oauth2.client.ClientAuthorizationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 /**
  * Tests that every proxy relay forwarding a backend refusal as a {@code ResponseStatusException}
@@ -77,6 +82,7 @@ class RelayedBackendStatusMvcTest {
   private WebClient webClient;
   private ListAppender<ILoggingEvent> adviceLog;
   private Logger adviceLogger;
+  private Logger clientLogger;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -87,11 +93,14 @@ class RelayedBackendStatusMvcTest {
     adviceLog = new ListAppender<>();
     adviceLog.start();
     adviceLogger.addAppender(adviceLog);
+    clientLogger = (Logger) LoggerFactory.getLogger(BackendApiClient.class);
+    clientLogger.addAppender(adviceLog);
   }
 
   @AfterEach
   void tearDown() throws Exception {
     adviceLogger.detachAppender(adviceLog);
+    clientLogger.detachAppender(adviceLog);
     backend.shutdown();
   }
 
@@ -107,59 +116,63 @@ class RelayedBackendStatusMvcTest {
     return Stream.of(
         relay(
             "AdminP4kImportPageController#enqueuePreview",
-            wc -> new AdminP4kImportPageController(wc, mock(BackendApiClient.class)),
+            wc -> new AdminP4kImportPageController(RealBackendApiClient.over(wc)),
             multipart("/admin/p4k-import/jobs").file(upload())),
         relay(
             "AdminPersonalBlueprintsPageController#previewImport",
-            wc -> new AdminPersonalBlueprintsPageController(mock(BackendApiClient.class), wc),
+            wc ->
+                new AdminPersonalBlueprintsPageController(
+                    RealBackendApiClient.mockExecutingOver(wc)),
             multipart("/admin/personal-blueprints/" + id + "/import/preview").file(upload())),
         relay(
             "AuditReportProxyController#downloadAuditLog",
-            AuditReportProxyController::new,
+            wc -> new AuditReportProxyController(RealBackendApiClient.over(wc)),
             get("/api/proxy/audit/BANK/export").param("from", FROM).param("to", TO)),
         relay(
             "AuditReportProxyController#purgeAuditLog",
-            AuditReportProxyController::new,
+            wc -> new AuditReportProxyController(RealBackendApiClient.over(wc)),
             delete("/api/proxy/audit/BANK").param("before", FROM)),
         relay(
             "BankReportProxyController#downloadStatement",
-            BankReportProxyController::new,
+            wc -> new BankReportProxyController(RealBackendApiClient.over(wc)),
             get("/api/proxy/bank/accounts/" + id + "/statement")
                 .param("from", FROM)
                 .param("to", TO)),
         relay(
             "DataExportProxyController#json",
-            wc -> new DataExportProxyController(wc, exportTimeouts()),
+            wc -> new DataExportProxyController(RealBackendApiClient.over(wc), exportTimeouts()),
             get("/api/proxy/me/export/json")),
         relay(
             "HangarDeleteAllProxyController#deleteAllShips",
-            HangarDeleteAllProxyController::new,
+            wc -> new HangarDeleteAllProxyController(RealBackendApiClient.over(wc)),
             delete("/hangar/ships/all")),
         relay(
             "HangarImportProxyController#importShips",
-            wc -> new HangarImportProxyController(wc, new StaticMessageSource()),
+            wc ->
+                new HangarImportProxyController(
+                    RealBackendApiClient.over(wc), new StaticMessageSource()),
             multipart("/hangar/import/ships").file(upload())),
         relay(
             "InventoryDeleteAllProxyController#deleteAllGlobalInventory",
-            InventoryDeleteAllProxyController::new,
+            wc -> new InventoryDeleteAllProxyController(RealBackendApiClient.over(wc)),
             delete("/inventory/all")),
         relay(
             "JobOrderHandoverReportProxyController#downloadHandoverReport",
-            JobOrderHandoverReportProxyController::new,
+            wc -> new JobOrderHandoverReportProxyController(RealBackendApiClient.over(wc)),
             get("/api/v1/orders/" + id + "/handovers/" + other + "/report")),
         relay(
             "JobOrderHandoverReportProxyController#downloadItemHandoverReport",
-            JobOrderHandoverReportProxyController::new,
+            wc -> new JobOrderHandoverReportProxyController(RealBackendApiClient.over(wc)),
             get("/api/v1/orders/" + id + "/item-handovers/" + other + "/report")),
         relay(
             "JobOrderHandoverReportProxyController#previewHandoverReport",
-            JobOrderHandoverReportProxyController::new,
+            wc -> new JobOrderHandoverReportProxyController(RealBackendApiClient.over(wc)),
             post("/api/v1/orders/" + id + "/handovers/report/preview")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}")),
         relay(
             "OrgUnitBankProxyController#downloadStatement",
-            wc -> new OrgUnitBankProxyController(mock(BackendApiClient.class), wc),
+            wc -> new OrgUnitBankProxyController(RealBackendApiClient.mockExecutingOver(wc)),
             get("/api/proxy/org-units/bank/accounts/" + id + "/statement")
                 .param("from", FROM)
                 .param("to", TO)),
@@ -167,8 +180,7 @@ class RelayedBackendStatusMvcTest {
             "PersonalBlueprintImportProxyController#preview",
             wc ->
                 new PersonalBlueprintImportProxyController(
-                    wc,
-                    mock(BackendApiClient.class),
+                    RealBackendApiClient.over(wc),
                     mock(IngestHandoffService.class),
                     new StaticMessageSource()),
             multipart("/personal-inventory/blueprints/import/preview").file(upload())));
@@ -199,11 +211,39 @@ class RelayedBackendStatusMvcTest {
         name + ": a relayed 4xx must not be logged at ERROR (REQ-OBS-001)");
   }
 
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("relays")
+  void anUnusableTokenStartsTheReauthenticationFlowNotA500(
+      String name,
+      Function<WebClient, Object> controller,
+      AbstractMockHttpServletRequestBuilder<?> request)
+      throws Exception {
+    WebClient failing =
+        WebClient.builder()
+            .baseUrl(backend.url("/").toString())
+            .filter(
+                (clientRequest, next) ->
+                    Mono.error(
+                        new ClientAuthorizationException(
+                            new OAuth2Error("invalid_grant"), "keycloak")))
+            .build();
+
+    MockMvcBuilders.standaloneSetup(controller.apply(failing))
+        .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))
+        .build()
+        .perform(request.header("X-Requested-With", "XMLHttpRequest"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().exists("X-Reauthenticate"))
+        .andExpect(jsonPath("$.code").value("REAUTH_REQUIRED"));
+
+    assertEquals(0, backend.getRequestCount(), name + " must not reach the backend");
+  }
+
   @Test
   void aBackend404OnADownloadNavigationRendersTheErrorPageWith404() throws Exception {
     backend.enqueue(new MockResponse().setResponseCode(404));
 
-    mockMvc(wc -> new DataExportProxyController(wc, exportTimeouts()))
+    mockMvc(wc -> new DataExportProxyController(RealBackendApiClient.over(wc), exportTimeouts()))
         .perform(get("/api/proxy/me/export/pdf"))
         .andExpect(status().isNotFound());
   }
@@ -212,14 +252,14 @@ class RelayedBackendStatusMvcTest {
   void aBackend503StaysA503AndIsTheOneFaultLoggedAtError() throws Exception {
     backend.enqueue(new MockResponse().setResponseCode(503));
 
-    mockMvc(HangarDeleteAllProxyController::new)
+    mockMvc(wc -> new HangarDeleteAllProxyController(RealBackendApiClient.over(wc)))
         .perform(delete("/hangar/ships/all").header("X-Requested-With", "XMLHttpRequest"))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));
 
     assertTrue(
         adviceLog.list.stream().anyMatch(e -> e.getLevel() == Level.ERROR),
-        "a relayed 5xx is a server fault and is logged at ERROR");
+        "a backend 5xx is a server fault and is logged at ERROR");
   }
 
   @Test
@@ -236,8 +276,7 @@ class RelayedBackendStatusMvcTest {
     mockMvc(
             wc ->
                 new PersonalBlueprintImportProxyController(
-                    wc,
-                    mock(BackendApiClient.class),
+                    RealBackendApiClient.over(wc),
                     mock(IngestHandoffService.class),
                     new StaticMessageSource()))
         .perform(
@@ -266,8 +305,7 @@ class RelayedBackendStatusMvcTest {
     mockMvc(
             wc ->
                 new PersonalBlueprintImportProxyController(
-                    wc,
-                    mock(BackendApiClient.class),
+                    RealBackendApiClient.over(wc),
                     mock(IngestHandoffService.class),
                     new StaticMessageSource()))
         .perform(

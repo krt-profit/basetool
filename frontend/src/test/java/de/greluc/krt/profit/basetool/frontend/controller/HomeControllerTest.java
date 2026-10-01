@@ -32,6 +32,8 @@ import org.springframework.ui.Model;
 
 class HomeControllerTest {
 
+  private static final java.util.UUID ANNOUNCEMENT_ID = java.util.UUID.randomUUID();
+
   @Test
   void home_ShouldUsePreferredUsername_InsteadOfFullName() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -57,10 +59,11 @@ class HomeControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     HomeController controller = new HomeController(backendApiClient);
 
-    var response = controller.markAnnouncementAsReadAjax("ann-1");
+    var response = controller.markAnnouncementAsReadAjax(ANNOUNCEMENT_ID);
 
     assertEquals(200, response.getStatusCode().value());
-    verify(backendApiClient).put("/api/v1/users/me/read-announcement/ann-1", null, Void.class);
+    verify(backendApiClient)
+        .put("/api/v1/users/me/read-announcement/" + ANNOUNCEMENT_ID, null, Void.class);
   }
 
   @Test
@@ -71,7 +74,7 @@ class HomeControllerTest {
         .when(backendApiClient)
         .put(anyString(), any(), any());
 
-    var response = controller.markAnnouncementAsReadAjax("ann-1");
+    var response = controller.markAnnouncementAsReadAjax(ANNOUNCEMENT_ID);
 
     assertEquals(502, response.getStatusCode().value());
   }

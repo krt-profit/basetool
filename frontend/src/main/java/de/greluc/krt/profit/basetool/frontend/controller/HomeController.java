@@ -189,7 +189,7 @@ public class HomeController {
   @NotNull
   @org.springframework.web.bind.annotation.PostMapping("/announcement/read")
   public String markAnnouncementAsRead(
-      @org.springframework.web.bind.annotation.RequestParam String id) {
+      @org.springframework.web.bind.annotation.RequestParam UUID id) {
     try {
       backendApiClient.put("/api/v1/users/me/read-announcement/" + id, null, Void.class);
     } catch (Exception e) {
@@ -210,7 +210,7 @@ public class HomeController {
       headers = "X-Requested-With=XMLHttpRequest")
   @org.springframework.web.bind.annotation.ResponseBody
   public org.springframework.http.ResponseEntity<Void> markAnnouncementAsReadAjax(
-      @org.springframework.web.bind.annotation.RequestParam String id) {
+      @org.springframework.web.bind.annotation.RequestParam UUID id) {
     try {
       backendApiClient.put("/api/v1/users/me/read-announcement/" + id, null, Void.class);
       return org.springframework.http.ResponseEntity.ok().build();

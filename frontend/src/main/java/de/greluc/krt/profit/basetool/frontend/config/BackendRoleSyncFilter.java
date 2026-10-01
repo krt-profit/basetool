@@ -135,21 +135,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
    */
   private static final long ROLE_RESYNC_MILLIS = 60_000L;
 
-  /**
-   * Returns a stable, non-reversible 8-hex-char tag of the principal name for log correlation, so
-   * the name itself is never logged.
-   *
-   * @param name OIDC principal name; may be {@code null} or empty
-   * @return a tag like {@code "u-1a2b3c4d"}, or {@code "<anon>"} for null or empty input
-   */
-  @NotNull
-  private static String maskPrincipal(String name) {
-    if (name == null || name.isEmpty()) {
-      return "<anon>";
-    }
-    return String.format("u-%08x", name.hashCode());
-  }
-
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -177,8 +162,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         }
 
         if (isDue(session.getAttribute(ROLES_SYNCED_AT_FLAG), ROLE_RESYNC_MILLIS)) {
-          log.debug(
-              "Session exists, starting role sync for user: {}", maskPrincipal(token.getName()));
+          log.debug("Session exists, starting role sync for the current user");
           if (syncRoles(token, session, request, response)) {
             session.setAttribute(ROLES_SYNCED_AT_FLAG, System.currentTimeMillis());
           } else if (STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG))) {
@@ -348,14 +332,13 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       HttpServletRequest request,
       HttpServletResponse response) {
     try {
-      log.debug("Syncing backend roles for user: {}", maskPrincipal(token.getName()));
+      log.debug("Syncing backend roles for the current user");
       UserDto user = backendApiClient.get("/api/v1/users/me", UserDto.class);
 
       if (user == null) {
         log.warn(
-            "Backend role sync skipped: /api/v1/users/me returned no user for {}; leaving the"
-                + " session unsynced so the next request retries.",
-            maskPrincipal(token.getName()));
+            "Backend role sync skipped: /api/v1/users/me returned no user; leaving the"
+                + " session unsynced so the next request retries.");
         return false;
       }
 
@@ -369,9 +352,8 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       boolean modified = !names(updatedAuthorities).equals(names(token.getAuthorities()));
       if (modified) {
         log.info(
-            "Backend role sync changed the authorities of user {}: {} -> {} (grants and revocations"
-                + " both applied).",
-            maskPrincipal(token.getName()),
+            "Backend role sync changed the authorities of the current user: {} -> {} (grants and"
+                + " revocations both applied).",
             token.getAuthorities().size(),
             updatedAuthorities.size());
         OAuth2AuthenticationToken newAuth;
@@ -395,10 +377,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
             }
           }
 
-          log.debug(
-              "Using nameAttributeKey: {} for new OidcUser (current name: {})",
-              nameAttributeKey,
-              maskPrincipal(currentName));
+          log.debug("Using nameAttributeKey: {} for new OidcUser", nameAttributeKey);
           OidcUser newPrincipal =
               new DefaultOidcUser(
                   updatedAuthorities,
@@ -407,11 +386,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
                   nameAttributeKey);
 
           if (!newPrincipal.getName().equals(currentName)) {
-            log.warn(
-                "Principal name changed during sync! Old: {}, New: {}. This may break OAuth2"
-                    + " lookups.",
-                maskPrincipal(currentName),
-                maskPrincipal(newPrincipal.getName()));
+            log.warn("Principal name changed during sync! This may break OAuth2 lookups.");
           }
 
           newAuth =
@@ -426,18 +401,14 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         }
 
         newAuth.setDetails(token.getDetails());
-        log.info(
-            "Replaced Authentication in SecurityContext for user: {} (New name: {})",
-            maskPrincipal(token.getName()),
-            maskPrincipal(newAuth.getName()));
+        log.info("Replaced Authentication in SecurityContext for the current user");
 
         org.springframework.security.core.context.SecurityContext context =
             SecurityContextHolder.getContext();
         context.setAuthentication(newAuth);
         securityContextRepository.saveContext(context, request, response);
       } else {
-        log.debug(
-            "Authorities already match the backend for user: {}", maskPrincipal(token.getName()));
+        log.debug("Authorities already match the backend for the current user");
       }
 
       return true;
@@ -449,13 +420,10 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         log.info("Backend refused the role sync with NO_ROLE; routing to the account-status page.");
         return false;
       }
-      log.debug(
-          "Backend role sync deferred (backend unavailable) for user: {}",
-          maskPrincipal(token.getName()),
-          e);
+      log.debug("Backend role sync deferred (backend unavailable) for the current user", e);
       return false;
     } catch (Exception e) {
-      log.error("Failed to sync backend roles for user: {}", maskPrincipal(token.getName()), e);
+      log.error("Failed to sync backend roles for the current user", e);
       return false;
     }
   }
