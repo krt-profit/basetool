@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.AuditDomains;
 import java.time.Instant;
 import java.util.List;
@@ -28,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -39,8 +43,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -62,7 +64,7 @@ public class AuditReportProxyController {
    */
   private static final List<String> ALLOWED_DOMAINS = AuditDomains.ALL;
 
-  private final WebClient webClient;
+  private final BackendApiClient backendApiClient;
 
   /**
    * Rejects any {@code domain} path segment that is not a known audit tab, so a crafted or unknown
@@ -154,22 +156,17 @@ public class AuditReportProxyController {
         "BANK".equals(domain) ? "/api/v1/bank/admin/audit" : "/api/v1/audit/" + domain;
     String uri =
         UriComponentsBuilder.fromPath(backendBase).queryParam("before", before).toUriString();
-    try {
-      byte[] body = webClient.delete().uri(uri).retrieve().bodyToMono(byte[].class).block();
-      HttpHeaders headers = new HttpHeaders();
-      headers.setContentType(MediaType.APPLICATION_JSON);
-      return ResponseEntity.ok().headers(headers).body(body);
-    } catch (WebClientResponseException e) {
-      log.warn("Audit purge proxy: backend returned {} for {}", e.getStatusCode(), uri);
-      throw new ResponseStatusException(e.getStatusCode(), e.getMessage());
-    } catch (ResponseStatusException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Audit purge proxy: unexpected error for {}", uri, e);
-      throw new ResponseStatusException(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "An unexpected error occurred while purging the audit log.");
-    }
+    byte[] body =
+        withBackendStatus(
+            () ->
+                backendApiClient.execute(
+                    HttpMethod.DELETE,
+                    uri,
+                    webClient -> webClient.delete().uri(uri),
+                    spec -> spec.bodyToMono(byte[].class)));
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    return ResponseEntity.ok().headers(headers).body(body);
   }
 
   /**
@@ -187,35 +184,27 @@ public class AuditReportProxyController {
       String userTimeZone,
       @NotNull String filename,
       @NotNull MediaType mediaType) {
-    try {
-      byte[] pdf =
-          webClient
-              .get()
-              .uri(uri)
-              .headers(
-                  h -> {
-                    if (userTimeZone != null && !userTimeZone.isBlank()) {
-                      h.set("X-User-Time-Zone", userTimeZone);
-                    }
-                  })
-              .retrieve()
-              .bodyToMono(byte[].class)
-              .block();
+    byte[] pdf =
+        withBackendStatus(
+            () ->
+                backendApiClient.execute(
+                    HttpMethod.GET,
+                    uri,
+                    webClient ->
+                        webClient
+                            .get()
+                            .uri(uri)
+                            .headers(
+                                h -> {
+                                  if (userTimeZone != null && !userTimeZone.isBlank()) {
+                                    h.set("X-User-Time-Zone", userTimeZone);
+                                  }
+                                }),
+                    spec -> spec.bodyToMono(byte[].class)));
 
-      HttpHeaders headers = new HttpHeaders();
-      headers.setContentType(mediaType);
-      headers.setContentDispositionFormData("attachment", filename);
-      return ResponseEntity.ok().headers(headers).body(pdf);
-    } catch (WebClientResponseException e) {
-      log.warn("Audit report proxy: backend returned {} for {}", e.getStatusCode(), uri);
-      throw new ResponseStatusException(e.getStatusCode(), e.getMessage());
-    } catch (ResponseStatusException e) {
-      throw e;
-    } catch (Exception e) {
-      log.error("Audit report proxy: unexpected error for {}", uri, e);
-      throw new ResponseStatusException(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "An unexpected error occurred while generating the audit log report.");
-    }
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(mediaType);
+    headers.setContentDispositionFormData("attachment", filename);
+    return ResponseEntity.ok().headers(headers).body(pdf);
   }
 }

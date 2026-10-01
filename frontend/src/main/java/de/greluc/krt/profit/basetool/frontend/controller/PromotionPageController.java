@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -263,11 +264,11 @@ public class PromotionPageController {
   public String manage(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,
-      @RequestParam(required = false) String userId,
+      @RequestParam(required = false) UUID userId,
       Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
 
-    if ("eligibilityCell".equals(fragment) && userId != null && !userId.isBlank()) {
+    if ("eligibilityCell".equals(fragment) && userId != null) {
       model.addAttribute("eligList", fetchEligibilityForUser(userId));
       return "promotion-manage :: eligibilityCell";
     }
@@ -306,8 +307,7 @@ public class PromotionPageController {
     Map<String, List<PromotionEligibilityDto>> eligibilityByUser = new LinkedHashMap<>();
     for (de.greluc.krt.profit.basetool.frontend.model.dto.UserDto member : members) {
       if (member.id() != null) {
-        eligibilityByUser.put(
-            member.id().toString(), fetchEligibilityForUser(member.id().toString()));
+        eligibilityByUser.put(member.id().toString(), fetchEligibilityForUser(member.id()));
       }
     }
 
@@ -548,7 +548,7 @@ public class PromotionPageController {
     }
   }
 
-  private List<PromotionEligibilityDto> fetchEligibilityForUser(String userId) {
+  private List<PromotionEligibilityDto> fetchEligibilityForUser(UUID userId) {
     try {
       List<PromotionEligibilityDto> result =
           backendApiClient.get(

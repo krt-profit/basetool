@@ -152,6 +152,14 @@ rt_resolve_digest() {
   printf '%s' "${out}" | sed -n 's/.*"Digest"[[:space:]]*:[[:space:]]*"\(sha256:[a-f0-9]\{64\}\)".*/\1/p' | head -1
 }
 
+rt_image_revision() {
+  local ref="$1" out
+  command -v skopeo >/dev/null 2>&1 || rt_die "skopeo is not installed; it is how an image label is read without pulling"
+  out="$(skopeo inspect --config "docker://${ref}" 2>/dev/null)" || return 1
+  printf '%s' "${out}" | tr -d '\n' \
+    | sed -n 's/.*"org\.opencontainers\.image\.revision"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+}
+
 rt_login() {
   local registry="$1" user="$2" pwfile="$3"
   ${RT_CLI} login "${registry}" --username "${user}" --password-stdin < "${pwfile}" || return 1
@@ -427,12 +435,32 @@ rt_unit_image() {
     file="${dir}/${svc}.container"
     [[ -r "${file}" ]] || continue
     ref="$(sed -n 's/^Image=\([^[:space:]]\{1,\}\)[[:space:]]*$/\1/p' "${file}" | tail -n 1)"
-    if [[ -n "${ref}" ]]; then
+    if rt_is_digest_pinned "${ref}"; then
       printf '%s\n' "${ref}"
       return 0
     fi
   done
   return 1
+}
+
+rt_is_digest_pinned() {
+  [[ "${1:-}" =~ @sha256:[0-9a-f]{64}$ ]]
+}
+
+export RT_PINNED_IMAGE=""
+
+rt_require_pinned_image() {
+  local label="$1" override="$2" svc="$3" fallback="${4:-}" ref
+  RT_PINNED_IMAGE=""
+  if [[ -n "${override}" ]]; then
+    rt_is_digest_pinned "${override}" \
+      || rt_die "${label}: the image override '${override}' is not digest-pinned (@sha256:<64 hex>) -- refusing to mount secrets into an unpinned image"
+    RT_PINNED_IMAGE="${override}"
+    return 0
+  fi
+  ref="$(rt_unit_image "${svc}" "${fallback}")" \
+    || rt_die "${label}: no digest-pinned Image= readable in ${svc}.container -- refusing to run with an unpinned image"
+  RT_PINNED_IMAGE="${ref}"
 }
 
 rt_prometheus_snapshot() {

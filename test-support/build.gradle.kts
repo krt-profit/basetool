@@ -17,6 +17,7 @@ dependencies {
   api("org.springframework:spring-web")
   api("org.springframework:spring-webmvc")
   api("ch.qos.logback:logback-classic")
+  api(libs.archunit.core) { exclude(group = "org.slf4j") }
 
   testImplementation("jakarta.servlet:jakarta.servlet-api")
   testImplementation(libs.junit.jupiter)

@@ -158,6 +158,32 @@ into. Two consequences bind:
 `LocationRepository.findLocationsWithRefinery`, `RefineryOrderService.validateLocationHasRefinery`,
 `RefineryOrderPageController.withPreservedLocation`, `Terminal.type`, migration `V226`
 
+### REQ-REFINERY-022 — A stored refinery order is stored exactly once
+
+Storing an order books its output as inventory rows and writes one `INVENTORY_RECEIVED_FROM_REFINERY`
+event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most once per order.
+
+- The order carries a `storedAt` marker, set only by the store operation and never cleared. The store
+  operation refuses an order with `storedAt` set, or with status `COMPLETED`, with
+  `error.refinery_order.already_stored`.
+- An update (`PUT`) of an order with `storedAt` set MUST NOT change its status; an attempt is refused
+  with 400 `error.refinery_order.stored_status_locked`. Cancelling through `DELETE` stays possible and
+  does not re-open storing.
+- Create (`POST /api/v1/refinery-orders` and the user-scoped variant) ignores a client-supplied
+  `status`, `storedAt`, `id`, `version` and `owner` where the caller may not set it: the order is always
+  created `OPEN`, unstored, with the owner and org unit resolved server-side. The create form therefore
+  offers no status choice. A `PUT` may set any status, as the edit form's status select does; this is
+  deliberate (owner decision 2026-10-01) and only a stored order is locked. An order a `PUT` sets to
+  `COMPLETED` without a store is accepted; it cannot be stored afterwards, so nothing is duplicated.
+- Store refuses (400) an item whose job order does not require the item's material, on the same terms
+  as `POST /inventory` (REQ-ORDERS-018).
+- Migration `V259` adds the nullable column `refinery_order.stored_at` and backfills it for orders that
+  are already `COMPLETED`.
+
+**Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
+`RefineryOrderServiceTest` · **Code:** `RefineryOrderService.updateRefineryOrder` /
+`storeRefineryOrder`
+
 ## Out of scope
 
 - The order **detail**, **create**, **store**, **cancel** and screenshot-**import** flows — covered

@@ -317,6 +317,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/check-conformance.test.sh
 
+      - name: pit-gate-selftest / Self-test the PIT completion gate
+        if: ${{ !cancelled() }}
+        run: bash scripts/check-pit-result.test.sh
+
       - name: cgroup-metrics-selftest / Self-test the cgroup metrics collector
         if: ${{ !cancelled() }}
         run: bash scripts/cgroup-container-metrics.test.sh
@@ -446,6 +450,10 @@ jobs:
       - name: edge-nginx / Check edge nginx configuration
         if: ${{ !cancelled() }}
         run: scripts/check-edge-nginx.sh
+
+      - name: edge-allowlist / Check the API allow-list's method gating against a live nginx
+        if: ${{ !cancelled() }}
+        run: scripts/check-edge-allowlist-behaviour.sh
 
       - name: acme-publish / Check acme certificate publishing
         if: ${{ !cancelled() }}
