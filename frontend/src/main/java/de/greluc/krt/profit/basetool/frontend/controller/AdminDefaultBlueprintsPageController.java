@@ -31,8 +31,6 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -202,10 +200,9 @@ public class AdminDefaultBlueprintsPageController {
    */
   @NotNull
   @PostMapping("/{id}/delete")
-  public String remove(@PathVariable String id, RedirectAttributes redirectAttributes) {
+  public String remove(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete(
-          BACKEND_BASE + "/" + URLEncoder.encode(id, StandardCharsets.UTF_8), Void.class);
+      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "admin.defaultBlueprints.toast.removed");
     } catch (Exception e) {
       log.error("Failed to remove default blueprint {}", id, e);
