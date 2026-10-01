@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Betriebsmodus der Session-Typprüfung als Metrik.** Das Frontend meldet den wirksamen Modus
+  (`off`/`report`/`enforce`) als `basetool_session_type_allow_list_mode`; so ist nach einem Rollout
+  sichtbar, dass `enforce` im Prozess angekommen ist.
+
 ### Changed
 
 - **Deploy: nur ein Release auf einmal.** Die Promotion prüft alle fünf Artefakte und ihren gemeinsamen Quell-Commit, bevor sie `:stable` verschiebt; `deploy.sh` verweigert einen Satz aus verschiedenen Commits und versucht es im nächsten Tick erneut. Notausgang: `IRI_REQUIRE_ONE_RELEASE=false`.

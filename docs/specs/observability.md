@@ -2267,6 +2267,13 @@ A fifth frontend session meter came with the session type allow-list (REQ-SEC-06
   `SessionTypeOutsideAllowList` (`sum by (mode) (increase(…[1h])) > 0`, no `for`, warning) — a rate
   threshold would never see the single report-mode step. Pinned by
   `monitoring/prometheus/tests/session_type_allow_list_alert_test.yml`.
+- `basetool_session_type_allow_list_mode{mode}` — gauge (`SessionTypeAllowListModeMetric`), one series
+  per mode (`off` / `report` / `enforce`, a closed set), `1` on the mode the frontend process resolved
+  from `app.session.type-allow-list` and `0` on the others. The refusal counter above is silent in
+  `enforce` while nothing is refused, so it cannot tell "enforcing" from "never read"; this gauge
+  can: `basetool_session_type_allow_list_mode{mode="enforce"} == 1` per frontend instance proves the
+  setting reached the process, as the startup line `Session type allow-list mode: ENFORCE` does for
+  one start only. No alert: a mode is a configuration, not a fault.
 
 Two frontend meters were added by the 2026-08 logging audit:
 
