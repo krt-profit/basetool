@@ -51,6 +51,7 @@ jobs:
         uses: ./.github/actions/setup-jdk-gradle
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Compute ISO week (cache rotation key)
         id: cache-key
