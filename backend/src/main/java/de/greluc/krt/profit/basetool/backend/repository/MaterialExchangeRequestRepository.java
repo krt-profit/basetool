@@ -67,10 +67,10 @@ public interface MaterialExchangeRequestRepository
           WHERE r.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeRequestStatus.ACTIVE
             AND (:onlyMine = false OR ow.id = :viewerId)
             AND (:query IS NULL
-                 OR LOWER(m.name) LIKE :query
-                 OR LOWER(r.itemName) LIKE :query
-                 OR LOWER(ow.username) LIKE :query
-                 OR LOWER(ow.displayName) LIKE :query)
+                 OR LOWER(m.name) LIKE :query ESCAPE '\\'
+                 OR LOWER(r.itemName) LIKE :query ESCAPE '\\'
+                 OR LOWER(ow.username) LIKE :query ESCAPE '\\'
+                 OR LOWER(ow.displayName) LIKE :query ESCAPE '\\')
             AND (:minQuality = 0 OR (r.minQuality IS NOT NULL AND r.minQuality >= :minQuality))
             AND (:minAmount IS NULL
                  OR CASE WHEN r.requestedAmount IS NOT NULL THEN r.requestedAmount ELSE r.itemQuantity END >= :minAmount)
@@ -90,10 +90,10 @@ public interface MaterialExchangeRequestRepository
           WHERE r.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeRequestStatus.ACTIVE
             AND (:onlyMine = false OR ow.id = :viewerId)
             AND (:query IS NULL
-                 OR LOWER(m.name) LIKE :query
-                 OR LOWER(r.itemName) LIKE :query
-                 OR LOWER(ow.username) LIKE :query
-                 OR LOWER(ow.displayName) LIKE :query)
+                 OR LOWER(m.name) LIKE :query ESCAPE '\\'
+                 OR LOWER(r.itemName) LIKE :query ESCAPE '\\'
+                 OR LOWER(ow.username) LIKE :query ESCAPE '\\'
+                 OR LOWER(ow.displayName) LIKE :query ESCAPE '\\')
             AND (:minQuality = 0 OR (r.minQuality IS NOT NULL AND r.minQuality >= :minQuality))
             AND (:minAmount IS NULL
                  OR CASE WHEN r.requestedAmount IS NOT NULL THEN r.requestedAmount ELSE r.itemQuantity END >= :minAmount)

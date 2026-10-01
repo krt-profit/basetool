@@ -213,7 +213,7 @@ public class HangarService {
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails, String query) {
     ScopePredicate scope = ownerScopeService.currentUnitOverviewScope();
-    String normalizedQuery = StringNormalization.trimToNull(query);
+    String normalizedQuery = LikePatterns.escapeNullable(StringNormalization.trimToNull(query));
     Page<Object[]> p =
         shipRepository.countShipsByType(
             scope.adminAllScope(),
