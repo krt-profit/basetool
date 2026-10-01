@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Betriebsmodus der Session-Typprüfung als Metrik.** Das Frontend meldet den wirksamen Modus
+  (`off`/`report`/`enforce`) als `basetool_session_type_allow_list_mode`; so ist nach einem Rollout
+  sichtbar, dass `enforce` im Prozess angekommen ist.
+
 ### Changed
 
 - **Keycloak 26.8.0.** Neues Image `quay.io/keycloak/keycloak:26.8`; Provider-JAR, Theme und Realm laufen
