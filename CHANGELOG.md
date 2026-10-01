@@ -6,8 +6,8 @@
 
 - **Keycloak 26.8.0.** Neues Image `quay.io/keycloak/keycloak:26.8`; Provider-JAR, Theme und Realm laufen
   unverändert. Brute-Force-Sperren bleiben jetzt über einen Neustart erhalten (Login-Fehler liegen in der
-  Datenbank). Die Mindestversionen für Netty, Protobuf, OpenTelemetry und Jackson im SPI-Build entfallen,
-  Keycloak bringt selbst neuere mit. Der Tag-Wechsel ist betreibergesteuert: vorher frisches Backup, ein
+  Datenbank). Die Mindestversionen für Netty, OpenTelemetry und Jackson im SPI-Build entfallen,
+  Keycloak bringt selbst neuere mit (Protobuf bleibt angehoben). Der Tag-Wechsel ist betreibergesteuert: vorher frisches Backup, ein
   Zurückrollen heißt Datenbank wiederherstellen; laufende Anmeldungen müssen einmal neu beginnen.
 - **Keycloak-Log ohne Daueralarm.** Die „Full scope allowed"-Warnung (je Token-Anfrage) und der veraltete
   Sticky-Session-Schalter sind abgestellt.
