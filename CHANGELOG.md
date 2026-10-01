@@ -33,6 +33,10 @@
 
 ### Security
 
+- **Keine Namens-Hashes mehr im Log.** Frontend-Logzeilen zur Rollenprüfung und zum Rollenabgleich tragen kein aus dem Benutzernamen abgeleitetes Kürzel mehr.
+- **Zugangsdaten verschwinden aus `toString()` und Logs.** Das Scrape-Passwort (Frontend, Ingest) und das Discord-Token im Keycloak-SPI werden nicht mehr ausgegeben; der Log-Maskierer erfasst zusätzlich `password=` und `secret=`.
+- **CSV-Export der Beförderungsmatrix neutralisiert Formeln.** Zellen, die mit `=`, `+`, `-`, `@`, Tab oder Zeilenumbruch beginnen, erhalten ein führendes `'`.
+- **Browser-IDs werden vor dem Backend-Aufruf geprüft.** Ankündigungs-ID, Mitglieds-ID des Beförderungsfragments, Standard-Blueprint-ID und der Rollen-Code der Bankkonten-Sichtbarkeit und -Limits müssen die erwartete Form haben, sonst antwortet das Frontend mit 400, ohne das Backend zu rufen.
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
   Zertifikate liest, fällt nicht mehr auf ein ungepinntes PostgreSQL-Image zurück; ohne lesbaren
   `@sha256:`-Pin endet der Lauf mit `FATAL`, `BackupStaleOrMissing` greift weiter.

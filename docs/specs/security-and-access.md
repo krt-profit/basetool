@@ -3477,6 +3477,8 @@ narrowed against the allowlist the page itself renders, before it is relayed.
 | a Spring sort specification                             | `RelayParams.sortSpecOrNull`                   | REQ-API-005's backend field whitelist                                                                                  |
 | free text (`q`, the list pages' `search`)               | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
 | the mission / operation list period (`start`, `end`)    | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `MissionController#searchMissions`, `OperationController`                                                              |
+| an announcement id, a member id on the promotion eligibility fragment | `UUID`                           | `UserController#updateReadAnnouncement`, `PromotionEligibilityController`                                             |
+| a bank role bucket (`roleCode`), a default-blueprint id | `RelayParams.constantNameOrNull` (enum-literal shape, else `400`), `UUID` | `BankApprovalLimitService` role buckets, `AdminDefaultBlueprintController` |
 | the mission list `status`                               | narrowed to `PLANNED`/`ACTIVE`/`COMPLETED`/`CANCELLED` | the backend's mission status vocabulary                                                                          |
 | a star-system name (`starSystemNames`)                  | a `WebClient` URI-template variable            | REQ-UI-014's materials-matrix relay                                                                                    |
 

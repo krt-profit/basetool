@@ -1001,10 +1001,7 @@ public class RefineryOrderPageController {
     Collection<? extends GrantedAuthority> authorities =
         (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
 
-    log.debug(
-        "Checking logistician status for user u-{}, authorities: {}",
-        Integer.toHexString(java.util.Objects.hashCode(principal.getName())),
-        authorities);
+    log.debug("Checking logistician status, authorities: {}", authorities);
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
     log.debug("Reachable authorities: {}", reachableAuthorities);
@@ -1021,9 +1018,7 @@ public class RefineryOrderPageController {
             backendApiClient.get(
                 "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
         if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
-          log.info(
-              "Granting logistician by backend flag for user: u-{}",
-              Integer.toHexString(java.util.Objects.hashCode(principal.getName())));
+          log.info("Granting logistician by backend flag");
           result = true;
         }
       } catch (Exception e) {
