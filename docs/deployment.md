@@ -549,9 +549,15 @@ Three gates, in order (REQ-OPS-002, REQ-OPS-024):
    architectures, failing on a fixed HIGH/CRITICAL finding. Break-glass: `-f allow_vulnerable=true`,
    which is announced in the approval record.
 2. **Approval** by the required reviewer on the `production` GitHub Environment (one `approve` job).
-3. **Signature** — cosign-verify against the anchored
-   `release-images.yml@refs/(heads/main|tags/vMAJOR.MINOR.PATCH)` identity, then re-tag all five
-   artifacts to `:stable` in lock-step, `fail-fast`.
+3. **Signature and one release** — cosign-verify all five artifacts against the anchored
+   `release-images.yml@refs/(heads/main|tags/vMAJOR.MINOR.PATCH)` identity, require that they share one
+   `org.opencontainers.image.revision`, and only then re-tag all five to `:stable` in a single job
+   (REQ-OPS-036).
+
+The host enforces the same on its side: `deploy.sh` refuses a target set whose images were built from
+different commits (or lack the label) and the next timer tick retries, so a promotion that is half done
+never reaches the stack. Break-glass: `IRI_REQUIRE_ONE_RELEASE=false`. If a promotion dies after
+re-tagging some artifacts, re-run `promote.yml` with the same version to finish it.
 
 `promote.yml` must be dispatched **from `main`**: its first job fails on any other ref, and the
 `production` environment accepts deployments from `main` only. The approval gate guards against a
