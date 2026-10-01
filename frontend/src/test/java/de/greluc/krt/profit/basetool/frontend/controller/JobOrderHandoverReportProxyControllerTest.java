@@ -24,12 +24,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -55,7 +56,12 @@ class JobOrderHandoverReportProxyControllerTest {
 
   @Mock private WebClient.RequestBodySpec requestBodySpec;
 
-  @InjectMocks private JobOrderHandoverReportProxyController controller;
+  private JobOrderHandoverReportProxyController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller = new JobOrderHandoverReportProxyController(RealBackendApiClient.over(webClient));
+  }
 
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})

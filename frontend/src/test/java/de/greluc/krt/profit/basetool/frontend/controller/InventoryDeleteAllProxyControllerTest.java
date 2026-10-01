@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -51,7 +51,7 @@ class InventoryDeleteAllProxyControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    controller = new InventoryDeleteAllProxyController(webClient);
+    controller = new InventoryDeleteAllProxyController(RealBackendApiClient.over(webClient));
   }
 
   @AfterEach
@@ -93,17 +93,16 @@ class InventoryDeleteAllProxyControllerTest {
   }
 
   @Test
-  void deleteAllGlobalInventory_onConnectionFailure_wrapsAs500() throws Exception {
+  void deleteAllGlobalInventory_onConnectionFailure_isATimeout() throws Exception {
     server.shutdown();
 
     ResponseStatusException ex =
         assertThrows(ResponseStatusException.class, () -> controller.deleteAllGlobalInventory());
 
     assertEquals(
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.GATEWAY_TIMEOUT,
         ex.getStatusCode(),
-        "Non-HTTP failures must be re-thrown as a 500 (sanitised — no upstream stack trace)");
-    assertTrue(ex.getReason() != null && ex.getReason().toLowerCase().contains("unexpected"));
+        "A connection failure maps like any backend timeout");
 
     server = new MockWebServer();
     server.start();

@@ -48,8 +48,8 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
  * class is loaded.
  *
  * <p>{@code app.session.type-allow-list} selects {@link Mode#OFF} (everything allowed, nothing
- * counted), {@link Mode#REPORT} (default: everything read, outsiders counted and logged) or {@link
- * Mode#ENFORCE} (outsiders refused, the affected attribute dropped).
+ * counted), {@link Mode#REPORT} (opt-in: everything read, outsiders counted and logged) or {@link
+ * Mode#ENFORCE} (default: outsiders refused, the affected attribute dropped).
  */
 @Slf4j
 public final class SessionTypeAllowList {
@@ -123,23 +123,24 @@ public final class SessionTypeAllowList {
     ENFORCE;
 
     /**
-     * Parses a configured mode leniently, falling back to {@link #REPORT}, which reads every class.
+     * Parses a configured mode leniently, falling back to {@link #ENFORCE} so a missing or mistyped
+     * value never weakens the check.
      *
      * @param raw the configured value; case and surrounding whitespace are ignored.
-     * @return the matching mode, or {@link #REPORT} when {@code raw} is blank or unrecognised.
+     * @return the matching mode, or {@link #ENFORCE} when {@code raw} is blank or unrecognised.
      */
     public static @NotNull Mode parse(@Nullable String raw) {
       if (raw == null || raw.isBlank()) {
-        return REPORT;
+        return ENFORCE;
       }
       try {
         return valueOf(raw.strip().toUpperCase(Locale.ROOT));
       } catch (IllegalArgumentException ex) {
         log.warn(
-            "Unrecognised app.session.type-allow-list '{}'; falling back to REPORT."
+            "Unrecognised app.session.type-allow-list '{}'; falling back to ENFORCE."
                 + " Valid values: OFF, REPORT, ENFORCE.",
             raw);
-        return REPORT;
+        return ENFORCE;
       }
     }
 

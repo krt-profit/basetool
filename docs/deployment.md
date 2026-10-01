@@ -549,9 +549,15 @@ Three gates, in order (REQ-OPS-002, REQ-OPS-024):
    architectures, failing on a fixed HIGH/CRITICAL finding. Break-glass: `-f allow_vulnerable=true`,
    which is announced in the approval record.
 2. **Approval** by the required reviewer on the `production` GitHub Environment (one `approve` job).
-3. **Signature** — cosign-verify against the anchored
-   `release-images.yml@refs/(heads/main|tags/vMAJOR.MINOR.PATCH)` identity, then re-tag all five
-   artifacts to `:stable` in lock-step, `fail-fast`.
+3. **Signature and one release** — cosign-verify all five artifacts against the anchored
+   `release-images.yml@refs/(heads/main|tags/vMAJOR.MINOR.PATCH)` identity, require that they share one
+   `org.opencontainers.image.revision`, and only then re-tag all five to `:stable` in a single job
+   (REQ-OPS-036).
+
+The host enforces the same on its side: `deploy.sh` refuses a target set whose images were built from
+different commits (or lack the label) and the next timer tick retries, so a promotion that is half done
+never reaches the stack. Break-glass: `IRI_REQUIRE_ONE_RELEASE=false`. If a promotion dies after
+re-tagging some artifacts, re-run `promote.yml` with the same version to finish it.
 
 `promote.yml` must be dispatched **from `main`**: its first job fails on any other ref, and the
 `production` environment accepts deployments from `main` only. The approval gate guards against a
@@ -892,8 +898,8 @@ systemctl start iri-deploy.timer
 ### Session type allow-list: report, then enforce
 
 The frontend reads a stored session value only if the class it names is on `SessionTypeAllowList`
-(REQ-SEC-067, ADR-0206). It ships in **`report`** mode — every value is read exactly as before,
-and a class outside the list is only counted and logged. Switching production to **`enforce`** is a
+(REQ-SEC-067, ADR-0206). It ships in **`enforce`** mode (the default since the report-first rollout ended); **`report`** is an explicit opt-in that reads every value as before and
+only counts and logs a class outside the list. Switching a host between the two is a
 `.env` change plus a frontend restart: a production write, so it waits for the owner's yes.
 
 > [!note] Applied on production 2026-09-25, 17:58 UTC — after ~5 hours of report data, not a week
@@ -902,7 +908,7 @@ and a class outside the list is only counted and logged. Switching production to
 > 1.11.0 went live (12:40 UTC) — about five hours of ordinary use, **not** the seven days the
 > precondition asks for, so the classes that only a rarer path writes are covered by the parity
 > test and the E2E suite (which runs `enforce`) rather than by production evidence. `.env` had no
-> `APP_SESSION_TYPE_ALLOW_LIST` line (the template defaulted to `report`); one line
+> `APP_SESSION_TYPE_ALLOW_LIST` line (the template then defaulted to `report`); one line
 > `APP_SESSION_TYPE_ALLOW_LIST=enforce` was appended, the render changed only `frontend.env`, and
 > the frontend logged `Session type allow-list mode: ENFORCE` with no refusal afterwards. **The
 > watch that replaces the missing days:** `SessionTypeOutsideAllowList` and
@@ -937,6 +943,12 @@ ${UCTL} restart frontend.service                        # blocks until healthy; 
 journalctl CONTAINER_NAME=frontend --since -5m -o cat | grep 'Session type allow-list mode'   # ... mode: ENFORCE
 ```
 
+**Reading the effective mode** (no write needed): Grafana → Explore → Prometheus,
+`basetool_session_type_allow_list_mode == 1` returns one series per frontend instance whose `mode`
+label is the mode the process runs with (`enforce`, `report` or `off`). The refusal counter cannot
+show this, because it stays silent while nothing is refused. The same fact appears once per start as
+the Loki line `Session type allow-list mode: …` (`{app="frontend"} |= "Session type allow-list mode"`).
+
 **Expected effect:** none a member can see. Nobody is signed out by the restart, and every value the
 parity test and the E2E suite (which runs `enforce`) cover reads identically. Watch for an hour:
 `SessionTypeOutsideAllowList` and `SessionValueDropsSustained` stay silent, and
@@ -944,7 +956,7 @@ parity test and the E2E suite (which runs `enforce`) cover reads identically. Wa
 outside the list turn up after all, that one attribute is dropped once per session and repaired on
 the same request (REQ-SEC-050) — the member keeps the login.
 
-**Rollback:** edit the line back to `APP_SESSION_TYPE_ALLOW_LIST=report` (or delete it), render
+**Rollback:** edit the line to `APP_SESSION_TYPE_ALLOW_LIST=report` (deleting it now means `enforce`), render
 `env.d/` again with the same command and `${UCTL} restart frontend.service`. No stored session is
 touched either way: the mode governs reading only. `off` restores the pre-list validator exactly, for
 the case where the reporting itself misbehaves.

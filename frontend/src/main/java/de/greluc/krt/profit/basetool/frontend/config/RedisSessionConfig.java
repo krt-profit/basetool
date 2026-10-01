@@ -83,10 +83,10 @@ public class RedisSessionConfig {
   static final String REDIS_DEFAULT_USER = "default";
 
   /**
-   * Raw {@code app.session.type-allow-list} value (default {@code report}), parsed leniently by
+   * Raw {@code app.session.type-allow-list} value (default {@code enforce}), parsed leniently by
    * {@link SessionTypeAllowList.Mode#parse(String)} (REQ-SEC-067, ADR-0206).
    */
-  @Value("${app.session.type-allow-list:report}")
+  @Value("${app.session.type-allow-list:enforce}")
   private String typeAllowListValue;
 
   /**

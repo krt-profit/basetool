@@ -317,6 +317,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/check-conformance.test.sh
 
+      - name: pit-gate-selftest / Self-test the PIT completion gate
+        if: ${{ !cancelled() }}
+        run: bash scripts/check-pit-result.test.sh
+
       - name: cgroup-metrics-selftest / Self-test the cgroup metrics collector
         if: ${{ !cancelled() }}
         run: bash scripts/cgroup-container-metrics.test.sh

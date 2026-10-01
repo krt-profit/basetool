@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
+import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -49,8 +51,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -65,7 +65,9 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 public class PersonalBlueprintImportProxyController {
 
-  private final WebClient webClient;
+  /** Backend path of the import preview. */
+  private static final String PREVIEW_URI = "/api/v1/personal-blueprints/import/preview";
+
   private final BackendApiClient backendApiClient;
   private final IngestHandoffService ingestHandoffService;
 
@@ -121,7 +123,7 @@ public class PersonalBlueprintImportProxyController {
    * @param file the uploaded blueprint export JSON (SCMDB log-watcher, Basetool BP Extractor,
    *     scmdb.net export or the {@code basetool.blueprints} envelope)
    * @return the import preview (per-name rows + status counts), or the refusal
-   * @throws ResponseStatusException 500 on an unexpected error
+   * @throws ResponseStatusException 500 when the upload cannot be read
    */
   @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<Object> preview(@RequestParam("file") @NotNull MultipartFile file) {
@@ -137,39 +139,43 @@ public class PersonalBlueprintImportProxyController {
       return BackendErrorResponses.problem(
           HttpStatus.CONTENT_TOO_LARGE, CODE_UPLOAD_TOO_LARGE, message(TOO_LARGE_KEY));
     }
+    byte[] bytes;
     try {
-      byte[] bytes = file.getBytes();
-      String filename =
-          file.getOriginalFilename() != null ? file.getOriginalFilename() : "blueprints.json";
-      MultipartBodyBuilder builder = new MultipartBodyBuilder();
-      builder
-          .part(
-              "file",
-              new ByteArrayResource(bytes) {
-                @Override
-                public String getFilename() {
-                  return filename;
-                }
-              })
-          .contentType(MediaType.APPLICATION_OCTET_STREAM);
-
-      return ResponseEntity.ok(
-          webClient
-              .post()
-              .uri("/api/v1/personal-blueprints/import/preview")
-              .contentType(MediaType.MULTIPART_FORM_DATA)
-              .body(BodyInserters.fromMultipartData(builder.build()))
-              .retrieve()
-              .bodyToMono(BlueprintImportPreviewDto.class)
-              .block());
-    } catch (WebClientResponseException e) {
-      log.warn("Blueprint import preview proxy: backend answered {}", e.getStatusCode());
-      return BackendErrorResponses.propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Blueprint import preview proxy: unexpected error", e);
+      bytes = file.getBytes();
+    } catch (IOException e) {
+      log.error("Blueprint import preview proxy: the upload could not be read", e);
       throw new ResponseStatusException(
           HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred during import preview.");
     }
+    String filename =
+        file.getOriginalFilename() != null ? file.getOriginalFilename() : "blueprints.json";
+    MultipartBodyBuilder builder = new MultipartBodyBuilder();
+    builder
+        .part(
+            "file",
+            new ByteArrayResource(bytes) {
+              @Override
+              public String getFilename() {
+                return filename;
+              }
+            })
+        .contentType(MediaType.APPLICATION_OCTET_STREAM);
+
+    return BackendErrorResponses.relay(
+        log,
+        "Blueprint import preview",
+        () ->
+            ResponseEntity.ok(
+                backendApiClient.execute(
+                    HttpMethod.POST,
+                    PREVIEW_URI,
+                    webClient ->
+                        webClient
+                            .post()
+                            .uri(PREVIEW_URI)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .body(BodyInserters.fromMultipartData(builder.build())),
+                    spec -> spec.bodyToMono(BlueprintImportPreviewDto.class))));
   }
 
   /**
