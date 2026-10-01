@@ -23,6 +23,12 @@ inputs:
     description: The package namespace.
     required: false
     default: ${{ github.repository_owner }}
+  verify-only:
+    description: >-
+      "true" resolves and cosign-verifies the source digest but moves no tag, so a caller can verify
+      every artifact of a release before re-tagging any of them.
+    required: false
+    default: 'false'
 
 outputs:
   digest:
@@ -96,6 +102,7 @@ runs:
         exit 1
 
     - name: Re-tag the verified digest
+      if: ${{ inputs.verify-only != 'true' }}
       shell: bash
       env:
         IMAGE: ${{ inputs.registry }}/${{ inputs.owner }}/basetool-${{ inputs.module }}
@@ -109,6 +116,7 @@ runs:
         echo "Promoted ${SOURCE_DIGEST} → ${IMAGE}:${TARGET}"
 
     - name: Summarise
+      if: ${{ inputs.verify-only != 'true' }}
       shell: bash
       env:
         MODULE: ${{ inputs.module }}
