@@ -18,8 +18,8 @@ def fetch(url: str) -> str:
         return resp.read().decode("utf-8", errors="replace")
 
 def to_text(raw: str) -> str:
-    raw = re.sub(r"<script.*?</script>", " ", raw, flags=re.S | re.I)
-    raw = re.sub(r"<style.*?</style>", " ", raw, flags=re.S | re.I)
+    raw = re.sub(r"<script\b.*?</script\s*>", " ", raw, flags=re.S | re.I)
+    raw = re.sub(r"<style\b.*?</style\s*>", " ", raw, flags=re.S | re.I)
     raw = re.sub(r"<[^>]+>", " ", raw)
     raw = html.unescape(raw)
     return re.sub(r"\s+", " ", raw)

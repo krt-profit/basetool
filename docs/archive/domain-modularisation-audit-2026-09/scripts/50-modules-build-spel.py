@@ -6,7 +6,7 @@ import sys
 
 REPO = r"$REPO"
 modules = sys.argv[1:] or ["backend", "frontend", "ingest"]
-ANN = re.compile(r"@(PreAuthorize|PostAuthorize|PreFilter|PostFilter)\s*\(\s*((?:\"(?:[^\"\\]|\\.)*\"\s*\+?\s*)+)", re.S)
+ANN = re.compile(r"@(PreAuthorize|PostAuthorize|PreFilter|PostFilter)\s*\(\s*(\"(?:[^\"\\]|\\.)*\"(?:\s*\+\s*\"(?:[^\"\\]|\\.)*\")*)\s*", re.S)
 BEAN = re.compile(r"@([A-Za-z_][A-Za-z0-9_]*)\s*\.")
 for m in modules:
     root = os.path.join(REPO, m, "src", "main", "java")
