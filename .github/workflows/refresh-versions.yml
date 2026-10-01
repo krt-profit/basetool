@@ -28,6 +28,7 @@ jobs:
         uses: ./.github/actions/setup-jdk-gradle
         with:
           cache-read-only: 'false'
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Run refreshVersions
         run: ./gradlew refreshVersions -PrefreshVersions --stacktrace
