@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Deploy: nur ein Release auf einmal.** Die Promotion prüft alle fünf Artefakte und ihren gemeinsamen Quell-Commit, bevor sie `:stable` verschiebt; `deploy.sh` verweigert einen Satz aus verschiedenen Commits und versucht es im nächsten Tick erneut. Notausgang: `IRI_REQUIRE_ONE_RELEASE=false`.
+
 - **Keycloak 26.8.0.** Neues Image `quay.io/keycloak/keycloak:26.8`; Provider-JAR, Theme und Realm laufen
   unverändert. Brute-Force-Sperren bleiben jetzt über einen Neustart erhalten (Login-Fehler liegen in der
   Datenbank). Die Mindestversionen für Netty, OpenTelemetry und Jackson im SPI-Build entfallen,
@@ -31,6 +33,19 @@
 - **Session-Typ-Allowlist: `enforce` ist jetzt überall die Vorgabe.** Code, `application.yml`, Compose und
   Quadlet-Vorlage standen noch auf `report`, Produktion setzte `enforce` per `.env`. `report` ist nur noch
   ausdrücklich wählbar; ein fehlender oder falsch geschriebener Wert fällt auf `enforce` zurück.
+- **Mutation-Testing-Lauf prüft jetzt auf Vollständigkeit.** Ein beim Job-Timeout abgebrochener Backend-Lauf
+  galt mit seinem Teilbericht als grün; jetzt scheitert der Lauf bei abgebrochenem PIT-Schritt oder fehlendem
+  `</mutations>`. Timeout 60 → 120 Minuten (Backend kam zweimal in Folge nicht in 60 durch).
+
+- **Neuer Alarm `ContainerStartTimeMissing`.** Der Crash-Loop-Alarm liest die Startzeiten des Podman-Exporters
+  und wurde still blind, wenn dieser keine Container-Serien mehr lieferte; der neue Alarm meldet das. Der Text
+  von `ContainerMetricsMissing` nennt den Crash-Loop-Alarm nicht mehr.
+
+### Security
+
+- **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
+  Zertifikate liest, fällt nicht mehr auf ein ungepinntes PostgreSQL-Image zurück; ohne lesbaren
+  `@sha256:`-Pin endet der Lauf mit `FATAL`, `BackupStaleOrMissing` greift weiter.
 - **Keycloak 26.8.0 schließt Sicherheitslücken.** CVE-2026-12388 (Rollen-Eskalation über
   Identity-Provider-Mapper), CVE-2026-14781, CVE-2026-19608 und CVE-2026-93999 (deaktivierte Clients im
   Token), dazu den Geräte-Login für brute-force-gesperrte Konten sowie Jackson und Netty im
