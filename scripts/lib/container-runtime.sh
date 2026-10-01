@@ -427,12 +427,32 @@ rt_unit_image() {
     file="${dir}/${svc}.container"
     [[ -r "${file}" ]] || continue
     ref="$(sed -n 's/^Image=\([^[:space:]]\{1,\}\)[[:space:]]*$/\1/p' "${file}" | tail -n 1)"
-    if [[ -n "${ref}" ]]; then
+    if rt_is_digest_pinned "${ref}"; then
       printf '%s\n' "${ref}"
       return 0
     fi
   done
   return 1
+}
+
+rt_is_digest_pinned() {
+  [[ "${1:-}" =~ @sha256:[0-9a-f]{64}$ ]]
+}
+
+RT_PINNED_IMAGE=""
+
+rt_require_pinned_image() {
+  local label="$1" override="$2" svc="$3" fallback="${4:-}" ref
+  RT_PINNED_IMAGE=""
+  if [[ -n "${override}" ]]; then
+    rt_is_digest_pinned "${override}" \
+      || rt_die "${label}: the image override '${override}' is not digest-pinned (@sha256:<64 hex>) -- refusing to mount secrets into an unpinned image"
+    RT_PINNED_IMAGE="${override}"
+    return 0
+  fi
+  ref="$(rt_unit_image "${svc}" "${fallback}")" \
+    || rt_die "${label}: no digest-pinned Image= readable in ${svc}.container -- refusing to run with an unpinned image"
+  RT_PINNED_IMAGE="${ref}"
 }
 
 rt_prometheus_snapshot() {

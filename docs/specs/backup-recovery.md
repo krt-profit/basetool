@@ -47,6 +47,11 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
 - [ ] The job opens no listening socket and requires no inbound access to the host.
 - [ ] A successful run writes `basetool_backup_last_success_timestamp`; `BackupStaleOrMissing`
   pages when it is older than 26 h or absent, so a failed or never-run backup is not silent.
+- [ ] The helper container that reads the secrets, certificates and `.env` (and the restore drill's
+  throwaway Postgres) runs only from a **digest-pinned** image — `db-backend`'s own `@sha256:` pin or
+  an override carrying one. An unreadable unit, an unpinned tag or an unpinned override makes
+  `backup.sh` / `restore-drill.sh` abort with `FATAL` before any container starts and without
+  writing the success metric (`scripts/container-runtime.test.sh`).
 
 **Enforced by:** `scripts/backup.sh` · `scripts/iri-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 

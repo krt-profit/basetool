@@ -26,7 +26,6 @@ KEEP_DAILY="${IRI_KEEP_DAILY:-7}"
 KEEP_WEEKLY="${IRI_KEEP_WEEKLY:-4}"
 KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
 
-HELPER_IMAGE_FALLBACK="docker.io/library/postgres:18-alpine"
 HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-}"
 
 MON_DATA="${IRI_MONITORING_DIR:-/var/iri/monitoring}"
@@ -88,14 +87,9 @@ rt_detect
 rt_wait_for_startup
 export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak backend ingest frontend edge acme"
 log "container runtime: ${RT_BACKEND}"
-if [[ -z "${HELPER_IMAGE}" ]]; then
-  if HELPER_IMAGE="$(rt_unit_image db-backend "${COMPOSE_DIR}/quadlet/systemd")"; then
-    log "helper image: ${HELPER_IMAGE} (db-backend's own pin)"
-  else
-    HELPER_IMAGE="${HELPER_IMAGE_FALLBACK}"
-    log "WARN: no Image= readable in db-backend.container -- falling back to the unpinned ${HELPER_IMAGE}"
-  fi
-fi
+rt_require_pinned_image "backup" "${HELPER_IMAGE}" db-backend "${COMPOSE_DIR}/quadlet/systemd"
+HELPER_IMAGE="${RT_PINNED_IMAGE}"
+log "helper image: ${HELPER_IMAGE}"
 command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic; ansible role: 10-packages.yml)"
 command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone; ansible role: 10-packages.yml)"
 
