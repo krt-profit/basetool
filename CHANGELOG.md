@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.13.5](https://github.com/krt-profit/basetool/releases/tag/v1.13.5) - 2026-10-01
+
 ### Added
 
 - **Betriebsmodus der Session-Typprüfung als Metrik.** Das Frontend meldet den wirksamen Modus
@@ -17,10 +19,10 @@
   Datenbank). Die Mindestversionen für Netty, OpenTelemetry und Jackson im SPI-Build entfallen,
   Keycloak bringt selbst neuere mit (Protobuf bleibt angehoben). Der Tag-Wechsel ist betreibergesteuert: vorher frisches Backup, ein
   Zurückrollen heißt Datenbank wiederherstellen; laufende Anmeldungen müssen einmal neu beginnen.
-  
+
 - **Keycloak-Log ohne Daueralarm.** Die „Full scope allowed"-Warnung (je Token-Anfrage) und der veraltete
   Sticky-Session-Schalter sind abgestellt.
-  
+
 - **Keycloak: Fehler-Events stehen im Log auf INFO statt WARN.** Ein Discord-Callback ohne Login-Cookie (`cookie_not_found`) ist ein Client-Zustand und verstopfte die WARN-Ansicht; die Zeilen und die Event-Metriken bleiben erhalten (`KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__ERROR_LEVEL`).
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
@@ -59,7 +61,7 @@
 - **Session-Typ-Allowlist: `enforce` ist jetzt überall die Vorgabe.** Code, `application.yml`, Compose und
   Quadlet-Vorlage standen noch auf `report`, Produktion setzte `enforce` per `.env`. `report` ist nur noch
   ausdrücklich wählbar; ein fehlender oder falsch geschriebener Wert fällt auf `enforce` zurück.
-  
+
 - **Mutation-Testing-Lauf prüft jetzt auf Vollständigkeit.** Ein beim Job-Timeout abgebrochener Backend-Lauf
   galt mit seinem Teilbericht als grün; jetzt scheitert der Lauf bei abgebrochenem PIT-Schritt oder fehlendem
   `</mutations>`. Timeout 60 → 120 Minuten (Backend kam zweimal in Folge nicht in 60 durch).
@@ -100,6 +102,7 @@
   oder voller Prüfwarteschlange wird ein Abo nun abgelehnt; der Tab abonniert bis zu fünfmal mit wachsender
   Wartezeit neu. Sockets mit abgelaufenem oder abgelehntem Token werden geschlossen und verbinden sich
   mit frischem Token neu.
+
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und
   Zertifikate liest, fällt nicht mehr auf ein ungepinntes PostgreSQL-Image zurück; ohne lesbaren
   `@sha256:`-Pin endet der Lauf mit `FATAL`, `BackupStaleOrMissing` greift weiter.

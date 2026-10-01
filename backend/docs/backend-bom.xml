@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:20a88123-be3e-4ac4-98cf-410b5de11bf2" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:7debd706-1509-4fd5-8674-1ab8482e6209" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-09-29T06:22:15Z</timestamp>
+    <timestamp>2026-10-01T16:10:50Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/36530568885</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/36889899803</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -207,27 +207,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.6?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.7?type=jar">
       <group>com.fasterxml.jackson.core</group>
       <name>jackson-core</name>
-      <version>2.21.6</version>
+      <version>2.21.7</version>
       <description>Core Jackson processing abstractions (aka Streaming API), implementation for JSON</description>
       <hashes>
-        <hash alg="MD5">260c547d6dbf50240db12d442ccc25f1</hash>
-        <hash alg="SHA-1">7a71e4eeb27e88ba462f8f085afd3e4ec6ecadf0</hash>
-        <hash alg="SHA-256">36111c3a4372cd5c2be6f4ec44a050382487920f3fc38ca3015c9c1678bd7c56</hash>
-        <hash alg="SHA-512">a136a96e3a5262b97b47b44cc52e9ff47a53a2d8c4a8429fb10e67c212109ec2dd8702eeebcecda52197caf5bdfbf2029c5317ebe3ec28e6426c901f39e40e89</hash>
-        <hash alg="SHA3-256">f00ddb24292cea8032421f6d11437ffe1550d10725caed0c5d0d31d7fb2f68ea</hash>
-        <hash alg="SHA3-512">4d140ed80a94528cb614c1cff46f833953de5aff648c71e3edc46dc79c2134da7d5bf4172adf77189ca2a1af0ecea7fa0019476e43bae6bc1bc6ac727b77ba4d</hash>
-        <hash alg="SHA-384">9332f43e84af6714db8ee81dca2f08a758b2459db90fa458949485c6579651df7b3263a1e7fd6992bbd32b48ae965cf3</hash>
-        <hash alg="SHA3-384">b193b854649272f12f0d5f98f8d2410c0dc46aac0dee7c2a8cdfea4747b3e1c9225409ff9a72dbcfd0b4c7c3145315a9</hash>
+        <hash alg="MD5">3b91b1c736a66b115e5a09378f418016</hash>
+        <hash alg="SHA-1">5abfb904683e642f4a5458f2a78ab9308c7c5a46</hash>
+        <hash alg="SHA-256">8c5623b98f32d5f7e1287ff61ed50e08ab7b11381e991fff89327faabba42261</hash>
+        <hash alg="SHA-512">a4f38908ebf7cb3da776955c398c7b55b0c056ae7265a511b4a2a37ef5a4c6fed433d611ee4f3a1071aa966cc5d16b1fcb95a0e7d672002ece9d89367a4f8f85</hash>
+        <hash alg="SHA3-256">e36426bcb4ad4fc45330029f2fe3f7ec89867d556dbf67824ea9b939fa15f62f</hash>
+        <hash alg="SHA3-512">f3b933bcc044f42d550481f8cbf69e1f3dc5061386de5e893c20ee00b82fd14f8c46b57ff5785819ad2613f2c1d12cce685d21477670c5cf055724780cf855b8</hash>
+        <hash alg="SHA-384">3aeabfb54452889a3f00a573046f8b0f66be7bf358cc4508797dd8e806620ca60cc27074fe171a50512c0db609bc6e44</hash>
+        <hash alg="SHA3-384">1ab7ec68a3ef0fa912b69466362cf4d85367548836d4339187d348c6af885accb34405c0f6674c5049ddc25ddc292582</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.6?type=jar</purl>
+      <purl>pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.7?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -238,27 +238,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.6?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7?type=jar">
       <group>com.fasterxml.jackson.core</group>
       <name>jackson-databind</name>
-      <version>2.21.6</version>
+      <version>2.21.7</version>
       <description>General data-binding functionality for Jackson: works on core streaming API</description>
       <hashes>
-        <hash alg="MD5">1fbcd5d4d1a6298f82430edf0a760150</hash>
-        <hash alg="SHA-1">90fc0c39cc03058141d4312ccadb431a583d6574</hash>
-        <hash alg="SHA-256">62134a98de12d0a421cd2f5b9854c8e63f10f524b0341e66cfd31a4326f6a329</hash>
-        <hash alg="SHA-512">42ff6cd31058348fda3cf487d7dee6e205c0984ff433150273667e618dff4fd6ce27eb25a2e57a4277ab998325c6e261c28799f985cf647d44f34925386dbe3a</hash>
-        <hash alg="SHA3-256">07928979e51ccf1e9aebb12052430bbb33ceae22f498e9ea63d98b3681adbfd7</hash>
-        <hash alg="SHA3-512">0ce2cbfd1aea47f3faabe0c2d2760a4f389f3e293add9ccbb21ab20a831163536359088b605436e006c5c45a627da874010f5c9028b896d0d98b3065f58f8dbc</hash>
-        <hash alg="SHA-384">05132d61435606dd1cce0f6df606ddfd43bb31e72cbee28d47d19c659395dcd3af206af2e8bc7c905cb0031e44ef1b60</hash>
-        <hash alg="SHA3-384">f803c9866c028690eff28c44b36ff77b08dc9c54e3a40ad4f39f3c00a61b0c80549b05add4667eb72a8c24b0e5033214</hash>
+        <hash alg="MD5">71abb795e3c9beff91198f789d2572e9</hash>
+        <hash alg="SHA-1">a2ebbc72e3092323f0f3defa786ff3bb0c47218c</hash>
+        <hash alg="SHA-256">1290c2795e93e8a6861a6c4d9ff0d844d32f5ea178362cb2721edf5561e828b1</hash>
+        <hash alg="SHA-512">3485a31a4815ef2577b91667768eebb10bea7ece6b1b7cc0fa3c06f2746c003f4f32c19c52cc30ad13813eff9941ae212caffa9353c717d00947ab80ecc76bd3</hash>
+        <hash alg="SHA3-256">5ddf3f0b32ae55b476de1f267be264b18d7ffd372ac1b0e35787986255e68c84</hash>
+        <hash alg="SHA3-512">5b58ad040187c209248ac0ebd60299056f7bba7984bf8bb8195391fab99778a4dc1df71057537244bf3e4f2c20ee92c35d8979c0cf8054e0ada0ba7aa1ed09b8</hash>
+        <hash alg="SHA-384">dec105362feb79f6674df0f7b635ec1cc0dc798a6b1626d8c8b9be0cadd2cfe52a674b572a03405f6bc1eefa52622570</hash>
+        <hash alg="SHA3-384">a06bbc372c5ee02cd721366e6349291290075927b27e5fd6b7849cabba3e564ab2e40b954e5db53815b68dfc3c95c853</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.6?type=jar</purl>
+      <purl>pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -269,70 +269,70 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.6?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.7?type=jar">
       <group>com.fasterxml.jackson.dataformat</group>
       <name>jackson-dataformat-yaml</name>
-      <version>2.21.6</version>
+      <version>2.21.7</version>
       <description>Support for reading and writing YAML-encoded data via Jackson abstractions.</description>
       <hashes>
-        <hash alg="MD5">0db505449e50af21f214282fbe8817b1</hash>
-        <hash alg="SHA-1">b2feb0a032b05b3bb731ec4941777991db8ebf27</hash>
-        <hash alg="SHA-256">e5a4ea8c86f9f8d068bb280b69be5c450f263343b4bf1d81be8586d4e8d5c698</hash>
-        <hash alg="SHA-512">c0f2d2dd2dfb1e537b7a50129437511b910a6aab1d23618988837a5a23139a89dd27ca6f2d86bda58e6efcbca2bc9ad4b45051bfdad2c4c1205da4affb911811</hash>
-        <hash alg="SHA3-256">ecdf1fa9357da9f49dd2de397aa3e5f1bdb611989b3c68b9a8304b90975cc550</hash>
-        <hash alg="SHA3-512">2feccd37117ecd37d389dff70e0d7a35559b08601e7210c8867d2898df239d2c2ada6ef6a72d4bf820e19c353e6f02d7828b5883b696cc9927c14a95a3146ec1</hash>
-        <hash alg="SHA-384">ecb1b395d8701537114adbabe0b5f5fec026a7e80945b533fabdb7434852c924b6f34716932ca72ff7fd312bb9d961df</hash>
-        <hash alg="SHA3-384">ac05ae49125ed8b169a23ef1a2cdf1aee88758432e8452f3aa5233a8da9822eff076b0593582f58b17c41341ab7a1fa9</hash>
+        <hash alg="MD5">cb73178d10762eb3bdc154226729c6bb</hash>
+        <hash alg="SHA-1">cd755d8f2c860e887301b47140f60ab58b3eb538</hash>
+        <hash alg="SHA-256">df2b3e6a194181dc067b7211d750926b4ae9e4f3c892a0005b8219a9b59be681</hash>
+        <hash alg="SHA-512">f0ba476abddd49e3de1331e8b17146a4f30a8369ab7178cb2ee20fb914ab409064cbcb494f5fa0fe0aa1e52bc54da3d9462838061e65c18620454361c0c95303</hash>
+        <hash alg="SHA3-256">2c30c266542a80d139dc8314aaecc45308d5a9c1b423da8475e3d4757bc15bce</hash>
+        <hash alg="SHA3-512">ed81c6e39826553fb31158e488cdd17f28e1fbec646473b324655a7962a0096b0aad26085aa16c5828c4b825a554831652a4f57ff9db2f949ac78bbb248cc957</hash>
+        <hash alg="SHA-384">354a37457c8145622f3d5e2ab4da84dce9b35a954315d23d2c1a87f99e1c24823eff012c96c50f935332ec13c6925b69</hash>
+        <hash alg="SHA3-384">00e5e4e2769a2e3bd3faa2f84de569abb42b977d9e184e4ca39cbe465771e0ee4fbf46872e12560a089c5795b4d37e7e</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.6?type=jar</purl>
+      <purl>pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.7?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.6?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.7?type=jar">
       <group>com.fasterxml.jackson.datatype</group>
       <name>jackson-datatype-jsr310</name>
-      <version>2.21.6</version>
+      <version>2.21.7</version>
       <description>Add-on module to support JSR-310 (Java 8 Date &amp; Time API) data types.</description>
       <hashes>
-        <hash alg="MD5">2bf6a672f6d3e371db3341256d504460</hash>
-        <hash alg="SHA-1">2819ad4d57206281d29a0b5829d35781abd5529d</hash>
-        <hash alg="SHA-256">1d82027afe574c63e24df72eb109f98de02dff3bb5adf81f0174b27088490067</hash>
-        <hash alg="SHA-512">748819e6e317629c2afbfd8906170b6e3a46ab2de070eb67a86465c1b4fc4bcc874e391c65d36c48694f26ebd375b8ac73668083db021d5e38249d2f6d2be7d3</hash>
-        <hash alg="SHA3-256">bd83d25925d0ae07d7273391de67c42d451d83a5cea61adf86ad5f7c530d1f43</hash>
-        <hash alg="SHA3-512">c5e24cd7fa5b1c8f75dd41b065ce66160ce914c686d6665ea497a2da35adb5d75f66db1b2ffdd39ff7b08eeb4fb52423961c81fe875aa79d2173cef5a83387eb</hash>
-        <hash alg="SHA-384">16a8706f4457e258d3341f2bd07aa0e9d8e8b02b58ee511a9ce44115b8c25e5b6cffb20240f0ed1993ba9c1ae7b3d274</hash>
-        <hash alg="SHA3-384">989a5ffee1e11f84107e2b259a6c2d01d595871b15caa310fe9efb2590512663f201503fd7bb0e40c0182f983340f524</hash>
+        <hash alg="MD5">3e0a6b99aee1b568b72a8ad2b1240745</hash>
+        <hash alg="SHA-1">ed949b76fb4a5530986cf5ab4a74aa0f03ca0cd6</hash>
+        <hash alg="SHA-256">5989b937f0aa5b6407e7a061077c9bfcac0590dc0a32e54b2fac6a3e2d49e812</hash>
+        <hash alg="SHA-512">3f0d918fb479ee6b0c1fc77e0ac3bc77426696158920b21d38324477597a5033909be3049bb42f73ac6e0c77c22f5057e4836a906446ce384528f912a2c39704</hash>
+        <hash alg="SHA3-256">99efec687946d83ccb23e34add5cbb0d14fa9370618731fa9f8f356391cfb0ca</hash>
+        <hash alg="SHA3-512">26ace591a92141b2087d564b97855ac5c9cfe8ceea3f40402f2e704c1d9fe800f64306df3d80e068f53a4aac211dfa3d3ccc9bb54df4cef0048b41a244b9ee34</hash>
+        <hash alg="SHA-384">65bd3cb7ce36078f7b5be685651bcc4e0075cb111a17ae29a1e4c8943a5195b0683f236692178bbd4fca35d7a58bca8c</hash>
+        <hash alg="SHA3-384">b45ecaa01aa39a8192987f4bab7b7ec7ecbe7a33ecf2d1227663adad852f8c97643bddb1620ca48a88b82edd549344a3</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.6?type=jar</purl>
+      <purl>pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.7?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.6?type=pom">
+    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.7?type=pom">
       <publisher>FasterXML</publisher>
       <group>com.fasterxml.jackson</group>
       <name>jackson-bom</name>
-      <version>2.21.6</version>
+      <version>2.21.7</version>
       <description>Bill of Materials pom for getting full, complete set of compatible versions of Jackson components maintained by FasterXML.com</description>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.6?type=pom</purl>
+      <purl>pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.7?type=pom</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -6038,27 +6038,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/tools.jackson.core/jackson-core@3.1.6?type=jar">
+    <component type="library" bom-ref="pkg:maven/tools.jackson.core/jackson-core@3.1.7?type=jar">
       <group>tools.jackson.core</group>
       <name>jackson-core</name>
-      <version>3.1.6</version>
+      <version>3.1.7</version>
       <description>Core Jackson processing abstractions (aka Streaming API), implementation for JSON</description>
       <hashes>
-        <hash alg="MD5">7c1586307c87a909a0a549f6ed6b7f30</hash>
-        <hash alg="SHA-1">6c6b0ebc04da57cf7b115dfc46807111bfd6c134</hash>
-        <hash alg="SHA-256">d4938937b819b48f273a25929dc4fbc72ac03b0753c9c6398f54c3905caf7d0e</hash>
-        <hash alg="SHA-512">604dd4898407235519ce759e8bed4e406d9ca77f747eeb36b06f13fd7331a1ca4fc0eaf56855a555e2750cd363682e6371010b7f16593e8828ff718446016e20</hash>
-        <hash alg="SHA3-256">7c4a1aa5acba0a0cf1642c73654a757d816247efba53bb14d3ffc0370bf90cc0</hash>
-        <hash alg="SHA3-512">90cf85cfa30f617a34bbd77dcfb2f2f25e7145b09a4de292069fc01a2a35f0c327ed33e3ae428fcc45302e7112c0ff0c1c929eaba0ca2f15f7b0878032bfa6ca</hash>
-        <hash alg="SHA-384">ac2f038628b2400b77000722a8e256b98409d795c8fad7cc45f7dfcdf7af63a55e7c2c284fe5bce3ea8087a0b1478075</hash>
-        <hash alg="SHA3-384">b7806d68500b6cd93fd4e8c8cbdd498b528ef8a680582ff00bfbac3fc0aef6ad39570b1e5f6faef1271a057003c0f3c9</hash>
+        <hash alg="MD5">4dcb2a5b488b0e020f6546a2973c0a28</hash>
+        <hash alg="SHA-1">a2b54921d5528a9df7f014222d2d519a14858801</hash>
+        <hash alg="SHA-256">7608c367fd8a92666d28711519599543c180298259963184ce04d2947a8f71e7</hash>
+        <hash alg="SHA-512">1c37cd61544eb6fd422ae5990edc28141c58e067354d45d914bfb2264012388642dc0a37527278a684c8be77947b6610aec9a198e993aa9f1aa41abe0d4564f3</hash>
+        <hash alg="SHA3-256">8b7f324cfdb00a01e0c57f7dd0a119aa4f8b4df49c4783fb119e293610eca5c5</hash>
+        <hash alg="SHA3-512">dec1814dc66a81941672e19650d8752ad21f3e2283bb77dd61b36e490f5d1eb63cba14be45699759fb50e6789b37d729029780b769500e9cfdc3e97ee4fbe9a2</hash>
+        <hash alg="SHA-384">4dbdce594cc59c7782097960ce5e0ce7be76f0fc35c88a3277b17cfba504f708b138235519faea44ee5d39569a5fb52a</hash>
+        <hash alg="SHA3-384">0315d3fabdbe773346dab3fb1484bb8a085a32a17954b8c9cdbfd49050de2d8a265f669b8819925e8b2f932b63a26be7</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/tools.jackson.core/jackson-core@3.1.6?type=jar</purl>
+      <purl>pkg:maven/tools.jackson.core/jackson-core@3.1.7?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -6069,27 +6069,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.6?type=jar">
+    <component type="library" bom-ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.7?type=jar">
       <group>tools.jackson.core</group>
       <name>jackson-databind</name>
-      <version>3.1.6</version>
+      <version>3.1.7</version>
       <description>General data-binding functionality for Jackson: works on core streaming API</description>
       <hashes>
-        <hash alg="MD5">dd69652b321988436085d6765c197ef5</hash>
-        <hash alg="SHA-1">0ffe06306171218710bd2b4b1aafb4e0ada77eea</hash>
-        <hash alg="SHA-256">f0ff64eaa9f1c4bca9d720cd70c542297b0b19fc8ad08531bc55e36c8eab8e4b</hash>
-        <hash alg="SHA-512">cc3e02bc3c2fa1036a7bd89d3a6f2fd968a55846084659b8fb5b7c4a637de910f7feefe2b7dbe0cf04305347a39aee044aad63d9d364ded36f62f9d4b75bdf1a</hash>
-        <hash alg="SHA3-256">16b21a8e729bf8d766d7ea5e51b9fead067c2154ef908d775c08fe4901842977</hash>
-        <hash alg="SHA3-512">6e4d6746215120a90733bf53bc0b8ecd09fb7ce15499e916c1383a8331948825c2b5b476788fbce02cfb03fb7d8326ea0d711ad7fac0b2d0e5a76bdc50116795</hash>
-        <hash alg="SHA-384">fd871ba17a85507cc52da0bf0d4bc1765f2d07117a428fdceffd76eb60f07d6170a9a58cb617a34feaf23127dd5034fd</hash>
-        <hash alg="SHA3-384">1b6d9319ad484cfe45bf91b6c24828f308f4a3f61d5ab84ee56240e70934b7431cb1d3adb2410a52e0bb02d56e14637a</hash>
+        <hash alg="MD5">bd36876c84ba73520f0633336ca2f93a</hash>
+        <hash alg="SHA-1">1f45f7dd68639c962435fae38ca100a70ccc0971</hash>
+        <hash alg="SHA-256">48c781de87e2016e1f0d973748a27130f11643e7ac080173f40e2d9669d84be3</hash>
+        <hash alg="SHA-512">fe0b99b58de750a449286d12aa00c99bb0213f09ed082d1c5723bba1018f41738e8759e1e16f82cae70dfe91f42108fb5edbe6f121f0348b3df22be7f0d519e9</hash>
+        <hash alg="SHA3-256">c10479d89ca9313c2fb84548a9e1a857b24755f8c06c13d7cc5e636470489b74</hash>
+        <hash alg="SHA3-512">4cc49aedacc5290fa7443fa769fa31b29e7a82cfcb435f965f883d825ceb3957b541930ce589f08e207a6d0404b4b886d8a3efcecc79294f1b2fcaaacadb7770</hash>
+        <hash alg="SHA-384">87f9068a3e5e4db443b28b8faf972e995fde5c90440e5ae33799b3adf82e7625129079ce622a2c1af36777a12ed4b68e</hash>
+        <hash alg="SHA3-384">16b0ce9c73ded795ff6aef613435f6f374b97f8929b6c1f6d8e7f778b92e0929b242c3932226d389b6fbe168119f9cd3</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/tools.jackson.core/jackson-databind@3.1.6?type=jar</purl>
+      <purl>pkg:maven/tools.jackson.core/jackson-databind@3.1.7?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -6100,44 +6100,44 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.6?type=jar">
+    <component type="library" bom-ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.7?type=jar">
       <group>tools.jackson.dataformat</group>
       <name>jackson-dataformat-cbor</name>
-      <version>3.1.6</version>
+      <version>3.1.7</version>
       <description>Support for reading and writing Concise Binary Object Representation ([CBOR](https://www.rfc-editor.org/info/rfc7049) encoded data using Jackson abstractions (streaming API, data binding, tree model)</description>
       <hashes>
-        <hash alg="MD5">baad12a8f48c60505eed5a27932624d1</hash>
-        <hash alg="SHA-1">afa59c74ece9c9648ffbd6037d793c853f5301f6</hash>
-        <hash alg="SHA-256">b2283274ed4d4f0a4f7d3d7abc35de41b1d44d604aa8cc16f31122186db62826</hash>
-        <hash alg="SHA-512">ba44a7e412d63beb63238dd0e60e1ce17fae237c665159f82eaab685454fea2faae233ca47070cc3ae10bd705d4cca2361d0740f0cbe3900a588af37fe1fdc46</hash>
-        <hash alg="SHA3-256">69c0c13c2b64b94f469481cef74162a3cc0874df108d72823c56ca7aa8017558</hash>
-        <hash alg="SHA3-512">a97299d675e69d3cbf7e95427a7424179a8dd62b8f660b53e6cd68454d67dd76e058db5f977b3008e4968ca285994b3e6786159764e276f932c414c72a8c4db1</hash>
-        <hash alg="SHA-384">ed5dd9277b4d5abda5edd0074c26c63bac556551bee045a9456a685f18016c8749fca06848ed95455a145a336d955b46</hash>
-        <hash alg="SHA3-384">fc532be720255ab0ed51b1314f1d822f5742f8bda1e1f0b6807ca5a1fa52a7dbca0863941dbbf05ec90d75706e5b80ff</hash>
+        <hash alg="MD5">e9c68cf5cf61b794293edbf02aa29a92</hash>
+        <hash alg="SHA-1">939963c9cfdddbd61fe1a50465cc81faab06199d</hash>
+        <hash alg="SHA-256">a9121d3f8ceecd42da4380f9dd5d2bcfc5157445c477297b2ca5e560eb56f95a</hash>
+        <hash alg="SHA-512">6cf8b149fb468d05df66018f57b0adacc2b23a4e788983492c7d6a435b9f02a07fb3495e643acddac183d75ca9b15603b906b2f011c3a07cbc0372150d726ca1</hash>
+        <hash alg="SHA3-256">b04a82f8c1b9bbb7e7a27fdfba24d260446dc43a54c4c7934b5627459f4bfc50</hash>
+        <hash alg="SHA3-512">5afdc1fdef6486976278c1a07778d2d8469652bef43b9cab57d9728c05df733c99c5979d7f8ddaebf9f369a27ad1b80e0b197a7801ca68d91b9c0b26d0be1e9a</hash>
+        <hash alg="SHA-384">341e9ad5962575af77261e15ade187248d16c2fed0b2877db8e0b06630e0973b97f5f2dbcef840a98b238c49f79439a4</hash>
+        <hash alg="SHA3-384">fad0123c9bcca16a4dce0ad9056771d846a8eaba46a0ba0af4beef1910d3d2aca34f10058645df3759aefc9d050b10db</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.6?type=jar</purl>
+      <purl>pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.7?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/tools.jackson/jackson-bom@3.1.6?type=pom">
+    <component type="library" bom-ref="pkg:maven/tools.jackson/jackson-bom@3.1.7?type=pom">
       <publisher>FasterXML</publisher>
       <group>tools.jackson</group>
       <name>jackson-bom</name>
-      <version>3.1.6</version>
+      <version>3.1.7</version>
       <description>Bill of Materials pom for getting full, complete set of compatible versions of Jackson 3.x components maintained by FasterXML.com</description>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/tools.jackson/jackson-bom@3.1.6?type=pom</purl>
+      <purl>pkg:maven/tools.jackson/jackson-bom@3.1.7?type=pom</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -6167,27 +6167,27 @@
     <dependency ref="pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar"/>
     <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.20.0?type=jar"/>
     <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"/>
-    <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.6?type=jar">
-      <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.6?type=pom"/>
+    <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.7?type=jar">
+      <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.7?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.6?type=jar">
+    <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7?type=jar">
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.6?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.6?type=pom"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.7?type=jar"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.7?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.6?type=jar">
-      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.6?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.6?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.6?type=pom"/>
+    <dependency ref="pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.7?type=jar">
+      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.7?type=jar"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7?type=jar"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.7?type=pom"/>
       <dependency ref="pkg:maven/org.yaml/snakeyaml@2.6?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.6?type=jar">
+    <dependency ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.7?type=jar">
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.6?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.6?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.6?type=pom"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.7?type=jar"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7?type=jar"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.7?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.6?type=pom"/>
+    <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.7?type=pom"/>
     <dependency ref="pkg:maven/com.fasterxml/classmate@1.7.3?type=jar"/>
     <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar">
       <dependency ref="pkg:maven/com.google.errorprone/error_prone_annotations@2.49.0?type=jar"/>
@@ -6240,7 +6240,7 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-security@4.1.1?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.1.1?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.1?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.6?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.7?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support">
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"/>
@@ -6424,9 +6424,9 @@
     <dependency ref="pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.55?type=jar"/>
     <dependency ref="pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.55?type=jar">
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.6?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.6?type=jar"/>
-      <dependency ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.6?type=jar"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7?type=jar"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.7?type=jar"/>
+      <dependency ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.7?type=jar"/>
       <dependency ref="pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.55?type=jar"/>
       <dependency ref="pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.55?type=jar"/>
       <dependency ref="pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar"/>
@@ -6452,7 +6452,7 @@
     </dependency>
     <dependency ref="pkg:maven/net.bytebuddy/byte-buddy@1.18.11?type=jar"/>
     <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar">
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.6?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.7?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.antlr/antlr4-runtime@4.13.2?type=jar"/>
     <dependency ref="pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"/>
@@ -6598,7 +6598,7 @@
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-jackson@4.1.1?type=jar">
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.1.1?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.6?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.7?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-jdbc@4.1.1?type=jar">
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-sql@4.1.1?type=jar"/>
@@ -6932,19 +6932,19 @@
     <dependency ref="pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar">
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.1.6?type=jar">
-      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.1.6?type=pom"/>
+    <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.1.7?type=jar">
+      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.1.7?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.6?type=jar">
+    <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.7?type=jar">
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.1.6?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.1.6?type=pom"/>
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.1.7?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.1.7?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.6?type=jar">
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.1.6?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.6?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.1.6?type=pom"/>
+    <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.7?type=jar">
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.1.7?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.7?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.1.7?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.1.6?type=pom"/>
+    <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.1.7?type=pom"/>
   </dependencies>
 </bom>
