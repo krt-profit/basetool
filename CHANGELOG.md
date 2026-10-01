@@ -19,6 +19,10 @@
   galt mit seinem Teilbericht als grün; jetzt scheitert der Lauf bei abgebrochenem PIT-Schritt oder fehlendem
   `</mutations>`. Timeout 60 → 120 Minuten (Backend kam zweimal in Folge nicht in 60 durch).
 
+- **Neuer Alarm `ContainerStartTimeMissing`.** Der Crash-Loop-Alarm liest die Startzeiten des Podman-Exporters
+  und wurde still blind, wenn dieser keine Container-Serien mehr lieferte; der neue Alarm meldet das. Der Text
+  von `ContainerMetricsMissing` nennt den Crash-Loop-Alarm nicht mehr.
+
 ### Security
 
 - **Backup und Restore-Drill brechen ohne Digest-Pin ab.** Der Helfer-Container, der Secrets, `.env` und

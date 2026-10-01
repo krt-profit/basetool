@@ -353,6 +353,12 @@ case "$cmd" in
       *)              emit_prom "$(sample '' 22)" ;;
     esac
     ;;
+  *"query=count%28basetool%3Acontainer%3Astart_time_seconds%29"*)
+    case "$scenario" in
+      start-time-missing) emit_prom "" ;;
+      *)                  emit_prom "$(sample '' 22)" ;;
+    esac
+    ;;
   *"query=count%28basetool_container_"*)
     emit_prom "$(sample '' 22)"
     ;;
@@ -645,6 +651,9 @@ STUB_SCENARIO=series-missing assert_status \
 STUB_SCENARIO=series-empty assert_status \
   "container-metrics fails on a series with no samples" \
   container-metrics fail "basetool_container_pids" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=start-time-missing assert_status \
+  "container-metrics fails when the restart-loop alert's start-time series is absent" \
+  container-metrics fail "basetool:container:start_time_seconds" -- "${STUB_ARGS[@]}"
 
 STUB_SCENARIO=logs-stopped assert_status \
   "log-streams fails when ingestion has stopped" log-streams fail "has stopped" -- "${STUB_ARGS[@]}"
