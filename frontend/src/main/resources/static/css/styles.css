@@ -2996,14 +2996,14 @@
         position: sticky;
         top: 0;
         padding: var(--space-2);
-        background: var(--color-black);
+        background: var(--color-bg-black);
     }
 
     .demand-search-input {
         width: 100%;
         min-height: 36px;
         padding: 0.25rem var(--space-2);
-        background: var(--color-black);
+        background: var(--color-bg-black);
         border: 1px solid var(--color-gray-3);
         color: var(--color-white);
         font-family: Lato, sans-serif;

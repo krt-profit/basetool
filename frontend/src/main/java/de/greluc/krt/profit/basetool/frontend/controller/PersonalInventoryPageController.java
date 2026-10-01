@@ -29,10 +29,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemUpd
 import de.greluc.krt.profit.basetool.frontend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import jakarta.validation.Valid;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -377,14 +376,21 @@ public class PersonalInventoryPageController {
         uri.append("page=").append(page).append('&');
       }
       uri.append("size=").append(size == null ? 50 : size);
-      if (sort != null && !sort.isBlank()) {
-        uri.append("&sort=").append(URLEncoder.encode(sort, StandardCharsets.UTF_8));
+      List<Object> variables = new ArrayList<>();
+      String safeSort = RelayParams.sortSpecOrNull(sort);
+      if (safeSort != null) {
+        uri.append("&sort={sort}");
+        variables.add(safeSort);
       }
       if (q != null && !q.isBlank()) {
         uri.append("&q={q}");
-        return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE, q);
+        variables.add(q);
       }
-      return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE);
+      if (variables.isEmpty()) {
+        return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE);
+      }
+      return backendApiClient.get(
+          uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE, variables.toArray());
     } catch (Exception e) {
       log.error("Failed to fetch personal inventory items", e);
       return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());
