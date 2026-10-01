@@ -38,9 +38,9 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time check that every {@code var(--x)} in the shipped stylesheets that has no fallback names
- * a custom property something declares: a stylesheet declaration, a script that sets it at runtime
- * or a template that sets it inline. An undefined property makes the declaration invalid at
+ * Build-time check that every {@code var(--x)} in the shipped stylesheets that has no fallback
+ * names a custom property something declares: a stylesheet declaration, a script that sets it at
+ * runtime or a template that sets it inline. An undefined property makes the declaration invalid at
  * computed-value time and silently drops it (REQ-UI-001).
  *
  * <p>{@link #ALLOWED_UNDEFINED} is the explicit allow-list for properties that are legitimately
@@ -51,8 +51,7 @@ class CustomPropertyExistenceTest {
   /** Properties allowed to stay undeclared in the shipped sources; none today. */
   private static final Set<String> ALLOWED_UNDEFINED = Set.of();
 
-  private static final Pattern DECLARATION =
-      Pattern.compile("(?<![\\w-])(--[A-Za-z0-9_-]+)\\s*:");
+  private static final Pattern DECLARATION = Pattern.compile("(?<![\\w-])(--[A-Za-z0-9_-]+)\\s*:");
 
   private static final Pattern SCRIPT_NAME = Pattern.compile("['\"`](--[A-Za-z0-9_-]+)['\"`]");
 
