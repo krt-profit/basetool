@@ -169,12 +169,17 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
 - An update (`PUT`) of an order with `storedAt` set MUST NOT change its status; an attempt is refused
   with 400 `error.refinery_order.stored_status_locked`. Cancelling through `DELETE` stays possible and
   does not re-open storing.
+- Create (`POST /api/v1/refinery-orders` and the user-scoped variant) ignores a client-supplied
+  `status`, `storedAt`, `id`, `version` and `owner` where the caller may not set it: the order is always
+  created `OPEN`, unstored, with the owner and org unit resolved server-side. The create form therefore
+  offers no status choice. A `PUT` may still set the status as the edit form's status select does; only
+  a stored order is locked.
 - Store refuses (400) an item whose job order does not require the item's material, on the same terms
   as `POST /inventory` (REQ-ORDERS-018).
 - Migration `V259` adds the nullable column `refinery_order.stored_at` and backfills it for orders that
   are already `COMPLETED`.
 
-**Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`),
+**Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
 `RefineryOrderServiceTest` · **Code:** `RefineryOrderService.updateRefineryOrder` /
 `storeRefineryOrder`
 

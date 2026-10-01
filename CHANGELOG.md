@@ -17,7 +17,7 @@
 
 ### Fixed
 
-- **Raffinerieauftrag: Einlagern nur einmal.** Ein bereits eingelagerter Auftrag lässt sich weder per Bearbeiten wieder öffnen noch ein zweites Mal einlagern (keine doppelten Lagerzeilen und Audit-Einträge). Beim Einlagern wird außerdem geprüft, dass der gewählte Auftrag das Material benötigt (Migration V259, REQ-REFINERY-022).
+- **Raffinerieauftrag: Einlagern nur einmal.** Ein bereits eingelagerter Auftrag lässt sich weder per Bearbeiten wieder öffnen noch ein zweites Mal einlagern (keine doppelten Lagerzeilen und Audit-Einträge). Beim Einlagern wird außerdem geprüft, dass der gewählte Auftrag das Material benötigt (Migration V259, REQ-REFINERY-022). Neue Aufträge entstehen immer als „Offen“; ein mitgeschickter Status wird ignoriert, das Erstellformular bietet keine Statuswahl mehr.
 
 ### Security
 

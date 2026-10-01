@@ -260,7 +260,8 @@ public class RefineryOrderService {
 
   /**
    * Persists a new refinery order owned by the given user, validating every referenced id and that
-   * the location hosts a refinery.
+   * the location hosts a refinery. The order is always created {@code OPEN} and unstored; a
+   * client-supplied status is ignored.
    *
    * @param userId owner id
    * @param order transient entity with shallow id-only references
@@ -279,6 +280,8 @@ public class RefineryOrderService {
       @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
     order.setId(null);
     order.setVersion(null);
+    order.setStatus(RefineryOrderStatus.OPEN);
+    order.setStoredAt(null);
 
     User user = Entities.require(userRepository.findById(userId), "error.user.not_found");
 

@@ -645,6 +645,28 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
+    void clientSuppliedServerManagedFields_areIgnoredOnCreate() {
+      stubUserAndLocation();
+      when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      User stranger = new User();
+      stranger.setId(OTHER_USER_ID);
+      RefineryOrder incoming = freshOrderWithLocation();
+      incoming.setId(UUID.randomUUID());
+      incoming.setVersion(7L);
+      incoming.setOwner(stranger);
+      incoming.setStatus(RefineryOrderStatus.COMPLETED);
+      incoming.setStoredAt(Instant.now());
+
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
+
+      assertEquals(RefineryOrderStatus.OPEN, result.getStatus());
+      assertNull(result.getStoredAt());
+      assertNull(result.getId());
+      assertNull(result.getVersion());
+      assertSame(owner, result.getOwner());
+    }
+
+    @Test
     void startedAtNull_defaultsToInstantNow() {
       stubUserAndLocation();
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
