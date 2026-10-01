@@ -48,8 +48,11 @@ Without them `.env`'s `KRT_BACKEND_TRUSTSTORE_PATH` points at nothing and the Di
 duplicate-account precheck fails open (the state production was in until 2026-09-25).
 
 Root-owned files and named volumes are read through a throwaway **helper container**
-(`IRI_BACKUP_HELPER_IMAGE`, default `docker.io/library/postgres:18-alpine`). If you override it,
-**qualify it fully**: rootless Podman on Rocky enforces short-name resolution and refuses a short
+(`IRI_BACKUP_HELPER_IMAGE`, default: the digest pin of `db-backend`'s own unit). **The helper never
+falls back to an unpinned image**: when no `@sha256:` pin is readable in `db-backend.container`, or
+an override lacks one, `backup.sh` (and `restore-drill.sh` with `IRI_DRILL_IMAGE`) abort with
+`FATAL` before starting a container and write no success metric, so `BackupStaleOrMissing` keeps
+counting. If you override it, **qualify it fully and pin the digest**: rootless Podman on Rocky enforces short-name resolution and refuses a short
 name without a TTY, and every helper read then fails as a best-effort `WARN` — the backup reports
 success over a snapshot missing the certificates, the ACL and the keystore.
 
