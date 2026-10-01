@@ -44,7 +44,8 @@ before the artifact is used.
      the gain is narrow: a malicious release of an existing publisher would pass both, and a tampered
      copy of an existing version fails the checksum today.
    Revisit when a release PR shows that the regeneration step itself is where review stops.
-3. **Two exemptions, both by artifact type**: `-sources.jar` and `-javadoc.jar` are trusted. Neither
+3. **Two exemptions, both by artifact type** (a third, the Gradle distribution sources, since
+   Amendment 1): `-sources.jar` and `-javadoc.jar` are trusted. Neither
    is ever on a build classpath; IDEs download them, and without the exemption every IDE sync
    reports verification failures that a contributor learns to ignore — which is the habit this file
    must not teach.
@@ -111,3 +112,15 @@ before the artifact is used.
   different artifact; the POM is part of what is trusted.
 - **Relying on the build cache or the Gradle cache being clean** — the caches are restored from
   earlier runs; they are an input to trust, not a source of it.
+
+## Amendment 1 (2026-10-01) — a third IDE-only exemption: the Gradle distribution sources
+
+Decision 3 named two exemptions and missed a third IDE download. IntelliJ's *Sync Gradle Changes*
+fetches `gradle-<version>-src.zip` (coordinates `gradle:gradle:<version>`, repository "Gradle
+distributions") for build-script navigation, and Gradle checks it against this file in the
+`:backend:compileClasspath` context. With no entry the sync failed with *Dependency verification
+failed … gradle-9.8.0-src.zip* — exactly the failure decision 3 says contributors must not learn to
+ignore. The file is never on a build classpath and is never resolved by a command-line build, so
+it is trusted by pattern (`group="gradle" name="gradle" file="gradle-.*-src[.]zip"`), not by
+checksum: a checksum would have to change with every wrapper bump and could only be generated from
+an IDE sync, which `--write-verification-metadata` does not perform.

@@ -6,6 +6,7 @@
       <trusted-artifacts>
          <trust file=".*-javadoc[.]jar" regex="true" reason="IDE download only, never on a build classpath (ADR-0208)"/>
          <trust file=".*-sources[.]jar" regex="true" reason="IDE download only, never on a build classpath (ADR-0208)"/>
+         <trust group="gradle" name="gradle" file="gradle-.*-src[.]zip" regex="true" reason="IDE download only: the Gradle distribution sources for build-script navigation (ADR-0208)"/>
       </trusted-artifacts>
    </configuration>
    <components>
