@@ -17,20 +17,26 @@
   Datenbank). Die Mindestversionen für Netty, OpenTelemetry und Jackson im SPI-Build entfallen,
   Keycloak bringt selbst neuere mit (Protobuf bleibt angehoben). Der Tag-Wechsel ist betreibergesteuert: vorher frisches Backup, ein
   Zurückrollen heißt Datenbank wiederherstellen; laufende Anmeldungen müssen einmal neu beginnen.
+  
 - **Keycloak-Log ohne Daueralarm.** Die „Full scope allowed"-Warnung (je Token-Anfrage) und der veraltete
   Sticky-Session-Schalter sind abgestellt.
+  
 - **Keycloak: Fehler-Events stehen im Log auf INFO statt WARN.** Ein Discord-Callback ohne Login-Cookie (`cookie_not_found`) ist ein Client-Zustand und verstopfte die WARN-Ansicht; die Zeilen und die Event-Metriken bleiben erhalten (`KC_SPI_EVENTS_LISTENER__JBOSS_LOGGING__ERROR_LEVEL`).
 
 - **Keycloak-Infoseite: Buttons einheitlich.** „Zum Basetool" und „Tab schließen" haben jetzt gleiche Breite, Höhe und Rahmen, mit Abstand zum Text darüber.
 
 ### Fixed
 
+- **Raffinerieauftrag: Einlagern nur einmal.** Ein bereits eingelagerter Auftrag lässt sich weder per Bearbeiten wieder öffnen noch ein zweites Mal einlagern (keine doppelten Lagerzeilen und Audit-Einträge). Beim Einlagern wird außerdem geprüft, dass der gewählte Auftrag das Material benötigt (Migration V259, REQ-REFINERY-022). Neue Aufträge entstehen immer als „Offen“; ein mitgeschickter Status wird ignoriert, das Erstellformular bietet keine Statuswahl mehr.
+
 - **Materialbedarf: Suchkopf der Materialauswahl ist wieder deckend schwarz.** Zwei Farbwerte der Oberfläche
   (Materialbedarf-Suche, Kontogruppen-Titel der Bank) verwiesen auf nicht existierende Design-Tokens; ein Test
   prüft künftig jedes `var(--…)`.
+
 - **Mitgliederliste: Dialogtexte werden als JavaScript-Text ausgegeben.** Löschen-, Sync- und
   Zusammenführen-Dialog bekamen ihre Übersetzungen HTML-maskiert; ein Anführungszeichen in einer
   Übersetzung hätte `&quot;` angezeigt.
+
 - **Mein Inventar: Sortierung mit Richtung erreicht das Backend unverfälscht.** Die Sortierangabe wurde doppelt
   kodiert und nie ausgewertet; sie läuft jetzt über `RelayParams` und eine URI-Variable.
 
@@ -39,6 +45,7 @@
 - **Session-Typ-Allowlist: `enforce` ist jetzt überall die Vorgabe.** Code, `application.yml`, Compose und
   Quadlet-Vorlage standen noch auf `report`, Produktion setzte `enforce` per `.env`. `report` ist nur noch
   ausdrücklich wählbar; ein fehlender oder falsch geschriebener Wert fällt auf `enforce` zurück.
+  
 - **Mutation-Testing-Lauf prüft jetzt auf Vollständigkeit.** Ein beim Job-Timeout abgebrochener Backend-Lauf
   galt mit seinem Teilbericht als grün; jetzt scheitert der Lauf bei abgebrochenem PIT-Schritt oder fehlendem
   `</mutations>`. Timeout 60 → 120 Minuten (Backend kam zweimal in Folge nicht in 60 durch).
