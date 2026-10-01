@@ -1248,7 +1248,12 @@ with an explicit request, after which the batch waits in the member's server ses
 browser names it only by its handoff id, so it cannot alter the batch or its client. The staged
 entry is keyed by the member's subject (`ingest:handoff:<sub>:<id>`), so only that member can open
 it; the developer site still tells a client to treat the link like a draft's `frontendUrl`, as a
-secret it never logs or shares (`docs/exchange/sync-guide.md`). The batch
+secret it never logs or shares (`docs/exchange/sync-guide.md`). The change set and its `stagedAt`
+come only from the gateway's staged entry and travel from the member's server session through the
+frontend to the backend; no browser request field is read for either (the endpoints take a handoff id
+alone, `ConnectedAppsConfirmControllerMvcTest.aBrowserSuppliedChangeSetOrStagingTimeIsNeverBelieved`),
+and the backend's `/api/v1/connected-apps/**` answers only the web client's own token
+(`ConnectedAppsGate`), which the member never holds. The batch
 carries its `stagedAt` through the frontend to the backend, and the staging lifetime of 30 minutes
 counts from it everywhere: the frontend neither loads nor applies a batch older than that (`404`)
 and drops expired session entries, and the backend refuses it (`403`; a `stagedAt` more than a
