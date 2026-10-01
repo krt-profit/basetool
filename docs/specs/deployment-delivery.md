@@ -102,7 +102,8 @@ job holds `id-token: write` — a keyless `cosign verify` needs no OIDC token (a
 - [ ] `release-images.yml` never writes the `:stable` tag for any artifact (backend/frontend/
   ingest/config/keycloak-spi).
 - [ ] `promote.yml` is `workflow_dispatch`-only and promotes `backend`, `frontend`, `ingest`,
-  `config` and `keycloak-spi` together (`fail-fast: true`).
+  `config` and `keycloak-spi` together: all five are verified and shown to share one source revision
+  before any tag moves (REQ-OPS-036).
 - [ ] A dedicated `approve` job (not the promote matrix) declares `environment: production`, so a
   required reviewer configured on that environment gates the run before any `:stable` flip, and the
   run creates exactly one deployment record (no phantom "Inactive" badge on the repo home page).
@@ -2403,6 +2404,37 @@ the result onto the Dependabot branch.
 [ADR-0215](../adr/0215-a-dependabot-compose-bump-carries-its-regenerated-units.md) · **Runbook:**
 `docs/deployment.md` → *Dependabot image bumps* · **Related:** REQ-OPS-004 (the units as the delivered
 definition)
+
+### REQ-OPS-036 — A deploy only applies one release
+
+`:stable` is moved onto five artifacts (`backend`, `frontend`, `ingest`, `config`, `keycloak-spi`), and
+`deploy.sh` resolves each tag separately every tick, so a promotion that is half done, interrupted or
+failed on one artifact would otherwise be deployed as a mixed release. A mixed release is not harmless:
+once an API is re-cut between modules, every call across the seam answers 404. Per-image signatures
+cannot catch it — each image is validly signed.
+
+Two gates close it. **`promote.yml`** verifies all five artifacts (cosign, same identity as before) and
+checks that they share one `org.opencontainers.image.revision` label **before** it moves any tag, then
+re-tags all five in a single job. **`deploy.sh`** refuses a non-`--reapply` target whose images —
+compared after their digests passed the cosign gate — do not all carry the same revision label, or
+whose label cannot be read. The refusal is not recorded as a bad target (no backoff): the next tick
+retries, and the promotion finishing makes it pass. `config` and `keycloak-spi` take part when they
+resolve; an unresolvable one keeps its existing "no change this tick" behaviour. Break-glass:
+`IRI_REQUIRE_ONE_RELEASE=false`, announced in the log.
+
+**Acceptance**
+
+- [ ] `promote.yml` re-tags nothing before every artifact verified and all five share one revision.
+- [ ] `deploy.sh` exits non-zero without pulling or applying when the target images' revision labels
+  differ or one is missing, writes the deploy-failure metric, and leaves no `failed.digests` record.
+- [ ] `--check-only` reports the same refusal; `--reapply` is not gated (it re-applies the deployed set).
+- [ ] `scripts/deploy.test.sh` covers refusal, missing label, success, break-glass and check-only.
+
+**Enforced by:** `.github/workflows/promote.yml` (`verify`, `same-revision`, `promote`) ·
+`.github/actions/retag-verified-digest` (`verify-only`) · `scripts/deploy.sh`
+(`assert_one_release_or_die`, `release_revision_problem`) · `scripts/lib/container-runtime.sh`
+(`rt_image_revision`) · `scripts/deploy.test.sh` (`scenario_mixed_release_*`) · **Runbook:**
+`docs/deployment.md` → *Promoting to production* · **Related:** REQ-OPS-002, REQ-OPS-015
 
 ## Open questions
 

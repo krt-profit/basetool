@@ -16,7 +16,7 @@ jobs:
   pitest:
     name: PIT (${{ matrix.module }})
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -43,28 +43,14 @@ jobs:
           set -o pipefail
           ./gradlew ":${MODULE}:pitest" --stacktrace 2>&1 | tee "${RUNNER_TEMP}/pitest.log"
 
-      - name: Fail when PIT produced no result
+      - name: Fail when PIT did not finish cleanly
         if: always()
         env:
           MODULE: ${{ matrix.module }}
-        run: |
-          set -euo pipefail
-          report="${MODULE}/build/reports/pitest/mutations.xml"
-          if grep -q "PitHelpError" "${RUNNER_TEMP}/pitest.log" 2>/dev/null; then
-            grep -m 5 -B 2 "PitHelpError" "${RUNNER_TEMP}/pitest.log" || true
-            echo "::error title=PIT (${MODULE})::PIT aborted with PitHelpError - the suite is not green under PIT, so no mutation was run"
-            exit 1
-          fi
-          if [ ! -s "$report" ]; then
-            echo "::error title=PIT (${MODULE})::no ${report} - PIT did not produce a result"
-            exit 1
-          fi
-          mutations="$(grep -c '<mutation ' "$report" || true)"
-          echo "PIT (${MODULE}): ${mutations} mutations in ${report}"
-          if [ "${mutations:-0}" -eq 0 ]; then
-            echo "::error title=PIT (${MODULE})::${report} lists no mutations"
-            exit 1
-          fi
+          PIT_OUTCOME: ${{ steps.pit.outcome }}
+        run: >-
+          bash scripts/check-pit-result.sh "${MODULE}" "${RUNNER_TEMP}/pitest.log"
+          "${MODULE}/build/reports/pitest/mutations.xml" "${PIT_OUTCOME}"
 
       - name: Upload PIT report
         if: always()

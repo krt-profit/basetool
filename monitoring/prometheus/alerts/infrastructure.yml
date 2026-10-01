@@ -75,7 +75,18 @@ groups:
           severity: critical
         annotations:
           summary: "No container metrics: fewer than 10 named containers are reporting"
-          description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. The source is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer (`systemctl status iri-container-metrics.timer`, /var/iri/monitoring/textfile/containers.prom)."
+          description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the cgroup-fed container alerts (working-set, OOM, CPU throttle) are silently blind. The restart-loop alert reads a different source and has its own guard, ContainerStartTimeMissing. The source is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer (`systemctl status iri-container-metrics.timer`, /var/iri/monitoring/textfile/containers.prom)."
+
+      - alert: ContainerStartTimeMissing
+        expr: >-
+          count(basetool:container:start_time_seconds) < 10
+          or absent(basetool:container:start_time_seconds)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No container start times: ContainerRestartLoop is blind"
+          description: "Fewer than 10 name-labelled containers report basetool:container:start_time_seconds (or none at all), so ContainerRestartLoop cannot fire. The source is the prometheus-podman-exporter (podman_container_started_seconds joined onto podman_container_info), not the cgroup collector that ContainerMetricsMissing guards: check the podman-exporter container, its socket access and TargetDown."
 
       - alert: PostgresDown
         expr: pg_up == 0
