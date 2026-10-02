@@ -1,6 +1,6 @@
 # Backup & disaster recovery — operator runbook
 
-> **Doc type:** Runbook — the *how-to*. Last reviewed: 2026-09-22. The binding requirements (the
+> **Doc type:** Runbook — the *how-to*. Last reviewed: 2026-10-02. The binding requirements (the
 > *what-must-hold*) live in [`docs/specs/backup-recovery.md`](specs/backup-recovery.md)
 > (`REQ-OPS-008..012`); the decision record is
 > [ADR-0056](adr/0056-offsite-encrypted-backup-to-nextcloud.md).
@@ -21,7 +21,10 @@ pull-only host posture (`REQ-OPS-001`).
 
 - **Schedule:** backup daily **04:15** (host-local, `iri-backup.timer`), drill **Sunday 05:30**
   (`iri-restore-drill.timer`, up to 5 min randomized delay). Both timers are `Persistent=true`.
-- **Retention (GFS):** keep 7 daily, 4 weekly, 6 monthly; `restic check` after every upload.
+- **Retention (GFS):** keep 7 daily, 4 weekly, 6 monthly, applied per host and tag
+  (`restic forget --group-by host,tags`) — every run backs up from its own timestamped staging
+  path, so restic's default grouping by path would keep every snapshot; `restic check` after every
+  upload.
 - **Downtime:** only the database dump (seconds), inside the 04:00–05:00 window — the slow upload
   runs after the stack is back up. See *How consistency works* below.
 
@@ -79,9 +82,16 @@ For a *globally* quiescent instant, the job:
 4. **restarts the writers**. A writer that is slow to report healthy (`Notify=healthy`) is logged
    as a `WARN` and the run continues, so the dumps still reach the repository;
 5. captures the monitoring plane, then **releases the lock** — production is fully live again;
-6. only *then* runs the slow `restic` encrypt + upload + `forget --prune` + `check`, and writes
-   `basetool_backup_last_success_timestamp` / `basetool_backup_duration_seconds` into the
-   node-exporter textfile directory (`/var/iri/monitoring/textfile/backup.prom`).
+6. only *then* opens the repository (`restic cat config`, one file, no lock), clears stale locks
+   (`restic unlock` — a lock a crashed or refused run left behind; a live run's lock is never
+   stale), and runs the slow `restic` encrypt + upload + `forget --prune` + `check`. It writes
+   `basetool_backup_last_success_timestamp`, `basetool_backup_duration_seconds`,
+   `basetool_backup_snapshots` and `basetool_backup_retention_limit` into the node-exporter
+   textfile directory (`/var/iri/monitoring/textfile/backup.prom`).
+
+The repository is initialised **only** when restic reports that it does not exist (exit code 10).
+Any other failure to open it — a `403` from the store, a wrong password, a lock — is `FATAL` with
+restic's own error in the log, never an `init` over an existing repository.
 
 A `trap` guarantees the writers are restarted even if a dump step fails, so production is never
 left down, and the plaintext staging directory is removed on every exit. Pass `--no-quiesce` for a
@@ -118,7 +128,10 @@ anonymous share link.
 5. **Server hardening.** Valid TLS certificate (so rclone verifies strictly — avoid
    `--no-check-certificate`); built-in brute-force protection on; trusted domains correct; keep
    Nextcloud updated. Server-side encryption is optional — the real protection is restic's
-   **client-side** encryption.
+   **client-side** encryption. If an intrusion-prevention layer (CrowdSec, fail2ban) sits in front
+   of the Nextcloud, **allowlist the production host's address there**: restic reads hundreds of
+   distinct files in a burst, which a crawler scenario bans (see *The store's edge blocks the
+   host* below).
 6. **Independence.** The Nextcloud instance must be on **separate hardware** from the basetool prod
    host (different machine, ideally different site/provider) — otherwise the off-site property is
    lost.
@@ -174,7 +187,7 @@ sudo chown deploy:deploy /etc/iri/backup.env && sudo chmod 0600 /etc/iri/backup.
 
 ```bash
 sudo -u deploy env RESTIC_CACHE_DIR=/var/lib/iri/restic-cache \
-  $(sudo grep -v '^#' /etc/iri/backup.env | xargs) restic init   # one-time (backup.sh also self-inits)
+  $(sudo grep -v '^#' /etc/iri/backup.env | xargs) restic init   # one-time (backup.sh inits only a repository that does not exist)
 ```
 
 ### 6. Start the timers
@@ -384,6 +397,35 @@ A restore with **no** compromise suspected keeps the restored secrets as-is.
   [`monitoring/prometheus/alerts/ops-automation.yml`](../monitoring/prometheus/alerts/ops-automation.yml).
   Treat a failed **restore drill** as a severe incident — it means the latest backup did not
   restore cleanly.
+- **More snapshots than the retention allows** pages `BackupRetentionNotApplied` (warning): the
+  repository grows every night and every run reads more from the store.
 - **Change retention/schedule:** edit `/etc/iri/backup.env` (retention) or the timer's `OnCalendar`
   (a drop-in under `/etc/systemd/system/iri-backup.timer.d/`, so the role's next run does not
   overwrite it).
+
+## The store's edge blocks the host
+
+**Symptom:** a run gets through some requests, then rclone reports `403 Forbidden` for everything
+(`read metadata failed`, `mkParentDir failed`, deletes refused) and restic turns that into `500`
+retries, `couldn't list files` or `repository contains errors`. A `403` with an **empty body** came
+from a proxy in front of Nextcloud, not from Nextcloud, which answers with XML or HTML.
+
+**Cause:** an intrusion-prevention layer at the Nextcloud's edge banned the host's address.
+restic over WebDAV reads many distinct files in a short burst — `restic check` without a cache
+reads every index, snapshot and tree pack — which a crawler scenario counts as scraping (the
+CrowdSec `http-crawl-non_statics` bucket holds 40 distinct GETs and drains one every 0.5 s). The
+ban outlasts the run (four hours by default), so the next run fails too, often before it uploads
+anything.
+
+**Do:**
+
+1. Do **not** probe the repository again while it is banned: every `restic snapshots` is another
+   burst and extends the ban.
+2. Have the edge's operator lift the ban and **allowlist the production host's address** for the
+   Nextcloud host. That is the fix; a rate limit alone does not keep `restic check` under the
+   threshold.
+3. Optionally slow rclone down in `/etc/iri/backup.env` — rclone reads any flag from an
+   `RCLONE_<FLAG>` variable and `backup.sh` exports the file, e.g. `RCLONE_TPSLIMIT=1.5`. It
+   makes a run take much longer and is a supplement to the allowlist, not a replacement.
+4. Start the backup by hand (`systemctl start iri-backup.service`) and read its log. A lock the
+   refused run left behind is cleared by the run itself (`restic unlock`).

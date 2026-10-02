@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Alarm `BackupRetentionNotApplied`.** `backup.sh` meldet die Zahl der Snapshots im Repository und das
+  Maximum der Aufbewahrung (`basetool_backup_snapshots`, `basetool_backup_retention_limit`); liegt die Zahl
+  darüber, warnt der Alarm.
+
 ### Changed
 
 - **Datenaustausch: Lagerposten umfassen das ganze eigene Lager.** Verbundene Anwendungen sehen und
@@ -12,6 +18,14 @@
 
 ### Fixed
 
+- **Backup: die Aufbewahrung greift wieder.** `restic forget` gruppierte nach dem Pfad, und jeder Lauf sichert
+  aus einem eigenen Staging-Verzeichnis, also wurde nie ein Snapshot entfernt (109 statt höchstens 17). Jetzt
+  gruppiert es nach Host und Tag.
+- **Backup: kein `restic init` mehr auf einen Fehler hin.** Initialisiert wird nur ein Repository, das nicht
+  existiert; ein 403 des Speichers, ein falsches Passwort oder ein Lock brechen mit restics eigener Meldung im
+  Log ab. Veraltete Locks räumt der Lauf vor dem Upload ab.
+- **Ansible-Rolle installiert `lib/restic-repo.sh`.** Ohne die Datei bricht das neue `backup.sh` auf dem Host
+  beim Start ab; ein Selbsttest prüft jetzt, dass jede eingebundene Bibliothek mitinstalliert wird.
 - **Datenaustausch: Rohstoffe behalten ihre Qualität.** Die Regel „Handelsware auf Qualität 0" traf
   jedes Material aus dem UEX-Katalog, auch alle Erze und Metalle; jetzt wird jedes Material mit der
   gesendeten Qualität gebucht. Bereits mit Qualität 0 gebuchte Posten bleiben, bis das Mitglied oder

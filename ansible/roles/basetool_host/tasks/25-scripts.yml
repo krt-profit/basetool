@@ -21,6 +21,7 @@
     - container-cleanup.sh
     - lib/container-runtime.sh
     - lib/common.sh
+    - lib/restic-repo.sh
     - render-env-d.py
     - render-redis-acl.py
     - mint-internal-tls.sh

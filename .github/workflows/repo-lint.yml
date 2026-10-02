@@ -337,6 +337,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/container-runtime.test.sh
 
+      - name: restic-repo-selftest / Self-test the backup's restic repository seam
+        if: ${{ !cancelled() }}
+        run: bash scripts/restic-repo.test.sh
+
       - name: render-env-d-selftest / Self-test the environment renderer
         if: ${{ !cancelled() }}
         run: bash scripts/render-env-d.test.sh
