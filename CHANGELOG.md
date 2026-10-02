@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Tests: das Test-Profil setzt nur noch der Build.** 237 überflüssige `@ActiveProfiles("test")`
+  sind entfernt; sie teilten Springs Test-Context-Cache, ohne etwas zu ändern. Ein Test je Anwendung
+  verhindert, dass sie wiederkommen (REQ-OPS-039).
+
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
   Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob
   dasselbe Material in derselben Qualität am selben Ort mit demselben Besitzer und derselben Einheit schon

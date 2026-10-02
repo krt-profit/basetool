@@ -258,6 +258,11 @@ production runs where that is cheap to arrange: the Redis integration tests star
 image by digest (`TestImages.REDIS`, guarded against the compose file and the Quadlet unit), and
 the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`).
 
+**The build sets the `test` profile, once.** Every Gradle `Test` task activates it, and no test class
+repeats it with `@ActiveProfiles("test")`: the annotation is part of Spring's test-context cache key,
+so it only splits contexts that are otherwise identical (REQ-OPS-039, guarded by a
+`TestProfileConventionTest` per application).
+
 ## 8.13 The external client exchange
 
 Three rules hold for every exchange route, and each new resource or capability inherits them:
