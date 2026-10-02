@@ -4100,6 +4100,27 @@ run, client, resource, reason and when the run started, kept 90 days) and the sh
 (`exchangeShipLinks`: client, the installation's id for the ship, the ship and when it was linked)
 — REQ-XCH-007, -008, -013, -017, -022, -034.
 
+**Rows that name the member in a role somebody else gave them** have a section each, so every
+column that references a member is either exported or listed with a reason in
+`GdprParticipantCoverageTest` (REQ-DATA-021). All are `ART_15`, being assigned by the organisation,
+except the market interest, which the member registered:
+
+|            Section            |                          Column                         |                                                           Selected                                                           |
+|-------------------------------|---------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `realmRoles`                  | `user_roles.user_id`                                    | role code and name                                                                                                           |
+| `orgUnitsAsGrandAdmiral`      | `org_unit.grand_admiral_user_id`                        | unit name, shorthand, kind                                                                                                   |
+| `missionsAsPartyLead`         | `mission.party_lead_user_id`                            | mission name (scrubbed), status, planned start and end                                                                       |
+| `missionUnitResponsibilities` | `mission_unit.responsible_user_id`                      | mission and unit name (both scrubbed), ship type, high-value flag; not the unit's note or ship                               |
+| `marketRequestInterests`      | `material_exchange_request_interest.interested_user_id` | request kind, item or material, when; not the requester (`ART_15_20`)                                                        |
+| `bankAccountBookingGrants`    | `bank_account_grant.user_id`                            | account number and name (scrubbed), deposit / withdraw / transfer rights; not who granted them                               |
+| `bankApprovalLimits`          | `bank_account_approval_limit.grantee_user_id`           | account number and name (scrubbed), the limit                                                                                |
+| `bankRequestsAsCounterparty`  | `bank_booking_request.counterparty_user_id`             | type, amount, status, note and justification (scrubbed); not the requester, the decider, the staff note or the reject reason |
+
+The counterparty requests mirror `bankRequestsRaised` and `bankBookingsAsCounterparty`: the
+member's side of the request, with the third party's prose scrubbed and their identity unselected.
+The staff note and the reject reason are the bank's internal text about another member's request,
+and stay out as they do for `bankRequestsRaised`.
+
 **Every section is marked with its legal basis**, so the portable subset is identifiable without
 re-deriving it:
 
@@ -4138,12 +4159,15 @@ places where that is the whole point:
 
 **Free text is the one place scrubbing is unavoidable**, and it is handled separately. A note the
 member wrote is *their* data and belongs in the export, and it may name somebody else mid-sentence
-where no `SELECT` list can reach. Six columns in five sections are scrubbed for the mirror-image
-reason — they
+where no `SELECT` list can reach. Eleven columns in nine sections are scrubbed for the
+mirror-image reason — they
 carry a **name somebody gave a thing**, which can be a person's: `hangar.name` (`ship.name`),
-`missionsManaged.mission` (`mission.name`, already scrubbed in the two sibling sections that select
-it), `notificationRuleTargets.rule` (`notification_rule.description`), `bankAccountGrants.account`
-(`bank_account.name`) and the two `orgChartPositions` name columns. Each is a person-name surface in
+`missionsManaged.mission`, `missionsAsPartyLead.mission` and `missionUnitResponsibilities.mission`
+(`mission.name`, already scrubbed in the two sibling sections that select it),
+`missionUnitResponsibilities.unit` (`mission_unit.name`), `notificationRuleTargets.rule`
+(`notification_rule.description`), `bankAccountGrants.account`, `bankAccountBookingGrants.account`
+and `bankApprovalLimits.account` (`bank_account.name`) and the two `orgChartPositions` name
+columns. Each is a person-name surface in
 `PersonSearchTargets` (REQ-SEC-060), which is the registry that settles the question rather than a
 per-section judgement call.
 
@@ -4274,8 +4298,23 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 - [x] The export reports whether third-party names were removed.
 - [x] The admin variant is ADMIN-only; a member, an officer and bank management are refused.
 - [x] Both paths write `PERSONAL_DATA_EXPORTED`, with `bySelf` telling them apart.
+- [x] Every column that references a member is exported by a section or listed as not exported
+  with a reason, and a column holding data about the member is exported (REQ-DATA-021); each of
+  the eight sections above returns the member's row only, with the third party's prose scrubbed
+  and their identity unselected.
+- [x] Every section has a `pdf.export.section.*` label in all three backend bundles, so the PDF
+  inventory never prints a raw key.
 
-**Enforced by:** `DataExportIntegrationTest`, `HandleScrubberTest`,
+> [!warning] Corrected 2026-10-03 — four inventory rows printed their key
+> `exchangeChanges`, `exchangeJournal`, `exchangeBulkUndoSkips` and `exchangeShipLinks` shipped
+> without a `pdf.export.section.*` label, so the PDF inventory named them by the raw key — the
+> defect the field labels had for the verbatim sections. `DataExportPdfSectionLabelCoverageTest`
+> fails the build on a section without a label in any of the three bundles, and on a label for a
+> section that no longer exists.
+
+**Enforced by:** `DataExportIntegrationTest`, `DataExportParticipantSectionsIntegrationTest`,
+`DataExportScrubCoverageTest`, `DataExportPdfFieldLabelCoverageTest`,
+`DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`, `HandleScrubberTest`,
 `DataExportControllerSecurityTest` · **Code:** `support/DataExportSections`,
 `support/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,

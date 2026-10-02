@@ -30,6 +30,13 @@
 
 ### Fixed
 
+- **Datenexport (Art. 15/20 DSGVO) vollständig.** Der Export enthält jetzt auch deine zugewiesenen
+  Rollen, eine Ernennung zum Grand Admiral, Einsätze mit dir als Partyleiter, Einsatzeinheiten in
+  deiner Verantwortung, Interessensbekundungen zu Gesuchen der Materialbörse, Buchungsberechtigungen
+  und persönliche Freigabe-Limits auf Bankkonten sowie Buchungsanträge mit dir als Gegenpartei; andere
+  Personen bleiben dabei ausgeblendet. Im PDF tragen außerdem die vier Abschnitte der verbundenen
+  Anwendungen jetzt einen lesbaren Namen statt ihres internen Schlüssels.
+
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
   schickte das Filterformular zusätzlich zum In-Place-Tausch ab und lud so die ganze Seite; der
   Filter tauscht jetzt nur noch seinen Abschnitt aus, wie bei Staffeln und Frequenztypen.
