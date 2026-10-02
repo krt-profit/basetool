@@ -100,6 +100,28 @@ expect 200 GET "/api/v1/operations/${NIL}/payouts"
 expect 405 POST "/api/v1/operations/${NIL}/payouts"
 expect 200 PUT "/api/v1/operations/${NIL}/payouts/paid-out"
 
+echo "== PUT /api/v1/orders/<uuid>/requested is admitted, and only that (G-23)"
+expect 200 PUT "/api/v1/orders/${NIL}/requested"
+expect 200 PUT "/api/v1/orders/${NIL}/requested?probe=1"
+expect 404 GET "/api/v1/orders/${NIL}/requested"
+expect 404 HEAD "/api/v1/orders/${NIL}/requested"
+expect 404 POST "/api/v1/orders/${NIL}/requested"
+expect 404 PATCH "/api/v1/orders/${NIL}/requested"
+expect 404 DELETE "/api/v1/orders/${NIL}/requested"
+expect 404 PUT "/api/v1/orders/${NIL}/requested/"
+expect 404 PUT "/api/v1/orders/${NIL}/requestedX"
+expect 404 PUT "/api/v1/orders/not-a-uuid/requested"
+expect 404 PUT /api/v1/orders/requested
+expect 404 GET /api/v1/orders/requested
+expect 404 PUT "/api/v1/orders/${NIL}/items/requested"
+
+echo "== the neighbouring orders rules are unchanged"
+expect 200 PUT "/api/v1/orders/${NIL}"
+expect 200 GET "/api/v1/orders/${NIL}"
+expect 405 DELETE "/api/v1/orders/${NIL}"
+expect 200 PUT "/api/v1/orders/${NIL}/status"
+expect 200 PUT "/api/v1/orders/${NIL}/priority"
+
 echo "== other families are unchanged"
 expect 200 POST /api/v1/orders
 expect 404 GET /api/v1/missions

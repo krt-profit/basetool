@@ -94,16 +94,26 @@ tasks.javadoc {
 }
 
 val contractBaseline = layout.buildDirectory.file("contract-baseline/openapi.json")
+val contractBaselineRequired =
+  providers
+    .environmentVariable("CONTRACT_BASELINE_REQUIRED")
+    .map { it.trim() == "true" }
+    .orElse(false)
 
 tasks.named<Test>("test") {
   inputs
     .files(contractBaseline)
     .withPropertyName("contractBaseline")
     .withPathSensitivity(PathSensitivity.NONE)
+  inputs.property("contractBaselineRequired", contractBaselineRequired)
   val baseline = contractBaseline
+  val baselineRequired = contractBaselineRequired
   jvmArgumentProviders.add(
     CommandLineArgumentProvider {
-      listOf("-Dcontract.baseline=" + baseline.get().asFile.absolutePath)
+      listOf(
+        "-Dcontract.baseline=" + baseline.get().asFile.absolutePath,
+        "-Dcontract.baseline.required=" + baselineRequired.get(),
+      )
     }
   )
 

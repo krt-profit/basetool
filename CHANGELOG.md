@@ -20,6 +20,11 @@
   wurde bisher stillschweigend verworfen; jetzt markiert das Formular sie und bucht erst, wenn sie ausgefüllt
   ist.
 
+- **API-Vertrag: Die Liste der App-Aufrufe ist jetzt Teil des Vertrags.** Die eingefrorene Menge deckt
+  jeden Aufruf der App ab (elf fehlende Operationen und sieben Query-Parameter ergänzt); ein Bruch gegenüber
+  dem letzten Release muss in `declared-breaks.txt` stehen, und dieser Vergleich läuft in CI verpflichtend
+  statt still übersprungen zu werden (REQ-API-016, REQ-API-017).
+
 ### Fixed
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
@@ -30,6 +35,10 @@
   Suche umstellt (z. B. „Nutzungsbedingungen", Hangar, Kontoverlauf, Blueprints) und dann blättert oder
   die Seite verlässt, wird nicht mehr gewarnt. Der Filter der Nutzungsbedingungen hat keinen
   „Anwenden"-Button mehr, er greift sofort.
+
+- **App: Auftraggeber können ihren Auftrag wieder bearbeiten.** Die öffentliche API-Edge ließ
+  `PUT /api/v1/orders/{id}/requested` nicht durch, die Bearbeitung in der App endete seit v0.2.0 mit 404.
+  Nach dem Deploy ist genau dieser `PUT` freigegeben (andere Methoden bleiben 404).
 
 ## [v1.13.6](https://github.com/krt-profit/basetool/releases/tag/v1.13.6) - 2026-10-02
 
