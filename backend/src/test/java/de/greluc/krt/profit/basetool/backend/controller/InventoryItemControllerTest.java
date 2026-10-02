@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRe
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryMergeCandidatesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -1557,5 +1558,24 @@ class InventoryItemControllerTest {
         .containsExactly(group);
 
     verifyNoInteractions(userService);
+  }
+
+  @Test
+  void getMergeCandidates_passesTheCallerFromTheTokenAndWrapsTheAnswer() {
+    UUID caller = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    Jwt token = jwt(caller.toString());
+    when(userService.getUserIdFromJwt(token)).thenReturn(caller);
+    when(inventoryItemService.hasMergeCandidates(
+            null, caller, materialId, locationId, 640, false, false, unitId))
+        .thenReturn(true);
+
+    InventoryMergeCandidatesDto result =
+        controller.getMergeCandidates(
+            token, null, materialId, locationId, 640, false, false, unitId);
+
+    assertThat(result.exists()).isTrue();
   }
 }

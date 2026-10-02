@@ -34,4 +34,7 @@
         margin: 0;
         cursor: pointer;
     }
+    .form-group input[aria-invalid='true'] {
+        border-color: var(--color-danger);
+    }
 }

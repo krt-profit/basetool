@@ -151,7 +151,7 @@ class InventoryInputAjaxControllerTest {
 
   @Test
   @WithMockUser
-  void addInventoryItemAjax_multipleAllocations_dropsBlankAmountRow() throws Exception {
+  void addInventoryItemAjax_multipleAllocations_refusesBlankAmountRow() throws Exception {
     UUID firstMission = UUID.randomUUID();
     UUID secondMission = UUID.randomUUID();
     mockMvc
@@ -168,10 +168,62 @@ class InventoryInputAjaxControllerTest {
                 .param("missionAllocations[1].targetId", secondMission.toString())
                 .param("missionAllocations[1].amount", "")
                 .param("source", "my"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("INVENTORY_ALLOCATION_AMOUNT_MISSING"));
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
+  }
+
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_multipleOrders_refusesBlankAmountRow() throws Exception {
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "23")
+                .param("jobOrderAllocations[0].targetId", UUID.randomUUID().toString())
+                .param("jobOrderAllocations[0].amount", "")
+                .param("jobOrderAllocations[1].targetId", UUID.randomUUID().toString())
+                .param("jobOrderAllocations[1].amount", "")
+                .param("source", "my"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("INVENTORY_ALLOCATION_AMOUNT_MISSING"));
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
+  }
+
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_multipleAllocationsWithEveryAmount_sendsEachSlice() throws Exception {
+    UUID firstMission = UUID.randomUUID();
+    UUID secondMission = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "23")
+                .param("missionAllocations[0].targetId", firstMission.toString())
+                .param("missionAllocations[0].amount", "5")
+                .param("missionAllocations[1].targetId", secondMission.toString())
+                .param("missionAllocations[1].amount", "8")
+                .param("missionAllocations[2].targetId", "")
+                .param("missionAllocations[2].amount", "")
+                .param("source", "my"))
         .andExpect(status().isOk());
 
     org.assertj.core.api.Assertions.assertThat(captureCreateRequest().missionAllocations())
-        .containsExactly(new InventoryAllocationInput(firstMission, 5d));
+        .containsExactly(
+            new InventoryAllocationInput(firstMission, 5d),
+            new InventoryAllocationInput(secondMission, 8d));
   }
 
   @Test
