@@ -101,5 +101,20 @@ run "restic_snapshot_count basetool" STUB_SNAPSHOTS_RC=1
 rc=$?
 if [[ ${rc} -ne 0 ]]; then ok "an unreadable count fails instead of reporting 0"; else bad "an unreadable count passed as '$(cat "${WORK}/out")'"; fi
 
+echo "== the role installs every lib an installed script sources =="
+ROLE_TASKS="${IRI_ROLE_SCRIPTS_TASKS:-${HERE}/../ansible/roles/basetool_host/tasks/25-scripts.yml}"
+mapfile -t installed < <(awk '/name: Install the operational scripts/ { f = 1 } f && /^    - / { print $2 } f && /^$/ { exit }' "${ROLE_TASKS}")
+if [[ ${#installed[@]} -gt 0 ]]; then ok "the role's install list has ${#installed[@]} entries"; else bad "no install list found in ${ROLE_TASKS}"; fi
+for script in "${installed[@]}"; do
+  [[ "${script}" == *.sh && "${script}" != lib/* ]] || continue
+  while IFS= read -r lib; do
+    if printf '%s\n' "${installed[@]}" | grep -qx "${lib}"; then
+      ok "${script} sources ${lib}, and the role installs it"
+    else
+      bad "${script} sources ${lib}, which the role does not install -- the script dies on the host"
+    fi
+  done < <(grep -oE '^\. "\$\{[A-Z_]+\}/lib/[A-Za-z0-9_-]+\.sh"' "${HERE}/${script}" | grep -oE 'lib/[A-Za-z0-9_-]+\.sh')
+done
+
 printf '%d passed, %d failed\n' "${PASSED}" "${FAILED}"
 [[ ${FAILED} -eq 0 ]]

@@ -16,6 +16,8 @@
 - **Backup: kein `restic init` mehr auf einen Fehler hin.** Initialisiert wird nur ein Repository, das nicht
   existiert; ein 403 des Speichers, ein falsches Passwort oder ein Lock brechen mit restics eigener Meldung im
   Log ab. Veraltete Locks räumt der Lauf vor dem Upload ab.
+- **Ansible-Rolle installiert `lib/restic-repo.sh`.** Ohne die Datei bricht das neue `backup.sh` auf dem Host
+  beim Start ab; ein Selbsttest prüft jetzt, dass jede eingebundene Bibliothek mitinstalliert wird.
 
 ## [v1.13.5](https://github.com/krt-profit/basetool/releases/tag/v1.13.5) - 2026-10-01
 
