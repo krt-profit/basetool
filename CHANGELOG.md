@@ -22,6 +22,10 @@
 
 ### Fixed
 
+- **Parallel geladene Seitenabschnitte senden die Sprache des Nutzers ans Backend.** Einsätze, Operationen,
+  Aufträge, Lager, Hangar, Raffinerie, Org-Bank und Einsatzdaten luden Abschnitte ohne `Accept-Language`; der
+  `ParallelPageLoader` übernimmt jetzt den ganzen Anfragekontext aus dem `ContextRegistry` (REQ-FE-030).
+
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
   schickte das Filterformular zusätzlich zum In-Place-Tausch ab und lud so die ganze Seite; der
   Filter tauscht jetzt nur noch seinen Abschnitt aus, wie bei Staffeln und Frequenztypen.

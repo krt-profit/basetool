@@ -168,8 +168,12 @@ a matching log line.
 
 **Reactor context propagation is mandatory** for anything that must be visible inside an exchange
 filter: `WebClient.exchange()` runs on a Reactor-Netty worker thread and a plain `ThreadLocal` is
-not copied there. The accessors that exist cover the active-OrgUnit pin and the correlation id.
-Forgetting one is silent — the holder is simply empty on the worker thread.
+not copied there. The accessors that exist cover the active-OrgUnit pin, the correlation id, the
+user locale and the client IP. Forgetting one is silent — the holder is simply empty on the worker
+thread. `ParallelPageLoader`, which runs a page's independent backend reads on virtual threads,
+restores a snapshot of the same registry on each worker, so a registered accessor reaches those
+sections too (REQ-FE-030, 2026-10-03; until then the loader copied the holders by hand and missed
+the locale).
 
 **This is a frontend rule only.** The backend and the ingest call HTTP through blocking
 `RestClient`s on the JDK HTTP client (ADR-0204): no WebFlux, no Reactor Netty, and the call runs on

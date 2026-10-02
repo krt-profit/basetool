@@ -2082,6 +2082,35 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
 `fragments/unsaved-modal.html`, `admin-terms.js`, `admin/terms.html` · **Related:** REQ-FE-005,
 REQ-FE-021
 
+### REQ-FE-030 — A parallel page section relays the same request context as the page
+
+`ParallelPageLoader` runs independent backend reads of one page on virtual threads (the mission,
+operation, job-order, inventory, hangar, refinery, org-unit bank and mission-data pages). A backend
+call from such a section carries exactly what a call from the request thread carries: the bearer,
+`X-Correlation-Id`, `X-Active-Org-Unit-Id`, `Accept-Language` and `X-Forwarded-For`.
+
+- **One source of truth.** The loader captures every `ThreadLocalAccessor` of Micrometer's
+  `ContextRegistry` on the calling thread (`ContextSnapshotFactory#captureAll`) and restores the
+  snapshot on the worker — the same accessors Reactor's automatic propagation uses: the four relays
+  `ReactorContextPropagationConfig#registerRelayAccessors` registers (org unit, correlation id,
+  user locale, client IP) and those libraries register (Spring Security's security context,
+  Micrometer's current observation). A holder registered later reaches the sections without a
+  change to the loader.
+- The security context, the request attributes and the MDC are copied explicitly as well.
+- A holder the caller has not set is cleared on the worker (`clearMissing`), and the worker's
+  holders are restored when the section ends.
+
+**Acceptance**
+
+- [x] A backend call made from a parallel section sends the caller's `Accept-Language`,
+  `X-Correlation-Id` and `X-Active-Org-Unit-Id` (before, the locale was not copied and the call went
+  out in the backend's default language).
+- [x] A thread-local accessor registered by a test, unknown to the loader, reaches the worker.
+- [x] With an empty registry the propagation tests fail.
+
+**Enforced by:** `ParallelPageLoaderTest` · **Code:** `service/ParallelPageLoader`,
+`config/ReactorContextPropagationConfig` · **Related:** REQ-OBS-002, REQ-OBS-009
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
