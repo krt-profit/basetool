@@ -7,7 +7,7 @@ The member's stock in the warehouse, as lots. Reading needs `exchange.stock.read
 
 A [`stock-lot`](../schemas/) is the member's stock of one material or item at one warehouse
 location, quality and stolen state: everything the member holds there, **personal and shared**,
-**summed across the org-unit pools** it is booked in — what the member's „Mein Lager" in the web
+**summed across the org-unit pools** it is booked in — what the member's own warehouse page in the web
 shows. It has no org unit and no row id. Stock another member holds is never in a lot.
 
 | Field | Meaning |
@@ -39,7 +39,7 @@ a lot's quality.
 | Field | Meaning |
 | --- | --- |
 | `type` | `RAW` (goes into a refinery), `REFINED` or `NO_REFINE`. Always present. |
-| `commodity` | Listed in UEX's commodity catalogue. Always present. That catalogue holds ores, refined metals and gems as well as trade goods, so `true` does **not** mean „a trade good without quality". |
+| `commodity` | Listed in UEX's commodity catalogue. Always present. That catalogue holds ores, refined metals and gems as well as trade goods, so `true` does **not** mean "a trade good without quality". |
 | `mineral` | UEX: a mined mineral. |
 | `harvestable` | UEX: harvested rather than mined. |
 | `raw` | UEX: an unrefined raw material. |
