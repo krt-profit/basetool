@@ -137,6 +137,10 @@ Two binding rules shape every UI change:
   behind the head scripts; inline page scripts run their code on `DOMContentLoaded`. A head-side
   `krtEvents` watchdog throws into the client-error beacon when `event-delegation.js` never ran
   (REQ-FE-023, `InlineScriptLoadOrderTest`, `ScriptLoadOrderE2eTest`).
+- **Only data forms arm the unsaved-changes guard** (2026-10-02). `unsaved-changes.js` warns before
+  a link leaves a page with an edited form; a form marked `no-track` or with `method="get"` is a
+  query and never arms it, and a submit triggered by the same edit clears it (REQ-FE-024,
+  `UnsavedChangesGuardE2eTest`).
 - **One dialog contract on native `<dialog>`s** (FE-SIMP-04/04b, 2026-09-23). Every
   `.krt-modal-overlay` is a `<dialog>` opened by `window.krtModal` with `showModal()`: top layer,
   inert page, Escape, focus in and back. Transient overlays go into the open dialog
