@@ -45,8 +45,9 @@ into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privac
 
 - [x] The map parses: one `base`, every module declared once with a non-negative rank, every rule
       names a declared module, at most one `class` rule per class, every `name` pattern compiles.
-- [x] Today's 1,389 source types are assigned to 26 modules (sizes as in the
-      [evidence appendix](../modularisation/evidence.md#target-modules-and-ranks)).
+- [x] Today's 1,390 source types are assigned to 26 modules: the 1,389 of the audit with the sizes
+      of the [evidence appendix](../modularisation/evidence.md#target-modules-and-ranks), plus
+      `InventoryMergeCandidatesDto`, which the `name ^(Inventory|…)` rule assigns to `inventory`.
 
 **Enforced by:** `DomainMapTest`, `DomainMapChecksTest` · **Code:** `DomainMap`, `ModuleSubjects`
 (test source set, package `…backend.architecture`)
@@ -108,8 +109,8 @@ one file per rule, one violation per line, sorted, UTF-8, LF, with no header and
 - Only module coupling is frozen. A security rule never enters a baseline.
 
 Measured on 2026-10-02: **138 class edges in 42 module pairs**. The plan's 150 edges in 48 pairs
-were measured with `jdeps` at `95e945326`; the difference is the tool, not the code (no backend
-source type was added or removed since): `jdeps` also counts the six permitted subclasses of the
+were measured with `jdeps` at `95e945326`; the difference is the tool, not the code (the only
+source type added since, `InventoryMergeCandidatesDto`, adds no violation): `jdeps` also counts the six permitted subclasses of the
 sealed `AppException` (ArchUnit does not import a `PermittedSubclasses` attribute as a dependency)
 and nine types that appear only in the descriptor of a called member or in an inlined constant,
 while ArchUnit additionally sees one annotation class value (`@Mapper(uses = SquadronMapper.class)`
