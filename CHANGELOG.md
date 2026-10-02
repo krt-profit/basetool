@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Sicherheitsausdrücke werden beim Build geprüft.** Jede Bean-Referenz in `@PreAuthorize` muss im
+  Kontext mit Namen und Parameterzahl auflösbar sein, die Sicherheits-Beans tragen feste Namen, und
+  kein Gate darf über `this` umgangen werden (REQ-SEC-075, REQ-SEC-076).
+- **Metrik und Alarm für nicht auswertbare Sicherheitsausdrücke.** Ein solcher Fehler bleibt ein
+  `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
+  löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
+
 ### Changed
 
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum

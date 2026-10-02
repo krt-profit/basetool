@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Registered as the {@code ownerScopeService} bean that the SpEL expressions reference;
  * read-only transactional.
  */
-@Service
+@Service("ownerScopeService")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OwnerScopeService {
