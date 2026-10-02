@@ -25,6 +25,11 @@
   dem letzten Release muss in `declared-breaks.txt` stehen, und dieser Vergleich läuft in CI verpflichtend
   statt still übersprungen zu werden (REQ-API-016, REQ-API-017).
 
+- **`openapi.json`: ein Tag pro Fachdomäne, Vertragsstufe pro Operation.** Jede Operation trägt genau
+  ein Domänen-Tag (22 Domänen, `x-domain`) und ihre Stufe `x-contract-tier` (T0/T1/T2, Quelle
+  `api/contract-tiers.txt`); die Change-Set-`Op`s von Blueprint und Schiff sind erstmals richtig
+  dokumentiert, und der Generator prüft das Dokument vor dem Schreiben (REQ-API-018).
+
 ### Fixed
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`

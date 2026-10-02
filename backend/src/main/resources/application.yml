@@ -88,6 +88,8 @@ logging:
     org.springframework.security: INFO
     io.github.resilience4j: INFO
     io.opentelemetry.exporter: WARN
+springdoc:
+  auto-tag-classes: false
 app:
   inventory:
     stolen-marking-enabled: ${APP_INVENTORY_STOLEN_MARKING_ENABLED:false}

@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.config.ContractTiers;
+import de.greluc.krt.profit.basetool.backend.config.OpenApiDomainConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -2137,6 +2139,32 @@ class ExternalContractTest {
   private static final int FROZEN_OPERATIONS_FLOOR = 246;
 
   /**
+   * The record of tier {@code T0}, which never changes (ADR-0234): the version gate, the 14
+   * exchange relay operations, the two streams and the live-sync signal. The SPI endpoint {@code
+   * POST /internal/discord/account-existence} is T0 too but is not in the document.
+   */
+  private static final Set<String> TIER_ZERO =
+      Set.of(
+          "GET /api/v1/app/version-policy",
+          "GET /api/v1/notifications/stream",
+          "GET /api/v1/live-sync/stream",
+          "POST /api/v1/live-sync/changed",
+          "GET /api/v1/exchange/catalog/locations",
+          "POST /api/v1/exchange/catalog/resolve",
+          "POST /api/v1/exchange/me/account-check",
+          "GET /api/v1/exchange/me/blueprints",
+          "POST /api/v1/exchange/me/blueprints/changes",
+          "POST /api/v1/exchange/me/drafts/blueprints",
+          "POST /api/v1/exchange/me/drafts/refinery-orders",
+          "GET /api/v1/exchange/me/installation",
+          "POST /api/v1/exchange/me/installation",
+          "GET /api/v1/exchange/me/org-demand",
+          "GET /api/v1/exchange/me/ships",
+          "POST /api/v1/exchange/me/ships/changes",
+          "GET /api/v1/exchange/me/stock",
+          "POST /api/v1/exchange/me/stock/changes");
+
+  /**
    * Verifies that no field reachable from the contract changed its type, format or {@code required}
    * status against the frozen record (REQ-API-009).
    *
@@ -2220,7 +2248,7 @@ class ExternalContractTest {
         .isNotEmpty();
 
     Map<DeclaredBreaks.Break, String> found =
-        DeclaredBreaks.between(previous, openapi(), comparedOperations());
+        DeclaredBreaks.between(previous, openapi(), comparedOperations(previous));
 
     assertThat(DeclaredBreaks.undeclared(found, ledger()))
         .as(
@@ -2284,13 +2312,17 @@ class ExternalContractTest {
 
   /**
    * Collects the operations the previous-release comparison looks at: the frozen set, every call of
-   * every committed app call list, and every operation the ledger names.
+   * every committed app call list, every operation the ledger names, and every operation the
+   * previous document marks {@code T0} or {@code T1}.
    *
+   * @param previous the previous release's document
    * @return the operations, verb upper case
    * @throws IOException if a call list or the ledger cannot be read
    */
-  private static Set<DeclaredBreaks.OperationKey> comparedOperations() throws IOException {
-    Set<DeclaredBreaks.OperationKey> operations = new LinkedHashSet<>();
+  private static Set<DeclaredBreaks.OperationKey> comparedOperations(JsonNode previous)
+      throws IOException {
+    Set<DeclaredBreaks.OperationKey> operations =
+        new LinkedHashSet<>(DeclaredBreaks.frozenIn(previous));
     for (ContractOperation operation : CONTRACT) {
       operations.add(
           new DeclaredBreaks.OperationKey(
@@ -2306,6 +2338,55 @@ class ExternalContractTest {
           new DeclaredBreaks.OperationKey(entry.declared().method(), entry.declared().path()));
     }
     return operations;
+  }
+
+  /**
+   * Verifies the contract tiers (REQ-API-018, ADR-0234): the {@code T0} list equals the record that
+   * never changes, the {@code T1} list is the frozen set minus {@code T0}, the document carries
+   * each operation's tier, and no ledger line declares a {@code T0} break.
+   *
+   * @throws IOException if the document or the ledger cannot be read
+   */
+  @Test
+  @DisplayName(
+      "the contract tiers are T0 as recorded, T1 as frozen, and T0 is never declared broken")
+  void theContractTiersMatchTheFrozenSet() throws IOException {
+    ContractTiers tiers = ContractTiers.load();
+    assertThat(tiers.operations(ContractTiers.T0))
+        .as("the T0 list in %s changed; T0 never changes (ADR-0234)", ContractTiers.RESOURCE)
+        .containsExactlyInAnyOrderElementsOf(TIER_ZERO);
+
+    Set<String> frozenMinusTierZero = new TreeSet<>();
+    for (ContractOperation operation : CONTRACT) {
+      frozenMinusTierZero.add(operation.method().toUpperCase(Locale.ROOT) + " " + operation.path());
+    }
+    frozenMinusTierZero.removeAll(TIER_ZERO);
+    assertThat(new TreeSet<>(tiers.operations(ContractTiers.T1)))
+        .as(
+            "the T1 list in %s is not the frozen set minus T0. Freezing and tiering are one"
+                + " decision: change CONTRACT and the list together",
+            ContractTiers.RESOURCE)
+        .isEqualTo(frozenMinusTierZero);
+
+    JsonNode document = openapi();
+    List<String> wrongTier = new ArrayList<>();
+    for (Map.Entry<String, JsonNode> path : document.path("paths").properties()) {
+      for (Map.Entry<String, JsonNode> verb : path.getValue().properties()) {
+        if (!verb.getValue().has("responses")) {
+          continue;
+        }
+        String tier = verb.getValue().path(OpenApiDomainConfig.TIER_EXTENSION).asString("");
+        String expected = tiers.tierOf(verb.getKey(), path.getKey());
+        if (!expected.equals(tier)) {
+          wrongTier.add(verb.getKey() + " " + path.getKey() + ": " + tier + " != " + expected);
+        }
+      }
+    }
+    assertThat(wrongTier).as("the committed document carries a stale x-contract-tier").isEmpty();
+
+    assertThat(DeclaredBreaks.onTierZero(ledger(), TIER_ZERO))
+        .as("%s declares a break of a T0 operation, which never breaks", LEDGER_RESOURCE)
+        .isEmpty();
   }
 
   /**

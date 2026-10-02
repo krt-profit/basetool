@@ -221,9 +221,17 @@ never write the document in place. `org.gradle.parallel=true` runs `:backend:tes
 parses a cut-off document and fails with `UnexpectedEndOfInputException` — an intermittent red build
 whose cause is nowhere near the test that reports it.
 
-The generator also **asserts** the document's load-bearing parts (title, the `bearer-jwt` scheme,
-the expected paths and request/response schemas) before writing, so a controller that silently stops
-being scanned fails the build instead of quietly shrinking the committed spec.
+The generator also **asserts** the document's load-bearing parts before writing, so a controller
+that silently stops being scanned fails the build instead of quietly shrinking the committed spec:
+the `bearer-jwt` scheme and the document-wide requirement on it, exactly the two anonymous
+operations (`GET /api/v1/app/version-policy`, `GET /api/v1/terms/document`), one domain tag and
+one contract tier on every operation, a per-domain operation-count floor, and unique schema names
+(REQ-API-018; `OpenApiDocumentAssertions`, `ExposedTypes`).
+
+> [!note] Corrected 2026-10-03
+> This paragraph described assertions (title, scheme, paths, schemas) that belonged to the removed
+> ingest generator; the backend's `OpenApiGeneratorTest` asserted only a `200` until the
+> assertions above were added with REQ-API-018 (rest-api-cut.md, *Findings*).
 
 Regeneration MUST also be **reproducible**: the same tree must produce the same bytes, so a
 `openapi.json` diff always means a real API change. The one thing that broke this was
@@ -259,6 +267,67 @@ contract tests then compared against a stale contract. Two parts close it:
   `git diff --exit-code -- '*/src/main/resources/api/openapi.json'` and fails the job on any
   difference. `.gitattributes` pins `*.json` to LF, so the comparison is on normalised content and a
   generator writing CRLF on Windows cannot produce a diff by itself.
+
+### REQ-API-018 — Every operation names its domain and its contract tier; every schema name one type
+
+The committed `openapi.json` is the review surface of the domain cut (ADR-0234, plan §5.10), so it
+says, per operation, which domain owns it and how frozen it is, and it describes every exposed type
+under a name of its own.
+
+- **One tag per domain.** `OpenApiDomainConfig.domainTagCustomizer` (an `OperationCustomizer`)
+  replaces every operation's tags with exactly one, its controller's domain, and mirrors it as
+  `x-domain`; the document's `tags` list holds those domains and nothing else, and springdoc's
+  class-name tags are off (`springdoc.auto-tag-classes: false`). The domains are the 22 of the REST
+  API cut's *Today's surface* (`admin-system`, `audit`, `bank`, `blueprint`, `catalogue`,
+  `dashboard`, `exchange`, `hangar`, `identity`, `inventory`, `joborder`, `leadership`, `livesync`,
+  `materialexchange`, `mission`, `notification`, `operation`, `orgchart`, `orgunit`,
+  `personalinventory`, `promotion`, `refinery`). The controller-to-domain table is explicit in main
+  code, `config/ApiDomains`, because the backend domain map of plan guard G-09
+  (`backend/src/test/resources/architecture/domain-map.txt`) is not on `main` yet; once it is, the
+  table is derived from it. One committed document stays — the app vendors it and the frontend
+  generates its test types from it; per-domain views are filtered from it.
+- **One contract tier per operation**, as `x-contract-tier` (REQ-API-001 names the tiers):
+  `T0` never breaks, `T1` is the Android contract, `T2` is web-only. The single source is
+  `backend/src/main/resources/api/contract-tiers.txt`, one `<T0|T1> <VERB> <path>` line per frozen
+  operation; every operation it does not name is `T2`. `ExternalContractTest` holds it to the record
+  that never changes (`T0`: the version gate, the 14 exchange relay operations, the two streams and
+  `POST /api/v1/live-sync/changed` — the SPI endpoint is T0 too but not in the document) and to the
+  frozen set (`T1` = frozen set minus `T0`, both directions), checks the committed document carries
+  each tier, and refuses a declared-break ledger line on a `T0` operation (REQ-API-017). The
+  previous-release comparison also compares every operation the previous document marks `T0` or
+  `T1`. The tier is data, not an exposure switch: the edge allow-list stays a reviewed file.
+- **Unique schema names.** Every name under `components.schemas` belongs to exactly one exposed Java
+  type or an explicit `@Schema(name = …)`. `ExposedTypes` walks every main-source controller's
+  handlers — return types, `@RequestBody` / `@RequestPart` parameters, generic arguments, record
+  components and fields — and groups the reached own types by the name springdoc gives them. The
+  collisions found (2026-10-03) are named apart: the nested `Op` of the stock, blueprint and ship
+  change sets, and `Provenance` of the blueprint change set and the blueprint DTO. `Skipped` was
+  named as a third collision by the audit, but its namesake is a service record no controller
+  exposes; the exposed one gets its name explicitly all the same. The name the document already
+  showed — and that the app's vendored copy and its generated models carry — stays on the type that
+  had it (`Op` the stock op, `Provenance` the change-set provenance, `Skipped` the undo result); the
+  others became
+  `ExchangeBlueprintOp`, `ExchangeShipOp` and `ExchangeBlueprintProvenance`, so the blueprint and
+  ship change sets are documented correctly for the first time (and the ship op's `Insurance`
+  appears). `use-fqn` stays off: it would rename every schema and every generated app model.
+
+**Acceptance**
+
+- [x] Every operation carries exactly one tag, equal to `x-domain`, from the 22 domains; the tag list
+  is the domains; every operation carries the tier its list entry or `T2` gives it — asserted by the
+  generator before it writes and on the committed document (`OpenApiDocumentAssertionsTest`).
+- [x] Each domain's operation count has a floor at today's count (573 operations).
+- [x] `T0` equals its record, `T1` equals the frozen set minus `T0`, no ledger line breaks `T0`
+  (`ExternalContractTest.theContractTiersMatchTheFrozenSet`).
+- [x] No two exposed types share a schema name; the scan reaches at least 441 names, and the domain
+  table names exactly the 99 controllers (`OpenApiSchemaNamesTest`).
+- [x] Each guard proven able to fail: a planted document with every fault, planted tier lines, planted
+  fixture controllers with two `Op` records, the real ship op without its explicit name, and a dropped
+  `T1` line.
+
+**Enforced by:** `OpenApiGeneratorTest`, `OpenApiDocumentAssertionsTest`, `OpenApiSchemaNamesTest`,
+`ExternalContractTest` (backend) ·
+**Related:** REQ-API-001, REQ-API-007, REQ-API-009, REQ-API-017, ADR-0234
 
 ### REQ-API-008 — Shared controller boilerplate (argument resolvers & response helpers)
 
@@ -1108,8 +1177,8 @@ type record (`theContractTypesAndNullabilityAreFrozen`) still runs.
   parameter yields exactly those breaks; each is accepted only by its own line (`DeclaredBreaksTest`).
 - [x] A required but missing baseline fails (`aMissingBaselineFailsWhereOneIsRequired`), and CI
   requires it (2026-10-03).
-- [ ] T0 operations refuse every ledger line — **open**, with the contract tiers (plan Phase 0
-  step 0.7).
+- [x] T0 operations refuse every ledger line, and the comparison also covers every operation the
+  previous document marks `T0` or `T1` (REQ-API-018, 2026-10-03).
 
 **Enforced by:** `ExternalContractTest`, `DeclaredBreaksTest`, `AppCallListTest` (backend) · the
 *Fetch the previous release's API contract* step of `ci.yml` ·
