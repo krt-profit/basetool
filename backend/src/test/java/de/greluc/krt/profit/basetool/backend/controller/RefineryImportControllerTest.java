@@ -41,7 +41,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -52,7 +51,6 @@ import org.springframework.web.context.WebApplicationContext;
  * envelope-level 400s with their problem detail, and the bean-validation 400.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class RefineryImportControllerTest {
 
   private static final String ENDPOINT = "/api/v1/refinery-orders/import-extract";

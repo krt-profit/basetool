@@ -326,6 +326,11 @@ tasks.named<Test>("test") {
     )
     .withPropertyName("e2eAudienceParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  inputs
+    .files(fileTree("src/e2e/java") { include("**/*.java") })
+    .withPropertyName("e2eSourcesForTestProfileScan")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
   inputs
     .files(
       fileTree("src/main/resources/static/fonts"),

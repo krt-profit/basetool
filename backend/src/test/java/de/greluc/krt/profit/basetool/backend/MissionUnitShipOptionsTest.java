@@ -49,7 +49,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -63,7 +62,6 @@ import org.springframework.web.context.WebApplicationContext;
  * already pinned to a unit even when their owner has left the roster.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class MissionUnitShipOptionsTest {
 

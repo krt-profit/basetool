@@ -62,7 +62,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -74,7 +73,6 @@ import org.springframework.web.context.WebApplicationContext;
  * previews it as the web import would, and nothing is written (REQ-XCH-019).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeDraftControllerTest {
 

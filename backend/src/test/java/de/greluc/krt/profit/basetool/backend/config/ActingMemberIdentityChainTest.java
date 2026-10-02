@@ -58,7 +58,6 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -76,7 +75,6 @@ import org.springframework.web.context.WebApplicationContext;
  * assertions target the {@code callerId} passed down.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 @TestPropertySource(
     properties = {

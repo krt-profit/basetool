@@ -46,7 +46,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -54,7 +53,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * and 409s for the rest, while writers to different sections both succeed.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class MissionSectionLockConcurrencyTest {
 
   private static final int THREADS = 5;

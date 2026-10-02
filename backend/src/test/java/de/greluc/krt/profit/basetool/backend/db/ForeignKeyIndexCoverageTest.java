@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Enforces REQ-DATA-017: fails for any foreign key whose columns are not the leading columns of a
@@ -38,7 +37,6 @@ import org.springframework.test.context.ActiveProfiles;
  * column> IS NOT NULL}. Exceptions go into {@link #ALLOWED_UNCOVERED} with a justification.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class ForeignKeyIndexCoverageTest {
 
   /**

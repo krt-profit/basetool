@@ -37,14 +37,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Verifies against real Postgres that the bank dashboard and paged account list issue a fixed
  * number of SQL statements regardless of account count (REQ-BANK-020, REQ-DATA-003).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class BankReadNoNPlusOneTest {
 
   /** Account fan-out for the seed — comfortably past the REQ-BANK-020 ≥ 100 threshold. */

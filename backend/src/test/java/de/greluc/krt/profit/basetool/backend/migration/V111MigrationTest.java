@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * TestContainers-backed migration test for {@code
@@ -37,7 +36,6 @@ import org.springframework.test.context.ActiveProfiles;
  * ({@code external_uuid}, {@code uex_vehicle_id}) carry their UNIQUE constraints.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V111MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

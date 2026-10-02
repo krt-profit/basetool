@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * TestContainers-backed migration test for {@code V113__create_external_sync_report.sql}. Asserts
@@ -36,7 +35,6 @@ import org.springframework.test.context.ActiveProfiles;
  * source_system} CHECK, and the two indexes the admin pages + retention sweep rely on.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V113MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

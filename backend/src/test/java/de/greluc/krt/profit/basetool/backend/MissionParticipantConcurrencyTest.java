@@ -49,7 +49,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -62,7 +61,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * runs in its own session.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class MissionParticipantConcurrencyTest {
 
   private static final int THREADS = 5;

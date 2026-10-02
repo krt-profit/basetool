@@ -53,7 +53,6 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -64,7 +63,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>Not {@code @Transactional}, so each worker runs its own session.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @WithMockUser(roles = {"ADMIN"})
 class OperationPayoutStatusConcurrencyTest {
 

@@ -30,7 +30,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -39,7 +38,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * create one row per (user, default), are idempotent and skip soft-deleted users.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class DefaultBlueprintProvisioningIntegrationTest {
 
   @Autowired private UserRepository userRepository;
