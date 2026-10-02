@@ -34,7 +34,6 @@
                 <option value="ACCEPTED" th:selected="${termsFilter == 'ACCEPTED'}" th:text="#{adminTerms.filter.accepted}">Zugestimmt</option>
                 <option value="ALL" th:selected="${termsFilter == 'ALL'}" th:text="#{adminTerms.filter.all}">Alle</option>
             </select>
-            <button type="submit" class="btn btn-outline" th:text="#{adminTerms.filter.apply}">Anwenden</button>
         </form>
 
         <div id="admin-terms-results" class="mt-2">

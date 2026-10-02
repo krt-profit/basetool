@@ -12,19 +12,37 @@ document.addEventListener('DOMContentLoaded', function () {
     const stayBtn = document.getElementById('unsaved-stay-btn');
     const closeBtn = document.getElementById('unsaved-close-btn');
 
-    document.addEventListener('input', function (e) {
-        const form = /** @type {Element} */ (e.target).closest('form');
-        if (form && !form.classList.contains('no-track')) {
-            isDirty = true;
+    /**
+     * Tells whether an edit inside the given form counts as unsaved data.
+     *
+     * A form marked `no-track` and a form with an explicit `method="get"` hold a query, not data,
+     * so editing them never arms the guard (REQ-FE-024).
+     *
+     * @param {HTMLFormElement | null} form the form the edited control belongs to
+     * @returns {boolean} true when the edit has to arm the guard
+     */
+    function tracksEdits(form) {
+        if (!form || form.classList.contains('no-track')) {
+            return false;
         }
-    });
+        return (form.getAttribute('method') || '').toLowerCase() !== 'get';
+    }
 
-    document.addEventListener('change', function (e) {
-        const form = /** @type {Element} */ (e.target).closest('form');
-        if (form && !form.classList.contains('no-track')) {
+    /**
+     * Arms the guard for an edit, ahead of the control's own listeners so a submit they trigger
+     * for the same edit clears it again.
+     *
+     * @param {Event} e the input or change event
+     */
+    function markDirty(e) {
+        const target = /** @type {Element} */ (e.target);
+        if (target instanceof Element && tracksEdits(target.closest('form'))) {
             isDirty = true;
         }
-    });
+    }
+
+    document.addEventListener('input', markDirty, true);
+    document.addEventListener('change', markDirty, true);
 
     window.resetUnsavedChanges = function () {
         isDirty = false;
