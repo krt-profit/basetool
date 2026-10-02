@@ -20,6 +20,16 @@
   wurde bisher stillschweigend verworfen; jetzt markiert das Formular sie und bucht erst, wenn sie ausgefüllt
   ist.
 
+- **API: mehr Bereiche werden nie zwischengespeichert.** Admin, Audit, Verbundene Anwendungen,
+  Datenaustausch, Leitung, Live-Sync, Materialbörse, Benachrichtigungsregeln, Aufträge, Organigramm,
+  SK-/Staffel-Mitglieder und der eigene Nutzungsbedingungs-Status antworten jetzt mit
+  `private, no-store` statt `no-cache, must-revalidate` (REQ-SEC-031); ein Test schlägt fehl, wenn
+  eine neue API-Familie nicht eingeordnet ist.
+
+- **API: höchstens 1 000 Einträge pro Seite.** Nur Preismatrix, Preisübersicht, Materialpreise,
+  Terminals und die UEX-Ortskataloge erlauben weiter 100 000 (REQ-API-005); Frontend und App fordern
+  sonst nirgends größere Seiten an.
+
 ### Fixed
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
@@ -30,6 +40,13 @@
   Suche umstellt (z. B. „Nutzungsbedingungen", Hangar, Kontoverlauf, Blueprints) und dann blättert oder
   die Seite verlässt, wird nicht mehr gewarnt. Der Filter der Nutzungsbedingungen hat keinen
   „Anwenden"-Button mehr, er greift sofort.
+
+### Security
+
+- **Pfadgebundene Schutzregeln prüfen sich selbst.** Tests über die echten Endpunkte stellen sicher,
+  dass jeder schreibende Endpunkt in der CSRF-Ausnahme liegt, jede Ratenlimit-Regel einen Endpunkt
+  trifft und die Ausnahmen der Freigabe-, Nutzungsbedingungs- und Datenaustausch-Filter exakte
+  Pfadlisten sind (REQ-SEC-078…080).
 
 ## [v1.13.6](https://github.com/krt-profit/basetool/releases/tag/v1.13.6) - 2026-10-02
 
