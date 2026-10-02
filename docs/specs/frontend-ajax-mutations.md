@@ -2104,7 +2104,7 @@ dispatcher actually serves:
 
 **Acceptance**
 
-- [x] The snapshot holds all 537 mappings (535 application handlers, 2 of Spring Boot's error
+- [x] The snapshot holds all 538 mappings (536 application handlers, 2 of Spring Boot's error
   controller) and matches the committed file (2026-10-02).
 - [x] The four member handlers that relied on the URL rule alone — `/org-chart`, `/ship-data` and
   both `/announcement/read` variants — declare `isAuthenticated()`, so the allow-list holds only the

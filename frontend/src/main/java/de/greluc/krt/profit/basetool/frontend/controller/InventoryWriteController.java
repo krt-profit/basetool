@@ -42,6 +42,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -106,6 +107,13 @@ public class InventoryWriteController {
           "error.inventory.personal.assignment",
           "Ein persönlicher Eintrag darf keinem Auftrag oder Einsatz zugeordnet sein.");
     }
+    String blankAllocationField = blankAllocationAmountField(form);
+    if (blankAllocationField != null) {
+      bindingResult.rejectValue(
+          blankAllocationField,
+          "inventory.input.alloc.amountMissing",
+          "Bei mehreren Zuordnungen braucht jede eine Menge.");
+    }
 
     if (bindingResult.hasErrors()) {
       return inventoryPageController.viewInputPage(form.getSource(), model);
@@ -154,6 +162,9 @@ public class InventoryWriteController {
     validateCatalogMode(form, bindingResult);
     if (formPersonalWithAssignment(form)) {
       return inventoryValidationError("INVENTORY_PERSONAL_ASSIGNMENT");
+    }
+    if (blankAllocationAmountField(form) != null) {
+      return inventoryValidationError("INVENTORY_ALLOCATION_AMOUNT_MISSING");
     }
     if (bindingResult.hasErrors()) {
       return inventoryValidationError("VALIDATION");
@@ -238,6 +249,41 @@ public class InventoryWriteController {
         || form.getMissionId() != null
         || !toAllocationInputs(form.getJobOrderAllocations(), form.getAmount()).isEmpty()
         || !toAllocationInputs(form.getMissionAllocations(), form.getAmount()).isEmpty();
+  }
+
+  /**
+   * Names the allocation dimension of a create form that targets several orders or missions while
+   * leaving one of their amounts blank (REQ-INV-027); item mode sends no missions and is not
+   * checked for them.
+   *
+   * @param form the bound create form
+   * @return {@code jobOrderAllocations} or {@code missionAllocations}, or {@code null} when every
+   *     dimension is unambiguous
+   */
+  @Nullable
+  private static String blankAllocationAmountField(@NotNull InventoryForm form) {
+    if (hasBlankAmountAmongSeveral(form.getJobOrderAllocations())) {
+      return "jobOrderAllocations";
+    }
+    if (form.getGameItemId() == null && hasBlankAmountAmongSeveral(form.getMissionAllocations())) {
+      return "missionAllocations";
+    }
+    return null;
+  }
+
+  /**
+   * Whether a dimension names two or more targets and leaves at least one of their amounts blank.
+   *
+   * @param rows the bound allocation rows; may be {@code null}
+   * @return {@code true} when the split is ambiguous
+   */
+  private static boolean hasBlankAmountAmongSeveral(List<InventoryForm.AllocationRow> rows) {
+    if (rows == null) {
+      return false;
+    }
+    List<InventoryForm.AllocationRow> targeted =
+        rows.stream().filter(row -> row != null && row.getTargetId() != null).toList();
+    return targeted.size() > 1 && targeted.stream().anyMatch(row -> row.getAmount() == null);
   }
 
   /**

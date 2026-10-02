@@ -266,6 +266,7 @@
 /inventory/input POST headers=[X-Requested-With=XMLHttpRequest] -> InventoryWriteController#addInventoryItemAjax gate=class:isAuthenticated() layout=yes
 /inventory/item-search GET -> InventoryPageController#itemSearch gate=class:isAuthenticated() layout=yes
 /inventory/material/{materialId} GET -> InventoryPageController#viewMaterialInventory gate=class:isAuthenticated() layout=yes
+/inventory/merge-candidates GET headers=[X-Requested-With=XMLHttpRequest] -> InventoryMergeProbeProxyController#mergeCandidates gate=class:isAuthenticated() layout=no
 /inventory/my GET -> InventoryPageController#viewMyInventory gate=class:isAuthenticated() layout=yes
 /inventory/my/entry-ids GET -> InventoryPageController#myEntryIds gate=class:isAuthenticated() layout=yes
 /inventory/my/game-item-stack/entries GET -> InventoryPageController#viewMyGameItemStackEntries gate=class:isAuthenticated() layout=yes

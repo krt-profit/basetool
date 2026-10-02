@@ -52,10 +52,10 @@ class RouteGateSnapshotTest {
   private static final String SNAPSHOT = "security/route-gate-snapshot.txt";
 
   /** Selection floor: the dispatcher's mapping count when the snapshot was introduced. */
-  private static final int MIN_MAPPINGS = 537;
+  private static final int MIN_MAPPINGS = 538;
 
   /** Selection floor: the application handler count when the rule was introduced. */
-  private static final int MIN_APPLICATION_HANDLERS = 535;
+  private static final int MIN_APPLICATION_HANDLERS = 536;
 
   /**
    * The application handlers allowed to carry no {@code @PreAuthorize}, named exactly as {@code

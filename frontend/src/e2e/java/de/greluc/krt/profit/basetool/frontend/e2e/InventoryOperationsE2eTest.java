@@ -132,6 +132,18 @@ class InventoryOperationsE2eTest {
   private static String needMatId;
   private static String needOrderId;
 
+  /** Own SCU material of {@link #einbuchenOffersTheMergeOptInOnlyWhenAMatchingRowExists()}. */
+  private static String mergeProbeMatId;
+
+  /** The member the on-behalf owner-picker flow books for: one Staffel and one SK of its own. */
+  private static String ownerTargetUserId;
+
+  /** The Staffel {@link #ownerTargetUserId} belongs to. */
+  private static String ownerTargetStaffelId;
+
+  /** The SK {@link #ownerTargetUserId} belongs to. */
+  private static String ownerTargetSkId;
+
   /**
    * Launches the browser, performs the single shared login, and (ephemeral stack only) seeds the
    * IRIDIUM membership plus one isolated material+row per scenario: a shared source location, the
@@ -237,6 +249,19 @@ class InventoryOperationsE2eTest {
     stolenMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Stolen Mat");
     stolenItemId =
         seeder.createInventoryItem(USERNAME, PASSWORD, stolenMatId, opsHubLocId, SEED_QUALITY, 40);
+
+    mergeProbeMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Merge Probe Mat");
+    seeder.createInventoryItem(USERNAME, PASSWORD, mergeProbeMatId, opsHubLocId, SEED_QUALITY, 30);
+
+    seeder.createMission(USERNAME, PASSWORD, "E2E Inv Mission B", true);
+
+    ownerTargetUserId = seeder.getUserId("test-both", "test-both-pw");
+    ownerTargetStaffelId =
+        seeder.createSquadron(USERNAME, PASSWORD, "E2E Inv Owner Staffel", "EIOS");
+    ownerTargetSkId = seeder.createSpecialCommand(USERNAME, PASSWORD, "E2E Inv Owner SK", "EIOK");
+    seeder.assignStaffelMembership(
+        USERNAME, PASSWORD, ownerTargetUserId, ownerTargetStaffelId, false, false);
+    seeder.addSpecialCommandMember(USERNAME, PASSWORD, ownerTargetSkId, ownerTargetUserId);
   }
 
   /** Releases the browser and the Playwright driver process. */
@@ -283,6 +308,122 @@ class InventoryOperationsE2eTest {
 
           assertEquals(
               42.0, after - before, AMOUNT_DELTA, "created amount should add to the total");
+        });
+  }
+
+  /**
+   * <em>Einbuchen, merge opt-in (REQ-INV-026).</em> The „Zusammenführen" row appears for an SCU
+   * material only while a row with the same owner, material, place, quality and unit exists, and
+   * hiding it unticks the box.
+   */
+  @Test
+  void einbuchenOffersTheMergeOptInOnlyWhenAMatchingRowExists() {
+    runFlow(
+        "inventory-einbuchen-merge-probe",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
+          page.waitForLoadState();
+          Locator mergeRow = page.locator("#merge-stock-row");
+          Locator mergeBox = page.locator("#mergeStock");
+
+          E2eSupport.selectComboboxByValue(
+              page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"),
+              mergeProbeMatId,
+              "E2E Inv Merge Probe Mat");
+          assertThat(mergeRow).isHidden();
+
+          E2eSupport.selectComboboxByValue(
+              page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"),
+              opsHubLocId,
+              "E2E Inv Ops Hub");
+          page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
+          assertThat(mergeRow).isVisible();
+          mergeBox.check();
+
+          page.locator("#quality").fill(String.valueOf(SEED_QUALITY + 1));
+          assertThat(mergeRow).isHidden();
+          assertThat(mergeBox).not().isChecked();
+
+          page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
+          assertThat(mergeRow).isVisible();
+          assertThat(mergeBox).not().isChecked();
+        });
+  }
+
+  /**
+   * <em>Einbuchen, split (REQ-INV-027).</em> With two missions named, a row without an amount is
+   * marked and the form does not submit; typing the amount clears the mark.
+   */
+  @Test
+  void einbuchenRefusesASecondAssignmentWithoutAnAmount() {
+    runFlow(
+        "inventory-alloc-amount-missing",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
+          page.waitForLoadState();
+          E2eSupport.selectComboboxFirstOption(
+              page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"));
+          E2eSupport.selectComboboxFirstOption(
+              page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"));
+          page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
+          page.locator("#amount").fill("20");
+
+          page.locator("[data-trigger='inv-input-add-mission']").click();
+          page.locator("[data-trigger='inv-input-add-mission']").click();
+          Locator rows = page.locator("#missionAllocRows [data-alloc-row]");
+          rows.nth(0).locator("[data-alloc-target]").selectOption(new SelectOption().setIndex(1));
+          rows.nth(0).locator("[data-alloc-amount]").fill("5");
+          rows.nth(1).locator("[data-alloc-target]").selectOption(new SelectOption().setIndex(2));
+          Locator blankAmount = rows.nth(1).locator("[data-alloc-amount]");
+          Locator hint = page.locator("#inputAllocAmountMissing");
+          assertThat(hint).isVisible();
+          assertThat(blankAmount).hasAttribute("aria-invalid", "true");
+
+          java.util.List<String> posts = new java.util.ArrayList<>();
+          page.onRequest(
+              request -> {
+                if ("POST".equals(request.method()) && request.url().contains("/inventory/input")) {
+                  posts.add(request.url());
+                }
+              });
+          page.evaluate(
+              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                  + " 'none'; } }");
+          page.locator("form[action$='/inventory/input'] button[type='submit']").click();
+          assertThat(blankAmount).isFocused();
+          page.waitForTimeout(1_000);
+          assertTrue(posts.isEmpty(), "the form must not submit an ambiguous split");
+
+          blankAmount.fill("3");
+          assertThat(hint).isHidden();
+          assertThat(blankAmount).not().hasAttribute("aria-invalid", "true");
+        });
+  }
+
+  /**
+   * <em>Einbuchen for another member.</em> Picking the member refills „Zuordnen zu" with that
+   * member's own units and asks for one; going back to the own entry restores the caller's options.
+   */
+  @Test
+  void onBehalfOwnerPickerFollowsTheChosenMember() {
+    runFlow(
+        "inventory-owner-picker-member",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=admin");
+          page.waitForLoadState();
+          Locator owner = page.locator("#owningOrgUnitId");
+          Locator userCombo = page.locator(".krt-combobox:has(#userId) .krt-combobox__input");
+
+          E2eSupport.selectComboboxByValue(userCombo, ownerTargetUserId, "test-both");
+          assertThat(page.locator(".owner-picker")).isVisible();
+          assertThat(owner.locator("option[value='" + ownerTargetStaffelId + "']")).hasCount(1);
+          assertThat(owner.locator("option[value='" + ownerTargetSkId + "']")).hasCount(1);
+          assertThat(owner).hasValue("");
+          assertThat(owner).hasJSProperty("required", true);
+
+          E2eSupport.clearCombobox(userCombo);
+          assertThat(owner.locator("option[value='" + ownerTargetSkId + "']")).hasCount(0);
+          assertThat(owner).hasJSProperty("required", false);
         });
   }
 
