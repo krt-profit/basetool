@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.keycloak.spi;
+package de.greluc.krt.profit.basetool.keycloak.spi.discord;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -47,8 +47,9 @@ import org.keycloak.util.JsonSerialization;
  * /users/@me} profile into a {@link BrokeredIdentityContext}.
  *
  * <p>The raw profile JSON is stored for {@link DiscordUserAttributeMapper}. The scopes include
- * {@code guilds.members.read} for {@link DiscordGuildRoleGateAuthenticator}; the provider itself
- * grants no access.
+ * {@code guilds.members.read} for {@link
+ * de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordGuildRoleGateAuthenticator}; the provider
+ * itself grants no access.
  */
 public class DiscordIdentityProvider
     extends AbstractOAuth2IdentityProvider<OAuth2IdentityProviderConfig>

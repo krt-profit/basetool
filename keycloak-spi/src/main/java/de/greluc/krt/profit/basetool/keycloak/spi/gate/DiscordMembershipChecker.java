@@ -17,9 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.keycloak.spi;
+package de.greluc.krt.profit.basetool.keycloak.spi.gate;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import de.greluc.krt.profit.basetool.keycloak.spi.discord.DiscordGuildNicknameReader;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;

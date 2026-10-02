@@ -1,1 +1,1 @@
-de.greluc.krt.profit.basetool.keycloak.spi.DiscordGuildRoleGateAuthenticatorFactory
+de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordGuildRoleGateAuthenticatorFactory

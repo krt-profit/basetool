@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.keycloak.spi;
+package de.greluc.krt.profit.basetool.keycloak.spi.discord;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
@@ -126,7 +126,7 @@ public class DiscordGuildNicknameReader {
    * @return the trimmed nickname (at most {@value #MAX_NICK_LENGTH} characters), or {@link
    *     Optional#empty()} when the field is absent, null, blank, or the body is unparseable
    */
-  static @NotNull Optional<String> extractNick(@Nullable String body) {
+  public static @NotNull Optional<String> extractNick(@Nullable String body) {
     return parseMember(body).flatMap(member -> normalizedText(member.get("nick")));
   }
 

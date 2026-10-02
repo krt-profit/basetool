@@ -118,7 +118,13 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   (ADR-0228, REQ-XCH-005); every Discord call
   goes through one shared HTTP client, and a first login reads the guild-member object once. Analysed by SpotBugs +
   FindSecBugs and held to a JaCoCo floor like the applications (since 2026-09-22). Shipped as its
-  own signed artifact (ADR-0055).
+  own signed artifact (ADR-0055). Three sub-packages by concern: `discord` (the identity provider,
+  its two mappers, the shared Discord client and the nickname reader), `gate` (the first-login
+  authenticator, the membership checker and the backend account precheck with its truststore) and
+  `exchange` (the `basetool-exchange` admin extension and the `krt-freemarker` login forms); `gate`
+  uses `discord`, nothing else crosses. `ServiceRegistrationsTest` pins the six
+  `META-INF/services` registrations, and `repo-lint.yml` ties the compile version to the image
+  (REQ-OPS-040).
 - **`keycloak-theme/krt-theme`** — not a Gradle module: the `login` and `account` themes in the
   organisation's design, shipped inside the config bundle.
 - **`logging-support`** — a plain library, **shipped** inside the three application JARs: the

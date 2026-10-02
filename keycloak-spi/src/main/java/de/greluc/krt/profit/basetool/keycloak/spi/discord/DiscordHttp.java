@@ -17,22 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.keycloak.spi;
+package de.greluc.krt.profit.basetool.keycloak.spi.discord;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
 
 /**
  * The single HTTP client for all calls to the public Discord API, shared by {@link
- * DiscordIdentityProvider} and {@link DiscordMembershipChecker} to keep one connection pool.
+ * DiscordIdentityProvider} and {@link
+ * de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordMembershipChecker} to keep one connection
+ * pool.
  */
-final class DiscordHttp {
+public final class DiscordHttp {
 
   /** Connect and per-request timeout for every Discord call. */
-  static final Duration TIMEOUT = Duration.ofSeconds(10);
+  public static final Duration TIMEOUT = Duration.ofSeconds(10);
 
   /** The shared client; default trust (Discord presents a publicly-trusted certificate). */
-  static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
+  public static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
 
   private DiscordHttp() {}
 }
