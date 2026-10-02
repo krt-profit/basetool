@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Datenaustausch: der eingefrorene Vertrag wird beim Bauen geprüft.** Backend-Antworten werden gegen die
+  veröffentlichten Schemas und Fixtures geprüft, jede Gateway-Route hat eine festgeschriebene Antwort, die
+  gemeinsamen Bezeichner von Backend, Gateway und Frontend stehen an einer Stelle, und ein PR am Austauschpfad
+  braucht das Label `e2e` (REQ-XCH-036…-038). Die Refinery-Entwurfsroute hat einen eigenen Request-Typ mit
+  identischem JSON; das Verhalten bleibt unverändert.
+
 ### Fixed
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
