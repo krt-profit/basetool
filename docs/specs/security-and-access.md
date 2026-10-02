@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-25.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -20,9 +20,9 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-072** (corrected 2026-09-25: this note still said
-> REQ-SEC-070 after REQ-SEC-070 had been allocated below) — re-check `origin/main` and open PRs before
-> claiming it. Requirements are grouped by subject, not strictly by number.
+> allocated. The next free id is **REQ-SEC-074** (corrected 2026-10-02: this note still said
+> REQ-SEC-072 after REQ-SEC-072 and REQ-SEC-073 had been allocated below) — re-check `origin/main`
+> and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
 
@@ -160,6 +160,79 @@ equivalents — a new violation fails `./gradlew test`:
   at build time rather than in production (security review, INFO regression guard).
 - The frontend does not depend on Spring Data JPA or JDBC (`frontendShouldNotDependOnSpringDataJpa`,
   `frontendShouldNotUseJdbcDirectly`); ingest depends on no persistence at all.
+
+How the backend rules select what they check, so that a refactor cannot disarm them silently, is
+REQ-SEC-073.
+
+### REQ-SEC-073 — The architecture gates select by role and class literal, carry selection floors, and every FQCN they hold resolves
+
+A rule that selects by a package or a class-name string checks less, without failing, as soon as a
+class moves or is renamed: ArchUnit fails a rule whose selection is empty, but not one whose
+selection shrank or whose target string no longer names a class. Every rule of the backend
+[`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
+therefore:
+
+- **Selects by role.** A layer is the classes of its role — web controllers (`@RestController`, or
+  meta-annotated `@Controller`), `@Service` beans, Spring Data `Repository` subtypes, MapStruct
+  `@Mapper` types and their generated implementations, JPA `@Entity`/`@Embeddable`/`@MappedSuperclass`
+  types, Bean Validation constraints and validators — plus the classes nested in them, plus the
+  package tree of one class of the layer named by class literal (so today's selection is kept
+  whole, and a role class stays selected wherever it moves). Layers without a role (`support`,
+  `integration`, `event`) are the package tree of a class literal. The exchange is selected by its
+  domain package segment (`exchange`), which survives both today's layer layout and a module
+  package.
+- **Names its keys by class literal**, never by a fully qualified name string: targets, allow-lists
+  (`permitAll()` handlers resolved as `java.lang.reflect.Method`), the staffel-scoped services and
+  controllers, the PII-carrying DTOs, the bank ledger repositories. A method name a rule keys on is
+  checked against its class when the rule is built, and a SpEL bean name is derived from the bean
+  class. A meta-test (`ArchitectureFqcnLiteralsTest`) fails on any string literal in the
+  architecture tests that looks like a fully qualified class name and does not resolve.
+- **Asserts a selection floor before it runs**: the number of classes (top-level) or members it
+  selects is at least the count measured when the floor was set; `allowEmptyShould(true)` is not
+  used. A rule that had nothing to select today is reshaped so that it selects the population it
+  guards (every repository method for the no-arg `findAll()` rule; every top-level class beside
+  `ScWikiClient`, the client included). A deliberate shrink lowers the floor in the same change.
+- **Is proven able to fail.** `ArchitectureRuleFailureTest` evaluates every rule family against
+  planted violations in `de.greluc.krt.profit.basetool.architecture.fixtures` — test sources, so
+  outside the production import (`ImportOption.DO_NOT_INCLUDE_TESTS`), and outside the backend
+  package, so outside the component scan — and asserts each one is reported. The fixtures place
+  role-annotated classes outside every layer package, which is what proves role selection.
+
+Two structural rules go with it (ADR-0047, amended):
+
+- **`support` is an allow-list leaf**: it may depend only on itself, the model and the
+  repositories, and on classes outside the backend. Logic that a mapper and a service share
+  belongs to the domain that owns it, inverted through an SPI there — not into `support`.
+- **Layers inside each module are acyclic** (`layersInsideEachModuleShouldBeFreeOfDependencyCycles`):
+  a top-level package named like one of today's layers is a layer of the root module; any other
+  top-level package is a domain module whose sub-packages are its layers, and each module's layers
+  must form no cycle. With no domain package yet, it selects exactly the slices of
+  `backendPackagesShouldBeFreeOfDependencyCycles`.
+
+The bank's two seam rules (ADR-0020, ADR-0028, re-keyed with the owner's approval on 2026-10-02)
+select the **bank domain**: the classes listed by class literal in `BANK_CLASSES`, the classes
+nested in them, MapStruct's implementations of the bank mappers, and every class of a `bank` module
+package. `everyBankNamedClassIsClassified` puts every class named after the bank into either that
+list or the reviewed org-unit side (`ORG_UNIT_BANK_SIDE`). The containment rule treats any class
+depending on `OwnerScopeService` and on any bank-domain class as a bridge, and the bridge set is
+exactly `OrgUnitBankAccessService`.
+
+**Acceptance criteria**
+
+- [x] No rule selects by a layer package string or names a class by a fully qualified string; no
+  rule uses `allowEmptyShould(true)`.
+- [x] Every rule asserts a selection floor equal to its count when the floor was set.
+- [x] Every rule family reports a planted violation; a shrunk selection fails its floor; a renamed
+  method key fails when the rule is built.
+- [x] An unresolvable fully qualified name in a string literal of the architecture tests fails the
+  meta-test.
+- [x] On today's code every rule finds no violation and selects at least the classes it selected
+  before.
+
+**Enforced by:** `ArchitectureTest`, `ArchitectureRuleFailureTest`, `ArchitectureFqcnLiteralsTest`
+· **Code:** the fixtures under `backend/src/test/java/de/greluc/krt/profit/basetool/architecture/fixtures/`
+· **Related:** REQ-SEC-003, REQ-SEC-052, REQ-SEC-007, REQ-BANK-008, REQ-BANK-019, ADR-0020,
+ADR-0028, ADR-0047
 
 ### REQ-SEC-004 — Roles & hierarchy
 
@@ -892,9 +965,9 @@ here:
   closed to it.
 - **Strict silo:** a Bereichsleitung sees/edits only its own Bereich's descendants; only the OL crosses
   Bereiche. No peer-Bereich access, even read-only.
-- **ArchUnit-whitelist obligation:** the name-keyed rules `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`,
-  `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` and `orgUnitAwareBankSeamIsContainedToOneClass`
-  silently skip classes not in their set; **every** new scoped controller/service added by the
+- **ArchUnit-whitelist obligation:** the list-keyed rules `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
+  and `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` (class literals since REQ-SEC-073)
+  check only the classes in their lists; **every** new scoped controller/service added by the
   restructure MUST be added to the relevant whitelist in the same PR (or covered by an
   annotation/package-based rule), so no new write endpoint ships ungated.
 

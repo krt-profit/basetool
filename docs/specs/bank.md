@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
 > **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011 (foundation); ADR-0020,
 > ADR-0028, ADR-0043 (org-unit seam, responsibility, visibility); ADR-0021, ADR-0022, ADR-0133
 > (booking requests); ADR-0039, ADR-0040 (holders); ADR-0041, ADR-0052 (transfer fee); ADR-0054
@@ -684,7 +684,7 @@ require a spec change.
 - [x] Bank services/repositories have no dependency on mission/operation/order types
   (ArchUnit-checkable package rule).
 
-**Enforced by:** `ArchitectureTest` (`bankClassesMustStaySeasonAndProfitIndependent`) · **Code:** all `Bank*` production classes (the package-wide rule forbids any season/profit dependency) · **Issues:** #556
+**Enforced by:** `ArchitectureTest` (`bankClassesMustStaySeasonAndProfitIndependent`) · **Code:** every class of the bank domain (`ArchitectureTest.BANK_CLASSES` and a future `bank` module package, REQ-SEC-073) — the rule forbids any season/profit dependency · **Issues:** #556
 
 ### REQ-BANK-020 — Storage, performance & integrity
 
@@ -790,8 +790,8 @@ org-unit-blind.
   delta/sparkline aggregates only.
 - [x] Each card shows the 30-day delta + sparkline trend, derived from the windowed posting slices
   with no per-account N+1 (`OrgUnitBankAccessServiceTest`, frontend `OrgUnitBankPageControllerMvcTest`).
-- [x] The seam is the only class bridging `OwnerScopeService` and the bank accounts
-  repository (`ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`); `BankSecurityService`
+- [x] The seam is the only class bridging `OwnerScopeService` and the bank — any bank-domain class,
+  the accounts repository included (`ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`); `BankSecurityService`
   never depends on `OwnerScopeService` (`bankClassesMustNotConsultOrgUnitScope`).
 - [x] A slim standalone page lists the overseen balances, gated to officers/leads, not
   `BANK_EMPLOYEE` (frontend `OrgUnitBankPageControllerMvcTest`).

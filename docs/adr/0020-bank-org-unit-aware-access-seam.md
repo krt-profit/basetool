@@ -4,6 +4,8 @@
 - **Date:** 2026-06-17
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-021 · REQ-BANK-022 · REQ-BANK-008 (amended) · ADR-0011 · issue #666
+- **Amended:** 2026-10-02 — both ArchUnit pins keyed by class literal and the bank domain instead of
+  the `Bank` name prefix (owner-approved; REQ-SEC-073, see the Amendment section below)
 
 ## Context
 
@@ -52,3 +54,23 @@ bank role.
   already in `OwnerScopeService` and drift from it.
 - **Several bridging classes** — rejected: the containment pin keeps the blast radius to one
   auditable seam.
+
+## Amendment (2026-10-02) — the pins are keyed by class literal, not by name prefix
+
+Approved by @greluc on 2026-10-02 (domain modularisation plan §5.4, guard G-01; REQ-SEC-073). The
+two pins no longer select by the `Bank` name prefix or name their targets by a fully qualified
+string, because a rename or a move would have made either one pass while checking nothing:
+
+- **"A bank class" is the bank domain**: the classes listed by class literal in
+  `ArchitectureTest.BANK_CLASSES` (the `Bank*` classes and the bank request records whose names do
+  not start with `Bank`), the classes nested in them, MapStruct's implementations of the bank
+  mappers, and every class of a `bank` module package once the bank has one.
+  `everyBankNamedClassIsClassified` puts every class named after the bank either into that list or
+  into the reviewed org-unit side (`ORG_UNIT_BANK_SIDE`), so a new one cannot slip past.
+- **`OwnerScopeService` and `OrgUnitBankAccessService` are class literals**, and each pin asserts a
+  selection floor, so a shrinking selection fails the build.
+- **The containment pin is stricter**: a bridge is any class that depends on `OwnerScopeService`
+  and on *any* bank-domain class, not only on `BankAccountRepository`. The bridge set is unchanged —
+  exactly `OrgUnitBankAccessService`.
+- What keeps the seam out of the org-unit-blindness pin is now its absence from `BANK_CLASSES` (and
+  its place in `ORG_UNIT_BANK_SIDE`), not its name. The non-`Bank*` name stays as a readable signal.

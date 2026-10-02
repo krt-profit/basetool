@@ -333,7 +333,9 @@ domain's rules through its repository, and a second write path into an aggregate
 stock book-in; the job-order production book-in that APPSEC-01 of the September audit caught
 writing into foreign stock) is found by review or not at all. Many security gates are
 keyed on package names, class names or paths, so a refactor could disarm them without failing a
-build.
+build. The backend ArchUnit rules no longer are (re-keyed by role and class literal with selection
+floors, 2026-10-02, REQ-SEC-073); SpEL bean names, path lists and the other name-keyed controls are
+the plan's remaining guards.
 
 **Closing it** is the [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md): package per
 domain with a published API, Spring Modulith and a frozen ArchUnit baseline in test scope, guards
