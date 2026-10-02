@@ -20,9 +20,9 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-072** (corrected 2026-09-25: this note still said
-> REQ-SEC-070 after REQ-SEC-070 had been allocated below) — re-check `origin/main` and open PRs before
-> claiming it. Requirements are grouped by subject, not strictly by number.
+> allocated. The next free id is **REQ-SEC-077** (corrected 2026-10-02: this note still said
+> REQ-SEC-072 after REQ-SEC-072 had been allocated, and REQ-SEC-073…076 went to the Phase 0 guard
+> packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
 
@@ -118,6 +118,46 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
   the identical `hasAnyRole('ADMIN','OFFICER')` splice across the promotion/rank/evaluation surface
   now reference one pre-built compile-time-constant expression, `Roles.ADMIN_OR_OFFICER` /
   `frontend.support.Roles.ADMIN_OR_OFFICER`, instead of repeating the splice per call site.
+
+### REQ-SEC-074 — Who may call an operation is pinned in one reviewed file
+
+The gate of a backend operation can live in a `SecurityConfig` URL rule, a controller
+`@PreAuthorize` and a service `@PreAuthorize`; a move or re-cut can drop any of them while every
+other test stays green. The **authorization matrix**
+[`backend/src/test/resources/api/authorization-matrix.txt`](../../backend/src/test/resources/api/authorization-matrix.txt)
+pins all three, and a change to it is a reviewed change.
+
+- **`[operations]`** — one line per handler mapping, verb and path pattern:
+  `VERB PATH | Handler#method | pre=<expr> | url=<matcher> -> <rule>`. `pre` is the effective
+  `@PreAuthorize` (the method's, else the class's, else `none`; a `@PostAuthorize` is appended as
+  `post=`). `url` is the `authorizeHttpRequests` entry that decides the request, **read from the
+  running filter chain**: the `AuthorizationFilter`'s `RequestMatcherDelegatingAuthorizationManager`
+  is evaluated against a mock request for the verb and the path (variables filled with `x`), first
+  match winning exactly as Spring Security decides; `unmatched -> denyAll` when nothing matches. A
+  mapping that declares no verb is listed once per `GET POST PUT PATCH DELETE`.
+- **`[service-gates]`** — one line per `@PreAuthorize` / `@PostAuthorize` method of a
+  non-controller application bean, `Class#method(arity) | pre=<expr>`, or `Class#*` for a
+  class-level gate.
+- **Stable across a move.** Handlers and beans are named by their simple class name, lines sort by
+  path, verb and handler, the file is UTF-8 with LF line endings (pinned in `.gitattributes`). A
+  package move therefore leaves the file byte-identical; any diff is a gate that changed.
+- **Regenerating.** After reviewing a diff, `./gradlew :backend:test --tests '*AuthorizationMatrixTest'
+  -Dauthz.matrix.update=true` rewrites the file (the build forwards the property to the test JVM);
+  the new file is committed with the change that caused it.
+
+**Acceptance**
+
+- [x] Every handler mapping (580 lines on 2026-10-02) and every service-level gate (18) appears;
+  fewer fails the test as an emptied selection.
+- [x] A changed annotation, a reordered or removed URL rule or a dropped service gate changes a line,
+  and the test names the removed and the added line.
+- [x] A URL-rule form the renderer does not know fails instead of printing an object identity.
+
+**Enforced by:** `AuthorizationMatrixTest` (against the golden file) ·
+`AuthorizationMatrixRenderingTest` (proves the matrix can fail: fixture annotations, reordered
+fixture rules, an unknown manager) · **Code:** test-only, `AuthorizationMatrix` ·
+**Related:** REQ-SEC-002, REQ-SEC-003, REQ-SEC-052, plan guard G-02
+([`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §6.1)
 
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 

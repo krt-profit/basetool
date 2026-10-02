@@ -8,7 +8,10 @@ findable from one place, not to restate them.
 Keycloak is the only identity provider; the applications never handle a credential. The backend is
 an OAuth2 **resource server**, the frontend an OAuth2 **client**. Authorisation is centralised on
 `@PreAuthorize` so the permission model can be read off the code, and ArchUnit tests enforce the
-invariants that keep it that way.
+invariants that keep it that way. Where a gate can still live in more than one place — a
+`SecurityConfig` URL rule, a controller annotation, a service annotation — the backend's
+authorization matrix pins all three for every operation in one reviewed file, so a move that drops
+one shows up as a diff (REQ-SEC-074).
 
 Beyond roles there are three mechanisms that are easy to miss:
 

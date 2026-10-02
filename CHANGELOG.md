@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
+  Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
+  Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
+
 ### Fixed
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
