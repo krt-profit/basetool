@@ -147,7 +147,7 @@ pins all three, and a change to it is a reviewed change.
 
 **Acceptance**
 
-- [x] Every handler mapping (580 lines on 2026-10-02) and every service-level gate (18) appears;
+- [x] Every handler mapping (581 lines on 2026-10-02) and every service-level gate (18) appears;
   fewer fails the test as an emptied selection.
 - [x] A changed annotation, a reordered or removed URL rule or a dropped service gate changes a line,
   and the test names the removed and the added line.

@@ -58,7 +58,7 @@ class AuthorizationMatrixTest {
   private static final String UPDATE_PROPERTY = "authz.matrix.update";
 
   /** Handler mappings on 2026-10-02; fewer means the selection lost operations. */
-  private static final int OPERATION_FLOOR = 580;
+  private static final int OPERATION_FLOOR = 581;
 
   /** Service-level gates on 2026-10-02; fewer means the selection lost gates. */
   private static final int SERVICE_GATE_FLOOR = 18;
