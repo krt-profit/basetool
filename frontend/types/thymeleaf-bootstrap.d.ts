@@ -85,6 +85,8 @@ declare const umbuchenI18n: KrtI18nDict;
 declare const INV_ADD_MSG: KrtI18nDict;
 /** The check-in order picker's need labels (REQ-INV-039), declared in inventory-input.html. */
 declare const INV_ORDER_NEED_MSG: KrtI18nDict;
+/** The check-in owner picker's placeholder and per-kind group labels, declared in inventory-input.html. */
+declare const INV_OWNER_PICKER_MSG: KrtI18nDict;
 
 /** Injected by the page bootstrap (declared in inventory-input.html). */
 declare const MSG_UNIT_PIECE: string;

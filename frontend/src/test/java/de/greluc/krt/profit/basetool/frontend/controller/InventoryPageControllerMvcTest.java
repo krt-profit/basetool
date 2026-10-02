@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.matchesRegex;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.stringContainsInOrder;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryMergeCandidatesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderGameItemNeedDto;
@@ -49,6 +51,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionAllocationDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -1190,6 +1193,176 @@ class InventoryPageControllerMvcTest {
             jsonPath("$.materials['" + orderId + "'][0].materialId").value(materialId.toString()))
         .andExpect(jsonPath("$.materials['" + needlessOrderId + "']").doesNotExist())
         .andExpect(jsonPath("$.gameItems").exists());
+  }
+
+  /**
+   * Stubs the Einbuchen form's reads with the given owner-picker options; every other list read
+   * answers empty.
+   *
+   * @param ownerOptions the caller's pickable org units
+   */
+  private void stubInputPageWithOwnerOptions(List<OrgUnitMembershipOptionDto> ownerOptions) {
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              return url.contains("pickable-org-units") ? ownerOptions : Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+  }
+
+  /**
+   * The owner picker preselects the active org unit of the sidebar when it is one of its options,
+   * and then offers no empty choice (REQ-ORG-023).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_ShouldPreselectTheActiveOrgUnitInTheOwnerPicker() throws Exception {
+    UUID staffel = UUID.randomUUID();
+    UUID sk = UUID.randomUUID();
+    stubInputPageWithOwnerOptions(
+        List.of(
+            new OrgUnitMembershipOptionDto(staffel, "IRIDIUM", "IRI", "SQUADRON", true),
+            new OrgUnitMembershipOptionDto(sk, "Bergbau", "BB", "SPECIAL_COMMAND", true)));
+
+    mockMvc
+        .perform(
+            get("/inventory/input")
+                .sessionAttr(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY, sk.toString()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("selected=\"selected\">Bergbau</option>")))
+        .andExpect(content().string(not(containsString("selected=\"selected\">IRIDIUM"))))
+        .andExpect(content().string(containsString("value=\"" + staffel + "\">IRIDIUM</option>")))
+        .andExpect(
+            content()
+                .string(
+                    matchesRegex(
+                        "(?s).*<select id=\"owningOrgUnitId\""
+                            + " name=\"owningOrgUnitId\">\\s*<optgroup.*")))
+        .andExpect(
+            content()
+                .string(
+                    containsString("<select id=\"owningOrgUnitId\" name=\"owningOrgUnitId\">")));
+  }
+
+  /**
+   * Without an active org unit among the options, the owner picker asks for a choice and preselects
+   * nothing (REQ-ORG-023).
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void viewInputPage_ShouldAskForAnOwnerChoiceWithoutAnActiveOrgUnit() throws Exception {
+    stubInputPageWithOwnerOptions(
+        List.of(
+            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON", true),
+            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Bergbau", "BB", "SQUADRON", true)));
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(containsString("<select id=\"owningOrgUnitId\" name=\"owningOrgUnitId\">")))
+        .andExpect(
+            content()
+                .string(
+                    matchesRegex(
+                        "(?s).*<select id=\"owningOrgUnitId\" name=\"owningOrgUnitId\">\\s*"
+                            + "<option value=\"\">-- Bitte wählen --</option>.*")))
+        .andExpect(content().string(not(containsString("selected=\"selected\""))));
+  }
+
+  /**
+   * On the on-behalf form the owner picker is rendered even with a single option, hidden and not
+   * required, so the script can refill it with the chosen member's units.
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void viewInputPage_ShouldKeepAHiddenOwnerPickerOnTheOnBehalfForm() throws Exception {
+    stubInputPageWithOwnerOptions(
+        List.of(
+            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON", true)));
+
+    mockMvc
+        .perform(get("/inventory/input").param("source", "admin"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("form-group owner-picker krtm-hidden")))
+        .andExpect(
+            content()
+                .string(
+                    containsString("<select id=\"owningOrgUnitId\" name=\"owningOrgUnitId\">")));
+
+    mockMvc
+        .perform(get("/inventory/input").param("source", "my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("id=\"owningOrgUnitId\""))));
+  }
+
+  /**
+   * The AJAX-only {@code /inventory/merge-candidates} relay forwards the whole stock identity to
+   * the backend probe and answers its verdict (REQ-INV-026).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void mergeCandidatesAjax_ShouldRelayTheIdentityAndAnswerTheVerdict() throws Exception {
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    List<String> probedUrls = new java.util.ArrayList<>();
+    when(backendApiClient.get(anyString(), eq(InventoryMergeCandidatesDto.class)))
+        .thenAnswer(
+            invocation -> {
+              probedUrls.add(invocation.getArgument(0));
+              return new InventoryMergeCandidatesDto(true);
+            });
+
+    mockMvc
+        .perform(
+            get("/inventory/merge-candidates")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .param("materialId", materialId.toString())
+                .param("locationId", locationId.toString())
+                .param("quality", "640")
+                .param("personal", "false")
+                .param("stolen", "false")
+                .param("owningOrgUnitId", unitId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exists").value(true));
+
+    assertThat(probedUrls)
+        .singleElement()
+        .satisfies(
+            url ->
+                assertThat(url)
+                    .startsWith("/api/v1/inventory/merge-candidates?")
+                    .contains("materialId=" + materialId)
+                    .contains("locationId=" + locationId)
+                    .contains("quality=640")
+                    .contains("personal=false")
+                    .contains("stolen=false")
+                    .contains("owningOrgUnitId=" + unitId)
+                    .doesNotContain("userId="));
+  }
+
+  /**
+   * A failed probe answers {@code 502}, so the form falls back to offering the opt-in rather than
+   * hiding it on a guess (REQ-INV-026).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void mergeCandidatesAjax_ShouldAnswerBadGatewayWhenTheBackendFails() throws Exception {
+    when(backendApiClient.get(anyString(), eq(InventoryMergeCandidatesDto.class)))
+        .thenThrow(new IllegalStateException("backend down"));
+
+    mockMvc
+        .perform(
+            get("/inventory/merge-candidates")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .param("materialId", UUID.randomUUID().toString())
+                .param("locationId", UUID.randomUUID().toString())
+                .param("quality", "500"))
+        .andExpect(status().isBadGateway());
   }
 
   /**

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG */
+/* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
 
 document.addEventListener('DOMContentLoaded', function () {
     const matSelect = document.getElementById('materialId');
@@ -42,6 +42,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const qualityInput = document.getElementById('quality');
     if (qualityInput) {
         qualityInput.addEventListener('input', relabelOrderOptions);
+        qualityInput.addEventListener('input', scheduleMergeProbe);
+    }
+
+    ['locationId', 'owningOrgUnitId', 'personal', 'stolen'].forEach(function (id) {
+        const field = document.getElementById(id);
+        if (field) field.addEventListener('change', scheduleMergeProbe);
+    });
+
+    captureOwnOwnerOptions();
+    const userSelect = document.getElementById('userId');
+    if (userSelect) {
+        userSelect.addEventListener('change', reloadOwnerPickerForUser);
     }
 
     const personalToggle = document.getElementById('personal');
@@ -202,16 +214,234 @@ function updateAmountFieldForMaterial(selectElement) {
     updateMergeOptIn(qtType);
 }
 
+let mergeOptInQuantityType = '';
+let mergeProbeTimer = 0;
+let mergeProbeSequence = 0;
+
 function updateMergeOptIn(qtType) {
+    mergeOptInQuantityType = qtType;
+    scheduleMergeProbe();
+}
+
+function setMergeOptInVisible(visible) {
     const mergeRow = document.getElementById('merge-stock-row');
     const mergeCheckbox = document.getElementById('mergeStock');
     if (!mergeRow) return;
-    if (qtType === 'SCU') {
-        mergeRow.classList.remove('krtm-hidden');
-    } else {
-        mergeRow.classList.add('krtm-hidden');
-        if (mergeCheckbox) mergeCheckbox.checked = false;
+    mergeRow.classList.toggle('krtm-hidden', !visible);
+    if (!visible && mergeCheckbox) mergeCheckbox.checked = false;
+}
+
+function fieldValue(id) {
+    const el = document.getElementById(id);
+    return el && !el.disabled ? String(el.value || '').trim() : '';
+}
+
+function fieldChecked(id) {
+    const el = document.getElementById(id);
+    return !!(el && el.checked);
+}
+
+function mergeProbeQuery() {
+    if (currentCatalogMode() !== 'material' || mergeOptInQuantityType !== 'SCU') return null;
+    const materialId = fieldValue('materialId');
+    const locationId = fieldValue('locationId');
+    const quality = fieldValue('quality');
+    if (!materialId || !locationId || !/^\d+$/.test(quality)) return null;
+    const params = new URLSearchParams({
+        materialId,
+        locationId,
+        quality,
+        personal: String(fieldChecked('personal')),
+        stolen: String(fieldChecked('stolen')),
+    });
+    const userId = fieldValue('userId');
+    if (userId) params.set('userId', userId);
+    const owningOrgUnitId = fieldValue('owningOrgUnitId');
+    if (owningOrgUnitId) params.set('owningOrgUnitId', owningOrgUnitId);
+    return params.toString();
+}
+
+function scheduleMergeProbe() {
+    window.clearTimeout(mergeProbeTimer);
+    const query = mergeProbeQuery();
+    const sequence = ++mergeProbeSequence;
+    if (query === null) {
+        setMergeOptInVisible(false);
+        return;
     }
+    mergeProbeTimer = window.setTimeout(function () {
+        fetch('/inventory/merge-candidates?' + query, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        })
+            .then(function (response) {
+                return response.ok ? response.json() : { exists: true };
+            })
+            .then(function (answer) {
+                if (sequence !== mergeProbeSequence) return;
+                setMergeOptInVisible(!!(answer && answer.exists));
+            })
+            .catch(function () {
+                if (sequence === mergeProbeSequence) setMergeOptInVisible(true);
+            });
+    }, 250);
+}
+
+const OWNER_KIND_ORDER = ['ORGANISATIONSLEITUNG', 'BEREICH', 'SQUADRON', 'SPECIAL_COMMAND'];
+let ownOwnerOptions = null;
+let ownerReloadSequence = 0;
+
+function ownerPickerParts() {
+    const select = document.getElementById('owningOrgUnitId');
+    const wrapper = select ? select.closest('.owner-picker') : null;
+    return select && wrapper ? { select, wrapper } : null;
+}
+
+function captureOwnOwnerOptions() {
+    const parts = ownerPickerParts();
+    if (!parts) return;
+    ownOwnerOptions = {
+        nodes: Array.prototype.map.call(parts.select.childNodes, function (node) {
+            return node.cloneNode(true);
+        }),
+        value: parts.select.value,
+        visible: !parts.wrapper.classList.contains('krtm-hidden'),
+        required: parts.select.required,
+    };
+}
+
+function restoreOwnOwnerOptions() {
+    const parts = ownerPickerParts();
+    if (!parts || !ownOwnerOptions) return;
+    parts.select.replaceChildren.apply(
+        parts.select,
+        ownOwnerOptions.nodes.map(function (node) {
+            return node.cloneNode(true);
+        }),
+    );
+    parts.select.value = ownOwnerOptions.value;
+    parts.select.required = ownOwnerOptions.required;
+    parts.wrapper.classList.toggle('krtm-hidden', !ownOwnerOptions.visible);
+}
+
+function ownerOption(membership, selectedId) {
+    const option = document.createElement('option');
+    option.value = membership.orgUnitId;
+    option.textContent = membership.orgUnitName || membership.orgUnitId;
+    option.selected = membership.orgUnitId === selectedId;
+    return option;
+}
+
+function renderOwnerOptions(memberships) {
+    const parts = ownerPickerParts();
+    if (!parts) return;
+    const list = Array.isArray(memberships)
+        ? memberships.filter(function (m) {
+              return m && m.orgUnitId;
+          })
+        : [];
+    const activeId = parts.wrapper.getAttribute('data-owner-picker-active') || '';
+    const preset =
+        list.length === 1
+            ? list[0].orgUnitId
+            : list.some(function (m) {
+                    return m.orgUnitId === activeId;
+                })
+              ? activeId
+              : '';
+    const select = parts.select;
+    select.replaceChildren();
+    if (!preset) {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = INV_OWNER_PICKER_MSG.placeholder;
+        select.appendChild(placeholder);
+    }
+    const kinds = OWNER_KIND_ORDER.filter(function (kind) {
+        return list.some(function (m) {
+            return m.kind === kind;
+        });
+    });
+    const grouped = kinds.length > 1;
+    OWNER_KIND_ORDER.forEach(function (kind) {
+        const ofKind = list.filter(function (m) {
+            return m.kind === kind;
+        });
+        if (!ofKind.length) return;
+        let parent = select;
+        if (grouped) {
+            const group = document.createElement('optgroup');
+            group.label = INV_OWNER_PICKER_MSG[kind] || kind;
+            select.appendChild(group);
+            parent = group;
+        }
+        ofKind.forEach(function (m) {
+            parent.appendChild(ownerOption(m, preset));
+        });
+    });
+    list.filter(function (m) {
+        return OWNER_KIND_ORDER.indexOf(m.kind) < 0;
+    }).forEach(function (m) {
+        select.appendChild(ownerOption(m, preset));
+    });
+    select.value = preset;
+    const visible = list.length > 1;
+    select.required = visible && !preset;
+    parts.wrapper.classList.toggle('krtm-hidden', !visible);
+}
+
+function reloadOwnerPickerForUser() {
+    const sequence = ++ownerReloadSequence;
+    const userId = fieldValue('userId');
+    if (!ownerPickerParts()) {
+        scheduleMergeProbe();
+        return;
+    }
+    if (!userId) {
+        restoreOwnOwnerOptions();
+        scheduleMergeProbe();
+        return;
+    }
+    fetch('/users/' + encodeURIComponent(userId) + '/memberships?allKinds=true', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+    })
+        .then(function (response) {
+            return response.ok ? response.json() : [];
+        })
+        .catch(function () {
+            return [];
+        })
+        .then(function (memberships) {
+            if (sequence !== ownerReloadSequence) return;
+            renderOwnerOptions(memberships);
+            scheduleMergeProbe();
+        });
+}
+
+function blankAmountRows(dimension) {
+    const targeted = allocTargetedRows(dimension);
+    if (targeted.length < 2) return [];
+    return targeted
+        .map(function (select) {
+            const row = select.closest('[data-alloc-row]');
+            return row ? row.querySelector('[data-alloc-amount]') : null;
+        })
+        .filter(function (input) {
+            return !!input && String(input.value || '').trim() === '';
+        });
+}
+
+function markBlankAllocationAmounts() {
+    const blank = blankAmountRows('jobOrder').concat(blankAmountRows('mission'));
+    document.querySelectorAll('[data-alloc-amount]').forEach(function (input) {
+        if (blank.indexOf(input) >= 0) {
+            input.setAttribute('aria-invalid', 'true');
+        } else {
+            input.removeAttribute('aria-invalid');
+        }
+    });
+    const hint = document.getElementById('inputAllocAmountMissing');
+    if (hint) hint.classList.toggle('krtm-hidden', blank.length === 0);
+    return blank;
 }
 
 function allocConfig(dimension) {
@@ -427,6 +657,7 @@ function allocDimensionSum(dimension) {
 function updateAllocOver() {
     updateAllocSingleHint('jobOrder');
     updateAllocSingleHint('mission');
+    markBlankAllocationAmounts();
     const overEl = document.getElementById('inputAllocOver');
     if (!overEl) return;
     const amountEl = document.getElementById('amount');
@@ -461,6 +692,13 @@ function syncPersonalAllocations() {
     if (!form) return;
     form.addEventListener('submit', function (event) {
         event.preventDefault();
+        const blank = markBlankAllocationAmounts();
+        if (blank.length) {
+            if (window.showFrontendErrorToast)
+                window.showFrontendErrorToast(INV_ADD_MSG.allocAmountMissing);
+            blank[0].focus();
+            return;
+        }
         window.krtFetch.submitForm({
             form,
             submitter: form.querySelector('button[type="submit"]'),
@@ -475,6 +713,8 @@ function syncPersonalAllocations() {
                 if (ownerRequired) msg = ownerRequired;
                 else if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT')
                     msg = INV_ADD_MSG.personalAssignment;
+                else if (problem && problem.code === 'INVENTORY_ALLOCATION_AMOUNT_MISSING')
+                    msg = INV_ADD_MSG.allocAmountMissing;
                 else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
                 else if (problem && problem.detail) msg = problem.detail;
                 if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);

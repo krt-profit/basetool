@@ -142,6 +142,7 @@ public final class FrontendPageRoutes {
           "/catalog/location-search",
           "/catalog/material-search",
           "/inventory/item-search",
+          "/inventory/merge-candidates",
           "/inventory/my/entry-ids",
           "/inventory/order-needs",
           "/materialboerse/offerable-products",

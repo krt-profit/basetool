@@ -796,8 +796,28 @@ client renders its own localized wording from that code. Concretely for this one
 > required on a leader with one membership would refuse a submit the backend would have accepted. So
 > the form still lets the member submit, and the rejection now tells them what to do.
 
+**What the picker shows.** It names no outcome it cannot promise. When the active org unit of the
+sidebar (`activeSquadronId`) is one of its options and nothing else is selected, that unit is
+**preselected** and the empty choice is left out, so the stamp is the unit the sidebar shows.
+Otherwise the empty choice reads „-- Bitte wählen --" / „-- Please choose --". *Amended 2026-10-02 by
+the owner: the empty choice read „-- Heimat-Staffel beibehalten --", although an empty pick resolves
+to the only direct membership or the pin, and is refused otherwise.* The rule lives in the shared
+`fragments/owner-picker.html` and so holds on all five surfaces.
+
+On the **on-behalf book-in** (`/inventory/input?source=admin`) the picker follows the member being
+booked for: it is rendered even with one option (hidden), and choosing a member refills it from
+`GET /users/{id}/memberships?allKinds=true` — that member's **direct** memberships, which is exactly
+the set the backend stamps from. Because the set is the direct one, the client may require a choice
+there: with several memberships and the active unit not among them, the picker is shown and
+required; with one it is hidden and preselected; with none it is hidden and empty. Choosing the own
+entry again restores the caller's options.
+
 **Acceptance**
 
+- [ ] With the active org unit among the options, the picker preselects it and offers no empty
+  choice; without it, the empty choice reads „Bitte wählen".
+- [ ] On the on-behalf book-in, choosing a member replaces the options with that member's direct
+  memberships and requires a pick when there are several and none is preselected.
 - [ ] A member of more than one org unit who submits a picker form with no choice and no pin gets a
   `400` whose problem `code` is `OWNER_ORG_UNIT_REQUIRED`, from **both** stamping entry points.
 - [ ] The member sees a localized instruction naming the control, in DE and EN — never the backend's
@@ -807,7 +827,9 @@ client renders its own localized wording from that code. Concretely for this one
 - [ ] A page-local `onError` handler renders the same wording as the central path.
 
 **Enforced by:** `OrgUnitStampingServiceOwnerRequiredTest` (both entry points, the status, and the
-pinned negative) · **Code:** `OrgUnitStampingService#resolveStampedOrgUnit` /
+pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidden on-behalf picker),
+`InventoryOperationsE2eTest#onBehalfOwnerPickerFollowsTheChosenMember` · **Code:**
+`fragments/owner-picker.html`, `inventory-input.js`, `OrgUnitStampingService#resolveStampedOrgUnit` /
 `#resolveSquadronForPickerOutput`, `OwnerOrgUnitRequiredException`, `AppExceptionKind`,
 `krt-fetch.js#ownerOrgUnitRequiredMessage`, `fragments/head.html` ·
 **Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `CLAUDE.md`
