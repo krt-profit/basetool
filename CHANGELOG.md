@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
+  Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
+  Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
+  (REQ-MOD-001…005).
+
 ### Changed
 
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum

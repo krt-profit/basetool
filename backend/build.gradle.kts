@@ -72,6 +72,8 @@ dependencies {
   testImplementation(libs.testcontainers.junit)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.archunit.core)
+  testImplementation(libs.spring.modulith.core)
+  testImplementation(libs.spring.modulith.docs)
   testImplementation(libs.okhttp3.mockwebserver)
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
