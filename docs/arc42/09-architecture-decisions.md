@@ -3,8 +3,8 @@
 ## 9.1 How decisions are recorded
 
 Every architecturally significant decision is an **ADR** in [`docs/adr/`](../adr/README.md), written
-before or with the change that implements it. There are **229** of them (ADR-0001 to ADR-0229,
-as of 2026-09-28). They are numbered
+before or with the change that implements it. There are **239** of them (ADR-0001 to ADR-0239,
+as of 2026-10-02). They are numbered
 sequentially, carry a status, and are amended in place with a dated `## Amendment N` section rather
 than silently rewritten — a vault or a decision log that edits its own history teaches its readers
 not to trust it.
@@ -42,6 +42,8 @@ other decision in context.
 | **0196** | A rootless host aliases its own public names to the container gateway | A container cannot reach the host through its public address, so the names it dials resolve to `host-gateway`; what that costs the external probes is §11.5a. |
 | **0197** | Shipped dependencies pass a GPL-compatible licence gate and are listed on a public page | The build refuses a library it may not redistribute under GPL-3.0-only — AspectJ was excluded for exactly that — and the footer's „Open-Source-Lizenzen“ page is generated from the same reports. |
 | **0192 / 0193** | Lombok and the JetBrains annotations everywhere; one logging facade, enforced | Style rules turned into compile errors and CI gates, so they stop depending on review attention. |
+| **0231 / 0232 / 0233** | The backend becomes a modular monolith; modules interact through commands, observers and after-commit events; ArchUnit and Spring Modulith enforce the boundaries | The target every backend change now moves towards (§8.14, §11.9): a package per domain with a published API, audit always in the business transaction, and a frozen module baseline that may only shrink. Decided 2026-09-29; being built. |
+| **0234** | The API is re-cut by hard cut, with a forced app update and a release-bound floor | No `/api/v2` beside `/api/v1`: contract tiers decide what may break, a declared-break ledger and the app's call list say what does, and the minimum app version rides the release. |
 
 ## 9.3 Where a decision is *not* an ADR
 
