@@ -400,7 +400,14 @@ rows fold. The merge key includes the „gestohlen" marker (REQ-INV-053), so sto
 stock never merge. The refinery store does not merge. An `SCU` write without the opt-in stays
 append-only (REQ-INV-001); the single-row modals offer the opt-in checkbox only on `SCU` rows (a
 `PIECE` row always merges, so no choice is shown), while the bulk modal always offers it because a
-selection can mix both.
+selection can mix both. The **Einbuchen** form narrows it further: it shows the checkbox only when a
+row to merge with exists, asking `GET /api/v1/inventory/merge-candidates` (relayed by the frontend as
+`GET /inventory/merge-candidates`) with the form's owner, material, location, quality, `personal`,
+`stolen` and picked org unit each time one of them changes. The probe resolves the owning org unit
+exactly as the create does (auto-stamp, active-context pin), counts with the merge key and offer
+exclusion below, takes no lock, answers `false` where the booking itself would be refused, and
+needs the on-behalf scope of REQ-SEC-005 to probe another member. Hiding the checkbox unticks it; a
+probe that fails shows it, so the opt-in is never lost to an outage.
 
 The **merge identity** is the **physical** stack key (Variante C, REQ-INV-027): owner · material ·
 location · quality · `personal` · owning org-unit pool (a `NULL` pool matches `NULL`) · `stolen`;
@@ -446,6 +453,8 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 - [ ] An `SCU` write merges only when the per-action opt-in is set; without it the row stays separate
   (append-only). In the single-row Einbuchen / Umbuchen modals the opt-in checkbox renders only for
   `SCU` materials.
+- [ ] The Einbuchen form shows the opt-in only while a mergeable row with the form's resolved stock
+  identity exists, and unticks it when it hides it.
 - [ ] A row backing a Materialbörse offer is never merged (neither survivor nor folded), and the
   offered quantity is unchanged by any merge.
 - [ ] Two concurrent same-stack writers do not double-count or lose stock (the `FOR UPDATE` group
@@ -456,8 +465,11 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
   lists it.
 
 **Enforced by:** `InventoryStockMergeTest`, `InventoryItemServiceTest`,
-`InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest` · **Code:**
-`InventoryCheckoutService#mergeStockIfRequested`, `InventoryItemRepository#findMergeGroupForUpdate`,
+`InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest`,
+`InventoryMergeProbeTest`, `InventoryMergeGroupDataTest`, `InventoryPageControllerMvcTest` ·
+**Code:** `InventoryCheckoutService#mergeStockIfRequested`,
+`InventoryItemRepository#findMergeGroupForUpdate`, `InventoryItemService#hasMergeCandidates`,
+`InventoryItemRepository#countMergeCandidates`,
 `MaterialExchangeOfferRepository#existsByInventoryItemId`, `InventoryItemService`,
 `V216__merge_piece_inventory_rows.sql`, `inventory-input.html` / `inventory-input.js`,
 `inventory-my.html` / `inventory-my.js`, `inventory-admin.html` / `inventory-admin.js`
@@ -538,7 +550,12 @@ the form to the create payload (the backend allocation input keeps its `@NotNull
 the API contract is unchanged), applies to both dimensions independently, and counts as an
 assignment for the "a personal entry carries no earmark" rule. It deliberately does **not** extend to
 several targets: with two or more target rows there is no unambiguous split, so every amount must be
-entered and a blank row is dropped as before. An explicitly entered amount always wins over the
+entered. A targeted row left blank is **refused, not dropped**: the form marks the row and does not
+submit, and the frontend write controller answers `422` with code
+`INVENTORY_ALLOCATION_AMOUNT_MISSING` (classic path: a field error) without calling the backend.
+*Amended 2026-10-02 by the owner: the blank row used to be dropped silently, so a member who named
+two orders and typed one amount earmarked only that one without being told.* An explicitly entered
+amount always wins over the
 shorthand, and a not-yet-picked row (no target) is neither counted as a target nor sent. The create
 form states the rule as a per-dimension hint and hides that hint as soon as a second target is named.
 
@@ -637,8 +654,9 @@ there is no separate income-attribution input.
   entry when nothing is deducted from a mission earmark.
 - [ ] Each allocation add / change / remove records the matching `INVENTORY_ALLOCATION_*` audit event.
 - [ ] A book-in naming exactly one order / mission with a blank amount earmarks the entry's full
-  amount to it (per dimension); with two or more targets a blank row is dropped, an explicit amount
-  always wins, and a blank-amount row still trips the personal-entry rejection.
+  amount to it (per dimension); with two or more targets a blank row is refused with `422`
+  `INVENTORY_ALLOCATION_AMOUNT_MISSING` and the form does not submit, an explicit amount always
+  wins, and a blank-amount row still trips the personal-entry rejection.
 
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
 `InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,

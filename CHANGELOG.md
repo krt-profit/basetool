@@ -8,6 +8,24 @@
   Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
   Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
 
+### Changed
+
+- **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
+  Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob
+  dasselbe Material in derselben Qualität am selben Ort mit demselben Besitzer und derselben Einheit schon
+  liegt; sonst bleibt die Zeile weg. Der Hilfetext nennt die Merge-Kriterien jetzt richtig.
+
+- **„Zuordnen zu" wählt die aktive Org-Einheit vor.** Ist die Einheit aus der Sidebar unter den Optionen,
+  steht sie schon ausgewählt (Lager, Hangar, Einsatz, Operation, Raffinerie); sonst heißt die leere
+  Auswahl „Bitte wählen" statt des irreführenden „Heimat-Staffel beibehalten".
+
+- **Einbuchen für ein anderes Mitglied: „Zuordnen zu" zeigt dessen Einheiten.** Wer im Globalen Lager
+  einen Nutzer wählt, bekommt dessen Org-Einheiten angeboten statt der eigenen.
+
+- **Einbuchen: mehrere Zuordnungen brauchen jede eine Menge.** Eine Auftrags- oder Einsatzzeile ohne Menge
+  wurde bisher stillschweigend verworfen; jetzt markiert das Formular sie und bucht erst, wenn sie ausgefüllt
+  ist.
+
 ### Fixed
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`

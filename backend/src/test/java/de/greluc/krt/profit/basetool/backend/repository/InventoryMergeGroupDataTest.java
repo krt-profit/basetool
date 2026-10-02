@@ -216,6 +216,46 @@ class InventoryMergeGroupDataTest {
     assertThat(group).extracting(InventoryItem::getId).containsExactly(shared.getId());
   }
 
+  @Test
+  void countMergeCandidates_countsTheSameRowsTheMergeGroupWouldFold() {
+    persistRow(5.0, QUALITY, false, orgUnit);
+    persistRow(3.0, QUALITY, false, orgUnit);
+    persistRow(2.0, QUALITY, false, null);
+    persistRow(1.0, QUALITY - 100, false, orgUnit);
+    persistRow(1.0, QUALITY, true, orgUnit);
+    InventoryItem offerBacked = persistRow(4.0, QUALITY, false, orgUnit);
+    offerRepository.save(
+        MaterialExchangeOffer.builder()
+            .kind(MaterialExchangeOfferKind.MATERIAL)
+            .inventoryItem(offerBacked)
+            .owner(user)
+            .owningOrgUnit(orgUnit)
+            .offeredAmount(4.0)
+            .status(MaterialExchangeOfferStatus.ACTIVE)
+            .releasedAt(Instant.parse("2026-10-02T00:00:00Z"))
+            .build());
+    entityManager.flush();
+
+    assertThat(
+            inventoryItemRepository.countMergeCandidates(
+                user.getId(),
+                material.getId(),
+                location.getId(),
+                QUALITY,
+                false,
+                false,
+                orgUnit.getId()))
+        .isEqualTo(2L);
+    assertThat(
+            inventoryItemRepository.countMergeCandidates(
+                user.getId(), material.getId(), location.getId(), QUALITY, false, false, null))
+        .isEqualTo(1L);
+    assertThat(
+            inventoryItemRepository.countMergeCandidates(
+                user.getId(), material.getId(), location.getId(), QUALITY + 1, false, false, null))
+        .isZero();
+  }
+
   /**
    * Persists a bookable game item with the given display name (kind/source defaults apply).
    *
