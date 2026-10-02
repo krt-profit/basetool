@@ -1119,7 +1119,9 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
 ## 6. Screens (frontend)
 
 Every page below the public surface of §1 is behind the frontend's `anyRequest().authenticated()`
-and a class-level `@PreAuthorize`. The table names the **frontend** gate of each screen and how the
+and a `@PreAuthorize` on its handler or its class — every handler carries one except the nine of
+the public surface (REQ-FE-025, `RouteGateSnapshotTest`, whose committed snapshot lists each route's
+gate). The table names the **frontend** gate of each screen and how the
 navigation (`fragments/sidebar.html`) shows it; what the screen then *contains* is decided by the
 backend gates of §3. Page controllers live under `frontend/.../controller/`.
 
@@ -1142,7 +1144,7 @@ backend gates of §3. Page controllers live under `frontend/.../controller/`.
 | Bank-Dashboard, Bankverwaltung, Anträge (`/bank`, `/bank/manage`, `/bank/requests`, `/bank/accounts/{id}`, `/bank/holders/{id}`)    | `BANK_EMPLOYEE`                                                         | `BANK_EMPLOYEE`                                                                |
 | Berechtigungen (`/bank/grants`)                                                                                                      | `BANK_MANAGEMENT`                                                       | `BANK_MANAGEMENT`                                                              |
 | Mitgliederverwaltung (`/members/**`) and every `/admin/**` page — Spezialkommandos, Organisationsstruktur, Informationen, Nutzungsbedingungen, Missionsdaten, Orte, Materialien, Material-Aliase, Blueprints, Standard-Blueprints, UEX-Daten, P4K-Import, Bank-Administration, Audit-Logs, Systemeinstellungen, Notification rules, Sync-Berichte, Discord-Registrierungen, Löschanträge, Personensuche, Pers. Inventar/Blueprints (Admin) | `hasRole('ADMIN')`                                                      | `ADMIN` group                                                                  |
-| Schiffsdaten (`/ship-data`)                                                                                                          | page `isAuthenticated()` (catch-all only); every write `ADMIN`          | `ADMIN` group                                                                  |
+| Schiffsdaten (`/ship-data`)                                                                                                          | page `isAuthenticated()`; every write `ADMIN`                           | `ADMIN` group                                                                  |
 | Terms acceptance (`/terms/accept`), waiting page (`/pending-approval`)                                                               | `isAuthenticated()`; reached by redirect, not navigation                | —                                                                              |
 
 `/ship-data` is the one listed admin screen whose **read** is not admin-gated in the frontend: a

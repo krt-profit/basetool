@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Frontend: Routen, Rechte und Sitzungstypen sind gegen Verschiebungen gesichert.** Eine
+  committete Routen-/Rechte-Tabelle, eine Pflicht-`@PreAuthorize` pro Handler, die statische Prüfung
+  aller `T(…)`-Verweise und View-Namen in Templates und eine aus dem Code abgeleitete Liste der
+  Sitzungstypen lassen den Build scheitern, statt dass ein verschobener Controller oder ein Formular
+  still ein Recht oder Flash-Werte verliert (REQ-FE-025…027). Organigramm, Schiffsdaten und
+  „Ankündigung gelesen" tragen ihr `isAuthenticated()` jetzt selbst; das Verhalten ist unverändert.
+
 ### Fixed
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`

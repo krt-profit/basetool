@@ -1,0 +1,537 @@
+/ GET -> HomeController#home gate=none layout=yes
+/.well-known/assetlinks.json GET produces=[application/json] -> AssetLinksController#assetLinks gate=none layout=no
+/admin/announcement GET -> AdminAnnouncementPageController#showAnnouncementPage gate=class:hasRole('ADMIN') layout=yes
+/admin/announcement/delete POST -> AdminAnnouncementPageController#deleteAnnouncement gate=class:hasRole('ADMIN') layout=yes
+/admin/announcement/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#deleteAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/announcement/update POST -> AdminAnnouncementPageController#updateAnnouncement gate=class:hasRole('ADMIN') layout=yes
+/admin/announcement/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminAnnouncementPageController#updateAnnouncementAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/audit-log GET -> AdminAuditLogPageController#auditLog gate=class:hasRole('ADMIN') layout=yes
+/admin/bank GET -> AdminBankPageController#bankAdmin gate=class:hasRole('ADMIN') layout=yes
+/admin/bank-audit GET -> AdminBankPageController#bankAuditRedirect gate=class:hasRole('ADMIN') layout=yes
+/admin/bank/wipe-reset POST -> AdminBankPageController#wipeReset gate=class:hasRole('ADMIN') layout=yes
+/admin/bank/wipe-reset POST headers=[X-Requested-With=XMLHttpRequest] -> AdminBankPageController#wipeResetAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/blueprints GET -> AdminBlueprintsPageController#listBlueprints gate=class:hasRole('ADMIN') layout=yes
+/admin/default-blueprints GET -> AdminDefaultBlueprintsPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/default-blueprints GET params=[fragment=rows] -> AdminDefaultBlueprintsPageController#rows gate=class:hasRole('ADMIN') layout=yes
+/admin/default-blueprints/add POST -> AdminDefaultBlueprintsPageController#add gate=class:hasRole('ADMIN') layout=yes
+/admin/default-blueprints/add POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDefaultBlueprintsPageController#addAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/default-blueprints/search GET -> AdminDefaultBlueprintsPageController#search gate=class:hasRole('ADMIN') layout=yes
+/admin/default-blueprints/{id}/delete POST -> AdminDefaultBlueprintsPageController#remove gate=class:hasRole('ADMIN') layout=yes
+/admin/default-blueprints/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDefaultBlueprintsPageController#removeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/deletion-requests GET -> AdminDeletionRequestsPageController#page gate=method:hasRole('ADMIN') layout=yes
+/admin/deletion-requests GET params=[fragment=rows] -> AdminDeletionRequestsPageController#rows gate=method:hasRole('ADMIN') layout=yes
+/admin/deletion-requests/{id}/decline POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDeletionRequestsPageController#decline gate=method:hasRole('ADMIN') layout=yes
+/admin/deletion-requests/{id}/execute POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDeletionRequestsPageController#execute gate=method:hasRole('ADMIN') layout=yes
+/admin/discord-registrations GET -> AdminDiscordRegistrationsPageController#list gate=class:hasRole('ADMIN') layout=yes
+/admin/discord-registrations/{id}/approve POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDiscordRegistrationsPageController#approveAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/discord-registrations/{id}/link POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDiscordRegistrationsPageController#linkAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/discord-registrations/{id}/merge POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDiscordRegistrationsPageController#mergeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/discord-registrations/{id}/reject POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDiscordRegistrationsPageController#rejectAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/discord-registrations/{id}/reopen POST headers=[X-Requested-With=XMLHttpRequest] -> AdminDiscordRegistrationsPageController#reopenAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/exchange-clients GET -> AdminExchangeClientsPageController#page gate=class:hasRole('ADMIN') layout=yes
+/admin/exchange-clients POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#create gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/settings PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#updateSettings gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/undo-runs/{runId} GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#undoRun gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/{id} GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#get gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/{id} PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#update gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/{id}/activate POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#activate gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/{id}/suspend POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#suspend gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/{id}/undo POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#startUndo gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/{id}/undo/installations GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#undoInstallations gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/{id}/undo/preview POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#previewUndo gate=class:hasRole('ADMIN') layout=no
+/admin/locations GET -> AdminLocationsPageController#listData gate=class:hasRole('ADMIN') layout=yes
+/admin/locations/{id}/toggle-home-location POST -> AdminLocationsPageController#toggleHomeLocation gate=method:hasRole('ADMIN') layout=yes
+/admin/locations/{id}/toggle-home-location POST headers=[X-Requested-With=XMLHttpRequest] -> AdminLocationsPageController#toggleHomeLocationAjax gate=method:hasRole('ADMIN') layout=yes
+/admin/locations/{id}/toggle-visibility POST -> AdminLocationsPageController#toggleLocationVisibility gate=method:hasRole('ADMIN') layout=yes
+/admin/locations/{id}/toggle-visibility POST headers=[X-Requested-With=XMLHttpRequest] -> AdminLocationsPageController#toggleLocationVisibilityAjax gate=method:hasRole('ADMIN') layout=yes
+/admin/material-aliases GET -> AdminMaterialAliasesPageController#list gate=class:hasRole('ADMIN') layout=yes
+/admin/material-aliases POST -> AdminMaterialAliasesPageController#create gate=class:hasRole('ADMIN') layout=yes
+/admin/material-aliases POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialAliasesPageController#createAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/material-aliases/{id} GET -> AdminMaterialAliasesPageController#edit gate=class:hasRole('ADMIN') layout=yes
+/admin/material-aliases/{id} POST -> AdminMaterialAliasesPageController#update gate=class:hasRole('ADMIN') layout=yes
+/admin/material-aliases/{id} POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialAliasesPageController#updateAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/material-aliases/{id}/delete POST -> AdminMaterialAliasesPageController#delete gate=class:hasRole('ADMIN') layout=yes
+/admin/material-aliases/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialAliasesPageController#deleteAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/materials GET -> AdminMaterialsPageController#listMaterials gate=class:hasRole('ADMIN') layout=yes
+/admin/materials/ajax POST -> AdminMaterialsPageController#createMaterialAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/materials/categories POST -> AdminMaterialsPageController#createCategory gate=class:hasRole('ADMIN') layout=yes
+/admin/materials/categories POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialsPageController#createCategoryAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/materials/categories/{id}/delete POST -> AdminMaterialsPageController#deleteCategory gate=class:hasRole('ADMIN') layout=yes
+/admin/materials/categories/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialsPageController#deleteCategoryAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/materials/{id}/ajax PUT -> AdminMaterialsPageController#updateMaterialAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/members/{userId}/export/json GET -> DataExportProxyController#adminJson gate=method:hasRole('ADMIN') layout=no
+/admin/members/{userId}/export/pdf GET -> DataExportProxyController#adminPdf gate=method:hasRole('ADMIN') layout=no
+/admin/mission-data GET -> AdminMissionDataPageController#listData gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types POST -> AdminMissionDataPageController#createFrequencyType gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#createFrequencyTypeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types/reorder POST -> AdminMissionDataPageController#reorderFrequencyTypes gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types/{id}/activate POST -> AdminMissionDataPageController#activateFrequencyType gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types/{id}/activate POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#activateFrequencyTypeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types/{id}/delete POST -> AdminMissionDataPageController#deleteFrequencyType gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#deleteFrequencyTypeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types/{id}/update POST -> AdminMissionDataPageController#updateFrequencyType gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/frequency-types/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#updateFrequencyTypeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/job-types POST -> AdminMissionDataPageController#createJobType gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/job-types POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#createJobTypeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/job-types/{id}/activate POST -> AdminMissionDataPageController#activateJobType gate=method:hasRole('ADMIN') layout=yes
+/admin/mission-data/job-types/{id}/activate POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#activateJobTypeAjax gate=method:hasRole('ADMIN') layout=yes
+/admin/mission-data/job-types/{id}/delete POST -> AdminMissionDataPageController#deleteJobType gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/job-types/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#deleteJobTypeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/job-types/{id}/update POST -> AdminMissionDataPageController#updateJobType gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/job-types/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#updateJobTypeAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/squadrons POST -> AdminMissionDataPageController#createSquadron gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/squadrons POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#createSquadronAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/squadrons/{id}/activate POST -> AdminMissionDataPageController#activateSquadron gate=method:hasRole('ADMIN') layout=yes
+/admin/mission-data/squadrons/{id}/activate POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#activateSquadronAjax gate=method:hasRole('ADMIN') layout=yes
+/admin/mission-data/squadrons/{id}/delete POST -> AdminMissionDataPageController#deleteSquadron gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/squadrons/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#deleteSquadronAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/squadrons/{id}/update POST -> AdminMissionDataPageController#updateSquadron gate=class:hasRole('ADMIN') layout=yes
+/admin/mission-data/squadrons/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMissionDataPageController#updateSquadronAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/notification-rules GET -> AdminNotificationRulePageController#page gate=class:hasRole('ADMIN') layout=yes
+/admin/notification-rules POST headers=[X-Requested-With=XMLHttpRequest] -> AdminNotificationRulePageController#create gate=class:hasRole('ADMIN') layout=yes
+/admin/notification-rules/{id} DELETE headers=[X-Requested-With=XMLHttpRequest] -> AdminNotificationRulePageController#delete gate=class:hasRole('ADMIN') layout=yes
+/admin/notification-rules/{id} GET headers=[X-Requested-With=XMLHttpRequest] -> AdminNotificationRulePageController#get gate=class:hasRole('ADMIN') layout=yes
+/admin/notification-rules/{id} PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminNotificationRulePageController#update gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure GET -> AdminOrgStructurePageController#page gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/bereiche POST headers=[X-Requested-With=XMLHttpRequest] -> AdminOrgStructurePageController#createBereich gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/org-units/{id}/parent PATCH headers=[X-Requested-With=XMLHttpRequest] -> AdminOrgStructurePageController#setParent gate=class:hasRole('ADMIN') layout=yes
+/admin/org-structure/organisationsleitung POST headers=[X-Requested-With=XMLHttpRequest] -> AdminOrgStructurePageController#createOrganisationsleitung gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import GET -> AdminP4kImportPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import/jobs GET -> AdminP4kImportPageController#listJobs gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import/jobs POST consumes=[multipart/form-data] -> AdminP4kImportPageController#enqueuePreview gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import/jobs/{id} GET -> AdminP4kImportPageController#getJob gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import/jobs/{id}/apply POST -> AdminP4kImportPageController#applyJob gate=class:hasRole('ADMIN') layout=yes
+/admin/person-search GET -> AdminPersonSearchPageController#page gate=method:hasRole('ADMIN') layout=yes
+/admin/personal-blueprints GET -> AdminPersonalBlueprintsPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-blueprints/delete-all-users POST -> AdminPersonalBlueprintsPageController#deleteAllUsers gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-blueprints/delete-all-users POST headers=[X-Requested-With=XMLHttpRequest] -> AdminPersonalBlueprintsPageController#deleteAllUsersAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-blueprints/{userSub}/add-selected POST -> AdminPersonalBlueprintsPageController#addSelected gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-blueprints/{userSub}/import/apply POST -> AdminPersonalBlueprintsPageController#applyImport gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-blueprints/{userSub}/import/preview POST consumes=[multipart/form-data] -> AdminPersonalBlueprintsPageController#previewImport gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-blueprints/{userSub}/items/{id}/delete POST -> AdminPersonalBlueprintsPageController#delete gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-blueprints/{userSub}/items/{id}/update-note POST -> AdminPersonalBlueprintsPageController#updateNote gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-inventory GET -> AdminPersonalInventoryPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-inventory/{userSub}/add POST -> AdminPersonalInventoryPageController#add gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-inventory/{userSub}/{id}/delete POST -> AdminPersonalInventoryPageController#delete gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-inventory/{userSub}/{id}/update POST -> AdminPersonalInventoryPageController#update gate=class:hasRole('ADMIN') layout=yes
+/admin/settings GET -> AdminSettingsPageController#viewSettings gate=class:hasRole('ADMIN') layout=yes
+/admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
+/admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands GET -> AdminSpecialCommandsPageController#listSpecialCommands gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands POST -> AdminSpecialCommandsPageController#createSpecialCommand gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#createSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id} GET -> AdminSpecialCommandsPageController#detailRedirect gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id}/activate POST -> AdminSpecialCommandsPageController#activateSpecialCommand gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id}/activate POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#activateSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id}/delete POST -> AdminSpecialCommandsPageController#deleteSpecialCommand gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#deleteSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id}/members/{userId}/lead POST -> AdminSpecialCommandsPageController#toggleMemberLead gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id}/members/{userId}/lead POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#toggleMemberLeadAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id}/update POST -> AdminSpecialCommandsPageController#updateSpecialCommand gate=class:hasRole('ADMIN') layout=yes
+/admin/special-commands/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#updateSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/sync-reports GET -> AdminSyncReportsPageController#combined gate=class:hasRole('ADMIN') layout=yes
+/admin/sync-reports/delete-old POST -> AdminSyncReportsPageController#deleteOld gate=class:hasRole('ADMIN') layout=yes
+/admin/sync-reports/delete-old POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSyncReportsPageController#deleteOldAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/sync-reports/scwiki GET -> AdminSyncReportsPageController#scwiki gate=class:hasRole('ADMIN') layout=yes
+/admin/sync-reports/uex GET -> AdminSyncReportsPageController#uex gate=class:hasRole('ADMIN') layout=yes
+/admin/terms GET -> AdminTermsPageController#showOverview gate=class:hasRole('ADMIN') layout=yes
+/admin/uex-data GET -> AdminUexPageController#listData gate=class:hasRole('ADMIN') layout=yes
+/admin/uex-data/terminals/{id}/auto-load POST -> AdminUexPageController#updateTerminalAutoLoadOverride gate=method:hasRole('ADMIN') layout=yes
+/admin/uex-data/terminals/{id}/auto-load POST headers=[X-Requested-With=XMLHttpRequest] -> AdminUexPageController#updateTerminalAutoLoadOverrideAjax gate=method:hasRole('ADMIN') layout=yes
+/admin/uex-data/terminals/{id}/toggle-visibility POST -> AdminUexPageController#toggleTerminalVisibility gate=method:hasRole('ADMIN') layout=yes
+/admin/uex-data/terminals/{id}/toggle-visibility POST headers=[X-Requested-With=XMLHttpRequest] -> AdminUexPageController#toggleTerminalVisibilityAjax gate=method:hasRole('ADMIN') layout=yes
+/admin/uex-data/{kind}/{id}/loading-dock POST -> AdminUexPageController#updateLoadingDockOverride gate=method:hasRole('ADMIN') layout=yes
+/admin/uex-data/{kind}/{id}/loading-dock POST headers=[X-Requested-With=XMLHttpRequest] -> AdminUexPageController#updateLoadingDockOverrideAjax gate=method:hasRole('ADMIN') layout=yes
+/announcement/read POST -> HomeController#markAnnouncementAsRead gate=method:isAuthenticated() layout=yes
+/announcement/read POST headers=[X-Requested-With=XMLHttpRequest] -> HomeController#markAnnouncementAsReadAjax gate=method:isAuthenticated() layout=yes
+/api/proxy/audit/{domain} DELETE -> AuditReportProxyController#purgeAuditLog gate=method:isAuthenticated() layout=no
+/api/proxy/audit/{domain}/export GET -> AuditReportProxyController#downloadAuditLog gate=method:isAuthenticated() layout=no
+/api/proxy/audit/{domain}/export.json GET -> AuditReportProxyController#downloadAuditLogJson gate=method:isAuthenticated() layout=no
+/api/proxy/bank/accounts POST -> BankProxyController#createAccount gate=method:isAuthenticated() layout=no
+/api/proxy/bank/accounts/search GET -> BankProxyController#searchAccounts gate=method:isAuthenticated() layout=no
+/api/proxy/bank/accounts/{id} PATCH -> BankProxyController#renameAccount gate=method:isAuthenticated() layout=no
+/api/proxy/bank/accounts/{id}/approval-tiers PATCH -> BankProxyController#setCartelApprovalTiers gate=method:isAuthenticated() layout=no
+/api/proxy/bank/accounts/{id}/balance-target PATCH -> BankProxyController#setBalanceTarget gate=method:isAuthenticated() layout=no
+/api/proxy/bank/accounts/{id}/close POST -> BankProxyController#closeAccount gate=method:isAuthenticated() layout=no
+/api/proxy/bank/accounts/{id}/reopen POST -> BankProxyController#reopenAccount gate=method:isAuthenticated() layout=no
+/api/proxy/bank/accounts/{id}/statement GET -> BankReportProxyController#downloadStatement gate=method:isAuthenticated() layout=no
+/api/proxy/bank/deposits POST -> BankProxyController#bookDeposit gate=method:isAuthenticated() layout=no
+/api/proxy/bank/export/three-month-report GET -> BankReportProxyController#downloadThreeMonthReport gate=method:isAuthenticated() layout=no
+/api/proxy/bank/grants POST -> BankProxyController#createGrant gate=method:isAuthenticated() layout=no
+/api/proxy/bank/grants/{userId}/{accountId} DELETE -> BankProxyController#deleteGrant gate=method:isAuthenticated() layout=no
+/api/proxy/bank/grants/{userId}/{accountId} PATCH -> BankProxyController#updateGrant gate=method:isAuthenticated() layout=no
+/api/proxy/bank/holders POST -> BankProxyController#registerHolder gate=method:isAuthenticated() layout=no
+/api/proxy/bank/holders/transfer POST -> BankProxyController#bookHolderTransfer gate=method:isAuthenticated() layout=no
+/api/proxy/bank/holders/{id} PATCH -> BankProxyController#updateHolder gate=method:isAuthenticated() layout=no
+/api/proxy/bank/requests/{id}/confirm POST -> BankProxyController#confirmBookingRequest gate=method:isAuthenticated() layout=no
+/api/proxy/bank/requests/{id}/reject POST -> BankProxyController#rejectBookingRequest gate=method:isAuthenticated() layout=no
+/api/proxy/bank/transactions/{id}/reversal POST -> BankProxyController#reverseTransaction gate=method:isAuthenticated() layout=no
+/api/proxy/bank/transfers POST -> BankProxyController#bookTransfer gate=method:isAuthenticated() layout=no
+/api/proxy/bank/withdrawals POST -> BankProxyController#bookWithdrawal gate=method:isAuthenticated() layout=no
+/api/proxy/materials/profit-calculation GET -> MaterialProxyController#getProfitCalculation gate=method:isAuthenticated() layout=no
+/api/proxy/materials/{id}/terminals GET -> MaterialProxyController#getMaterialTerminals gate=method:isAuthenticated() layout=no
+/api/proxy/me/export/json GET -> DataExportProxyController#json gate=method:isAuthenticated() layout=no
+/api/proxy/me/export/pdf GET -> DataExportProxyController#pdf gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/approval-limit/all-members DELETE -> OrgUnitBankProxyController#clearAllMembersApprovalLimit gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/approval-limit/all-members PUT -> OrgUnitBankProxyController#setAllMembersApprovalLimit gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/approval-limit/area-members DELETE -> OrgUnitBankProxyController#clearAreaMembersApprovalLimit gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/approval-limit/area-members PUT -> OrgUnitBankProxyController#setAreaMembersApprovalLimit gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/approval-limit/role/{roleCode} DELETE -> OrgUnitBankProxyController#clearRoleApprovalLimit gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/approval-limit/role/{roleCode} PUT -> OrgUnitBankProxyController#setRoleApprovalLimit gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/approval-limit/user/{userId} DELETE -> OrgUnitBankProxyController#clearUserApprovalLimit gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/approval-limit/user/{userId} PUT -> OrgUnitBankProxyController#setUserApprovalLimit gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/balance-target PUT -> OrgUnitBankProxyController#setBalanceTarget gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/statement GET -> OrgUnitBankProxyController#downloadStatement gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/visibility/all-members/{enabled} PUT -> OrgUnitBankProxyController#setAllMembersVisibility gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/visibility/area-members/{enabled} PUT -> OrgUnitBankProxyController#setAreaMembersVisibility gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/visibility/role/{roleCode} DELETE -> OrgUnitBankProxyController#removeRoleVisibility gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/visibility/role/{roleCode} POST -> OrgUnitBankProxyController#addRoleVisibility gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/visibility/user/{userId} DELETE -> OrgUnitBankProxyController#removeUserVisibility gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/accounts/{id}/visibility/user/{userId} POST -> OrgUnitBankProxyController#addUserVisibility gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/requests POST -> OrgUnitBankProxyController#createRequest gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/requests/{id} PUT -> OrgUnitBankProxyController#updateRequest gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/requests/{id}/cancel POST -> OrgUnitBankProxyController#cancelRequest gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/requests/{id}/owner-approval DELETE -> OrgUnitBankProxyController#revokeOwnerApproval gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/requests/{id}/owner-approval POST -> OrgUnitBankProxyController#grantOwnerApproval gate=method:isAuthenticated() layout=no
+/api/proxy/promotion/categories POST -> PromotionProxyController#createCategory gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/categories/{id} DELETE -> PromotionProxyController#deleteCategory gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/categories/{id} PUT -> PromotionProxyController#updateCategory gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/evaluations/user/{userId}/category/{categoryId} PUT -> PromotionProxyController#updateEvaluation gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/level-contents POST -> PromotionProxyController#createLevelContent gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/level-contents/{id} DELETE -> PromotionProxyController#deleteLevelContent gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/level-contents/{id} PUT -> PromotionProxyController#updateLevelContent gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/rank-requirements POST -> PromotionProxyController#createRankRequirement gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/rank-requirements/{id} DELETE -> PromotionProxyController#deleteRankRequirement gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/rank-requirements/{id} PUT -> PromotionProxyController#updateRankRequirement gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/topics POST -> PromotionProxyController#createTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/topics/{id} DELETE -> PromotionProxyController#deleteTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/promotion/topics/{id} PUT -> PromotionProxyController#updateTopic gate=method:hasAnyRole('ADMIN','OFFICER') layout=no
+/api/proxy/special-commands/{id}/profit-eligible PATCH -> SpecialCommandAdminProxyController#setProfitEligible gate=method:hasRole('ADMIN') layout=no
+/api/proxy/squadrons/{id}/profit-eligible PATCH -> SquadronAdminProxyController#setProfitEligible gate=method:hasRole('ADMIN') layout=no
+/api/proxy/squadrons/{id}/promotion-enabled PATCH -> SquadronAdminProxyController#setPromotionEnabled gate=method:hasRole('ADMIN') layout=no
+/api/v1/orders/{jobOrderId}/handovers/report/preview POST -> JobOrderHandoverReportProxyController#previewHandoverReport gate=method:isAuthenticated() layout=no
+/api/v1/orders/{jobOrderId}/handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadHandoverReport gate=method:isAuthenticated() layout=no
+/api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadItemHandoverReport gate=method:isAuthenticated() layout=no
+/app/callback GET -> AppLinkController#callback gate=none layout=yes
+/app/link-help GET -> AppLinkController#linkHelp gate=none layout=yes
+/bank GET -> BankPageController#dashboard gate=method:hasRole('BANK_EMPLOYEE') layout=yes
+/bank/accounts/{id} GET -> BankPageController#accountDetail gate=method:hasRole('BANK_EMPLOYEE') layout=yes
+/bank/grants GET -> BankGrantsPageController#grants gate=method:hasRole('BANK_MANAGEMENT') layout=yes
+/bank/holders/{id} GET -> BankPageController#holderDetail gate=method:hasRole('BANK_EMPLOYEE') layout=yes
+/bank/manage GET -> BankManagePageController#manage gate=method:hasRole('BANK_EMPLOYEE') layout=yes
+/bank/requests GET -> BankRequestQueuePageController#queue gate=method:hasRole('BANK_EMPLOYEE') layout=yes
+/blueprint-overview GET -> BlueprintOverviewPageController#view gate=class:isAuthenticated() layout=yes
+/blueprint-overview/owners GET -> BlueprintOverviewPageController#owners gate=class:isAuthenticated() layout=yes
+/catalog/location-search GET -> CatalogSearchController#locationSearch gate=class:isAuthenticated() layout=no
+/catalog/material-search GET -> CatalogSearchController#materialSearch gate=class:isAuthenticated() layout=no
+/connected-apps GET -> ConnectedAppsPageController#page gate=class:isAuthenticated() layout=yes
+/connected-apps/confirm GET -> ConnectedAppsConfirmController#page gate=class:isAuthenticated() layout=yes
+/connected-apps/confirm/apply POST headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsConfirmRelayController#apply gate=class:isAuthenticated() layout=no
+/connected-apps/confirm/discard POST headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsConfirmRelayController#discard gate=class:isAuthenticated() layout=no
+/connected-apps/confirm/load POST headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsConfirmRelayController#load gate=class:isAuthenticated() layout=no
+/connected-apps/installations/{installationId} DELETE headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#disconnectInstallation gate=class:isAuthenticated() layout=no
+/connected-apps/installations/{installationId}/seen POST headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#markSeen gate=class:isAuthenticated() layout=no
+/connected-apps/{clientId} DELETE headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#disconnectClient gate=class:isAuthenticated() layout=no
+/connected-apps/{clientId}/undo POST headers=[X-Requested-With=XMLHttpRequest] -> ConnectedAppsRelayController#undo gate=class:isAuthenticated() layout=no
+/csrf GET -> CsrfTokenController#csrf gate=class:isAuthenticated() layout=no
+/error * -> BasicErrorController#error gate=none layout=no
+/error * produces=[text/html] -> BasicErrorController#errorHtml gate=none layout=no
+/hangar GET -> HangarPageController#viewHangar gate=class:isAuthenticated() layout=yes
+/hangar/add POST -> HangarPageController#addShip gate=class:isAuthenticated() layout=yes
+/hangar/add POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#addShipAjax gate=class:isAuthenticated() layout=yes
+/hangar/home-location POST -> HangarPageController#setHomeLocation gate=class:isAuthenticated() layout=yes
+/hangar/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#setHomeLocationAjax gate=class:isAuthenticated() layout=yes
+/hangar/import/fleetview POST consumes=[multipart/form-data] -> HangarImportProxyController#importFleetview gate=method:isAuthenticated() layout=no
+/hangar/import/ships POST consumes=[multipart/form-data] -> HangarImportProxyController#importShips gate=method:isAuthenticated() layout=no
+/hangar/ships/all DELETE -> HangarDeleteAllProxyController#deleteAllShips gate=method:isAuthenticated() layout=no
+/hangar/squadron GET -> HangarPageController#viewSquadron gate=class:isAuthenticated() layout=yes
+/hangar/{id}/delete POST -> HangarPageController#deleteShip gate=class:isAuthenticated() layout=yes
+/hangar/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#deleteShipAjax gate=class:isAuthenticated() layout=yes
+/hangar/{id}/update POST -> HangarPageController#updateShip gate=class:isAuthenticated() layout=yes
+/hangar/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#updateShipAjax gate=class:isAuthenticated() layout=yes
+/impressum GET -> ImpressumController#showImpressum gate=none layout=yes
+/internal/client-error POST -> ClientErrorReportController#report gate=class:isAuthenticated() layout=no
+/inventory GET -> InventoryPageController#viewAggregatedInventory gate=class:isAuthenticated() layout=yes
+/inventory/all DELETE -> InventoryDeleteAllProxyController#deleteAllGlobalInventory gate=method:hasRole('ADMIN') layout=no
+/inventory/all GET -> InventoryPageController#viewAllInventory gate=class:isAuthenticated() layout=yes
+/inventory/all/game-item-stack/entries GET -> InventoryPageController#viewAllGameItemStackEntries gate=class:isAuthenticated() layout=yes
+/inventory/all/stack/entries GET -> InventoryPageController#viewAllStackEntries gate=class:isAuthenticated() layout=yes
+/inventory/bulk-checkout POST -> InventoryWriteController#bulkCheckout gate=class:isAuthenticated() layout=yes
+/inventory/bulk-org-unit POST -> InventoryOrgUnitChangeProxyController#bulkChangeOrgUnit gate=class:isAuthenticated() layout=no
+/inventory/bulk-rebook POST -> InventoryWriteController#bulkRebook gate=class:isAuthenticated() layout=yes
+/inventory/bulk-stolen POST -> InventoryStolenMarkProxyController#bulkMarkStolen gate=class:isAuthenticated() layout=no
+/inventory/game-item/{gameItemId} GET -> InventoryPageController#viewGameItemInventory gate=class:isAuthenticated() layout=yes
+/inventory/input GET -> InventoryPageController#viewInputPage gate=class:isAuthenticated() layout=yes
+/inventory/input POST -> InventoryWriteController#addInventoryItem gate=class:isAuthenticated() layout=yes
+/inventory/input POST headers=[X-Requested-With=XMLHttpRequest] -> InventoryWriteController#addInventoryItemAjax gate=class:isAuthenticated() layout=yes
+/inventory/item-search GET -> InventoryPageController#itemSearch gate=class:isAuthenticated() layout=yes
+/inventory/material/{materialId} GET -> InventoryPageController#viewMaterialInventory gate=class:isAuthenticated() layout=yes
+/inventory/my GET -> InventoryPageController#viewMyInventory gate=class:isAuthenticated() layout=yes
+/inventory/my/entry-ids GET -> InventoryPageController#myEntryIds gate=class:isAuthenticated() layout=yes
+/inventory/my/game-item-stack/entries GET -> InventoryPageController#viewMyGameItemStackEntries gate=class:isAuthenticated() layout=yes
+/inventory/my/stack/entries GET -> InventoryPageController#viewMyStackEntries gate=class:isAuthenticated() layout=yes
+/inventory/order-needs GET headers=[X-Requested-With=XMLHttpRequest] -> InventoryPageController#orderNeedsAjax gate=class:isAuthenticated() layout=yes
+/inventory/{id}/allocation DELETE -> InventoryWriteController#removeAllocation gate=class:isAuthenticated() layout=yes
+/inventory/{id}/allocation PATCH -> InventoryWriteController#changeAllocation gate=class:isAuthenticated() layout=yes
+/inventory/{id}/allocation POST -> InventoryWriteController#addAllocation gate=class:isAuthenticated() layout=yes
+/inventory/{id}/book-out POST -> InventoryWriteController#bookOutInventoryItem gate=class:isAuthenticated() layout=yes
+/inventory/{id}/delivered PATCH -> InventoryWriteController#updateDelivered gate=class:isAuthenticated() layout=yes
+/inventory/{id}/note PUT -> InventoryWriteController#updateInventoryItemNote gate=class:isAuthenticated() layout=yes
+/inventory/{id}/org-unit POST -> InventoryOrgUnitChangeProxyController#changeOrgUnit gate=class:isAuthenticated() layout=no
+/inventory/{id}/personal-rebook POST -> InventoryWriteController#rebookPersonalInventoryItem gate=class:isAuthenticated() layout=yes
+/inventory/{id}/stolen POST -> InventoryStolenMarkProxyController#markStolen gate=class:isAuthenticated() layout=no
+/inventory/{id}/transfer POST -> InventoryWriteController#transferInventoryItem gate=class:isAuthenticated() layout=yes
+/licenses GET -> OssLicensesController#showLicenses gate=none layout=yes
+/manifest.webmanifest GET -> WebAppManifestController#manifest gate=none layout=no
+/materialboerse GET -> MaterialboersePageController#board gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/item-offers/ajax POST -> MaterialboersePageController#releaseItem gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/item-requests/ajax POST -> MaterialboersePageController#createItemRequest gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/items/{inventoryItemId}/deactivate/ajax POST -> MaterialboersePageController#deactivateForItem gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/offerable-products GET -> MaterialboersePageController#offerableProducts gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/offers/ajax POST -> MaterialboersePageController#release gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/offers/{id}/deactivate/ajax POST -> MaterialboersePageController#deactivate gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/offers/{id}/interest/ajax DELETE -> MaterialboersePageController#withdrawInterest gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/offers/{id}/interest/ajax POST -> MaterialboersePageController#registerInterest gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/offers/{id}/remark/ajax PUT -> MaterialboersePageController#updateOffer gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/releasable-items GET -> MaterialboersePageController#releasableItems gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/request-materials GET -> MaterialboersePageController#requestMaterials gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/requests/ajax POST -> MaterialboersePageController#createMaterialRequest gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/requests/{id}/ajax PUT -> MaterialboersePageController#updateRequest gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/requests/{id}/deactivate/ajax POST -> MaterialboersePageController#deactivateRequest gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/requests/{id}/interest/ajax DELETE -> MaterialboersePageController#withdrawFulfillment gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/requests/{id}/interest/ajax POST -> MaterialboersePageController#signalFulfillment gate=class:hasRole('KRT_MEMBER') layout=yes
+/materials GET -> MaterialsPageController#listMaterials gate=class:isAuthenticated() layout=yes
+/materials/overview GET -> MaterialsPageController#getMatrixOverview gate=class:isAuthenticated() layout=yes
+/materials/overview/data GET -> MaterialsPageController#getMatrixData gate=class:isAuthenticated() layout=yes
+/materials/profit-calculation GET -> ProfitCalculationPageController#showProfitCalculationPage gate=method:hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN') layout=yes
+/materials/{id} GET -> MaterialsPageController#getMaterialDetail gate=class:isAuthenticated() layout=yes
+/me/active-org-unit POST -> MeFrontendController#setActiveOrgUnit gate=class:isAuthenticated() layout=yes
+/members GET -> MemberManagementController#listMembers gate=class:hasRole('ADMIN') layout=yes
+/members/api/search GET -> MemberManagementController#searchMembers gate=class:hasRole('ADMIN') layout=yes
+/members/sync POST -> MemberManagementController#syncMembersAjax gate=method:hasRole('ADMIN') layout=yes
+/members/{id} DELETE -> MemberManagementController#deleteMemberAjax gate=method:hasRole('ADMIN') layout=yes
+/members/{id}/consolidate POST -> MemberManagementController#consolidateMemberAjax gate=method:hasRole('ADMIN') layout=yes
+/members/{id}/delete POST -> MemberManagementController#deleteMember gate=method:hasRole('ADMIN') layout=yes
+/members/{id}/edit GET -> MemberManagementController#editMember gate=class:hasRole('ADMIN') layout=yes
+/members/{id}/edit POST -> MemberManagementController#updateMember gate=class:hasRole('ADMIN') layout=yes
+/members/{id}/edit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberManagementController#updateMemberAjax gate=class:hasRole('ADMIN') layout=yes
+/missions GET -> MissionPageController#listMissions gate=class:isAuthenticated() layout=yes
+/missions POST -> MissionWriteController#createMission gate=class:isAuthenticated() layout=yes
+/missions/new GET -> MissionPageController#createMissionForm gate=class:isAuthenticated() layout=yes
+/missions/{id} GET -> MissionPageController#missionDetail gate=class:isAuthenticated() layout=yes
+/missions/{id} POST -> MissionWriteController#updateMission gate=class:isAuthenticated() layout=yes
+/missions/{id} POST headers=[X-Requested-With=XMLHttpRequest] -> MissionWriteController#updateMissionAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/actual-time POST -> MissionWriteController#updateActualTime gate=class:isAuthenticated() layout=yes
+/missions/{id}/delete POST -> MissionWriteController#deleteMission gate=method:hasRole('ADMIN') layout=yes
+/missions/{id}/finance-entries POST -> MissionFinancePageController#addFinanceEntry gate=class:isAuthenticated() layout=yes
+/missions/{id}/finance-entries/ajax POST produces=[application/json] -> MissionFinancePageController#addFinanceEntryAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/finance-entries/{entryId}/ajax DELETE produces=[application/json] -> MissionFinancePageController#deleteFinanceEntryAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/finance-entries/{entryId}/ajax PUT produces=[application/json] -> MissionFinancePageController#updateFinanceEntryAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/finance-entries/{entryId}/delete POST -> MissionFinancePageController#deleteFinanceEntry gate=class:isAuthenticated() layout=yes
+/missions/{id}/finance-entries/{entryId}/update POST -> MissionFinancePageController#updateFinanceEntry gate=class:isAuthenticated() layout=yes
+/missions/{id}/frequencies POST -> MissionWriteController#addOrUpdateFrequency gate=method:hasRole('MISSION_MANAGER') layout=yes
+/missions/{id}/frequencies/ajax PUT produces=[application/json] -> MissionWriteController#addOrUpdateFrequencyAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
+/missions/{id}/frequencies/custom/ajax POST produces=[application/json] -> MissionWriteController#addCustomFrequencyAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
+/missions/{id}/frequencies/custom/{frequencyId}/ajax PUT produces=[application/json] -> MissionWriteController#updateCustomFrequencyAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
+/missions/{id}/frequencies/{frequencyId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteFrequencyAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
+/missions/{id}/frequencies/{frequencyId}/delete POST -> MissionWriteController#deleteFrequency gate=method:hasRole('MISSION_MANAGER') layout=yes
+/missions/{id}/managers/{userId} DELETE -> MissionWriteController#removeManager gate=class:isAuthenticated() layout=yes
+/missions/{id}/managers/{userId} POST -> MissionWriteController#addManager gate=class:isAuthenticated() layout=yes
+/missions/{id}/objectives/ajax POST produces=[application/json] -> MissionWriteController#addObjectiveAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/objectives/reorder/ajax PUT produces=[application/json] -> MissionWriteController#reorderObjectivesAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/objectives/{objectiveId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteObjectiveAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/objectives/{objectiveId}/ajax PUT produces=[application/json] -> MissionWriteController#updateObjectiveAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/owner/ajax PUT produces=[application/json] -> MissionWriteController#setMissionOwner gate=class:isAuthenticated() layout=yes
+/missions/{id}/owning-org-unit/ajax PUT produces=[application/json] -> MissionWriteController#setMissionOwningOrgUnit gate=class:isAuthenticated() layout=yes
+/missions/{id}/participant POST -> MissionWriteController#addParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/ajax POST produces=[application/json] -> MissionWriteController#addParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/unassigned/ajax GET produces=[application/json] -> MissionPageController#getUnassignedParticipantsAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/ajax PUT produces=[application/json] -> MissionWriteController#updateParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/check-in POST -> MissionWriteController#checkInParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/check-in/ajax POST produces=[application/json] -> MissionWriteController#checkInParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/check-out POST -> MissionWriteController#checkOutParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/check-out/ajax POST produces=[application/json] -> MissionWriteController#checkOutParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/delete POST -> MissionWriteController#deleteParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/payout-preference POST -> MissionWriteController#updatePayoutPreference gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/update POST -> MissionWriteController#updateParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/party-lead POST -> MissionWriteController#setPartyLead gate=class:isAuthenticated() layout=yes
+/missions/{id}/party-lead/ajax PUT produces=[application/json] -> MissionWriteController#setPartyLeadAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/ajax POST produces=[application/json] -> MissionWriteController#addStepAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/reorder/ajax PUT produces=[application/json] -> MissionWriteController#reorderStepsAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/{stepId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteStepAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/{stepId}/ajax PUT produces=[application/json] -> MissionWriteController#updateStepAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/{stepId}/done/ajax PATCH produces=[application/json] -> MissionWriteController#toggleStepDoneAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units POST -> MissionWriteController#addUnit gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/ajax POST produces=[application/json] -> MissionWriteController#addUnitAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteUnitAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/ajax PUT produces=[application/json] -> MissionWriteController#updateUnitAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew POST -> MissionWriteController#addCrew gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/ajax POST produces=[application/json] -> MissionWriteController#addCrewAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/{crewId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteCrewAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/{crewId}/ajax PUT produces=[application/json] -> MissionWriteController#updateCrewAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/{crewId}/delete POST -> MissionWriteController#deleteCrew gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/{crewId}/update POST -> MissionWriteController#updateCrew gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/delete POST -> MissionWriteController#deleteUnit gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/update POST -> MissionWriteController#updateUnit gate=class:isAuthenticated() layout=yes
+/notifications GET -> NotificationPageController#page gate=class:isAuthenticated() layout=yes
+/notifications/page-items GET headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#pageItems gate=class:isAuthenticated() layout=yes
+/notifications/read DELETE headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#clearRead gate=class:isAuthenticated() layout=yes
+/notifications/read-all POST headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#markAllRead gate=class:isAuthenticated() layout=yes
+/notifications/recent GET headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#recent gate=class:isAuthenticated() layout=yes
+/notifications/stream GET produces=[text/event-stream] -> NotificationPageController#stream gate=class:isAuthenticated() layout=yes
+/notifications/unread-count GET headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#unreadCount gate=class:isAuthenticated() layout=yes
+/notifications/{id} DELETE headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#delete gate=class:isAuthenticated() layout=yes
+/notifications/{id}/read POST headers=[X-Requested-With=XMLHttpRequest] -> NotificationPageController#markRead gate=class:isAuthenticated() layout=yes
+/operations GET -> OperationPageController#listOperations gate=class:isAuthenticated() layout=yes
+/operations/create POST -> OperationPageController#createOperation gate=method:hasRole('MISSION_MANAGER') layout=yes
+/operations/create POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#createOperationAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
+/operations/markdown-preview POST produces=[text/html] -> OperationPageController#markdownPreview gate=class:isAuthenticated() layout=yes
+/operations/{id} GET -> OperationPageController#operationDetails gate=class:isAuthenticated() layout=yes
+/operations/{id}/delete POST -> OperationPageController#deleteOperation gate=method:hasRole('ADMIN') layout=yes
+/operations/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#deleteOperationAjax gate=method:hasRole('ADMIN') layout=yes
+/operations/{id}/finance/{missionId} GET -> OperationPageController#operationMissionFinance gate=class:isAuthenticated() layout=yes
+/operations/{id}/payouts/paid-out POST -> OperationPageController#updatePayoutStatus gate=method:hasRole('MISSION_MANAGER') and (#request.paidOut() or hasAnyRole('ADMIN', 'OFFICER')) layout=yes
+/operations/{id}/update POST -> OperationPageController#updateOperation gate=method:hasRole('MISSION_MANAGER') layout=yes
+/operations/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#updateOperationAjax gate=method:hasRole('MISSION_MANAGER') layout=yes
+/orders GET -> JobOrderPageController#viewOrders gate=class:isAuthenticated() layout=yes
+/orders/create GET -> JobOrderPageController#viewCreateForm gate=class:isAuthenticated() layout=yes
+/orders/create POST -> JobOrderWriteController#createOrder gate=class:isAuthenticated() layout=yes
+/orders/create POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#createOrderAjax gate=class:isAuthenticated() layout=yes
+/orders/item-blueprints/{gameItemId} GET -> JobOrderPageController#itemBlueprints gate=class:isAuthenticated() layout=yes
+/orders/item-derivation/{blueprintId} GET -> JobOrderPageController#itemDerivation gate=class:isAuthenticated() layout=yes
+/orders/item-search GET -> JobOrderPageController#itemSearch gate=class:isAuthenticated() layout=yes
+/orders/items POST -> JobOrderWriteController#createItemOrder gate=class:isAuthenticated() layout=yes
+/orders/items POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#createItemOrderAjax gate=class:isAuthenticated() layout=yes
+/orders/material-demand GET -> JobOrderMaterialDemandPageController#viewMaterialDemand gate=method:isAuthenticated() layout=yes
+/orders/{id} DELETE -> JobOrderWriteController#deleteOrderAjax gate=class:isAuthenticated() layout=yes
+/orders/{id} GET -> JobOrderPageController#viewOrderDetail gate=class:isAuthenticated() layout=yes
+/orders/{id}/assignees POST -> JobOrderWriteController#addAssignee gate=class:isAuthenticated() layout=yes
+/orders/{id}/assignees/{userId} DELETE -> JobOrderWriteController#removeAssignee gate=class:isAuthenticated() layout=yes
+/orders/{id}/assignees/{userId}/note DELETE -> JobOrderWriteController#deleteAssigneeNote gate=class:isAuthenticated() layout=yes
+/orders/{id}/assignees/{userId}/note PUT -> JobOrderWriteController#setAssigneeNote gate=class:isAuthenticated() layout=yes
+/orders/{id}/blueprint-variant-counting POST -> JobOrderWriteController#updateBlueprintVariantCounting gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/claims POST -> JobOrderWriteController#upsertClaim gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/claims/{claimId}/withdraw POST -> JobOrderWriteController#withdrawClaim gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/delete POST -> JobOrderWriteController#deleteOrder gate=class:isAuthenticated() layout=yes
+/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
+/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
+/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
+/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
+/orders/{id}/items/edit GET -> JobOrderPageController#viewEditItemForm gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/items/update POST -> JobOrderWriteController#updateItemOrder gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
+/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
+/orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
+/orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes
+/orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/requested-update POST -> JobOrderWriteController#updateOrderAsRequester gate=class:isAuthenticated() layout=yes
+/orders/{id}/requested-update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAsRequesterAjax gate=class:isAuthenticated() layout=yes
+/orders/{id}/status POST -> JobOrderWriteController#updateStatus gate=class:isAuthenticated() layout=yes
+/orders/{id}/update POST -> JobOrderWriteController#updateOrder gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{id}/update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAjax gate=method:hasRole('LOGISTICIAN') layout=yes
+/orders/{jobOrderId}/item-collection GET -> ItemCollectionPageController#viewItemCollection gate=method:isAuthenticated() layout=yes
+/orders/{jobOrderId}/material-collection GET -> MaterialCollectionPageController#viewMaterialCollection gate=method:isAuthenticated() layout=yes
+/org-chart GET -> OrgChartPageController#orgChart gate=method:isAuthenticated() layout=yes
+/org-chart/positions/ajax POST -> OrgChartPageController#createPosition gate=method:hasRole('ADMIN') layout=yes
+/org-chart/positions/{id}/ajax DELETE -> OrgChartPageController#deletePosition gate=method:hasRole('ADMIN') layout=yes
+/org-chart/positions/{id}/ajax PUT -> OrgChartPageController#updatePosition gate=method:hasRole('ADMIN') layout=yes
+/org-chart/positions/{id}/leader/ajax DELETE -> OrgChartPageController#vacateLeader gate=method:hasRole('ADMIN') layout=yes
+/org-unit-bank GET -> OrgUnitBankPageController#orgUnitBank gate=method:hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
+/org-unit-bank/accounts/{id} GET -> OrgUnitBankPageController#orgUnitBankAccount gate=method:hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes
+/organisation/leitung GET -> LeitungPageController#leitung gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/bereiche/{bereichId}/members/ajax POST -> LeitungPageController#addBereichLeader gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/bereiche/{bereichId}/members/{userId}/ajax DELETE -> LeitungPageController#removeBereichLeader gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/kommando-groups/{groupId}/ajax DELETE -> LeitungPageController#deleteKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/kommando-groups/{groupId}/ajax PUT -> LeitungPageController#updateKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/organisationsleitung/{olId}/grand-admiral/ajax DELETE -> LeitungPageController#removeGrandAdmiral gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/organisationsleitung/{olId}/grand-admiral/ajax PUT -> LeitungPageController#setGrandAdmiral gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/organisationsleitung/{olId}/members/ajax POST -> LeitungPageController#addOlMember gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/organisationsleitung/{olId}/members/{userId}/ajax DELETE -> LeitungPageController#removeOlMember gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/special-commands/{skId}/members/{userId}/lead/ajax PATCH -> LeitungPageController#toggleSkLead gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/squadrons/{squadronId}/kommando-groups/ajax POST -> LeitungPageController#createKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/squadrons/{squadronId}/ranks/{userId}/ajax DELETE -> LeitungPageController#removeSquadronRank gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/squadrons/{squadronId}/ranks/{userId}/ajax PUT -> LeitungPageController#assignSquadronRank gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/special-commands/{id} GET -> SpecialCommandMembersPageController#detail gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/special-commands/{id}/members POST -> SpecialCommandMembersPageController#addMember gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/special-commands/{id}/members POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#addMemberAjax gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/special-commands/{id}/members/{userId}/delete POST -> SpecialCommandMembersPageController#removeMember gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/special-commands/{id}/members/{userId}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#removeMemberAjax gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/special-commands/{id}/members/{userId}/flags POST -> SpecialCommandMembersPageController#patchMemberFlags gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/special-commands/{id}/members/{userId}/flags POST headers=[X-Requested-With=XMLHttpRequest] -> SpecialCommandMembersPageController#patchMemberFlagsAjax gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes
+/pending-approval GET -> PendingApprovalPageController#pendingApproval gate=class:isAuthenticated() layout=yes
+/pending-approval/status GET -> PendingApprovalPageController#status gate=class:isAuthenticated() layout=yes
+/personal-inventory GET -> PersonalInventoryPageController#view gate=class:isAuthenticated() layout=yes
+/personal-inventory/add POST -> PersonalInventoryPageController#add gate=class:isAuthenticated() layout=yes
+/personal-inventory/add POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryPageController#addAjax gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints GET -> PersonalInventoryBlueprintsPageController#view gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/add-selected POST -> PersonalInventoryBlueprintsPageController#addSelected gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/craftability GET -> PersonalInventoryBlueprintsPageController#craftability gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/delete-all POST -> PersonalInventoryBlueprintsPageController#deleteAll gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/delete-all POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryBlueprintsPageController#deleteAllAjax gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/import/apply POST -> PersonalBlueprintImportProxyController#apply gate=class:isAuthenticated() layout=no
+/personal-inventory/blueprints/import/preview POST consumes=[multipart/form-data] -> PersonalBlueprintImportProxyController#preview gate=class:isAuthenticated() layout=no
+/personal-inventory/blueprints/import/staged POST -> PersonalBlueprintImportProxyController#staged gate=class:isAuthenticated() layout=no
+/personal-inventory/blueprints/search GET -> PersonalInventoryBlueprintsPageController#search gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/{id}/delete POST -> PersonalInventoryBlueprintsPageController#delete gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryBlueprintsPageController#deleteAjax gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/{id}/recipe GET -> PersonalInventoryBlueprintsPageController#recipe gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/{id}/update-note POST -> PersonalInventoryBlueprintsPageController#updateNote gate=class:isAuthenticated() layout=yes
+/personal-inventory/blueprints/{id}/update-note POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryBlueprintsPageController#updateNoteAjax gate=class:isAuthenticated() layout=yes
+/personal-inventory/uex-search GET -> PersonalInventoryPageController#uexSearch gate=class:isAuthenticated() layout=yes
+/personal-inventory/{id}/delete POST -> PersonalInventoryPageController#delete gate=class:isAuthenticated() layout=yes
+/personal-inventory/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryPageController#deleteAjax gate=class:isAuthenticated() layout=yes
+/personal-inventory/{id}/update POST -> PersonalInventoryPageController#update gate=class:isAuthenticated() layout=yes
+/personal-inventory/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryPageController#updateAjax gate=class:isAuthenticated() layout=yes
+/privacy GET -> PrivacyController#showPrivacy gate=none layout=yes
+/profile GET -> ProfileController#profile gate=class:isAuthenticated() layout=yes
+/profile/blueprint-sharing POST -> ProfileController#updateBlueprintSharing gate=class:isAuthenticated() layout=yes
+/profile/blueprint-sharing POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileController#updateBlueprintSharingAjax gate=class:isAuthenticated() layout=yes
+/profile/deletion-request DELETE headers=[X-Requested-With=XMLHttpRequest] -> DeletionRequestProxyController#withdraw gate=method:isAuthenticated() layout=yes
+/profile/deletion-request GET params=[fragment=card] -> DeletionRequestProxyController#card gate=method:isAuthenticated() layout=yes
+/profile/deletion-request POST headers=[X-Requested-With=XMLHttpRequest] -> DeletionRequestProxyController#request gate=method:isAuthenticated() layout=yes
+/profile/description POST -> ProfileController#updateDescription gate=class:isAuthenticated() layout=yes
+/profile/description POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileController#updateDescriptionAjax gate=class:isAuthenticated() layout=yes
+/profile/payout-preference POST -> ProfileController#updatePayoutPreference gate=class:isAuthenticated() layout=yes
+/profile/payout-preference POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileController#updatePayoutPreferenceAjax gate=class:isAuthenticated() layout=yes
+/profile/rsi-handle POST -> ProfileController#updateRsiHandle gate=class:isAuthenticated() layout=yes
+/profile/rsi-handle POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileRsiHandleProxyController#updateRsiHandle gate=class:isAuthenticated() layout=no
+/promotion/admin/rank-requirements GET -> PromotionPageController#adminRankRequirements gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/promotion/admin/topics GET -> PromotionPageController#adminTopics gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/promotion/manage GET -> PromotionPageController#manage gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/promotion/my-evaluations GET -> PromotionPageController#myEvaluations gate=class:isAuthenticated() layout=yes
+/promotion/overview GET -> PromotionPageController#overview gate=class:isAuthenticated() layout=yes
+/refinery-orders GET -> RefineryOrderPageController#viewOrders gate=method:isAuthenticated() layout=yes
+/refinery-orders/create GET -> RefineryOrderPageController#viewCreateForm gate=method:isAuthenticated() layout=yes
+/refinery-orders/create POST -> RefineryOrderWriteController#createOrder gate=method:isAuthenticated() layout=yes
+/refinery-orders/create POST headers=[X-Requested-With=XMLHttpRequest] -> RefineryOrderWriteController#createOrderAjax gate=method:isAuthenticated() layout=yes
+/refinery-orders/import POST consumes=[multipart/form-data] -> RefineryImportProxyController#importExtract gate=method:isAuthenticated() layout=yes
+/refinery-orders/import POST headers=[X-Requested-With=XMLHttpRequest] consumes=[multipart/form-data] -> RefineryOrderPageController#importExtractAjax gate=method:isAuthenticated() layout=yes
+/refinery-orders/import-handoff POST headers=[X-Requested-With=XMLHttpRequest] -> RefineryOrderPageController#importHandoff gate=method:isAuthenticated() layout=yes
+/refinery-orders/locations/{locationId}/yields GET -> RefineryOrderPageController#getYieldsForLocation gate=method:isAuthenticated() layout=yes
+/refinery-orders/users/{userId}/org-units GET -> RefineryOrderPageController#getUserOrgUnits gate=method:isAuthenticated() layout=yes
+/refinery-orders/{id} GET -> RefineryOrderPageController#viewOrderDetail gate=method:isAuthenticated() layout=yes
+/refinery-orders/{id} POST -> RefineryOrderWriteController#updateOrder gate=method:isAuthenticated() layout=yes
+/refinery-orders/{id} POST headers=[X-Requested-With=XMLHttpRequest] -> RefineryOrderWriteController#updateOrderAjax gate=method:isAuthenticated() layout=yes
+/refinery-orders/{id}/delete POST -> RefineryOrderWriteController#deleteOrder gate=method:isAuthenticated() layout=yes
+/refinery-orders/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> RefineryOrderWriteController#deleteOrderAjax gate=method:isAuthenticated() layout=yes
+/refinery-orders/{id}/store POST -> RefineryOrderWriteController#storeOrder gate=method:isAuthenticated() layout=yes
+/refinery-orders/{id}/store POST headers=[X-Requested-With=XMLHttpRequest] -> RefineryOrderWriteController#storeOrderAjax gate=method:isAuthenticated() layout=yes
+/sc-links GET -> ScLinksPageController#showLinks gate=class:isAuthenticated() layout=yes
+/ship-data GET -> ShipDataPageController#listData gate=method:isAuthenticated() layout=yes
+/ship-data/manufacturers/{id}/visibility POST -> ShipDataPageController#toggleManufacturerVisibility gate=method:hasRole('ADMIN') layout=yes
+/ship-data/manufacturers/{id}/visibility POST headers=[X-Requested-With=XMLHttpRequest] -> ShipDataPageController#toggleManufacturerVisibilityAjax gate=method:hasRole('ADMIN') layout=yes
+/ship-data/reset-fitted POST -> ShipDataPageController#resetAllFitted gate=method:hasRole('ADMIN') layout=yes
+/ship-data/reset-fitted POST headers=[X-Requested-With=XMLHttpRequest] -> ShipDataPageController#resetAllFittedAjax gate=method:hasRole('ADMIN') layout=yes
+/ship-data/ship-types/{id}/visibility POST -> ShipDataPageController#toggleShipTypeVisibility gate=method:hasRole('ADMIN') layout=yes
+/ship-data/ship-types/{id}/visibility POST headers=[X-Requested-With=XMLHttpRequest] -> ShipDataPageController#toggleShipTypeVisibilityAjax gate=method:hasRole('ADMIN') layout=yes
+/terms GET -> TermsController#showTerms gate=none layout=yes
+/terms/accept GET -> TermsAcceptancePageController#showAcceptancePage gate=class:isAuthenticated() layout=yes
+/terms/accept POST -> TermsAcceptancePageController#recordAcceptance gate=class:isAuthenticated() layout=yes
+/users/search GET -> UserProxyController#searchUsers gate=method:isAuthenticated() layout=no
+/users/search-bank GET -> UserProxyController#searchUsersForBank gate=method:isAuthenticated() layout=no
+/users/{userId} GET -> UserProxyController#getUser gate=method:isAuthenticated() layout=no
+/users/{userId}/memberships GET -> UserProxyController#userMemberships gate=method:isAuthenticated() layout=no

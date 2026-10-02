@@ -296,7 +296,11 @@ sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
 
 val backendDtoMirrorDir = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto"
 
+val updateSnapshots = providers.gradleProperty("updateSnapshots").map { "true" }.orElse("false")
+
 tasks.named<Test>("test") {
+  systemProperty("basetool.updateSnapshots", updateSnapshots.get())
+
   inputs
     .files(rootProject.fileTree(backendDtoMirrorDir) { include("*.java") })
     .withPropertyName("backendDtoMirrorSources")
