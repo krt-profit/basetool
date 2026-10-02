@@ -20,6 +20,15 @@
   wurde bisher stillschweigend verworfen; jetzt markiert das Formular sie und bucht erst, wenn sie ausgefüllt
   ist.
 
+- **Build: Qualitätsschwellen pro Modul ausdrücklich.** Testheap, JaCoCo-Schwellen und PIT-Ziele
+  stehen in `<modul>/build-settings.properties`; fehlt ein Wert, bricht die Konfiguration ab, statt
+  still auf 0.50/0.40 zu fallen (REQ-OPS-037). Die Werte sind unverändert.
+
+- **Build: Prüfungen, die an Pfaden hängen, schlagen fehl statt still zu schrumpfen.** Neue Prüfung,
+  dass jeder Eingabepfad der Build-Skripte existiert; i18n- und Seiten-CSS-Scans lesen Unterordner;
+  ein Frontend-DTO ohne Backend-Gegenstück fällt durch; ein `ContextShapeTest` je Anwendung zählt
+  geplante Jobs, Transaktions-Listener, Controller und Filterketten (REQ-OPS-038).
+
 ### Fixed
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`

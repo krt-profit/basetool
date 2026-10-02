@@ -258,6 +258,13 @@ production runs where that is cheap to arrange: the Redis integration tests star
 image by digest (`TestImages.REDIS`, guarded against the compose file and the Quadlet unit), and
 the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`).
 
+**A quality gate never falls back to a default, and a guard never narrows in silence.** Each module
+declares its test heap, coverage floors and PIT targets in its own `build-settings.properties`, and
+configuration fails without them (REQ-OPS-037). Guards that find their subject by a path or a
+listing fail when they stop seeing it — build-script input paths, recursive content scans, the DTO
+mirror pairing, and a counted context shape per application (REQ-OPS-038) — so moving files or
+packages cannot switch a gate off.
+
 ## 8.13 The external client exchange
 
 Three rules hold for every exchange route, and each new resource or capability inherits them:

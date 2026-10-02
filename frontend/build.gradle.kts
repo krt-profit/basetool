@@ -294,11 +294,11 @@ val generateOssLicenses =
 
 sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
 
-val backendDtoMirrorDir = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto"
+val backendDtoMirrorDir = "backend/src/main/java"
 
 tasks.named<Test>("test") {
   inputs
-    .files(rootProject.fileTree(backendDtoMirrorDir) { include("*.java") })
+    .files(rootProject.fileTree(backendDtoMirrorDir) { include("**/*.java") })
     .withPropertyName("backendDtoMirrorSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 

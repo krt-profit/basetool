@@ -2436,6 +2436,94 @@ resolve; an unresolvable one keeps its existing "no change this tick" behaviour.
 (`rt_image_revision`) · `scripts/deploy.test.sh` (`scenario_mixed_release_*`) · **Runbook:**
 `docs/deployment.md` → *Promoting to production* · **Related:** REQ-OPS-002, REQ-OPS-015
 
+### REQ-OPS-037 — Every module declares its own quality settings; none is defaulted
+
+The root `build.gradle.kts` applies the shared conventions to every module, but the values that
+differ per module are **declared by the module itself** in `<module>/build-settings.properties`,
+never derived from the module's name with a fallback. A module carved out of `backend` must not
+quietly be held to weaker floors than the code it came from (plan G-20).
+
+| Key | Required when the module applies | Read by |
+| --- | --- | --- |
+| `test.maxHeap` | `java` | every `Test` task's `maxHeapSize` |
+| `coverage.instruction`, `coverage.branch` | `jacoco` | `jacocoTestCoverageVerification`, a ratio in (0, 1] |
+| `mutation.targetClasses`, `mutation.targetTests` | `info.solidsoft.pitest` | PIT's target patterns, comma-separated |
+
+- **Absence fails configuration.** A missing file, a missing key for an applied plugin, an unknown
+  key or a malformed value stops the build with the module, the file and the key named.
+- **The file is a configuration-cache input** (`providers.fileContents`): an edit invalidates the
+  cache entry, and the build stays configuration-cache clean.
+- **The image builds copy it** next to each module's `build.gradle.kts` (`docker/app/Dockerfile`,
+  `docker/sandbox/keycloak/Dockerfile`), so it is a shared image input for the release reuse plan.
+- **PIT is judged by its completion**, not its exit code: `scripts/check-pit-result.sh` fails the
+  weekly mutation run on a cut-off or empty `mutations.xml` (plan C-02).
+
+Values at introduction, identical to the name-keyed maps they replace:
+
+| Module | Test heap | Instruction / branch floor | PIT targets |
+| --- | --- | --- | --- |
+| `backend` | 3072m | 0.82 / 0.65 | `…backend.service.*` |
+| `frontend` | 2048m | 0.60 / 0.46 | `…frontend.service.*` |
+| `ingest` | 1024m | 0.93 / 0.85 | `…ingest.service.*` |
+| `keycloak-spi` | 1024m | 0.66 / 0.60 | — |
+| `logging-support` | 1024m | 0.50 / 0.40 | — |
+| `test-support` | 1024m | — | — |
+
+**Acceptance**
+
+- [x] The effective test heap, JaCoCo limits and PIT targets of every module are unchanged
+  (dumped before and after with an init script).
+- [x] Removing `coverage.branch` from `logging-support`, `mutation.targetTests` from `ingest`, or
+  `test-support`'s whole file, adding an unknown key or setting a floor above 1 each fails
+  `./gradlew help` with a message naming the module and key.
+- [x] `./gradlew help --configuration-cache` reuses its entry on the second run.
+
+**Enforced by:** root `build.gradle.kts` (`ModuleBuildSettings`, `moduleBuildSettings()`) ·
+`*/build-settings.properties` · `scripts/check-pit-result.sh` (`pitest.yml`) · **Related:**
+REQ-OPS-038
+
+### REQ-OPS-038 — Guards keyed on today's layout fail instead of going quiet
+
+Several gates find their subject by a path, a directory listing or a package prefix. A file or
+package move — the domain modularisation consists of little else — would narrow them one file at a
+time while the build stays green (plan G-20, G-24). Each of them therefore fails when it stops seeing
+what it guards:
+
+- **Every input path a build script declares exists.** `scripts/check-gradle-input-paths.py`
+  resolves each `inputs.file`, `inputs.files` and `inputs.dir` of every tracked `*.gradle.kts`
+  (literals, `file`/`fileTree`, `layout.projectDirectory`, `rootProject.file`, and a `val` holding
+  one) and fails on a missing one; Gradle drops a missing `inputs.files` entry silently, leaving the
+  task up to date when the real file changes. A selection floor fails it when the parser stops
+  finding today's references (`repo-lint.yml`, `gradle-input-paths`).
+- **Content scans walk recursively.** `I18nDictionaryCoverageTest` reads every script below
+  `static/js` and `TemplateCommentHygieneTest` every page stylesheet below `static/css/pages`, so a
+  per-domain subfolder stays covered; each is proven on a subfolder fixture.
+- **A frontend DTO mirror without a backend twin fails.** `DtoMirrorConsistencyTest` finds the twin
+  by record name anywhere under `backend/src/main/java`, nested records included, or under the name
+  `RENAMED_TWINS` gives it; a frontend record with neither fails unless `UNPAIRED_BY_DESIGN` lists it
+  with its reason, and a stale entry in either list fails. The frontend `test` task takes the whole
+  backend source tree as its input for this.
+- **The application contexts keep their shape.** A `ContextShapeTest` in `backend`, `frontend` and
+  `ingest` counts, in the running test context, the `@Scheduled` methods, `@TransactionalEventListener`
+  methods and controllers of beans under `de.greluc.krt.profit.basetool`, and the
+  `SecurityFilterChain` beans, and asserts today's exact numbers (`test-support`'s `ContextShape`).
+  A module that leaves the component scan changes a count.
+
+**Acceptance**
+
+- [x] The input-path checker's self-test reports a deleted input file and directory, and finds each
+  reference shape without taking an `include` pattern or a `buildDirectory` output for a path.
+- [x] Each recursive scan finds a fixture placed in a subfolder.
+- [x] The mirror pairing reports an unpaired fixture record, pairs a nested backend twin and a
+  renamed one, and reports a stale list entry; the real pairing holds at least 267 mirrors.
+- [x] `ContextShape` counts a fixture context exactly (a repeated schedule once) and only inside its
+  package prefix.
+
+**Enforced by:** `scripts/check-gradle-input-paths.py` (`repo-lint.yml`) ·
+`frontend/…/i18n/I18nDictionaryCoverageTest` · `frontend/…/template/TemplateCommentHygieneTest` ·
+`frontend/…/DtoMirrorConsistencyTest` · `*/…/architecture/ContextShapeTest` ·
+`test-support/…/context/ContextShape` · **Related:** REQ-OPS-037
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not
