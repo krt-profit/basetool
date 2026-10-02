@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -599,7 +599,9 @@ DB cascade removed the membership row.
 **Enforced by:** `UserDeletionService.deleteUser` (explicit ordered reassignment),
 `MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
 `db/migration/V63` (companion table without auto-cascade on `owner_id`),
-`OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection-only snapshot seam).
+`OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection-only snapshot seam),
+`GdprParticipantCoverageTest` (every non-cascading foreign key to `app_user` is a step the
+deletion is checked to call, REQ-DATA-021).
 
 ### REQ-DATA-009 — A global statement-execution timeout bounds every query (finding SEC-03)
 
@@ -1016,6 +1018,147 @@ are unaffected, because they do not go through the HQL `like` rendering.
 
 **Code:** `LikePatterns`, the `…Repository` queries named above, `BlueprintProductService`,
 `JobOrderItemService`, `InventoryItemCatalogService`, `HangarService`
+
+### REQ-DATA-020 — every table has one owning module, and SQL reaches a foreign table only through a listed crossing
+
+Every base table of the schema (except Flyway's `flyway_schema_history`) has **exactly one owning
+module** of the target architecture ([plan §5.1, §5.6](../DOMAIN_MODULARISATION_PLAN.md)). The
+owner is the module whose aggregate the table stores; foreign keys between modules stay, they are
+integrity, not coupling. A **trigger** or a **native statement** (a repository's
+`@Query(nativeQuery = true)` or `@NativeQuery`, an entity's `@Formula`) names another module's table
+only through a reviewed crossing listed with its reason in `TableOwnershipTest`, and SQL that no
+repository declares runs only in the four listed classes: the three GDPR registries'
+executors (`DataExportService`, `PersonSearchService`, `UserAccountMergeService`) and
+`ChangeSourceTransactionManager`.
+
+Every table and column a trigger function names — `NEW.x`, `OLD.x`, `alias.x`, an `INSERT` column
+list, and every table, through every schema function the trigger calls — **resolves against
+today's schema**. PostgreSQL checks a PL/pgSQL body only when it runs, so a column renamed under
+the change feed of [ADR-0224](../adr/0224-the-change-feed-is-a-trigger-written-key-log.md) would
+pass the migration and fail every later write to `personal_blueprint`, `default_blueprint`,
+`inventory_item` or `ship`; the migration that renames a column recreates the functions that name
+it.
+
+The ownership map, 117 tables. Its machine-readable copy is
+`backend/src/test/resources/architecture/table-ownership.txt`, which the test reads; a new table is
+added to both. `deletion_request` sits with identity, as do the GDPR classes once the transitional
+`privacy` module dissolves (plan §7.6).
+
+| Module | Tables | Tables owned |
+| --- | ---: | --- |
+| `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
+| `audit` | 1 | `audit_event` |
+| `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
+| `catalogue` | 36 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `space_station`, `star_system`, `terminal`, `uex_category` |
+| `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
+| `admin` | 1 | `system_setting` |
+| `dashboard` | 1 | `announcement` |
+| `orgchart` | 1 | `org_chart_position` |
+| `promotion` | 5 | `member_evaluation`, `promotion_category`, `promotion_level_content`, `promotion_topic`, `rank_requirement` |
+| `personalinventory` | 1 | `personal_inventory_item` |
+| `hangar` | 1 | `ship` |
+| `blueprint` | 3 | `blueprint_external_alias`, `default_blueprint`, `personal_blueprint` |
+| `inventory` | 3 | `inventory_item`, `inventory_item_job_order_allocation`, `inventory_item_mission_allocation` |
+| `mission` | 12 | `mission`, `mission_crew`, `mission_crew_job_types`, `mission_finance_entry`, `mission_frequency`, `mission_managers`, `mission_objective`, `mission_ownership`, `mission_participant`, `mission_participant_org_unit`, `mission_step`, `mission_unit` |
+| `refinery` | 2 | `refinery_good`, `refinery_order` |
+| `joborder` | 10 | `job_order`, `job_order_assignees`, `job_order_handover`, `job_order_handover_item`, `job_order_item`, `job_order_item_handover`, `job_order_item_handover_entry`, `job_order_item_material`, `job_order_material`, `material_claim` |
+| `materialexchange` | 4 | `material_exchange_interest`, `material_exchange_offer`, `material_exchange_request`, `material_exchange_request_interest` |
+| `operation` | 2 | `operation`, `operation_payout_status` |
+| `bank` | 10 | `bank_account`, `bank_account_approval_limit`, `bank_account_grant`, `bank_account_view_grant`, `bank_audit_event`, `bank_booking_request`, `bank_holder`, `bank_holder_posting`, `bank_posting`, `bank_transaction` |
+| `exchange` | 11 | `exchange_bulk_undo_run`, `exchange_bulk_undo_skip`, `exchange_change`, `exchange_client`, `exchange_client_capability`, `exchange_client_revocation`, `exchange_feed_horizon`, `exchange_installation`, `exchange_journal`, `exchange_settings`, `exchange_ship_link` |
+
+The listed crossings:
+
+| Crossing | Foreign tables | Why |
+| --- | --- | --- |
+| The four V252/V260 change-feed triggers on `personal_blueprint`, `default_blueprint`, `inventory_item`, `ship` | `exchange_change` (write), `app_user` (read) | The exchange's key log is written with the row (ADR-0224) |
+| `trg_guard_promotion_topic_owner_kind`, `trg_guard_rank_requirement_owner_kind` | `org_unit` (read) | The owning unit must be a squadron; a downward read |
+| `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station` (read) | Catalogue names joined into the exchange's stock lots |
+| `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |
+
+**Acceptance**
+
+- [x] A table without an owner, a table owned twice, an owner that is not a module and an owned
+  table that no longer exists each fail the build.
+- [x] A trigger or native statement naming a foreign table outside the list fails, and so does a
+  listed crossing that no longer happens; a class running SQL outside a repository fails unless it
+  is listed.
+- [x] Every table and column a trigger function names exists; the four change-feed triggers are
+  among those checked.
+- [x] Each rule is proven able to fail: a table created, a cross-module trigger attached, a change-feed
+  column and the change-feed table renamed — each inside a rolled-back transaction — and a planted
+  repository and SQL caller are all reported. Selection floors: 117 tables, 18 triggers, 30 native
+  statements.
+
+**Enforced by:** `TableOwnershipTest`, `TriggerColumnResolutionTest` · **Code:**
+`architecture/table-ownership.txt`, `SchemaCatalog`, `SqlReferences` (test sources)
+
+### REQ-DATA-021 — every column that references a member has a disposition in each GDPR registry
+
+A column **references a member** when it carries a foreign key to `app_user`, or when it is a `uuid`
+named `user_id`, `owner_id`, `*_user_id`, `*_by`, `*_by_id` or `*_sub` (56 columns today, three of
+them without a foreign key). Each such column has a disposition in all three registries, or is
+listed with its reason:
+
+- **Erasure** (REQ-DATA-008, `UserDeletionService`): its foreign key cascades or nulls on delete;
+  or the deletion resolves it before the account row goes, listed as a step the service is checked
+  to call (11 columns: reassigned, nulled or purged); or it outlives the account by design
+  (`audit_event.target_user_id`, `bank_audit_event.target_user_id`, REQ-AUDIT-001; and
+  `p4k_import_job.created_by`, the enqueuing admin's id on an import job, pruned to seven days
+  after every import run).
+- **Export** (REQ-SEC-058, `DataExportSections`): a section selects the member's rows by it, or it
+  is listed as not exported. Today 35 columns are exported and 21 are not: 13 name the member as
+  the actor on somebody else's or the organisation's record, or mirror an exported column; **8
+  hold data about the member that no section selects yet** (`bank_account_approval_limit`,
+  `bank_account_grant.user_id`, `bank_booking_request.counterparty_user_id`,
+  `material_exchange_request_interest`, `mission.party_lead_user_id`,
+  `mission_unit.responsible_user_id`, `org_unit.grand_admiral_user_id`, `user_roles`) — an open
+  decision for the owner, listed so that a ninth cannot join silently.
+- **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act;
+  only `p4k_import_job.created_by` is listed as not merged. `UserAccountMergeCoverageTest` holds
+  the foreign-key columns as before; this requirement adds the ones without a key.
+
+**Acceptance**
+
+- [x] A new member-referencing column without a disposition fails in each registry; a listed
+  column that no longer exists fails; a column listed as not exported that a section exports fails.
+- [x] Every listed deletion step is a call `UserDeletionService` makes.
+- [x] Proven able to fail: a table with a non-cascading foreign key to `app_user` and an
+  unregistered `*_by` column, created in a rolled-back transaction, is reported by all three
+  registries; a deletion step the service never calls is reported. Selection floor: 56 columns.
+
+**Enforced by:** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`,
+`UserIdentityColumnForeignKeyTest` · **Code:** `UserDeletionService`, `DataExportSections`,
+`UserAccountMergeService`
+
+### REQ-DATA-022 — a cached instance is never edited; caches move to read models
+
+The master-data caches are Caffeine caches that hold object references, so every reader shares the
+instance a `@Cacheable` method returned. **No mutator may edit that instance**: a write loads the
+entity from the repository inside its own transaction. Today's catalogue mutators are safe only
+because they call their own `@Cacheable` getter through self-invocation, which bypasses the cache
+proxy; a query/command split would route the same call through the proxy, edit the shared
+instance, and — since `@CacheEvict` does not run when the write throws — leave the edit in the
+cache after a failed write.
+
+The **target state** is that a cache holds read models, never an `@Entity` (plan §5.6, Phase 4).
+Until then the 32 catalogue methods that still return an entity are listed with their reason, and
+the list may only shrink.
+
+**Acceptance**
+
+- [x] For every service with a `@Cacheable` method, every mutating method (an evicting annotation,
+  or a non-read-only transaction) has a case that reads through the cache, runs the mutator through
+  its proxy, and finds every field of every returned instance unchanged; the case list must equal
+  the discovered mutators (45 today).
+- [x] No method calls another class's `@Cacheable` method and a setter on the entity it returns.
+- [x] No new `@Cacheable` method returns an entity or a container of entities.
+- [x] Proven able to fail: a planted query/command split, as beans of the invariant test, is
+  caught editing the cached instance; the same split and a planted entity cache are reported by
+  the structural rules. Selection floor: 33 `@Cacheable` methods.
+
+**Enforced by:** `CachedCatalogueEntityInvariantTest`, `CacheableEntityRulesTest` · **Code:**
+`CacheConfig`, the catalogue `…Service` classes
 
 ## Out of scope
 

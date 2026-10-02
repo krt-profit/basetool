@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Backend-Wächter für Daten und Transaktionen (Modularisierung, Phase 0).** Tests prüfen jetzt, dass
+  jede Tabelle genau einem Modul gehört, Trigger und natives SQL fremde Tabellen nur über gelistete
+  Ausnahmen erreichen, jede Mitgliedsreferenz in Löschung, Datenauskunft und Kontozusammenführung
+  geregelt ist, Audit nie nach dem Commit geschrieben wird und Mutatoren keine gecachte Instanz
+  verändern (REQ-DATA-020…022, REQ-AUDIT-007). Keine Verhaltensänderung.
+
 ### Changed
 
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum

@@ -319,6 +319,15 @@ since the go-live of 2026-09-28, so these risks hold now.
   version, re-checks those classes and renders one device consent page (the sandbox smoke test
   asserts the warning and the code). A silently changed default-provider rule would leave the
   consent page without the code but still working.
+- **Thirty-two master-data caches hold the catalogue entities themselves** (opened 2026-10-03).
+  Every reader shares the cached instance, and the mutators are safe only because they load
+  through self-invocation; a test runs every mutator against a cached read and a rule lets the
+  list only shrink until the caches hold read models (`REQ-DATA-022`, plan Phase 4).
+- **Eight member-referencing columns are not in the Art. 15 export** (opened 2026-10-03): approval
+  limits, account grants, booking requests as counterparty, market-request interest, party lead,
+  unit responsibility, grand admiral appointment and realm roles. Listed in
+  `GdprParticipantCoverageTest` so that no ninth joins silently; whether each becomes a section is
+  the owner's decision (`REQ-DATA-021`, `REQ-SEC-058`).
 
 ## 11.9 The domains are coupled inside correct layers — opened 2026-09-29
 
