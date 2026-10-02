@@ -2050,6 +2050,34 @@ over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `fragments/head.html`, `event
 `krt-client-error.js` · **Related:** REQ-FE-001, REQ-OBS-* (`basetool_client_error_total`), ADR-0069
 (page JavaScript in static modules), ADR-0125
 
+### REQ-FE-024 — Only an edited data form arms the unsaved-changes guard
+
+`unsaved-changes.js`, loaded on every page with the sidebar, warns before a link leaves a page whose
+form holds edits nobody submitted: it opens the „Ungespeicherte Änderungen" dialog instead of
+following the link, and a full navigation gets the browser's own leave prompt.
+
+A filter, a search or a pager is not unsaved data, and the guard must not treat it as such:
+
+- **A form with an explicit `method="get"` never arms the guard**, nor does a form marked
+  `no-track`. A GET form is a query; leaving it loses nothing. The rule lives in the guard itself,
+  so a new filter form needs no class to be right.
+- **A submit clears the guard, including one the edit itself triggers.** The guard listens to
+  `input` and `change` in the capture phase, so it arms before the control's own listener runs; a
+  listener that submits for the same edit then clears it. Listening in the bubble phase re-armed the
+  guard after the submit and warned on the next link, which is how the auto-applied terms filter
+  warned on its own pager.
+
+**Acceptance**
+
+- [x] Changing the „Nutzungsbedingungen" filter re-renders the list in place, and a link then
+  leaves the page without a warning.
+- [x] Typing a hangar search, which filters in place, leaves the next link unguarded.
+- [x] An unsaved edit in a data form still opens the dialog when a link is clicked.
+
+**Enforced by:** `UnsavedChangesGuardE2eTest` · **Code:** `unsaved-changes.js`,
+`fragments/unsaved-modal.html`, `admin-terms.js`, `admin/terms.html` · **Related:** REQ-FE-005,
+REQ-FE-021
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract

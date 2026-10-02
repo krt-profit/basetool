@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Keine Warnung vor ungespeicherten Änderungen mehr nach einem Filter.** Wer einen Filter oder eine
+  Suche umstellt (z. B. „Nutzungsbedingungen", Hangar, Kontoverlauf, Blueprints) und dann blättert oder
+  die Seite verlässt, wird nicht mehr gewarnt. Der Filter der Nutzungsbedingungen hat keinen
+  „Anwenden"-Button mehr, er greift sofort.
+
 ## [v1.13.6](https://github.com/krt-profit/basetool/releases/tag/v1.13.6) - 2026-10-02
 
 ### Added
