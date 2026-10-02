@@ -54,6 +54,12 @@ ownership according to a documented matrix, the admin area and promotion are exp
 and `orgUnitId` travels in the MDC and in a relay header so the active context is visible in logs
 and across the module boundary.
 
+A scoped aggregate says so in its own code: it carries `@TenantScoped`, naming its owning or
+responsible unit, and the tenancy guards select by that marker and by what a controller writes,
+never by class names, so a split or moved controller stays under the scope-gate rule (REQ-ORG-028).
+Request bodies are kept apart from what the server manages by the same kind of structural rule
+(REQ-SEC-077).
+
 Authority: [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (`REQ-ORG-*`).
 
 ## 8.3 Persistence and schema

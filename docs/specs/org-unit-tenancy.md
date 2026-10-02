@@ -227,6 +227,11 @@ prevents new `@JoinColumn(name = "squadron_id")`. Its allow-list names only `Use
 entity no longer maps the column at all (V104 dropped `app_user`'s legacy squadron fields);
 `MissionParticipant`'s affiliation moved to the `mission_participant_org_unit` join table.
 
+> **Amended by REQ-ORG-028 (2026-10-03):** the scope rules now also select by the `@TenantScoped`
+> marker on the aggregate rather than only by class names. The simple-name write-gate rule
+> `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` still runs beside the marker-based rule
+> and can be retired, because the marker-based rule selects every controller it names and more.
+
 ### REQ-ORG-007 — Audit MDC field
 
 `CorrelationIdFilter` emits MDC `orgUnitId` on every request. Logback patterns must include
@@ -833,3 +838,51 @@ pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidd
 `#resolveSquadronForPickerOutput`, `OwnerOrgUnitRequiredException`, `AppExceptionKind`,
 `krt-fetch.js#ownerOrgUnitRequiredMessage`, `fragments/head.html` ·
 **Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `CLAUDE.md`
+
+### REQ-ORG-028 — A scoped aggregate carries `@TenantScoped`, and the scope rules select by it
+
+Every entity whose rows belong to an owning or responsible org unit carries the marker
+`backend.annotation.TenantScoped`, naming the field that holds that unit. Today that is `Mission`,
+`Operation`, `Ship`, `InventoryItem` and `RefineryOrder` (`owningOrgUnit`), `JobOrder`
+(`responsibleOrgUnit`), and `PromotionTopic` and `RankRequirement` (`owningSquadron`).
+
+- **Every org-unit reference is classified.** Every persistent field of an entity that refers to an
+  org unit — an association to `OrgUnit` or a subtype, a collection of them, or a `UUID` column
+  named `…org_unit_id` / `…squadron_id`, embedded keys included — is either named by the entity's
+  marker or listed, with its reason, as no tenancy boundary. The list holds fourteen references
+  today: the job order's customer unit, the executing unit of the two handovers, the material
+  claim's claiming unit, the participant's affiliation, the Materialbörse's offer and request
+  attribution (the board is organisation-wide), the bank account holder and the two bank
+  counterparties, the Kommandogruppe's Staffel, the org-chart position's unit, the hierarchy parent
+  and the membership key. A marker naming a field that is no org-unit reference, a reference both
+  marked and listed, and a list entry that matches nothing fail the build too.
+- **Tenant data** is every marked entity and, transitively, every entity with a mandatory to-one
+  association to one (an aggregate part: mission participants, job-order materials, refinery goods,
+  promotion categories, …).
+- **The write gate is selected by what a controller writes, not by its name.** A controller that
+  injects a bean writing tenant data or the org-unit tree (`save*`, `delete*` or a `@Modifying`
+  query on its repository) has each write mapping with a `UUID` path variable checked: the effective
+  `@PreAuthorize` must gate **every** top-level `or` branch on a scope bean (`ownerScopeService`,
+  `accessGateService`, `missionSecurityService`, `specialCommandSecurityService`,
+  `orgRoleManagementSecurityService`) or on `hasRole('ADMIN')` alone, read from the SpEL syntax tree.
+  A handler whose scope check lives in the service layer is listed with its reason and must reach a
+  `can*` call on a scope service, or a method whose own `@PreAuthorize` is scope-gated, within three
+  calls; a selected handler that writes no tenant data is listed with its reason.
+
+This selects strictly more than the seven controller names the earlier rule listed, which therefore
+can be retired once both rules are merged.
+
+**Acceptance**
+
+- [x] Every org-unit reference of every entity is marked or listed with a reason (22 references
+  today, a floor).
+- [x] The eight aggregates above carry the marker.
+- [x] Every selected write handler is scope-gated, service-gated with a reachable scope check, or
+  listed as no tenant write (24 controllers, 126 handlers today, floors); the seven controllers of
+  the earlier whitelist are among them.
+- [x] Each rule fails on planted fixtures: an unmarked owning entity, a marker on a plain column, a
+  stale list entry, an `or isAuthenticated()` branch beside a scope call, a class-level gate only,
+  and a service-gated handler whose service never checks scope.
+
+**Enforced by:** `TenancyGuardTest`, `TenancyGuardRules`, `SpelScopeGate` · **Code:**
+`TenantScoped` · **Related:** REQ-ORG-002, REQ-ORG-003, REQ-ORG-006, REQ-SEC-077

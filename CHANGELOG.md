@@ -31,6 +31,14 @@
   die Seite verlässt, wird nicht mehr gewarnt. Der Filter der Nutzungsbedingungen hat keinen
   „Anwenden"-Button mehr, er greift sofort.
 
+### Security
+
+- **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
+  tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
+  Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
+  (REQ-ORG-028, REQ-SEC-077, REQ-API-015). 13 Admin-/SPI-Endpunkte validieren ihren Body jetzt;
+  gültige Anfragen ändern sich nicht.
+
 ## [v1.13.6](https://github.com/krt-profit/basetool/releases/tag/v1.13.6) - 2026-10-02
 
 ### Added

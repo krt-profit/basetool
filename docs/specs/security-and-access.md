@@ -146,7 +146,12 @@ equivalents — a new violation fails `./gradlew test`:
 - Staffel-scoped write endpoints gate on `OwnerScopeService`
   (`staffelScopedWriteEndpointsMustGateOnOwnerScopeService`,
   `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
-  the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007).
+  the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007). The write-gate rule
+  is re-expressed on the `@TenantScoped` marker, selecting every controller that writes tenant data
+  (`TenancyGuardTest`, REQ-ORG-028).
+- No type is both returned and bound as a request body beyond a reviewed list, no request type
+  carries a server-managed component, and every body is `@Valid` (`MassAssignmentGuardTest`,
+  REQ-SEC-077, REQ-API-015).
 - Controllers never return JPA entities (DTOs only — see [`api-conventions.md`](api-conventions.md)).
 - No controller depends on `OrgUnitMembershipMapper` — the membership entity→DTO projection runs
   inside `OrgUnitMembershipService`'s own transactions, never controller-side after commit
@@ -5104,6 +5109,58 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 `MemberManagementController`, `profile.html`, `profile.js`, `member-edit.html` · **Record:**
 [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md) (A1) · **Related:**
 REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
+
+### REQ-SEC-077 — A request body never carries what the server manages
+
+Mass assignment is closed by structure, not by the care of each mapper:
+
+1. **No type is both returned and bound.** A type a handler returns — directly or inside
+   `ResponseEntity`, `PageResponse`, `List` or another generic — is never a `@RequestBody` type. A
+   dual-use type turns every read field added later into a writable one.
+2. **A request type carries no server-managed component.** Neither a body type nor any project type
+   nested in one declares the owner (`owner`, `ownerId`, …), an `owning…` component, a component
+   naming an org unit, a creation or modification timestamp or a `…SyncedAt`, or a `status` unless
+   every path binding the type ends in `/status` (a transition endpoint). The body type itself
+   declares no `id`: the identity of the written row comes from the path or the server. A nested
+   `id` names a referenced row and is allowed.
+3. **Every body is validated** (REQ-API-015).
+
+Two reviewed lists hold today's deliberate exceptions, and a stale entry fails the build:
+
+- **Thirteen dual-use types** whose split would rename a frozen OpenAPI schema the app consumes, which
+  the modularisation's Phase 0 forbids: `BereichDto`, `FrequencyTypeDto`, `JobTypeDto`,
+  `LocationDto`, `MaterialCategoryDto`, `MaterialDto`, `OrganisationsleitungDto`,
+  `RefineryOrderDto`, `RefiningMethodDto`, `SpecialCommandDto`, `SquadronDto`, `StarSystemDto`,
+  `TerminalDto`. Each entry names which of its server-managed components a MockMvc test proves
+  unwritable — a forged `id` naming another existing row neither overwrites that row on create nor
+  retargets an update; the refinery order's forged owner (outside the caller's units), owning
+  Staffel and create status are not persisted; a terminal update writes only `hidden` — and which
+  are deliberate client input, with the check that validates each. The guard refuses an entry whose
+  components and proof do not match, so the exception is proven safe rather than frozen. The split
+  follows each domain's API cut (ADR-0060).
+- **Reviewed client inputs:** components that look server-managed but are a validated choice — the
+  create-time owning unit resolved by `OwnerScopeService.resolveOrgUnitForPickerOutput`
+  (REQ-ORG-004), a move or rebook target, the job order's processing and customer unit, a bank
+  counterparty, an ADMIN's org-chart or hierarchy choice, and the lifecycle `status` of the mission
+  and operation sections, each with its reason.
+
+A new request type complies with no exception.
+
+**Acceptance**
+
+- [x] No type beyond the thirteen is returned and bound (573 handlers, 161 body types today,
+  floors).
+- [x] No request type declares a server-managed component beyond the reviewed inputs.
+- [x] Every dual-use entry accounts for each server-managed component, and
+  `DualUseRequestBodyProofTest` holds a proof per type.
+- [x] Each rule fails on planted fixtures: a returned-and-bound DTO, `id` / `ownerId` /
+  `createdAt` / `status` on a body, a `status` outside `/status`, a nested `owningOrgUnitId`, and a
+  stale list entry; a `status` on a `/status`-only type and a nested `id` pass.
+
+**Enforced by:** `MassAssignmentGuardTest`, `MassAssignmentGuardRules`,
+`DualUseRequestBodyProofTest`, `RefineryOrderServiceLifecycleTest`
+(`clientSuppliedServerManagedFields_areIgnoredOnCreate`) · **Related:** REQ-API-002, REQ-API-015,
+REQ-ORG-028, REQ-SEC-005, ADR-0060
 
 ## Out of scope
 
