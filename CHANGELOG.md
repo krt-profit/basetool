@@ -31,6 +31,12 @@
   die Seite verlässt, wird nicht mehr gewarnt. Der Filter der Nutzungsbedingungen hat keinen
   „Anwenden"-Button mehr, er greift sofort.
 
+### Security
+
+- **Die Backend-Clients des Frontends senden nur noch an das Backend.** Jeder `WebClient` lehnt eine Anfrage an
+  einen anderen Host als `app.backend-url` ab, bevor das Bearer-Token angehängt wird; ArchUnit hält die Clients im
+  Backend-Kern (REQ-FE-029).
+
 ## [v1.13.6](https://github.com/krt-profit/basetool/releases/tag/v1.13.6) - 2026-10-02
 
 ### Added

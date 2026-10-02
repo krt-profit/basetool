@@ -63,37 +63,38 @@ class BackendHostnameVerificationTest {
   @Test
   void byDefaultThePinnedChainAloneDecides() throws Exception {
     try (MockWebServer backend = httpsServer(BACKEND_CERT)) {
-      assertThat(get(client(BACKEND_CERT, false), backend)).isEqualTo("ok");
+      assertThat(get(client(BACKEND_CERT, false, backend))).isEqualTo("ok");
     }
   }
 
   @Test
   void withVerificationOnAMisnamedCertificateIsRefused() throws Exception {
     try (MockWebServer backend = httpsServer(BACKEND_CERT)) {
-      WebClient client = client(BACKEND_CERT, true);
+      WebClient client = client(BACKEND_CERT, true, backend);
 
-      assertThatThrownBy(() -> get(client, backend)).isInstanceOf(RuntimeException.class);
+      assertThatThrownBy(() -> get(client))
+          .isInstanceOf(RuntimeException.class)
+          .isNotInstanceOf(BackendOriginViolationException.class);
     }
   }
 
   @Test
   void withVerificationOnACorrectlyNamedCertificateIsAccepted() throws Exception {
     try (MockWebServer backend = httpsServer(LOCALHOST_CERT)) {
-      assertThat(get(client(LOCALHOST_CERT, true), backend)).isEqualTo("ok");
+      assertThat(get(client(LOCALHOST_CERT, true, backend))).isEqualTo("ok");
     }
   }
 
   /**
-   * Calls the server once through the client.
+   * Calls the server once through the client, which is addressed to it.
    *
    * @param client the client under test.
-   * @param server the server.
    * @return the response body.
    */
-  private static String get(WebClient client, MockWebServer server) {
+  private static String get(WebClient client) {
     return client
         .get()
-        .uri("https://localhost:" + server.getPort() + "/ping")
+        .uri("/ping")
         .retrieve()
         .bodyToMono(String.class)
         .block(Duration.ofSeconds(10));
@@ -123,10 +124,12 @@ class BackendHostnameVerificationTest {
    *
    * @param pinned the certificate the bundle pins.
    * @param verifyHostname {@code app.http.verify-backend-hostname}.
+   * @param server the server the client is addressed to, dialled as {@code localhost}.
    * @return the streaming backend WebClient, which shares the trust logic of every backend client.
    * @throws Exception when the truststore cannot be built.
    */
-  private static WebClient client(HeldCertificate pinned, boolean verifyHostname) throws Exception {
+  private static WebClient client(
+      HeldCertificate pinned, boolean verifyHostname, MockWebServer server) throws Exception {
     ExchangeFilterFunction passthrough = (request, next) -> next.exchange(request);
     WebClientLoggingFilter logging = mock(WebClientLoggingFilter.class);
     when(logging.correlationIdPropagation()).thenReturn(passthrough);
@@ -139,7 +142,7 @@ class BackendHostnameVerificationTest {
     when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});
 
     return new WebClientConfig(
-            new AppBackendProperties("https://backend:11261"),
+            new AppBackendProperties("https://localhost:" + server.getPort()),
             new AppHttpProperties(
                 Duration.ofSeconds(3),
                 Duration.ofSeconds(5),
