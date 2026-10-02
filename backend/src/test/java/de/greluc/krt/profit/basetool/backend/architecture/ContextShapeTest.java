@@ -32,7 +32,6 @@ import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.stereotype.Controller;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,7 +45,6 @@ import org.springframework.web.bind.annotation.RestController;
  * context and not counted.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class ContextShapeTest {
 
   /** The backend's shape under the test profile. */
