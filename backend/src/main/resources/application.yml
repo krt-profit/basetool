@@ -170,9 +170,15 @@ app:
     connected-apps:
       web-client-ids: ${APP_EXCHANGE_CONNECTED_APPS_WEB_CLIENT_IDS:basetool-frontend}
   android:
-    minimum-version-code: ${APP_ANDROID_MINIMUM_VERSION_CODE:0}
-    latest-version-code: ${APP_ANDROID_LATEST_VERSION_CODE:0}
-    releases-url: ${APP_ANDROID_RELEASES_URL:https://github.com/krt-profit/basetool-android/releases/latest}
+    version-policy:
+      release:
+        minimum-version-code: 17
+        latest-version-code: 17
+        releases-url: https://github.com/krt-profit/basetool-android/releases/latest
+      emergency-override:
+        minimum-version-code: ${APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE:}
+        latest-version-code: ${APP_ANDROID_LATEST_VERSION_CODE_OVERRIDE:}
+        releases-url: ${APP_ANDROID_RELEASES_URL_OVERRIDE:}
   default-blueprints:
     provisioning:
       enabled: ${APP_DEFAULT_BLUEPRINTS_PROVISIONING_ENABLED:true}

@@ -317,6 +317,14 @@ ride the bundle. Provider JARs are barred from the config bundle and get their o
 signed artifact (ADR-0055). Requirements:
 [`deployment-delivery.md`](../specs/deployment-delivery.md).
 
+**A value that must roll back with the release lives in the image, not in `.env`.** `env.d` is
+rendered from the host `.env`, which no rollback touches, so a value the API depends on would
+survive a rollback of the API it was set for. The Android app floor is the case in point: it is a
+literal in the backend's `application.yml` (REQ-API-020), and the host keeps only an emergency
+override under its own `_OVERRIDE` names, alerted while it is in force. A variable the templates
+stop passing simply stops reaching the container; its stale `.env` line stays for the older
+releases a rollback may still render.
+
 **The Keycloak realm is the one piece of the deployment no artifact carries.** It lives in
 `db-keycloak` on each host, so delivery keeps images, units and provider JAR in lock-step across
 production and testing while the two realms were free to diverge — and did: on 2026-09-22 the

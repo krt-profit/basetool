@@ -474,7 +474,9 @@ The owner therefore decided (2026-10-01, D-11) on a **release-bound floor** — 
 a reviewed default in the release's own configuration, so it deploys and rolls back together with
 the API it protects, with the host value kept only as an emergency override — together with the
 app's re-read on resume and after an unexpected 404 and the `APP_UPDATE_REQUIRED` answer of retired
-paths. The S8 sequence above holds only until the release-bound floor is in place.
+paths. The S8 sequence above holds only until the release-bound floor is in place. *Implemented
+2026-10-03 (REQ-API-020): the floor is a literal in the backend's `application.yml`, the host keeps
+only `APP_ANDROID_*_OVERRIDE`, and retired paths answer `410 APP_UPDATE_REQUIRED`.*
 
 **Machinery the cut needs first** (Phase 0): ADR-0136, REQ-API-001, REQ-API-009 and REQ-API-010
 amended for the hard cut; a declared-break ledger that lists every removed or changed frozen

@@ -4,6 +4,17 @@
 
 ### Changed
 
+- **Die Mindestversion der Android-App gehört jetzt zum Release** (REQ-API-020). Untergrenze, neueste
+  Version und Release-Seite stehen fest in der `application.yml` des Backends (17 / 17) und gehen bei
+  einem Rollback mit zurück. `APP_ANDROID_MINIMUM_VERSION_CODE`, `…_LATEST_VERSION_CODE` und
+  `…_RELEASES_URL` werden nicht mehr gelesen; für den Notfall gibt es die leeren
+  `APP_ANDROID_*_OVERRIDE`, die beim Start mit `WARN` und nach einem Tag als Alarm
+  `AndroidVersionPolicyOverrideActive` auffallen.
+
+- **Stillgelegte App-Endpunkte antworten `410 APP_UPDATE_REQUIRED`** statt mit einem Fehler, auch ohne
+  gültiges Token, damit die App ihre Update-Sperre zeigt (REQ-API-020). Die Liste
+  `api/retired-operations.txt` ist noch leer; bis dahin ändert sich nichts.
+
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
   Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob
   dasselbe Material in derselben Qualität am selben Ort mit demselben Besitzer und derselben Einheit schon

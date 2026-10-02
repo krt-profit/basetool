@@ -2558,6 +2558,14 @@ pinned in `ApiVhostAnonymousSurfaceTest` like every other allow-listed path. Fam
 controller behind them are admitted **by name rather than by stem** (the refinery family path by
 path, for example), which is why the rest of those surfaces stays unreachable.
 
+**A retired Android operation answers without a token, and serves nothing** (REQ-API-020). An
+operation a hard-cut wave retired and listed in `api/retired-operations.txt` answers
+`410 APP_UPDATE_REQUIRED` ahead of authentication, so an app too old to log in still meets its
+update wall. It is not an anonymous *operation*: no handler is behind it, the answer is constant for
+every value of a placeholder, and another verb or a longer path continues to authentication as
+before. The list is empty today. When the generated edge include (plan guard G-08) admits such a
+path, its row states `410`.
+
 Everything else on the list is refused without a token — the Finanzen endpoints among them
 (`isAuthenticated() and isMemberOrAbove() and canSeeMission`), and since ADR-0159 the mission itself
 as well.

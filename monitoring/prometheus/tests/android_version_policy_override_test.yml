@@ -1,0 +1,68 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - the floor has run on the emergency override for a day
+    interval: 1m
+    input_series:
+      - series: 'basetool_android_version_policy_override{field="minimum_version_code", application="basetool-backend", job="basetool-backend"}'
+        values: "1x1600"
+      - series: 'basetool_android_version_policy_override{field="latest_version_code", application="basetool-backend", job="basetool-backend"}'
+        values: "0x1600"
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: AndroidVersionPolicyOverrideActive
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-backend
+              field: minimum_version_code
+            exp_annotations:
+              summary: "The Android version policy runs on an emergency override"
+              description: "basetool_android_version_policy_override{field=\"minimum_version_code\"} has been 1 for a day: the host's APP_ANDROID_*_OVERRIDE replaces the release default committed in application.yml, so this value no longer deploys or rolls back with the release (REQ-API-020). Raise the release default in a PR to the overridden value, release it, then empty the override in .env and re-render env.d — docs/deployment.md, The Android app floor."
+
+  - name: pending, not firing - a break-glass override inside its first day
+    interval: 1m
+    input_series:
+      - series: 'basetool_android_version_policy_override{field="minimum_version_code", application="basetool-backend", job="basetool-backend"}'
+        values: "1x1600"
+    alert_rule_test:
+      - eval_time: 12h
+        alertname: AndroidVersionPolicyOverrideActive
+        exp_alerts: []
+
+  - name: silent - every field comes from the release default
+    interval: 1m
+    input_series:
+      - series: 'basetool_android_version_policy_override{field="minimum_version_code", application="basetool-backend", job="basetool-backend"}'
+        values: "0x1600"
+      - series: 'basetool_android_version_policy_override{field="latest_version_code", application="basetool-backend", job="basetool-backend"}'
+        values: "0x1600"
+      - series: 'basetool_android_version_policy_override{field="releases_url", application="basetool-backend", job="basetool-backend"}'
+        values: "0x1600"
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: AndroidVersionPolicyOverrideActive
+        exp_alerts: []
+
+  - name: resolves - the override is folded into the release and emptied
+    interval: 1m
+    input_series:
+      - series: 'basetool_android_version_policy_override{field="releases_url", application="basetool-backend", job="basetool-backend"}'
+        values: "1x1500 0x100"
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: AndroidVersionPolicyOverrideActive
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-backend
+              field: releases_url
+            exp_annotations:
+              summary: "The Android version policy runs on an emergency override"
+              description: "basetool_android_version_policy_override{field=\"releases_url\"} has been 1 for a day: the host's APP_ANDROID_*_OVERRIDE replaces the release default committed in application.yml, so this value no longer deploys or rolls back with the release (REQ-API-020). Raise the release default in a PR to the overridden value, release it, then empty the override in .env and re-render env.d — docs/deployment.md, The Android app floor."
+      - eval_time: 26h
+        alertname: AndroidVersionPolicyOverrideActive
+        exp_alerts: []
