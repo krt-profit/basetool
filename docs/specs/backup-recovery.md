@@ -42,8 +42,15 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
   the service user's manager instead of failing (REQ-OPS-016, since 2026-09-25).
 - [ ] The repository is a restic repo (client-side encrypted, deduplicated); the storage target
   (Nextcloud over rclone WebDAV) only ever receives encrypted blobs.
-- [ ] After each upload the job runs `restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6
-  --prune` and `restic check`.
+- [ ] After each upload the job runs `restic forget --group-by host,tags --keep-daily 7
+  --keep-weekly 4 --keep-monthly 6 --prune` and `restic check`. The retention groups by host and
+  tag, because every run backs up from its own timestamped staging path and restic's default
+  grouping by path keeps every snapshot. `basetool_backup_snapshots` above
+  `basetool_backup_retention_limit` pages `BackupRetentionNotApplied` (`scripts/restic-repo.test.sh`).
+- [ ] The job initialises the repository only when restic reports that it does not exist (exit
+  code 10). A store that refuses (`403`), a wrong password or a lock is `FATAL` with restic's own
+  error in the log, never an `init` over an existing repository; stale locks are cleared with
+  `restic unlock` before the upload.
 - [ ] The job opens no listening socket and requires no inbound access to the host.
 - [ ] A successful run writes `basetool_backup_last_success_timestamp`; `BackupStaleOrMissing`
   pages when it is older than 26 h or absent, so a failed or never-run backup is not silent.
@@ -53,7 +60,7 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
   `backup.sh` / `restore-drill.sh` abort with `FATAL` before any container starts and without
   writing the success metric (`scripts/container-runtime.test.sh`).
 
-**Enforced by:** `scripts/backup.sh` · `scripts/iri-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
+**Enforced by:** `scripts/backup.sh` · `scripts/lib/restic-repo.sh` · `scripts/iri-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 
 ### REQ-OPS-009 — Consistency via a minimal, bounded nightly quiesce
 

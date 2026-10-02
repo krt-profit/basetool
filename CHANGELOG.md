@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Alarm `BackupRetentionNotApplied`.** `backup.sh` meldet die Zahl der Snapshots im Repository und das
+  Maximum der Aufbewahrung (`basetool_backup_snapshots`, `basetool_backup_retention_limit`); liegt die Zahl
+  darüber, warnt der Alarm.
+
+### Fixed
+
+- **Backup: die Aufbewahrung greift wieder.** `restic forget` gruppierte nach dem Pfad, und jeder Lauf sichert
+  aus einem eigenen Staging-Verzeichnis, also wurde nie ein Snapshot entfernt (109 statt höchstens 17). Jetzt
+  gruppiert es nach Host und Tag.
+- **Backup: kein `restic init` mehr auf einen Fehler hin.** Initialisiert wird nur ein Repository, das nicht
+  existiert; ein 403 des Speichers, ein falsches Passwort oder ein Lock brechen mit restics eigener Meldung im
+  Log ab. Veraltete Locks räumt der Lauf vor dem Upload ab.
+
 ## [v1.13.5](https://github.com/krt-profit/basetool/releases/tag/v1.13.5) - 2026-10-01
 
 ### Added

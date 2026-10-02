@@ -101,6 +101,15 @@ groups:
           summary: "GHCR pull token expiring <14d"
           description: "The production GHCR pull token's recorded expiry is under 14 days away — rotate it and update its .expiry file (docs/deployment.md → Token rotation). A lapsed token silently stops all deploys. If the expiry itself looks wrong, deploy.sh logs an unparseable sidecar as a WARN: `{app=\"ops-deploy\"} |~ \"expiry\"` in Grafana -> Explore -> Loki."
 
+      - alert: BackupRetentionNotApplied
+        expr: basetool_backup_snapshots > basetool_backup_retention_limit
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup repository keeps more snapshots than its retention allows ({{ $value }})"
+          description: "After the last successful backup the off-site restic repository held more snapshots than the GFS retention (IRI_KEEP_DAILY + IRI_KEEP_WEEKLY + IRI_KEEP_MONTHLY) can keep, so `restic forget` removed nothing it should have. The repository grows every night, and every run then reads more files from the store — a burst large enough to be blocked as a crawler by the store's edge. `{app=\"ops-backup\"} |~ \"retention|snapshots kept\"` in Grafana -> Explore -> Loki shows what forget kept; `backup.sh --dry-run` lists the snapshots and their paths. Not visible via `journalctl -u iri-backup.service` (stdout/stderr are appended to /var/log/iri-backup.log)."
+
       - alert: ContainerCleanupStaleOrMissing
         expr: |
           (time() - basetool_container_cleanup_last_success_timestamp) > 8 * 24 * 3600

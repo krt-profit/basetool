@@ -10,6 +10,9 @@ IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/container-runtime.sh
 # shellcheck disable=SC1091
 . "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
+# shellcheck source=lib/restic-repo.sh
+# shellcheck disable=SC1091
+. "${IRI_SCRIPT_DIR}/lib/restic-repo.sh"
 
 COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
 STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
@@ -27,6 +30,8 @@ KEEP_WEEKLY="${IRI_KEEP_WEEKLY:-4}"
 KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
 
 HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-}"
+BACKUP_TAG="basetool"
+SNAPSHOT_COUNT=""
 
 MON_DATA="${IRI_MONITORING_DIR:-/var/iri/monitoring}"
 START_EPOCH="$(date +%s)"
@@ -78,6 +83,14 @@ write_backup_metrics() {
     echo "# HELP basetool_backup_duration_seconds Runtime of the last successful backup in seconds."
     echo "# TYPE basetool_backup_duration_seconds gauge"
     echo "basetool_backup_duration_seconds ${dur}"
+    echo "# HELP basetool_backup_retention_limit Most snapshots the configured GFS retention can keep."
+    echo "# TYPE basetool_backup_retention_limit gauge"
+    echo "basetool_backup_retention_limit $(( KEEP_DAILY + KEEP_WEEKLY + KEEP_MONTHLY ))"
+    if [[ "${SNAPSHOT_COUNT:-}" =~ ^[0-9]+$ ]]; then
+      echo "# HELP basetool_backup_snapshots Snapshots in the off-site repository after retention was applied."
+      echo "# TYPE basetool_backup_snapshots gauge"
+      echo "basetool_backup_snapshots ${SNAPSHOT_COUNT}"
+    fi
   } | write_textfile backup.prom || true
 }
 
@@ -294,21 +307,20 @@ if [[ "${SKIP_UPLOAD}" == "true" ]]; then
   exit 0
 fi
 
-if ! restic snapshots >/dev/null 2>&1; then
-  log "restic repository not reachable yet — attempting one-time init"
-  restic init || fail "restic init failed — check ${BACKUP_ENV} (repo URL, password, rclone remote)"
-fi
+restic_open_repo
+restic_clear_stale_locks
 
 log "uploading encrypted snapshot to ${RESTIC_REPOSITORY}"
-restic backup --tag basetool --host basetool-prod "${STAGING}"
+restic backup --tag "${BACKUP_TAG}" --host basetool-prod "${STAGING}"
 
-log "applying GFS retention (keep daily=${KEEP_DAILY} weekly=${KEEP_WEEKLY} monthly=${KEEP_MONTHLY}) + prune"
-restic forget --tag basetool \
-  --keep-daily "${KEEP_DAILY}" --keep-weekly "${KEEP_WEEKLY}" --keep-monthly "${KEEP_MONTHLY}" \
-  --prune
+log "applying GFS retention per host and tag (keep daily=${KEEP_DAILY} weekly=${KEEP_WEEKLY} monthly=${KEEP_MONTHLY}) + prune"
+restic_apply_retention "${BACKUP_TAG}" "${KEEP_DAILY}" "${KEEP_WEEKLY}" "${KEEP_MONTHLY}"
 
 log "verifying repository integrity (restic check)"
 restic check
+
+SNAPSHOT_COUNT="$(restic_snapshot_count "${BACKUP_TAG}" || true)"
+log "snapshots kept: ${SNAPSHOT_COUNT:-unknown} (retention allows at most $(( KEEP_DAILY + KEEP_WEEKLY + KEEP_MONTHLY )))"
 
 write_backup_metrics
 
