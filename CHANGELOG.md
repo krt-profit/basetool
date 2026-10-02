@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
+  schickte das Filterformular zusätzlich zum In-Place-Tausch ab und lud so die ganze Seite; der
+  Filter tauscht jetzt nur noch seinen Abschnitt aus, wie bei Staffeln und Frequenztypen.
+
 - **Keine Warnung vor ungespeicherten Änderungen mehr nach einem Filter.** Wer einen Filter oder eine
   Suche umstellt (z. B. „Nutzungsbedingungen", Hangar, Kontoverlauf, Blueprints) und dann blättert oder
   die Seite verlässt, wird nicht mehr gewarnt. Der Filter der Nutzungsbedingungen hat keinen

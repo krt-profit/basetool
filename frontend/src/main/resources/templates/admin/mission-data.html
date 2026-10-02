@@ -96,7 +96,7 @@
         <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="jobtypes-box">
             <h2 th:text="#{admin.mission_data.job_types}" class="m-0">Aufgabenwünsche</h2>
             <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
-                <form th:action="@{/admin/mission-data}" method="get" id="filter-form" class="no-track m-0 flex-gap-sm">
+                <form th:action="@{/admin/mission-data}" method="get" id="jobtype-filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
                     <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}">

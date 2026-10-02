@@ -191,19 +191,4 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     }
-
-    const filterForm = document.getElementById('filter-form');
-    if (filterForm) {
-        const filterInputs = filterForm.querySelectorAll('input, select');
-        filterInputs.forEach((input) => {
-            input.addEventListener('change', function () {
-                filterForm.submit();
-            });
-        });
-
-        const submitBtn = filterForm.querySelector('button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.style.display = 'none';
-        }
-    }
 });
