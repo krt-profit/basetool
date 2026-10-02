@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
+  schickte das Filterformular zusätzlich zum In-Place-Tausch ab und lud so die ganze Seite; der
+  Filter tauscht jetzt nur noch seinen Abschnitt aus, wie bei Staffeln und Frequenztypen.
+
 ## [v1.13.6](https://github.com/krt-profit/basetool/releases/tag/v1.13.6) - 2026-10-02
 
 ### Added

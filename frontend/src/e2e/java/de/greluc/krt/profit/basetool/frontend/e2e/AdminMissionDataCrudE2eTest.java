@@ -28,7 +28,9 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import com.microsoft.playwright.options.LoadState;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -36,9 +38,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * CRUD coverage for {@code /admin/mission-data}: creates a squadron through the modal and deletes
- * it through the confirm dialog, both re-rendering {@code #squadrons-results} in place
- * (REQ-FE-002). Cleans up after itself; runs as {@code test-admin}.
+ * CRUD and filter coverage for {@code /admin/mission-data}: creates a squadron through the modal
+ * and deletes it through the confirm dialog, both re-rendering {@code #squadrons-results} in place
+ * (REQ-FE-002), and toggles each section's include-inactive filter without a page load
+ * (REQ-FE-005). Cleans up after itself; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class AdminMissionDataCrudE2eTest {
@@ -54,6 +57,13 @@ class AdminMissionDataCrudE2eTest {
 
   /** Distinctive (unique) shorthand for the created squadron. */
   private static final String SQUADRON_SHORTHAND = "E2EMD";
+
+  /** Each include-inactive checkbox id paired with the fragment its section swaps. */
+  private static final String[][] FILTERS = {
+    {"includeInactiveSquadrons", "squadrons-results"},
+    {"includeInactiveJobTypes", "jobtypes-results"},
+    {"includeInactiveFrequencyTypes", "freqtypes-results"},
+  };
 
   private static Playwright playwright;
   private static Browser browser;
@@ -132,6 +142,51 @@ class AdminMissionDataCrudE2eTest {
             "the squadron writes must update in place — no page reload cleared the marker");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "admin-mission-data-crud");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Toggles the include-inactive checkbox of the squadrons, job-types and frequency-types sections
+   * and asserts that each one re-renders through its own {@code fragment=} swap, with no main-frame
+   * navigation request and the no-reload marker intact once the network is idle.
+   */
+  @Test
+  void includeInactiveFiltersSwapInPlaceWithoutReload() {
+    String baseUrl = STACK.baseUrl();
+    try (BrowserContext context = authedContext()) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/admin/mission-data");
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+        page.evaluate("() => { window.__krtNoReload = true; }");
+        AtomicInteger navigations = new AtomicInteger();
+        page.onRequest(
+            request -> {
+              if (request.isNavigationRequest() && request.frame() == page.mainFrame()) {
+                navigations.incrementAndGet();
+              }
+            });
+
+        for (String[] filter : FILTERS) {
+          Locator checkbox = page.locator("#" + filter[0]);
+          boolean before = checkbox.isChecked();
+          page.waitForResponse(
+              response -> response.url().contains("fragment=" + filter[1]), checkbox::click);
+          page.waitForLoadState(LoadState.NETWORKIDLE);
+
+          assertEquals(!before, checkbox.isChecked(), filter[0] + " must keep its toggled state");
+          assertEquals(
+              0, navigations.get(), "toggling " + filter[0] + " must not navigate the page");
+          assertEquals(
+              Boolean.TRUE,
+              page.evaluate("() => window.__krtNoReload === true"),
+              "toggling " + filter[0] + " must swap in place — no page reload cleared the marker");
+        }
+        assertThat(page.locator(".notification-toast.error-toast")).hasCount(0);
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "admin-mission-data-filters");
         throw failure;
       }
     }

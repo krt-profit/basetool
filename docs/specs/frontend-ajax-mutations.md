@@ -317,6 +317,9 @@ navigation while filtering did not.
 **Acceptance**
 
 - [ ] Changing a filter swaps the results without navigating.
+- [ ] A filter's change wiring lives in its page module. No script loaded on every page binds a
+  page's filter form, and no listener submits a filter form natively beside its swap — that
+  navigates the page away while the swap is still in flight.
 - [ ] Clicking a pagination/sort control inside the results container swaps in place (no full page
   load) and preserves the active filter query.
 - [ ] A swap whose GET is **redirected** (e.g. an expired session bounced to the login page) or
@@ -540,7 +543,8 @@ the only sanctioned reload.
 refinery-import (#591), asset-management (#578), bank (#579), promotion (#580), org/members/profile
 (#581) and admin-CRUD (#582) twin / fragment / endpoint MVC + e2e tests, plus
 `OperationPageControllerMvcTest` (the error fragment is inert on the full page and still renders
-for an unknown fragment name). **Issues:** the epic children
+for an unknown fragment name), and `AdminMissionDataCrudE2eTest` (the three include-inactive filters
+swap with no navigation request). **Issues:** the epic children
 (#572) through (#591), most recently (#580), (#581) and (#582), the last child. **Code:**
 `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
 `mission-detail.html`,
