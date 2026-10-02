@@ -173,11 +173,12 @@ Forgetting one is silent — the holder is simply empty on the worker thread.
 
 **This is a frontend rule only.** The backend and the ingest call HTTP through blocking
 `RestClient`s on the JDK HTTP client (ADR-0204): no WebFlux, no Reactor Netty, and the call runs on
-the thread that holds the MDC. Each module builds its clients in one `config.RestClientConfig`,
-wires the observation registry by hand (neither ships Boot's `spring-boot-restclient`), pins
-HTTP/1.1 and caps the response body with a `ResponseSizeLimitInterceptor`; a new outbound call in
-either module goes through those clients rather than a fresh `RestClient.builder()`, or it is
-neither observed nor bounded.
+the thread that holds the MDC. Each module builds its clients in one `RestClientConfig` (backend
+`config`, ingest `relay`), wires the observation registry by hand (neither ships Boot's
+`spring-boot-restclient`), pins HTTP/1.1 and caps the response body with a
+`ResponseSizeLimitInterceptor`; a new outbound call in either module goes through those clients
+rather than a fresh `RestClient.builder()`, or it is neither observed nor bounded. In the ingest,
+`ConcernPackageRulesTest` fails on an outbound HTTP client outside `relay` (REQ-INGEST-014).
 
 In the ingest the exchange relay runs on `exchangeRestClient` (30 s) under its own breaker
 `exchange` and, for change sets of more than 100 ops, a four-slot bulkhead (ADR-0204 amendment 2,

@@ -10,6 +10,11 @@
   braucht das Label `e2e` (REQ-XCH-036…-038). Die Refinery-Entwurfsroute hat einen eigenen Request-Typ mit
   identischem JSON; das Verhalten bleibt unverändert.
 
+- **Ingest-Gateway: nach Zuständigkeit paketiert, mit Strukturregeln.** Die Klassen liegen jetzt in 15
+  Paketen nach Aufgabe (`edge`, `auth`, `gate`, `relay`, …) statt nach Art; ein ArchUnit-Test verbietet
+  Paketzyklen, ausgehende HTTP-Aufrufe außerhalb von `relay` und Redis außerhalb von `registry`, `store`
+  und `handoff` (REQ-INGEST-013/-014). Reine Verschiebung, das Verhalten bleibt unverändert.
+
 ### Changed
 
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
