@@ -1581,7 +1581,7 @@ public class InventoryPageController {
       try {
         List<OrgUnitMembershipOptionDto> options =
             backendApiClient.get(
-                "/api/v1/users/" + form.getUserId() + "/memberships",
+                "/api/v1/users/" + form.getUserId() + "/memberships?allKinds=true",
                 ORG_UNIT_MEMBERSHIP_OPTION_LIST);
         return options != null ? options : List.of();
       } catch (Exception e) {

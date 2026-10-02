@@ -51,7 +51,9 @@
                     </select>
                 </div>
 
-                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+                <th:block th:with="ownerPickerAlwaysRender=*{isGlobal}">
+                    <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+                </th:block>
 
                 <div class="form-group">
                     <label th:text="#{inventory.form.item.modeLabel}">Eintragsart</label>
@@ -150,6 +152,7 @@
                 </div>
 
                 <p id="inputAllocOver" class="form-hint krtm-hidden" th:text="#{inventory.input.alloc.over}">Zuordnung übersteigt die Menge</p>
+                <p id="inputAllocAmountMissing" class="form-hint krtm-hidden" data-testid="alloc-amount-missing" th:text="#{inventory.input.alloc.amountMissing}">Bei mehreren Zuordnungen braucht jede eine Menge.</p>
 
                 <div class="form-group check-row" th:unless="*{isGlobal}">
                     <input type="checkbox" id="personal" th:field="*{personal}">
@@ -196,7 +199,15 @@
     const INV_ADD_MSG = {
         failed: /*[[#{error.inventory.add.failed}]]*/ 'Fehler.',
         personalAssignment: /*[[#{error.inventory.personal.assignment}]]*/ 'Ungueltig.',
-        validation: /*[[#{error.validation.failed}]]*/ 'Eingaben pruefen.'
+        validation: /*[[#{error.validation.failed}]]*/ 'Eingaben pruefen.',
+        allocAmountMissing: /*[[#{inventory.input.alloc.amountMissing}]]*/ 'Menge fehlt.'
+    };
+    const INV_OWNER_PICKER_MSG = {
+        placeholder: /*[[#{ownerPicker.placeholder}]]*/ '-- Bitte waehlen --',
+        ORGANISATIONSLEITUNG: /*[[#{ownerPicker.organisationsleitung}]]*/ 'Organisationsleitung',
+        BEREICH: /*[[#{ownerPicker.bereich}]]*/ 'Bereich',
+        SQUADRON: /*[[#{ownerPicker.staffel}]]*/ 'Staffel',
+        SPECIAL_COMMAND: /*[[#{ownerPicker.specialCommand}]]*/ 'Spezialkommando'
     };
 </script>
 <script th:src="@{/js/inventory-input.js}" defer th:attr="nonce=${cspNonce}"></script>

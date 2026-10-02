@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRe
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryMergeCandidatesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -711,6 +712,54 @@ public class InventoryItemController {
     if (materialId == null) {
       throw new BadRequestException("materialId is required for catalog=MATERIAL");
     }
+  }
+
+  /**
+   * Answers whether an Einbuchen of a material with this stock identity would find an existing row
+   * to merge with, so the form offers the {@code SCU} merge opt-in only then (REQ-INV-026). Probing
+   * for another member requires the same scope as booking for them (REQ-SEC-005).
+   *
+   * @param jwt the caller's token
+   * @param userId the member booked for, or {@code null} for the caller
+   * @param materialId the material being booked in
+   * @param locationId the target location
+   * @param quality the quality grade
+   * @param personal whether the row would be personal
+   * @param stolen whether the row would be marked „gestohlen"
+   * @param owningOrgUnitId the picked owning org unit, or {@code null} for the auto-stamp
+   * @return whether a mergeable row exists
+   */
+  @GetMapping("/merge-candidates")
+  @PreAuthorize(INVENTORY_ACCESS)
+  @Operation(
+      summary = "Probe for mergeable stock",
+      description =
+          "Returns whether a book-in of the given material stock identity (owner, material,"
+              + " location, quality, personal, stolen, resolved owning org unit) would find an"
+              + " existing row to merge with. Rows backing a Materialbörse offer do not count.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Probe answered"),
+    @ApiResponse(responseCode = "403", description = "Not allowed to book for that member")
+  })
+  public InventoryMergeCandidatesDto getMergeCandidates(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestParam(required = false) UUID userId,
+      @RequestParam UUID materialId,
+      @RequestParam UUID locationId,
+      @RequestParam int quality,
+      @RequestParam(required = false, defaultValue = "false") boolean personal,
+      @RequestParam(required = false, defaultValue = "false") boolean stolen,
+      @RequestParam(required = false) UUID owningOrgUnitId) {
+    return new InventoryMergeCandidatesDto(
+        inventoryItemService.hasMergeCandidates(
+            userId,
+            userService.getUserIdFromJwt(jwt),
+            materialId,
+            locationId,
+            quality,
+            personal,
+            stolen,
+            owningOrgUnitId));
   }
 
   /**

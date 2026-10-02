@@ -2,11 +2,16 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="ownerPicker(options, name, selected, required)"
-     th:if="${options != null and options.size() > 1}"
+     th:if="${options != null and (options.size() > 1 or ownerPickerAlwaysRender == true)}"
+     th:with="activeOption=${activeSquadronId != null and #lists.contains(options.![orgUnitId()], activeSquadronId) ? activeSquadronId : null},
+              preset=${selected != null ? selected : activeOption},
+              pickerVisible=${options.size() > 1}"
+     th:classappend="${pickerVisible} ? '' : 'krtm-hidden'"
+     th:attr="data-owner-picker-active=${activeSquadronId}"
      class="form-group owner-picker">
     <label th:for="${name}" th:text="#{ownerPicker.label}">Zuordnen zu</label>
     <select th:id="${name}" th:name="${name}" th:required="${required}">
-        <option value="" th:text="#{ownerPicker.placeholder}">-- Bitte wählen --</option>
+        <option value="" th:if="${preset == null}" th:text="#{ownerPicker.placeholder}">-- Bitte wählen --</option>
         <th:block th:with="hasOl=${!options.?[kind == 'ORGANISATIONSLEITUNG'].isEmpty()},
                             hasBereich=${!options.?[kind == 'BEREICH'].isEmpty()},
                             hasStaffel=${!options.?[kind == 'SQUADRON'].isEmpty()},
@@ -17,35 +22,35 @@
                     <option th:each="o : ${options}"
                             th:if="${o.kind() == 'ORGANISATIONSLEITUNG'}"
                             th:value="${o.orgUnitId()}"
-                            th:selected="${selected != null and selected == o.orgUnitId()}"
+                            th:selected="${preset != null and preset == o.orgUnitId()}"
                             th:text="${o.orgUnitName()}">Organisationsleitung</option>
                 </optgroup>
                 <optgroup th:if="${hasBereich}" th:label="#{ownerPicker.bereich}">
                     <option th:each="o : ${options}"
                             th:if="${o.kind() == 'BEREICH'}"
                             th:value="${o.orgUnitId()}"
-                            th:selected="${selected != null and selected == o.orgUnitId()}"
+                            th:selected="${preset != null and preset == o.orgUnitId()}"
                             th:text="${o.orgUnitName()}">Bereich</option>
                 </optgroup>
                 <optgroup th:if="${hasStaffel}" th:label="#{ownerPicker.staffel}">
                     <option th:each="o : ${options}"
                             th:if="${o.kind() == 'SQUADRON'}"
                             th:value="${o.orgUnitId()}"
-                            th:selected="${selected != null and selected == o.orgUnitId()}"
+                            th:selected="${preset != null and preset == o.orgUnitId()}"
                             th:text="${o.orgUnitName()}">Staffel</option>
                 </optgroup>
                 <optgroup th:if="${hasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
                     <option th:each="o : ${options}"
                             th:if="${o.kind() == 'SPECIAL_COMMAND'}"
                             th:value="${o.orgUnitId()}"
-                            th:selected="${selected != null and selected == o.orgUnitId()}"
+                            th:selected="${preset != null and preset == o.orgUnitId()}"
                             th:text="${o.orgUnitName()}">Spezialkommando</option>
                 </optgroup>
             </th:block>
             <th:block th:unless="${kindCount > 1}">
                 <option th:each="o : ${options}"
                         th:value="${o.orgUnitId()}"
-                        th:selected="${selected != null and selected == o.orgUnitId()}"
+                        th:selected="${preset != null and preset == o.orgUnitId()}"
                         th:text="${o.orgUnitName()}">Org Unit</option>
             </th:block>
         </th:block>

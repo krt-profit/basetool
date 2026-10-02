@@ -1050,6 +1050,39 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   }
 
   /**
+   * Counts the material rows a book-in with the given stock identity would merge with, without
+   * locking them (REQ-INV-026). Same key and offer exclusion as {@link
+   * #findMergeGroupForUpdate(UUID, UUID, UUID, UUID, Integer, Boolean, Boolean, UUID)}.
+   *
+   * @param userId the owning user of the stack; never {@code null}.
+   * @param materialId the stack's material; never {@code null}.
+   * @param locationId the stack's storage location; never {@code null}.
+   * @param quality the stack's quality grade; never {@code null}.
+   * @param personal the stack's personal flag; never {@code null}.
+   * @param stolen the stack's „gestohlen" flag; never {@code null}.
+   * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null} to match rows with
+   *     no owning org unit.
+   * @return the number of mergeable rows.
+   */
+  @Query(
+      """
+      SELECT COUNT(i) FROM InventoryItem i WHERE i.user.id = :userId AND
+      i.material.id = :materialId AND i.location.id = :locationId AND i.quality = :quality AND
+      i.personal = :personal AND i.stolen = :stolen AND
+      ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
+      :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
+      o.inventoryItem = i)
+      """)
+  long countMergeCandidates(
+      @Param("userId") UUID userId,
+      @Param("materialId") UUID materialId,
+      @Param("locationId") UUID locationId,
+      @Param("quality") Integer quality,
+      @Param("personal") Boolean personal,
+      @Param("stolen") Boolean stolen,
+      @Param("owningOrgUnitId") UUID owningOrgUnitId);
+
+  /**
    * Bulk-deletes the non-personal inventory within the given org-unit scope; personal rows are
    * never touched. Callers must enforce access first.
    *

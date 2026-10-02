@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.AppException;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
@@ -77,6 +78,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -555,6 +557,68 @@ public class InventoryItemService {
         inventoryCheckoutService.mergeStockIfRequested(
             saved, Boolean.TRUE.equals(dto.mergeStock()));
     return inventoryItemMapper.toDto(merged);
+  }
+
+  /**
+   * Probes whether an Einbuchen with the given material stock identity would find a row to merge
+   * with (REQ-INV-026), resolving owner and owning org unit exactly as {@link #createInventoryItem}
+   * does.
+   *
+   * <p>Runs without a surrounding transaction so a refused org-unit resolution answers {@code
+   * false} instead of marking a shared transaction rollback-only.
+   *
+   * @param userId the member booked for, or {@code null} for the caller
+   * @param currentUserId the caller's id
+   * @param materialId the material being booked in
+   * @param locationId the target location
+   * @param quality the quality grade
+   * @param personal whether the row would be personal
+   * @param stolen whether the row would be marked „gestohlen"
+   * @param owningOrgUnitId the picked owning org unit, or {@code null} for the auto-stamp
+   * @return {@code true} when at least one mergeable row exists; {@code false} as well when the
+   *     booking itself would be refused
+   * @throws AccessDeniedException when the caller may not book for {@code userId}
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public boolean hasMergeCandidates(
+      UUID userId,
+      @NotNull UUID currentUserId,
+      @NotNull UUID materialId,
+      @NotNull UUID locationId,
+      int quality,
+      boolean personal,
+      boolean stolen,
+      UUID owningOrgUnitId) {
+    UUID targetUserId = userId != null ? userId : currentUserId;
+    boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
+    if (onBehalfOfSomeoneElse && !ownerScopeService.canManageUserInventory(targetUserId)) {
+      throw new AccessDeniedException(
+          "You are not allowed to inspect inventory items of other users");
+    }
+    if ((onBehalfOfSomeoneElse && personal)
+        || (stolen && !inventoryProperties.stolenMarkingEnabled())) {
+      return false;
+    }
+    User user = userRepository.findById(targetUserId).orElse(null);
+    if (user == null) {
+      return false;
+    }
+    OrgUnit owningOrgUnit;
+    try {
+      owningOrgUnit =
+          ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId);
+    } catch (AppException refused) {
+      return false;
+    }
+    return inventoryItemRepository.countMergeCandidates(
+            targetUserId,
+            materialId,
+            locationId,
+            quality,
+            personal,
+            stolen,
+            owningOrgUnit != null ? owningOrgUnit.getId() : null)
+        > 0;
   }
 
   /**
