@@ -141,6 +141,10 @@ Two binding rules shape every UI change:
   a link leaves a page with an edited form; a form marked `no-track` or with `method="get"` is a
   query and never arms it, and a submit triggered by the same edit clears it (REQ-FE-024,
   `UnsavedChangesGuardE2eTest`).
+- **Every backend call the frontend makes names an operation the backend has** (2026-10-03). A test
+  parses the frontend sources, folds every call site's URI into a template and matches verb and
+  path against the committed `openapi.json`; the live-sync probe templates must be existing `GET`s.
+  The few sites it cannot fold are listed by name (REQ-FE-028, `BackendCallExistenceTest`).
 - **One dialog contract on native `<dialog>`s** (FE-SIMP-04/04b, 2026-09-23). Every
   `.krt-modal-overlay` is a `<dialog>` opened by `window.krtModal` with `showModal()`: top layer,
   inert page, Escape, focus in and back. Transient overlays go into the open dialog

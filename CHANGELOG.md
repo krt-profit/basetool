@@ -22,6 +22,10 @@
 
 ### Fixed
 
+- **Admin: Bearbeiten und Löschen im persönlichen Inventar eines Mitglieds funktionieren wieder.** Das
+  Frontend rief `/api/v1/admin/personal-inventory/{id}` statt `…/items/{id}` auf, das Backend lehnte ab.
+  Ein neuer Test prüft jetzt jeden Backend-Aufruf des Frontends gegen die `openapi.json` (REQ-FE-028).
+
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
   schickte das Filterformular zusätzlich zum In-Place-Tausch ab und lud so die ganze Seite; der
   Filter tauscht jetzt nur noch seinen Abschnitt aus, wie bei Staffeln und Frequenztypen.

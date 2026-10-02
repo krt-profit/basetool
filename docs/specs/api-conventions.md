@@ -23,9 +23,12 @@ are read only by a human, so a deprecation the in-repo client kept using used to
 sunset day as a broken page — the frontend was still calling twelve of the seventeen deprecated
 mission endpoints weeks before theirs. `DeprecatedBackendEndpointCallGuardTest` (frontend) reads
 every `deprecated: true` operation out of the committed `openapi.json` and fails the build when a
-`backendApiClient.<verb>("/api/…")` call in the frontend's main sources matches one, verb included.
-A new deprecation is guarded as soon as the document is regenerated; move the caller to the named
-replacement in the same change.
+frontend call matches one, verb included. It reads the call sites from the same scan as the
+existence guard of REQ-FE-028, so `backendApiClient.execute(…)` and concatenated, constant or
+builder-built URIs are seen too. A new deprecation is guarded as soon as the document is
+regenerated; move the caller to the named replacement in the same change. The one deprecated
+operation the frontend still relays on purpose, `POST /api/v1/hangar/import/fleetview` (sunset
+2027-05-14), is named in the guard's list of reviewed relays.
 
 **The seventeen deprecated mission endpoints are deleted — early** (owner decision 2026-09-22,
 #1996): the MissionDto-returning unit, crew, participant, check-in/-out, payout-preference,

@@ -2082,6 +2082,48 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
 `fragments/unsaved-modal.html`, `admin-terms.js`, `admin/terms.html` · **Related:** REQ-FE-005,
 REQ-FE-021
 
+### REQ-FE-028 — Every frontend call to the backend names an operation the backend has
+
+Every request the frontend sends to the backend names an operation of the committed
+`backend/src/main/resources/api/openapi.json`, verb and path template both, and every live-sync
+subscribe probe (`LiveSyncTopicClass#authProbePath`, `#fallbackProbePath`) is a `GET` the document
+has. A unit test that mocks `BackendApiClient` stays green when the backend path it mocks is gone;
+this rule is what notices.
+
+- **Every call site is checked, not a sample.** The guard parses the frontend's main sources with
+  the JDK's compiler front end and folds each URI expression of a `backendApiClient` verb, of
+  `backendApiClient.execute(…)` and of the two bare clients (the SSE relay, the live-sync probe)
+  into a template: literals, `+`, constants of any class, locals, `String` parameters through the
+  call sites of their method, `String`-returning helpers, `String.format`/`formatted`, conditionals
+  (both branches), `StringBuilder` and `UriComponentsBuilder` chains. The query string is dropped;
+  every runtime value is one path variable.
+- **What cannot be folded is listed, exactly.** A call site the scanner cannot fold must be named in
+  the test's exception list with the check that covers it instead; a new one, or a stale entry,
+  fails. Two remain: the probe's resource and capability reads, whose URIs are the topic-class
+  templates the probe rule checks.
+- **The values that are not call sites are read from their declarations:** every `CachedCatalog`
+  URI and the anonymous terms read are existing `GET`s.
+- **An `execute(…)` site declares what it sends.** Its verb and URI arguments, which feed the log
+  line and the error metric, must equal the request its lambda builds.
+- **The selection cannot shrink unnoticed:** at least 611 resolved call sites and seven probe
+  templates.
+- `DeprecatedBackendEndpointCallGuardTest` reads the same scan, so it sees `execute(…)` sites too.
+  The one deprecated operation still relayed, `POST /api/v1/hangar/import/fleetview` (sunset
+  2027-05-14), is named in its list of reviewed relays.
+
+**Acceptance**
+
+- [x] A fixture calling a retired path and one calling an existing path with the wrong verb are
+  both reported; an `execute(…)` fixture declaring `GET` while sending `POST` is reported.
+- [x] A probe template that is no `GET` of the document is reported.
+- [x] The guard found the admin update and delete of a member's personal-inventory item calling
+  `PUT`/`DELETE /api/v1/admin/personal-inventory/{id}`, which the backend never served (it serves
+  `…/items/{id}`); both now call the backend's paths.
+
+**Enforced by:** `BackendCallExistenceTest`, `DeprecatedBackendEndpointCallGuardTest`,
+`AdminPersonalInventoryPageControllerMvcTest` · **Code:** `contract/BackendCallScanner`,
+`contract/BackendOperations` (tests) · **Related:** REQ-FE-015, REQ-API-001, ADR-0032
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
