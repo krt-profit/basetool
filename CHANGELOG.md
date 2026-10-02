@@ -8,6 +8,14 @@
   Maximum der Aufbewahrung (`basetool_backup_snapshots`, `basetool_backup_retention_limit`); liegt die Zahl
   darüber, warnt der Alarm.
 
+### Changed
+
+- **Datenaustausch: Lagerposten umfassen das ganze eigene Lager.** Verbundene Anwendungen sehen und
+  setzen jetzt alle Lagerzeilen des Mitglieds, persönliche und geteilte, wie „Mein Lager" sie zeigt;
+  Ausbuchungen nehmen zuerst persönliche Zeilen und nie reservierten Bestand. `materialKind` liefert
+  zusätzlich die UEX-Merkmale `mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable`
+  (Migration `V260`, ADR-0230). Die Datenschutzerklärung (Abschnitt 3.10) nennt das jetzt so.
+
 ### Fixed
 
 - **Backup: die Aufbewahrung greift wieder.** `restic forget` gruppierte nach dem Pfad, und jeder Lauf sichert
@@ -18,6 +26,10 @@
   Log ab. Veraltete Locks räumt der Lauf vor dem Upload ab.
 - **Ansible-Rolle installiert `lib/restic-repo.sh`.** Ohne die Datei bricht das neue `backup.sh` auf dem Host
   beim Start ab; ein Selbsttest prüft jetzt, dass jede eingebundene Bibliothek mitinstalliert wird.
+- **Datenaustausch: Rohstoffe behalten ihre Qualität.** Die Regel „Handelsware auf Qualität 0" traf
+  jedes Material aus dem UEX-Katalog, auch alle Erze und Metalle; jetzt wird jedes Material mit der
+  gesendeten Qualität gebucht. Bereits mit Qualität 0 gebuchte Posten bleiben, bis das Mitglied oder
+  die Anwendung sie korrigiert.
 
 ## [v1.13.5](https://github.com/krt-profit/basetool/releases/tag/v1.13.5) - 2026-10-01
 

@@ -88,6 +88,14 @@ visible, bounded and reversible.
   exchange follows the web.
 - **Infer deletes from an absent entry.** Rejected: an incomplete client snapshot would wipe data.
 
+## Amendment — 2026-10-02: a lot is everything the member holds, at its own quality
+
+[ADR-0230](0230-an-exchange-stock-lot-is-everything-the-member-holds-at-its-quality.md) replaces two
+parts of decision 2: a lot now covers the member's personal **and** shared rows, and the fixed
+quality 0 for trade goods is gone — every material lot keeps the quality the client sends. The
+consequence „a fixed quality 0 for trade goods distorts average and maximum quality and quality
+floors" no longer holds for new writes.
+
 ## Amendment — 2026-09-27: the ship rule stays per operation
 
 The second security review of the go-live (#2092, L2) found that the ship half of decision 6 never

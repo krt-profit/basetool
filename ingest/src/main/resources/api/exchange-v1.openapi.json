@@ -558,7 +558,7 @@
     "/exchange/v1/me/stock": {
       "get": {
         "operationId": "stock_read",
-        "summary": "The member's personal stock lots: snapshot or changes since a cursor.",
+        "summary": "The member's stock lots, personal and shared: snapshot or changes since a cursor.",
         "tags": [
           "stock"
         ],

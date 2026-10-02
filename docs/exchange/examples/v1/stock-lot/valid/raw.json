@@ -6,7 +6,13 @@
   },
   "materialKind": {
     "type": "RAW",
-    "commodity": false
+    "commodity": true,
+    "mineral": true,
+    "harvestable": false,
+    "raw": true,
+    "refined": false,
+    "buyable": false,
+    "sellable": true
   },
   "location": {
     "name": "Area18",

@@ -22,8 +22,9 @@ package de.greluc.krt.profit.basetool.backend.model.projection;
 import java.util.UUID;
 
 /**
- * One lot of a member's personal stock for the exchange: the member's personal rows of one material
- * or item at one location, quality and stolen state, summed across org-unit pools (REQ-XCH-016).
+ * One lot of a member's stock for the exchange: the member's rows, personal and shared, of one
+ * material or item at one location, quality and stolen state, summed across org-unit pools
+ * (REQ-XCH-016).
  */
 public interface ExchangeStockLotRow {
 
@@ -68,6 +69,48 @@ public interface ExchangeStockLotRow {
    * @return whether it is a commodity
    */
   Boolean getCommodity();
+
+  /**
+   * The material's UEX mineral flag, or {@code null} when UEX does not know it.
+   *
+   * @return {@code 1}, {@code 0} or {@code null}
+   */
+  Integer getMineral();
+
+  /**
+   * The material's UEX harvestable flag, or {@code null} when UEX does not know it.
+   *
+   * @return {@code 1}, {@code 0} or {@code null}
+   */
+  Integer getHarvestable();
+
+  /**
+   * The material's UEX raw flag, or {@code null} when UEX does not know it.
+   *
+   * @return {@code 1}, {@code 0} or {@code null}
+   */
+  Integer getRaw();
+
+  /**
+   * The material's UEX refined flag, or {@code null} when UEX does not know it.
+   *
+   * @return {@code 1}, {@code 0} or {@code null}
+   */
+  Integer getRefined();
+
+  /**
+   * The material's UEX buyable flag, or {@code null} when UEX does not know it.
+   *
+   * @return {@code 1}, {@code 0} or {@code null}
+   */
+  Integer getBuyable();
+
+  /**
+   * The material's UEX sellable flag, or {@code null} when UEX does not know it.
+   *
+   * @return {@code 1}, {@code 0} or {@code null}
+   */
+  Integer getSellable();
 
   /**
    * The material's unit, or {@code null} for an item lot.

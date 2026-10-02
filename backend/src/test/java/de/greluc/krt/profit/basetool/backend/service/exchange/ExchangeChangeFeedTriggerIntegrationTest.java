@@ -31,7 +31,9 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeChangeRepository
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -181,34 +183,82 @@ class ExchangeChangeFeedTriggerIntegrationTest {
   }
 
   @Test
-  void personalStockIsSequencedByLotAndSharedStockIsNot() {
+  void personalAndSharedStockAreSequencedByLot() {
     UUID material = material("feed-titanium");
     UUID location = location("feed-area18");
+    String lot = "m:" + material + "|l:" + location + "|q:3|s:0";
 
     UUID personal = stock(alice, material, location, 3, true, false);
-    stock(alice, material, location, 3, false, false);
+    UUID shared = stock(alice, material, location, 3, false, false);
     jdbc.update("UPDATE inventory_item SET amount = 5 WHERE id = ?", personal);
+    jdbc.update("UPDATE inventory_item SET amount = 6 WHERE id = ?", shared);
 
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(
-                ExchangeResource.STOCK, "m:" + material + "|l:" + location + "|q:3|s:0"),
-            org.assertj.core.groups.Tuple.tuple(
-                ExchangeResource.STOCK, "m:" + material + "|l:" + location + "|q:3|s:0"));
+            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot));
   }
 
   @Test
-  void rebookingPersonalStockToTheSharedPoolLeavesTheLot() {
+  void rebookingStockBetweenPersonalAndSharedLeavesTheLotUnchanged() {
     UUID material = material("feed-quantainium");
     UUID location = location("feed-orison");
     UUID row = stock(alice, material, location, 1, true, true);
     int before = changes(alice).size();
 
     jdbc.update("UPDATE inventory_item SET personal = false WHERE id = ?", row);
+    jdbc.update("UPDATE inventory_item SET personal = true WHERE id = ?", row);
 
-    assertThat(changes(alice)).hasSize(before + 1);
-    assertThat(changes(alice).getLast().getEntityKey()).endsWith("|q:1|s:1");
+    assertThat(changes(alice)).hasSize(before);
+  }
+
+  @Test
+  void theMigrationAnnouncesEachLotHoldingSharedRowsOnce() throws Exception {
+    UUID material = material("feed-hadanite");
+    UUID location = location("feed-grim-hex");
+    stock(alice, material, location, 4, false, false);
+    stock(alice, material, location, 4, false, false);
+    stock(alice, material, location, 4, true, false);
+    stock(alice, material, location, 5, true, false);
+    jdbc.update("DELETE FROM exchange_change WHERE user_id = ?", alice);
+    String migration =
+        new String(
+            Objects.requireNonNull(
+                    getClass()
+                        .getResourceAsStream(
+                            "/db/migration/V260__exchange_stock_lots_span_shared_rows.sql"))
+                .readAllBytes(),
+            StandardCharsets.UTF_8);
+
+    jdbc.execute(migration.substring(migration.indexOf("INSERT INTO exchange_change")));
+
+    assertThat(changes(alice))
+        .singleElement()
+        .satisfies(
+            c -> {
+              assertThat(c.getEntityKey())
+                  .isEqualTo("m:" + material + "|l:" + location + "|q:4|s:0");
+              assertThat(c.getSourceChannel()).isEqualTo("system");
+            });
+  }
+
+  @Test
+  void movingStockToAnotherPlaceSequencesTheLotItLeftAndTheLotItJoined() {
+    UUID material = material("feed-agricium");
+    UUID from = location("feed-lorville");
+    UUID to = location("feed-new-babbage");
+    UUID row = stock(alice, material, from, 2, false, false);
+    int before = changes(alice).size();
+
+    jdbc.update("UPDATE inventory_item SET location_id = ? WHERE id = ?", to, row);
+
+    assertThat(changes(alice).subList(before, changes(alice).size()))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly(
+            "m:" + material + "|l:" + from + "|q:2|s:0", "m:" + material + "|l:" + to + "|q:2|s:0");
   }
 
   @Test

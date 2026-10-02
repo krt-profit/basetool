@@ -374,10 +374,12 @@ exchange off. The gateway sees a change within about 5 seconds.
 - **Blueprints.** `sandbox-member` owns Sandbox Rifle and Sandbox Knife, `sandbox-member-2` owns
   Sandbox Helmet. The default blueprints (`isDefault: true` in the feed) are granted to every member
   within a minute of the start.
-- **Personal stock of `sandbox-member`.** Sandbox Metal in the IRIDIUM pool and in the Sandbox
-  Squadron pool at the same place and quality, so the two rows form one lot; Sandbox Trade Goods,
-  Sandbox Component and Sandbox Ore (Raw) in no pool; one Sandbox Rifle. Part of the IRIDIUM row is
-  offered on the Material Exchange. `sandbox-member-2` holds one lot of Sandbox Metal.
+- **Stock of `sandbox-member`.** Sandbox Metal in the IRIDIUM pool and in the Sandbox Squadron pool
+  at the same place and quality, so the two rows form one lot; Sandbox Trade Goods, Sandbox
+  Component and Sandbox Ore (Raw) in no pool; one Sandbox Rifle — all personal. Beside the personal
+  Sandbox Ore (Raw), 10 SCU of it at the same place and quality are shared in the Sandbox Squadron
+  pool, so that lot holds 30 SCU. Part of the IRIDIUM row is offered on the Material Exchange.
+  `sandbox-member-2` holds one lot of Sandbox Metal.
 - **Ships.** Two for `sandbox-member`, one for `sandbox-member-2`.
 - **Open orders.** A material order and an item order for IRIDIUM and a material order for Sandbox
   Squadron, with minimum qualities, so `GET /exchange/v1/me/org-demand` answers. Sandbox Squadron

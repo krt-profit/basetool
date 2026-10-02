@@ -1,6 +1,6 @@
 # Processors and recipients (Art. 28 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-28.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-02.
 
 Every third party that can reach personal data, what role it plays, and what has to be in place for
 it. A party is a **processor** when it processes on the controller's instructions (Art. 28 — a data
@@ -85,7 +85,7 @@ either a missing contract or a missing paragraph in the privacy policy.
   **independent controller** under its own privacy statement, which the approval requires to be
   published (owner decision 2026-09-28).
 - **Reaches:** within the capabilities the member consented to — the member's own blueprints with
-  their note, personal stock and ships, the anonymised org demand of the member's units, catalogue
+  their note, warehouse stock (personal and shared) and ships, the anonymised org demand of the member's units, catalogue
   data. Never another member's data, the e-mail address or the display name.
 - **Third country:** none through the tool; the data goes to the member's device. A provider's own
   onward processing is disclosed in its privacy statement.

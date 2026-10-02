@@ -1,6 +1,6 @@
 # Record of processing activities (Art. 30 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-28.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-02.
 
 Art. 30 GDPR requires a controller to maintain a record of its processing activities. The small-
 organisation exemption in **Art. 30(5) does not apply**: it is available only where processing is
@@ -195,7 +195,7 @@ requires it and duplicating it into further files spreads personal data for no g
 ### A11 — Connected applications (the exchange API)
 
 - **Purpose:** let an approved client on the member's own device read and write the member's own
-  blueprints, personal warehouse stock and ships and read the anonymised open demand of the
+  blueprints, warehouse stock (personal and shared) and ships and read the anonymised open demand of the
   member's units, at the member's request; let the member see, disconnect and undo every
   connection; detect and reverse a faulty or malicious client (REQ-XCH-*,
   [`external-exchange.md`](../specs/external-exchange.md)).

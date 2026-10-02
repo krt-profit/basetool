@@ -53,12 +53,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {
 
-  /** A member's personal lots with what the exchange shows of them (REQ-XCH-016). */
+  /** A member's lots, personal and shared, with what the exchange shows of them (REQ-XCH-016). */
   String EXCHANGE_LOTS =
       """
       SELECT lots.anchor AS anchor, lots.lot_key AS lotKey, lots.material_id AS materialId,
              m.name AS materialName, m.type AS materialType,
              (m.id IS NOT NULL AND m.id_commodity IS NOT NULL) AS commodity,
+             m.is_mineral AS mineral, m.is_harvestable AS harvestable, m.is_raw AS raw,
+             m.is_refined AS refined, m.is_buyable AS buyable, m.is_sellable AS sellable,
              m.quantity_type AS quantityType, lots.game_item_id AS gameItemId,
              g.name AS gameItemName, l.name AS locationName, c.id_city AS uexCityId,
              s.id_space_station AS uexSpaceStationId, lots.quality AS quality,
@@ -69,7 +71,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
                    i.material_id, i.game_item_id, i.location_id,
                    COALESCE(i.quality, 0) AS quality, i.stolen, SUM(i.amount) AS amount
             FROM inventory_item i
-            WHERE i.user_id = :member AND i.personal
+            WHERE i.user_id = :member
             GROUP BY i.material_id, i.game_item_id, i.location_id, i.quality, i.stolen) lots
       LEFT JOIN material m ON m.id = lots.material_id
       LEFT JOIN game_item g ON g.id = lots.game_item_id
@@ -79,7 +81,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       """;
 
   /**
-   * Returns one snapshot page of a member's personal lots, ordered by their lowest row id.
+   * Returns one snapshot page of a member's lots, ordered by their lowest row id.
    *
    * @param member the member
    * @param after the lowest row id of the last lot delivered, or the zero id for the first page
@@ -93,7 +95,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("member") UUID member, @Param("after") UUID after, @Param("limit") int limit);
 
   /**
-   * Returns the member's personal lots with the given keys, as they are now.
+   * Returns the member's lots with the given keys, as they are now.
    *
    * @param member the member
    * @param keys the lot keys
@@ -1110,7 +1112,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Locks a member's personal rows of one material lot for the exchange (REQ-XCH-016).
+   * Locks a member's rows of one material lot, personal and shared, for the exchange (REQ-XCH-016).
    *
    * <p>Compares the quality as stored, which a material row always carries ({@code
    * chk_inventory_item_quality_by_kind}).
@@ -1125,12 +1127,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       """
-      SELECT i FROM InventoryItem i WHERE i.user.id = :member AND i.personal = true
+      SELECT i FROM InventoryItem i WHERE i.user.id = :member
         AND i.material.id = :materialId AND i.location.id = :locationId
         AND i.quality = :quality AND i.stolen = :stolen
       ORDER BY i.id
       """)
-  List<InventoryItem> lockPersonalMaterialLot(
+  List<InventoryItem> lockMaterialLot(
       @Param("member") UUID member,
       @Param("materialId") UUID materialId,
       @Param("locationId") UUID locationId,
@@ -1148,7 +1150,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   int lockExchangeLot(@Param("key") long key);
 
   /**
-   * Locks a member's personal rows of one item lot for the exchange (REQ-XCH-016).
+   * Locks a member's rows of one item lot, personal and shared, for the exchange (REQ-XCH-016).
    *
    * @param member the member
    * @param gameItemId the item
@@ -1159,18 +1161,18 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       """
-      SELECT i FROM InventoryItem i WHERE i.user.id = :member AND i.personal = true
+      SELECT i FROM InventoryItem i WHERE i.user.id = :member
         AND i.gameItem.id = :gameItemId AND i.location.id = :locationId AND i.stolen = :stolen
       ORDER BY i.id
       """)
-  List<InventoryItem> lockPersonalItemLot(
+  List<InventoryItem> lockItemLot(
       @Param("member") UUID member,
       @Param("gameItemId") UUID gameItemId,
       @Param("locationId") UUID locationId,
       @Param("stolen") boolean stolen);
 
   /**
-   * Counts a member's personal lots, as the exchange keys them.
+   * Counts a member's lots, personal and shared, as the exchange keys them.
    *
    * @param member the member
    * @return the number of lots
@@ -1180,8 +1182,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           """
           SELECT COUNT(DISTINCT exchange_stock_lot_key(material_id, game_item_id, location_id,
                                                        quality, stolen))
-          FROM inventory_item WHERE user_id = :member AND personal
+          FROM inventory_item WHERE user_id = :member
           """,
       nativeQuery = true)
-  long countPersonalLots(@Param("member") UUID member);
+  long countExchangeLots(@Param("member") UUID member);
 }

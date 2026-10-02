@@ -162,7 +162,7 @@ class ExchangeStockLookupPlanIntegrationTest {
   void theLotLockFindsTheRowsTheLotKeyNames() {
     UUID atZero = stock(material, null, 0, true);
     UUID atSeven = stock(material, null, 7, true);
-    stock(material, null, 0, false);
+    UUID sharedAtZero = stock(material, null, 0, false);
     stock(null, item, null, true);
 
     for (int quality : new int[] {0, 7, 3}) {
@@ -171,7 +171,7 @@ class ExchangeStockLookupPlanIntegrationTest {
           jdbc.queryForList(
               """
               SELECT id FROM inventory_item
-              WHERE user_id = ? AND personal AND material_id = ? AND location_id = ?
+              WHERE user_id = ? AND material_id = ? AND location_id = ?
                 AND COALESCE(quality, 0) = ? AND stolen = false
               """,
               UUID.class,
@@ -182,7 +182,7 @@ class ExchangeStockLookupPlanIntegrationTest {
 
       assertThat(locked).containsExactlyInAnyOrderElementsOf(byLotKey);
     }
-    assertThat(stockIds(0)).containsExactly(atZero);
+    assertThat(stockIds(0)).containsExactlyInAnyOrder(atZero, sharedAtZero);
     assertThat(stockIds(7)).containsExactly(atSeven);
     assertThatThrownBy(() -> stock(material, null, null, true))
         .isInstanceOf(DataIntegrityViolationException.class)
@@ -200,8 +200,7 @@ class ExchangeStockLookupPlanIntegrationTest {
     new TransactionTemplate(transactionManager)
         .executeWithoutResult(
             status ->
-                inventoryRepository.lockPersonalMaterialLot(
-                    member, material, location, quality, false));
+                inventoryRepository.lockMaterialLot(member, material, location, quality, false));
     return RecordingInspector.STATEMENTS.stream()
         .filter(s -> s.contains("inventory_item") && s.contains("for no key update"))
         .findFirst()
@@ -252,7 +251,7 @@ class ExchangeStockLookupPlanIntegrationTest {
             .execute(
                 status ->
                     inventoryRepository
-                        .lockPersonalMaterialLot(member, material, location, quality, false)
+                        .lockMaterialLot(member, material, location, quality, false)
                         .stream()
                         .map(InventoryItem::getId)
                         .toList()));

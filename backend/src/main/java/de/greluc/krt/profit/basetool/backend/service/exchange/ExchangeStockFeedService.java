@@ -46,13 +46,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The member's personal stock lots as a snapshot and a change feed for exchange clients
- * (REQ-XCH-013, REQ-XCH-016, ADR-0224).
+ * The member's stock lots as a snapshot and a change feed for exchange clients (REQ-XCH-013,
+ * REQ-XCH-016, ADR-0224, ADR-0230).
  *
- * <p>A lot is the member's personal rows of one material or item at one location, quality and
- * stolen state, summed across org-unit pools; its key is the one the change feed records. A
- * snapshot pages lots by their lowest row id: a lot whose rows change while the snapshot is read
- * may move, but every such change follows in the feed.
+ * <p>A lot is the member's rows, personal and shared, of one material or item at one location,
+ * quality and stolen state, summed across org-unit pools; its key is the one the change feed
+ * records. A snapshot pages lots by their lowest row id: a lot whose rows change while the snapshot
+ * is read may move, but every such change follows in the feed.
  */
 @Service
 @RequiredArgsConstructor
@@ -71,7 +71,7 @@ public class ExchangeStockFeedService {
   private final ExchangeFeedReader feedReader;
 
   /**
-   * Returns one page of the member's personal stock lots.
+   * Returns one page of the member's stock lots.
    *
    * @param member the member
    * @param cursor the cursor the client echoed, or {@code null} for a new snapshot
@@ -163,7 +163,14 @@ public class ExchangeStockFeedService {
     ExchangeMaterialKindDto kind =
         material
             ? new ExchangeMaterialKindDto(
-                lot.getMaterialType(), Boolean.TRUE.equals(lot.getCommodity()))
+                lot.getMaterialType(),
+                Boolean.TRUE.equals(lot.getCommodity()),
+                flag(lot.getMineral()),
+                flag(lot.getHarvestable()),
+                flag(lot.getRaw()),
+                flag(lot.getRefined()),
+                flag(lot.getBuyable()),
+                flag(lot.getSellable()))
             : null;
     String unit =
         material && QuantityType.SCU.name().equals(lot.getQuantityType())
@@ -177,6 +184,17 @@ public class ExchangeStockFeedService {
         lot.getQuality(),
         lot.getStolen(),
         new ExchangeQuantityDto(amount(lot.getAmount(), unit), unit));
+  }
+
+  /**
+   * Reads a UEX {@code 0}/{@code 1} flag.
+   *
+   * @param value the stored flag
+   * @return {@code true} for {@code 1}, {@code false} for any other value, {@code null} when
+   *     unknown
+   */
+  static @Nullable Boolean flag(@Nullable Integer value) {
+    return value == null ? null : value == 1;
   }
 
   /**
