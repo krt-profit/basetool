@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
@@ -63,7 +64,7 @@ import tools.jackson.databind.ObjectMapper;
 public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
 
   /** Stable machine-readable code the frontend and the extractor map to a consent prompt. */
-  static final String CODE_TERMS_NOT_ACCEPTED = "TERMS_NOT_ACCEPTED";
+  static final String CODE_TERMS_NOT_ACCEPTED = CoreProblemCode.TERMS_NOT_ACCEPTED.code();
 
   /** The shared parser for this filter's path patterns. */
   private static final PathPatternParser PATH_PARSER = PathPatternParser.defaultInstance;

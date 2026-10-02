@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
@@ -130,7 +131,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
    * Stable machine-readable problem {@code code} for this filter's refusals, matching the shape of
    * the person-gates' refusals.
    */
-  static final String CODE_ACTING_MEMBER_REFUSED = "ACTING_MEMBER_REFUSED";
+  static final String CODE_ACTING_MEMBER_REFUSED = CoreProblemCode.ACTING_MEMBER_REFUSED.code();
 
   private final IngestGatewayProperties gatewayProperties;
   private final ActingMemberAuthorities actingMemberAuthorities;

@@ -96,23 +96,25 @@ import tools.jackson.databind.DatabindException;
 public class GlobalExceptionHandler {
 
   /** Stable error codes exposed via the {@code code} extension property. */
-  public static final String CODE_OPTIMISTIC_LOCK = "OPTIMISTIC_LOCK";
+  public static final String CODE_OPTIMISTIC_LOCK = CoreProblemCode.OPTIMISTIC_LOCK.code();
 
-  public static final String CODE_PESSIMISTIC_LOCK = "PESSIMISTIC_LOCK";
-  public static final String CODE_ACCESS_DENIED = "ACCESS_DENIED";
-  public static final String CODE_UNAUTHENTICATED = "UNAUTHENTICATED";
-  public static final String CODE_VALIDATION_FAILED = "VALIDATION_FAILED";
-  public static final String CODE_CONSTRAINT_VIOLATION = "CONSTRAINT_VIOLATION";
-  public static final String CODE_DUPLICATE_ENTITY = "DUPLICATE_ENTITY";
-  public static final String CODE_ILLEGAL_ARGUMENT = "ILLEGAL_ARGUMENT";
-  public static final String CODE_BAD_REQUEST = "BAD_REQUEST";
-  public static final String CODE_TYPE_MISMATCH = "TYPE_MISMATCH";
-  public static final String CODE_DATA_INTEGRITY = "DATA_INTEGRITY_VIOLATION";
-  public static final String CODE_NOT_FOUND = "NOT_FOUND";
-  public static final String CODE_METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED";
+  public static final String CODE_PESSIMISTIC_LOCK = CoreProblemCode.PESSIMISTIC_LOCK.code();
+  public static final String CODE_ACCESS_DENIED = CoreProblemCode.ACCESS_DENIED.code();
+  public static final String CODE_UNAUTHENTICATED = CoreProblemCode.UNAUTHENTICATED.code();
+  public static final String CODE_VALIDATION_FAILED = CoreProblemCode.VALIDATION_FAILED.code();
+  public static final String CODE_CONSTRAINT_VIOLATION =
+      CoreProblemCode.CONSTRAINT_VIOLATION.code();
+  public static final String CODE_DUPLICATE_ENTITY = CoreProblemCode.DUPLICATE_ENTITY.code();
+  public static final String CODE_ILLEGAL_ARGUMENT = CoreProblemCode.ILLEGAL_ARGUMENT.code();
+  public static final String CODE_BAD_REQUEST = CoreProblemCode.BAD_REQUEST.code();
+  public static final String CODE_TYPE_MISMATCH = CoreProblemCode.TYPE_MISMATCH.code();
+  public static final String CODE_DATA_INTEGRITY = CoreProblemCode.DATA_INTEGRITY_VIOLATION.code();
+  public static final String CODE_NOT_FOUND = CoreProblemCode.NOT_FOUND.code();
+  public static final String CODE_METHOD_NOT_ALLOWED = CoreProblemCode.METHOD_NOT_ALLOWED.code();
 
-  public static final String CODE_UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE";
-  public static final String CODE_INTERNAL_ERROR = "INTERNAL_ERROR";
+  public static final String CODE_UNSUPPORTED_MEDIA_TYPE =
+      CoreProblemCode.UNSUPPORTED_MEDIA_TYPE.code();
+  public static final String CODE_INTERNAL_ERROR = CoreProblemCode.INTERNAL_ERROR.code();
 
   private static final String MDC_CORRELATION_ID = "correlationId";
 

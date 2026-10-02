@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
@@ -66,7 +67,7 @@ import tools.jackson.databind.ObjectMapper;
 public class SubjectRateLimitingFilter extends OncePerRequestFilter {
 
   /** Stable machine-readable code on the problem body, shared with the per-IP limiter. */
-  static final String CODE_RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED";
+  static final String CODE_RATE_LIMIT_EXCEEDED = CoreProblemCode.RATE_LIMIT_EXCEEDED.code();
 
   /** Hard cap on simultaneously tracked subjects, bounding the bucket map's footprint. */
   static final long MAX_TRACKED_SUBJECTS = 50_000L;
