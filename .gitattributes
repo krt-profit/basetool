@@ -51,3 +51,5 @@ docker/maintenance/** text eol=lf
 *.acl text eol=lf
 
 docker/sandbox/** text eol=lf
+
+backend/src/test/resources/architecture/** text eol=lf
