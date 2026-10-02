@@ -78,10 +78,13 @@ class AuthorizationMatrixRenderingTest {
     /**
      * Carries a service-level gate.
      *
-     * @param id ignored
+     * @param id the id the gate checks
+     * @return the id
      */
     @PreAuthorize("@fixtureGate.allows(#id)")
-    public void gated(String id) {}
+    public String gated(String id) {
+      return id;
+    }
 
     /** Carries no gate. */
     public void ungated() {}
