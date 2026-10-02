@@ -46,7 +46,8 @@ decimals: the server rounds it half-up to three before it stores or compares it,
 
 ## Quality — `quality`
 
-An integer from 0 to 1000. Trade goods are always stored at 0, whatever a client sends.
+An integer from 0 to 1000. A material is stored at the quality the client sends, whatever its kind;
+send 0 when the quality is not known. An item has none and is stored at 0.
 
 ## Place — `location-ref`
 
@@ -64,8 +65,11 @@ recorded. A default grant is the server's alone, so a client's `default` is stor
 
 ## Material kind — `material-kind`
 
-Read-only: `{type: RAW | REFINED | NO_REFINE, commodity}`, so a client can route a material to its
-own lists; `commodity` is true for a UEX trade good.
+Read-only: `{type: RAW | REFINED | NO_REFINE, commodity}` and, where UEX knows the material, its
+flags `mineral`, `harvestable`, `raw`, `refined`, `buyable` and `sellable`, so a client can route a
+material to its own lists. `commodity` is true for a material listed in UEX's commodity catalogue,
+ores and refined metals included. None of it decides the quality; see
+[stock](resources/stock.md#material-kind).
 
 ## Offline file — `envelope`
 

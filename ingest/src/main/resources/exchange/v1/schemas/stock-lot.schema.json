@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ingest.profit-base.online/exchange/v1/schemas/stock-lot.schema.json",
   "title": "Stock lot",
-  "description": "The member's personal stock of one material at one location, quality and stolen state, summed across org-unit pools. It has no org unit and no row id.",
+  "description": "The member's stock, personal and shared, of one material at one location, quality and stolen state, summed across org-unit pools. It has no org unit and no row id.",
   "type": "object",
   "properties": {
     "key": {

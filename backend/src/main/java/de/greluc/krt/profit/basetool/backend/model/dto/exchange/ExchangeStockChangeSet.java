@@ -48,7 +48,7 @@ public record ExchangeStockChangeSet(
    * @param op always {@code set-quantity}
    * @param material the material or item
    * @param location the Lager location
-   * @param quality the quality, 0 for a trade good or an item
+   * @param quality the quality of a material lot, ignored for an item
    * @param stolen whether the lot is marked stolen
    * @param quantity the quantity the lot should hold
    * @param expectedQuantity the quantity the client last saw, 0 for a new lot

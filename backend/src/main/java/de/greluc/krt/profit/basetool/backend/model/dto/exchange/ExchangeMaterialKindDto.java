@@ -19,13 +19,32 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A material's read-only classification, which a client uses to route a lot to its own lists
- * (REQ-XCH-016).
+ * (REQ-XCH-016); a flag UEX does not know for the material is left out.
+ *
+ * <p>None of it decides a lot's quality: every material lot keeps the quality it is booked at.
  *
  * @param type {@code RAW}, {@code REFINED} or {@code NO_REFINE}
- * @param commodity whether the material is a UEX commodity
+ * @param commodity whether the material is listed in UEX's commodity catalogue
+ * @param mineral UEX: whether it is a mined mineral
+ * @param harvestable UEX: whether it is harvested
+ * @param raw UEX: whether it is an unrefined raw material
+ * @param refined UEX: whether it is the product of a refinery
+ * @param buyable UEX: whether a terminal sells it
+ * @param sellable UEX: whether a terminal buys it
  */
-public record ExchangeMaterialKindDto(@NotNull String type, boolean commodity) {}
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record ExchangeMaterialKindDto(
+    @NotNull String type,
+    boolean commodity,
+    @Nullable Boolean mineral,
+    @Nullable Boolean harvestable,
+    @Nullable Boolean raw,
+    @Nullable Boolean refined,
+    @Nullable Boolean buyable,
+    @Nullable Boolean sellable) {}

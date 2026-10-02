@@ -64,8 +64,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * The member's personal stock lots as a snapshot and a change feed, relayed from the ingest gateway
- * (REQ-XCH-013, REQ-XCH-016). Writes commit, because the feed reads only finished transactions.
+ * The member's stock lots, personal and shared, as a snapshot and a change feed, relayed from the
+ * ingest gateway (REQ-XCH-013, REQ-XCH-016). Writes commit, because the feed reads only finished
+ * transactions.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -136,21 +137,23 @@ class ExchangeStockControllerTest {
   }
 
   @Test
-  void aLotSumsTheMembersPersonalRowsAcrossPoolsAndLeavesTheRestOut() throws Exception {
+  void aLotSumsTheMembersPersonalAndSharedRowsAcrossPoolsAndLeavesOtherMembersOut()
+      throws Exception {
     UUID titanium = material("RAW", "SCU", 42);
     UUID area18 = location("Area18 " + UUID.randomUUID());
     List<UUID> pools = jdbc.queryForList("SELECT id FROM org_unit LIMIT 1", UUID.class);
     UUID pool = pools.isEmpty() ? null : pools.getFirst();
     stock(member, titanium, null, area18, 500, 1.25, true, false, null);
     stock(member, titanium, null, area18, 500, 2.0004, true, false, pool);
-    stock(member, titanium, null, area18, 500, 7, false, false, null);
+    stock(member, titanium, null, area18, 500, 7, false, false, pool);
     stock(member, titanium, null, area18, 500, 3, true, true, null);
     stock(other, titanium, null, area18, 500, 9, true, false, null);
+    stock(other, titanium, null, area18, 500, 11, false, false, pool);
 
     read(relayed(get(PATH)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items.length()").value(2))
-        .andExpect(jsonPath("$.items[?(@.stolen == false)].quantity.amount").value(3.25))
+        .andExpect(jsonPath("$.items[?(@.stolen == false)].quantity.amount").value(10.25))
         .andExpect(jsonPath("$.items[?(@.stolen == false)].quantity.unit").value("SCU"))
         .andExpect(jsonPath("$.items[?(@.stolen == false)].quality").value(500))
         .andExpect(jsonPath("$.items[?(@.stolen == false)].material.bt").value(titanium.toString()))
@@ -160,6 +163,29 @@ class ExchangeStockControllerTest {
         .andExpect(jsonPath("$.items[0].location.name").exists())
         .andExpect(jsonPath("$.removed.length()").value(0))
         .andExpect(jsonPath("$.hasMore").value(false));
+  }
+
+  @Test
+  void aMaterialKindCarriesTheUexFlagsItKnowsAndLeavesTheUnknownOut() throws Exception {
+    UUID ore = material("RAW", "SCU", 43);
+    jdbc.update(
+        """
+        UPDATE material SET is_mineral = 1, is_harvestable = 0, is_raw = 1, is_refined = 0,
+                            is_buyable = 0, is_sellable = NULL
+        WHERE id = ?
+        """,
+        ore);
+    stock(member, ore, null, location("Daymar " + UUID.randomUUID()), 561, 4, true, false, null);
+
+    read(relayed(get(PATH)))
+        .andExpect(jsonPath("$.items[0].quality").value(561))
+        .andExpect(jsonPath("$.items[0].materialKind.commodity").value(true))
+        .andExpect(jsonPath("$.items[0].materialKind.mineral").value(true))
+        .andExpect(jsonPath("$.items[0].materialKind.harvestable").value(false))
+        .andExpect(jsonPath("$.items[0].materialKind.raw").value(true))
+        .andExpect(jsonPath("$.items[0].materialKind.refined").value(false))
+        .andExpect(jsonPath("$.items[0].materialKind.buyable").value(false))
+        .andExpect(jsonPath("$.items[0].materialKind.sellable").doesNotExist());
   }
 
   @Test
@@ -223,7 +249,7 @@ class ExchangeStockControllerTest {
   }
 
   @Test
-  void aRowRebookedToTheSharedPoolLeavesThePersonalLot() throws Exception {
+  void aRowRebookedToTheSharedPoolStaysInItsLotAndChangesNothingInTheFeed() throws Exception {
     UUID titanium = material("RAW", "SCU", null);
     UUID area18 = location("Area18 " + UUID.randomUUID());
     UUID row = stock(member, titanium, null, area18, 1, 4, true, false, null);
@@ -233,7 +259,24 @@ class ExchangeStockControllerTest {
 
     read(relayed(get(PATH).param("cursor", cursor)))
         .andExpect(jsonPath("$.items.length()").value(0))
-        .andExpect(jsonPath("$.removed.length()").value(1));
+        .andExpect(jsonPath("$.removed.length()").value(0));
+    read(relayed(get(PATH)))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(4));
+  }
+
+  @Test
+  void aChangedSharedRowReachesTheFeed() throws Exception {
+    UUID titanium = material("RAW", "SCU", null);
+    UUID area18 = location("Area18 " + UUID.randomUUID());
+    UUID row = stock(member, titanium, null, area18, 1, 4, false, false, null);
+    String cursor = snapshotEnd();
+
+    jdbc.update("UPDATE inventory_item SET amount = 9 WHERE id = ?", row);
+
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].quantity.amount").value(9));
   }
 
   @Test

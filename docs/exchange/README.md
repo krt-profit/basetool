@@ -1,7 +1,7 @@
 # Profit Basetool — Exchange API
 
 The Exchange API lets **approved** third-party applications exchange a member's own data with the
-Profit Basetool: their blueprints, their personal stock, their ships, the anonymous open demand of
+Profit Basetool: their blueprints, their stock, their ships, the anonymous open demand of
 their units, and drafts the member reviews in the browser. It is not a general-purpose API. Every
 client is approved publicly and case by case, and every member decides which client may do what.
 
@@ -26,7 +26,7 @@ the registry grants it to the client.
 | --- | --- |
 | `exchange.connect` | the service document, labelling the installation, the account check |
 | `exchange.blueprints.read` / `.write` | reading and changing the member's blueprints |
-| `exchange.stock.read` / `.write` | reading and setting the member's personal stock lots |
+| `exchange.stock.read` / `.write` | reading and setting the member's stock lots, personal and shared |
 | `exchange.hangar.read` / `.write` | reading and changing the member's own ships |
 | `exchange.demand.read` | the anonymous open demand of the member's units |
 | `exchange.drafts.blueprints` / `.refinery` | staging blueprints or refinery orders for review in the browser |

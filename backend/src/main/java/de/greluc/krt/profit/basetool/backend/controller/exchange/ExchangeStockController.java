@@ -46,13 +46,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The member's personal stock lots for an exchange client, reachable only from the ingest gateway
- * (REQ-XCH-013, REQ-XCH-016).
+ * The member's stock lots, personal and shared, for an exchange client, reachable only from the
+ * ingest gateway (REQ-XCH-013, REQ-XCH-016).
  */
 @RestController
 @RequestMapping("/api/v1/exchange/me/stock")
 @RequiredArgsConstructor
-@Tag(name = "Exchange — stock", description = "The member's personal stock lots and their changes")
+@Tag(name = "Exchange — stock", description = "The member's stock lots and their changes")
 public class ExchangeStockController {
 
   /** Reads the snapshot and the feed. */

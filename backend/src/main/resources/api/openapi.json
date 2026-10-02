@@ -49,6 +49,9 @@
     "description" : "Operation aggregate: groups multiple missions under one umbrella and exposes aggregated finance and payout views.",
     "name" : "Operations"
   }, {
+    "description" : "The member's stock lots and their changes",
+    "name" : "Exchange — stock"
+  }, {
     "description" : "Approved third-party exchange clients",
     "name" : "Admin — Exchange registry"
   }, {
@@ -99,9 +102,6 @@
   }, {
     "description" : "The calling installation of a client",
     "name" : "Exchange — installation"
-  }, {
-    "description" : "The member's personal stock lots and their changes",
-    "name" : "Exchange — stock"
   }, {
     "description" : "Per-user owned crafting blueprints (#327).",
     "name" : "Personal Blueprints"
@@ -62242,7 +62242,25 @@
       "ExchangeMaterialKindDto" : {
         "type" : "object",
         "properties" : {
+          "buyable" : {
+            "type" : "boolean"
+          },
           "commodity" : {
+            "type" : "boolean"
+          },
+          "harvestable" : {
+            "type" : "boolean"
+          },
+          "mineral" : {
+            "type" : "boolean"
+          },
+          "raw" : {
+            "type" : "boolean"
+          },
+          "refined" : {
+            "type" : "boolean"
+          },
+          "sellable" : {
             "type" : "boolean"
           },
           "type" : {

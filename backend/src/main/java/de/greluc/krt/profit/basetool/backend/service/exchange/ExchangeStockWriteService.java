@@ -90,13 +90,16 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Applies a client's stock changes to the member's personal lots: each op sets a lot to a quantity
- * against the quantity the client last saw, under row locks, and the difference is booked in or out
- * like the Lager does (REQ-XCH-014, REQ-XCH-016, REQ-XCH-021, REQ-XCH-022, ADR-0218).
+ * Applies a client's stock changes to the member's lots, personal and shared: each op sets a lot to
+ * a quantity against the quantity the client last saw, under row locks, and the difference is
+ * booked in or out like the Lager does (REQ-XCH-014, REQ-XCH-016, REQ-XCH-021, REQ-XCH-022,
+ * ADR-0218, ADR-0230).
  *
- * <p>A book-in is a new personal row without an org unit. A book-out takes the lot's rows without
- * an org unit first, then the oldest, through the Lager's own book-out, which lowers linked
- * Materialbörse offers and audits each offer it lowers or removes; they are counted in the result.
+ * <p>A book-in is a new personal row without an org unit, at the quality the op names. A book-out
+ * takes the lot's personal rows first, then rows without an org unit, then the oldest, and never
+ * more of a row than its job-order and mission reservations leave free, through the Lager's own
+ * book-out, which lowers linked Materialbörse offers and audits each offer it lowers or removes;
+ * they are counted in the result.
  */
 @Service
 @RequiredArgsConstructor
@@ -353,7 +356,7 @@ public class ExchangeStockWriteService {
             && !inventoryProperties.stolenMarkingEnabled()) {
           skip = new Skip(REJECTED, STOLEN_MARKING_DISABLED);
         } else {
-          Integer quality = entry.material() == null || entry.commodity() ? null : op.quality();
+          Integer quality = entry.material() == null ? null : op.quality();
           lot =
               new Lot(
                   entry.material(), entry.gameItem(), location.get(), quality, op.stolen(), unit);
@@ -508,7 +511,8 @@ public class ExchangeStockWriteService {
   }
 
   /**
-   * Locks the member's personal rows of a lot, the rows without an org unit first, then the oldest.
+   * Locks the member's rows of a lot, personal and shared, in the order a book-out takes them: the
+   * personal rows first, then the rows without an org unit, then the oldest.
    *
    * @param member the member
    * @param lot the lot
@@ -518,16 +522,17 @@ public class ExchangeStockWriteService {
     List<InventoryItem> rows =
         new ArrayList<>(
             lot.material() != null
-                ? inventoryRepository.lockPersonalMaterialLot(
+                ? inventoryRepository.lockMaterialLot(
                     member,
                     lot.material().getId(),
                     lot.location().getId(),
                     lot.quality() == null ? 0 : lot.quality(),
                     lot.stolen())
-                : inventoryRepository.lockPersonalItemLot(
+                : inventoryRepository.lockItemLot(
                     member, lot.gameItem().getId(), lot.location().getId(), lot.stolen()));
     rows.sort(
-        Comparator.comparing((InventoryItem r) -> r.getOwningOrgUnit() == null ? 0 : 1)
+        Comparator.comparing((InventoryItem r) -> Boolean.TRUE.equals(r.getPersonal()) ? 0 : 1)
+            .thenComparing(r -> r.getOwningOrgUnit() == null ? 0 : 1)
             .thenComparing(
                 InventoryItem::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder())));
     return rows;
@@ -819,8 +824,9 @@ public class ExchangeStockWriteService {
   }
 
   /**
-   * Books stock out through the Lager's own book-out, row by row, which audits every Materialbörse
-   * offer it lowers or removes, and counts those offers.
+   * Books stock out through the Lager's own book-out, row by row, never more of a row than its
+   * reservations leave free, which audits every Materialbörse offer it lowers or removes, and
+   * counts those offers.
    *
    * @param member the member
    * @param rows the lot's locked rows, in the order to take them
@@ -839,7 +845,7 @@ public class ExchangeStockWriteService {
       if (remaining.signum() <= 0) {
         break;
       }
-      BigDecimal take = round(BigDecimal.valueOf(row.getAmount()), unit).min(remaining);
+      BigDecimal take = round(free(List.of(row)), unit).min(remaining);
       if (take.signum() <= 0) {
         continue;
       }
@@ -866,13 +872,13 @@ public class ExchangeStockWriteService {
   }
 
   /**
-   * Counts the member's personal lots.
+   * Counts the member's lots, personal and shared.
    *
    * @param member the member
    * @return the number of lots
    */
   private long lotCount(@NotNull UUID member) {
-    return inventoryRepository.countPersonalLots(member);
+    return inventoryRepository.countExchangeLots(member);
   }
 
   /**
@@ -977,7 +983,6 @@ public class ExchangeStockWriteService {
    * @param material the material, or {@code null}
    * @param gameItem the item, or {@code null}
    * @param unit the lot's unit
-   * @param commodity whether the material is a trade good, stored at quality 0
    * @param result the result that ends the op, or {@code null}
    * @param reason the reason of that result, or {@code null}
    */
@@ -985,7 +990,6 @@ public class ExchangeStockWriteService {
       @Nullable Material material,
       @Nullable GameItem gameItem,
       @NotNull String unit,
-      boolean commodity,
       @Nullable String result,
       @Nullable String reason) {
 
@@ -1000,7 +1004,7 @@ public class ExchangeStockWriteService {
           material.getQuantityType() == QuantityType.PIECE
               ? QuantityType.PIECE.name()
               : QuantityType.SCU.name();
-      return new Catalogue(material, null, unit, material.getIdCommodity() != null, null, null);
+      return new Catalogue(material, null, unit, null, null);
     }
 
     /**
@@ -1010,7 +1014,7 @@ public class ExchangeStockWriteService {
      * @return the entry
      */
     static @NotNull Catalogue of(@NotNull GameItem item) {
-      return new Catalogue(null, item, QuantityType.PIECE.name(), false, null, null);
+      return new Catalogue(null, item, QuantityType.PIECE.name(), null, null);
     }
 
     /**
@@ -1021,18 +1025,18 @@ public class ExchangeStockWriteService {
      * @return the entry
      */
     static @NotNull Catalogue skip(@NotNull String result, @NotNull String reason) {
-      return new Catalogue(null, null, QuantityType.SCU.name(), false, result, reason);
+      return new Catalogue(null, null, QuantityType.SCU.name(), result, reason);
     }
   }
 
   /**
-   * A lot: the member's personal rows of one material or item at one location, quality and stolen
-   * state.
+   * A lot: the member's rows, personal and shared, of one material or item at one location, quality
+   * and stolen state.
    *
    * @param material the material, or {@code null} for an item lot
    * @param gameItem the item, or {@code null} for a material lot
    * @param location the location
-   * @param quality the quality, {@code null} for an item or a trade good stored at 0
+   * @param quality the quality, {@code null} for an item
    * @param stolen whether it is stolen
    * @param unit its unit
    */

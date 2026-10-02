@@ -1,22 +1,22 @@
 # Stock
 
-The member's personal stock in the warehouse, as lots. Reading needs `exchange.stock.read`, changing
-needs `exchange.stock.write`.
+The member's stock in the warehouse, as lots. Reading needs `exchange.stock.read`, changing needs
+`exchange.stock.write`.
 
 ## A lot
 
-A [`stock-lot`](../schemas/) is the member's personal stock of one material or item at one
-warehouse location, quality and stolen state, **summed across the org-unit pools** it is booked
-in. It has no org unit and no row id. Shared stock that is not the member's personal stock is
-never in a lot.
+A [`stock-lot`](../schemas/) is the member's stock of one material or item at one warehouse
+location, quality and stolen state: everything the member holds there, **personal and shared**,
+**summed across the org-unit pools** it is booked in — what the member's „Mein Lager" in the web
+shows. It has no org unit and no row id. Stock another member holds is never in a lot.
 
 | Field | Meaning |
 | --- | --- |
 | `key` | Opaque identifier of the lot. |
 | `material` | `{bt, name}`: a material, or a game item. `bt` is its Basetool id. |
-| `materialKind` | Materials only: `{type: RAW, REFINED or NO_REFINE, commodity}`. `commodity` is `true` for a UEX trade good. |
+| `materialKind` | Materials only, see [below](#material-kind). |
 | `location` | `{name, uex?}` of the warehouse location. |
-| `quality` | 0 to 1000. Always 0 for a trade good and for an item. |
+| `quality` | 0 to 1000. Every material lot has the quality it is booked at; an item lot has 0. |
 | `stolen` | Whether the stock is marked stolen. |
 | `quantity` | `{amount, unit}` in the material's own unit; SCU to three decimals, items in whole `PIECE`s. |
 
@@ -31,11 +31,30 @@ never in a lot.
 }
 ```
 
+### Material kind
+
+`materialKind` classifies a material so a client can sort it into its own lists. It never decides
+a lot's quality.
+
+| Field | Meaning |
+| --- | --- |
+| `type` | `RAW` (goes into a refinery), `REFINED` or `NO_REFINE`. Always present. |
+| `commodity` | Listed in UEX's commodity catalogue. Always present. That catalogue holds ores, refined metals and gems as well as trade goods, so `true` does **not** mean „a trade good without quality". |
+| `mineral` | UEX: a mined mineral. |
+| `harvestable` | UEX: harvested rather than mined. |
+| `raw` | UEX: an unrefined raw material. |
+| `refined` | UEX: the product of a refinery. |
+| `buyable` | UEX: a terminal sells it. |
+| `sellable` | UEX: a terminal buys it. |
+
+The six UEX flags are left out for a material UEX does not know.
+
 ## Reading the lots — `GET /exchange/v1/me/stock`
 
 A snapshot without `cursor`, the changes since it with one: the same `cursor`, `limit`, paging and
 tombstones as [blueprints](blueprints.md#reading-the-set--get-exchangev1meblueprints). A lot whose
-stock is all booked out, or rebooked to the shared pool, arrives as a tombstone. A lot whose stock
+stock is all booked out, or moved to another member, arrives as a tombstone; rebooking stock between
+personal and shared does not change its lot. A lot whose stock
 changes while a snapshot is read may move to a later page; its change follows in the feed either way.
 
 ## Setting quantities — `POST /exchange/v1/me/stock/changes`
@@ -78,8 +97,9 @@ steps; the first that fails ends it:
 | An empty lot whose last change came from the web, the app, the system, another client or another installation | `rejected` `REMOVED_ELSEWHERE` |
 | A fall larger than the lot's stock not reserved for a job order or mission | `rejected` `STOCK_EARMARKED` |
 
-A trade good and an item are always stored at quality 0: the op addresses the lot at quality 0,
-whatever `quality` it sends. `REMOVED_ELSEWHERE` guards against refilling what the member emptied
+A material op addresses the lot at the `quality` it sends, whatever the material's kind; send 0 for
+stock whose quality you do not know. An item op addresses the lot at quality 0, whatever `quality`
+it sends. `REMOVED_ELSEWHERE` guards against refilling what the member emptied
 elsewhere; ask the member, then resend with `override: true`. On `STOCK_EARMARKED`, ask the member
 to release the reservation in the web. On `VERSION_CONFLICT`, pull the feed, merge, and send the op
 again under a new `Idempotency-Key`.
@@ -90,7 +110,8 @@ A change is booked like the warehouse books it, audited in the warehouse under y
 
 - **A rise** books the difference in as new personal stock without an org unit; counted pieces join
   the existing stock of that item as a book-in in the web does.
-- **A fall** books the difference out, taking stock without an org unit first, then the oldest.
+- **A fall** books the difference out, taking personal stock first, then stock without an org unit,
+  then the oldest. It never takes stock reserved for a job order or mission.
 
 **Material Exchange offers.** The Material Exchange is the Basetool's board of stock offers and
 requests between members, unrelated to this API. A book-out that leaves less stock than an offer

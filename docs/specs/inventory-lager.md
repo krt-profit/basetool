@@ -108,9 +108,9 @@ rendered only when an entry has one. The
 per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchanged.
 
 The exchange groups differently and on purpose: its **lot** is material (or game item) + location +
-quality + „gestohlen" over the member's own personal rows, **across** their org-unit pools, and
-leaves shared rows out (REQ-XCH-016, ADR-0218). A lot can therefore span several stacks of this
-view.
+quality + „gestohlen" over every row the member holds, personal **and** shared, **across** their
+org-unit pools (REQ-XCH-016, ADR-0218, ADR-0230). A lot can therefore span several stacks of this
+view, and rebooking a row between personal and shared does not change its lot.
 
 **Game-item rows (REQ-INV-029/030).** Since [`inventory-items.md`](inventory-items.md)
 REQ-INV-029 the Lager also holds **game-item** stock rows with their own stack key —
@@ -670,11 +670,11 @@ page also offers an **item-variant** aggregate — one row per gameItem with the
 here is unchanged and excludes item rows.
 
 The overview makes no distinction for the „gestohlen" marker (owner decision, REQ-INV-053). The
-exchange books trade goods at quality 0 (REQ-XCH-016) into personal rows, which this overview
-leaves out; once such a row is rebooked into the shared pool, its quality 0 lowers the average
-shown here — accepted (ADR-0218). *Corrected 2026-09-27: the planned amendment said exchange trade
-goods lower the average and the maximum here. Exchange book-ins are personal and not counted until
-rebooked, and a quality-0 row can never lower a maximum.*
+exchange books every material at the quality the client sends (REQ-XCH-016), so a rebooked exchange
+row counts here at its real quality. *Amended 2026-10-02 (ADR-0230): the exchange stored every UEX
+commodity — nearly the whole catalogue — at quality 0, and such a row, once rebooked into the
+shared pool, lowered the average here; that was accepted in ADR-0218 and is gone. Rows booked that
+way before the amendment keep their quality 0 until the member corrects them.*
 
 **Acceptance**
 

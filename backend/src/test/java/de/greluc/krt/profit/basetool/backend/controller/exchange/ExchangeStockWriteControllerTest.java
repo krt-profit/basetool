@@ -110,6 +110,7 @@ class ExchangeStockWriteControllerTest {
   private final List<UUID> items = new ArrayList<>();
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> cities = new ArrayList<>();
+  private final List<UUID> missions = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -145,6 +146,7 @@ class ExchangeStockWriteControllerTest {
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
     jdbc.update("DELETE FROM material_exchange_offer WHERE owner_id = ?", member);
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
+    missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
     jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
     jdbc.update("DELETE FROM app_user WHERE id = ?", member);
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
@@ -346,7 +348,7 @@ class ExchangeStockWriteControllerTest {
   }
 
   @Test
-  void aTradeGoodIsStoredAtQualityZero() throws Exception {
+  void aUexCommodityKeepsTheQualityItIsSentAt() throws Exception {
     UUID agricium = material("SCU", 900_000 + (int) (Math.random() * 90_000));
     String area18 = locationName(location(null));
 
@@ -358,7 +360,81 @@ class ExchangeStockWriteControllerTest {
                 Integer.class,
                 member,
                 agricium))
+        .isEqualTo(740);
+  }
+
+  @Test
+  void threeQualitiesOfOneMaterialStayThreeLots() throws Exception {
+    UUID feynmaline = material("SCU", 900_000 + (int) (Math.random() * 90_000));
+    String place = locationName(location(null));
+
+    change(
+            "{\"ops\":["
+                + op(feynmaline, place, 561, "1", "0", "SCU")
+                + ","
+                + op(feynmaline, place, 682, "2", "0", "SCU")
+                + ","
+                + op(feynmaline, place, 371, "3", "0", "SCU")
+                + "]}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(3));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT quality || ':' || amount FROM inventory_item WHERE user_id = ?"
+                    + " AND material_id = ?",
+                String.class,
+                member,
+                feynmaline))
+        .containsExactlyInAnyOrder("561:1", "682:2", "371:3");
+  }
+
+  @Test
+  void aCommodityLotBookedInTheWebIsWrittenAtItsOwnQuality() throws Exception {
+    UUID feynmaline = material("SCU", 900_000 + (int) (Math.random() * 90_000));
+    UUID area18 = location(null);
+    UUID loose = row(feynmaline, area18, 561, 4, null);
+
+    set(feynmaline, locationName(area18), 561, "6", "4", "SCU")
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(amount(loose)).isEqualTo(4.0);
+    assertThat(total(feynmaline)).isEqualTo(6.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inventory_item WHERE user_id = ? AND quality = 0",
+                Integer.class,
+                member))
         .isZero();
+  }
+
+  @Test
+  void aFallTakesPersonalStockBeforeSharedAndLeavesReservationsAlone() throws Exception {
+    UUID laranite = material("SCU", null);
+    UUID area18 = location(null);
+    UUID unit = jdbc.queryForObject("SELECT id FROM org_unit LIMIT 1", UUID.class);
+    UUID personal = row(laranite, area18, 500, 2, unit);
+    UUID shared = sharedRow(laranite, area18, 500, 10, unit);
+    reserve(shared, 6);
+    String place = locationName(area18);
+
+    set(laranite, place, 500, "4", "12", "SCU")
+        .andExpect(jsonPath("$.results[0].reason").value("STOCK_EARMARKED"));
+    assertThat(total(laranite)).isEqualTo(12.0);
+
+    set(laranite, place, 500, "7", "12", "SCU").andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inventory_item WHERE id = ?", Integer.class, personal))
+        .isZero();
+    assertThat(amount(shared)).isEqualTo(7.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT amount FROM inventory_item_mission_allocation WHERE inventory_item_id = ?",
+                Double.class,
+                shared))
+        .isEqualTo(6.0);
   }
 
   @Test
@@ -691,6 +767,63 @@ class ExchangeStockWriteControllerTest {
         unit,
         Timestamp.from(Instant.now().minusSeconds(unit == null ? 10 : 3600)));
     return id;
+  }
+
+  /**
+   * Seeds a shared Lager row of the member, older than every personal row.
+   *
+   * @param material the material
+   * @param location the location
+   * @param quality the quality
+   * @param amount the amount
+   * @param unit the owning org unit
+   * @return the row
+   */
+  private @NotNull UUID sharedRow(
+      @NotNull UUID material,
+      @NotNull UUID location,
+      int quality,
+      double amount,
+      @NotNull UUID unit) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,
+                                    personal, stolen, owning_org_unit_id, created_at, version)
+        VALUES (?, ?, ?, ?, ?, ?, false, false, ?, ?, 0)
+        """,
+        id,
+        member,
+        material,
+        location,
+        quality,
+        amount,
+        unit,
+        Timestamp.from(Instant.now().minusSeconds(7200)));
+    return id;
+  }
+
+  /**
+   * Reserves part of a row for a new mission.
+   *
+   * @param inventoryItem the row
+   * @param amount the reserved amount
+   */
+  private void reserve(@NotNull UUID inventoryItem, double amount) {
+    UUID mission = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO mission (id, name, version) VALUES (?, ?, 0)", mission, "Op " + mission);
+    missions.add(mission);
+    jdbc.update(
+        """
+        INSERT INTO inventory_item_mission_allocation (id, inventory_item_id, mission_id, amount,
+                                                       version, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 0, now(), now())
+        """,
+        UUID.randomUUID(),
+        inventoryItem,
+        mission,
+        amount);
   }
 
   /**

@@ -13,7 +13,7 @@
 ## Context & goal
 
 Approved external client software — VerseKit first, our own SC Extractor second — lets a member keep
-blueprints, the personal part of the Lager and their ships in step between that program and the
+blueprints, their stock in the Lager and their ships in step between that program and the
 Basetool, and read what their own units still need. It does so only through the **exchange API**
 on the ingest gateway, never through the backend API. This spec states what must hold; the ADRs
 above say why. The work is tracked in epic #2078; each requirement names the work package (WP) and
@@ -636,7 +636,8 @@ stack (`ExchangeConnectionsE2eTest`, `ExchangeDepartureE2eTest`)
 
 On `/api/v1/exchange/**` the acting member holds an exchange role and the relayed capability
 authorities — never their stored roles, permissions or contextual grants. Exchange reads and
-writes touch only the member's own blueprints, own personal Lager rows and own ships; they never
+writes touch only the member's own blueprints, own Lager rows (personal and shared, ADR-0230) and
+own ships; they never
 use the admin all-scope or an admin pin. The membership, pending-approval and terms gates apply
 unchanged. No exchange response carries personal data of
 anyone.
@@ -709,8 +710,9 @@ permanent `$id`, `https://ingest.profit-base.online/exchange/v1/schemas/<name>.s
 decision 2026-09-26), and a `$id` is never changed once published. The schemas are:
 `item-ref` (precedence `bt` › `scRecord` › `scGuid` › `uexId` › `locKey` › `name` + `nameLocale`),
 `quantity` (`{amount, unit: SCU|PIECE}`, PIECE whole; an SCU amount is not limited in its decimals — the backend rounds it half-up to three, and so does every comparison with `expectedQuantity`), `quality` (integer
-0–1000; trade goods fixed 0), `location-ref`, `provenance` (`log|manual|import|default|other`,
-`observedAt`), `material-kind` (`RAW|REFINED|NO_REFINE` plus `commodity`), `blueprint`, `stock-lot`
+0–1000, stored as sent for every material), `location-ref`, `provenance` (`log|manual|import|default|other`,
+`observedAt`), `material-kind` (`RAW|REFINED|NO_REFINE` plus `commodity`, and the optional UEX
+flags `mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable`), `blueprint`, `stock-lot`
 (material, location, quality, `stolen`, quantity — no org unit, no row id), `ship` (with required
 `version`), `org-demand`, `location`, `installation`, `account-check`, `change-set` (at most 500
 ops), `change-result` (compact, at most 32 KiB; its optional `cursor` is reserved and never sent in
@@ -807,9 +809,11 @@ purged position as the horizon, below which a cursor has expired.
 
 - [x] A test fails for any write path to the synced tables that bypasses the sequence.
   *`ExchangeChangeFeedTriggerIntegrationTest` pins the synced tables — `personal_blueprint`,
-  `default_blueprint`, `inventory_item` (the member's personal rows only, keyed by lot) and `ship` —
-  to their triggers and runs bulk deletes, owner reassignment, a rebooking to the shared pool and
-  user deletion through them.*
+  `default_blueprint`, `inventory_item` (the member's rows, personal and shared, keyed by lot) and
+  `ship` — to their triggers and runs bulk deletes, owner reassignment, a move to another place, a
+  rebooking between personal and shared that leaves the lot unchanged, and user deletion through
+  them. `V260` announced every lot holding shared rows once, as a `system` change, so a cursor
+  taken before it still sees them (ADR-0230).*
 - [x] A default-set change emits entries for every affected member.
   *`ExchangeChangeFeedTriggerIntegrationTest`.*
 - [x] Every writing transaction is attributed to its channel. *`ChangeSourceTransactionManagerIntegrationTest`.*
@@ -886,14 +890,26 @@ trip built on the E2E stack (`ExchangeSyncE2eTest`)
 
 ### REQ-XCH-016 — Stock syncs as lots, booked like the web
 
-A lot is material + location + quality + stolen over the member's personal rows, across org-unit
-pools. `set-quantity` carries `expectedQuantity`; the server compares under row locks and answers
-`409 VERSION_CONFLICT` on a difference, otherwise books the delta in or out through the Lager's
-services. Book-ins carry no org unit (REQ-ORG, own stamping path); book-outs take rows without a
-unit first, then the oldest. Linked Materialbörse offers follow a book-out as in the web; the result
-reports `offersReduced` and `offersRemoved`, and each change writes its `MARKET_*` audit event.
-Trade goods are stored at quality 0. Writes are audited in the Lager domain with the external
-client.
+A lot is material + location + quality + stolen over **every row the member holds, personal and
+shared**, across org-unit pools — what the member's „Mein Lager" shows (ADR-0230). `set-quantity`
+carries `expectedQuantity`; the server compares under row locks and answers `409 VERSION_CONFLICT`
+on a difference, otherwise books the delta in or out through the Lager's services. Book-ins are
+personal rows without an org unit (REQ-ORG, own stamping path); book-outs take the personal rows
+first, then rows without a unit, then the oldest, and never the part of a row reserved for a job
+order or mission. Linked Materialbörse offers follow a book-out as in the web; the result reports
+`offersReduced` and `offersRemoved`, and each change writes its `MARKET_*` audit event. **Every
+material lot keeps the quality the client sends**, whatever the material's kind; an item lot has
+quality 0. `materialKind` classifies a material for the client's own lists — `type`, `commodity`
+(listed in UEX's commodity catalogue, ores and refined metals included) and the UEX flags
+`mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable` where UEX knows them — and never
+decides the quality. Writes are audited in the Lager domain with the external client.
+
+*Amended 2026-10-02 (ADR-0230, owner decision of the same day):* a lot covered the member's personal
+rows only, and a material carrying a UEX commodity id — nearly the whole catalogue, every ore and
+refined metal included — was stored at quality 0 whatever the client sent. Three lots of one
+mineral at qualities 561, 682 and 371 became one lot without a quality, and a lot the feed showed
+at its quality could not be written at it. Until the amendment, every client stock write in
+production had landed at quality 0 (203 journal entries, 36 lots).
 
 **Acceptance**
 
@@ -916,8 +932,17 @@ client.
   the history grew.*
 - [x] A book-out below an offered amount lowers the offer and records the audit event.
   *`ExchangeStockWriteControllerTest`.*
-- [x] A lot sums the member's personal rows across pools, leaves shared rows out, and becomes a
-  tombstone when its rows are gone or rebooked to the shared pool. *`ExchangeStockControllerTest`.*
+- [x] A lot sums the member's personal and shared rows across pools, leaves other members' rows
+  out, stays unchanged when a row is rebooked between personal and shared, and becomes a tombstone
+  when its rows are gone. *`ExchangeStockControllerTest`. Amended 2026-10-02 (ADR-0230): the lot
+  left shared rows out, and a rebooking to the shared pool was a tombstone.*
+- [x] A material lot is stored at the quality the op sends, a UEX commodity included; three
+  qualities of one material stay three lots; a lot booked in the web is written at its own quality.
+  *`ExchangeStockWriteControllerTest`.*
+- [x] A fall takes personal rows before shared ones and never the reserved part of a row, which
+  answers `STOCK_EARMARKED` when the free stock is short. *`ExchangeStockWriteControllerTest`.*
+- [x] `materialKind` carries the UEX flags the material has and leaves the unknown ones out.
+  *`ExchangeStockControllerTest`.*
 - [x] Moving stock to the lot's stolen twin marks the rows — a part split off, a whole lot flipped —
   and a piece book-in joins the existing row. *`ExchangeStockWriteControllerTest`.*
 
@@ -937,10 +962,12 @@ the batch names is locked before any op compares `expectedQuantity` (`VERSION_CO
 transaction-scoped advisory lock per member and lot key, all of them in ascending order of the
 lock key, then the lots' rows in the order of the lots' keys, each lot's rows in id order
 (ADR-0229). So two sets of one member over the same lots never deadlock whatever order their ops
-come in, and the one that waited sees what the other booked, an empty lot included. A trade good is stored at quality 0. A
+come in, and the one that waited sees what the other booked, an empty lot included. A material
+lot is addressed at the quality the op sends. A
 lot emptied by another channel or installation is refilled only with `override`
 (`REMOVED_ELSEWHERE`); stock reserved for a job order or mission is never taken (`STOCK_EARMARKED`,
-owner decision 2026-09-27 — personal rows carry no reservations, so this guards the invariant);
+owner decision 2026-09-27; the reservations sit on the lot's shared rows, and a book-out takes
+from each row only what its reservations leave free);
 a stolen lot waits for `APP_INVENTORY_STOLEN_MARKING_ENABLED` (`STOLEN_MARKING_DISABLED`). The
 mass-change guard counts a lot set to 0 or cut to a tenth of what it held when the client's window
 opened, unless the batch's rises of the same material cover the whole fall (REQ-XCH-021). A fall and
@@ -951,7 +978,8 @@ out rows backing a Materialbörse offer and the earmarked part of a row; the res
 decision 2026-09-27). A book-in is a new personal row without an org unit
 (`INVENTORY_ITEM_CREATED`), which piece-counted stock then joins to the existing row as a book-in in
 the Lager does (REQ-INV-026, owner decision 2026-09-27); a book-out runs the Lager's own
-`DISCARD` book-out over the rows without an org unit first, then the oldest, and every offer it
+`DISCARD` book-out over the personal rows first, then the rows without an org unit, then the
+oldest, and every offer it
 lowers or removes is audited by that book-out (`MARKET_OFFER_REDUCED`, `MARKET_OFFER_REMOVED`,
 `reason=stock`, REQ-MARKET-013) and counted in
 `offersReduced` / `offersRemoved`. Each changed lot is journaled.
@@ -2037,7 +2065,8 @@ succeeding, never succeeded).
 | Silent removal of Materialbörse offers by a sync book-out | reported and audited, not undoable — accepted (REQ-XCH-016/-022) |
 | A ship removal through the exchange detaching the ship from its mission units, which are org data | reported (`detachedFromMissions`) and audited (`MISSION_UNIT_UPDATED`), not undoable: undo recreates the ship under a new id without its mission units — accepted (REQ-XCH-017/-022) |
 | The version gate bypassed by a manipulated client | cooperative by design — accepted (REQ-XCH-024) |
-| Data poisoning of org-wide views | own personal rows only, validated through the domain services (REQ-XCH-009/-016) |
+| Data poisoning of org-wide views | own rows only, validated through the domain services; a client books in only personal rows, so it can add nothing to an org-wide view, and lowers the member's own shared rows only as far as their reservations allow, journaled and undoable (REQ-XCH-009/-016/-021/-022, ADR-0230) |
+| A client booking out shared stock the org counts on | the member's own rows only, as the member may in the web; reserved stock never taken (`STOCK_EARMARKED`); offers lowered and audited; mass-change guard, journal and undo (REQ-XCH-016/-021/-022) — accepted (owner decision 2026-10-02, ADR-0230) |
 | Token leakage via backups, diagnostics or a problem-report webhook | client security requirements (REQ-XCH-027) |
 | A switchable issuer used for phishing | only through a developer environment variable, never in the UI (REQ-XCH-027) |
 | The installation label as a spoofing channel or PC-name leak | length and character limits, always after the client name, never logged or audited (REQ-XCH-007) |
