@@ -44,6 +44,13 @@
   Minor-Versionen nennen (REQ-OPS-040). Die Klassen liegen jetzt in `discord`, `gate` und `exchange`;
   das Verhalten bleibt unverändert.
 
+- **Frontend: Routen, Rechte und Sitzungstypen sind gegen Verschiebungen gesichert.** Eine
+  committete Routen-/Rechte-Tabelle, eine Pflicht-`@PreAuthorize` pro Handler, die statische Prüfung
+  aller `T(…)`-Verweise und View-Namen in Templates und eine aus dem Code abgeleitete Liste der
+  Sitzungstypen lassen den Build scheitern, statt dass ein verschobener Controller oder ein Formular
+  still ein Recht oder Flash-Werte verliert (REQ-FE-025…027). Organigramm, Schiffsdaten und
+  „Ankündigung gelesen" tragen ihr `isAuthenticated()` jetzt selbst; das Verhalten ist unverändert.
+
 ### Changed
 
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,

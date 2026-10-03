@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0239
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0206, ADR-0239
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -2093,6 +2093,107 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
 **Enforced by:** `UnsavedChangesGuardE2eTest` · **Code:** `unsaved-changes.js`,
 `fragments/unsaved-modal.html`, `admin-terms.js`, `admin/terms.html` · **Related:** REQ-FE-005,
 REQ-FE-021
+
+### REQ-FE-025 — The route table and its gates are pinned, and every handler carries a gate
+
+Many of the frontend's checks name their subject by a package or a class, and a moved class would
+leave them green without checking anything. The route table is therefore pinned by what the
+dispatcher actually serves:
+
+- **A committed route/gate snapshot.** `frontend/src/test/resources/security/route-gate-snapshot.txt`
+  holds one sorted line per mapping of `requestMappingHandlerMapping`: path patterns, verbs, the
+  `params` / `headers` / `consumes` / `produces` conditions, the handler as `SimpleName#method`, the
+  effective `@PreAuthorize` (the method's, else the class's, with its source) and the
+  `UsesLayoutModel` opt-in. The handler is named without its package, so a pure move leaves the file
+  byte-identical; any diff is an intended route or gate change and is reviewed as such. The file is
+  rewritten with `./gradlew :frontend:test --tests '*RouteGateSnapshotTest' -PupdateSnapshots`.
+- **A gate on every handler.** Every application handler has an effective `@PreAuthorize` — its own
+  or its class's — except an exact list of nine handlers named `SimpleName#method`: the anonymous
+  surface of REQ-SEC-052 (landing page, Impressum, privacy, terms, licences, the App Link callback and
+  help page, `assetlinks.json`, the web app manifest). A handler moved out of a class-gated
+  controller fails the build instead of being served to any signed-in member. The class-level rule
+  of `ArchitectureTest` (REQ-SEC-052) stays as it is.
+
+**Acceptance**
+
+- [x] The snapshot holds all 538 mappings (536 application handlers, 2 of Spring Boot's error
+  controller) and matches the committed file (2026-10-02).
+- [x] The four member handlers that relied on the URL rule alone — `/org-chart`, `/ship-data` and
+  both `/announcement/read` variants — declare `isAuthenticated()`, so the allow-list holds only the
+  nine public handlers (2026-10-02).
+- [x] A stale allow-list entry fails; a handler moved into an ungated class fails and changes its
+  snapshot line (planted fixtures).
+
+**Enforced by:** `RouteGateSnapshotTest` (snapshot, per-handler rule, selection floors),
+`RouteGateSnapshotRuleTest` (planted fixtures), `GoldenFileTest` · **Related:** REQ-SEC-052,
+REQ-FE-020
+
+### REQ-FE-026 — Template type references and view names resolve before render time
+
+A template names Java by string — `T(de.greluc….support.Roles).ADMIN` inside `sec:authorize` — and a
+controller names templates by string. Neither is seen by the compiler; a broken one fails only when
+the page is rendered (an SpEL error, a 500). Both are resolved statically:
+
+- every `T(fqcn)` in a template loads and its member is a public static field or method; every
+  `T(` opener must parse, so an unparseable reference cannot hide (172 references in 22 templates on
+  2026-10-02);
+- every view a `Controller` or `ControllerAdvice` returns as a literal (returned, a ternary branch of
+  a return, a switch arm, a `ModelAndView` name), every `"view :: fragment"` literal in any Java
+  source and every literal `path :: fragment` reference between templates names an existing template
+  that declares the fragment (`th:fragment` or `th:ref`);
+- every template is named by such a reference or is one of Spring Boot's status-code error views,
+  so a view returned in a shape the scan does not recognise fails instead of passing unchecked.
+
+**Acceptance**
+
+- [x] All 172 `T(…)` references resolve; all 182 Java view references and all 486 template fragment
+  references resolve; every one of the 120 templates is named (2026-10-02).
+- [x] A moved class, a missing constant, a moved template and a renamed fragment are each reported
+  (planted fixtures).
+
+**Enforced by:** `TemplateTypeReferenceTest`, `ViewNameResolutionTest` (both with selection floors
+and planted fixtures) · **Code:** `support/Roles`
+
+### REQ-FE-027 — Every session-bound type is derived from the code and admitted by the allow-list
+
+The session type allow-list of REQ-SEC-067 admits the application's classes by the prefix
+`de.greluc.krt.profit.basetool.frontend.model.`. A flashed form moved out of that package would be
+refused under `enforce` and its flash attribute dropped after the redirect, silently in the UI. The
+set of types the frontend can store in the session is therefore derived from the compiled code:
+
+- Every call of `RedirectAttributes.addFlashAttribute` / `addAllFlashAttributes`, a `FlashMap`
+  write, `HttpSession.setAttribute` and `WebUtils.setSessionAttribute` is resolved to the static type
+  of its value from the bytecode — a constant, a local variable's generic type, a method's generic
+  return type, a field, a cast or a constructor. A value whose type does not determine the stored
+  classes (a merge of two branches, `Object`, a type variable, a raw container, an abstract
+  application type) fails the build unless a reviewed entry resolves it; there is one, the role sync
+  filter's copied `ArrayList` of authority names.
+- The closure over those types — record components, instance fields and getters of every
+  application type, transitively — must be admitted by the enforcing validator as production builds
+  it. `@SessionAttributes` and session-scoped beans are absent; one appearing fails the build until
+  the scan learns about it.
+- The application part of the closure is the **exact list** the allow-list narrows to in its own
+  release (D-10): `frontend/src/test/resources/session/session-bound-types.txt`, 21 types on
+  2026-10-02 (10 flashed forms and DTOs plus their nested types and enums), rewritten with
+  `-PupdateSnapshots`.
+- **No allow-list entry is broader than a model or session package**: an application prefix must
+  name a `model` or `session` package of the frontend, the non-application prefixes stay
+  `org.springframework.security.`, the three name patterns stay the reviewed ones, and an exact name
+  is a plain class name.
+
+**Acceptance**
+
+- [x] 317 session writes are resolved, every type of the closure is admitted, and the exact list
+  matches the committed file (2026-10-02).
+- [x] A planted flash of a form outside `frontend.model`, a nested row type and a
+  `java.util.concurrent` map are each refused; a raw list and an `Object` value are reported as
+  unresolved; a planted `@SessionAttributes` is reported.
+- [x] A prefix such as `…frontend.`, `…frontend.mission.`, `de.greluc.` or `java.` is reported as too
+  broad.
+
+**Enforced by:** `SessionBoundTypeClosureTest`, `SessionTypeAllowListBreadthTest` · **Code:**
+`config/SessionTypeAllowList`, `config/RedisSessionConfig` · **Related:** REQ-SEC-067 · **ADR:**
+ADR-0206
 
 ## Out of scope
 

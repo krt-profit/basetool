@@ -3635,6 +3635,9 @@ Redis, which three services reach (APPSEC-05, improvement audit 2026-09-22).
 | `CONTAINER_WRITTEN_FINAL_SESSION_TYPES` | Tomcat's WebSocket binding listener (REQ-SEC-049) |
 
 A new session attribute of a type outside the list is a change to this table, in the same PR.
+`SessionBoundTypeClosureTest` derives every session-bound type from the compiled code and fails the
+build when one falls outside the list, and `SessionTypeAllowListBreadthTest` refuses an entry
+broader than a model or session package (REQ-FE-027).
 
 > [!warning] Corrected 2026-09-23 — the first list refused every signed-in member under `enforce`
 > The list as merged (PR #2018) had no `java.lang`, `java.math` or `java.net` entry and not the
@@ -3693,6 +3696,7 @@ touches no stored session and needs no migration.
 
 **Enforced by:** `SessionTypeAllowListTest` (parity over a realistic session, gadget refusal before
 construction, report/off reading, package boundaries, metrics, mode parsing) ·
+`SessionBoundTypeClosureTest`, `SessionTypeAllowListBreadthTest` (REQ-FE-027) ·
 `SessionSerializerRoundTripTest`, `RedisSessionImportFlashRoundTripTest`,
 `FaultTolerantSessionSerializerTest`, `HalfWrittenSessionHashIntegrationTest`,
 `SessionAttributeRepairIntegrationTest` (all built on the enforcing mapper) · the E2E suite
@@ -3945,6 +3949,8 @@ a defect there would turn both guards green at once, so it is tested on its own 
 through them) ·
 `ArchitectureTest#permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`,
 `#readEndpointsMustDeclareAnAuthorisationAnnotation` · `OpenApiAnonymousOperationsTest` ·
+`RouteGateSnapshotTest` (the frontend: every handler carries a gate except the nine public ones,
+REQ-FE-025) ·
 `HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
 `SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
 `ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
