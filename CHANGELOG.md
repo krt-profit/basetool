@@ -38,6 +38,12 @@
   Paketzyklen, ausgehende HTTP-Aufrufe außerhalb von `relay` und Redis außerhalb von `registry`, `store`
   und `handoff` (REQ-INGEST-013/-014). Reine Verschiebung, das Verhalten bleibt unverändert.
 
+- **Keycloak-Provider: Registrierungen und Keycloak-Version werden beim Bauen geprüft.** Ein Test lädt
+  alle sechs Service-Registrierungen samt Provider-ID, und `repo-lint` schlägt fehl, wenn die
+  Keycloak-Version im Katalog und das Keycloak-Image in Compose, Quadlet und Sandbox verschiedene
+  Minor-Versionen nennen (REQ-OPS-040). Die Klassen liegen jetzt in `discord`, `gate` und `exchange`;
+  das Verhalten bleibt unverändert.
+
 ### Changed
 
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,

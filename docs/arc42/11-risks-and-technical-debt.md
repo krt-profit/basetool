@@ -323,7 +323,11 @@ since the go-live of 2026-09-28, so these risks hold now.
   compiles against the pinned version only, so every Keycloak bump rebuilds it against the new
   version, re-checks those classes and renders one device consent page (the sandbox smoke test
   asserts the warning and the code). A silently changed default-provider rule would leave the
-  consent page without the code but still working.
+  consent page without the code but still working. Two build-time checks narrow the gap
+  (REQ-OPS-040): `scripts/check-keycloak-version.py` fails when the catalog's `keycloak` version and
+  the image pins name different Keycloak lines, and `ServiceRegistrationsTest` fails when one of the
+  six service registrations no longer resolves, implements its SPI, instantiates or keeps its
+  provider id. Neither runs the SPI inside Keycloak; that stays the sandbox smoke test's job.
 - **Thirty-two master-data caches hold the catalogue entities themselves** (opened 2026-10-03).
   Every reader shares the cached instance, and the mutators are safe only because they load
   through self-invocation; a test runs every mutator against a cached read and a rule lets the

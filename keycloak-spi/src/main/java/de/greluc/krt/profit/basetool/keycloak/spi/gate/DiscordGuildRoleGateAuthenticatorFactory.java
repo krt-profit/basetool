@@ -17,8 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.keycloak.spi;
+package de.greluc.krt.profit.basetool.keycloak.spi.gate;
 
+import de.greluc.krt.profit.basetool.keycloak.spi.discord.DiscordHttp;
 import java.time.Duration;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;

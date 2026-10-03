@@ -17,13 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.keycloak.spi;
+package de.greluc.krt.profit.basetool.keycloak.spi.gate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import de.greluc.krt.profit.basetool.keycloak.spi.DiscordMembershipChecker.Result;
+import de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordMembershipChecker.Result;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;

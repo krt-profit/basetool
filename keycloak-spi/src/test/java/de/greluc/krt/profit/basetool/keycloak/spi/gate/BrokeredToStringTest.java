@@ -17,12 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.keycloak.spi;
+package de.greluc.krt.profit.basetool.keycloak.spi.gate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import de.greluc.krt.profit.basetool.keycloak.spi.DiscordGuildRoleGateAuthenticator.Brokered;
+import de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordGuildRoleGateAuthenticator.Brokered;
 import org.junit.jupiter.api.Test;
 
 /** Tests that {@link Brokered#toString()} reports presence only and never a value. */
