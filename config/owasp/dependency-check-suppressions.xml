@@ -61,4 +61,11 @@
     <cve>CVE-2026-15076</cve>
   </suppress>
 
+  <suppress until="2026-11-03Z">
+    <notes>Unpatched + dev-only. GHSA-vfj7-8cjw-p6xm (CVE-2026-93687) is a stack-exhaustion denial of service in braces through deeply nested brace patterns, affecting every version up to 3.0.3 with no patched release yet. braces 3.0.3 reaches frontend/package-lock.json only through micromatch 4.0.8 (via stylelint, globby and fast-glob), which every latest parent release still requires. It belongs to the frontend's lint tooling, runs only in the Gradle lint tasks on repository-controlled glob patterns, and ships in no jar, image or runtime classpath. Drop this entry when braces publishes a fix and the lockfile takes it.</notes>
+    <packageUrl regex="true">^pkg:npm/braces@3\.0\.3$</packageUrl>
+    <vulnerabilityName>GHSA-vfj7-8cjw-p6xm</vulnerabilityName>
+    <cve>CVE-2026-93687</cve>
+  </suppress>
+
 </suppressions>
