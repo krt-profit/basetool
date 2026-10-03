@@ -42,6 +42,8 @@ import java.util.ServiceLoader;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Stream;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.keycloak.Config;
@@ -345,14 +347,12 @@ class ServiceRegistrationsTest {
   public static final class NotRunnable {}
 
   /** A planted entry the service loader cannot instantiate. */
+  @Getter
+  @RequiredArgsConstructor
   public static final class NoNoArgRunnable implements Runnable {
 
-    /**
-     * Requires an argument, so no public no-arg constructor exists.
-     *
-     * @param ignored any value
-     */
-    public NoNoArgRunnable(int ignored) {}
+    /** Any value; the constructor requires it, so no public no-arg constructor exists. */
+    private final int value;
 
     /** Does nothing. */
     @Override
