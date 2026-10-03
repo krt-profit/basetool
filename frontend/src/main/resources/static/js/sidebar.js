@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -18,85 +19,437 @@
  */
 
 document.addEventListener('DOMContentLoaded', function () {
+    const phone = window.matchMedia('(max-width: 768px)');
+    const sidebarEl = document.getElementById('sidebar');
+    const overlayEl = document.getElementById('sidebar-overlay');
     const hamburgerEl = document.getElementById('hamburger');
-    if (hamburgerEl) {
-        hamburgerEl.addEventListener('click', function (e) {
+    const menuTabEl = document.getElementById('mobile-menu-toggle');
+    const closeBtn = document.getElementById('close-sidebar');
+    const filterEl = /** @type {HTMLInputElement | null} */ (document.getElementById('nav-filter'));
+    const adminBarEl = sidebarEl ? sidebarEl.querySelector('.nav-admin-bar') : null;
+    const adminModeEl = sidebarEl ? sidebarEl.querySelector('.nav-mode-admin') : null;
+    const filterEmptyEl = sidebarEl ? sidebarEl.querySelector('.nav-filter-empty') : null;
+    const toPaletteEl = sidebarEl ? sidebarEl.querySelector('.nav-filter-to-palette') : null;
+    const personalEl = document.getElementById('nav-personal');
+    const userToggleEl = sidebarEl ? sidebarEl.querySelector('.nav-user-toggle') : null;
+    const langBtnEl = sidebarEl ? sidebarEl.querySelector('.nav-lang-btn') : null;
+    const langMenuEl = document.getElementById('nav-lang-menu');
+    const tabEls = Array.from(document.querySelectorAll('.mobile-tab[data-tab-path]'));
+
+    /** @type {HTMLElement | null} */
+    let returnFocusEl = null;
+    let adminMode = false;
+    let query = '';
+
+    /**
+     * Reads one persisted drawer value, tolerating storage that is blocked or unavailable.
+     *
+     * @param {string} storageKey the localStorage key
+     * @returns {string | null} the stored value, or null when absent or unreadable
+     */
+    const readState = function (storageKey) {
+        try {
+            return localStorage.getItem(storageKey);
+        } catch (_e) {
+            return null;
+        }
+    };
+
+    /**
+     * Persists one drawer value, ignoring storage that is blocked or full.
+     *
+     * @param {string} storageKey the localStorage key
+     * @param {string} value the value to store
+     */
+    const writeState = function (storageKey, value) {
+        try {
+            localStorage.setItem(storageKey, value);
+        } catch (_e) {}
+    };
+
+    /**
+     * The visible text of an element with its whitespace collapsed.
+     *
+     * @param {Element | null} el the element
+     * @returns {string} its text, or an empty string
+     */
+    const textOf = function (el) {
+        return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    };
+
+    /** @type {HTMLAnchorElement | null} */
+    let activeLink = null;
+    if (sidebarEl) {
+        const here = window.location.pathname;
+        let activeLen = -1;
+        sidebarEl
+            .querySelectorAll(
+                '.nav-top-link, .nav-group:not(.nav-group-filter-only) .nav-link, .nav-personal .nav-link',
+            )
+            .forEach(function (link) {
+                if (!(link instanceof HTMLAnchorElement)) return;
+                const href = link.getAttribute('href');
+                if (!href || href.charAt(0) !== '/') return;
+                const linkPath = href.split('?')[0].split('#')[0];
+                const isMatch =
+                    linkPath === '/'
+                        ? here === '/'
+                        : here === linkPath || here.indexOf(linkPath + '/') === 0;
+                if (isMatch && linkPath.length > activeLen) {
+                    activeLink = link;
+                    activeLen = linkPath.length;
+                }
+            });
+    }
+    const currentLink = /** @type {HTMLAnchorElement | null} */ (activeLink);
+    const activeGroup = currentLink ? currentLink.closest('.nav-group') : null;
+    if (currentLink) {
+        currentLink.classList.add('is-active');
+        currentLink.setAttribute('aria-current', 'page');
+        if (activeGroup) activeGroup.classList.add('is-active');
+    }
+
+    const groups = sidebarEl ? Array.from(sidebarEl.querySelectorAll('.nav-group')) : [];
+    /** @type {Map<Element, boolean>} */
+    const groupOpen = new Map();
+
+    /**
+     * Shows or hides a group's links and mirrors the state on its head.
+     *
+     * @param {Element} group the `.nav-group`
+     * @param {boolean} open whether the links are shown
+     */
+    const renderGroup = function (group, open) {
+        const head = group.querySelector('.nav-group-head');
+        const links = group.querySelector('.nav-group-links');
+        if (head) head.setAttribute('aria-expanded', String(open));
+        if (links instanceof HTMLElement) links.hidden = !open;
+    };
+
+    /**
+     * Sets every group to its default for the current device class: on a phone only the group
+     * holding the current page is open (accordion), elsewhere every group is open unless the
+     * member collapsed it before.
+     */
+    const initGroups = function () {
+        groups.forEach(function (group) {
+            const key = group.getAttribute('data-group-key');
+            let open;
+            if (phone.matches) {
+                open = group === activeGroup;
+            } else {
+                open = group === activeGroup || readState('krt.sidebar.' + key) !== 'closed';
+            }
+            groupOpen.set(group, open);
+            if (!query) renderGroup(group, open);
+        });
+    };
+
+    groups.forEach(function (group) {
+        const count = group.querySelector('.nav-group-count');
+        if (count) count.textContent = String(group.querySelectorAll('.nav-link').length);
+        const head = group.querySelector('.nav-group-head');
+        if (!head) return;
+        head.addEventListener('click', function () {
+            if (query) return;
+            const open = !groupOpen.get(group);
+            if (open && phone.matches) {
+                const mode = group.closest('.nav-mode');
+                groups.forEach(function (other) {
+                    if (other !== group && other.closest('.nav-mode') === mode) {
+                        groupOpen.set(other, false);
+                        renderGroup(other, false);
+                    }
+                });
+            }
+            groupOpen.set(group, open);
+            renderGroup(group, open);
+            if (!phone.matches) {
+                writeState(
+                    'krt.sidebar.' + group.getAttribute('data-group-key'),
+                    open ? 'open' : 'closed',
+                );
+            }
+        });
+    });
+    initGroups();
+    if (typeof phone.addEventListener === 'function') {
+        phone.addEventListener('change', initGroups);
+    }
+
+    /** Applies the admin mode and the menu filter to the list. */
+    const renderList = function () {
+        if (!sidebarEl) return;
+        const filtering = query.length > 0;
+        sidebarEl.classList.toggle('is-filtering', filtering);
+        sidebarEl.classList.toggle('is-admin-mode', adminMode);
+        if (adminBarEl instanceof HTMLElement) adminBarEl.hidden = filtering || !adminMode;
+        let anyHit = false;
+        groups.forEach(function (group) {
+            const filterOnly = group.classList.contains('nav-group-filter-only');
+            const links = Array.from(group.querySelectorAll('.nav-link'));
+            if (!(group instanceof HTMLElement)) return;
+            if (!filtering) {
+                group.hidden = filterOnly;
+                links.forEach(function (link) {
+                    if (link instanceof HTMLElement) link.hidden = false;
+                });
+                renderGroup(group, !!groupOpen.get(group));
+                return;
+            }
+            const groupHit = textOf(group.querySelector('.nav-group-label'))
+                .toLowerCase()
+                .includes(query);
+            let hits = 0;
+            links.forEach(function (link) {
+                const hit = groupHit || textOf(link).toLowerCase().includes(query);
+                if (link instanceof HTMLElement) link.hidden = !hit;
+                if (hit) hits++;
+            });
+            group.hidden = hits === 0;
+            if (hits > 0) {
+                anyHit = true;
+                renderGroup(group, true);
+            }
+        });
+        if (filterEmptyEl instanceof HTMLElement) filterEmptyEl.hidden = !filtering || anyHit;
+        if (toPaletteEl instanceof HTMLElement) toPaletteEl.hidden = !filtering;
+    };
+
+    /**
+     * Switches the list between the main groups and the administration groups.
+     *
+     * @param {boolean} on whether the administration groups are shown
+     */
+    const setAdminMode = function (on) {
+        adminMode = on && !!adminModeEl;
+        query = '';
+        if (filterEl) filterEl.value = '';
+        setPersonalOpen(false);
+        renderList();
+    };
+
+    /**
+     * Shows or hides the personal panel above the user row.
+     *
+     * @param {boolean} open whether the panel is shown
+     */
+    const setPersonalOpen = function (open) {
+        if (personalEl) personalEl.hidden = !open;
+        if (userToggleEl) userToggleEl.setAttribute('aria-expanded', String(open));
+    };
+
+    /**
+     * Shows or hides the language menu.
+     *
+     * @param {boolean} open whether the menu is shown
+     */
+    const setLangOpen = function (open) {
+        if (langMenuEl) langMenuEl.hidden = !open;
+        if (langBtnEl) langBtnEl.setAttribute('aria-expanded', String(open));
+    };
+
+    const markActiveTab = function () {
+        const here = window.location.pathname;
+        /** @type {Element | null} */
+        let best = null;
+        let bestLen = -1;
+        tabEls.forEach(function (tab) {
+            const path = tab.getAttribute('data-tab-path') || '';
+            if ((here === path || here.indexOf(path + '/') === 0) && path.length > bestLen) {
+                best = tab;
+                bestLen = path.length;
+            }
+        });
+        return best;
+    };
+    const activeTab = /** @type {Element | null} */ (markActiveTab());
+
+    /**
+     * Mirrors the drawer state on its openers and on the tab bar.
+     *
+     * @param {boolean} open whether the drawer is open
+     */
+    const setOpeners = function (open) {
+        if (hamburgerEl) hamburgerEl.setAttribute('aria-expanded', String(open));
+        if (menuTabEl) {
+            menuTabEl.setAttribute('aria-expanded', String(open));
+            menuTabEl.classList.toggle('is-active', open);
+        }
+        if (activeTab) activeTab.classList.toggle('is-active', !open);
+    };
+    setOpeners(false);
+
+    /**
+     * Opens the drawer and moves focus into it.
+     *
+     * @param {HTMLElement | null} [focus] the element to focus; the menu filter when omitted
+     */
+    const openSidebar = function (focus) {
+        if (!sidebarEl) return;
+        const active = document.activeElement;
+        returnFocusEl = active instanceof HTMLElement ? active : null;
+        sidebarEl.removeAttribute('inert');
+        sidebarEl.classList.add('open');
+        if (overlayEl) overlayEl.classList.add('visible');
+        setOpeners(true);
+        const target = focus || (phone.matches ? null : filterEl);
+        if (target) target.focus({ preventScroll: true });
+    };
+
+    /**
+     * Closes the drawer.
+     *
+     * @param {boolean} restoreFocus whether focus returns to the control that opened it
+     */
+    const closeSidebar = function (restoreFocus) {
+        if (!sidebarEl) return;
+        sidebarEl.classList.remove('open');
+        sidebarEl.setAttribute('inert', '');
+        if (overlayEl) overlayEl.classList.remove('visible');
+        setOpeners(false);
+        setLangOpen(false);
+        if (restoreFocus && returnFocusEl && returnFocusEl.isConnected) {
+            returnFocusEl.focus({ preventScroll: true });
+        }
+        returnFocusEl = null;
+    };
+
+    const isOpen = function () {
+        return !!sidebarEl && sidebarEl.classList.contains('open');
+    };
+
+    window.krtNav = {
+        open(focus) {
+            openSidebar(focus || null);
+        },
+        close() {
+            closeSidebar(false);
+        },
+    };
+
+    if (sidebarEl && adminModeEl) {
+        adminMode =
+            window.location.pathname.indexOf('/admin/') === 0 ||
+            (!!currentLink && adminModeEl.contains(currentLink));
+    }
+    if (currentLink && personalEl && personalEl.contains(currentLink)) {
+        setPersonalOpen(true);
+    }
+    renderList();
+
+    [hamburgerEl, menuTabEl].forEach(function (opener) {
+        if (!opener) return;
+        opener.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
-            const sidebarEl = document.getElementById('sidebar');
-            const overlayEl = document.getElementById('sidebar-overlay');
-            if (sidebarEl) sidebarEl.classList.add('open');
-            if (overlayEl) overlayEl.classList.add('visible');
+            if (isOpen()) {
+                closeSidebar(true);
+            } else {
+                openSidebar();
+            }
+        });
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            closeSidebar(true);
+        });
+    }
+    if (overlayEl) {
+        overlayEl.addEventListener('click', function () {
+            closeSidebar(true);
+        });
+        overlayEl.addEventListener(
+            'touchstart',
+            function (e) {
+                e.preventDefault();
+                closeSidebar(true);
+            },
+            { passive: false },
+        );
+    }
+
+    if (sidebarEl) {
+        sidebarEl.addEventListener('click', function (e) {
+            const target = e.target instanceof Element ? e.target : null;
+            const link = target ? target.closest('a[href]') : null;
+            if (link && !link.closest('.nav-lang-menu')) {
+                closeSidebar(false);
+                return;
+            }
+            if (langMenuEl && !langMenuEl.hidden && target && !target.closest('.nav-lang')) {
+                setLangOpen(false);
+            }
         });
     }
 
-    (function initSidebarSections() {
-        const here = window.location.pathname;
-        let activeLink = null;
-        let activeLen = -1;
-        document.querySelectorAll('.sidebar-links a').forEach(function (link) {
-            const href = link.getAttribute('href');
-            if (!href || href.charAt(0) !== '/') return;
-            const linkPath = href.split('?')[0].split('#')[0];
-            const isMatch =
-                linkPath === '/'
-                    ? here === '/'
-                    : here === linkPath || here.indexOf(linkPath + '/') === 0;
-            if (isMatch && linkPath.length > activeLen) {
-                activeLink = link;
-                activeLen = linkPath.length;
+    if (filterEl) {
+        filterEl.addEventListener('input', function () {
+            query = filterEl.value.trim().toLowerCase();
+            renderList();
+        });
+        filterEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const first = sidebarEl
+                    ? sidebarEl.querySelector(
+                          '.nav-mode .nav-group:not([hidden]) .nav-link:not([hidden])',
+                      )
+                    : null;
+                if (query && first instanceof HTMLAnchorElement) first.click();
             }
         });
-        let activeGroup = null;
-        if (activeLink) {
-            activeLink.classList.add('sidebar-link-active');
-            activeLink.setAttribute('aria-current', 'page');
-            activeGroup = activeLink.closest('.sidebar-group');
-            if (activeGroup) activeGroup.classList.add('sidebar-group-active');
+    }
+
+    if (toPaletteEl) {
+        toPaletteEl.addEventListener('click', function () {
+            const text = filterEl ? filterEl.value.trim() : '';
+            closeSidebar(false);
+            if (window.krtPalette) window.krtPalette.open(text);
+        });
+    }
+
+    if (sidebarEl) {
+        sidebarEl.querySelectorAll('.nav-admin-entry, .nav-admin-back').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                setAdminMode(!adminMode);
+                const list = document.getElementById('nav-list');
+                if (list) list.scrollTop = 0;
+            });
+        });
+    }
+
+    if (userToggleEl) {
+        userToggleEl.addEventListener('click', function () {
+            setPersonalOpen(!!personalEl && personalEl.hidden === true);
+        });
+    }
+
+    if (langBtnEl) {
+        langBtnEl.addEventListener('click', function (e) {
+            e.stopPropagation();
+            setLangOpen(!!langMenuEl && langMenuEl.hidden === true);
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || e.defaultPrevented) return;
+        if (langMenuEl && !langMenuEl.hidden) {
+            setLangOpen(false);
+            if (langBtnEl instanceof HTMLElement) langBtnEl.focus();
+            e.preventDefault();
+            return;
         }
-        const readState = function (storageKey) {
-            try {
-                return localStorage.getItem(storageKey);
-            } catch (_e) {
-                return null;
-            }
-        };
-        const writeState = function (storageKey, value) {
-            try {
-                localStorage.setItem(storageKey, value);
-            } catch (_e) {}
-        };
-        document.querySelectorAll('.sidebar-group').forEach(function (group) {
-            const groupKey = group.getAttribute('data-group-key');
-            if (group === activeGroup) {
-                group.open = true;
-            } else if (groupKey) {
-                const stored = readState('krt.sidebar.' + groupKey);
-                if (stored === 'open') group.open = true;
-                else if (stored === 'closed') group.open = false;
-            }
-            if (groupKey) {
-                group.addEventListener('toggle', function () {
-                    writeState('krt.sidebar.' + groupKey, group.open ? 'open' : 'closed');
-                });
-            }
-        });
-    })();
+        if (isOpen()) {
+            e.preventDefault();
+            closeSidebar(true);
+        }
+    });
 
     if (window.location.pathname.indexOf('/admin/') === 0) {
         document.body.classList.add('admin-mode');
-        const navEl = document.querySelector('header > nav');
-        if (navEl && !document.querySelector('.admin-mode-chip')) {
-            const labels = document.getElementById('sidebar');
-            const chip = document.createElement('span');
-            chip.className = 'admin-mode-chip';
-            chip.setAttribute(
-                'aria-label',
-                (labels && labels.getAttribute('data-admin-mode-label')) || '',
-            );
-            chip.textContent = (labels && labels.getAttribute('data-admin-mode-chip')) || '';
-            navEl.appendChild(chip);
-        }
     }
 
     const footerEl = document.querySelector('body > .krt-footer');
@@ -104,8 +457,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.appendChild(footerEl);
     }
 
-    if (footerEl) {
-        const phone = window.matchMedia('(max-width: 768px)');
+    if (footerEl instanceof HTMLElement) {
         let covers = false;
         let pending = false;
         const measure = () => {
@@ -134,37 +486,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    const sidebarEl = document.getElementById('sidebar');
-    const overlayEl = document.getElementById('sidebar-overlay');
-    const closeBtn = document.getElementById('close-sidebar');
-
-    const closeSidebar = function (e) {
-        if (e && e.currentTarget && e.currentTarget.tagName !== 'A') {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        if (sidebarEl) sidebarEl.classList.remove('open');
-        if (overlayEl) overlayEl.classList.remove('visible');
-    };
-
-    if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
-    if (overlayEl) {
-        overlayEl.addEventListener('click', closeSidebar);
-        overlayEl.addEventListener('touchstart', closeSidebar, { passive: false });
-    }
-
-    document.querySelectorAll('.sidebar-links a, .sidebar-sublinks a').forEach((link) => {
-        link.addEventListener('click', closeSidebar);
-    });
-
+    /**
+     * Rewrites every `.utc-time` element below `root` from its ISO UTC text to Berlin local time.
+     *
+     * @param {ParentNode} root the subtree to format
+     */
     function formatUtcTimes(root) {
-        (root || document).querySelectorAll('.utc-time').forEach((el) => {
-            const text = el.textContent.trim();
+        root.querySelectorAll('.utc-time').forEach((el) => {
+            const text = (el.textContent || '').trim();
             if (text && (text.endsWith('Z') || text.includes('T'))) {
                 let dateStr = text;
                 if (!dateStr.endsWith('Z')) dateStr += 'Z';
                 const date = new Date(dateStr);
-                if (!isNaN(date)) {
+                if (!isNaN(date.getTime())) {
                     el.textContent = new Intl.DateTimeFormat(undefined, {
                         year: 'numeric',
                         month: '2-digit',
@@ -179,16 +513,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     formatUtcTimes(document);
     document.addEventListener('krt:swapped', function (e) {
-        formatUtcTimes(e && e.detail ? e.detail.container : document);
+        const container = e && e.detail ? e.detail.container : null;
+        formatUtcTimes(container instanceof Element ? container : document);
     });
 
     const switcherForm = document.getElementById('squadron-switcher-form');
-    if (switcherForm) {
-        const switcherSelect = document.getElementById('squadron-switcher-select');
-        if (switcherSelect) {
-            switcherSelect.addEventListener('change', function () {
-                switcherForm.submit();
-            });
-        }
+    const switcherSelect = document.getElementById('squadron-switcher-select');
+    if (switcherForm instanceof HTMLFormElement && switcherSelect) {
+        switcherSelect.addEventListener('change', function () {
+            switcherForm.submit();
+        });
     }
 });
