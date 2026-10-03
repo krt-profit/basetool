@@ -127,6 +127,19 @@ public enum AppExceptionKind {
       "Mission participant required",
       ErrorDisclosurePolicy.STANDARD),
 
+  /**
+   * {@code RateLimitExceededException} — a budget a controller keeps itself refused the call; the
+   * response carries {@code Retry-After}.
+   */
+  RATE_LIMIT_EXCEEDED(
+      HttpStatus.TOO_MANY_REQUESTS,
+      CoreProblemCode.RATE_LIMIT_EXCEEDED.code(),
+      "problem.rate_limit_exceeded.title",
+      "problem.rate_limit_exceeded.detail",
+      "rate-limit-exceeded",
+      "Rate limit exceeded",
+      ErrorDisclosurePolicy.STANDARD),
+
   /** {@code DuplicateEntityException} — service-layer uniqueness check. */
   DUPLICATE_ENTITY(
       HttpStatus.CONFLICT,

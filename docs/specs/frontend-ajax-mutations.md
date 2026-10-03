@@ -1807,7 +1807,11 @@ does, and the backend relays locally and then onto the shared channel. `202`, be
 signal and not a transaction: the mutation it follows has already committed, and a client that
 treated a failure here as a failed write would show an error for a change that is in the database. A
 `429` is to be **dropped, not retried** — the buckets exist to bound the re-fetch herd, and a retry
-defeats the bound it just hit.
+defeats the bound it just hit. Both refusals are standard problems (REQ-API-004): an unknown topic or a
+frame naming no known section is `400 BAD_REQUEST`, a full bucket is `429 RATE_LIMIT_EXCEEDED` with
+`Retry-After: 1`, the buckets' refill granularity. The status is the contract; the app classifies by it
+and also tolerates the body (`ApiErrorMapper`). *Corrected 2026-10-03: both answered with an empty
+body until then, although the document promised a problem.*
 
 **The bounds are REQ-FE-015's, unchanged**: per-subject burst 40 / refill 20 per second, per-topic
 burst 200 / refill 100 per second, and receiver-side coalescing of 400 ms for a per-resource room
@@ -1843,6 +1847,8 @@ registry: the admin area is web-only permanently, so a room there would have no 
 - [x] A refused topic is dropped and the stream still opens; nothing accepted is `403`
   (`LiveSyncControllerTest`).
 - [x] Too many topics is refused rather than truncated (`LiveSyncControllerTest`).
+- [x] A refused `changed` frame answers a localized problem: `400 BAD_REQUEST`, or
+  `429 RATE_LIMIT_EXCEEDED` with `Retry-After` (`LiveSyncControllerTest`).
 - [x] Local delivery precedes the fan-out, so a Redis outage costs peers only
   (`LiveSyncRelayServiceTest`).
 - [x] Both buckets bound what they are meant to, and one member's flood does not cost another theirs

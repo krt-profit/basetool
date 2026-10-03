@@ -23,13 +23,18 @@ import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.exception.ProblemCode;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.headers.Header;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.SequencedMap;
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -54,6 +59,12 @@ public class OpenApiProblemDetailsConfig {
   /** The path prefix both rate limiters guard, so every operation under it can answer 429. */
   private static final String RATE_LIMITED_PREFIX = "/api/";
 
+  /** Where the shared header definitions live in the document. */
+  private static final String HEADER_REF_PREFIX = "#/components/headers/";
+
+  /** The headers every 429 carries, name to description, in document order. */
+  private static final SequencedMap<String, String> RATE_LIMIT_HEADERS = rateLimitHeaders();
+
   /**
    * Returns SpringDoc customizer that decorates every operation with the standard error responses
    * ({@code 400/401/403/404/409/500}, and {@code 429} under {@code /api/}) and registers the {@code
@@ -74,6 +85,7 @@ public class OpenApiProblemDetailsConfig {
    */
   private static void customizeOpenApi(@NotNull OpenAPI openApi) {
     registerProblemDetailSchema(openApi);
+    registerRateLimitHeaders(openApi);
     if (openApi.getPaths() == null) {
       return;
     }
@@ -99,11 +111,52 @@ public class OpenApiProblemDetailsConfig {
                                 responses,
                                 "429",
                                 "Too Many Requests: a rate limit was exceeded"
-                                    + " (RATE_LIMIT_EXCEEDED); the X-Rate-Limit headers say when"
-                                    + " to retry");
+                                    + " (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds"
+                                    + " to wait");
+                            RATE_LIMIT_HEADERS
+                                .keySet()
+                                .forEach(
+                                    name ->
+                                        responses
+                                            .get("429")
+                                            .addHeaderObject(
+                                                name, new Header().$ref(HEADER_REF_PREFIX + name)));
                           }
                           addProblemResponse(responses, "500", "Internal Server Error");
                         }));
+  }
+
+  /**
+   * Lists the headers every 429 carries.
+   *
+   * @return header name to description, in document order
+   */
+  @NotNull
+  private static SequencedMap<String, String> rateLimitHeaders() {
+    SequencedMap<String, String> headers = new LinkedHashMap<>();
+    headers.put("Retry-After", "Whole seconds to wait before the next call.");
+    headers.put("X-Rate-Limit-Limit", "The capacity of the budget that refused the call.");
+    headers.put("X-Rate-Limit-Remaining", "The tokens left in that budget; 0 on a refusal.");
+    headers.put("X-Rate-Limit-Retry-After-Seconds", "The same wait as Retry-After.");
+    return Collections.unmodifiableSequencedMap(headers);
+  }
+
+  /**
+   * Registers the rate-limit headers under {@code components.headers}, each an integer.
+   *
+   * @param openApi the document under construction
+   */
+  private static void registerRateLimitHeaders(@NotNull OpenAPI openApi) {
+    Components components = openApi.getComponents();
+    if (components == null) {
+      components = new Components();
+      openApi.setComponents(components);
+    }
+    for (Map.Entry<String, String> entry : RATE_LIMIT_HEADERS.entrySet()) {
+      components.addHeaders(
+          entry.getKey(),
+          new Header().description(entry.getValue()).schema(typed("integer", "int64", null)));
+    }
   }
 
   /**

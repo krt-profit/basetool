@@ -29,7 +29,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -53,7 +55,24 @@ class ProblemCodeRegistryTest {
   private static final String MAIN_SOURCES = "backend/src/main/java";
 
   /** How many codes the registry held when the floor was last raised. */
-  private static final int REGISTRY_FLOOR = 49;
+  private static final int REGISTRY_FLOOR = 50;
+
+  /** The keys of a path item that name an operation. */
+  private static final Set<String> HTTP_METHODS =
+      Set.of("get", "put", "post", "delete", "patch", "head", "options", "trace");
+
+  /** The backend bundles every problem title and detail must be in. */
+  private static final List<String> BUNDLES = List.of("messages", "messages_de", "messages_en");
+
+  /**
+   * Codes whose producer reads a key base other than {@code problem.<code in lower case>}: the
+   * handler's data-integrity mapping reads {@code problem.data_integrity}, and {@link
+   * AppExceptionKind#EXTERNAL_SERVICE_ERROR} reads {@code problem.external_service}.
+   */
+  private static final Map<String, String> KEY_BASE_ALIASES =
+      Map.of(
+          "DATA_INTEGRITY_VIOLATION", "problem.data_integrity",
+          "EXTERNAL_SERVICE_ERROR", "problem.external_service");
 
   /** A fixture registry enum that repeats a kernel code. */
   enum FixtureClashingCodes implements ProblemCode {
@@ -181,6 +200,97 @@ class ProblemCodeRegistryTest {
         .containsAll(produced);
   }
 
+  /**
+   * Every registered code has a non-blank title and detail in every backend bundle, and so has
+   * every key an {@link AppExceptionKind} or a {@link BankConflictException} reads.
+   *
+   * @throws IOException if a bundle cannot be read
+   */
+  @Test
+  @DisplayName("every registered code has its title and detail in every bundle")
+  void everyCodeHasItsTitleAndDetailInEveryBundle() throws IOException {
+    Set<String> keys = new TreeSet<>();
+    for (String code : ProblemCodeRegistry.codes(ProblemCodeRegistry.registryEnums()).keySet()) {
+      String base = KEY_BASE_ALIASES.getOrDefault(code, "problem." + code.toLowerCase(Locale.ROOT));
+      keys.add(base + ".title");
+      keys.add(base + ".detail");
+      if (code.startsWith("BANK_")) {
+        BankConflictException bank = new BankConflictException(code, "probe");
+        keys.add(bank.titleKey());
+        keys.add(bank.detailKey());
+      }
+    }
+    for (AppExceptionKind kind : AppExceptionKind.values()) {
+      keys.add(kind.titleKey());
+      keys.add(kind.detailKey());
+    }
+
+    assertThat(keys).hasSizeGreaterThanOrEqualTo(2 * REGISTRY_FLOOR);
+    assertThat(missingKeys(loadBundles(), keys))
+        .as(
+            "a problem code has no localized title or detail, so the client is shown the bundle"
+                + " key. Add the keys to every backend bundle (REQ-API-004, REQ-API-019)")
+        .isEmpty();
+  }
+
+  /** The bundle check reports a key one bundle lacks or leaves blank. */
+  @Test
+  @DisplayName("a bundle missing or blanking a key is caught")
+  void aBundleMissingAKeyIsCaught() {
+    Properties complete = new Properties();
+    complete.setProperty("problem.planted.title", "Planted");
+    complete.setProperty("problem.planted.detail", "Planted detail");
+    Properties partial = new Properties();
+    partial.setProperty("problem.planted.title", " ");
+    Map<String, Properties> bundles = new TreeMap<>();
+    bundles.put("complete", complete);
+    bundles.put("partial", partial);
+
+    assertThat(missingKeys(bundles, Set.of("problem.planted.title", "problem.planted.detail")))
+        .containsExactly("partial: problem.planted.detail", "partial: problem.planted.title");
+  }
+
+  /**
+   * Loads every backend message bundle from the classpath.
+   *
+   * @return bundle name to its properties, in name order
+   * @throws IOException if a bundle cannot be read
+   */
+  private static Map<String, Properties> loadBundles() throws IOException {
+    Map<String, Properties> bundles = new TreeMap<>();
+    for (String name : BUNDLES) {
+      try (InputStream in =
+          ProblemCodeRegistryTest.class.getResourceAsStream("/" + name + ".properties")) {
+        assertThat(in).as("bundle %s must be on the classpath", name).isNotNull();
+        Properties properties = new Properties();
+        properties.load(in);
+        bundles.put(name, properties);
+      }
+    }
+    return bundles;
+  }
+
+  /**
+   * Lists every key a bundle lacks or carries blank.
+   *
+   * @param bundles bundle name to its properties
+   * @param keys the keys every bundle must carry
+   * @return {@code "<bundle>: <key>"} for each gap, sorted
+   */
+  private static Set<String> missingKeys(Map<String, Properties> bundles, Set<String> keys) {
+    Set<String> missing = new TreeSet<>();
+    bundles.forEach(
+        (name, properties) -> {
+          for (String key : keys) {
+            String value = properties.getProperty(key);
+            if (value == null || value.isBlank()) {
+              missing.add(name + ": " + key);
+            }
+          }
+        });
+    return missing;
+  }
+
   /** No main source writes a code as a literal; every code goes through the registry. */
   @Test
   @DisplayName("no main source writes a problem code as a string literal")
@@ -248,6 +358,56 @@ class ProblemCodeRegistryTest {
     assertThat(problem.path("properties").path("code").has("enum"))
         .as("code is a documented list, never an enum (theContractRequiredEnumsAreFrozen)")
         .isFalse();
+  }
+
+  /**
+   * Every {@code /api/**} operation's 429 declares {@code Retry-After} and the rate-limit headers,
+   * each defined once under {@code components.headers}.
+   *
+   * @throws IOException if the document cannot be read
+   */
+  @Test
+  @DisplayName("every documented 429 declares Retry-After and the rate-limit headers")
+  void everyDocumented429DeclaresItsHeaders() throws IOException {
+    JsonNode document;
+    try (InputStream in = ProblemCodeRegistryTest.class.getResourceAsStream("/api/openapi.json")) {
+      document = new ObjectMapper().readTree(in);
+    }
+    List<String> headers =
+        List.of(
+            "Retry-After",
+            "X-Rate-Limit-Limit",
+            "X-Rate-Limit-Remaining",
+            "X-Rate-Limit-Retry-After-Seconds");
+    for (String header : headers) {
+      assertThat(document.path("components").path("headers").has(header))
+          .as("components.headers.%s", header)
+          .isTrue();
+    }
+
+    List<String> lacking = new ArrayList<>();
+    int checked = 0;
+    for (Map.Entry<String, JsonNode> path : document.path("paths").properties()) {
+      if (!path.getKey().startsWith("/api/")) {
+        continue;
+      }
+      for (Map.Entry<String, JsonNode> operation : path.getValue().properties()) {
+        if (!HTTP_METHODS.contains(operation.getKey())) {
+          continue;
+        }
+        JsonNode tooMany = operation.getValue().path("responses").path("429");
+        checked++;
+        for (String header : headers) {
+          if (!("#/components/headers/" + header)
+              .equals(tooMany.path("headers").path(header).path("$ref").asString(""))) {
+            lacking.add(operation.getKey() + " " + path.getKey() + " " + header);
+          }
+        }
+      }
+    }
+
+    assertThat(checked).as("operations under /api/").isGreaterThanOrEqualTo(500);
+    assertThat(lacking).as("a 429 without its rate-limit headers").isEmpty();
   }
 
   /**

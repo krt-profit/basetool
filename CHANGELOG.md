@@ -30,11 +30,18 @@
   `api/contract-tiers.txt`); die Change-Set-`Op`s von Blueprint und Schiff sind erstmals richtig
   dokumentiert, und der Generator prüft das Dokument vor dem Schreiben (REQ-API-018).
 
-- **Fehlercodes: ein Register statt verstreuter Strings.** Alle 49 Problem-Codes des Backends stehen in
+- **Fehlercodes: ein Register statt verstreuter Strings.** Alle 50 Problem-Codes des Backends stehen in
   `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
   `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
 
 ### Fixed
+
+- **API-Fehler: richtige Status, Codes und Header statt 500 oder leerem Body.** Fehlende Parameter,
+  Header, Cookies oder Multipart-Teile antworten `400 BAD_REQUEST`, ein nicht lieferbarer Medientyp
+  `406 NOT_ACCEPTABLE` (neuer Code), ein zu großer Upload `413 REQUEST_BODY_TOO_LARGE` statt `500`; jeder
+  429 trägt `code = RATE_LIMIT_EXCEEDED`, `Retry-After` und eine Correlation-Id, auch der des
+  Pro-Konto-Limits und `POST /api/v1/live-sync/changed` (bisher ohne Body). Vier Bank-Codes zeigen jetzt
+  einen übersetzten Titel statt des Schlüssels.
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
   schickte das Filterformular zusätzlich zum In-Place-Tausch ab und lud so die ganze Seite; der

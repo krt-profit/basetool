@@ -2013,8 +2013,15 @@ their bound (the anonymous page-size ceiling of REQ-SEC-032 went with the anonym
 anonymous paths REQ-SEC-052 leaves are unpaginated). The budget MUST be enforced after
 the pending-approval and terms gates, so a caller refused there does not spend a token first. The
 scope MUST be decided on the **decoded** path (REQ-SEC-029). The rejection MUST reuse the per-IP
-limiter's contract: `429`, the stable code `RATE_LIMIT_EXCEEDED`, and the
-`X-Rate-Limit-*` headers including a retry hint.
+limiter's contract: `429`, the stable code `RATE_LIMIT_EXCEEDED`, the
+`X-Rate-Limit-*` headers including a retry hint, a `Retry-After` header carrying the same whole
+seconds until the bucket refills, and a `correlationId` that the body and the `X-Correlation-Id`
+header share. The filter runs inside the security chain, before `CorrelationIdFilter`, so it reuses an
+id already in the MDC and otherwise mints one, as the other filter-level producers do.
+
+> [!note] Corrected 2026-10-03
+> Until then this 429 sent no `Retry-After`, and its `correlationId` was `null`: the filter read the
+> `X-Correlation-Id` response header, which `CorrelationIdFilter` only sets after the security chain.
 
 The subject MUST NOT appear in a metric label or a log message — it is unbounded and it is PII. The
 bucket map MUST be bounded so a flood of distinct subjects cannot grow it without limit.
@@ -2037,6 +2044,9 @@ bucket map MUST be bounded so a flood of distinct subjects cannot grow it withou
 **Acceptance**
 
 - [x] A second write beyond the budget from the same subject is refused with `429` and a retry hint.
+- [x] The `429` carries `Retry-After` equal to `X-Rate-Limit-Retry-After-Seconds` and a non-null
+  `correlationId` equal to its `X-Correlation-Id` header, also through the real filter chain
+  (`SubjectRateLimitingFilterTest`, `ProblemCodeRuntimeProbeTest`).
 - [x] Two different subjects do not share a bucket.
 - [x] Ordinary reads spend no tokens; the SSE connect does.
 - [x] An encoded spelling of an API write cannot shed the budget.
@@ -2048,7 +2058,7 @@ bucket map MUST be bounded so a flood of distinct subjects cannot grow it withou
   endpoint sweep in `SecurityFilterChainOrderTest`).
 
 **Enforced by:** `SubjectRateLimitingFilterTest`, `SecurityFilterChainOrderTest` (the export sweep),
-`BackendPropertiesValidationTest` · **Code:** `SubjectRateLimitingFilter`,
+`BackendPropertiesValidationTest`, `ProblemCodeRuntimeProbeTest` · **Code:** `SubjectRateLimitingFilter`,
 `RateLimitProperties.Subject`, `RateLimitProperties.Export`, `SecurityConfig`
 
 ### REQ-SEC-034 — A rejected registration MUST be recoverable through a supported admin action

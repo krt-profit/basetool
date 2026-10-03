@@ -51,6 +51,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -61,15 +62,25 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.ErrorResponseException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingMatrixVariableException;
+import org.springframework.web.bind.MissingPathVariableException;
+import org.springframework.web.bind.MissingRequestCookieException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import tools.jackson.databind.DatabindException;
@@ -115,6 +126,10 @@ public class GlobalExceptionHandler {
   public static final String CODE_UNSUPPORTED_MEDIA_TYPE =
       CoreProblemCode.UNSUPPORTED_MEDIA_TYPE.code();
   public static final String CODE_INTERNAL_ERROR = CoreProblemCode.INTERNAL_ERROR.code();
+  public static final String CODE_NOT_ACCEPTABLE = CoreProblemCode.NOT_ACCEPTABLE.code();
+  public static final String CODE_REQUEST_BODY_TOO_LARGE =
+      CoreProblemCode.REQUEST_BODY_TOO_LARGE.code();
+  public static final String CODE_RATE_LIMIT_EXCEEDED = CoreProblemCode.RATE_LIMIT_EXCEEDED.code();
 
   private static final String MDC_CORRELATION_ID = "correlationId";
 
@@ -564,7 +579,14 @@ public class GlobalExceptionHandler {
       }
       logProblem(request, pd, ex.logLabel(), extra);
     }
-    return toEntity(pd);
+    ResponseEntity<ProblemDetail> entity = toEntity(pd);
+    if (ex.responseHeaders().isEmpty()) {
+      return entity;
+    }
+    HttpHeaders headers = new HttpHeaders();
+    headers.putAll(entity.getHeaders());
+    ex.responseHeaders().forEach(headers::set);
+    return new ResponseEntity<>(pd, headers, entity.getStatusCode());
   }
 
   /**
@@ -850,6 +872,114 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * Maps a response no media type the request accepts can carry to 406 with code {@code
+   * NOT_ACCEPTABLE}, logging the producible types.
+   *
+   * @param ex the refusal, carrying the producible media types
+   * @param request servlet request for instance URI + access-log enrichment
+   * @return RFC 7807 problem-detail response
+   */
+  @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+  public ResponseEntity<ProblemDetail> handleMediaTypeNotAcceptable(
+      @NotNull HttpMediaTypeNotAcceptableException ex, HttpServletRequest request) {
+    ProblemDetail pd =
+        problem(
+            HttpStatus.NOT_ACCEPTABLE,
+            tr("problem.not_acceptable.title"),
+            tr("problem.not_acceptable.detail"),
+            request,
+            "not-acceptable",
+            CODE_NOT_ACCEPTABLE);
+    logProblem(
+        request,
+        pd,
+        "Not acceptable",
+        Map.of("supportedMediaTypes", String.valueOf(ex.getSupportedMediaTypes())));
+    return toEntity(pd);
+  }
+
+  /**
+   * Maps a missing request parameter, header, cookie, matrix variable or multipart part, and a
+   * mapping's unsatisfied parameter condition, to 400 with code {@code BAD_REQUEST}, the detail
+   * naming the missing value. One Spring classifies as a server error, a path variable the mapping
+   * does not declare, stays the generic 500 of {@link #handleAllExceptions}.
+   *
+   * @param ex a {@link ServletRequestBindingException} or {@link
+   *     MissingServletRequestPartException}
+   * @param request servlet request for instance URI + access-log enrichment
+   * @return RFC 7807 problem-detail response
+   */
+  @ExceptionHandler({
+    ServletRequestBindingException.class,
+    MissingServletRequestPartException.class
+  })
+  public ResponseEntity<ProblemDetail> handleMissingRequestValue(
+      @NotNull Exception ex, HttpServletRequest request) {
+    if (ex instanceof ErrorResponse response && response.getStatusCode().is5xxServerError()) {
+      return handleAllExceptions(ex, request);
+    }
+    String name = missingValueName(ex);
+    ProblemDetail pd =
+        problem(
+            HttpStatus.BAD_REQUEST,
+            tr("problem.bad_request.title"),
+            name != null
+                ? tr("problem.missing_request_value.detail", name)
+                : tr("problem.bad_request.detail"),
+            request,
+            "bad-request",
+            CODE_BAD_REQUEST);
+    logProblem(
+        request,
+        pd,
+        "Missing request value",
+        Map.of("exception", ex.getClass().getSimpleName(), "name", String.valueOf(name)));
+    return toEntity(pd);
+  }
+
+  /**
+   * Names the value a binding exception found missing.
+   *
+   * @param ex the binding exception
+   * @return the parameter, header, cookie, variable or part name, or {@code null} when the
+   *     exception names none
+   */
+  @Nullable
+  private static String missingValueName(@NotNull Exception ex) {
+    return switch (ex) {
+      case MissingServletRequestParameterException missing -> missing.getParameterName();
+      case MissingRequestHeaderException missing -> missing.getHeaderName();
+      case MissingRequestCookieException missing -> missing.getCookieName();
+      case MissingPathVariableException missing -> missing.getVariableName();
+      case MissingMatrixVariableException missing -> missing.getVariableName();
+      case MissingServletRequestPartException missing -> missing.getRequestPartName();
+      default -> null;
+    };
+  }
+
+  /**
+   * Maps an upload over the multipart size limit to 413 with code {@code REQUEST_BODY_TOO_LARGE}.
+   *
+   * @param ex the multipart resolver's refusal
+   * @param request servlet request for instance URI + access-log enrichment
+   * @return RFC 7807 problem-detail response
+   */
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ProblemDetail> handleMaxUploadSizeExceeded(
+      @NotNull MaxUploadSizeExceededException ex, HttpServletRequest request) {
+    ProblemDetail pd =
+        problem(
+            HttpStatus.CONTENT_TOO_LARGE,
+            tr("problem.request_body_too_large.title"),
+            tr("problem.request_body_too_large.detail"),
+            request,
+            "request-body-too-large",
+            CODE_REQUEST_BODY_TOO_LARGE);
+    logProblem(request, pd, "Upload too large", Map.of("maxUploadSize", ex.getMaxUploadSize()));
+    return toEntity(pd);
+  }
+
+  /**
    * Maps an unsupported HTTP method to 405 with code {@code METHOD_NOT_ALLOWED}, logging the
    * supported methods.
    *
@@ -1001,6 +1131,7 @@ public class GlobalExceptionHandler {
       case CONFLICT -> CODE_DUPLICATE_ENTITY;
       case METHOD_NOT_ALLOWED -> CODE_METHOD_NOT_ALLOWED;
       case BAD_REQUEST -> CODE_BAD_REQUEST;
+      case TOO_MANY_REQUESTS -> CODE_RATE_LIMIT_EXCEEDED;
       default -> status.is5xxServerError() ? CODE_INTERNAL_ERROR : CODE_BAD_REQUEST;
     };
   }

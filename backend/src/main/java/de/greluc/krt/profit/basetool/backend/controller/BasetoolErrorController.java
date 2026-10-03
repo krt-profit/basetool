@@ -161,6 +161,12 @@ public class BasetoolErrorController implements ErrorController {
               "problem.method_not_allowed.detail",
               "method-not-allowed",
               CoreProblemCode.METHOD_NOT_ALLOWED.code());
+      case TOO_MANY_REQUESTS ->
+          new ProblemMapping(
+              "problem.rate_limit_exceeded.title",
+              "problem.rate_limit_exceeded.detail",
+              "rate-limit-exceeded",
+              CoreProblemCode.RATE_LIMIT_EXCEEDED.code());
       case SERVICE_UNAVAILABLE ->
           new ProblemMapping(
               "problem.service_unavailable.title",
