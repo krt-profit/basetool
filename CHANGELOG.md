@@ -24,7 +24,7 @@
   Benachrichtigungen zu Aufträgen, Materialbörse, verbundenen Anwendungen und Admin-Vorgängen
   führen direkt zur Seite (REQ-NOTIF-022).
 - **Auftragsverwaltung: „Meine · Alle".** Wer beides sehen darf, wechselt zwischen eigenen und allen
-  Aufträgen (REQ-ORDERS-038).
+  Aufträgen (REQ-ORDERS-040).
 
 - **Auftragsdetail im neuen Muster.** Oben zeigt „Geliefert / benötigt" mit Balken den Fortschritt;
   die Reiter richten sich nach der Auftragsart (Material: Bedarf · Übergaben · Bearbeiter ·
