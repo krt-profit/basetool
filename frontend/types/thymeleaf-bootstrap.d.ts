@@ -261,6 +261,8 @@ declare const MSG_INVENTORY_BELOW_FLOOR: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_INVENTORY_PART_OF: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
+declare const MSG_PRODUCTION_COUNTED_HIGHER: string;
+/** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_FAILED: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_MISSION_HERKUNFT: string;

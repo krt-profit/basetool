@@ -1894,3 +1894,4 @@ QualityTierDto.labelEn=string
 QualityTierDto.minQuality=integer/int32
 QualityTierDto.sortOrder=integer/int32
 QualityTierDto.version=integer/int64
+JobOrderHandoverItemCreateDto.qualityRequirement=string

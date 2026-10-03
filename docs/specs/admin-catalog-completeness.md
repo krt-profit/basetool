@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** ADMIN · **Related ADRs:** ADR-0102, ADR-0103
 
 # Admin catalog pages — complete rendering, no silent truncation
@@ -34,8 +34,10 @@ one bounded page. The frontend assembles the complete set by walking the backend
 the last page is reached (shared helper: `CatalogPages.fetchAll`), bounded only by a safety cap
 against inconsistent backend page math. Covered surfaces: `/admin/materials` (materials),
 `/admin/locations` (locations), `/admin/mission-data` (job types, squadrons, frequency types),
-`/admin/special-commands` (Spezialkommandos), `/admin/settings` (promotion squadron toggles; the
-intake-SK picker was removed with the anonymous order form, ADR-0149), `/admin/uex-data` (cities, space stations, outposts, POIs, terminals),
+`/admin/special-commands` (Spezialkommandos), `/admin/settings` (the per-Staffel promotion and
+order-processing toggles over the active squadrons, and the per-SK order-processing toggle over the
+active Spezialkommandos; the intake-SK picker was removed with the anonymous order form, ADR-0149),
+`/admin/uex-data` (cities, space stations, outposts, POIs, terminals),
 `/ship-data` (manufacturers, ship types). Any *new* admin surface of this shape falls under this
 requirement as well, and an existing surface later found to match the shape is converted when it
 is next touched.
@@ -51,7 +53,8 @@ is next touched.
 
 **Enforced by:** `CatalogPagesTest`, `AdminMaterialsPageControllerTest`,
 `AdminLocationsPageControllerTest`, `AdminMissionDataPageControllerTest`,
-`AdminSettingsPageControllerTest`, `AdminSpecialCommandsPageControllerTest`,
+`AdminSettingsPageControllerTest`, `AdminSettingsPageControllerMvcTest` (one SK toggle per active
+Spezialkommando), `AdminSpecialCommandsPageControllerTest`,
 `AdminUexPageControllerTest`, `ShipDataPageControllerTest` · **Code:**
 `frontend support.CatalogPages` + the seven admin page controllers · **Issues:** —
 
