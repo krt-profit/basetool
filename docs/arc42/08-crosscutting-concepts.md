@@ -305,8 +305,9 @@ opposite acts; one is not licence for the other.
 **Mutation testing runs weekly for all three applications** (`pitest.yml`: backend, frontend and
 ingest, each with its own job timeout). A job passes only when PIT finished and left a non-empty
 report (`scripts/check-pit-result.sh`). The backend and frontend mutate their `service` package; the
-ingest mutates where its gates live — `service`, `exchange`, `filter` and `ratelimit`
-(`ingest/build.gradle.kts`). No module declares a mutation threshold yet.
+ingest mutates every concern package that holds a gate or its state — `auth`, `contract`, `edge`,
+`gate`, `handoff`, `idempotency`, `limits`, `observability`, `registry`, `relay`, `store` — all but
+the wiring (`assembly`, `config`), `problem` and `web` (`ingest/build-settings.properties`, REQ-OPS-037). No module declares a mutation threshold yet.
 
 The reverse direction holds too: **nothing test-only ships.** The `test` profile lives in each
 module's `src/test/resources` and the `jar`/`bootJar` tasks fail on a jar that carries one; the

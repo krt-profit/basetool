@@ -92,8 +92,8 @@
   REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
 
 - **CI: Mutationstests auch für den Ingest-Gateway.** Der wöchentliche PIT-Lauf (`pitest.yml`) prüft
-  jetzt auch `ingest`, mit eigenem Timeout und demselben Abschluss-Gate; mutiert werden die Pakete mit
-  den Gates (`exchange`, `filter`, `ratelimit`, `service`) statt nur `service` (MB-07).
+  jetzt auch `ingest`, mit eigenem Timeout und demselben Abschluss-Gate; mutiert werden alle
+  Zuständigkeitspakete mit Gates und ihrem Zustand statt nur der früheren `service`-Klassen (MB-07).
 
 ### Fixed
 
