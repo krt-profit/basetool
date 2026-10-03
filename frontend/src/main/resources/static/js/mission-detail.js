@@ -2866,15 +2866,32 @@ if (document.readyState === 'loading') {
         }
     }
 
+    /**
+     * Returns the viewport y at which the visible page ends: the top of the pinned bottom bar
+     * (the phone tab bar or the fixed footer) when one is shown, otherwise the viewport height.
+     *
+     * @returns {number} the lowest client y that still shows page content
+     */
+    function visibleBottom() {
+        let bottom = window.innerHeight;
+        document.querySelectorAll('.mobile-tabbar, .krt-footer').forEach(function (bar) {
+            if (getComputedStyle(bar).position !== 'fixed') return;
+            const r = bar.getBoundingClientRect();
+            if (r.height > 0 && r.top < bottom) bottom = r.top;
+        });
+        return bottom;
+    }
+
     function driveEdgeScroll(y) {
-        const h = window.innerHeight;
+        const h = visibleBottom();
         if (y <= EDGE_ZONE_PX) {
             autoScrollDir = -1;
             autoScrollStep = Math.ceil((MAX_SCROLL_STEP_PX * (EDGE_ZONE_PX - y)) / EDGE_ZONE_PX);
         } else if (y >= h - EDGE_ZONE_PX) {
             autoScrollDir = 1;
-            autoScrollStep = Math.ceil(
-                (MAX_SCROLL_STEP_PX * (y - (h - EDGE_ZONE_PX))) / EDGE_ZONE_PX,
+            autoScrollStep = Math.min(
+                MAX_SCROLL_STEP_PX,
+                Math.ceil((MAX_SCROLL_STEP_PX * (y - (h - EDGE_ZONE_PX))) / EDGE_ZONE_PX),
             );
         } else {
             autoScrollDir = 0;
@@ -3133,9 +3150,11 @@ if (document.readyState === 'loading') {
             return;
         }
         const row = touchRow;
-        const zone = zoneAt(e.clientX, e.clientY);
+        const overBar = e.clientY >= visibleBottom();
+        const zone = overBar ? null : zoneAt(e.clientX, e.clientY);
         endTouchDrag();
         suppressClick = true;
+        if (overBar) return;
         if (zone) {
             if (!zone.contains(row)) moveParticipant(row, zone);
             return;

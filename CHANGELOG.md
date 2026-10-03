@@ -4,11 +4,28 @@
 
 ### Added
 
-- **Keycloak-Provider: Registrierungen und Keycloak-Version werden beim Bauen geprüft.** Ein Test lädt
-  alle sechs Service-Registrierungen samt Provider-ID, und `repo-lint` schlägt fehl, wenn die
-  Keycloak-Version im Katalog und das Keycloak-Image in Compose, Quadlet und Sandbox verschiedene
-  Minor-Versionen nennen (REQ-OPS-040). Die Klassen liegen jetzt in `discord`, `gate` und `exchange`;
-  das Verhalten bleibt unverändert.
+- **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
+  Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
+  Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
+  (REQ-MOD-001…005).
+
+- **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
+  Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
+  Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
+
+- **Sicherheitsausdrücke werden beim Build geprüft.** Jede Bean-Referenz in `@PreAuthorize` muss im
+  Kontext mit Namen und Parameterzahl auflösbar sein, die Sicherheits-Beans tragen feste Namen, und
+  kein Gate darf über `this` umgangen werden (REQ-SEC-075, REQ-SEC-076).
+
+- **Metrik und Alarm für nicht auswertbare Sicherheitsausdrücke.** Ein solcher Fehler bleibt ein
+  `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
+  löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
+
+- **Backend-Wächter für Daten und Transaktionen (Modularisierung, Phase 0).** Tests prüfen jetzt, dass
+  jede Tabelle genau einem Modul gehört, Trigger und natives SQL fremde Tabellen nur über gelistete
+  Ausnahmen erreichen, jede Mitgliedsreferenz in Löschung, Datenauskunft und Kontozusammenführung
+  geregelt ist, Audit nie nach dem Commit geschrieben wird und Mutatoren keine gecachte Instanz
+  verändern (REQ-DATA-020…022, REQ-AUDIT-007). Keine Verhaltensänderung.
 
 - **Datenaustausch: der eingefrorene Vertrag wird beim Bauen geprüft.** Backend-Antworten werden gegen die
   veröffentlichten Schemas und Fixtures geprüft, jede Gateway-Route hat eine festgeschriebene Antwort, die
@@ -21,30 +38,34 @@
   Paketzyklen, ausgehende HTTP-Aufrufe außerhalb von `relay` und Redis außerhalb von `registry`, `store`
   und `handoff` (REQ-INGEST-013/-014). Reine Verschiebung, das Verhalten bleibt unverändert.
 
-- **Backend-Wächter für Daten und Transaktionen (Modularisierung, Phase 0).** Tests prüfen jetzt, dass
-  jede Tabelle genau einem Modul gehört, Trigger und natives SQL fremde Tabellen nur über gelistete
-  Ausnahmen erreichen, jede Mitgliedsreferenz in Löschung, Datenauskunft und Kontozusammenführung
-  geregelt ist, Audit nie nach dem Commit geschrieben wird und Mutatoren keine gecachte Instanz
-  verändern (REQ-DATA-020…022, REQ-AUDIT-007). Keine Verhaltensänderung.
-
-- **Sicherheitsausdrücke werden beim Build geprüft.** Jede Bean-Referenz in `@PreAuthorize` muss im
-  Kontext mit Namen und Parameterzahl auflösbar sein, die Sicherheits-Beans tragen feste Namen, und
-  kein Gate darf über `this` umgangen werden (REQ-SEC-075, REQ-SEC-076).
-
-- **Metrik und Alarm für nicht auswertbare Sicherheitsausdrücke.** Ein solcher Fehler bleibt ein
-  `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
-  löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
-
-- **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
-  Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
-  Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
-
-- **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
-  Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
-  Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
-  (REQ-MOD-001…005).
+- **Keycloak-Provider: Registrierungen und Keycloak-Version werden beim Bauen geprüft.** Ein Test lädt
+  alle sechs Service-Registrierungen samt Provider-ID, und `repo-lint` schlägt fehl, wenn die
+  Keycloak-Version im Katalog und das Keycloak-Image in Compose, Quadlet und Sandbox verschiedene
+  Minor-Versionen nennen (REQ-OPS-040). Die Klassen liegen jetzt in `discord`, `gate` und `exchange`;
+  das Verhalten bleibt unverändert.
 
 ### Changed
+
+- **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
+  Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
+  Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
+  REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
+
+- **Architekturtests schlagen bei verschobenen Klassen an.** Die ArchUnit-Regeln des Backends wählen
+  Klassen nach Rolle (`@RestController`, `@Service`, Repository, `@Mapper`, `@Entity`) und Klassenliteral
+  statt nach Paket- und Namensstrings, jede Regel prüft eine Mindestauswahl, und ein Metatest prüft, dass
+  jeder verbliebene Klassenname auflösbar ist (REQ-SEC-073). Eine Verschiebung lässt den Build scheitern,
+  statt eine Regel still leerlaufen zu lassen.
+
+- **API: mehr Bereiche werden nie zwischengespeichert.** Admin, Audit, Verbundene Anwendungen,
+  Datenaustausch, Leitung, Live-Sync, Materialbörse, Benachrichtigungsregeln, Aufträge, Organigramm,
+  SK-/Staffel-Mitglieder und der eigene Nutzungsbedingungs-Status antworten jetzt mit
+  `private, no-store` statt `no-cache, must-revalidate` (REQ-SEC-031); ein Test schlägt fehl, wenn
+  eine neue API-Familie nicht eingeordnet ist.
+
+- **API: höchstens 1 000 Einträge pro Seite.** Nur Preismatrix, Preisübersicht, Materialpreise,
+  Terminals und die UEX-Ortskataloge erlauben weiter 100 000 (REQ-API-005); Frontend und App fordern
+  sonst nirgends größere Seiten an.
 
 - **Datenaustausch: ein Refinery-Entwurf verlangt laut Schema mindestens einen Auftrag.**
   `refinery-draft.schema.json` setzt `minItems: 1` auf `orders`, wie das Backend es schon immer verlangt; eine
@@ -61,28 +82,22 @@
   ein Frontend-DTO ohne Backend-Gegenstück fällt durch; ein `ContextShapeTest` je Anwendung zählt
   geplante Jobs, Transaktions-Listener, Controller und Filterketten (REQ-OPS-038).
 
-- **API: mehr Bereiche werden nie zwischengespeichert.** Admin, Audit, Verbundene Anwendungen,
-  Datenaustausch, Leitung, Live-Sync, Materialbörse, Benachrichtigungsregeln, Aufträge, Organigramm,
-  SK-/Staffel-Mitglieder und der eigene Nutzungsbedingungs-Status antworten jetzt mit
-  `private, no-store` statt `no-cache, must-revalidate` (REQ-SEC-031); ein Test schlägt fehl, wenn
-  eine neue API-Familie nicht eingeordnet ist.
-
-- **API: höchstens 1 000 Einträge pro Seite.** Nur Preismatrix, Preisübersicht, Materialpreise,
-  Terminals und die UEX-Ortskataloge erlauben weiter 100 000 (REQ-API-005); Frontend und App fordern
-  sonst nirgends größere Seiten an.
-
-- **Architekturtests schlagen bei verschobenen Klassen an.** Die ArchUnit-Regeln des Backends wählen
-  Klassen nach Rolle (`@RestController`, `@Service`, Repository, `@Mapper`, `@Entity`) und Klassenliteral
-  statt nach Paket- und Namensstrings, jede Regel prüft eine Mindestauswahl, und ein Metatest prüft, dass
-  jeder verbliebene Klassenname auflösbar ist (REQ-SEC-073). Eine Verschiebung lässt den Build scheitern,
-  statt eine Regel still leerlaufen zu lassen.
-
-- **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
-  Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
-  Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
-  REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
-
 ### Fixed
+
+- **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
+  Seite jetzt schon oberhalb der Tab-Leiste, sodass eine verdeckte Einheit erreichbar wird; Loslassen über
+  der Tab-Leiste bricht ab, statt die Zuweisung zu entfernen.
+
+- **Org-Einheiten-Auswahl im Menü auf Tablets wieder 44 px hoch** (Touch-Mindestgröße, REQ-UI-009).
+
+- **E2E: nach einem Formular-Submit wartet die Suite, bis die Zielseite geladen ist.** Die nächste
+  Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
+  Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
+
+- **Build: die Node-Skripte unter `frontend/scripts/` werden gelintet und auf Formatierung geprüft.**
+  `:frontend:lintJs` und `:frontend:prettierCheck` lasen `scripts/**/*.mjs` entgegen ADR-0130 nicht; jetzt
+  tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
+  die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
 
 - **Datenexport (Art. 15/20 DSGVO) vollständig.** Der Export enthält jetzt auch deine zugewiesenen
   Rollen, eine Ernennung zum Grand Admiral, Einsätze mit dir als Partyleiter, Einsatzeinheiten in
@@ -91,27 +106,18 @@
   Personen bleiben dabei ausgeblendet. Im PDF tragen außerdem die vier Abschnitte der verbundenen
   Anwendungen jetzt einen lesbaren Namen statt ihres internen Schlüssels.
 
-- **Build: die Node-Skripte unter `frontend/scripts/` werden gelintet und auf Formatierung geprüft.**
-  `:frontend:lintJs` und `:frontend:prettierCheck` lasen `scripts/**/*.mjs` entgegen ADR-0130 nicht; jetzt
-  tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
-  die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
-
-- **E2E: nach einem Formular-Submit wartet die Suite, bis die Zielseite geladen ist.** Die nächste
-  Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
-  Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
-
 ### Security
-
-- **Pfadgebundene Schutzregeln prüfen sich selbst.** Tests über die echten Endpunkte stellen sicher,
-  dass jeder schreibende Endpunkt in der CSRF-Ausnahme liegt, jede Ratenlimit-Regel einen Endpunkt
-  trifft und die Ausnahmen der Freigabe-, Nutzungsbedingungs- und Datenaustausch-Filter exakte
-  Pfadlisten sind (REQ-SEC-078…080).
 
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
   tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
   Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
   (REQ-ORG-028, REQ-SEC-077, REQ-API-015). 13 Admin-/SPI-Endpunkte validieren ihren Body jetzt;
   gültige Anfragen ändern sich nicht.
+
+- **Pfadgebundene Schutzregeln prüfen sich selbst.** Tests über die echten Endpunkte stellen sicher,
+  dass jeder schreibende Endpunkt in der CSRF-Ausnahme liegt, jede Ratenlimit-Regel einen Endpunkt
+  trifft und die Ausnahmen der Freigabe-, Nutzungsbedingungs- und Datenaustausch-Filter exakte
+  Pfadlisten sind (REQ-SEC-078…080).
 
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 
