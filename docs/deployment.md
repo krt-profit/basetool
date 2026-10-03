@@ -556,8 +556,12 @@ Three gates, in order (REQ-OPS-002, REQ-OPS-024):
 
 The host enforces the same on its side: `deploy.sh` refuses a target set whose images were built from
 different commits (or lack the label) and the next timer tick retries, so a promotion that is half done
-never reaches the stack. Break-glass: `IRI_REQUIRE_ONE_RELEASE=false`. If a promotion dies after
-re-tagging some artifacts, re-run `promote.yml` with the same version to finish it.
+never reaches the stack. A tick that lands while `promote` is still moving the five tags sees such a
+set; it logs `is not one release yet … waiting`, applies nothing and does **not** count as a failed
+deploy. Only a set that stays mixed past `IRI_MIXED_RELEASE_GRACE` (900 s) fails and raises
+`DeployFailed` — then the promotion was interrupted. A missing label fails at once. Break-glass:
+`IRI_REQUIRE_ONE_RELEASE=false`. If a promotion dies after re-tagging some artifacts, re-run
+`promote.yml` with the same version to finish it.
 
 `promote.yml` must be dispatched **from `main`**: its first job fails on any other ref, and the
 `production` environment accepts deployments from `main` only. The approval gate guards against a

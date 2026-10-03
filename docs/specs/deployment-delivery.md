@@ -2427,13 +2427,24 @@ retries, and the promotion finishing makes it pass. `config` and `keycloak-spi` 
 resolve; an unresolvable one keeps its existing "no change this tick" behaviour. Break-glass:
 `IRI_REQUIRE_ONE_RELEASE=false`, announced in the log.
 
+The single `promote` job still moves the five tags one after another, so a tick can land inside
+that window (about 30 s per promotion). Labels that **differ** are therefore first waited out as a
+promotion in progress: the tick applies nothing, exits 0 and stamps no failure, and
+`mixed-release.since` in the state directory records when the mixed set was first seen. Only a
+mixed set that outlasts `IRI_MIXED_RELEASE_GRACE` (default 900 s) fails the deploy, because then
+a promotion was interrupted. A **missing** label is never waited out. One release removes the
+record.
+
 **Acceptance**
 
 - [ ] `promote.yml` re-tags nothing before every artifact verified and all five share one revision.
-- [ ] `deploy.sh` exits non-zero without pulling or applying when the target images' revision labels
-  differ or one is missing, writes the deploy-failure metric, and leaves no `failed.digests` record.
+- [ ] `deploy.sh` neither pulls nor applies when the target images' revision labels differ or one
+  is missing, and leaves no `failed.digests` record.
+- [ ] Differing labels inside the grace exit 0 without a deploy-failure stamp; past the grace, and
+  for a missing label at once, the tick exits non-zero and writes the deploy-failure metric.
 - [ ] `--check-only` reports the same refusal; `--reapply` is not gated (it re-applies the deployed set).
-- [ ] `scripts/deploy.test.sh` covers refusal, missing label, success, break-glass and check-only.
+- [ ] `scripts/deploy.test.sh` covers the wait, the refusal past the grace, missing label, success,
+  break-glass and check-only.
 
 **Enforced by:** `.github/workflows/promote.yml` (`verify`, `same-revision`, `promote`) ·
 `.github/actions/retag-verified-digest` (`verify-only`) · `scripts/deploy.sh`
