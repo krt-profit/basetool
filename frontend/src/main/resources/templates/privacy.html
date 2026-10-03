@@ -1,33 +1,76 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${appTitle} + ' - ' + #{privacy.title}">Profit Basetool - Datenschutz</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/legal.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="hud-box mt-2">
-        <h1 th:text="#{privacy.title}">Datenschutzerklärung</h1>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{privacy.title})}"></th:block>
 
-        <h2 th:text="#{privacy.h1_1}">1. Datenschutz auf einen Blick</h2>
-        
-        <h3 th:text="#{privacy.h2_1_1}">Allgemeine Hinweise</h3>
+    <nav class="card legal-toc" aria-labelledby="privacy-toc-title" data-testid="privacy-toc">
+        <h2 id="privacy-toc-title" class="card-title" th:text="#{privacy.toc}">Inhalt</h2>
+        <ol class="legal-toc__list">
+            <li>
+                <a href="#privacy-1" th:text="#{privacy.h1_1}">1. Datenschutz auf einen Blick</a>
+                <ol class="legal-toc__sub">
+                    <li><a href="#privacy-1-1" th:text="#{privacy.h2_1_1}">Allgemeine Hinweise</a></li>
+                    <li><a href="#privacy-1-2" th:text="#{privacy.h2_1_2}">Wer ist verantwortlich?</a></li>
+                    <li><a href="#privacy-1-3" th:text="#{privacy.h2_1_3}">Wofür nutzen wir Ihre Daten?</a></li>
+                    <li><a href="#privacy-1-4" th:text="#{privacy.h2_1_4}">Welche Rechte haben Sie?</a></li>
+                </ol>
+            </li>
+            <li>
+                <a href="#privacy-2" th:text="#{privacy.h1_2}">2. Allgemeine Hinweise und Pflichtinformationen</a>
+                <ol class="legal-toc__sub">
+                    <li><a href="#privacy-2-1" th:text="#{privacy.h2_2_1}">Verantwortliche Stelle</a></li>
+                    <li><a href="#privacy-2-2" th:text="#{privacy.h2_2_2}">Speicherdauer</a></li>
+                    <li><a href="#privacy-2-3" th:text="#{privacy.h2_2_3}">Ihre Rechte als Betroffener</a></li>
+                    <li><a href="#privacy-2-4" th:text="#{privacy.h2_2_4}">Widerruf Ihrer Einwilligung</a></li>
+                    <li><a href="#privacy-2-5" th:text="#{privacy.h2_2_5}">Beschwerderecht</a></li>
+                </ol>
+            </li>
+            <li>
+                <a href="#privacy-3" th:text="#{privacy.h1_3}">3. Datenerfassung auf dieser Website</a>
+                <ol class="legal-toc__sub">
+                    <li><a href="#privacy-3-1" th:text="#{privacy.h2_3_1}">Externes Hosting</a></li>
+                    <li><a href="#privacy-3-2" th:text="#{privacy.h2_3_2}">Cookies</a></li>
+                    <li><a href="#privacy-3-3" th:text="#{privacy.h2_3_3}">Server-Log-Dateien</a></li>
+                    <li><a href="#privacy-3-4" th:text="#{privacy.h2_3_4}">Mitgliederkonto</a></li>
+                    <li><a href="#privacy-3-5" th:text="#{privacy.h2_3_5}">Anmeldung über Discord</a></li>
+                    <li><a href="#privacy-3-6" th:text="#{privacy.h2_3_6}">Benachrichtigungen und Live-Funktionen</a></li>
+                    <li><a href="#privacy-3-7" th:text="#{privacy.h2_3_7}">Begleitende Desktop-Anwendung</a></li>
+                    <li><a href="#privacy-3-10" th:text="#{privacy.h2_3_10}">Verbundene Anwendungen</a></li>
+                    <li><a href="#privacy-3-8" th:text="#{privacy.h2_3_8}">Sicherheits-Monitoring</a></li>
+                    <li><a href="#privacy-3-9" th:text="#{privacy.h2_3_9}">Begleitende Android-App</a></li>
+                </ol>
+            </li>
+        </ol>
+    </nav>
+
+    <div class="card legal-doc" data-testid="legal-doc">
+        <h2 id="privacy-1" th:text="#{privacy.h1_1}">1. Datenschutz auf einen Blick</h2>
+
+        <h3 id="privacy-1-1" th:text="#{privacy.h2_1_1}">Allgemeine Hinweise</h3>
         <p th:text="#{privacy.p_1_1}">Die folgenden Hinweise geben einen einfachen Überblick darüber...</p>
-        
-        <h3 th:text="#{privacy.h2_1_2}">Wer ist verantwortlich für die Datenerfassung auf dieser Website?</h3>
+
+        <h3 id="privacy-1-2" th:text="#{privacy.h2_1_2}">Wer ist verantwortlich für die Datenerfassung auf dieser Website?</h3>
         <p th:text="#{privacy.p_1_2}">Die Datenverarbeitung auf dieser Website erfolgt durch...</p>
-        
-        <h3 th:text="#{privacy.h2_1_3}">Wofür nutzen wir Ihre Daten?</h3>
+
+        <h3 id="privacy-1-3" th:text="#{privacy.h2_1_3}">Wofür nutzen wir Ihre Daten?</h3>
         <p th:text="#{privacy.p_1_3}">Ein Teil der Daten wird erhoben, um eine fehlerfreie Bereitstellung...</p>
-        
-        <h3 th:text="#{privacy.h2_1_4}">Welche Rechte haben Sie bezüglich Ihrer Daten?</h3>
+
+        <h3 id="privacy-1-4" th:text="#{privacy.h2_1_4}">Welche Rechte haben Sie bezüglich Ihrer Daten?</h3>
         <p th:text="#{privacy.p_1_4}">Sie haben jederzeit das Recht, Auskunft über Herkunft...</p>
 
-        <h2 th:text="#{privacy.h1_2}">2. Allgemeine Hinweise und Pflichtinformationen</h2>
-        
-        <h3 th:text="#{privacy.h2_2_1}">Verantwortliche Stelle</h3>
+        <h2 id="privacy-2" th:text="#{privacy.h1_2}">2. Allgemeine Hinweise und Pflichtinformationen</h2>
+
+        <h3 id="privacy-2-1" th:text="#{privacy.h2_2_1}">Verantwortliche Stelle</h3>
         <p>
             <span th:text="#{privacy.p_2_1}">Die verantwortliche Stelle für die Datenverarbeitung...</span><br><br>
             <strong th:text="#{privacy.address.name}">Lucas Greuloch</strong><br>
@@ -37,12 +80,12 @@
             <span th:text="#{privacy.contact.email_label}">E-Mail:</span> <a th:href="'mailto:' + #{privacy.contact.email_value}" th:text="#{privacy.contact.email_value}">lucas.greuloch@gmail.com</a>
         </p>
 
-        <h3 th:text="#{privacy.h2_2_2}">Speicherdauer</h3>
+        <h3 id="privacy-2-2" th:text="#{privacy.h2_2_2}">Speicherdauer</h3>
         <p th:text="#{privacy.p_2_2}">Im Falle einer Löschanfrage Ihres Nutzerkontos werden...</p>
 
-        <h3 th:text="#{privacy.h2_2_3}">Ihre Rechte als Betroffener</h3>
+        <h3 id="privacy-2-3" th:text="#{privacy.h2_2_3}">Ihre Rechte als Betroffener</h3>
         <p th:text="#{privacy.p_2_3}">Sie haben im Rahmen der geltenden gesetzlichen Bestimmungen (insb. DSGVO) folgende Rechte:</p>
-        <ul class="krtm-list-style-type-disc-margin-left-2rem-a571">
+        <ul class="legal-list">
             <li th:text="#{privacy.list_2_3_1}">Recht auf Auskunft...</li>
             <li th:text="#{privacy.list_2_3_2}">Recht auf Berichtigung...</li>
             <li th:text="#{privacy.list_2_3_3}">Recht auf Löschung...</li>
@@ -52,10 +95,10 @@
             <li th:text="#{privacy.list_2_3_7}">Recht auf Beschwerde...</li>
         </ul>
 
-        <h3 th:text="#{privacy.h2_2_4}">Widerruf Ihrer Einwilligung zur Datenverarbeitung</h3>
+        <h3 id="privacy-2-4" th:text="#{privacy.h2_2_4}">Widerruf Ihrer Einwilligung zur Datenverarbeitung</h3>
         <p th:text="#{privacy.p_2_4}">Viele Datenverarbeitungsvorgänge sind nur mit Ihrer ausdrücklichen...</p>
 
-        <h3 th:text="#{privacy.h2_2_5}">Beschwerderecht bei der zuständigen Aufsichtsbehörde</h3>
+        <h3 id="privacy-2-5" th:text="#{privacy.h2_2_5}">Beschwerderecht bei der zuständigen Aufsichtsbehörde</h3>
         <p th:text="#{privacy.p_2_5_1}">Im Falle datenschutzrechtlicher Verstöße steht Ihnen ein Beschwerderecht...</p>
         <p>
             <span th:text="#{privacy.p_2_5_2}">Der Landesbeauftragte...</span><br>
@@ -67,15 +110,15 @@
             <span th:text="#{privacy.p_2_5_8}">E-Mail: poststelle(at)datenschutz.rlp.de</span>
         </p>
 
-        <h2 th:text="#{privacy.h1_3}">3. Datenerfassung auf dieser Website</h2>
-        
-        <h3 th:text="#{privacy.h2_3_1}">Externes Hosting</h3>
+        <h2 id="privacy-3" th:text="#{privacy.h1_3}">3. Datenerfassung auf dieser Website</h2>
+
+        <h3 id="privacy-3-1" th:text="#{privacy.h2_3_1}">Externes Hosting</h3>
         <p th:text="#{privacy.p_3_1_1}">Diese Website wird bei einem externen Dienstleister gehostet...</p>
         <p th:text="#{privacy.p_3_1_2}">Der Einsatz des Hosters erfolgt zum Zwecke der Vertragserfüllung...</p>
         <p th:utext="#{privacy.p_3_1_3}">Wir setzen folgenden Hoster ein...</p>
         <p th:text="#{privacy.p_3_1_4}">Wir haben mit unserem Hoster einen Auftragsverarbeitungsvertrag (AVV)...</p>
 
-        <h3 th:text="#{privacy.h2_3_2}">Cookies</h3>
+        <h3 id="privacy-3-2" th:text="#{privacy.h2_3_2}">Cookies</h3>
         <p th:text="#{privacy.p_3_2_1}">Unsere Internetseiten verwenden ausschließlich technisch notwendige...</p>
         <p th:utext="#{privacy.p_3_2_2}">Sitzungs-Cookie...</p>
         <p th:utext="#{privacy.p_3_2_3}">XSRF-TOKEN...</p>
@@ -84,49 +127,48 @@
         <p th:utext="#{privacy.p_3_2_7}">Keycloak...</p>
         <p th:utext="#{privacy.p_3_2_8}">Local Storage / Session Storage...</p>
 
-        <h3 th:text="#{privacy.h2_3_3}">Server-Log-Dateien</h3>
+        <h3 id="privacy-3-3" th:text="#{privacy.h2_3_3}">Server-Log-Dateien</h3>
         <p th:text="#{privacy.p_3_3_1}">Der Provider der Seiten erhebt und speichert automatisch...</p>
         <p th:text="#{privacy.p_3_3_2}">Die Anwendung selbst protokolliert pro Aufruf nur technische Eckdaten...</p>
 
-        <h3 th:text="#{privacy.h2_3_4}">Mitgliederkonto und squadronbezogene Daten</h3>
+        <h3 id="privacy-3-4" th:text="#{privacy.h2_3_4}">Mitgliederkonto und squadronbezogene Daten</h3>
         <p th:text="#{privacy.p_3_4_1}">Zur Nutzung des Tools führen wir für Sie ein Mitgliederkonto...</p>
         <p th:utext="#{privacy.p_3_4_2}">Kontodaten...</p>
         <p th:utext="#{privacy.p_3_4_3}">Nutzungs- und Squadron-Daten...</p>
         <p th:utext="#{privacy.p_3_4_4}">Sichtbarkeit innerhalb der Organisation...</p>
         <p th:utext="#{privacy.p_3_4_5}">Angaben zu nicht registrierten Personen...</p>
 
-        <h3 th:text="#{privacy.h2_3_5}">Anmeldung über Discord</h3>
+        <h3 id="privacy-3-5" th:text="#{privacy.h2_3_5}">Anmeldung über Discord</h3>
         <p th:utext="#{privacy.p_3_5_1}">Für die Anmeldung können Sie sich alternativ mit Ihrem Discord-Konto authentifizieren...</p>
         <p th:utext="#{privacy.p_3_5_2}">Bei der Anmeldung werden Sie auf die Seiten von Discord weitergeleitet...</p>
         <p th:utext="#{privacy.p_3_5_3}">Aus diesen Daten speichern wir dauerhaft Ihre Discord-Account-ID...</p>
         <p th:utext="#{privacy.p_3_5_4}">Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO...</p>
 
-        <h3 th:text="#{privacy.h2_3_6}">Benachrichtigungen und Live-Funktionen</h3>
+        <h3 id="privacy-3-6" th:text="#{privacy.h2_3_6}">Benachrichtigungen und Live-Funktionen</h3>
         <p th:text="#{privacy.p_3_6_1}">Innerhalb des Tools stellen wir Ihnen Benachrichtigungen bereit...</p>
         <p th:text="#{privacy.p_3_6_2}">Einzelne Bereiche bieten eine Echtzeit-Zusammenarbeit...</p>
 
-        <h3 th:text="#{privacy.h2_3_7}">Begleitende Desktop-Anwendung (Datenimport)</h3>
+        <h3 id="privacy-3-7" th:text="#{privacy.h2_3_7}">Begleitende Desktop-Anwendung (Datenimport)</h3>
         <p th:text="#{privacy.p_3_7_1}">Optional können Sie eine begleitende Desktop-Anwendung verwenden...</p>
 
-        <h3 th:text="#{privacy.h2_3_10}">Verbundene Anwendungen</h3>
+        <h3 id="privacy-3-10" th:text="#{privacy.h2_3_10}">Verbundene Anwendungen</h3>
         <p th:utext="#{privacy.p_3_10_1}">Sie können zugelassene Programme anderer Anbieter mit Ihrem Konto verbinden...</p>
         <p th:utext="#{privacy.p_3_10_2}">Welche Daten die Anwendung erhält...</p>
         <p th:utext="#{privacy.p_3_10_3}">Verarbeitung durch die Anwendung...</p>
         <p th:utext="#{privacy.p_3_10_4}">Was wir zu Ihren Verbindungen speichern...</p>
         <p th:utext="#{privacy.p_3_10_5}">Trennen und Rückgängigmachen...</p>
 
-        <h3 th:text="#{privacy.h2_3_8}">Sicherheits-Monitoring und Missbrauchserkennung</h3>
+        <h3 id="privacy-3-8" th:text="#{privacy.h2_3_8}">Sicherheits-Monitoring und Missbrauchserkennung</h3>
         <p th:text="#{privacy.p_3_8_1}">Zum Schutz des Betriebs betreiben wir ein internes Sicherheits-Monitoring...</p>
         <p th:text="#{privacy.p_3_8_2}">Die aus dem Betrieb gewonnenen Kennzahlen und Auswertungen enthalten keine personenbezogenen Daten...</p>
         <p th:text="#{privacy.p_3_8_3}">Zur Analyse von Fehlern und Antwortzeiten erfassen wir zudem technische Ablaufverfolgungen (Traces)...</p>
 
-        <br>
-        <h3 th:text="#{privacy.h2_3_9}">Begleitende Android-App</h3>
+        <h3 id="privacy-3-9" th:text="#{privacy.h2_3_9}">Begleitende Android-App</h3>
         <p th:utext="#{privacy.p_3_9_1}">Optional koennen Sie die Basetool-App fuer Android verwenden...</p>
         <p th:text="#{privacy.p_3_9_2}">Die Anmeldung erfolgt ueber denselben Anmeldedienst...</p>
         <p th:text="#{privacy.p_3_9_3}">Die App enthaelt keine Analyse-, Werbe- oder Tracking-Bestandteile...</p>
 
-        <p><em th:text="#{privacy.last_updated}">Stand dieser Datenschutzerklärung: 20.07.2026</em></p>
+        <p class="legal-updated"><em th:text="#{privacy.last_updated}">Stand dieser Datenschutzerklärung: 20.07.2026</em></p>
     </div>
     <th:block th:replace="~{fragments/fankit :: band}" />
 </main>

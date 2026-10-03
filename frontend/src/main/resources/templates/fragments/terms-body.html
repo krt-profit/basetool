@@ -8,7 +8,7 @@
         <h2 th:text="${section.heading}">1. Geltungsbereich und Vertragspartner</h2>
         <th:block th:each="clause : ${section.clauses}">
             <p th:text="${clause.text}">Absatztext dieser Klausel.</p>
-            <ul class="krtm-list-style-type-disc-margin-left-2rem-a571"
+            <ul class="legal-list"
                 th:if="${!clause.bullets.isEmpty()}">
                 <li th:each="bullet : ${clause.bullets}" th:text="${bullet}">Listenpunkt.</li>
             </ul>
@@ -17,8 +17,7 @@
 
     <p><a th:href="@{/privacy}" th:text="#{privacy.title}">Datenschutzerklärung</a></p>
 
-    <br>
-    <p><em th:text="${terms.lastUpdated}">Stand dieser Nutzungsbedingungen: 05.08.2026</em></p>
+    <p class="legal-updated"><em th:text="${terms.lastUpdated}">Stand dieser Nutzungsbedingungen: 05.08.2026</em></p>
 </div>
 </body>
 </html>

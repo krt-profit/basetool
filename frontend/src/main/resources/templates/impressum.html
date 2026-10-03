@@ -1,17 +1,20 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${appTitle} + ' - ' + #{impressum.title}">Profit Basetool - Impressum</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/legal.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="hud-box mt-2">
-        <h1 th:text="#{impressum.title}">Impressum</h1>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{impressum.title})}"></th:block>
+    <div class="card legal-doc" data-testid="legal-doc">
         <p th:text="#{impressum.p1}">Angaben gem\u00e4\u00df \u00a7 5 DDG</p>
-        
+
         <p>
             <span th:text="#{impressum.address.name}">Lucas Greuloch</span><br>
             <span th:text="#{impressum.address.street}">Stauffenbergallee 20a</span><br>
@@ -38,10 +41,10 @@
             <strong th:text="#{impressum.liability}">Haftungsausschluss:</strong><br><br>
             <strong th:text="#{impressum.liability.content}">Haftung f\u00fcr Inhalte</strong><br>
             <span th:text="#{impressum.liability.content.text}">Die Inhalte unserer Seiten...</span><br><br>
-            
+    
             <strong th:text="#{impressum.liability.links}">Haftung f\u00fcr Links</strong><br>
             <span th:text="#{impressum.liability.links.text}">Unser Angebot enth\u00e4lt Links...</span><br><br>
-            
+    
             <strong th:text="#{impressum.liability.copyright}">Urheberrecht</strong><br>
             <span th:text="#{impressum.liability.copyright.text}">Die durch die Seitenbetreiber...</span>
         </p>

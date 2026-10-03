@@ -141,6 +141,52 @@ class OrgChartPageRenderTest {
     assertThat(html).as("vacant Staffelleiter sits at level 3").contains("aria-level=\"3\"");
     assertThat(html).as("edit toggle exposes its pressed state").contains("aria-pressed=\"false\"");
     assertThat(html).as("edit-mode hint rendered (hidden until editing)").contains("oc-edit-hint");
+    assertThat(html)
+        .as("the page head carries the Organisation eyebrow and the edit toggle as a quiet action")
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Organisation<")
+        .containsPattern(
+            "class=\"page-actions\">\\s*<button type=\"button\" class=\"btn btn-ghost"
+                + " oc-edit-toggle\"")
+        .doesNotContain("btn--cta\" data-trigger=\"oc-toggle-edit\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("krtm-");
+  }
+
+  /**
+   * A member sees the page head without the edit toggle, and a chart with no unit at all shows the
+   * empty state instead of a HUD box (REQ-UI-027).
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void emptyChart_member_rendersThePageHeadAndTheEmptyState() throws Exception {
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                null,
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("<h1>Organigramm</h1>")
+        .contains("data-testid=\"empty-state\"")
+        .doesNotContain("data-trigger=\"oc-toggle-edit\"")
+        .doesNotContain("class=\"page-actions\"")
+        .doesNotContain("hud-box");
   }
 
   @Test

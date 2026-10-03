@@ -5,21 +5,10 @@
         max-width: none;
     }
 
-    main.oc-page .greeting {
+    main.oc-page > .page-head,
+    main.oc-page > .alert {
         max-width: var(--content-max);
         margin-inline: auto;
-    }
-
-    main.oc-page .oc-greeting {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        flex-wrap: wrap;
-    }
-
-    main.oc-page .oc-greeting .oc-edit-toggle {
-        flex: 0 0 auto;
-        margin-inline-start: auto;
     }
 
     .oc-chart {
@@ -566,9 +555,89 @@
 
     @media (width <= 768px) {
         .oc-chart {
-            --oc-box-w: 160px;
-            --oc-col-gap: 1rem;
-            --oc-unit-gap: 2rem;
+            --oc-indent: var(--space-4);
+
+            overflow-x: visible;
+            margin-top: var(--space-4);
+        }
+
+        .oc-tree,
+        .oc-bereich-row {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: var(--space-4);
+            min-width: 0;
+        }
+
+        .oc-col,
+        .oc-bereich-body {
+            align-items: stretch;
+        }
+
+        .oc-fan,
+        .oc-fan--bereiche {
+            flex-direction: column;
+            align-items: stretch;
+            gap: var(--space-2);
+            min-width: 0;
+            margin: var(--space-2) 0 0 var(--space-2);
+            padding: 0 0 0 var(--oc-indent);
+            border-left: var(--oc-line-w) solid var(--oc-line);
+        }
+
+        .oc-fan::before,
+        .oc-fan > li::before,
+        .oc-fan > li::after,
+        .oc-v::before {
+            display: none;
+        }
+
+        .oc-fan > li,
+        .oc-fan--units > li,
+        .oc-fan--bereiche > li {
+            align-items: stretch;
+            padding: 0;
+        }
+
+        .oc-v {
+            height: var(--space-2);
+        }
+
+        .oc-node,
+        .oc-unit-box,
+        .oc-leader-wrap,
+        .oc-add {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .oc-unit-box,
+        .oc-unit-box--ol {
+            align-items: flex-start;
+            min-width: 0;
+            max-width: none;
+            padding: var(--space-2) var(--space-3);
+        }
+
+        .oc-unit-box .nm {
+            text-align: left;
+        }
+
+        .oc-caption {
+            justify-content: flex-start;
+            margin-bottom: var(--space-2);
+        }
+
+        .oc-tree + .oc-caption,
+        .oc-fan--bereiche + .oc-caption,
+        .oc-bereich-row + .oc-caption {
+            margin-top: var(--space-6);
+        }
+
+        .oc-scrollbar,
+        .oc-scrollbar--active {
+            display: none;
         }
     }
 }

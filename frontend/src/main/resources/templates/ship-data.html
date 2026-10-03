@@ -12,99 +12,132 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{nav.hangar_data}">Schiffsdaten</h1>
-        <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/ship-data/reset-fitted}" method="post" id="reset-fitted-form">
-            <button type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="reset-fitted-confirm-modal" th:text="#{hangar.ship.reset_fitted}">Alle unfitted</button>
-        </form>
-    </div>
-
-    <th:block th:if="${catalogTruncated}">
-        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mt-2')}"></div>
+    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.hangar_data}, actions=~{::ship-data-actions})}">
+            <th:block th:ref="ship-data-actions">
+                <th:block th:replace="~{fragments/components :: overflowMenu(id='ship-data-menu', items=~{::ship-data-menu-items})}">
+                    <th:block th:ref="ship-data-menu-items">
+                        <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                data-trigger="open-modal-display" data-modal-id="reset-fitted-confirm-modal"
+                                data-testid="ship-data-reset-fitted" th:text="#{hangar.ship.reset_fitted}">Alle unfitted</button>
+                    </th:block>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
+    <th:block sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.hangar_data})}"></th:block>
     </th:block>
 
-    <div class="hud-box mt-2">
+    <th:block th:replace="~{fragments/components :: alert('danger', ${error}, null)}"></th:block>
 
-        <div class="data-section">
-            <div class="flex-between-mb">
-                <h2 th:text="#{ship.shiptypes}">Schiffstypen</h2>
-                <div class="form-group krtm-margin-bottom-0-width-300px-position-relativ-70af">
-                    <input type="text" id="filterShipTypes" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="shipTypesTable" autocomplete="off">
-                    <datalist id="shipTypeNames-data" class="krtm-display-none-5790">
-                        <option th:each="st : ${shipTypes}" th:value="${st.name}"></option>
-                    </datalist>
+    <th:block th:if="${catalogTruncated}">
+        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
+    </th:block>
+
+    <section class="sd-section" aria-labelledby="sd-shiptypes-title">
+        <div class="split sd-section__head">
+            <h2 id="sd-shiptypes-title" class="sd-section__title">
+                <span th:text="#{ship.shiptypes}">Schiffstypen</span>
+                <span class="chip chip--muted" data-testid="sd-shiptypes-count" th:text="${shipTypes != null ? #lists.size(shipTypes) : 0}">0</span>
+            </h2>
+            <div class="toolbar sd-toolbar">
+                <div class="toolbar__search">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                    <input type="search" id="filterShipTypes" autocomplete="off" data-testid="toolbar-search"
+                           data-trigger="filter-table" data-table-id="shipTypesTable"
+                           th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
                 </div>
+                <datalist id="shipTypeNames-data" hidden>
+                    <option th:each="st : ${shipTypes}" th:value="${st.name}"></option>
+                </datalist>
             </div>
+        </div>
 
-            <div class="table-responsive">
-            <table id="shipTypesTable">
+        <div class="card card--flush">
+            <table id="shipTypesTable" class="data-table data-table--stack" th:unless="${#lists.isEmpty(shipTypes)}">
                 <thead>
                     <tr>
                         <th th:text="#{ship.shiptype.name}">Name</th>
-                        <th th:text="#{ship.manufacturer}">Hersteller</th>
                         <th th:text="#{ship.shiptype.description}">Beschreibung</th>
-                        <th sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
+                        <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="st : ${shipTypes}" th:classappend="${st.hidden} ? 'krtm-opacity-05' : ''">
-                        <td th:text="${st.name}">Name</td>
-                        <td th:text="${st.manufacturer != null ? st.manufacturer.abbreviation : ''}">Hersteller</td>
-                        <td th:text="${st.description}">Desc</td>
-                        <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                    <tr th:each="st : ${shipTypes}" data-testid="ship-type-row" th:classappend="${st.hidden} ? 'sd-row--hidden' : ''">
+                        <td>
+                            <span class="cell-title" th:text="${st.name}">Name</span>
+                            <span class="cell-sub" th:if="${st.manufacturer != null}" th:text="${st.manufacturer.abbreviation}">Hersteller</span>
+                        </td>
+                        <td th:attr="data-label=#{ship.shiptype.description}" th:text="${st.description}">Desc</td>
+                        <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                             <form th:action="@{/ship-data/ship-types/{id}/visibility(id=${st.id})}" method="post"
-                                  class="js-visibility-toggle"
+                                  class="js-visibility-toggle m-0"
                                   th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
                                 <input type="hidden" name="hidden" th:value="${!st.hidden}">
-                                <button type="submit" class="btn" th:classappend="${st.hidden} ? '' : 'btn-secondary'" th:text="${st.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
+                                <button type="submit" class="btn btn-ghost btn-xs" th:text="${st.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
                             </form>
                         </td>
                     </tr>
                 </tbody>
             </table>
+            <th:block th:if="${error == null and #lists.isEmpty(shipTypes)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='shipdata.shipTypes.empty', textKey='shipdata.empty.text')}"></th:block>
+            </th:block>
+        </div>
+    </section>
+
+    <section class="sd-section" aria-labelledby="sd-manufacturers-title">
+        <div class="split sd-section__head">
+            <h2 id="sd-manufacturers-title" class="sd-section__title">
+                <span th:text="#{ship.manufacturers}">Hersteller</span>
+                <span class="chip chip--muted" data-testid="sd-manufacturers-count" th:text="${manufacturers != null ? #lists.size(manufacturers) : 0}">0</span>
+            </h2>
+            <div class="toolbar sd-toolbar">
+                <div class="toolbar__search">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                    <input type="search" id="filterManufacturers" autocomplete="off" data-testid="toolbar-search-manufacturers"
+                           data-trigger="filter-table" data-table-id="manufacturersTable"
+                           th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
+                </div>
+                <datalist id="mfgNames-data" hidden>
+                    <option th:each="m : ${manufacturers}" th:value="${m.name}"></option>
+                </datalist>
             </div>
         </div>
 
-        <div class="data-section">
-            <div class="flex-between-mb">
-                <h2 th:text="#{ship.manufacturers}">Hersteller</h2>
-                <div class="form-group krtm-margin-bottom-0-width-300px-position-relativ-70af">
-                    <input type="text" id="filterManufacturers" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="manufacturersTable" autocomplete="off">
-                    <datalist id="mfgNames-data" class="krtm-display-none-5790">
-                        <option th:each="m : ${manufacturers}" th:value="${m.name}"></option>
-                    </datalist>
-                </div>
-            </div>
-            
-            <div class="table-responsive">
-            <table id="manufacturersTable">
+        <div class="card card--flush">
+            <table id="manufacturersTable" class="data-table data-table--stack" th:unless="${#lists.isEmpty(manufacturers)}">
                 <thead>
                     <tr>
                         <th th:text="#{ship.manufacturer.name}">Name</th>
-                        <th th:text="#{ship.manufacturer.abbreviation}">Kürzel</th>
                         <th th:text="#{ship.manufacturer.description}">Beschreibung</th>
-                        <th sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
+                        <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="m : ${manufacturers}" th:classappend="${m.hidden} ? 'krtm-opacity-05' : ''">
-                        <td th:text="${m.name}">Name</td>
-                        <td th:text="${m.abbreviation}">Kürzel</td>
-                        <td th:text="${m.description}">Desc</td>
-                        <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                    <tr th:each="m : ${manufacturers}" data-testid="manufacturer-row" th:classappend="${m.hidden} ? 'sd-row--hidden' : ''">
+                        <td>
+                            <span class="cell-title" th:text="${m.name}">Name</span>
+                            <span class="cell-sub" th:text="${m.abbreviation}">Kürzel</span>
+                        </td>
+                        <td th:attr="data-label=#{ship.manufacturer.description}" th:text="${m.description}">Desc</td>
+                        <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                             <form th:action="@{/ship-data/manufacturers/{id}/visibility(id=${m.id})}" method="post"
-                                  class="js-visibility-toggle"
+                                  class="js-visibility-toggle m-0"
                                   th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
                                 <input type="hidden" name="hidden" th:value="${!m.hidden}">
-                                <button type="submit" class="btn" th:classappend="${m.hidden} ? '' : 'btn-secondary'" th:text="${m.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
+                                <button type="submit" class="btn btn-ghost btn-xs" th:text="${m.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
                             </form>
                         </td>
                     </tr>
                 </tbody>
             </table>
-            </div>
+            <th:block th:if="${error == null and #lists.isEmpty(manufacturers)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='shipdata.manufacturers.empty', textKey='shipdata.empty.text')}"></th:block>
+            </th:block>
         </div>
-    </div>
+    </section>
 </main>
 
 <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
