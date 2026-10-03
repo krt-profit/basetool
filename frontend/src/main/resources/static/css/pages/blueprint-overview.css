@@ -1,69 +1,82 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
+    .bpo-filter-form {
+        margin: 0;
+    }
+
+    .bpo-table .bpo-owners-cell {
+        width: 60%;
+    }
+
+    .bpo-chips,
+    .bpo-chip-list {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .bpo-chip--external {
+        border-style: dashed;
+        color: var(--color-gray-2-text);
+    }
+
+    .bpo-more {
+        cursor: pointer;
+        font-family: var(--font-body);
+    }
+
+    .bpo-more:hover,
+    .bpo-more:focus-visible {
+        background-color: rgb(231 126 35 / 20%);
+    }
+
+    .bpo-note {
+        font-size: var(--fs-xs);
+        color: var(--color-gray-2-text);
+    }
+
+    .bpo-note--error {
+        color: var(--color-danger-text);
+    }
+
+    .bpo-count {
+        font-weight: var(--fw-bold);
+        color: var(--color-white);
+    }
+
     .details-row {
         display: none;
     }
+
     .details-row.bp-expanded {
         display: table-row;
     }
+
     .details-row td {
         border-left: 2px solid var(--color-primary);
         padding: 0;
-        background-color: rgba(0, 0, 0, 0.1);
+        background-color: rgb(0 0 0 / 10%);
     }
+
     .bp-owners-panel {
         padding: 0.75rem 1rem;
     }
-    .bp-owners-loading,
-    .bp-owners-empty,
-    .bp-owners-error {
-        font-size: 0.85rem;
-        color: var(--color-gray-2-text);
+
+    @media (width <= 1024px) {
+        .bpo-more {
+            min-height: var(--touch-target-dense);
+        }
     }
-    .bp-owners-error {
-        color: var(--color-danger-text);
-    }
-    .bp-owners-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4rem;
-    }
-    .bp-owners-list .bp-owner {
-        padding: 0.2rem 0.6rem;
-        font-size: 0.85rem;
-        color: var(--color-gray-1);
-        background-color: rgba(231, 126, 35, 0.08);
-        border: 1px solid rgba(231, 126, 35, 0.25);
-    }
-    .bp-owners-list .bp-owner-external {
-        margin-left: 0.4rem;
-        color: var(--color-gray-2-text);
-        font-size: 0.78rem;
-        font-style: italic;
-    }
-    .bp-owner-count {
-        font-weight: 700;
-    }
-    .bp-filter {
-        position: relative;
-        max-width: 360px;
-        margin-bottom: 1.25rem;
-    }
-    .bp-filter .bp-filter-icon {
-        position: absolute;
-        left: 0.85rem;
-        top: 50%;
-        transform: translateY(-50%);
-        display: inline-flex;
-        color: var(--color-gray-2-text);
-        pointer-events: none;
-    }
-    .bp-filter input[type='search'] {
-        width: 100%;
-        padding-left: 2.6rem;
+
+    @media (width <= 768px) {
+        .bpo-table .bpo-owners-cell {
+            width: auto;
+        }
+
+        .details-row.bp-expanded {
+            display: block;
+        }
     }
 }
