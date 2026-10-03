@@ -165,8 +165,8 @@ class JobOrderHandoverCompletionIntegrationTest {
             "swing-by",
             "KARTELL",
             List.of(
-                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8, null),
-                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 5.7, null)));
+                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8, null, null),
+                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 5.7, null, null)));
 
     jobOrderHandoverService.createHandover(f.jobOrderId(), dto);
 

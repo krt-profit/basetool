@@ -45,6 +45,10 @@
   Aktualitätsprüfung statt in `openapi.json`; der Vergleich mit dem letzten Release prüft beide
   Dokumente. Keine Verhaltensänderung (REQ-XCH-039).
 
+- **Aufträge: Qualität bei Übergabe und Herstellung selbst wählen.** Braucht ein Auftrag ein Material in
+  mehreren Qualitätsstufen, wählst du bei der Übergabe je Position die Stufe (vorbelegt, änderbar). Die
+  Herstellung schlägt die niedrigste passende Qualität vor (REQ-ORDERS-038/039).
+
 - **Aufträge: Qualitätsstufen als pflegbarer Katalog.** Admins legen Stufen mit Code, Mindestqualität
   und deutscher/englischer Bezeichnung unter „Qualitätsstufen“ an; neue Stufen brauchen kein Release.
   „Keine“ und „Gut (650+)“ bleiben unverändert (REQ-ORDERS-036, ADR-0241, Migration V261–V264).
@@ -188,6 +192,20 @@
 
 ### Fixed
 
+- **Systemeinstellungen: Auftragsbearbeitung pro Spezialkommando wieder schaltbar.** Der Abschnitt
+  zeigte seit dem Wegfall des anonymen Auftragsformulars immer „Keine Spezialkommandos gefunden.";
+  jetzt listet er alle aktiven SKs mit ihrem Schalter (Frontend-Controller, REQ-ADMIN-001).
+
+- **Datenauskunft: Qualität der Eintragungen.** Der Export zeigt die Qualitätsstufe einer
+  Material-Eintragung wieder an; seit dem Stufen-Katalog blieb sie bei neuen Eintragungen leer.
+- **Sandbox: Seed läuft wieder.** Die Beispielaufträge des Exchange-Sandbox-Seeds nennen ihre
+  Qualitätsstufe; seit V262/V263 brach der Seed an der fehlenden Stufe ab.
+
+- **Aufträge: Übergaben buchen auf die richtige Zeile.** Eine Übergabe verringerte bisher immer die
+  erste Zeile eines Materials und löste alle Zuordnungen, sobald diese erfüllt war — auch wenn eine
+  zweite Qualitätsstufe noch offen war. Bestand unter der Mindestqualität wird jetzt abgelehnt; die
+  Herstellung prüft die Qualität ebenfalls (REQ-ORDERS-038/039).
+
 - **Deploy: kein Fehlalarm mehr während einer Promotion.** Trifft ein Deploy-Tick das kurze Fenster, in dem
   `promote.yml` die fünf `:stable`-Tags nacheinander verschiebt, wartet `deploy.sh` jetzt ab, statt
   `DeployFailed` auszulösen. Erst ein Satz, der länger als `IRI_MIXED_RELEASE_GRACE` (900 s) gemischt bleibt, gilt
@@ -263,6 +281,10 @@
 - **Die Backend-Clients des Frontends senden nur noch an das Backend.** Jeder `WebClient` lehnt eine Anfrage an
   einen anderen Host als `app.backend-url` ab, bevor das Bearer-Token angehängt wird; ArchUnit hält die Clients im
   Backend-Kern (REQ-FE-029).
+
+- **Build: Jackson-3.2.1-Fehlalarm aus dem Abhängigkeitsgraphen entfernt.** Die Launcher-Suche des
+  PIT-Plugins löste die Testabhängigkeiten ohne Spring-Boot-BOM auf und meldete so Jackson 3.2.1
+  (Dependabot #40–#46); sie ist abgeschaltet. Ausgeliefert wird weiter das gepatchte Jackson 3.1.7 bzw. 2.21.7.
 
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 

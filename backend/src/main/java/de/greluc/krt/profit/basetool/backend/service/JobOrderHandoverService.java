@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandoverItem;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
@@ -42,15 +43,22 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.support.Quality;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +82,16 @@ public class JobOrderHandoverService {
    */
   static final String ERROR_ITEM_NOT_LINKED_TO_ORDER = "error.job_order.inventory_item_not_linked";
 
+  /**
+   * I18n key of the 400 detail for stock whose quality is below the floor of the tier it is booked
+   * or consumed against (REQ-ORDERS-038, REQ-ORDERS-039). Shared with {@link
+   * JobOrderItemProductionService}.
+   */
+  static final String ERROR_QUALITY_BELOW_FLOOR = "error.job_order.quality_below_floor";
+
+  /** I18n key of the 400 detail for a tier code that names no line of the handed material. */
+  static final String ERROR_QUALITY_TIER_NOT_ON_ORDER = "error.job_order.quality_tier_not_on_order";
+
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
@@ -96,6 +114,7 @@ public class JobOrderHandoverService {
    * @param amount the handed-over amount
    * @param remaining the amount left after the decrement (0 when depleted)
    * @param depleted whether the source row was removed
+   * @param quality the code of the quality tier the amount was booked against, or {@code null}
    */
   private record HandedItem(
       UUID itemId,
@@ -103,7 +122,93 @@ public class JobOrderHandoverService {
       String material,
       double amount,
       double remaining,
-      boolean depleted) {}
+      boolean depleted,
+      String quality) {
+
+    /**
+     * Returns this snapshot with the tier it was booked against.
+     *
+     * @param tierCode the tier's code
+     * @return the completed snapshot
+     */
+    HandedItem withQuality(String tierCode) {
+      return new HandedItem(itemId, label, material, amount, remaining, depleted, tierCode);
+    }
+  }
+
+  /**
+   * Books a handed amount against the order's lines of the entry's material (REQ-ORDERS-038).
+   *
+   * <p>With a tier code the amount goes to that line first; without one to the line with the
+   * highest floor the entry's quality meets. What the first line cannot take spills over to the
+   * other lines the quality meets, highest floor first; anything left beyond every line is dropped,
+   * as an over-delivery always was.
+   *
+   * @param jobOrder the managed order
+   * @param inventoryItem the handed entry
+   * @param amount the handed amount
+   * @param tierCode the chosen tier's code, or {@code null}
+   * @return the code of the tier the amount was booked against first, or {@code null} when the
+   *     order has no line of the material
+   * @throws BadRequestException when the code names no line of the material, or the entry's quality
+   *     is below the chosen tier's floor
+   */
+  @Nullable
+  private static String bookAgainstLines(
+      @NotNull JobOrder jobOrder,
+      @NotNull InventoryItem inventoryItem,
+      double amount,
+      @Nullable String tierCode) {
+    UUID materialId = inventoryItem.getMaterial().getId();
+    int quality = Quality.orMin(inventoryItem.getQuality());
+    List<JobOrderMaterial> eligible =
+        jobOrder.getMaterials().stream()
+            .filter(mat -> mat.getMaterial().getId().equals(materialId))
+            .filter(mat -> mat.getQualityTier().isSatisfiedBy(quality))
+            .sorted(
+                Comparator.comparingInt(
+                        (JobOrderMaterial mat) -> mat.getQualityTier().getMinQuality())
+                    .reversed())
+            .collect(Collectors.toCollection(ArrayList::new));
+    if (tierCode != null && !tierCode.isBlank()) {
+      String code = tierCode.trim().toUpperCase(Locale.ROOT);
+      boolean lineExists =
+          jobOrder.getMaterials().stream()
+              .anyMatch(
+                  mat ->
+                      mat.getMaterial().getId().equals(materialId)
+                          && mat.getQualityTier().getCode().equals(code));
+      if (!lineExists) {
+        throw new BadRequestException(ERROR_QUALITY_TIER_NOT_ON_ORDER);
+      }
+      JobOrderMaterial chosen =
+          eligible.stream()
+              .filter(mat -> mat.getQualityTier().getCode().equals(code))
+              .findFirst()
+              .orElseThrow(() -> new BadRequestException(ERROR_QUALITY_BELOW_FLOOR));
+      eligible.remove(chosen);
+      eligible.addFirst(chosen);
+    }
+    if (eligible.isEmpty()) {
+      boolean materialOnOrder =
+          jobOrder.getMaterials().stream()
+              .anyMatch(mat -> mat.getMaterial().getId().equals(materialId));
+      if (materialOnOrder) {
+        throw new BadRequestException(ERROR_QUALITY_BELOW_FLOOR);
+      }
+      return null;
+    }
+    double left = amount;
+    for (JobOrderMaterial mat : eligible) {
+      if (left <= QUANTITY_EPSILON) {
+        break;
+      }
+      double take = Math.min(left, mat.getAmount());
+      mat.setAmount(Math.max(0.0, mat.getAmount() - take));
+      left -= take;
+    }
+    return eligible.getFirst().getQualityTier().getCode();
+  }
 
   /**
    * Creates a job-order handover and atomically applies its effects.
@@ -152,6 +257,7 @@ public class JobOrderHandoverService {
             });
 
     Set<UUID> materialsToUnlink = new HashSet<>();
+    Set<UUID> touchedMaterials = new LinkedHashSet<>();
 
     final Integer orderDisplayId = jobOrder.getDisplayId();
     final List<HandedItem> handedItems = new ArrayList<>();
@@ -216,7 +322,8 @@ public class JobOrderHandoverService {
               materialName,
               itemDto.amount(),
               itemDepleted ? 0.0 : remainingAmount,
-              itemDepleted));
+              itemDepleted,
+              null));
 
       if (remainingAmount <= QUANTITY_EPSILON) {
         offerRatchet.beforeDelete(
@@ -232,17 +339,20 @@ public class JobOrderHandoverService {
         inventoryItemRepository.save(inventoryItem);
       }
 
-      jobOrder.getMaterials().stream()
-          .filter(mat -> mat.getMaterial().getId().equals(inventoryItem.getMaterial().getId()))
-          .findFirst()
-          .ifPresent(
-              mat -> {
-                double newAmount = mat.getAmount() - itemDto.amount();
-                mat.setAmount(Math.max(0.0, newAmount));
-                if (mat.getAmount() <= QUANTITY_EPSILON) {
-                  materialsToUnlink.add(mat.getMaterial().getId());
-                }
-              });
+      String tierCode =
+          bookAgainstLines(jobOrder, inventoryItem, itemDto.amount(), itemDto.qualityRequirement());
+      handedItems.set(handedItems.size() - 1, handedItems.getLast().withQuality(tierCode));
+      touchedMaterials.add(inventoryItem.getMaterial().getId());
+    }
+
+    for (UUID materialId : touchedMaterials) {
+      boolean materialFulfilled =
+          jobOrder.getMaterials().stream()
+              .filter(mat -> mat.getMaterial().getId().equals(materialId))
+              .allMatch(mat -> mat.getAmount() <= QUANTITY_EPSILON);
+      if (materialFulfilled) {
+        materialsToUnlink.add(materialId);
+      }
     }
 
     JobOrderHandover savedHandover = jobOrderHandoverRepository.save(handover);
@@ -278,7 +388,8 @@ public class JobOrderHandoverService {
               .with("material", h.material())
               .with("amount", h.amount())
               .with("remaining", h.remaining())
-              .with("depleted", h.depleted()));
+              .with("depleted", h.depleted())
+              .with("quality", h.quality()));
     }
     auditService.record(
         AuditEventType.JOB_ORDER_HANDOVER_CREATED,
