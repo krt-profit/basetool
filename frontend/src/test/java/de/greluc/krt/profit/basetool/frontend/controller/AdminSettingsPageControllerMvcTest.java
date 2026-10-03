@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,9 +35,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +56,8 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * MVC test for {@link AdminSettingsPageController}'s settings AJAX twin: it applies the invariants
  * and per-setting PUTs and returns the new versions as JSON, a yellow &gt;= red violation returns
- * {@code 422 problem+json}, and without {@code X-Requested-With} the URL still redirects.
+ * {@code 422 problem+json}, and without {@code X-Requested-With} the URL still redirects. The page
+ * itself renders on the form pattern.
  */
 @SpringBootTest
 class AdminSettingsPageControllerMvcTest {
@@ -136,16 +145,17 @@ class AdminSettingsPageControllerMvcTest {
     verify(backendApiClient).clearStaticDataCache();
   }
 
+  /**
+   * The page stylesheet styles no form input itself: the form layout sizes the fields, so no page
+   * rule can stretch the per-unit switches the way an unscoped input rule once did.
+   */
   @Test
   @WithMockUser(roles = "ADMIN")
-  void viewSettings_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+  void viewSettings_pageStylesheetStylesNoInputThatCouldReachTheSwitches() throws Exception {
     mockMvc
         .perform(get("/admin/settings"))
         .andExpect(status().isOk())
-        .andExpect(
-            PageStylesheets.content(
-                containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+        .andExpect(PageStylesheets.content(not(containsString(".form-group input"))));
   }
 
   @Test
@@ -195,5 +205,89 @@ class AdminSettingsPageControllerMvcTest {
         .andExpect(status().is3xxRedirection());
 
     verify(backendApiClient).clearStaticDataCache();
+  }
+
+  /**
+   * Renders the settings page in German with the refinery rounding stored as {@code DOWN} and one
+   * squadron in the picker catalogue.
+   *
+   * @param squadrons the squadrons the catalogue answers with
+   * @return the rendered page
+   * @throws Exception if the request fails
+   */
+  private String renderPage(List<SquadronDto> squadrons) throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
+        .thenReturn(new SystemSettingDto("refinery.rounding.mode", "DOWN", 4L));
+    when(backendApiClient.get(eq("/api/v1/squadrons?size=1000&sort=name,asc&page=0"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(squadrons, 0, 1000, squadrons.size(), 1, List.of()));
+    return mockMvc
+        .perform(get("/admin/settings").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * The page renders on the form pattern: a page head under the "System &amp; Daten" eyebrow, the
+   * three saved settings as numbered sections of one form card with a single sticky primary action,
+   * the rounding mode as a segment carrying the stored value, and the per-unit flags as switches in
+   * their own numbered sections that save on change.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void thePageRendersTheFormPattern() throws Exception {
+    SquadronDto iridium =
+        new SquadronDto(UUID.randomUUID(), "IRIDIUM", "IRI", "", true, true, false, 0L);
+
+    String html = renderPage(List.of(iridium));
+
+    assertThat(html)
+        .contains("data-testid=\"page-head\"")
+        .containsPattern("<span class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .contains("<h1>Systemeinstellungen</h1>")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertThat(main.split("btn--cta", -1)).hasSize(2);
+    assertThat(main.split("class=\"form-section\"", -1)).hasSize(7);
+    assertThat(main)
+        .doesNotContain("krtm-")
+        .doesNotContain("krt-table")
+        .containsPattern("<form id=\"admin-settings-form\" class=\"form-layout card\"")
+        .contains("1 \u00b7 Auftragsverwaltung</legend>")
+        .contains("2 \u00b7 Raffinerie</legend>")
+        .contains("3 \u00b7 Operationen</legend>")
+        .containsPattern(
+            "class=\"form-actions--sticky\">\\s*<button type=\"submit\" class=\"btn btn--cta\"")
+        .contains("Einstellungen speichern")
+        .doesNotContain("<select id=\"refineryRoundingMode\"")
+        .contains("class=\"segmented segmented--block segmented--lg\"")
+        .containsPattern("name=\"refineryRoundingMode\" value=\"DOWN\" checked")
+        .doesNotContain("value=\"UP\" checked")
+        .contains("4 \u00b7 Bef\u00f6rderungssystem pro Staffel</span>")
+        .contains("\u00b7 speichert sofort")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("<label class=\"switch\">")
+        .containsPattern("class=\"squadron-promotion-toggle\"[^>]*checked")
+        .containsPattern(
+            "class=\"squadron-profit-toggle\"[^>]*aria-label=\"Auftragsbearbeitung: IRI\"")
+        .contains("class=\"cell-title\">IRI<");
+  }
+
+  /** Without squadrons the per-squadron sections show the empty state instead of a table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void noSquadronsRenderTheEmptyState() throws Exception {
+    String html = renderPage(List.of());
+
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertThat(main)
+        .contains("data-testid=\"empty-state\"")
+        .contains("Keine Staffeln gefunden.")
+        .contains("Sobald es Staffeln gibt, erscheinen sie hier.")
+        .doesNotContain("squadron-promotion-toggle")
+        .doesNotContain("squadron-profit-toggle");
   }
 }

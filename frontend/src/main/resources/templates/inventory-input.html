@@ -11,26 +11,94 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{inventory.input.title}">Lagereintrag einbuchen</h1>
-    </div>
+<main th:with="inputSource=${inventoryForm.source},
+               backHref=${inputSource == 'admin' ? '/inventory/all' : (inputSource == 'aggregated' ? '/inventory' : '/inventory/my')},
+               backKey=${inputSource == 'admin' ? 'inventory.overview.global' : (inputSource == 'aggregated' ? 'nav.inventory' : 'inventory.overview.my')}">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${backKey}, eyebrowHref=@{${backHref}},
+        titleText=#{inventory.input.title})}"></th:block>
 
-    <div class="hud-box mt-2">
-        <div th:if="${error}" class="hud-box hud-box-error">
-            <p th:text="#{__${error}__}">Fehler</p>
+    <form id="inventory-input-form" class="form-layout card" th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}">
+        <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
+        <div th:if="${#fields.hasErrors('*')}" class="alert alert-danger" role="alert">
+            <ul class="form-errors">
+                <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
+            </ul>
         </div>
+        <input type="hidden" th:field="*{isGlobal}" />
+        <input type="hidden" th:field="*{source}" />
 
-        <div class="form-container">
-            <form id="inventory-input-form" th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}">
-                <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
-                    <ul class="text-danger">
-                        <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
-                    </ul>
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="|1 · #{inventory.input.section.stock}|">1 · Bestand</legend>
+            <th:block th:replace="~{fragments/components :: segmented(name='inventoryCatalogMode', labelKey='inventory.form.item.modeLabel',
+                variant='segmented--block segmented--lg',
+                selected=${inventoryForm.gameItemId != null ? 'item' : 'material'},
+                options=${ {{value: 'material', labelKey: 'inventory.form.item.mode.material'}, {value: 'item', labelKey: 'inventory.form.item.mode.item'}} })}"></th:block>
+
+            <div id="mode-material-fields" class="form-grid" th:hidden="*{gameItemId != null}">
+                <div class="form-group">
+                    <label for="materialId" th:text="#{inventory.input.material}">Material</label>
+                    <select id="materialId" th:field="*{materialId}" required data-krt-combobox="remote-materials">
+                        <option value="" data-quantity-type="" th:text="#{info.select}">-- Bitte wählen --</option>
+                        <option th:each="mat : ${materials}" th:if="${mat.id == inventoryForm.materialId}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
+                    </select>
                 </div>
-                <input type="hidden" th:field="*{isGlobal}" />
-                <input type="hidden" th:field="*{source}" />
-                
+                <div class="form-group">
+                    <label for="quality" th:text="#{inventory.form.quality}">Qualität</label>
+                    <input type="number" id="quality" th:field="*{quality}" min="0" max="1000" value="100" required>
+                </div>
+            </div>
+
+            <div id="mode-item-fields" th:hidden="*{gameItemId == null}">
+                <div class="form-group">
+                    <label for="gameItemId" th:text="#{inventory.form.item.label}">Item</label>
+                    <select id="gameItemId" th:field="*{gameItemId}" required
+                            data-krt-combobox="remote-game-items"
+                            th:data-combobox-placeholder="#{inventory.form.item.placeholder}">
+                        <option value=""></option>
+                        <option th:if="*{gameItemId != null}" th:value="*{gameItemId}"
+                                th:text="${#strings.isEmpty(inventoryForm.gameItemName)} ? *{gameItemId} : *{gameItemName}"></option>
+                    </select>
+                    <input type="hidden" th:field="*{gameItemName}" data-role="game-item-name-echo" />
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="|2 · #{inventory.input.section.amount}|">2 · Menge &amp; Lagerort</legend>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="amount"><span th:text="#{inventory.form.amount}">Menge</span> <span id="amount-unit"></span><th:block th:replace="~{fragments/scu-hint :: scuHint('amount-scu-hint', true)}"></th:block></label>
+                    <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="locationId" th:text="#{inventory.form.location}">Lagerort</label>
+                    <select id="locationId" th:field="*{locationId}" required data-krt-combobox="remote-locations">
+                        <option value="" th:text="#{info.select}">-- Bitte wählen --</option>
+                        <option th:each="loc : ${locations}" th:if="${loc.id == inventoryForm.locationId}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group check-row" th:if="${canMarkStolen}">
+                <input type="checkbox" id="stolen" th:field="*{stolen}" data-testid="bookin-stolen">
+                <div>
+                    <label for="stolen" th:text="#{inventory.stolen.bookin.label}">Gestohlen</label>
+                    <p class="form-hint" th:text="#{inventory.stolen.bookin.help}">Bestand als gestohlen einbuchen.</p>
+                </div>
+            </div>
+
+            <div class="form-group check-row" id="merge-stock-row" hidden>
+                <input type="checkbox" id="mergeStock" th:field="*{mergeStock}">
+                <div>
+                    <label for="mergeStock" th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenführen</label>
+                    <p class="form-hint" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</p>
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="|3 · #{inventory.input.section.assignment}|">3 · Zuordnung</legend>
+            <div class="form-grid">
                 <div class="form-group" th:if="*{isGlobal}">
                     <label for="userId" th:text="#{inventory.input.assignUser}">Nutzer zuordnen</label>
                     <select id="userId" th:field="*{userId}" data-krt-combobox="remote-users">
@@ -42,137 +110,71 @@
                 <th:block th:with="ownerPickerAlwaysRender=*{isGlobal}">
                     <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 </th:block>
+            </div>
 
-                <div class="form-group">
-                    <label th:text="#{inventory.form.item.modeLabel}">Eintragsart</label>
-                    <div class="flex-gap-sm krtm-display-flex-gap-1-5rem-7e37">
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
-                            <input type="radio" name="inventoryCatalogMode" value="material"
-                                   th:attr="checked=*{gameItemId == null} ? 'checked' : null"
-                                   data-trigger="inv-input-mode-toggle"
-                                   data-testid="inventory-mode-material" />
-                            <span th:text="#{inventory.form.item.mode.material}">Material</span>
-                        </label>
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
-                            <input type="radio" name="inventoryCatalogMode" value="item"
-                                   th:attr="checked=*{gameItemId != null} ? 'checked' : null"
-                                   data-trigger="inv-input-mode-toggle"
-                                   data-testid="inventory-mode-item" />
-                            <span th:text="#{inventory.form.item.mode.item}">Item</span>
-                        </label>
+            <div class="form-group check-row" th:unless="*{isGlobal}">
+                <input type="checkbox" id="personal" th:field="*{personal}">
+                <div>
+                    <label for="personal" th:text="#{inventory.personal.label}">Als persönlicher Eintrag markieren</label>
+                    <p class="form-hint" th:text="#{inventory.personal.help}">Dieser Eintrag ist nur für dich sichtbar und taucht nicht im globalen Lager auf.</p>
+                </div>
+            </div>
+
+            <div class="form-group alloc-group" id="jobOrderAllocGroup" th:attr="data-order-needs=${jobOrderNeedsJson}">
+                <span class="form-label" th:text="#{inventory.input.orders.label}">Aufträge zuordnen (optional)</span>
+                <div class="alloc-table">
+                    <div class="alloc-head" aria-hidden="true">
+                        <span th:text="#{inventory.input.alloc.col.order}">Auftrag</span>
+                        <span th:text="#{inventory.assoc.amount}">Menge</span>
                     </div>
+                    <div id="jobOrderAllocRows" class="alloc-rows" data-alloc-rows="jobOrder"></div>
                 </div>
-
-                <div id="mode-material-fields" th:hidden="*{gameItemId != null}">
-                    <div class="form-group">
-                        <label for="materialId">Material</label>
-                        <select id="materialId" th:field="*{materialId}" required data-krt-combobox="remote-materials">
-                            <option value="" data-quantity-type="">-- Bitte wählen --</option>
-                            <option th:each="mat : ${materials}" th:if="${mat.id == inventoryForm.materialId}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="quality">Qualität</label>
-                        <input type="number" id="quality" th:field="*{quality}" min="0" max="1000" value="100" required>
-                    </div>
-                </div>
-
-                <div id="mode-item-fields" th:hidden="*{gameItemId == null}">
-                    <div class="form-group">
-                        <label for="gameItemId" th:text="#{inventory.form.item.label}">Item</label>
-                        <select id="gameItemId" th:field="*{gameItemId}" required
-                                data-krt-combobox="remote-game-items"
-                                th:data-combobox-placeholder="#{inventory.form.item.placeholder}">
-                            <option value=""></option>
-                            <option th:if="*{gameItemId != null}" th:value="*{gameItemId}"
-                                    th:text="${#strings.isEmpty(inventoryForm.gameItemName)} ? *{gameItemId} : *{gameItemName}"></option>
-                        </select>
-                        <input type="hidden" th:field="*{gameItemName}" data-role="game-item-name-echo" />
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="locationId">Ort</label>
-                    <select id="locationId" th:field="*{locationId}" required data-krt-combobox="remote-locations">
-                        <option value="">-- Bitte wählen --</option>
-                        <option th:each="loc : ${locations}" th:if="${loc.id == inventoryForm.locationId}" th:value="${loc.id}" th:text="${loc.name}"></option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="amount">Menge <span id="amount-unit"></span><th:block th:replace="~{fragments/scu-hint :: scuHint('amount-scu-hint', true)}"></th:block></label>
-                    <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
-                </div>
-                
-                <div class="form-group" id="jobOrderAllocGroup" th:attr="data-order-needs=${jobOrderNeedsJson}">
-                    <label th:text="#{inventory.input.orders.label}">Aufträge zuordnen (optional)</label>
-                    <div id="jobOrderAllocRows" data-alloc-rows="jobOrder"></div>
-                    <p class="form-hint" id="jobOrderAllocSingleHint" th:text="#{inventory.input.alloc.single}">Bei genau einer Zuordnung kann die Menge leer bleiben - dann wird die gesamte Menge zugeordnet.</p>
-                    <button type="button" class="btn btn-ghost" data-trigger="inv-input-add-order" th:text="#{inventory.assoc.add.order}">+ Auftrag</button>
-                    <template id="jobOrderRowTemplate">
-                        <div class="flex-gap-sm mb-1" data-alloc-row>
-                            <select class="w-full" data-alloc-target>
-                                <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
+                <p class="form-hint" id="jobOrderAllocSingleHint" th:text="#{inventory.input.alloc.single}">Bei genau einer Zuordnung kann die Menge leer bleiben - dann wird die gesamte Menge zugeordnet.</p>
+                <button type="button" class="btn btn-ghost alloc-add" data-trigger="inv-input-add-order"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{inventory.assoc.add.order}">Auftrag zuordnen</span></button>
+                <template id="jobOrderRowTemplate">
+                    <div class="alloc-row" data-alloc-row>
+                        <select data-alloc-target th:aria-label="#{inventory.input.alloc.col.order}">
+                            <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
                             <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.requiredMaterialIds != null and !order.requiredMaterialIds.isEmpty() ? #strings.listJoin(order.requiredMaterialIds, ',') : ''}" th:data-game-items="${order.requiredGameItemIds != null and !order.requiredGameItemIds.isEmpty() ? #strings.listJoin(order.requiredGameItemIds, ',') : ''}" th:text="${'#' + order.displayId + ' - ' + @handles.display(order.handle) + ' (' + order.status + ')'}"></option>
-                            </select>
-                            <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
-                            <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}">&#215;</button>
-                        </div>
-                    </template>
-                </div>
-
-                <div class="form-group" id="missionAllocGroup">
-                    <label th:text="#{inventory.input.missions.label}">Einsätze zuordnen (optional)</label>
-                    <div id="missionAllocRows" data-alloc-rows="mission"></div>
-                    <p class="form-hint" id="missionAllocSingleHint" th:text="#{inventory.input.alloc.single}">Bei genau einer Zuordnung kann die Menge leer bleiben - dann wird die gesamte Menge zugeordnet.</p>
-                    <button type="button" class="btn btn-ghost" data-trigger="inv-input-add-mission" th:text="#{inventory.assoc.add.mission}">+ Einsatz</button>
-                    <template id="missionRowTemplate">
-                        <div class="flex-gap-sm mb-1" data-alloc-row>
-                            <select class="w-full" data-alloc-target>
-                                <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
-                                <option th:each="mission : ${missions}" th:value="${mission.id}" th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
-                            </select>
-                            <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
-                            <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}">&#215;</button>
-                        </div>
-                    </template>
-                </div>
-
-                <p id="inputAllocOver" class="form-hint krtm-hidden" th:text="#{inventory.input.alloc.over}">Zuordnung übersteigt die Menge</p>
-                <p id="inputAllocAmountMissing" class="form-hint krtm-hidden" data-testid="alloc-amount-missing" th:text="#{inventory.input.alloc.amountMissing}">Bei mehreren Zuordnungen braucht jede eine Menge.</p>
-
-                <div class="form-group check-row" th:unless="*{isGlobal}">
-                    <input type="checkbox" id="personal" th:field="*{personal}">
-                    <div>
-                        <label for="personal" th:text="#{inventory.personal.label}">Als persönlicher Eintrag markieren</label>
-                        <p class="form-hint" th:text="#{inventory.personal.help}">Dieser Eintrag ist nur für dich sichtbar und taucht nicht im globalen Lager auf.</p>
+                        </select>
+                        <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}" th:aria-label="#{inventory.assoc.amount}">
+                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     </div>
-                </div>
+                </template>
+            </div>
 
-                <div class="form-group check-row" th:if="${canMarkStolen}">
-                    <input type="checkbox" id="stolen" th:field="*{stolen}" data-testid="bookin-stolen">
-                    <div>
-                        <label for="stolen" th:text="#{inventory.stolen.bookin.label}">Gestohlen</label>
-                        <p class="form-hint" th:text="#{inventory.stolen.bookin.help}">Bestand als gestohlen einbuchen.</p>
+            <div class="form-group alloc-group" id="missionAllocGroup">
+                <span class="form-label" th:text="#{inventory.input.missions.label}">Einsätze zuordnen (optional)</span>
+                <div class="alloc-table">
+                    <div class="alloc-head" aria-hidden="true">
+                        <span th:text="#{inventory.input.alloc.col.mission}">Einsatz</span>
+                        <span th:text="#{inventory.assoc.amount}">Menge</span>
                     </div>
+                    <div id="missionAllocRows" class="alloc-rows" data-alloc-rows="mission"></div>
                 </div>
-
-                <div class="form-group check-row krtm-hidden" id="merge-stock-row">
-                    <input type="checkbox" id="mergeStock" th:field="*{mergeStock}">
-                    <div>
-                        <label for="mergeStock" th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenführen</label>
-                        <p class="form-hint" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</p>
+                <p class="form-hint" id="missionAllocSingleHint" th:text="#{inventory.input.alloc.single}">Bei genau einer Zuordnung kann die Menge leer bleiben - dann wird die gesamte Menge zugeordnet.</p>
+                <button type="button" class="btn btn-ghost alloc-add" data-trigger="inv-input-add-mission"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{inventory.assoc.add.mission}">Einsatz zuordnen</span></button>
+                <template id="missionRowTemplate">
+                    <div class="alloc-row" data-alloc-row>
+                        <select data-alloc-target th:aria-label="#{inventory.input.alloc.col.mission}">
+                            <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
+                            <option th:each="mission : ${missions}" th:value="${mission.id}" th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
+                        </select>
+                        <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}" th:aria-label="#{inventory.assoc.amount}">
+                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     </div>
-                </div>
+                </template>
+            </div>
 
-                <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
-                    <a th:href="@{/inventory}" data-trigger="history-back" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{general.cancel}">Abbrechen</a>
-                </div>
-            </form>
+            <p id="inputAllocOver" class="field-error" role="alert" hidden th:text="#{inventory.input.alloc.over}">Zuordnung übersteigt die Menge</p>
+            <p id="inputAllocAmountMissing" class="field-error" role="alert" hidden data-testid="alloc-amount-missing" th:text="#{inventory.input.alloc.amountMissing}">Bei mehreren Zuordnungen braucht jede eine Menge.</p>
+        </fieldset>
+
+        <div class="form-actions--sticky">
+            <a th:href="@{${backHref}}" data-trigger="history-back" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</a>
+            <button type="submit" class="btn btn--cta" data-testid="inventory-input-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{inventory.input.new}">Einbuchen</span></button>
         </div>
-    </div>
+    </form>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

@@ -1523,6 +1523,21 @@ Nutzungsbedingungen (segment „Noch offen · Zugestimmt · Alle"), Einsatzdaten
 row's relative day („in 5 Tagen", „heute", „vor 4 Tagen") comes from the `@relativeDays` template
 bean (Europe/Berlin), its date from `.utc-time[data-format=short]`.
 
+**On patterns B and C (phase 2):** the home page (pattern B: the greeting without a description, eyebrow
+„<Org-Einheit> · <Wochentag, Datum>", a 2 : 1 grid with „Nächste 7 Tage" as row links — date block,
+„TS · Join · Treffpunkt · Einheit", translated status, „Meine Einheit" — and, beside it, the
+information card with a three-line clamp and „Gelesen", and the three newest notifications read
+from the bell's `/notifications/recent`; no call to action per mission). Pattern C: Neuer Auftrag
+(kind as a segment, numbered sections, material rows as a grid with a remove icon, the scmdb import
+as a dialog, a comment counter, a live summary in the sticky bar), Lagereintrag einbuchen, Mitglied
+bearbeiten (tabs „Stammdaten · Mitgliedschaften · Datenauskunft", `?tab=` deeplink),
+Systemeinstellungen, Information bearbeiten, the notification-rule editor, the quality-tier dialog,
+and the profile as one settings page (section navigation, one save bar that appears on a change and
+saves the changed sections one after another, REQ-FE-001). The hangar's insurance field is a
+segment „Keine · Monate · LTI" with a month field; the stored value stays `0` / `LTI` / `n`. The
+„Angemeldet" chip of the hand-off's home page is not built: no read says whether the member is signed
+up for a listed mission.
+
 **Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) · Stylelint
 `media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·
 **Code:** `static/css/styles.css` (`components` layer), `fragments/page-head.html`,

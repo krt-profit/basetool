@@ -266,6 +266,59 @@ class AdminNotificationRulePageControllerMvcTest {
         .doesNotContain(">\u2713<");
   }
 
+  /**
+   * The rule editor renders on the form pattern inside its card: three numbered sections (event,
+   * recipients, options), the selector rows under one column header with an icon remove button and
+   * a full-width add button, the two flags as switches, and the actions in a sticky bar with the
+   * one primary button; every id the editor script binds stays in place.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theRuleEditorRendersTheFormPattern() throws Exception {
+    stubRules();
+
+    String html =
+        mockMvc
+            .perform(get("/admin/notification-rules").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String editor =
+        html.substring(
+            html.indexOf("<section class=\"card admin-rule-editor\""), html.indexOf("</main>"));
+    assertThat(editor.split("class=\"form-section\"", -1)).hasSize(4);
+    assertThat(editor.split("btn--cta", -1)).hasSize(2);
+    assertThat(editor)
+        .contains("<form id=\"rule-form\" class=\"form-layout\" data-rule-id=\"\">")
+        .contains("1 \u00b7 Ereignis</legend>")
+        .contains("2 \u00b7 Empf\u00e4nger</legend>")
+        .contains("3 \u00b7 Optionen</legend>")
+        .contains("id=\"rule-version\"")
+        .contains("id=\"rule-eventType\"")
+        .contains("id=\"rule-notificationType\"")
+        .contains("id=\"rule-description\"")
+        .containsPattern("<label class=\"switch\" for=\"rule-enabled\">")
+        .containsPattern("<label class=\"switch\" for=\"rule-excludeActor\">")
+        .contains("class=\"selector-row selector-row--head\" aria-hidden=\"true\"")
+        .contains(">Auswahl<")
+        .contains("id=\"selectors-container\"")
+        .contains("class=\"btn btn-ghost selector-add\" id=\"add-selector\"")
+        .containsPattern(
+            "class=\"form-actions--sticky\">\\s*<button type=\"button\" class=\"btn btn-ghost\""
+                + " id=\"rule-cancel\"")
+        .contains("Regel speichern")
+        .contains("id=\"selector-row-template\"")
+        .contains("data-selector-row")
+        .containsPattern("<select data-selector-kind aria-label=\"Art\">")
+        .contains("data-krt-combobox=\"remote-users\" aria-label=\"Benutzer\">")
+        .containsPattern(
+            "class=\"btn btn-quiet-danger btn-icon selector-row__remove\" data-selector-remove")
+        .doesNotContain("<h3")
+        .doesNotContain("krtm-");
+  }
+
   /** No rule yet: the fragment carries the empty state instead of a table. */
   @Test
   @WithMockUser(roles = "ADMIN")

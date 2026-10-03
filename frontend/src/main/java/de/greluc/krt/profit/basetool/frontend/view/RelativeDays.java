@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
@@ -32,8 +33,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Template bean ({@code @relativeDays}) that counts calendar days between today and an instant in
- * the Europe/Berlin zone, for the relative date line of a list row (REQ-UI-027).
+ * Template bean ({@code @relativeDays}) for dates as the squadron reads them, in Europe/Berlin:
+ * calendar days to an instant for a list row's relative line, today, and an instant zoned to format
+ * (REQ-UI-027).
  */
 @Component("relativeDays")
 @RequiredArgsConstructor(access = lombok.AccessLevel.PACKAGE)
@@ -64,8 +66,28 @@ public class RelativeDays {
     if (instant == null) {
       return null;
     }
-    LocalDate today = LocalDate.now(clock.withZone(ZONE));
-    LocalDate day = instant.atZone(ZONE).toLocalDate();
-    return ChronoUnit.DAYS.between(today, day);
+    return ChronoUnit.DAYS.between(today(), instant.atZone(ZONE).toLocalDate());
+  }
+
+  /**
+   * Today's date in Europe/Berlin, for a page head that names the day.
+   *
+   * @return today's date
+   */
+  @NotNull
+  public LocalDate today() {
+    return LocalDate.now(clock.withZone(ZONE));
+  }
+
+  /**
+   * The instant in Europe/Berlin, so a template formats its day and time as the members read them.
+   *
+   * @param instant the instant to convert; {@code null} yields {@code null}
+   * @return the zoned date-time, or {@code null} for a {@code null} instant
+   */
+  @Nullable
+  @Contract("null -> null; !null -> !null")
+  public ZonedDateTime local(@Nullable Instant instant) {
+    return instant == null ? null : instant.atZone(ZONE);
   }
 }

@@ -108,7 +108,8 @@ class ProfileBlueprintSharingInPlaceE2eTest {
 
         Locator checkbox =
             page.locator("#profile-blueprint-sharing-form input[name='shareBlueprintsGlobally']");
-        Locator submit = page.locator("#profile-blueprint-sharing-form button[type='submit']");
+        Locator submit = page.getByTestId("profile-save");
+        assertThat(page.getByTestId("profile-save-bar")).isHidden();
 
         boolean initial = checkbox.isChecked();
 
@@ -138,11 +139,12 @@ class ProfileBlueprintSharingInPlaceE2eTest {
   }
 
   /**
-   * Submits the blueprint-sharing form in place and asserts a success toast, no error toast and no
-   * {@code OPTIMISTIC_LOCK} reload-confirm dialog ({@code .krt-confirm-overlay}).
+   * Saves the blueprint-sharing section through the save bar and asserts a success toast, no error
+   * toast, no {@code OPTIMISTIC_LOCK} reload-confirm dialog ({@code .krt-confirm-overlay}) and that
+   * the bar hides again once nothing is unsaved.
    *
    * @param page the authenticated profile page
-   * @param submit the blueprint-sharing form's submit button
+   * @param submit the save bar's save button
    */
   private static void saveInPlace(Page page, Locator submit) {
     page.evaluate(
@@ -157,6 +159,7 @@ class ProfileBlueprintSharingInPlaceE2eTest {
         .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
     assertThat(page.locator(".notification-toast.error-toast")).hasCount(0);
     assertThat(page.locator(".krt-confirm-overlay")).hasCount(0);
+    assertThat(page.getByTestId("profile-save-bar")).isHidden();
   }
 
   /**

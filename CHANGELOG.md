@@ -4,6 +4,15 @@
 
 ### Added
 
+- **Startseite und Formulare im neuen Muster (Phase 2).** Die Startseite zeigt die nächsten 7 Tage als
+  Liste mit Datumsblock, daneben Information und die neuesten Benachrichtigungen. Neuer Auftrag,
+  Einbuchen, Mitglied bearbeiten (mit Reitern), Systemeinstellungen, Information und
+  Benachrichtigungsregeln haben nummerierte Abschnitte und eine fixierte Aktionsleiste (REQ-UI-027).
+- **Profil als eine Einstellungsseite.** Abschnitts-Navigation links, eine Speichern-Leiste, die nur
+  bei Änderungen erscheint und alle geänderten Abschnitte speichert.
+- **Hangar: Versicherung als „Keine · Monate · LTI".** Statt einer Liste mit 122 Einträgen; Monate
+  als Zahl von 1 bis 120.
+
 - **Listenseiten im neuen Muster (Phase 1).** Einsätze, Operationen, Benachrichtigungen, Aufträge,
   Materialbedarf, Lager, Sammelübersichten, Materialien, Mitglieder, Beförderung und alle
   Admin-Listen haben einen Seitenkopf mit Zähler, eine Werkzeugleiste mit Suche, Segment-Schalter und

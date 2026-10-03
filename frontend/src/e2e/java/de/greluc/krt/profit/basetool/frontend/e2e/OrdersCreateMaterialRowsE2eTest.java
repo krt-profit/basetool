@@ -27,8 +27,8 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -36,12 +36,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Adds a ship to the hangar through the UI and verifies it appears in the ship list. The ship type
- * comes from the catalog seed in {@link E2eStackExtension}; {@link BackendSeeder} seeds the IRIDIUM
- * membership in {@link #setUp()}.
+ * Drives the material rows of the {@code /orders/create} form (REQ-UI-027): rows are removed only
+ * while another remains, the remaining rows are renumbered without a gap, the comment counter
+ * follows the text, and the scmdb import opens as a dialog.
+ *
+ * <p>Read-only: never submits.
  */
 @Tag("e2e")
-class HangarAddShipE2eTest {
+class OrdersCreateMaterialRowsE2eTest {
 
   /** Provisions (or, in staging mode, targets) the stack for the whole run. */
   @RegisterExtension static final E2eStackExtension STACK = new E2eStackExtension();
@@ -52,14 +54,11 @@ class HangarAddShipE2eTest {
   private static Playwright playwright;
   private static Browser browser;
 
-  /** Launches the browser and, for the ephemeral stack, seeds the user's IRIDIUM membership. */
+  /** Launches the browser shared across the page check. */
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
-    if (STACK.managesStack()) {
-      new BackendSeeder().ensureIridiumMembership(USERNAME, PASSWORD);
-    }
   }
 
   /** Releases the browser and the Playwright driver process. */
@@ -74,11 +73,12 @@ class HangarAddShipE2eTest {
   }
 
   /**
-   * Adds a ship through the modal and asserts it appears in the hangar list without a page reload
-   * (REQ-FE-001).
+   * Adds two rows, removes the first, checks the amount fields are named {@code materials[0]} and
+   * {@code materials[1]}, removes down to one row whose remove button is then disabled, types a
+   * comment and reads the counter, and opens and closes the scmdb dialog.
    */
   @Test
-  void addsAShipThroughTheUiInPlace() {
+  void materialRowsRemoveRenumberAndCount() {
     String baseUrl = STACK.baseUrl();
     Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
     try (BrowserContext context =
@@ -88,30 +88,41 @@ class HangarAddShipE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/hangar");
-        page.getByTestId("hangar-add-ship").click();
+        E2eSupport.navigate(page, baseUrl + "/orders/create");
+        Locator rows = page.locator("#materials-container .material-row");
+        Locator removes =
+            page.locator("#materials-container [data-trigger=\"orders-remove-material\"]");
+        assertThat(rows).hasCount(1);
+        assertThat(removes.first()).isDisabled();
 
-        page.locator("#ship-type").selectOption(new SelectOption().setLabel("E2E Ship Type"));
-        page.getByTestId("segment-insuranceKind-lti").click();
+        page.locator("[data-trigger=\"orders-add-material\"]").click();
+        page.locator("[data-trigger=\"orders-add-material\"]").click();
+        assertThat(rows).hasCount(3);
+        assertThat(removes.first()).isEnabled();
 
-        page.evaluate("window.__krtNoReload = true;");
-        page.evaluate(
-            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
-                + " 'none'; } }");
-        page.waitForResponse(
-            r -> r.url().contains("/hangar/add") && "POST".equals(r.request().method()),
-            () -> page.getByTestId("hangar-ship-submit").click());
-
+        removes.first().click();
+        assertThat(rows).hasCount(2);
         assertEquals(
-            Boolean.TRUE,
-            page.evaluate("window.__krtNoReload === true"),
-            "adding a ship must not reload the page");
-        assertThat(
-                page.getByTestId("hangar-ship-row")
-                    .filter(new Locator.FilterOptions().setHasText("E2E Ship Type")))
-            .isVisible();
+            List.of("materials[0].amount", "materials[1].amount"),
+            page.locator("#materials-container [data-role=\"material-amount\"]")
+                .evaluateAll("els => els.map(e => e.getAttribute('name'))"),
+            "the remaining rows are renumbered without a gap");
+
+        removes.first().click();
+        assertThat(rows).hasCount(1);
+        assertThat(removes.first()).isDisabled();
+
+        page.locator("#comment").fill("Hallo");
+        assertThat(page.locator("#comment-count")).hasText("5 / 1000");
+        assertThat(page.getByTestId("order-summary")).not().isEmpty();
+
+        page.getByTestId("orders-scmdb-open").click();
+        assertThat(page.locator("#orders-scmdb-modal")).isVisible();
+        assertThat(page.locator("#scmdb-import-text")).isVisible();
+        page.keyboard().press("Escape");
+        assertThat(page.locator("#orders-scmdb-modal")).isHidden();
       } catch (RuntimeException | AssertionError failure) {
-        E2eSupport.dump(page, "hangar-add-ship");
+        E2eSupport.dump(page, "orders-create-material-rows");
         throw failure;
       }
     }

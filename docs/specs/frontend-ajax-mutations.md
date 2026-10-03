@@ -486,7 +486,12 @@ two Staffel slots (REQ-ORG-017, up to two) each carry their own flags and save t
 `{field: message}` membership-delta twin (REQ-FE-007).
 The profile payout-preference form joins the description form on `krtFetch.write` (both echo the one
 shared user-row version), and the home-page mark-announcement-read posts in place and removes its
-control. The one reload deliberately kept is the sidebar active-OrgUnit switcher: switching the
+control. Since 2026-10-03 the profile is one settings page (REQ-UI-027): its four sections keep
+their forms and endpoints, and one save bar — shown only while a section differs from what was
+loaded — writes the changed sections one after another, each with the version the previous write
+returned, stops at the first failure (the failed and later sections stay marked changed), and
+copies the new version into all four forms. A `<noscript>` button per section keeps the plain form
+post (REQ-SEC-072). The one reload deliberately kept is the sidebar active-OrgUnit switcher: switching the
 org-unit re-scopes every list, count and entity on the page through `OwnerScopeService`, so the
 existing controlled full navigation (`POST /me/active-org-unit` → `_referer` redirect) is the correct
 UX — an "in-place" swap would amount to re-rendering the whole page anyway (REQ-ORG-\*).
