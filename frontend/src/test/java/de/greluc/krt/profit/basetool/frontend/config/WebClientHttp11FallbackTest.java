@@ -81,13 +81,15 @@ class WebClientHttp11FallbackTest {
   void theFlagTurnsHttp2Off() {
     WebClient client =
         WebClientTestSupport.config(
-                AppHttpProperties.BackendProtocol.HTTP11, AppHttpProperties.BackendCodec.CBOR)
+                AppHttpProperties.BackendProtocol.HTTP11,
+                AppHttpProperties.BackendCodec.CBOR,
+                "https://127.0.0.1:" + server.port())
             .liveSyncAuthWebClient();
 
     String body =
         client
             .get()
-            .uri(java.net.URI.create("https://127.0.0.1:" + server.port() + "/probe"))
+            .uri("/probe")
             .retrieve()
             .bodyToMono(String.class)
             .block(Duration.ofSeconds(20));

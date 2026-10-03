@@ -47,7 +47,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -56,7 +55,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * here. Complements {@link StreamAwareShallowEtagHeaderFilterTest}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
 class SseDeliveryThroughFilterChainTest {
 
   /** How long a first byte may take before the stream counts as swallowed. */

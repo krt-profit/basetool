@@ -26,7 +26,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -35,7 +34,6 @@ import org.springframework.web.reactive.function.client.WebClient;
  * its sibling web loggers are not (REQ-OBS-001).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class PageNotFoundLogLevelTest {
 
   /**

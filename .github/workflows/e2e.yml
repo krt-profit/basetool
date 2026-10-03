@@ -22,6 +22,38 @@ permissions:
   contents: read
 
 jobs:
+  exchange-label:
+    name: Exchange changes carry the e2e label
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: List the pull request's changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files" --jq '.[].filename' \
+            > "${RUNNER_TEMP}/changed-files.txt"
+          wc -l < "${RUNNER_TEMP}/changed-files.txt"
+
+      - name: Check the exchange path against the e2e label
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: >-
+          python3 .github/scripts/check_exchange_e2e_label.py
+          --changed "${RUNNER_TEMP}/changed-files.txt" --labels "${LABELS}"
+
   build-stack:
     name: Build E2E images
     if: >-

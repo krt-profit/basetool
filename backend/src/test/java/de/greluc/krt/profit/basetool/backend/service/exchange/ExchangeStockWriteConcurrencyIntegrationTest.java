@@ -65,7 +65,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
@@ -73,7 +72,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * set or undo that waited for another sees what that one wrote (REQ-XCH-016, ADR-0229).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class ExchangeStockWriteConcurrencyIntegrationTest {
 
   private static final String CLIENT = "versekit-lock";

@@ -353,6 +353,14 @@ groups:
           summary: "403 access-denied spike ({{ $labels.application }})"
           description: "{{ $labels.application }} is returning 403 access-denied at an elevated rate — possible authorization probing or a broken permission gate after a deploy."
 
+      - alert: SecurityExpressionEvaluationFailed
+        expr: sum by (application, kind) (increase(basetool_security_expression_failures_total{application="basetool-backend"}[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "A method-security expression could not be evaluated on {{ $labels.application }} ({{ $labels.kind }})"
+          description: "Spring Security failed to evaluate a @PreAuthorize expression in the last 10 minutes, so every call of that operation is refused with 400 ILLEGAL_ARGUMENT. The series is normally zero: kind=evaluation is a bean or method the expression names but the context lacks (a renamed security bean, a changed arity), kind=other an expression that yields no decision. The WARN log line of the 400 (code ILLEGAL_ARGUMENT, exceptionMessage) names the expression; it is a deploy defect, fix the expression or the bean and redeploy (REQ-OBS-020)."
+
       - alert: PendingApprovalBlockSpike
         expr: sum by (application) (rate(basetool_http_error_total{code="PENDING_APPROVAL"}[5m])) > 0.2
         for: 10m

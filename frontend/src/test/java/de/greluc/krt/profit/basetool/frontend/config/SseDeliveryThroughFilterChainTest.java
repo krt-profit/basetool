@@ -44,7 +44,6 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,7 +57,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * request-thread {@code ready} comment as the notification relay (ADR-0113).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
 class SseDeliveryThroughFilterChainTest {
 
   /** The test stream's path; {@code /sm/**} is {@code permitAll} in {@link SecurityConfig}. */

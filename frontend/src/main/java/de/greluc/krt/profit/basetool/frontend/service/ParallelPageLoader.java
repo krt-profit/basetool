@@ -19,12 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
-import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
-import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContext;
-import de.greluc.krt.profit.basetool.frontend.logging.CorrelationContext;
+import io.micrometer.context.ContextRegistry;
+import io.micrometer.context.ContextSnapshot;
+import io.micrometer.context.ContextSnapshotFactory;
 import jakarta.annotation.PreDestroy;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,9 +39,14 @@ import org.springframework.web.context.request.RequestContextHolder;
 
 /**
  * Runs independent backend fetches for one page in parallel on virtual threads, re-establishing the
- * caller's request context on each: security context, request attributes, {@link
- * CorrelationContext}, {@link ActiveSquadronContext}, {@link ClientIpContext} and the MDC, which
- * the outbound WebClient pipeline needs for its headers.
+ * caller's request context on each (REQ-FE-030).
+ *
+ * <p>Every {@code ThreadLocalAccessor} of the {@link ContextRegistry} — the relays {@code
+ * ReactorContextPropagationConfig} registers (org unit, correlation id, user locale, client IP) and
+ * those libraries register — is captured on the caller and restored on the worker through one
+ * {@link ContextSnapshot}, the same accessors Reactor's automatic propagation uses. The security
+ * context, the request attributes and the MDC, which have no accessor of their own here, are copied
+ * explicitly. A holder the caller has not set is cleared on the worker.
  *
  * <p>Use only inside a servlet request, and join every returned future before the controller method
  * returns.
@@ -53,6 +57,26 @@ public class ParallelPageLoader {
   /** Virtual-thread executor running the page-load tasks. */
   private final ExecutorService executor =
       Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("page-loader-", 0L).factory());
+
+  /** Captures and restores every registered thread-local accessor. */
+  private final ContextSnapshotFactory snapshots;
+
+  /**
+   * Creates the loader on the global {@link ContextRegistry}, the one Reactor propagates through.
+   */
+  public ParallelPageLoader() {
+    this(ContextRegistry.getInstance());
+  }
+
+  /**
+   * Creates the loader on a given registry.
+   *
+   * @param registry the registry whose accessors are captured and restored
+   */
+  ParallelPageLoader(@NotNull ContextRegistry registry) {
+    this.snapshots =
+        ContextSnapshotFactory.builder().contextRegistry(registry).clearMissing(true).build();
+  }
 
   /**
    * Submits the supplier to the virtual-thread executor with the caller's request context
@@ -65,46 +89,33 @@ public class ParallelPageLoader {
    */
   @NotNull
   public <T> CompletableFuture<T> loadAsync(@NotNull Supplier<T> task) {
-    UUID activeSquadron = ActiveSquadronContext.get();
-    String correlationId = CorrelationContext.get();
-    String clientIp = ClientIpContext.get();
+    ContextSnapshot snapshot = snapshots.captureAll();
     SecurityContext securityContext = SecurityContextHolder.getContext();
     RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
     Map<String, String> mdc = MDC.getCopyOfContextMap();
 
     return CompletableFuture.supplyAsync(
         () -> {
-          try {
-            applyContext(
-                activeSquadron, correlationId, clientIp, securityContext, requestAttributes, mdc);
-            return task.get();
-          } finally {
-            clearContext();
+          try (ContextSnapshot.Scope ignored = snapshot.setThreadLocals()) {
+            try {
+              applyRequestState(securityContext, requestAttributes, mdc);
+              return task.get();
+            } finally {
+              clearRequestState();
+            }
           }
         },
         executor);
   }
 
   /**
-   * Installs the captured request-scoped state (authentication, squadron pin, client IP,
-   * correlation id, MDC) on the current worker thread.
+   * Installs the captured security context, request attributes and MDC on the current worker
+   * thread.
    */
-  private static void applyContext(
-      @Nullable UUID activeSquadron,
-      @Nullable String correlationId,
-      @Nullable String clientIp,
+  private static void applyRequestState(
       @NotNull SecurityContext securityContext,
       @Nullable RequestAttributes requestAttributes,
       @Nullable Map<String, String> mdc) {
-    if (activeSquadron != null) {
-      ActiveSquadronContext.set(activeSquadron);
-    }
-    if (correlationId != null) {
-      CorrelationContext.set(correlationId);
-    }
-    if (clientIp != null) {
-      ClientIpContext.set(clientIp);
-    }
     SecurityContextHolder.setContext(securityContext);
     if (requestAttributes != null) {
       RequestContextHolder.setRequestAttributes(requestAttributes);
@@ -114,11 +125,8 @@ public class ParallelPageLoader {
     }
   }
 
-  /** Removes every thread-local entry the helper might have populated. */
-  private static void clearContext() {
-    ActiveSquadronContext.clear();
-    CorrelationContext.clear();
-    ClientIpContext.clear();
+  /** Removes the security context, request attributes and MDC from the worker thread. */
+  private static void clearRequestState() {
     SecurityContextHolder.clearContext();
     RequestContextHolder.resetRequestAttributes();
     MDC.clear();

@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V239__drop_guest_role_and_guest_edit_token.sql} (REQ-SEC-052,
@@ -38,7 +37,6 @@ import org.springframework.test.context.ActiveProfiles;
  * promoted.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V239MigrationTest {
 
   private static final String SEEDED_ROLE_CODE = "GUEST_V239_FIXTURE";

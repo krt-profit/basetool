@@ -52,9 +52,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Exercises {@link HangarService#updateShip} under real concurrency: a seeded ship is updated by
@@ -64,7 +61,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>Not {@code @Transactional}, so the worker threads can see the seeded rows.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class OptimisticLockingTest {
 
   private static final int THREADS = 5;
@@ -84,8 +80,6 @@ class OptimisticLockingTest {
   @Autowired private UserRepository userRepository;
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private UUID ownerId;
   private UUID shipTypeId;

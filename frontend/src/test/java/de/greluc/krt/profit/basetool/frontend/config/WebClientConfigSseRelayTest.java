@@ -116,7 +116,7 @@ class WebClientConfigSseRelayTest {
           return Mono.just(ClientResponse.create(HttpStatus.OK).build());
         };
     ClientRequest request =
-        ClientRequest.create(HttpMethod.GET, URI.create("https://backend/stream")).build();
+        ClientRequest.create(HttpMethod.GET, URI.create("https://backend:11261/stream")).build();
     chain.filter(request, capture).block();
     return sent.get();
   }

@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.web;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,32 +31,48 @@ import org.springframework.data.domain.Sort;
 
 /**
  * Translates pagination query parameters into a {@link Pageable}: sorting only on whitelisted
- * fields, {@code id} appended as tiebreaker, and {@code size} clamped to {@value #MAX_PAGE_SIZE}.
+ * fields, {@code id} appended as tiebreaker, and {@code size} clamped to a {@link PageCeiling}.
  *
- * <p>The ceiling is high because some views load everything in one request; long-running queries
- * are bounded by the statement timeout instead (REQ-DATA-009).
+ * <p>Every list is clamped to {@value #MAX_PAGE_SIZE} unless its controller opts out explicitly
+ * with {@link PageCeiling#LOAD_ALL} (REQ-API-005); long-running queries are bounded by the
+ * statement timeout as well (REQ-DATA-009).
  */
 public final class PaginationUtil {
 
+  /** The kernel default upper bound on the {@code size} query parameter. */
+  public static final int MAX_PAGE_SIZE = 1_000;
+
   /**
-   * Upper bound on the {@code size} query parameter. High by design so the "load all in one
-   * request" surfaces (material trade matrix, admin material / member / UEX lists, org-unit
-   * pickers) are not truncated; the query-execution timeout (REQ-DATA-009) is what bounds a heavy
-   * fetch's hold on a database connection. See the class Javadoc (SEC-03).
+   * The upper bound on {@code size} for a list that opted out with {@link PageCeiling#LOAD_ALL}.
    */
-  public static final int MAX_PAGE_SIZE = 100_000;
+  public static final int LOAD_ALL_MAX_PAGE_SIZE = 100_000;
 
   /** Default {@code size} when the caller supplies none or a non-positive value. */
   public static final int DEFAULT_PAGE_SIZE = 50;
 
+  /** The largest {@code size} a list answers with. */
+  @RequiredArgsConstructor
+  @Getter
+  public enum PageCeiling {
+
+    /** The kernel default, {@value PaginationUtil#MAX_PAGE_SIZE}, for every list. */
+    DEFAULT(MAX_PAGE_SIZE),
+
+    /**
+     * The explicit opt-out, {@value PaginationUtil#LOAD_ALL_MAX_PAGE_SIZE}, for a catalogue list a
+     * caller loads in one request with a larger page.
+     */
+    LOAD_ALL(LOAD_ALL_MAX_PAGE_SIZE);
+
+    /** The largest page size this ceiling allows. */
+    private final int maxSize;
+  }
+
   private PaginationUtil() {}
 
   /**
-   * Builds a {@link Pageable} from raw query parameters.
-   *
-   * <p>{@code page} defaults to 0 and is clamped to at least 0; {@code size} defaults to 50 and is
-   * clamped to {@code [1, 100000]}. {@code sort} is a semicolon-separated list of {@code
-   * field,asc|desc} tokens; {@code id} is appended as tiebreaker when whitelisted.
+   * Builds a {@link Pageable} from raw query parameters under the {@link PageCeiling#DEFAULT}
+   * ceiling.
    *
    * @param pageParam zero-based page index, may be {@code null}
    * @param sizeParam page size, may be {@code null}
@@ -72,11 +90,37 @@ public final class PaginationUtil {
       String sortParam,
       Set<String> allowedSortFields,
       String defaultSortField) {
+    return createPageRequest(
+        pageParam, sizeParam, sortParam, allowedSortFields, defaultSortField, PageCeiling.DEFAULT);
+  }
+
+  /**
+   * Builds a {@link Pageable} from raw query parameters.
+   *
+   * <p>{@code page} defaults to 0 and is clamped to at least 0; {@code size} defaults to 50 and is
+   * clamped to {@code [1, ceiling]}. {@code sort} is a semicolon-separated list of {@code
+   * field,asc|desc} tokens; {@code id} is appended as tiebreaker when whitelisted.
+   *
+   * @param pageParam zero-based page index, may be {@code null}
+   * @param sizeParam page size, may be {@code null}
+   * @param sortParam raw {@code sort} query parameter, may be {@code null} or blank
+   * @param allowedSortFields whitelist of sortable field names (must include {@code
+   *     defaultSortField})
+   * @param defaultSortField fallback field used when {@code sortParam} is null/blank
+   * @param ceiling the largest page size this list answers with
+   * @return a {@link Pageable} ready to hand to a repository
+   * @throws IllegalArgumentException when {@code sortParam} contains a field not in {@code
+   *     allowedSortFields}
+   */
+  public static Pageable createPageRequest(
+      Integer pageParam,
+      Integer sizeParam,
+      String sortParam,
+      Set<String> allowedSortFields,
+      String defaultSortField,
+      @NotNull PageCeiling ceiling) {
     int page = pageParam == null || pageParam < 0 ? 0 : pageParam;
-    int size =
-        sizeParam == null || sizeParam <= 0
-            ? DEFAULT_PAGE_SIZE
-            : Math.min(sizeParam, MAX_PAGE_SIZE);
+    int size = clampSize(sizeParam, ceiling);
 
     Sort sort = resolveSort(sortParam, allowedSortFields, defaultSortField);
     if (!containsProperty(sort, "id") && allowedSortFields.contains("id")) {
@@ -86,8 +130,8 @@ public final class PaginationUtil {
   }
 
   /**
-   * Builds an unsorted {@link Pageable} with the same page and size clamping, for queries that
-   * define their own {@code ORDER BY}.
+   * Builds an unsorted {@link Pageable} with the same page clamping and the {@link
+   * PageCeiling#DEFAULT} ceiling, for queries that define their own {@code ORDER BY}.
    *
    * @param pageParam zero-based page index, may be {@code null}
    * @param sizeParam page size, may be {@code null}
@@ -95,11 +139,21 @@ public final class PaginationUtil {
    */
   public static Pageable createUnsortedPageRequest(Integer pageParam, Integer sizeParam) {
     int page = pageParam == null || pageParam < 0 ? 0 : pageParam;
-    int size =
-        sizeParam == null || sizeParam <= 0
-            ? DEFAULT_PAGE_SIZE
-            : Math.min(sizeParam, MAX_PAGE_SIZE);
-    return PageRequest.of(page, size);
+    return PageRequest.of(page, clampSize(sizeParam, PageCeiling.DEFAULT));
+  }
+
+  /**
+   * Clamps a requested page size to {@code [1, ceiling]}, defaulting an absent or non-positive
+   * value to {@value #DEFAULT_PAGE_SIZE}.
+   *
+   * @param sizeParam the requested size, may be {@code null}
+   * @param ceiling the ceiling to clamp to
+   * @return the effective page size
+   */
+  private static int clampSize(Integer sizeParam, @NotNull PageCeiling ceiling) {
+    return sizeParam == null || sizeParam <= 0
+        ? DEFAULT_PAGE_SIZE
+        : Math.min(sizeParam, ceiling.getMaxSize());
   }
 
   private static boolean containsProperty(Sort sort, String property) {
