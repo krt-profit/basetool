@@ -36,7 +36,8 @@ import tools.jackson.databind.JsonNode;
 /**
  * What a generated OpenAPI document must satisfy before it is written (REQ-API-007, REQ-API-018):
  * the bearer security scheme, exactly the two anonymous operations, one domain tag and one contract
- * tier on every operation, and a per-domain operation-count floor.
+ * tier on every operation, a per-domain operation-count floor, no exchange relay path, and no
+ * dangling reference; and what the exchange's internal relay document must satisfy (REQ-XCH-039).
  */
 public final class OpenApiDocumentAssertions {
 
@@ -59,7 +60,7 @@ public final class OpenApiDocumentAssertions {
           Map.entry("blueprint", 25),
           Map.entry("catalogue", 90),
           Map.entry("dashboard", 4),
-          Map.entry("exchange", 35),
+          Map.entry("exchange", 21),
           Map.entry("hangar", 15),
           Map.entry("identity", 58),
           Map.entry("inventory", 28),
@@ -75,6 +76,9 @@ public final class OpenApiDocumentAssertions {
           Map.entry("personalinventory", 9),
           Map.entry("promotion", 34),
           Map.entry("refinery", 14));
+
+  /** The one domain of the exchange's internal relay document. */
+  public static final String RELAY_DOMAIN = "exchange";
 
   /** Not instantiable. */
   private OpenApiDocumentAssertions() {}
@@ -92,6 +96,91 @@ public final class OpenApiDocumentAssertions {
       @NotNull ContractTiers tiers,
       @NotNull Map<String, Integer> floor) {
     List<String> problems = new ArrayList<>();
+    Set<String> anonymous = new TreeSet<>();
+    Map<String, Integer> perDomain = new TreeMap<>();
+    checkDocument(document, tiers, problems, anonymous, perDomain);
+    if (!anonymous.equals(ANONYMOUS)) {
+      problems.add("the anonymous operations are " + anonymous + ", expected " + ANONYMOUS);
+    }
+    for (String path : document.path("paths").propertyNames()) {
+      if (ExchangeFence.isRelayPath(path)) {
+        problems.add(
+            path
+                + " is an exchange relay path; it belongs in the internal relay document only"
+                + " (ADR-0216)");
+      }
+    }
+    checkFloor(floor, perDomain, problems);
+    return List.copyOf(problems);
+  }
+
+  /**
+   * Lists everything the exchange's internal relay document gets wrong (REQ-XCH-039): beyond the
+   * checks of {@link #problems}, it holds only relay paths, exactly {@link
+   * ExchangeFence#RELAY_OPERATIONS} operations, all of the {@code exchange} domain and tier {@code
+   * T0}, and none of them anonymous.
+   *
+   * @param relay the relay document
+   * @param tiers the contract tier list
+   * @return one line per problem; empty when the document is sound
+   */
+  public static @NotNull @Unmodifiable List<String> relayProblems(
+      @NotNull JsonNode relay, @NotNull ContractTiers tiers) {
+    List<String> problems = new ArrayList<>();
+    Set<String> anonymous = new TreeSet<>();
+    Map<String, Integer> perDomain = new TreeMap<>();
+    checkDocument(relay, tiers, problems, anonymous, perDomain);
+    if (!anonymous.isEmpty()) {
+      problems.add("the relay document has anonymous operations " + anonymous);
+    }
+    for (Map.Entry<String, JsonNode> path : relay.path("paths").properties()) {
+      if (!ExchangeFence.isRelayPath(path.getKey())) {
+        problems.add(path.getKey() + " is not an exchange relay path");
+      }
+      for (Map.Entry<String, JsonNode> verb : path.getValue().properties()) {
+        if (VERBS.contains(verb.getKey())
+            && !ContractTiers.T0.equals(
+                verb.getValue().path(OpenApiDomainConfig.TIER_EXTENSION).asString(""))) {
+          problems.add(
+              verb.getKey().toUpperCase(Locale.ROOT)
+                  + " "
+                  + path.getKey()
+                  + " is a relay operation outside tier T0");
+        }
+      }
+    }
+    if (!perDomain.keySet().equals(Set.of(RELAY_DOMAIN))) {
+      problems.add(
+          "the relay document's domains are " + perDomain.keySet() + ", not exchange only");
+    }
+    int operations = ExchangeFence.operationCount(relay);
+    if (operations != ExchangeFence.RELAY_OPERATIONS) {
+      problems.add(
+          "the relay document has "
+              + operations
+              + " operations, expected exactly "
+              + ExchangeFence.RELAY_OPERATIONS
+              + "; the relay surface is frozen (D-05)");
+    }
+    return List.copyOf(problems);
+  }
+
+  /**
+   * Checks what both documents share: the security scheme and requirement, every operation's tag,
+   * domain and tier, the tag list, and that every reference resolves.
+   *
+   * @param document the document
+   * @param tiers the contract tier list
+   * @param problems the accumulator
+   * @param anonymous collects the operations that declare {@code security: []}
+   * @param perDomain collects the operation count per domain
+   */
+  private static void checkDocument(
+      JsonNode document,
+      ContractTiers tiers,
+      List<String> problems,
+      Set<String> anonymous,
+      Map<String, Integer> perDomain) {
     JsonNode scheme = document.path("components").path("securitySchemes").path("bearer-jwt");
     if (!"http".equals(scheme.path("type").asString(""))
         || !"bearer".equals(scheme.path("scheme").asString(""))
@@ -103,9 +192,7 @@ public final class OpenApiDocumentAssertions {
       problems.add("the document-wide security requirement is not exactly bearer-jwt");
     }
 
-    Set<String> anonymous = new TreeSet<>();
     Set<String> usedDomains = new TreeSet<>();
-    Map<String, Integer> perDomain = new TreeMap<>();
     for (Map.Entry<String, JsonNode> path : document.path("paths").properties()) {
       for (Map.Entry<String, JsonNode> verb : path.getValue().properties()) {
         if (!VERBS.contains(verb.getKey())) {
@@ -120,15 +207,25 @@ public final class OpenApiDocumentAssertions {
         checkTags(key, operation, tiers, problems, usedDomains, perDomain);
       }
     }
-    if (!anonymous.equals(ANONYMOUS)) {
-      problems.add("the anonymous operations are " + anonymous + ", expected " + ANONYMOUS);
-    }
 
     Set<String> declared = new TreeSet<>();
     document.path("tags").forEach(tag -> declared.add(tag.path("name").asString("")));
     if (!declared.equals(usedDomains)) {
       problems.add("the document's tag list " + declared + " is not the domains " + usedDomains);
     }
+    ExchangeFence.danglingReferences(document)
+        .forEach(reference -> problems.add("the document lacks the component " + reference));
+  }
+
+  /**
+   * Checks each domain's operation count against its floor.
+   *
+   * @param floor the per-domain operation-count floor
+   * @param perDomain the counted operations per domain
+   * @param problems the accumulator
+   */
+  private static void checkFloor(
+      Map<String, Integer> floor, Map<String, Integer> perDomain, List<String> problems) {
     floor.forEach(
         (domain, minimum) -> {
           int count = perDomain.getOrDefault(domain, 0);
@@ -143,7 +240,6 @@ public final class OpenApiDocumentAssertions {
                     + "; lower the floor in the same change if they moved deliberately");
           }
         });
-    return List.copyOf(problems);
   }
 
   /**

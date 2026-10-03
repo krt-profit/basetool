@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,20 +28,16 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
- * Verifies what the committed {@code openapi.json} states about who may call each operation: every
- * security requirement names a defined scheme, and exactly the operations that answer without a
- * token declare {@code security: []} (REQ-SEC-052).
+ * Verifies what the committed {@code openapi.json} and relay document state about who may call each
+ * operation: every security requirement names a defined scheme, and exactly the operations that
+ * answer without a token declare {@code security: []} (REQ-SEC-052).
  *
  * <p>Reads the committed document from the classpath, since that is what downstream clients
  * consume.
  */
 class OpenApiAnonymousOperationsTest {
-
-  /** The committed document, as it ships. */
-  private static final String OPENAPI_RESOURCE = "/api/openapi.json";
 
   /**
    * The operations REQ-SEC-052 serves without a token, spelled {@code METHOD path}.
@@ -59,20 +54,12 @@ class OpenApiAnonymousOperationsTest {
       List.of("get", "put", "post", "delete", "options", "head", "patch", "trace");
 
   /**
-   * Reads the committed document.
+   * Reads the committed documents, the published one and the exchange's relay document, as one.
    *
-   * @return the parsed document
+   * @return the joined document
    */
   private static JsonNode openapi() {
-    try (InputStream in =
-        OpenApiAnonymousOperationsTest.class.getResourceAsStream(OPENAPI_RESOURCE)) {
-      assertThat(in)
-          .as("the committed %s must be on the test classpath", OPENAPI_RESOURCE)
-          .isNotNull();
-      return new ObjectMapper().readTree(in);
-    } catch (Exception e) {
-      throw new IllegalStateException("could not read " + OPENAPI_RESOURCE, e);
-    }
+    return CommittedOpenApi.merged();
   }
 
   /**

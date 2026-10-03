@@ -9,7 +9,8 @@
 - **Date:** 2026-09-26
 - **Deciders:** @greluc
 - **Amended:** 2026-09-28 (twice, see below); 2026-10-02 — the relay surface is the exchange's
-  internal published API, with its own internal OpenAPI document (see the last Amendment section)
+  internal published API, with its own internal OpenAPI document (see the last Amendment section;
+  all three points of it implemented by 2026-10-03, the document as REQ-XCH-039)
 - **Related:** spec [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-001`…) ·
   [`desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-001`, `-010`, `-011`, `-012`) ·
   [ADR-0217](0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md) ·
@@ -131,3 +132,14 @@ byte-identical while the rest of `/api/v1` is re-cut:
 - A backend wire-contract test against the published schemas and fixtures and a parity test for
   every identifier the gateway and the backend share guard it; the refinery draft route gets its own
   request DTO instead of reusing the web import's.
+
+**Implemented 2026-10-03** (REQ-XCH-036…039). The internal document is
+`backend/src/main/resources/api/exchange-relay.openapi.json`: the 14 relay operations, the 64
+schemas and the headers they reach, all of tier `T0`. `OpenApiGeneratorTest` splits it off the one
+model springdoc generates — a filter of the full model, not a springdoc group, so schemas are never
+duplicated and nothing falls between groups — and `openapi.json` keeps every other operation and
+every schema they still reach (48 schemas left it). Both documents get the same staleness check: the
+generator rewrites a stale one locally and fails in CI. The previous-release comparison reads both
+documents of a release, and fails when the baseline does not document every `T0` operation. Only
+the committed document is fenced: the runtime `/v3/api-docs` still describes the full model, as
+before — ADMIN-only and switched off in production.

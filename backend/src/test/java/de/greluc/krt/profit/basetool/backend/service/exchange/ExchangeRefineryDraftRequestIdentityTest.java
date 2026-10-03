@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service.exchange;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.api.CommittedOpenApi;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeRefineryDraftRequest;
@@ -62,14 +63,12 @@ import tools.jackson.databind.node.ObjectNode;
  * extract it replaced on the frozen route (REQ-XCH-038): the same components, types and
  * constraints, the same JSON after a round trip of every published fixture and of every one-field
  * mutation of them, the same validation outcome, the same extract handed to the import, and the
- * same schema in the committed OpenAPI document.
+ * same schema in the committed published and relay OpenAPI documents.
  */
 @SpringBootTest
 class ExchangeRefineryDraftRequestIdentityTest {
 
   private static final Path FIXTURES = Path.of("../docs/exchange/examples/v1/refinery-draft");
-
-  private static final Path OPENAPI = Path.of("src/main/resources/api/openapi.json");
 
   private static final String FULL_EXTRACT =
       """
@@ -122,16 +121,19 @@ class ExchangeRefineryDraftRequestIdentityTest {
 
   @Test
   void theCommittedOpenApiDocumentDescribesBothRequestsAlike() throws IOException {
-    JsonNode document = mapper.readTree(Files.readString(OPENAPI, StandardCharsets.UTF_8));
+    JsonNode published =
+        mapper.readTree(Files.readString(CommittedOpenApi.PUBLISHED_FILE, StandardCharsets.UTF_8));
+    JsonNode relay =
+        mapper.readTree(Files.readString(CommittedOpenApi.RELAY_FILE, StandardCharsets.UTF_8));
     JsonNode exchange =
-        document.at("/paths/~1api~1v1~1exchange~1me~1drafts~1refinery-orders/post/requestBody");
+        relay.at("/paths/~1api~1v1~1exchange~1me~1drafts~1refinery-orders/post/requestBody");
     JsonNode web =
-        document.at("/paths/~1api~1v1~1refinery-orders~1import-extract/post/requestBody");
+        published.at("/paths/~1api~1v1~1refinery-orders~1import-extract/post/requestBody");
     assertThat(exchange.at("/content/application~1json/schema/$ref").asString())
         .isEqualTo("#/components/schemas/ExchangeRefineryDraftRequest");
     assertThat(web.at("/content/application~1json/schema/$ref").asString())
         .isEqualTo("#/components/schemas/RefineryExtractDto");
-    assertThat(inline(document, exchange)).isEqualTo(inline(document, web));
+    assertThat(inline(relay, exchange)).isEqualTo(inline(published, web));
   }
 
   /**

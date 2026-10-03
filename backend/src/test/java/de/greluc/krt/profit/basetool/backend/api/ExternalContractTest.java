@@ -2070,6 +2070,12 @@ class ExternalContractTest {
   private static final String BASELINE_PROPERTY = "contract.baseline";
 
   /**
+   * System property naming the previous release's exchange relay document; set by the build, read
+   * only when the file exists, since a release before the fence has none (REQ-XCH-039).
+   */
+  private static final String RELAY_BASELINE_PROPERTY = "contract.baseline.relay";
+
+  /**
    * System property that turns a missing baseline into a failure; the build sets it from {@code
    * CONTRACT_BASELINE_REQUIRED}, which CI sets.
    */
@@ -2191,13 +2197,19 @@ class ExternalContractTest {
             + " required here; the frozen record in theContractTypesAndNullabilityAreFrozen covers"
             + " this run");
 
-    JsonNode previous = new ObjectMapper().readTree(Files.readString(baseline));
+    JsonNode previousPublished = new ObjectMapper().readTree(Files.readString(baseline));
+    String relayBaseline = System.getProperty(RELAY_BASELINE_PROPERTY);
+    JsonNode previousRelay =
+        relayBaseline != null && Files.isReadable(Path.of(relayBaseline))
+            ? new ObjectMapper().readTree(Files.readString(Path.of(relayBaseline)))
+            : null;
+    JsonNode previous = previousRelease(previousPublished, previousRelay);
     assertThat(contractSignatures(previous))
         .as("the baseline document yielded no contract signatures, so this case proves nothing")
         .isNotEmpty();
 
     Map<DeclaredBreaks.Break, String> found =
-        DeclaredBreaks.between(previous, openapi(), comparedOperations(previous));
+        DeclaredBreaks.between(previous, CommittedOpenApi.merged(), comparedOperations(previous));
 
     assertThat(DeclaredBreaks.undeclared(found, ledger()))
         .as(
@@ -2231,6 +2243,61 @@ class ExternalContractTest {
 
     Path present = Files.writeString(tempDir.resolve("present.json"), "{}");
     assertThat(requiredBaseline(present.toString(), true)).isEqualTo(present);
+  }
+
+  /**
+   * Verifies that the previous-release comparison covers every {@code T0} operation: a release
+   * whose relay operations live in its internal relay document is compared only together with that
+   * document, so a baseline without it fails instead of skipping the exchange (REQ-XCH-039).
+   */
+  @Test
+  @DisplayName("a previous release is compared with its relay document, or the comparison fails")
+  void aPreviousReleaseWithoutItsRelayDocumentFails() {
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode full = CommittedOpenApi.merged();
+    ExchangeFence.Split split = ExchangeFence.split(full);
+
+    assertThat(previousRelease(full, null).path("paths").propertyNames())
+        .as("a release before the fence carried the relay in its published document")
+        .contains("/api/v1/exchange/me/stock");
+    assertThat(previousRelease(split.published(), split.relay()).path("paths").propertyNames())
+        .contains("/api/v1/exchange/me/stock", "/api/v1/live-sync/stream");
+    assertThatThrownBy(() -> previousRelease(split.published(), null))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("GET /api/v1/exchange/me/stock");
+    assertThatThrownBy(() -> previousRelease(mapper.readTree("{\"paths\":{}}"), split.relay()))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("GET /api/v1/live-sync/stream");
+  }
+
+  /**
+   * Joins a previous release's published document with its relay document, when it has one, and
+   * requires the result to document every {@code T0} operation.
+   *
+   * @param published the previous release's {@code openapi.json}
+   * @param relay the previous release's relay document, or {@code null} for a release before the
+   *     fence
+   * @return the document the comparison reads
+   * @throws AssertionError naming the {@code T0} operations the baseline does not document
+   */
+  static JsonNode previousRelease(JsonNode published, @Nullable JsonNode relay) {
+    JsonNode previous = relay == null ? published : ExchangeFence.merge(published, relay);
+    Set<String> missing = new TreeSet<>();
+    for (String operation : TIER_ZERO) {
+      String[] parts = operation.split(" ", 2);
+      if (OpenApiWalk.operation(previous, parts[1], parts[0]).isMissingNode()) {
+        missing.add(operation);
+      }
+    }
+    if (!missing.isEmpty()) {
+      throw new AssertionError(
+          "the previous-release baseline does not document the T0 operations "
+              + missing
+              + ", so the comparison would skip them. The CI step 'Fetch the previous release's"
+              + " API contract' writes the relay document to"
+              + " backend/build/contract-baseline/exchange-relay.openapi.json");
+    }
+    return previous;
   }
 
   /**
@@ -2317,7 +2384,7 @@ class ExternalContractTest {
             ContractTiers.RESOURCE)
         .isEqualTo(frozenMinusTierZero);
 
-    JsonNode document = openapi();
+    JsonNode document = CommittedOpenApi.merged();
     List<String> wrongTier = new ArrayList<>();
     for (Map.Entry<String, JsonNode> path : document.path("paths").properties()) {
       for (Map.Entry<String, JsonNode> verb : path.getValue().properties()) {

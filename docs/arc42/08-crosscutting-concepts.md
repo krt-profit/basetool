@@ -136,7 +136,10 @@ Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every 
 reviewed catalogue lists opt out to 100 000), UTC everywhere, and a committed
 `openapi.json` per REST-serving module — generated with sorted keys by each module's
 `OpenApiGeneratorTest`, and CI fails a pull request whose committed document differs from the one
-its build generated.
+its build generated. The backend's generator splits the exchange relay surface (`/api/v1/exchange/**`,
+tier T0) off into its own internal document, `exchange-relay.openapi.json`, with the same staleness
+check; `openapi.json` is what the app and the frontend read, the relay document is read only by the
+contract guards and served to no one (REQ-XCH-039, ADR-0216).
 
 A breaking change is a **hard cut**, not a second version: every operation carries a contract tier
 (T0 never breaks, T1 is what a released app calls and breaks only in a declared wave with a forced

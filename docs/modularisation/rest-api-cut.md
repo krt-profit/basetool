@@ -861,7 +861,10 @@ what wave 1 already needs.
   document.
 - **The exchange fence.** `/api/v1/exchange/**` moves into its own internal OpenAPI document with its
   own staleness check (ADR-0216 amendment); G-18 adds the backend wire-contract test against the 28
-  published schemas and 101 fixtures and the parity tests for every shared identifier.
+  published schemas and 101 fixtures and the parity tests for every shared identifier. *Done
+  2026-10-03:* `backend/src/main/resources/api/exchange-relay.openapi.json`, split off the generated
+  model by `OpenApiGeneratorTest` — 14 operations and 64 schemas, 48 of which left `openapi.json`
+  (REQ-XCH-039).
 
 ## Wave order
 

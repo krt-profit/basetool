@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Eigenes internes OpenAPI-Dokument für die Exchange-Relay-Schnittstelle.** Die 14 Operationen
+  unter `/api/v1/exchange/**` stehen jetzt in `exchange-relay.openapi.json` mit eigener
+  Aktualitätsprüfung statt in `openapi.json`; der Vergleich mit dem letzten Release prüft beide
+  Dokumente. Keine Verhaltensänderung (REQ-XCH-039).
+
 - **Aufträge: Qualitätsstufen als pflegbarer Katalog.** Admins legen Stufen mit Code, Mindestqualität
   und deutscher/englischer Bezeichnung unter „Qualitätsstufen“ an; neue Stufen brauchen kein Release.
   „Keine“ und „Gut (650+)“ bleiben unverändert (REQ-ORDERS-036, ADR-0241, Migration V261–V264).
