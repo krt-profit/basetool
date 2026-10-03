@@ -97,8 +97,13 @@ function applyBulkSelectionToLoaded(root) {
     });
 }
 
+/**
+ * Shows the selection bar while anything is selected, writes its count and syncs the group boxes.
+ */
 function updateBulkCheckoutState() {
     const count = bulkSelectedIds.size;
+    const bar = document.getElementById('bulkCheckoutBar');
+    if (bar) bar.hidden = count === 0;
     const btn = /** @type {HTMLButtonElement | null} */ (
         document.getElementById('bulkCheckoutBtn')
     );
@@ -116,7 +121,7 @@ function updateBulkCheckoutState() {
         const stolenBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById(id));
         if (stolenBtn) stolenBtn.disabled = count === 0;
     });
-    if (countSpan) countSpan.textContent = count > 0 ? '(' + count + ')' : '';
+    if (countSpan) countSpan.textContent = String(count);
     /** @type {NodeListOf<HTMLInputElement>} */ (
         document.querySelectorAll('.group-select-all')
     ).forEach(function (groupCb) {
@@ -196,8 +201,8 @@ function fetchAllMatchingEntryIds() {
         document.getElementById('minQuality')
     );
     const minQuality = minQualitySelect ? minQualitySelect.value : '';
-    const personalOnly = personalFlagChecked('personalOnly', 'itemPersonalOnly');
-    const nonPersonalOnly = personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly');
+    const personalOnly = personalScopeIs('personal');
+    const nonPersonalOnly = personalScopeIs('shared');
 
     const url = new URL(window.location.origin + '/inventory/my/entry-ids');
     if (itemsView) url.searchParams.append('view', 'items');
@@ -346,7 +351,7 @@ function refreshBulkRebookOrgUnitPicker() {
     if (!wrapper || !select) return;
     const mode = bulkRebookMode();
     select.innerHTML = '';
-    wrapper.style.display = 'none';
+    wrapper.hidden = true;
     if (mode === 'PERSONALIZE') return;
     const userSelect = /** @type {HTMLInputElement | null} */ (
         document.getElementById('bulkRebookTargetUserId')
@@ -371,10 +376,10 @@ function refreshBulkRebookOrgUnitPicker() {
                 o.textContent = opt.orgUnitName;
                 select.appendChild(o);
             });
-            wrapper.style.display = 'block';
+            wrapper.hidden = false;
         })
         .catch(function () {
-            wrapper.style.display = 'none';
+            wrapper.hidden = true;
         });
 }
 
@@ -382,9 +387,9 @@ function toggleBulkRebookMode() {
     const mode = bulkRebookMode();
     const transferFields = document.getElementById('bulkRebookTransferFields');
     const hint = document.getElementById('bulkRebookPersonalHint');
-    if (transferFields) transferFields.style.display = mode === 'LOCATION' ? 'block' : 'none';
+    if (transferFields) transferFields.hidden = mode !== 'LOCATION';
     if (hint) {
-        hint.classList.toggle('krtm-hidden', mode === 'LOCATION');
+        hint.hidden = mode === 'LOCATION';
         if (mode === 'PERSONALIZE') hint.textContent = bulkRebookI18n.hintPersonalize;
         else if (mode === 'DEPERSONALIZE') hint.textContent = bulkRebookI18n.hintDepersonalize;
     }
@@ -534,36 +539,37 @@ function myCheckbox(id) {
 }
 
 /**
- * Clears the counterpart of a checked personal-flag filter and re-runs the filter.
+ * The visibility segment of the toolbar: '' for all entries, 'personal' or 'shared'.
  *
- * @param {HTMLElement} el the toggled checkbox
+ * @returns {string} the selected scope
  */
-function togglePersonalFilter(el) {
-    const box = /** @type {HTMLInputElement} */ (el);
-    if (box && box.checked) {
-        /** @type {Record<string, string>} */
-        const counterparts = {
-            personalOnly: 'nonPersonalOnly',
-            nonPersonalOnly: 'personalOnly',
-            itemPersonalOnly: 'itemNonPersonalOnly',
-            itemNonPersonalOnly: 'itemPersonalOnly',
-        };
-        const other = myCheckbox(counterparts[box.id]);
-        if (other) other.checked = false;
-    }
-    filterMyInventory();
+function myPersonalScope() {
+    const checked = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="personalScope"]:checked')
+    );
+    return checked ? checked.value : '';
 }
 
 /**
- * Whether the personal-flag checkbox of the active view is checked.
+ * Selects one option of the visibility segment, when the page renders it.
  *
- * @param {string} materialId the material view's checkbox id
- * @param {string} itemId the items view's checkbox id
+ * @param {string} scope '', 'personal' or 'shared'
+ */
+function setMyPersonalScope(scope) {
+    const radio = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="personalScope"][value="' + scope + '"]')
+    );
+    if (radio) radio.checked = true;
+}
+
+/**
+ * Whether the visibility segment narrows the view to personal or to shared entries.
+ *
+ * @param {string} scope 'personal' or 'shared'
  * @returns {boolean} the flag
  */
-function personalFlagChecked(materialId, itemId) {
-    const el = myCheckbox(materialId) || myCheckbox(itemId);
-    return el ? el.checked : false;
+function personalScopeIs(scope) {
+    return myPersonalScope() === scope;
 }
 
 /**
@@ -647,8 +653,8 @@ function snapshotMyInventoryFilters() {
             gameItems: myInventoryFilterSelection('gameItemCheck'),
             locations: myInventoryFilterSelection('locCheck'),
             jobOrders: myInventoryFilterSelection('jobOrderCheck'),
-            personalOnly: personalFlagChecked('personalOnly', 'itemPersonalOnly'),
-            nonPersonalOnly: personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly'),
+            personalOnly: personalScopeIs('personal'),
+            nonPersonalOnly: personalScopeIs('shared'),
             stolen: myStolenFilterValue(),
         };
     }
@@ -661,8 +667,8 @@ function snapshotMyInventoryFilters() {
         minQuality: minQualitySelect ? minQualitySelect.value : '',
         jobOrders: myInventoryFilterSelection('jobOrderCheck'),
         missions: myInventoryFilterSelection('missionCheck'),
-        personalOnly: personalFlagChecked('personalOnly', 'itemPersonalOnly'),
-        nonPersonalOnly: personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly'),
+        personalOnly: personalScopeIs('personal'),
+        nonPersonalOnly: personalScopeIs('shared'),
         stolen: myStolenFilterValue(),
     };
 }
@@ -729,18 +735,12 @@ function restoreMyInventoryFilters() {
     families.forEach(function (f) {
         if (applyMySavedSelection(f[0], f[1], f[2], f[3])) changed = true;
     });
-    const personalBox =
-        /** @type {HTMLInputElement | null} */ (document.getElementById('personalOnly')) ||
-        /** @type {HTMLInputElement | null} */ (document.getElementById('itemPersonalOnly'));
-    const nonPersonalBox =
-        /** @type {HTMLInputElement | null} */ (document.getElementById('nonPersonalOnly')) ||
-        /** @type {HTMLInputElement | null} */ (document.getElementById('itemNonPersonalOnly'));
-    if (personalBox && saved.personalOnly === true) {
-        personalBox.checked = true;
-        changed = true;
-    } else if (nonPersonalBox && saved.nonPersonalOnly === true) {
-        nonPersonalBox.checked = true;
-        changed = true;
+    if (saved.personalOnly === true) {
+        setMyPersonalScope('personal');
+        changed = personalScopeIs('personal') || changed;
+    } else if (saved.nonPersonalOnly === true) {
+        setMyPersonalScope('shared');
+        changed = personalScopeIs('shared') || changed;
     }
     const stolenSelect = myStolenFilterSelect();
     if (stolenSelect && (saved.stolen === 'non' || saved.stolen === 'only')) {
@@ -757,8 +757,6 @@ function countActiveMyInventoryFilters() {
         if (Array.isArray(snapshot[dimension]) && snapshot[dimension].length > 0) active++;
     });
     if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
-    if (snapshot.personalOnly === true) active++;
-    if (snapshot.nonPersonalOnly === true) active++;
     if (snapshot.stolen === 'non' || snapshot.stolen === 'only') active++;
     return active;
 }
@@ -767,6 +765,7 @@ function filterMyInventory() {
     clearBulkSelection();
     persistMyInventoryFilters();
     if (window.krtFilterPanel) window.krtFilterPanel.refresh('myFilterPanel');
+    if (window.krtFilterChips) window.krtFilterChips.refresh();
     const itemsView = myLager.lagerIsItemsView();
     const activeMaterials = myLager.collectChecked('matCheck');
     const activeGameItems = myLager.collectChecked('gameItemCheck');
@@ -777,8 +776,8 @@ function filterMyInventory() {
         document.getElementById('minQuality')
     );
     const minQuality = minQualitySelect ? minQualitySelect.value : '';
-    const personalOnly = personalFlagChecked('personalOnly', 'itemPersonalOnly');
-    const nonPersonalOnly = personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly');
+    const personalOnly = personalScopeIs('personal');
+    const nonPersonalOnly = personalScopeIs('shared');
     const stolenFilter = myStolenFilterValue();
 
     const container = document.getElementById('myInventoryTableContainer');
@@ -852,12 +851,7 @@ function resetMyInventoryFilter() {
         document.getElementById('minQuality')
     );
     if (minQualitySelect) minQualitySelect.value = '';
-    ['personalOnly', 'nonPersonalOnly', 'itemPersonalOnly', 'itemNonPersonalOnly'].forEach(
-        function (id) {
-            const el = myCheckbox(id);
-            if (el) el.checked = false;
-        },
-    );
+    setMyPersonalScope('');
     const stolenSelect = myStolenFilterSelect();
     if (stolenSelect) stolenSelect.value = '';
     if (document.getElementById('materialHeader'))
@@ -971,7 +965,15 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtFilterPanel.registerCounter('myFilterPanel', countActiveMyInventoryFilters);
         window.krtFilterPanel.refresh('myFilterPanel');
     }
+    if (window.krtFilterChips) window.krtFilterChips.refresh();
     if (filtersRestored) filterMyInventory();
+});
+
+document.addEventListener('change', function (event) {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.name === 'personalScope') {
+        filterMyInventory();
+    }
 });
 
 let umbuchenItemId = null;
@@ -990,7 +992,7 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     );
     if (!wrapper || !select) return;
     select.innerHTML = '';
-    wrapper.style.display = 'none';
+    wrapper.hidden = true;
     if (!ownerId) return;
     fetch('/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
@@ -1015,10 +1017,10 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
             ) {
                 select.value = umbuchenCurrentOwningOrgUnitId;
             }
-            wrapper.style.display = 'block';
+            wrapper.hidden = false;
         })
         .catch(function () {
-            wrapper.style.display = 'none';
+            wrapper.hidden = true;
         });
 }
 
@@ -1037,13 +1039,13 @@ function toggleUmbuchenMode() {
     );
     if (!transferFields || !personalFields || !targetUser || !targetLocation) return;
     if (mode === 'PERSONAL') {
-        transferFields.style.display = 'none';
-        personalFields.style.display = 'block';
+        transferFields.hidden = true;
+        personalFields.hidden = false;
         targetUser.required = false;
         targetLocation.required = false;
     } else {
-        transferFields.style.display = 'block';
-        personalFields.style.display = 'none';
+        transferFields.hidden = false;
+        personalFields.hidden = true;
         targetUser.required = true;
         targetLocation.required = true;
     }
@@ -1088,7 +1090,7 @@ function openUmbuchenModal(
         document.getElementById('umbuchenMergeStock')
     );
     if (mergeCheckbox) mergeCheckbox.checked = false;
-    if (mergeRow) mergeRow.classList.toggle('krtm-hidden', !isScu);
+    if (mergeRow) mergeRow.hidden = !isScu;
 
     amountEl.value = amount ?? '';
     amountEl.max = amount ?? '';
@@ -1130,12 +1132,12 @@ function openUmbuchenModal(
             ? umbuchenI18n.hintPersonalize
             : umbuchenI18n.hintDepersonalize;
     const personalDisabled = personalizing && hasAssoc;
-    if (personalLabel) personalLabel.style.display = personalDisabled ? 'none' : '';
+    if (personalLabel) personalLabel.hidden = personalDisabled;
     if (!personalizing) {
         refreshUmbuchenPersonalOrgUnitPicker(userId);
     } else {
         const w = document.getElementById('umbuchenPersonalOrgUnitWrapper');
-        if (w) w.style.display = 'none';
+        if (w) w.hidden = true;
     }
 
     const locationMode = /** @type {HTMLInputElement | null} */ (
@@ -1306,7 +1308,7 @@ function openOrgUnitChangeModal(el) {
     if (msgEl) msgEl.textContent = orgUnitChangeI18n.messageSingle;
     const mergeRow = document.getElementById('orgUnitChangeMergeRow');
     if (mergeRow) {
-        mergeRow.style.display = el.getAttribute('data-quantity-type') === 'SCU' ? '' : 'none';
+        mergeRow.hidden = el.getAttribute('data-quantity-type') !== 'SCU';
     }
     resetOrgUnitChangeMerge();
     fillOrgUnitChangePicker(el.getAttribute('data-owning-org-unit-id') || null);
@@ -1324,7 +1326,7 @@ function openBulkOrgUnitChangeModal() {
     const msgEl = document.getElementById('orgUnitChangeMessage');
     if (msgEl) msgEl.textContent = orgUnitChangeI18n.messageBulk.replace('{0}', String(ids.length));
     const mergeRow = document.getElementById('orgUnitChangeMergeRow');
-    if (mergeRow) mergeRow.style.display = '';
+    if (mergeRow) mergeRow.hidden = false;
     resetOrgUnitChangeMerge();
     fillOrgUnitChangePicker(null);
     setMyDisplay('orgUnitChangeModal', 'flex');
@@ -1495,8 +1497,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         filterMyInventory();
     });
     window.krtEvents.on('change', 'inv-my-filter', filterMyInventory);
-    window.krtEvents.on('change', 'inv-my-personal-filter', togglePersonalFilter);
     window.krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
+    window.krtEvents.on('click', 'inv-my-clear-selection', clearBulkSelection);
     window.krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
     window.krtEvents.on('change', 'inv-my-toggle-group-cb', function (el) {
         toggleGroupCheckboxes(el);

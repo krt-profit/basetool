@@ -336,8 +336,42 @@ public class InventoryPageController {
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "inventory-material :: inventoryMaterialResults";
     }
-    model.addAttribute("materials", fetchMaterials());
+    List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto> materials =
+        fetchMaterials();
+    model.addAttribute("materials", materials);
+    model.addAttribute("materialName", drilldownMaterialName(materialId, items, materials));
     return "inventory-material";
+  }
+
+  /**
+   * Names the drilled-into material for the page head: the first row's material, else the catalog
+   * entry with the id.
+   *
+   * @param materialId the drilled-into material
+   * @param items the rows of the current page
+   * @param materials the material catalog
+   * @return the material's name, or {@code null} when neither source knows it
+   */
+  @Nullable
+  private static String drilldownMaterialName(
+      @NotNull UUID materialId,
+      @NotNull List<InventoryItemDto> items,
+      @NotNull
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto> materials) {
+    return items.stream()
+        .map(InventoryItemDto::material)
+        .filter(java.util.Objects::nonNull)
+        .map(de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto::name)
+        .filter(java.util.Objects::nonNull)
+        .findFirst()
+        .or(
+            () ->
+                materials.stream()
+                    .filter(m -> materialId.equals(m.id()))
+                    .map(
+                        de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto::name)
+                    .findFirst())
+        .orElse(null);
   }
 
   /**
