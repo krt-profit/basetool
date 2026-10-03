@@ -26,13 +26,15 @@ import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -69,52 +71,81 @@ class WebClientHttp2NegotiationTest {
   private static final Duration HOLD = Duration.ofMillis(400);
 
   /** The ALPN protocol the server saw on the connection that carried the last request. */
-  private final AtomicReference<String> negotiated = new AtomicReference<>("none");
+  private static final AtomicReference<String> negotiated = new AtomicReference<>("none");
 
   /**
    * The distinct peer addresses the server saw, which counts the TCP connections opened on both
    * protocols.
    */
-  private final Set<SocketAddress> peers = ConcurrentHashMap.newKeySet();
+  private static final Set<SocketAddress> peers = ConcurrentHashMap.newKeySet();
 
-  private DisposableServer server;
+  private static DisposableServer server;
 
-  @BeforeEach
-  void startServer() {
-    negotiated.set("none");
-    peers.clear();
-    server =
-        HttpServer.create()
-            .host("127.0.0.1")
-            .port(0)
-            .protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
-            .secure(
-                spec ->
-                    spec.sslContext(
-                        (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
-                            Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
-            .handle(
-                (request, response) -> {
-                  request.withConnection(
-                      connection -> {
-                        negotiated.set(
-                            WebClientTestSupport.applicationProtocol(connection.channel()));
-                        peers.add(connection.channel().remoteAddress());
-                      });
-                  Mono<String> body = Mono.just("ok");
-                  if (SLOW_PATH.equals(request.path()) || request.uri().endsWith(SLOW_PATH)) {
-                    body = body.delayElement(HOLD);
-                  }
-                  return response.header("Content-Type", "text/plain").sendString(body);
-                })
-            .bindNow();
+  /**
+   * Addresses the clients to the local server, the only origin they send to.
+   *
+   * @param registry the dynamic property registry
+   */
+  @DynamicPropertySource
+  static void backendUrl(DynamicPropertyRegistry registry) {
+    registry.add("app.backend-url", () -> "https://127.0.0.1:" + server().port());
   }
 
-  @AfterEach
-  void stopServer() {
+  @BeforeEach
+  void resetObservations() {
+    negotiated.set("none");
+    peers.clear();
+  }
+
+  @AfterAll
+  static void stopServer() {
     if (server != null) {
       server.disposeNow(Duration.ofSeconds(10));
+      server = null;
     }
+  }
+
+  /**
+   * Binds the TLS server on first use, so the context can read its port.
+   *
+   * @return the bound server
+   */
+  private static synchronized DisposableServer server() {
+    if (server == null) {
+      server = bind();
+    }
+    return server;
+  }
+
+  /**
+   * Binds a TLS server offering h2 and HTTP/1.1 that records the protocol and peer of every call.
+   *
+   * @return the bound server
+   */
+  private static DisposableServer bind() {
+    return HttpServer.create()
+        .host("127.0.0.1")
+        .port(0)
+        .protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
+        .secure(
+            spec ->
+                spec.sslContext(
+                    (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
+                        Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
+        .handle(
+            (request, response) -> {
+              request.withConnection(
+                  connection -> {
+                    negotiated.set(WebClientTestSupport.applicationProtocol(connection.channel()));
+                    peers.add(connection.channel().remoteAddress());
+                  });
+              Mono<String> body = Mono.just("ok");
+              if (SLOW_PATH.equals(request.path()) || request.uri().endsWith(SLOW_PATH)) {
+                body = body.delayElement(HOLD);
+              }
+              return response.header("Content-Type", "text/plain").sendString(body);
+            })
+        .bindNow();
   }
 
   @Test
@@ -175,12 +206,12 @@ class WebClientHttp2NegotiationTest {
   }
 
   /**
-   * The absolute URI of the route that holds its response.
+   * The path of the route that holds its response.
    *
-   * @return the slow probe URI on the ephemeral port the server bound
+   * @return the slow probe path, resolved against the clients' base URL
    */
-  private java.net.URI slowUri() {
-    return java.net.URI.create("https://127.0.0.1:" + server.port() + "/" + SLOW_PATH);
+  private static String slowUri() {
+    return "/" + SLOW_PATH;
   }
 
   /**
@@ -199,11 +230,11 @@ class WebClientHttp2NegotiationTest {
   }
 
   /**
-   * The absolute URI of the local probe endpoint, overriding the clients' {@code baseUrl}.
+   * The path of the local probe endpoint.
    *
-   * @return the probe URI on the ephemeral port the server bound
+   * @return the probe path, resolved against the clients' base URL
    */
-  private java.net.URI uri() {
-    return java.net.URI.create("https://127.0.0.1:" + server.port() + "/probe");
+  private static String uri() {
+    return "/probe";
   }
 }

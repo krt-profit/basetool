@@ -1,0 +1,30 @@
+=== request
+GET /exchange/v1
+=== relayed
+GET /api/v1/exchange/me/installation
+accept: application/json, application/problem+json
+accept-encoding: gzip, deflate
+authorization: Bearer gateway-service-token
+traceparent: <trace>
+x-correlation-id: <correlation-id>
+x-exchange-capabilities: exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.stock.read,exchange.stock.write
+x-exchange-client: versekit
+x-exchange-connected-at: <connected-at>
+x-exchange-installation: <thumbprint>
+x-ingest-on-behalf-of: 6f1c2e7a-3b4d-4c5e-8f60-718293a4b5c6
+=== response
+200
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+content-type: application/json
+dpop-nonce: <dpop-nonce>
+expires: 0
+pragma: no-cache
+ratelimit: limit=1000, remaining=<remaining>, reset=<reset>
+ratelimit-policy: 1000;w=60
+vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+x-content-type-options: nosniff
+x-correlation-id: <correlation-id>
+x-frame-options: DENY
+x-xss-protection: 0
+{"apiVersion":"1.0","capabilities":["exchange.blueprints.read","exchange.blueprints.write","exchange.connect","exchange.demand.read","exchange.drafts.blueprints","exchange.drafts.refinery","exchange.hangar.read","exchange.hangar.write","exchange.stock.read","exchange.stock.write"],"installationId":"inst-7f3c2a9e","limits":{"batchMaxOps":500,"requestsPerMinute":1000},"deprecations":[],"docsUrl":"https://krt-profit.github.io/basetool/","minClientVersion":"2.0.0"}

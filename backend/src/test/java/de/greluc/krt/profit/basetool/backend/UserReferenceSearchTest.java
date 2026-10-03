@@ -35,7 +35,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,7 +47,6 @@ import org.springframework.web.context.WebApplicationContext;
  * roles, no membership flags, so nothing a peer view would have to redact.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class UserReferenceSearchTest {
 

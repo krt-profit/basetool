@@ -25,7 +25,10 @@ directly and lost `BackendApiClient`'s error mapping: an expired refresh token a
 instead of the re-authentication flow, and the failure was not counted. Since 2026-10-01 they call
 `BackendApiClient#execute` (same bean, same request shapes), and
 `ArchitectureTest#noControllerHoldsARawWebClient` keeps controllers off the raw client; the
-notification page's SSE relay is the one exception.
+notification page's SSE relay is the one exception. Since 2026-10-03 `WebClientConfinementTest`
+extends that to every class — only `WebClientConfig` builds a client, and only `BackendApiClient`,
+the SSE relay and the live-sync probe hold one — and every backend client refuses any origin but
+the backend's before the bearer is attached (REQ-FE-029, §8.7).
 
 *Trade-off accepted:* the frontend hand-mirrors the backend's DTOs rather than sharing a module,
 so a contract change has to be made twice. Two gates watch for drift (`FrontendDtoContractTest`,

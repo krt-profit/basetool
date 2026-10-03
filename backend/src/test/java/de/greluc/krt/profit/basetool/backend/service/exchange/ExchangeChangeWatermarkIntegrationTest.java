@@ -38,14 +38,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * A running writer holds the feed's watermark back, so an entry it commits later can never land
  * behind a position a reader has already passed (REQ-XCH-013, ADR-0224).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class ExchangeChangeWatermarkIntegrationTest {
 
   @Autowired private DataSource dataSource;

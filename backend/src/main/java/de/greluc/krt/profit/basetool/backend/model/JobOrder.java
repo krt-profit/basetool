@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,6 +45,7 @@ import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Generated;
 
 /** Job Order JPA entity. */
+@TenantScoped("responsibleOrgUnit")
 @Entity
 @Getter
 @Setter
