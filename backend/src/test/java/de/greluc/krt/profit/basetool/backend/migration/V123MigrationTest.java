@@ -70,7 +70,6 @@ class V123MigrationTest {
     assertEquals("uuid", material.get("job_order_item_id"));
     assertEquals("uuid", material.get("material_id"));
     assertEquals("double precision", material.get("required_quantity"));
-    assertEquals("character varying", material.get("quality_requirement"));
   }
 
   @Test

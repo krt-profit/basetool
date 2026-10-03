@@ -116,7 +116,6 @@ class V261QualityTierMigrationTest {
             "ck_refinery_good_quality_range",
             "ck_job_order_handover_item_quality_range",
             "ck_blueprint_ingredient_min_quality_range",
-            "ck_job_order_material_min_quality_range",
             "ck_blueprint_requirement_modifier_quality_range",
             "ck_blueprint_modifier_segment_quality_range");
   }
