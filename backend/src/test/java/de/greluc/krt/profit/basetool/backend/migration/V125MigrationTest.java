@@ -25,14 +25,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V125__drop_legacy_material_and_ship_type_columns.sql}: the migration is
  * recorded and {@code material.is_manual_entry} and {@code ship_type.description} are gone.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V125MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

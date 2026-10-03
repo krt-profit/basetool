@@ -38,7 +38,7 @@ class CredentialFieldRatchetTest {
       Set.of(
           "de.greluc.krt.profit.basetool.ingest.config.MonitoringScrapeProperties",
           "de.greluc.krt.profit.basetool.ingest.config.ServiceAccountProperties",
-          "de.greluc.krt.profit.basetool.ingest.service.ServiceAccountTokenProvider$CachedToken");
+          "de.greluc.krt.profit.basetool.ingest.relay.ServiceAccountTokenProvider$CachedToken");
 
   @Test
   void everyCredentialBearingTypeIsReviewedAndRedacts() {

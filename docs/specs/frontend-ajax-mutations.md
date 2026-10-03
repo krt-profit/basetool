@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0206
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0206, ADR-0239
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -1746,6 +1746,19 @@ against each module's `/* global */` header remains the check that a module only
 its own page provides. Both checks are required; neither replaces the other, so a new bootstrap
 constant is added to **both** the declaration file and the module's `global` header.
 
+**The browser baseline is "Baseline 2025" (ES2025)** (owner decision D-16, ADR-0239). The scripts
+may rely on what Chrome 122, Firefox 131 and Safari / iOS 18.4 ship — the floor set by the iterator
+helpers — and nothing newer: `Promise.try`, `RegExp.escape` and `Float16Array` wait until the floor
+moves past them. The type check's `lib` / `target` and ESLint's `ecmaVersion` stay at **ES2023**
+until TypeScript 7 is proven to accept the `ES2025` lib, then rise to 2025 together; until then an
+ES2025 API is used only where the type check already knows it. Trusted Types follow the same
+decision: report-only through the `csp_violation` beacon first, then enforced.
+
+> [!note] Amended 2026-10-02 — the browser baseline (D-16; ADR-0239)
+> The project had no documented baseline; the features already shipped implied Chrome 105,
+> Firefox 121 and Safari 16.4. **Decided, implementation pending:** `tsconfig.json` and
+> `eslint.config.mjs` still target ES2023, and no Trusted Types directive is sent yet.
+
 **JSDoc must be JSDoc.** In a checked file, `{@code …}` / `{@link …}` / `@param name {shape}` —
 Javadoc spellings this repo uses elsewhere — are parsed as type syntax and are hard errors.
 Convert them when opting a file in.
@@ -1754,9 +1767,8 @@ Convert them when opting a file in.
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
-> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, the 40 files (of 96) carrying
-> `// @ts-check` (recounted 2026-09-23, after FE-SIMP-03 added `inventory-common.js` and opted
-> `inventory-admin.js` / `inventory-my.js` in) · **ADR:** ADR-0125, ADR-0130 ·
+> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, the 44 files (of 100) carrying
+> `// @ts-check` (recounted 2026-10-02) · **ADR:** ADR-0125, ADR-0130, ADR-0239 ·
 > **Issues:** —
 
 ### REQ-FE-019 — The same live sync reaches the native app, in both directions

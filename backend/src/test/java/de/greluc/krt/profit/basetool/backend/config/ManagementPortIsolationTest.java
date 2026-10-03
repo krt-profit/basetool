@@ -34,7 +34,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.tomcat.TomcatWebServer;
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Verifies the backend's management-port isolation (ADR-0134).
@@ -48,7 +47,6 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {"management.server.port=0"})
-@ActiveProfiles("test")
 class ManagementPortIsolationTest {
 
   /** The application connector — the one a public vhost would proxy. */

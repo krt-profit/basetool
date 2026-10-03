@@ -57,7 +57,7 @@ class ObservationPrivacyFilterMirrorParityTest {
     String ingest =
         normalise(
             repoRoot.resolve(
-                "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/config/"
+                "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/"
                     + "ObservationPrivacyFilter.java"));
 
     assertThat(frontend)

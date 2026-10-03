@@ -35,7 +35,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -48,7 +47,6 @@ import org.springframework.web.reactive.function.client.WebClient;
  * the backend never compresses its responses (BE-PERF-14, ADR-0161).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @TestPropertySource(
     properties = {
       "app.http.connect-timeout=500ms",

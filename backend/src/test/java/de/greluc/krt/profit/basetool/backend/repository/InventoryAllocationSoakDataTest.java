@@ -37,7 +37,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -45,7 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
  * while the inventory entry and its amount survive (REQ-INV-027). Each test rolls back.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class InventoryAllocationSoakDataTest {
 

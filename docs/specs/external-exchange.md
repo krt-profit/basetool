@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — requirements accepted by the owner, built except where a status line
 > says otherwise (epic [#2078](https://github.com/krt-profit/basetool/issues/2078)). Last reviewed:
-> 2026-09-28.
+> 2026-10-03.
 > **Owner area:** XCH · **Related ADRs:** [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md),
 > [ADR-0218](../adr/0218-exchange-sync-semantics.md),
@@ -1600,6 +1600,26 @@ most 200 characters.
   `ExchangeContractTest.theSchemasOnlyGrewSinceThePreviousRelease` compares them with
   `SchemaCompatibility`, whose rules `SchemaCompatibilityTest` pins. Until a release carries the
   v1 schemas the comparison has nothing to compare and is skipped.
+- [x] A narrowing the owner accepts as a correction is listed by its exact comparison message, with
+  its reason, in `ExchangeContractTest.ACCEPTED_NARROWINGS`; any other narrowing still fails, and the
+  entry is proven to match exactly what the comparison reports for it.
+
+> [!note] 2026-10-03 — `refinery-draft` requires at least one order
+> `refinery-draft.schema.json` gains `"minItems": 1` on `orders`, and the fixture
+> `refinery-draft/valid/minimal.json` (`"orders": []`) moves to `invalid/no-orders.json`. This
+> narrowing aligns the published schema with behaviour the backend has always had: its extract
+> carries `@NotEmpty` on `orders`, so no request with an empty `orders` ever succeeded — it was
+> answered `400`, relayed to the client as `SCHEMA_INVALID`. It is therefore not treated as a
+> breaking change and does not open `v2`. Decided by the owner on 2026-10-03. The client still gets
+> `400 SCHEMA_INVALID`; the refusal now comes from the gateway before the relay, with `errors[]`
+> naming `/orders`, instead of the backend's relayed refusal without `errors[]`.
+>
+> The same decision covers the two lists inside an order: `goods` and `sourceImages` gain
+> `"minItems": 1`, because the backend's order carries `@NotEmpty` on both, so an order with either
+> list empty never succeeded either. `refinery-draft/invalid/no-goods.json` and
+> `invalid/no-source-images.json` pin the refusal; the backend refuses all three invalid fixtures
+> with `400 VALIDATION_FAILED` (`ExchangeWireContractTest`), and all three narrowings are listed in
+> `ACCEPTED_NARROWINGS`.
 
 **Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest` · **Status:** implemented —
 WP 0.2 (#2080)
@@ -1809,7 +1829,8 @@ installation raises a notification and stays highlighted until seen. The page li
 list of approved clients (REQ-XCH-002, REQ-SEC-027). `ADMIN` manages the registry on an admin page
 with a suspend switch. The page is web-only; the app links to it.
 
-The page is `/connected-apps` (sidebar *Persönlich*, every member), over `/api/v1/connected-apps`.
+The page is `/connected-apps` (the drawer's personal menu *Persönlich*, REQ-UI-026, every member),
+over `/api/v1/connected-apps`.
 Its header links `docs/legal/approved-clients.md` on GitHub
 (`https://github.com/krt-profit/basetool/blob/main/docs/legal/approved-clients.md`) in a new tab,
 the address the developer site's onboarding page links as well.
@@ -2041,6 +2062,114 @@ succeeding, never succeeded).
   *`scheduled_job_never_succeeded_test.yml`.*
 
 **Status:** built (#2092)
+
+### REQ-XCH-036 — The frozen exchange is pinned at build time
+
+The exchange contract and the backend surface the gateway relays to keep their behaviour
+byte-identical (D-05 of the domain modularisation plan): the 14 relay operations on 13 backend
+paths, their parameters, request and answer shapes, the relayed codes and statuses, and the
+gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
+surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
+contract allows.
+
+- **Backend wire contract.** `ExchangeWireContractTest` sends every published `valid/` request
+  fixture of a relayed route to the backend as the gateway relays it and expects `200`; every
+  answer, and the answers of every read on seeded data (one blueprint, one stock lot at a UEX city,
+  one ship, and the tombstones after their removal), must validate against the published schema
+  the gateway checks it with. Every published answer fixture survives a round trip through the
+  backend's answer type. One named exception is pinned, not hidden: the gateway's own `warnings`
+  and the reserved `cursor` of a change result are members the backend never writes. The published
+  `refinery-draft/invalid/no-orders.json` (`"orders": []`), which the schema refuses, is refused
+  by the backend too, with `400 VALIDATION_FAILED`. Of `GET /api/v1/exchange/me/installation` the gateway takes only
+  `installationId` into the service document, so only that member is checked.
+- **Golden answers.** `ExchangeGoldenAnswerTest` records, for every `/exchange/v1` route and for a
+  relayed refusal, a translated code, a relay failure, an answer that breaks its schema, a draft
+  its schema refuses before the relay and a staged mass change, the client's request, the backend request the relay sent with every header,
+  and the status, every header and the body the client got — under a fixed backend stub answering
+  with the published fixtures — and compares it byte for byte with the committed goldens under
+  `ingest/src/test/resources/exchange/golden/`. Only named volatile values are normalised (DPoP
+  key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
+  the rate-limit counters). A difference writes the observed answer under
+  `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
+  pull request. The test also asserts that the backend stub received exactly the 14 relay
+  operations.
+- **Security filter order.** `SecurityFilterChainOrderTest` and
+  `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
+  their order, each chain's matcher and the exact ordered list of its filters — the exchange gates
+  `ExchangeTokenGateFilter`, `ExchangeGateFilter`, `ExchangeLimitFilter` and
+  `ExchangeIdempotencyFilter` after authentication — in the test profile and with the management
+  port and the scrape credentials set.
+- **The `e2e` label.** A pull request that changes the exchange path — the backend's exchange
+  controllers, services and DTOs, `ActingMemberFilter`, `ActingMemberHeader`,
+  `ExchangeProblemException`, `ExchangeCapability`, the ingest's `src/main`, the published
+  fixtures or the shared seam definition — fails the `Exchange changes carry the e2e label` job of
+  `e2e.yml` until it carries the `e2e` label, so the full E2E suite runs on it
+  (`.github/scripts/check_exchange_e2e_label.py`, self-tested in `repo-lint.yml`).
+
+Every guard is proven able to fail by a planted violation in its own test.
+
+**Acceptance**
+
+- [x] Every published request fixture of a relayed route is accepted by the backend; every backend
+  answer validates against its published schema.
+  *`ExchangeWireContractTest`.*
+- [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
+  seam's 14 operations. *`ExchangeGoldenAnswerTest`.*
+- [x] The gateway's security filter chains hold exactly the pinned filters in order.
+  *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
+- [x] A pull request touching the exchange path without the `e2e` label fails.
+  *`check_exchange_e2e_label.py --selftest`.*
+
+**Enforced by:** the tests above · **Status:** implemented (plan guard G-18)
+
+### REQ-XCH-037 — Backend, gateway and frontend share one seam definition
+
+Every identifier the modules exchange on the relay seam is declared once, in
+`test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
+it, so a rename on one side alone fails that side's build:
+
+- the 14 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's eight exchange controllers and their `@exchangeGate`
+  expressions, `ActingMemberFilter`'s 13 exact paths, the gateway's `ExchangeRoutes` and its relay
+  prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
+  (`ExchangeGoldenAnswerTest`);
+- the five relay headers, the ten capability scopes, the seven gate codes with their statuses, the
+  codes the gateway passes through and the four backend codes it translates;
+- the registry mirror document: the backend's writer must produce the seam's sample document, and
+  the gateway's reader must read every member of it — renaming any member it reads changes what it
+  returns, so a rename can no longer fall back silently (`writtenAt` is the one member the gateway
+  does not read) (`ExchangeMirrorSeamParityTest`, `ExchangeRelaySeamParityTest`);
+- the revocation keys `exchange:deny:<thumbprint>` and `exchange:revoked:<client>:<member>` with the
+  epoch second as value, the handoff key `ingest:handoff:<member>:<id>`, the staged handoff's
+  members and kinds and the members of a staged mass change (`IngestHandoffSeamParityTest` in the
+  frontend).
+
+**Acceptance**
+
+- [x] Each module's parity test passes on today's code and fails on a planted rename.
+  *`ExchangeRelaySeamParityTest` (backend and ingest), `ExchangeMirrorSeamParityTest`,
+  `IngestHandoffSeamParityTest`.*
+
+**Enforced by:** the tests above · **Status:** implemented (plan guard G-18)
+
+### REQ-XCH-038 — The refinery draft route has its own request type
+
+`POST /api/v1/exchange/me/drafts/refinery-orders` binds `ExchangeRefineryDraftRequest`, not the web
+import's `RefineryExtractDto`, so a change to the web import cannot change the frozen exchange
+route. Its JSON shape, types, nullability and constraints are those of the web import's extract
+today; `ExchangeDraftService` copies it field by field into the extract the import builds the
+draft from. A later change of the web import's extract adapts that copy and leaves the exchange
+request as it is.
+
+**Acceptance**
+
+- [x] Both records declare the same components, types and constraints; every published refinery
+  draft fixture and every one-field mutation of it reads to the same JSON, the same validation
+  outcome and the same extract through both types; the committed `openapi.json` describes both
+  request bodies alike. *`ExchangeRefineryDraftRequestIdentityTest`.*
+
+**Enforced by:** `ExchangeRefineryDraftRequestIdentityTest` · **Status:** implemented (plan guard
+G-18)
 
 ## Threat model
 

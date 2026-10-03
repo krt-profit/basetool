@@ -28,14 +28,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V120__add_blueprint_requirement_groups.sql}: the requirement-group
  * tables and blueprint column additions exist and validate against the entities.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V120MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

@@ -36,6 +36,7 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Personal inventory & blueprints** — members maintain their own item list and unlocked crafting blueprints (importable from external extractors), with craftability and org-unit availability overviews.
 - **Org chart & structure** — an interactive hierarchy view (OL → Bereiche → Staffeln/SKs) plus admin structure maintenance.
 - **Data protection, in the application** — every member exports a complete copy of their own data as PDF or JSON and can request the erasure of their account; an admin decides the request, can export another account's for a requester who cannot sign in, and has a name search that finds every mention of a person across the free-text surfaces no foreign key points at. Retention is bounded rather than open-ended: refused registrations 90 days, notifications 90/180 days, the exchange journal and change feed 90 days, disconnected exchange installations and client revocations 90 days after the disconnection, both audit trails 24 months. The engineering records the GDPR expects a controller to hold are in [`docs/privacy/`](docs/privacy/README.md).
+- **Navigation & quick access** — a structured menu drawer with a menu filter, iconed groups, a personal menu and administration as a separate mode; a `Ctrl`/`⌘` + `K` quick access that finds every page the member may open; on phones a fixed tab bar with the menu as a sheet.
 - **i18n & Keycloak theme** — every user-visible string is translated (German default, English); a custom Keycloak theme carries the DAS KARTELL corporate design.
 - **Companion clients** — a native Android app ([`krt-profit/basetool-android`](https://github.com/krt-profit/basetool-android)) consumes the same REST API through the dedicated API vhost, with a server-side version policy (`GET /api/v1/app/version-policy`); the desktop SC extractor ([`krt-profit/basetool-sc-extractor`](https://github.com/krt-profit/basetool-sc-extractor)) sends refinery and blueprint data through the ingest gateway. Neither carries business logic of its own.
 
@@ -148,7 +149,7 @@ For developing an Exchange API client, the **local sandbox** runs that test stac
 
 ### Tests
 
-Tests force `spring.profiles.active=test`. Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED`; `Test` additionally attaches the Mockito agent.
+Tests force `spring.profiles.active=test`, so no test class repeats it with `@ActiveProfiles("test")` (REQ-OPS-039). Test classes reuse an existing context configuration — a plain `@SpringBootTest` or, in the backend, `@LeafServiceMockTest` — and `TestContextBudgetTest` holds each application to a budget of distinct Spring contexts (REQ-OPS-041). Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED`; `Test` additionally attaches the Mockito agent.
 
 ```bash
 ./gradlew test                                              # all tests
