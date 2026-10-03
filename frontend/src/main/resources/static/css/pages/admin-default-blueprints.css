@@ -1,0 +1,16 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .dbp-section + .dbp-section {
+        margin-top: var(--space-6);
+    }
+
+    .dbp-section > .krt-bp-section-title {
+        margin-bottom: var(--space-3);
+    }
+
+    .dbp-section .krt-dbp-del-form {
+        display: inline-flex;
+        margin: 0;
+    }
+}

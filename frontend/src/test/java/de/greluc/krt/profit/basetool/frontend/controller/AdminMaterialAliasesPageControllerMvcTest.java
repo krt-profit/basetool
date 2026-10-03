@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -38,7 +39,10 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasDto
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -125,6 +129,75 @@ class AdminMaterialAliasesPageControllerMvcTest {
             PageStylesheets.content(
                 containsString(
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+  }
+
+  /**
+   * Renders {@code /admin/material-aliases} in German.
+   *
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String renderList() throws Exception {
+    return mockMvc
+        .perform(get("/admin/material-aliases").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * The list renders on the list pattern with the source system translated: the raw backend code
+   * never reaches the cell.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listPage_rendersTheListPatternWithATranslatedSource() throws Exception {
+    MaterialExternalAliasDto alias =
+        new MaterialExternalAliasDto(
+            UUID.randomUUID(),
+            0L,
+            UUID.randomUUID(),
+            "Silicon (Raw)",
+            "REFINERY_SCREEN",
+            "Raw Silicon",
+            null,
+            null,
+            null,
+            null,
+            "system",
+            Instant.parse("2026-06-01T00:00:00Z"),
+            Instant.parse("2026-06-01T00:00:00Z"));
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(List.of(alias));
+
+    String html = renderList();
+
+    assertThat(html)
+        .contains("data-testid=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .contains("class=\"data-table data-table--stack\"")
+        .containsPattern("class=\"cell-title\"[^>]*>Raw Silicon<")
+        .containsPattern("data-alias-field=\"sourceSystem\"[^>]*>Raffinerie-Bildschirm<")
+        .doesNotContain(">REFINERY_SCREEN<");
+    assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
+        .doesNotContain("krtm-")
+        .doesNotContain("colspan");
+    assertThat(html).containsPattern("data-alias-empty hidden=\"hidden\"");
+  }
+
+  /** An empty alias list shows the empty state and hides the table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listPage_rendersTheEmptyState() throws Exception {
+    String html = renderList();
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .containsPattern("data-alias-table hidden=\"hidden\"")
+        .doesNotContainPattern("data-alias-empty hidden");
   }
 
   @Test

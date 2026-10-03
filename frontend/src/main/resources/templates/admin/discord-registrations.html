@@ -12,108 +12,120 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.discordRegistrations.title}">Discord-Registrierungen</h1>
-        <p th:text="#{admin.discordRegistrations.subtitle}">Neue Discord-Anmeldungen freigeben oder ablehnen.</p>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.discordRegistrations.title},
+        count=${#lists.size(registrations)}, countId='registrationsCount')}"></th:block>
+
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
+
+    <div class="tab-nav reg-tabs" role="tablist" th:aria-label="#{admin.discordRegistrations.title}" data-testid="reg-tabs">
+        <button type="button" class="tab active" role="tab" id="reg-tab-open" aria-selected="true"
+                aria-controls="reg-panel-open" data-reg-tab="open" data-testid="reg-tab-open">
+            <span th:text="#{admin.discordRegistrations.tab.open}">Offen</span><span class="tab-count" data-reg-count="open"
+                  th:text="${#lists.size(registrations)}">0</span>
+        </button>
+        <button type="button" class="tab" role="tab" id="reg-tab-rejected" aria-selected="false" tabindex="-1"
+                aria-controls="reg-panel-rejected" data-reg-tab="rejected" data-testid="reg-tab-rejected">
+            <span th:text="#{admin.discordRegistrations.tab.rejected}">Abgelehnt</span><span class="tab-count" data-reg-count="rejected"
+                  th:text="${#lists.size(rejected)}">0</span>
+        </button>
     </div>
 
-    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
-        <p th:text="#{${error}}">Fehler beim Laden.</p>
-    </div>
-
-    <div class="hud-box mt-2">
-        <div class="table-responsive">
-            <table id="registrationsTable">
+    <section id="reg-panel-open" role="tabpanel" aria-labelledby="reg-tab-open">
+        <div class="card card--flush">
+            <table id="registrationsTable" class="data-table data-table--stack" th:hidden="${#lists.isEmpty(registrations)}">
                 <thead>
                     <tr>
                         <th th:text="#{admin.discordRegistrations.col.user}">Nutzer</th>
                         <th th:text="#{admin.discordRegistrations.col.nickname}">Server-Nickname</th>
                         <th th:text="#{admin.discordRegistrations.col.registeredAt}">Registriert</th>
-                        <th th:text="#{admin.discordRegistrations.col.actions}">Aktionen</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.discordRegistrations.col.actions}">Aktionen</span></th>
                     </tr>
                 </thead>
                 <tbody id="registrationsBody">
                     <tr th:each="reg : ${registrations}" th:id="'reg-row-' + ${reg.id}"
                         th:attr="data-id=${reg.id},data-version=${reg.version}">
                         <td>
-                            <span th:text="${reg.username}">Nutzer</span>
+                            <span class="cell-title" th:text="${reg.username}">Nutzer</span>
                             <span th:if="${reg.callsignCollision}" class="chip chip--warning"
                                   th:text="#{admin.discordRegistrations.callsignCollision}"
                                   th:title="#{admin.discordRegistrations.callsignCollision.hint}">Callsign doppelt</span>
                         </td>
-                        <td>
+                        <td th:attr="data-label=#{admin.discordRegistrations.col.nickname}">
                             <span th:if="${reg.serverNickname}" th:text="${reg.serverNickname}">Server-Nickname</span>
                             <span th:unless="${reg.serverNickname}" class="reg-when" aria-hidden="true">&mdash;</span>
                         </td>
-                        <td class="reg-when" th:text="${#temporals.format(reg.registeredAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
-                        <td>
-                            <div class="reg-actions">
-                                <button type="button" class="btn btn--cta" data-action="approve"
+                        <td class="reg-when" th:attr="data-label=#{admin.discordRegistrations.col.registeredAt}"
+                            th:text="${#temporals.format(reg.registeredAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
+                        <td class="cell-actions">
+                            <div class="cluster gap-2 reg-actions">
+                                <button type="button" class="btn btn-success btn-xs" data-action="approve"
                                         th:text="#{admin.discordRegistrations.approve}">Freigeben</button>
-                                <button type="button" class="btn btn-outline" data-action="link"
+                                <button type="button" class="btn btn-ghost btn-xs" data-action="link"
                                         th:text="#{admin.discordRegistrations.link}">Verknüpfen</button>
-                                <button type="button" class="btn btn-outline" data-action="merge"
+                                <button type="button" class="btn btn-ghost btn-xs" data-action="merge"
                                         th:title="#{admin.discordRegistrations.merge.hint}"
                                         th:text="#{admin.discordRegistrations.merge}">Konten zusammenführen</button>
-                                <button type="button" class="btn btn-outline-danger" data-action="reject"
+                                <button type="button" class="btn btn-quiet-danger btn-xs" data-action="reject"
                                         th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
                             </div>
                         </td>
                     </tr>
-                    <tr id="registrationsEmpty" th:if="${#lists.isEmpty(registrations)}">
-                        <td colspan="4" th:text="#{admin.discordRegistrations.empty}">Keine offenen Registrierungen.</td>
-                    </tr>
                 </tbody>
             </table>
+            <div id="registrationsEmpty" class="reg-empty" th:hidden="${!#lists.isEmpty(registrations)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.discordRegistrations.empty',
+                    textKey='admin.discordRegistrations.empty.text')}"></th:block>
+            </div>
         </div>
-    </div>
+    </section>
 
-    <div class="hud-box mt-2">
-        <h2 class="mt-0" th:text="#{admin.discordRegistrations.rejected.title}">Abgelehnte Registrierungen</h2>
-        <p class="reg-when" th:text="#{admin.discordRegistrations.rejected.hint}">Eine irrtümlich abgelehnte Registrierung kann wieder in die Warteschlange zurückgeholt werden.</p>
-        <div class="table-responsive">
-            <table id="rejectedTable">
+    <section id="reg-panel-rejected" role="tabpanel" aria-labelledby="reg-tab-rejected" hidden>
+        <p class="reg-when reg-hint" th:text="#{admin.discordRegistrations.rejected.hint}">Eine irrtümlich abgelehnte Registrierung kann wieder in die Warteschlange zurückgeholt werden.</p>
+        <div class="card card--flush">
+            <table id="rejectedTable" class="data-table data-table--stack" th:hidden="${#lists.isEmpty(rejected)}">
                 <thead>
                     <tr>
                         <th th:text="#{admin.discordRegistrations.col.user}">Nutzer</th>
                         <th th:text="#{admin.discordRegistrations.col.nickname}">Server-Nickname</th>
                         <th th:text="#{admin.discordRegistrations.col.registeredAt}">Registriert</th>
                         <th th:text="#{admin.discordRegistrations.col.rejectedAt}">Abgelehnt</th>
-                        <th th:text="#{admin.discordRegistrations.col.actions}">Aktionen</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.discordRegistrations.col.actions}">Aktionen</span></th>
                     </tr>
                 </thead>
                 <tbody id="rejectedBody">
                     <tr th:each="reg : ${rejected}" th:id="'rejected-row-' + ${reg.id}"
                         th:attr="data-id=${reg.id},data-version=${reg.version}">
                         <td>
-                            <span th:text="${reg.username}">Nutzer</span>
+                            <span class="cell-title" th:text="${reg.username}">Nutzer</span>
                             <span th:if="${reg.callsignCollision}" class="chip chip--warning"
                                   th:text="#{admin.discordRegistrations.callsignCollision}"
                                   th:title="#{admin.discordRegistrations.callsignCollision.hint}">Callsign doppelt</span>
                         </td>
-                        <td>
+                        <td th:attr="data-label=#{admin.discordRegistrations.col.nickname}">
                             <span th:if="${reg.serverNickname}" th:text="${reg.serverNickname}">Server-Nickname</span>
                             <span th:unless="${reg.serverNickname}" class="reg-when" aria-hidden="true">&mdash;</span>
                         </td>
-                        <td class="reg-when" th:text="${#temporals.format(reg.registeredAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
-                        <td class="reg-when">
+                        <td class="reg-when" th:attr="data-label=#{admin.discordRegistrations.col.registeredAt}"
+                            th:text="${#temporals.format(reg.registeredAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
+                        <td class="reg-when" th:attr="data-label=#{admin.discordRegistrations.col.rejectedAt}">
                             <span th:if="${reg.decidedAt}" th:text="${#temporals.format(reg.decidedAt, 'dd.MM.yyyy HH:mm', 'UTC')}">29.06.2026 00:00</span>
                             <span th:unless="${reg.decidedAt}" aria-hidden="true">&mdash;</span>
                         </td>
-                        <td>
-                            <div class="reg-actions">
-                                <button type="button" class="btn btn-outline" data-action="reopen"
+                        <td class="cell-actions">
+                            <div class="cluster gap-2 reg-actions">
+                                <button type="button" class="btn btn-ghost btn-xs" data-action="reopen"
                                         th:text="#{admin.discordRegistrations.reopen}">Wiederöffnen</button>
                             </div>
                         </td>
                     </tr>
-                    <tr id="rejectedEmpty" th:if="${#lists.isEmpty(rejected)}">
-                        <td colspan="5" th:text="#{admin.discordRegistrations.rejected.empty}">Keine abgelehnten Registrierungen.</td>
-                    </tr>
                 </tbody>
             </table>
+            <div id="rejectedEmpty" class="reg-empty" th:hidden="${!#lists.isEmpty(rejected)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.discordRegistrations.rejected.empty',
+                    textKey='admin.discordRegistrations.rejected.empty.text')}"></th:block>
+            </div>
         </div>
-    </div>
+    </section>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide', body=~{::reject-modal-body})}">
         <th:block th:ref="reject-modal-body">
@@ -187,15 +199,14 @@
         linkNoTarget: /*[[#{error.admin.discordRegistrations.link.noTarget}]]*/ 'Bitte einen Account auswählen.',
         reopened: /*[[#{admin.discordRegistrations.reopened}]]*/ 'Registrierung wieder eröffnet.',
         reopenError: /*[[#{error.admin.discordRegistrations.reopen}]]*/ 'Wiederöffnen fehlgeschlagen.',
+        reopen: /*[[#{admin.discordRegistrations.reopen}]]*/ 'Wiederöffnen',
         approve: /*[[#{admin.discordRegistrations.approve}]]*/ 'Freigeben',
         link: /*[[#{admin.discordRegistrations.link}]]*/ 'Verknüpfen',
         merge: /*[[#{admin.discordRegistrations.merge}]]*/ 'Zusammenführen',
         merged: /*[[#{admin.discordRegistrations.merged}]]*/ 'Konten zusammengeführt.',
         mergeError: /*[[#{error.admin.discordRegistrations.merge}]]*/ 'Zusammenführen fehlgeschlagen.',
         mergeNoSource: /*[[#{error.admin.discordRegistrations.merge.noSource}]]*/ 'Bitte ein Konto auswählen.',
-        reject: /*[[#{admin.discordRegistrations.reject}]]*/ 'Ablehnen',
-        empty: /*[[#{admin.discordRegistrations.empty}]]*/ 'Keine offenen Registrierungen.',
-        rejectedEmpty: /*[[#{admin.discordRegistrations.rejected.empty}]]*/ 'Keine abgelehnten Registrierungen.'
+        reject: /*[[#{admin.discordRegistrations.reject}]]*/ 'Ablehnen'
     };
 </script>
 <script th:src="@{/js/discord-registrations.js}" defer th:attr="nonce=${cspNonce}"></script>

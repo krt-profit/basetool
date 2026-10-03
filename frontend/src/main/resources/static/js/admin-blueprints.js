@@ -96,22 +96,39 @@
         }
     });
 
+    function search(form) {
+        const input = form.querySelector('input[name="search"]');
+        const term = input ? input.value.trim() : '';
+        const url =
+            form.getAttribute('action') + (term ? '?search=' + encodeURIComponent(term) : '');
+        if (window.krtFetch) {
+            window.krtFetch.swap({ url, container: '#' + RESULTS_ID, history: true });
+        } else {
+            window.location.assign(url);
+        }
+    }
+
+    let searchTimer = null;
+
     document.addEventListener('submit', function (e) {
         const form = e.target;
         if (!form || form.id !== 'admin-bp-filter') {
             return;
         }
         e.preventDefault();
-        const input = form.querySelector('input[name="search"]');
-        const search = input ? input.value.trim() : '';
-        const url =
-            form.getAttribute('action') + (search ? '?search=' + encodeURIComponent(search) : '');
-        if (window.krtFetch) {
-            window.krtFetch.swap({ url, container: '#' + RESULTS_ID, history: true });
-        } else {
-            window.location.assign(url);
-        }
+        clearTimeout(searchTimer);
+        search(form);
     });
+
+    const filterForm = document.getElementById('admin-bp-filter');
+    if (filterForm && window.krtFetch) {
+        filterForm.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () {
+                search(filterForm);
+            }, 300);
+        });
+    }
 
     computeAll(document);
     if (window.krtFetch) {

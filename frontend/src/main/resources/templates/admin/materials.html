@@ -13,68 +13,36 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.materials.title}">Materialien verwalten</h1>
-    </div>
-
-    <th:block th:if="${catalogTruncated}">
-        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mt-2')}"></div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.materials.title},
+        count=${materials != null ? materials.size() : null}, countId='materials-count', countFor='materials-results', actions=~{::materials-actions})}">
+        <th:block th:ref="materials-actions">
+            <button type="button" class="btn btn--cta" data-trigger="materials-open-create-modal" data-testid="page-head-primary"
+                    th:text="#{admin.materials.create.button}">Material anlegen</button>
+        </th:block>
     </th:block>
 
-    <div class="hud-box mt-2">
-        <div class="data-section">
-            <h2 th:text="#{admin.materials.categories.title}">Kategorien verwalten</h2>
-            <form method="post" th:action="@{/admin/materials/categories}" class="inline-form mb-1" data-category-create>
-                <input type="text" name="name" required th:placeholder="#{general.name}">
-                <button type="submit" class="btn btn--cta" th:text="#{general.add}">Hinzufügen</button>
-            </form>
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th th:text="#{admin.materials.categories.name}">Kategorie</th>
-                            <th th:text="#{general.action}">Aktion</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="cat : ${categories}" data-category-row>
-                            <td th:text="${cat.name}">Category Name</td>
-                            <td>
-                                <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" class="krtm-display-inline-2f87"
-                                      data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}"
-                                      th:data-category-id="${cat.id}">
-                                    <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                </form>
-                            </td>
-                        </tr>
-                        <tr th:if="${categories.isEmpty()}" data-category-empty>
-                            <td colspan="2" th:text="#{general.no_entries}">Keine Einträge</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+    <th:block th:replace="~{fragments/components :: alert('danger', ${error}, null)}"></th:block>
+
+    <th:block th:if="${catalogTruncated}">
+        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
+    </th:block>
+
+    <div class="toolbar">
+        <div class="toolbar__search">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+            <input type="search" id="filterMaterials" autocomplete="off" data-testid="toolbar-search"
+                   data-trigger="filter-table" data-table-id="materialsTable"
+                   th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
         </div>
+        <datalist id="materialNames-data" hidden>
+            <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
+        </datalist>
     </div>
 
-    <div class="hud-box mt-2">
-        <div class="data-section">
-            <div class="krtm-display-flex-justify-content-space-between-a-3a17">
-                <h2 th:text="#{admin.materials.subtitle}">Materialien</h2>
-                <div class="krtm-display-flex-align-items-center-gap-0-75rem-5618">
-                    <button type="button" class="btn btn--cta" data-trigger="materials-open-create-modal" th:text="#{admin.materials.create.button}">Material anlegen</button>
-                    <div class="form-group krtm-margin-bottom-0-width-300px-max-width-100-po-85dc">
-                        <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="materialsTable" autocomplete="off">
-                        <datalist id="materialNames-data" class="krtm-display-none-5790">
-                            <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
-                        </datalist>
-                    </div>
-                </div>
-            </div>
-
-            <div th:if="${error}" class="alert alert-danger mb-1" th:text="#{${error}}">Fehler</div>
-
-            <div class="table-responsive">
-            <table id="materialsTable">
+    <div id="materials-results" class="card card--flush">
+        <div data-materials-table th:hidden="${materials == null or materials.isEmpty()}"
+             th:data-list-total="${materials != null ? materials.size() : 0}">
+            <table id="materialsTable" class="data-table data-table--stack admin-materials-table">
                 <thead>
                     <tr>
                         <th th:text="#{admin.material.name}">Name</th>
@@ -85,48 +53,53 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="mat : ${materials}" th:data-mat-id="${mat.id}" th:data-version="${mat.version}">
+                    <tr th:each="mat : ${materials}" th:data-mat-id="${mat.id}" th:data-version="${mat.version}" data-testid="material-row">
                         <td>
-                            <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span><span th:if="${mat?.isVisible == false}" class="material-hidden-badge" th:title="#{admin.material.hidden.tooltip}" th:text="#{admin.material.hidden}">Versteckt</span><span th:if="${mat?.isIllegal == true}" class="text-danger krtm-margin-right-0-5rem-font-weight-bold-4522" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning krtm-color-var-color-warning-margin-right-0-5rem-9316" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning krtm-color-var-color-warning-margin-right-0-5rem-9316" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
-                        </td>
-                        <td>
-                            <div class="nowrap">
-                                <span th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
+                            <span class="cell-title" th:text="${mat?.name}">Name</span>
+                            <div class="cluster gap-1 admin-material-flags"
+                                 th:if="${mat?.isManualEntry == true or mat?.isVisible == false or mat?.isIllegal == true or mat?.isVolatileQt == true or mat?.isVolatileTime == true}">
+                                <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span>
+                                <span th:if="${mat?.isVisible == false}" class="material-hidden-badge" th:title="#{admin.material.hidden.tooltip}" th:text="#{admin.material.hidden}">Versteckt</span>
+                                <span th:if="${mat?.isIllegal == true}" class="text-danger admin-material-flag" th:title="#{material.is_illegal}">&#9888;</span>
+                                <span th:if="${mat?.isVolatileQt == true}" class="text-warning admin-material-flag" th:title="#{material.is_volatile_qt}">&#9888;</span>
+                                <span th:if="${mat?.isVolatileTime == true}" class="text-warning admin-material-flag" th:title="#{material.is_volatile_time}">&#9888;</span>
                             </div>
-                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="krtm-margin-top-0-5rem-font-size-0-85em-white-spa-0ed1">
-                                <label class="krtm-margin-bottom-0-cursor-pointer-min-height-44-daca">
-                                    <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" class="krtm-margin-right-0-25rem-945d" />
+                        </td>
+                        <td th:attr="data-label=#{admin.material.type}">
+                            <span class="nowrap" th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
+                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="stack gap-1 admin-material-toggles">
+                                <label class="admin-material-toggle">
+                                    <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" />
                                     <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
                                 </label>
-                            </div>
-                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="krtm-margin-top-0-5rem-font-size-0-85em-white-spa-0ed1">
-                                <label class="krtm-margin-bottom-0-cursor-pointer-min-height-44-daca">
-                                    <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" class="krtm-margin-right-0-25rem-945d" />
+                                <label class="admin-material-toggle">
+                                    <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" />
                                     <span th:text="#{admin.material.job_order}">Auftrag</span>
                                 </label>
-                            </div>
-                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="krtm-margin-top-0-5rem-font-size-0-85em-white-spa-0ed1">
-                                <label class="krtm-margin-bottom-0-cursor-pointer-min-height-44-daca">
-                                    <input type="checkbox" name="isVisible" data-update-type="VISIBILITY" th:checked="${mat.isVisible != false}" data-trigger="admin-materials-update" class="krtm-margin-right-0-25rem-945d" />
+                                <label class="admin-material-toggle">
+                                    <input type="checkbox" name="isVisible" data-update-type="VISIBILITY" th:checked="${mat.isVisible != false}" data-trigger="admin-materials-update" />
                                     <span th:text="#{admin.material.visible}">Sichtbar</span>
                                 </label>
                             </div>
                         </td>
-                        <td>
-                            <select name="quantityType" data-update-type="QUANTITY_TYPE" data-trigger="admin-materials-update" class="w-full">
+                        <td th:attr="data-label=#{admin.materials.quantityType}">
+                            <select name="quantityType" data-update-type="QUANTITY_TYPE" data-trigger="admin-materials-update" class="w-full"
+                                    th:attr="aria-label=#{admin.materials.quantityType}">
                                 <option value="SCU" th:text="#{admin.materials.quantityType.scu}" th:selected="${mat.quantityType == 'SCU' || mat.quantityType == null}">SCU</option>
                                 <option value="PIECE" th:text="#{admin.materials.quantityType.piece}" th:selected="${mat.quantityType == 'PIECE'}">Stück</option>
                             </select>
                         </td>
-                        <td>
-                            <select name="categoryId" data-update-type="CATEGORY" data-trigger="admin-materials-update" class="w-full">
+                        <td th:attr="data-label=#{admin.materials.categories.name}">
+                            <select name="categoryId" data-update-type="CATEGORY" data-trigger="admin-materials-update" class="w-full"
+                                    th:attr="aria-label=#{admin.materials.categories.name}">
                                 <option value="" th:text="#{admin.materials.categories.unsorted}">Unsortiert</option>
                                 <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}" th:selected="${mat.category != null and mat.category.id == cat.id}">Category</option>
                             </select>
                         </td>
-                        <td>
+                        <td th:attr="data-label=#{admin.material.refined}">
                             <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
-                                <select sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" class="w-full">
+                                <select sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" class="w-full"
+                                        th:attr="aria-label=#{admin.material.refined}">
                                     <option value="" th:text="#{general.please_select}">Bitte wählen...</option>
                                     <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
                                 </select>
@@ -139,15 +112,52 @@
                     </tr>
                 </tbody>
             </table>
-            </div>
         </div>
+        <th:block th:if="${materials == null or materials.isEmpty()}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.materials.empty', textKey='admin.materials.empty.text')}"></th:block>
+        </th:block>
     </div>
+
+    <section class="card admin-materials-categories" aria-labelledby="material-categories-title">
+        <div class="card-head">
+            <h2 id="material-categories-title" class="card-title" th:text="#{admin.materials.categories.title}">Kategorien verwalten</h2>
+        </div>
+        <form method="post" th:action="@{/admin/materials/categories}" class="cluster gap-2 admin-materials-category-form" data-category-create>
+            <input type="text" name="name" required class="grow" th:placeholder="#{general.name}" th:attr="aria-label=#{general.name}">
+            <button type="submit" class="btn btn-ghost" th:text="#{general.add}">Hinzufügen</button>
+        </form>
+        <div data-category-table th:hidden="${categories == null or categories.isEmpty()}">
+            <table class="data-table data-table--stack">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.materials.categories.name}">Kategorie</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="cat : ${categories}" data-category-row>
+                        <td><span class="cell-title" th:text="${cat.name}">Category Name</span></td>
+                        <td class="cell-actions">
+                            <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" class="m-0"
+                                  data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}"
+                                  th:data-category-id="${cat.id}">
+                                <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty-state" data-testid="empty-state" data-category-empty th:hidden="${categories != null and !categories.isEmpty()}">
+            <th:block th:replace="~{fragments/components :: emptyStateBody('admin.materials.categories.empty', 'admin.materials.categories.empty.text', null)}"></th:block>
+        </div>
+    </section>
 </main>
 
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create-material', titleKey='admin.materials.create.modal.title', variant='krt-modal--wide krt-modal-create-material', titleId='modal-create-material-title', closeTrigger='materials-close-create-modal', body=~{::modal-create-material-body})}">
     <th:block th:ref="modal-create-material-body">
         <div class="krt-modal-body">
-        <p class="form-hint krtm-margin-bottom-1rem-c2c0" th:text="#{admin.materials.create.modal.intro}">Für Materialien, die noch nicht in UEX vorhanden sind.</p>
+        <p class="form-hint mb-1" th:text="#{admin.materials.create.modal.intro}">Für Materialien, die noch nicht in UEX vorhanden sind.</p>
 
         <div class="form-group">
             <label class="form-label" for="cm-name" th:text="#{admin.materials.create.field.name}">Name</label>
@@ -223,8 +233,7 @@
         deleteSuccess: /*[[#{notification.success.delete}]]*/ 'Gelöscht.',
         deleteError:   /*[[#{notification.error.delete}]]*/ 'Löschen fehlgeschlagen.',
         deleteConfirm: /*[[#{admin.materials.categories.delete.confirm}]]*/ 'Wirklich löschen?',
-        deleteTitle:   /*[[#{general.delete}]]*/ 'Löschen',
-        noEntries:     /*[[#{general.no_entries}]]*/ 'Keine Einträge'
+        deleteTitle:   /*[[#{general.delete}]]*/ 'Löschen'
     };
     const CAT_CONFLICT = {
         title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',

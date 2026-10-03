@@ -249,17 +249,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     ['squadrons-box', 'jobtypes-box', 'freqtypes-box'].forEach((boxId) => {
-        const isCollapsed = localStorage.getItem(boxId + '-collapsed') === 'true';
+        let isCollapsed;
+        try {
+            isCollapsed = localStorage.getItem(boxId + '-collapsed') === 'true';
+        } catch (_e) {
+            isCollapsed = false;
+        }
         if (isCollapsed) {
-            const box = document.getElementById(boxId);
-            if (box) {
-                const content = box.querySelector('.box-content');
-                const icon = box.querySelector('.toggle-icon');
-                if (content && icon) {
-                    content.style.display = 'none';
-                    icon.textContent = '+';
-                }
-            }
+            setBoxCollapsed(document.getElementById(boxId), true);
         }
     });
 
@@ -313,30 +310,36 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-function toggleBox(event, boxId) {
-    if (
-        event.target.closest('button') ||
-        event.target.closest('form') ||
-        event.target.closest('input') ||
-        event.target.closest('label')
-    ) {
-        return;
-    }
+/**
+ * Shows or hides a box's list and keeps its toggle's expanded state in step.
+ *
+ * @param {HTMLElement | null} box the section element
+ * @param {boolean} collapsed true to hide the list
+ */
+function setBoxCollapsed(box, collapsed) {
+    if (!box) return;
+    const content = box.querySelector('.box-content');
+    const toggle = box.querySelector('.md-box__toggle');
+    if (content) content.hidden = collapsed;
+    if (toggle) toggle.setAttribute('aria-expanded', String(!collapsed));
+    box.classList.toggle('is-collapsed', collapsed);
+}
+
+/**
+ * Collapses or expands a box and remembers the choice per browser.
+ *
+ * @param {string} boxId the section element id
+ */
+function toggleBox(boxId) {
     const box = document.getElementById(boxId);
     if (!box) return;
     const content = box.querySelector('.box-content');
-    const icon = box.querySelector('.toggle-icon');
-    if (content && icon) {
-        if (window.getComputedStyle(content).display === 'none') {
-            content.style.display = 'block';
-            icon.textContent = '-';
-            localStorage.setItem(boxId + '-collapsed', 'false');
-        } else {
-            content.style.display = 'none';
-            icon.textContent = '+';
-            localStorage.setItem(boxId + '-collapsed', 'true');
-        }
-    }
+    if (!content) return;
+    const collapse = !content.hidden;
+    setBoxCollapsed(box, collapse);
+    try {
+        localStorage.setItem(boxId + '-collapsed', String(collapse));
+    } catch (_e) {}
 }
 
 function setupDragAndDrop(containerId, reorderUrl) {
@@ -420,8 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'mission-data-toggle-box', function (el, event) {
-        toggleBox(event, el.getAttribute('data-box-id'));
+    window.krtEvents.on('click', 'mission-data-toggle-box', function (el) {
+        toggleBox(el.getAttribute('data-box-id'));
     });
 }
 

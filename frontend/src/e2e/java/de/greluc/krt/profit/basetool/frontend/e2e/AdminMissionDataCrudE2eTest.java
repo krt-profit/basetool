@@ -171,9 +171,10 @@ class AdminMissionDataCrudE2eTest {
 
         for (String[] filter : FILTERS) {
           Locator checkbox = page.locator("#" + filter[0]);
+          Locator toggle = page.locator("label.switch[for='" + filter[0] + "']");
           boolean before = checkbox.isChecked();
           page.waitForResponse(
-              response -> response.url().contains("fragment=" + filter[1]), checkbox::click);
+              response -> response.url().contains("fragment=" + filter[1]), toggle::click);
           page.waitForLoadState(LoadState.NETWORKIDLE);
 
           assertEquals(!before, checkbox.isChecked(), filter[0] + " must keep its toggled state");

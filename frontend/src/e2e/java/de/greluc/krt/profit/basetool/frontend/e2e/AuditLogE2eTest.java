@@ -107,6 +107,7 @@ class AuditLogE2eTest {
             page.locator("[data-testid='audit-row']").count() >= 1,
             "the Bank tab lists at least one event");
 
+        page.locator("[data-testid='page-head'] [data-testid='overflow-menu-toggle']").click();
         assertThat(page.locator("[data-testid='audit-purge-open']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         page.locator("[data-testid='audit-purge-open']").click();
@@ -117,19 +118,18 @@ class AuditLogE2eTest {
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         page.locator("[data-testid='audit-filter-event']").selectOption("DEPOSIT_BOOKED");
-        page.locator("[data-testid='audit-filter-apply']").click();
+        assertThat(page).hasURL(Pattern.compile(".*[?&]eventType=DEPOSIT_BOOKED.*"));
         assertThat(page.locator("[data-testid='audit-row']").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertTrue(
             page.locator("[data-testid='audit-row']").count() >= 1,
             "filtering by DEPOSIT_BOOKED still lists the seeded deposit");
-
-        assertThat(page).hasURL(Pattern.compile(".*[?&]eventType=DEPOSIT_BOOKED.*"));
         assertEquals(
             Boolean.TRUE,
             page.evaluate("() => window.__krtNoReload === true"),
             "Filtering the audit log must update in place — no page reload.");
 
+        E2eSupport.openFilterPanel(page);
         assertThat(page.locator("[data-testid='audit-filter-client']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
 
@@ -139,11 +139,11 @@ class AuditLogE2eTest {
         assertThat(page.locator("[data-testid='audit-panel']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
 
+        E2eSupport.openFilterPanel(page);
         assertThat(page.locator("[data-testid='audit-filter-client']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.locator("[data-testid='audit-filter-client']").selectOption("basetool-frontend");
-        page.locator("[data-testid='audit-filter-apply']").click();
         assertThat(page).hasURL(Pattern.compile(".*[?&]clientId=basetool-frontend.*"));
         assertEquals(
             Boolean.TRUE,

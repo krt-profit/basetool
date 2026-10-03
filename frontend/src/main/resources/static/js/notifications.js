@@ -114,21 +114,41 @@
             .catch(function () {});
     }
 
-    function buildItem(item) {
+    /**
+     * Builds one notification row.
+     *
+     * @param {any} item the server-localized notification view
+     * @param {boolean} [linkable] whether the row links to the page the notification is about
+     * @returns {HTMLLIElement} the row
+     */
+    function buildItem(item, linkable) {
         const li = document.createElement('li');
         li.className = 'notification-item' + (item.read ? ' is-read' : '');
         li.setAttribute('data-notif-id', item.id);
         li.setAttribute('data-notif-read', item.read ? 'true' : 'false');
 
+        const href =
+            linkable && typeof window.safeSameOriginUrl === 'function'
+                ? window.safeSameOriginUrl(item.href)
+                : null;
         const body = document.createElement('div');
         body.className = 'notification-item-body';
-        const text = document.createElement('p');
+        const text = document.createElement(href ? 'span' : 'p');
         text.className = 'notification-item-text';
         text.textContent = item.text != null ? item.text : '';
         const time = document.createElement('span');
         time.className = 'notification-item-time';
         time.textContent = item.createdAtDisplay != null ? item.createdAtDisplay : '';
-        body.appendChild(text);
+        if (href) {
+            const link = document.createElement('a');
+            link.className = 'row-link';
+            link.setAttribute('data-testid', 'row-link');
+            link.href = href;
+            link.appendChild(text);
+            body.appendChild(link);
+        } else {
+            body.appendChild(text);
+        }
         body.appendChild(time);
 
         const actions = document.createElement('div');
@@ -146,10 +166,28 @@
                 'btn btn-quiet-danger btn-icon',
             ),
         );
+        if (href) {
+            actions.appendChild(chevron());
+        }
 
         li.appendChild(body);
         li.appendChild(actions);
         return li;
+    }
+
+    /**
+     * The decorative chevron that ends a linked row.
+     *
+     * @returns {SVGSVGElement} the icon
+     */
+    function chevron() {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'row-chevron');
+        svg.setAttribute('aria-hidden', 'true');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', '#krt-icon-chevron-right');
+        svg.appendChild(use);
+        return svg;
     }
 
     function actionButton(attr, label, icon, className) {
@@ -375,7 +413,7 @@
                 }
                 data.items.forEach(function (item) {
                     if (!list.querySelector('[data-notif-id="' + cssEscape(item.id) + '"]')) {
-                        list.appendChild(buildItem(item));
+                        list.appendChild(buildItem(item, true));
                     }
                 });
                 btn.setAttribute('data-notif-next-page', String(page + 1));

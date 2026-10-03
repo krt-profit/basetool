@@ -1,6 +1,23 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
+    .xc-block {
+        margin-bottom: var(--space-6);
+    }
+    .xc-heading {
+        margin: 0;
+    }
+    .xc-switch-state,
+    .xc-hint {
+        margin: 0;
+    }
+    .xc-form-card .xc-heading {
+        margin-bottom: var(--space-4);
+    }
+    .xc-actions {
+        justify-content: flex-end;
+        flex-wrap: nowrap;
+    }
     .form-group label {
         display: block;
         margin-bottom: 0.4rem;
@@ -57,5 +74,23 @@
     .xc-undo-skipped {
         margin: 0.5rem 0 0;
         padding-left: 1rem;
+    }
+
+    @media (width <= 768px) {
+        .xc-actions {
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+        .xc-capabilities {
+            display: inline;
+            padding-left: 0;
+            list-style: none;
+        }
+        .xc-capabilities li {
+            display: inline;
+        }
+        .xc-capabilities li + li::before {
+            content: ', ';
+        }
     }
 }

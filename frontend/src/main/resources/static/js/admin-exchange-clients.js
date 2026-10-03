@@ -381,6 +381,13 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                 toggleSwitch(switchBtn);
                 return;
             }
+            if (target.closest('[data-xc-new]')) {
+                event.preventDefault();
+                resetForm();
+                el.form.scrollIntoView({ behavior: 'smooth' });
+                el.clientId.focus({ preventScroll: true });
+                return;
+            }
             const row = target.closest('[data-client-id]');
             if (!row || row === el.form) {
                 return;

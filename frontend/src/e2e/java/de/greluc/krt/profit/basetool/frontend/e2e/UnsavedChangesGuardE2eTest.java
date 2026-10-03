@@ -90,7 +90,9 @@ class UnsavedChangesGuardE2eTest {
 
           page.waitForResponse(
               r -> r.url().contains("/admin/terms") && r.url().contains("filter=ACCEPTED"),
-              () -> page.locator("#admin-terms-filter").selectOption("ACCEPTED"));
+              () ->
+                  page.locator("#admin-terms-filter-form [data-testid='segment-filter-accepted']")
+                      .click());
 
           leaveThroughBrandLinkUnguarded(page, "/admin/terms");
         });

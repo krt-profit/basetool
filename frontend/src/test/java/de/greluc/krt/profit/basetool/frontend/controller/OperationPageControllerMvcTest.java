@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,9 +57,11 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -133,6 +136,174 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("ACTIVE")))
         .andExpect(content().string(containsString("status-active")));
+  }
+
+  /**
+   * Renders {@code /operations} in German with the given page from the backend.
+   *
+   * @param page the page the backend returns
+   * @param query the query string, without {@code ?}
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private String renderList(PageResponse<OperationDto> page, String query) throws Exception {
+    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef()))
+        .thenReturn(page);
+    return mockMvc
+        .perform(get("/operations?" + query).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * An operation row as the search returns it.
+   *
+   * @param status the backend status string
+   * @param description the description, may be {@code null}
+   * @return the row
+   */
+  private static OperationDto listedOperation(String status, String description) {
+    return new OperationDto(
+        UUID.fromString("00000000-0000-0000-0000-000000000077"),
+        "Op Alpha",
+        description,
+        status,
+        null,
+        0L,
+        Instant.parse("2030-10-08T18:00:00Z"),
+        null,
+        null);
+  }
+
+  /**
+   * The list renders on pattern A: head with eyebrow, count and the one create action, toolbar,
+   * row-link table with a translated status and the admin's row delete, list foot.
+   */
+  @Test
+  @WithMockUser(roles = {"ADMIN", "MISSION_MANAGER"})
+  void operationsList_rendersTheListPattern() throws Exception {
+    String html =
+        renderList(
+            new PageResponse<>(
+                List.of(listedOperation("PLANNED", "Erste Operation")),
+                0,
+                20,
+                1L,
+                1,
+                List.of("createdAt,desc")),
+            "");
+
+    assertTrue(html.contains("class=\"page-head\""), "page head");
+    assertTrue(
+        Pattern.compile("class=\"page-eyebrow\"[^>]*>Einsatzplanung<").matcher(html).find(),
+        "eyebrow names the navigation area");
+    assertTrue(
+        Pattern.compile("data-testid=\"page-head-count\"[^>]*>1<").matcher(html).find(),
+        "count chip");
+    assertTrue(html.contains("data-list-count-for=\"operations-results\""));
+    assertFalse(html.contains("class=\"greeting"), "no greeting banner");
+    assertFalse(html.contains("hud-box"), "no hud-box");
+    String head =
+        html.substring(html.indexOf("class=\"page-head\""), html.indexOf("operations-filter-form"));
+    assertEquals(2, head.split("btn--cta", -1).length, "exactly one primary action in the head");
+    assertTrue(head.contains("data-modal-id=\"create-operation-modal\""), "create opens the modal");
+    assertTrue(html.contains("data-testid=\"toolbar-search\""));
+    assertTrue(html.contains("id=\"operation-search\""));
+    assertTrue(html.contains("data-testid=\"segment-period-upcoming\""));
+    assertTrue(
+        Pattern.compile("name=\"period\" value=\"UPCOMING\" checked=\"checked\"")
+            .matcher(html)
+            .find(),
+        "upcoming is the default segment");
+    assertTrue(html.contains("data-testid=\"operations-filter-toggle\""));
+    assertTrue(html.contains("data-filter-chips"));
+    assertTrue(html.contains("class=\"data-table data-table--stack operations-table\""));
+    assertTrue(
+        Pattern.compile(
+                "class=\"row-link\"[^>]*href=\"/operations/00000000-0000-0000-0000-000000000077\"")
+            .matcher(html)
+            .find(),
+        "the first column links the row");
+    assertTrue(html.contains("Erste Operation"), "the description is the row's sub line");
+    assertTrue(
+        Pattern.compile("class=\"status-pill status-planned\">GEPLANT<").matcher(html).find(),
+        "translated status");
+    assertFalse(html.contains(">PLANNED<"), "no raw status");
+    assertTrue(html.contains("data-trigger=\"operations-open-delete\""), "admin row delete");
+    assertTrue(html.contains("id=\"delete-operation-form\""));
+    assertTrue(html.contains("data-list-total=\"1\""));
+  }
+
+  /** An empty result renders the empty state and no table. */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationsList_rendersTheEmptyState() throws Exception {
+    String html =
+        renderList(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()), "");
+
+    assertTrue(html.contains("data-testid=\"empty-state\""));
+    assertTrue(html.contains("Keine Operationen gefunden."));
+    assertFalse(html.contains("data-table--stack"));
+    assertFalse(html.contains("data-list-total"));
+    assertFalse(html.contains("data-trigger=\"operations-open-delete\""));
+  }
+
+  /** The past segment relays only finished statuses and is selected from the URL. */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationsList_pastPeriod_relaysOnlyFinishedStatusesAndSelectsTheSegment() throws Exception {
+    String html =
+        renderList(
+            new PageResponse<>(
+                List.of(listedOperation("COMPLETED", null)), 0, 20, 1L, 1, List.of()),
+            "period=PAST");
+
+    List<String> relayed = relayedSearchUris();
+    assertEquals(1, relayed.size(), relayed.toString());
+    assertTrue(relayed.get(0).endsWith("&status=COMPLETED&status=CANCELED&"), relayed.get(0));
+    assertTrue(
+        Pattern.compile("name=\"period\" value=\"PAST\" checked=\"checked\"").matcher(html).find());
+    assertTrue(
+        Pattern.compile("class=\"status-pill status-completed\">ABGESCHLOSSEN<")
+            .matcher(html)
+            .find());
+  }
+
+  /** {@code showPast=true} still means all statuses; an unknown period falls back to upcoming. */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationsList_legacyShowPast_meansAllAndUnknownPeriodFallsBack() throws Exception {
+    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/operations").param("showPast", "true").param("fragment", "results"))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get("/operations").param("period", "SOMETIME").param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    List<String> relayed = relayedSearchUris();
+    assertEquals(2, relayed.size(), relayed.toString());
+    assertTrue(
+        relayed.get(0).endsWith("&status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&"),
+        relayed.get(0));
+    assertTrue(relayed.get(1).endsWith("&status=PLANNED&status=ACTIVE&"), relayed.get(1));
+  }
+
+  /**
+   * The operation-search URIs relayed to the backend so far, in call order.
+   *
+   * @return the relayed {@code /api/v1/operations/search} URI templates
+   */
+  private List<String> relayedSearchUris() {
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient, atLeastOnce()).get(uriCaptor.capture(), anyTypeRef());
+    return uriCaptor.getAllValues().stream()
+        .filter(uri -> uri.startsWith("/api/v1/operations/search?"))
+        .toList();
   }
 
   @Test

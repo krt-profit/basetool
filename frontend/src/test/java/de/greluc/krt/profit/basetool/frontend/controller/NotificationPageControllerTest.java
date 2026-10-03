@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -39,6 +40,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.MessageSource;
@@ -184,5 +186,76 @@ class NotificationPageControllerTest {
     ArgumentCaptor<Object> pageArg = ArgumentCaptor.captor();
     verify(backendApiClient).get(anyString(), anyTypeRef(), pageArg.capture(), any());
     assertEquals(0, pageArg.getValue());
+  }
+
+  /** A job-order notification links its order; without the order's id it links nothing. */
+  @Test
+  void targetOf_jobOrderLinksTheOrder() {
+    UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
+
+    assertEquals(
+        "/orders/" + orderId,
+        NotificationPageController.targetOf("JOB_ORDER_CREATED", "JOB_ORDER", orderId));
+    assertEquals(
+        "/orders/" + orderId,
+        NotificationPageController.targetOf(
+            "JOB_ORDER_UPDATED_BY_REQUESTER", "JOB_ORDER", orderId));
+    assertNull(NotificationPageController.targetOf("JOB_ORDER_CREATED", "JOB_ORDER", null));
+    assertNull(NotificationPageController.targetOf("JOB_ORDER_CREATED", "OTHER", orderId));
+  }
+
+  /** A notification whose subject is a page links that page; one without a page links nothing. */
+  @Test
+  void targetOf_pageSubjectsAndUnlinkedTypes() {
+    UUID id = UUID.randomUUID();
+
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_EXCHANGE_OFFER", id));
+    assertEquals(
+        "/connected-apps",
+        NotificationPageController.targetOf(
+            "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_INSTALLATION", id));
+    assertEquals(
+        "/profile",
+        NotificationPageController.targetOf(
+            "ACCOUNT_DELETION_REQUEST_DECLINED", "DELETION_REQUEST", id));
+    assertNull(
+        NotificationPageController.targetOf(
+            "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST", id));
+    assertNull(NotificationPageController.targetOf(null, null, null));
+  }
+
+  /** The page slice carries each row's link target for the load-more rows. */
+  @Test
+  void pageItems_carriesTheLinkTarget() {
+    UUID orderId = UUID.randomUUID();
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(), any()))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(
+                    new NotificationDto(
+                        UUID.randomUUID(),
+                        "JOB_ORDER_CREATED",
+                        null,
+                        "JOB_ORDER",
+                        orderId,
+                        false,
+                        null,
+                        0L,
+                        Instant.parse("2026-01-01T00:00:00Z"),
+                        null)),
+                1,
+                50,
+                51L,
+                2,
+                List.of()));
+    NotificationPageController controller = controllerWith(backendApiClient);
+
+    NotificationPageSliceDto slice = controller.pageItems(1);
+
+    assertEquals("/orders/" + orderId, slice.items().get(0).href());
   }
 }

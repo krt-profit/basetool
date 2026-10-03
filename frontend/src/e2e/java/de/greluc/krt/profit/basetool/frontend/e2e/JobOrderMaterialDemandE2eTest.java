@@ -217,11 +217,11 @@ class JobOrderMaterialDemandE2eTest {
   }
 
   /**
-   * The filter panel collapses, remembers the choice across a reload, and the toggle carries the
-   * active-filter count — the Lager idiom (REQ-INV-037) this page mirrors.
+   * The filter popover starts closed on every load, the filters it holds survive a reload, and the
+   * toggle carries the active-filter count (REQ-UI-027, REQ-UI-017).
    */
   @Test
-  void filterPanelCollapsesRemembersTheChoiceAndCountsActiveFilters() {
+  void filterPopoverStartsClosedKeepsTheFiltersAndCountsThem() {
     try (BrowserContext context = newContext()) {
       Page page = context.newPage();
       try {
@@ -241,7 +241,9 @@ class JobOrderMaterialDemandE2eTest {
         assertThat(count).containsText("1");
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
-        assertThat(page.locator("#demandFilterPanel")).isVisible();
+        assertThat(page.locator("#demandFilterPanel")).isHidden();
+        assertThat(page.locator("[data-testid='demand-filter-toggle']"))
+            .hasAttribute("aria-expanded", "false");
         assertThat(page.locator("[data-testid='demand-hide-covered']")).isChecked();
         assertThat(page.locator(".filter-toggle [data-filter-count]")).containsText("1");
       } catch (RuntimeException | AssertionError failure) {

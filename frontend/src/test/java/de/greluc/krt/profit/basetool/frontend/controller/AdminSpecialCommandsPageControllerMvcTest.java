@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,6 +109,52 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("admin/special-commands"))
         .andExpect(content().string(containsString("id=\"sc-results\"")));
+  }
+
+  /**
+   * The list follows the list pattern (REQ-UI-027): page head with the admin eyebrow, count and the
+   * one primary action, the include-inactive switch, and a row link to the special command instead
+   * of an "open" button.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_rendersTheListPattern() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+        .thenReturn(oneSpecialCommand());
+
+    String html =
+        mockMvc
+            .perform(get("/admin/special-commands").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .containsPattern("id=\"add-sc-btn\" class=\"btn btn--cta\"")
+        .contains("class=\"switch\" for=\"includeInactive\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .containsPattern("class=\"row-link\"[^>]*href=\"/organisation/special-commands/")
+        .doesNotContain("Mitglieder verwalten</a>")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    assertThat(html.split("btn--cta", -1)).hasSize(3);
+  }
+
+  /** An empty catalogue renders the empty state, not a bare text block. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_rendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/admin/special-commands"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(not(containsString("data-table--stack"))));
   }
 
   @Test

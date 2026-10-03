@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,6 +46,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -204,6 +206,71 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("Starter Pistol")))
         .andExpect(content().string(not(containsString("<main"))))
         .andExpect(content().string(not(containsString("krt-dbp-list-host"))));
+  }
+
+  /**
+   * The page renders on the list pattern (REQ-UI-027): page head with the master-data eyebrow and
+   * count, no banner or hud-box, and the stacked table inside a flush card.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void page_rendersTheListPattern() throws Exception {
+    DefaultBlueprintDto entry =
+        new DefaultBlueprintDto(
+            UUID.randomUUID(), "starter_pistol", "Starter Pistol", null, null, "system", null, 0L);
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(List.of(entry));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/default-blueprints").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .contains("data-list-count-for=\"krt-dbp-list-host\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("krt-admin-banner")
+        .contains("id=\"krt-dbp-list-host\" class=\"card card--flush\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("data-list-total=\"1\"")
+        .doesNotContain("colspan");
+    assertThat(html.split("btn--cta", -1)).hasSize(2);
+  }
+
+  /**
+   * An empty default set renders the empty state instead of a colspan row.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void rowsFragment_emptySet_rendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(List.of());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/default-blueprints")
+                    .param("fragment", "rows")
+                    .header("X-Requested-With", "XMLHttpRequest"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .doesNotContain("data-table--stack")
+        .doesNotContain("colspan")
+        .doesNotContain("data-list-total");
   }
 
   @Test

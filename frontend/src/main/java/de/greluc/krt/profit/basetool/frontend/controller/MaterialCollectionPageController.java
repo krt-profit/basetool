@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCollectionEntryD
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.view.MaterialCollectionGroup;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -73,7 +74,8 @@ public class MaterialCollectionPageController {
    *
    * @param jobOrderId job order id passed through to the template
    * @param fragment when {@code results}, render only the {@code collectionResults} fragment
-   * @param model Thymeleaf model populated with {@code jobOrderId}, {@code entries}, {@code
+   * @param model Thymeleaf model populated with {@code jobOrderId}, {@code entries}, the
+   *     per-material {@code materialGroups}, the overall {@code collectionProgress} and {@code
    *     locations}
    * @return the {@code material-collection} view name, or its {@code collectionResults} fragment
    */
@@ -105,7 +107,11 @@ public class MaterialCollectionPageController {
     }
 
     model.addAttribute("jobOrderId", jobOrderId);
+    List<MaterialCollectionGroup> materialGroups =
+        MaterialCollectionGroup.of(entries == null ? List.of() : entries);
     model.addAttribute("entries", entries);
+    model.addAttribute("materialGroups", materialGroups);
+    model.addAttribute("collectionProgress", MaterialCollectionGroup.total(materialGroups));
     model.addAttribute("locations", locations);
     if ("results".equals(fragment)) {
       return "material-collection :: collectionResults";

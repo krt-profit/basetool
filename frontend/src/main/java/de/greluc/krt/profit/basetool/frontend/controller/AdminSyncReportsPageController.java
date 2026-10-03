@@ -262,6 +262,7 @@ public class AdminSyncReportsPageController {
         model.addAttribute("currentPage", events.page());
         model.addAttribute("totalPages", events.totalPages());
         model.addAttribute("totalElements", events.totalElements());
+        model.addAttribute("eventsPage", events);
       } else {
         populateEmpty(model);
       }

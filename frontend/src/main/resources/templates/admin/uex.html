@@ -12,9 +12,15 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.uex.title}">UEX-Daten verwalten</h1>
-        <div class="uex-sync-stamp">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.uex.title},
+        count=${starSystems != null ? starSystems.size() : 0}, countId='uex-count', actions=~{::uex-actions})}">
+        <th:block th:ref="uex-actions">
+            <a th:href="@{/admin/sync-reports/uex}" class="btn btn-ghost" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>
+        </th:block>
+    </th:block>
+
+    <div class="uex-status cluster gap-3" data-testid="uex-sync-status">
+        <span class="uex-sync-stamp">
             <span class="uex-sync-stamp__label" th:text="#{admin.terminal.uexLastSync}">Letzter UEX-Sync</span>
             <span th:if="${latestUexSync != null}"
                   class="uex-sync-stamp__value local-datetime-display"
@@ -23,34 +29,30 @@
             <span th:if="${latestUexSync == null}"
                   class="uex-sync-stamp__value unknown"
                   th:text="#{admin.terminal.uexLastSync.never}">noch nicht gesynct</span>
-        </div>
-        <div class="uex-summary-chips">
-            <span class="chip"><strong th:text="${starSystems != null ? starSystems.size() : 0}">0</strong><span th:text="#{admin.uex.summary.systems}">Sternsysteme</span></span>
-            <span class="chip"><strong th:text="${totalCities}">0</strong><span th:text="#{admin.uex.summary.cities}">Staedte</span></span>
-            <span class="chip"><strong th:text="${totalStations}">0</strong><span th:text="#{admin.uex.summary.stations}">Raumstationen</span></span>
-            <span class="chip"><strong th:text="${totalOutposts}">0</strong><span th:text="#{admin.uex.summary.outposts}">Aussenposten</span></span>
-            <span class="chip"><strong th:text="${totalPois}">0</strong><span th:text="#{admin.uex.summary.pois}">POIs</span></span>
-            <span class="chip"><strong th:text="${totalTerminals}">0</strong><span th:text="#{admin.uex.summary.terminals}">Terminals</span></span>
-        </div>
+        </span>
+        <span class="chip"><strong th:text="${starSystems != null ? starSystems.size() : 0}">0</strong><span th:text="#{admin.uex.summary.systems}">Sternsysteme</span></span>
+        <span class="chip"><strong th:text="${totalCities}">0</strong><span th:text="#{admin.uex.summary.cities}">St&auml;dte</span></span>
+        <span class="chip"><strong th:text="${totalStations}">0</strong><span th:text="#{admin.uex.summary.stations}">Raumstationen</span></span>
+        <span class="chip"><strong th:text="${totalOutposts}">0</strong><span th:text="#{admin.uex.summary.outposts}">Au&szlig;enposten</span></span>
+        <span class="chip"><strong th:text="${totalPois}">0</strong><span th:text="#{admin.uex.summary.pois}">POIs</span></span>
+        <span class="chip"><strong th:text="${totalTerminals}">0</strong><span th:text="#{admin.uex.summary.terminals}">Terminals</span></span>
     </div>
 
     <th:block th:if="${catalogTruncated}">
-        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mt-2')}"></div>
+        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
     </th:block>
 
-    <div class="hud-box mt-2">
-        <div class="flex-between-mb">
-            <h2 th:text="#{admin.uex.systems.heading}">Sternsysteme</h2>
-            <div class="form-group krtm-margin-bottom-0-width-320px-position-relativ-19ed">
-                <input type="text" id="filterUex" th:placeholder="#{general.filter.name.placeholder}" autocomplete="off">
-            </div>
-        </div>
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler</div>
 
-        <p th:if="${error}" class="error-message" th:text="#{${error}}">Fehler</p>
+    <div class="toolbar">
+        <th:block th:replace="~{fragments/components :: toolbarSearch('filterUex', 'q', null, 'general.filter.name.placeholder')}"></th:block>
+    </div>
 
-        <p th:if="${starSystems == null or starSystems.isEmpty()}"
-           class="uex-empty-hint"
-           th:text="#{admin.uex.empty.systems}">Keine UEX-Daten geladen.</p>
+    <div th:if="${starSystems == null or starSystems.isEmpty()}" class="card card--flush">
+        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.uex.empty.title', textKey='admin.uex.empty.systems')}"></th:block>
+    </div>
+
+    <div class="uex-tree">
 
         <details class="uex-system" open
                  th:each="system : ${starSystems}"
@@ -105,7 +107,7 @@
                            class="uex-empty-hint"
                            th:text="#{admin.uex.empty.terminals}">Keine Terminals erfasst.</p>
                         <div th:if="${!cityNode.terminals.isEmpty()}" class="table-responsive">
-                            <table class="terminal-table">
+                            <table class="data-table terminal-table">
                                 <thead>
                                     <tr>
                                         <th th:text="#{admin.terminal.name}">Name</th>
@@ -166,7 +168,7 @@
                            class="uex-empty-hint"
                            th:text="#{admin.uex.empty.terminals}">Keine Terminals erfasst.</p>
                         <div th:if="${!stationNode.terminals.isEmpty()}" class="table-responsive">
-                            <table class="terminal-table">
+                            <table class="data-table terminal-table">
                                 <thead>
                                     <tr>
                                         <th th:text="#{admin.terminal.name}">Name</th>
@@ -194,7 +196,7 @@
                    class="uex-empty-hint"
                    th:text="#{admin.uex.empty.outposts}">Keine Aussenposten in diesem System.</p>
                 <div th:if="${!system.outposts.isEmpty()}" class="table-responsive">
-                    <table>
+                    <table class="data-table data-table--stack">
                         <thead>
                             <tr>
                                 <th th:text="#{admin.terminal.name}">Name</th>
@@ -204,9 +206,9 @@
                         </thead>
                         <tbody>
                             <tr th:each="outpost : ${system.outposts}" class="uex-row-outpost" th:attr="data-name=${outpost.name}">
-                                <td th:text="${outpost.name}">Name</td>
-                                <td th:text="${outpost.planetName}">Planet</td>
-                                <td>
+                                <td><span class="cell-title" th:text="${outpost.name}">Name</span></td>
+                                <td th:attr="data-label=#{admin.uex_locations.planet}" th:text="${outpost.planetName}">Planet</td>
+                                <td th:attr="data-label=#{admin.uex.flag.column.loadingDock}">
                                     <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                                         <form method="post" th:action="@{/admin/uex-data/outposts/{id}/loading-dock(id=${outpost.id})}" class="m-0">
                                             <input type="hidden" name="action" value="uex">
@@ -235,7 +237,7 @@
                    class="uex-empty-hint"
                    th:text="#{admin.uex.empty.pois}">Keine POIs in diesem System.</p>
                 <div th:if="${!system.pois.isEmpty()}" class="table-responsive">
-                    <table>
+                    <table class="data-table data-table--stack">
                         <thead>
                             <tr>
                                 <th th:text="#{admin.terminal.name}">Name</th>
@@ -245,9 +247,9 @@
                         </thead>
                         <tbody>
                             <tr th:each="poi : ${system.pois}" class="uex-row-poi" th:attr="data-name=${poi.name}">
-                                <td th:text="${poi.name}">Name</td>
-                                <td th:text="${poi.planetName}">Planet</td>
-                                <td>
+                                <td><span class="cell-title" th:text="${poi.name}">Name</span></td>
+                                <td th:attr="data-label=#{admin.uex_locations.planet}" th:text="${poi.planetName}">Planet</td>
+                                <td th:attr="data-label=#{admin.uex.flag.column.loadingDock}">
                                     <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                                         <form method="post" th:action="@{/admin/uex-data/pois/{id}/loading-dock(id=${poi.id})}" class="m-0">
                                             <input type="hidden" name="action" value="uex">
@@ -274,7 +276,7 @@
                         (<span th:text="${system.orphanTerminals.size()}">0</span>)
                     </h3>
                     <div class="table-responsive">
-                        <table class="terminal-table">
+                        <table class="data-table terminal-table">
                             <thead>
                                 <tr>
                                     <th th:text="#{admin.terminal.name}">Name</th>

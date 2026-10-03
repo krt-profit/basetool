@@ -162,6 +162,10 @@
             setCollapsed(panel, collapsed);
             if (transient) {
                 if (!collapsed) {
+                    panel.classList.remove('filter-popover__panel--start');
+                    if (panel.getBoundingClientRect().left < 0) {
+                        panel.classList.add('filter-popover__panel--start');
+                    }
                     const first = /** @type {HTMLElement | null} */ (
                         panel.querySelector('input:not([type="hidden"]), select, textarea, button')
                     );

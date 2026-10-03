@@ -4,6 +4,19 @@
 
 ### Added
 
+- **Listenseiten im neuen Muster (Phase 1).** Einsätze, Operationen, Benachrichtigungen, Aufträge,
+  Materialbedarf, Lager, Sammelübersichten, Materialien, Mitglieder, Beförderung und alle
+  Admin-Listen haben einen Seitenkopf mit Zähler, eine Werkzeugleiste mit Suche, Segment-Schalter und
+  Filter-Popover, entfernbare Filter-Chips und Tabellen, deren Zeile der Link ist und die auf dem
+  Smartphone stapeln; Status sind übersetzt, leere Listen zeigen einen Leerzustand (REQ-UI-027).
+- **Einsätze und Operationen: Zeitraum „Kommend · Vergangen · Alle".** Ersetzt die Checkbox
+  „Vergangene anzeigen"; die gespeicherte Auswahl wird übernommen.
+- **Benachrichtigungen: „Ungelesen · Alle" und Links.** Die Seite zeigt zunächst nur Ungelesenes;
+  Benachrichtigungen zu Aufträgen, Materialbörse, verbundenen Anwendungen und Admin-Vorgängen
+  führen direkt zur Seite (REQ-NOTIF-022).
+- **Auftragsverwaltung: „Meine · Alle".** Wer beides sehen darf, wechselt zwischen eigenen und allen
+  Aufträgen (REQ-ORDERS-038).
+
 - **Neues Erscheinungsbild der Website, Grundlage (Phase 0).** Fließtext in Lato 400 statt 300, nur
   noch die Seitentitel orange, Zwischenüberschriften weiß; dazu neue Bausteine für Seitenkopf mit
   „⋯“-Menü, Werkzeugleiste mit Filter-Chips, Segment-Schalter, Listentabellen, die auf dem Smartphone

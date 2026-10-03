@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -156,8 +158,59 @@ class AdminOrgStructurePageControllerMvcTest {
     mockMvc
         .perform(get("/admin/org-structure").param("fragment", "bogus"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("org-units-table")))
+        .andExpect(content().string(containsString("id=\"org-structure-units\"")))
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
         .andExpect(content().string(containsString("bereich-form")));
+  }
+
+  /**
+   * The page renders on the list pattern: page head under the "Benutzer &amp; Inhalte" group with
+   * the unit count, the units as a stacked data table with the kind translated, the create forms as
+   * cards, no HUD box.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void page_admin_rendersTheListPattern() throws Exception {
+    UUID olId = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new OrgUnitNodeDto(
+                    olId, "Organisationsleitung KRT", "OL", "ORGANISATIONSLEITUNG", null, null, 0L),
+                new OrgUnitNodeDto(
+                    UUID.fromString("00000000-0000-0000-0000-0000000000a2"),
+                    "Bereich Profit",
+                    "PRF",
+                    "BEREICH",
+                    olId,
+                    "PROFIT",
+                    0L)));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/org-structure").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>2<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertThat(main.split("btn--cta", -1)).hasSize(2);
+    assertThat(main)
+        .doesNotContain("krtm-")
+        .doesNotContain("colspan")
+        .contains("id=\"org-structure-units\" class=\"card card--flush\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .containsPattern("class=\"cell-title\">Bereich Profit<")
+        .containsPattern("data-label=\"Art\">Bereich<")
+        .doesNotContain(">BEREICH<")
+        .doesNotContain("data-testid=\"empty-state\"");
   }
 
   @Test

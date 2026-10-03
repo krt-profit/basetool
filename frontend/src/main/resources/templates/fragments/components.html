@@ -24,7 +24,7 @@
 
 <div th:fragment="emptyState" class="empty-state" data-testid="empty-state" th:id="${emptyId}">
   <th:block th:replace="~{fragments/components :: emptyStateBody(${titleKey}, ${textKey}, ${filterHintKey})}"></th:block>
-  <a th:if="${actionHref != null and actionKey != null}" class="btn btn-outline btn-sm" th:href="${actionHref}"
+  <a th:if="${actionHref != null and actionKey != null}" class="btn btn-outline" th:href="${actionHref}"
      data-testid="empty-state-action" th:text="#{__${actionKey}__}">Aktion</a>
 </div>
 

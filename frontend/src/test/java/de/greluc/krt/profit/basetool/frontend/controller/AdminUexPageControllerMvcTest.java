@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,11 +29,13 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,6 +94,27 @@ class AdminUexPageControllerMvcTest {
         false,
         null,
         false);
+  }
+
+  /**
+   * The page carries the page head with the admin eyebrow, the sync status line and the toolbar
+   * search, no greeting banner or HUD box, and the empty state when no systems are loaded.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_rendersThePageHeadAndEmptyState() throws Exception {
+    mockMvc
+        .perform(get("/admin/uex-data").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"page-head\"")))
+        .andExpect(content().string(containsString("data-testid=\"page-eyebrow\">Stammdaten<")))
+        .andExpect(content().string(containsString("data-testid=\"uex-sync-status\"")))
+        .andExpect(content().string(containsString("id=\"filterUex\"")))
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(containsString("href=\"/admin/sync-reports/uex\"")))
+        .andExpect(content().string(not(containsString("class=\"greeting"))))
+        .andExpect(content().string(not(containsString("hud-box"))))
+        .andExpect(content().string(not(containsString("btn--cta"))));
   }
 
   @Test

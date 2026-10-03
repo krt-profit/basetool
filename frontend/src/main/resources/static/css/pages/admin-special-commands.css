@@ -1,9 +1,6 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    .data-section {
-        margin-bottom: 3rem;
-    }
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
@@ -18,5 +15,19 @@
         color: var(--color-gray-1);
         font-family: var(--font-body);
         box-sizing: border-box;
+    }
+    .sc-row--inactive td:not(.cell-actions) {
+        opacity: 0.6;
+    }
+    .sc-desc {
+        max-width: 40rem;
+        word-break: break-word;
+    }
+    .sc-inline-form {
+        display: inline-block;
+        margin: 0;
+    }
+    .sc-delete-name {
+        color: var(--color-primary);
     }
 }

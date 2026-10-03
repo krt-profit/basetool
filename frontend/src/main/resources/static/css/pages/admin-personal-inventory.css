@@ -1,0 +1,15 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .krt-pi-userform {
+        margin-bottom: var(--space-4);
+    }
+    .krt-pi-filter {
+        display: block;
+        margin: var(--space-4) 0 0;
+    }
+    .krt-pi-note {
+        word-break: break-word;
+        max-width: 40rem;
+    }
+}

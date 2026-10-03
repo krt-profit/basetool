@@ -2,7 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{notifications.title} + ' - ' + ${appTitle}">Notifications - Profit Basetool</title>
-    <th:block th:fragment="extraLinks"></th:block>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/notifications.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -10,29 +12,37 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{notifications.title}">Benachrichtigungen</h1>
-        <p th:text="#{notifications.subtitle}">Deine pers&#246;nlichen Benachrichtigungen.</p>
-    </div>
-
-    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
-        <p th:text="#{${error}}">Fehler beim Laden.</p>
-    </div>
-
-    <div class="hud-box mt-2">
-        <div class="notification-page-actions">
-            <button type="button" class="btn btn-secondary" data-notif-mark-all
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.personal', titleText=#{notifications.title},
+        actions=~{::notifications-actions})}">
+        <th:block th:ref="notifications-actions">
+            <button type="button" class="btn btn-ghost" data-notif-mark-all data-testid="notifications-mark-all"
                     th:text="#{notifications.markAllRead}">Alle als gelesen markieren</button>
-            <button type="button" class="btn btn-secondary" data-notif-clear-read
-                    th:text="#{notifications.clearRead}">Gelesene l&#246;schen</button>
-        </div>
+            <th:block th:replace="~{fragments/components :: overflowMenu(id='notifications-more', items=~{::notifications-more-items})}">
+                <th:block th:ref="notifications-more-items">
+                    <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                            data-notif-clear-read data-testid="notifications-clear-read"
+                            th:text="#{notifications.clearRead}">Gelesene l&#246;schen</button>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
 
+    <div th:if="${error}" class="alert alert-danger" th:text="#{${error}}">Fehler beim Laden.</div>
+
+    <div class="toolbar" id="notifications-toolbar">
+        <th:block th:replace="~{fragments/components :: segmented(name='filter', labelKey='notifications.filter.label', selected='UNREAD',
+            options=${ {{value: 'UNREAD', labelKey: 'notifications.filter.unread'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
+    </div>
+
+    <div id="notification-inbox" class="card card--flush notification-inbox" data-notif-filter="unread">
         <ul class="notification-list" id="notification-page-list">
             <li th:each="n : ${notifications}" class="notification-item"
                 th:classappend="${n.read} ? 'is-read' : ''"
                 th:attr="data-notif-id=${n.id},data-notif-read=${n.read}">
                 <div class="notification-item-body">
-                    <p class="notification-item-text" th:text="${n.text}">Notification text</p>
+                    <a th:if="${n.href != null}" class="row-link" data-testid="row-link" th:href="@{${n.href}}"
+                       ><span class="notification-item-text" th:text="${n.text}">Notification text</span></a>
+                    <p th:if="${n.href == null}" class="notification-item-text" th:text="${n.text}">Notification text</p>
                     <span class="notification-item-time" th:text="${n.createdAtDisplay}">2026-01-01 00:00 UTC</span>
                 </div>
                 <div class="notification-item-actions">
@@ -45,21 +55,26 @@
                             th:title="#{notifications.delete}" th:aria-label="#{notifications.delete}">
                         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"></use></svg>
                     </button>
+                    <svg th:if="${n.href != null}" class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
                 </div>
             </li>
         </ul>
-        <p class="notification-empty" data-notif-empty
-           th:classappend="${#lists.isEmpty(notifications)} ? '' : 'notification-badge-hidden'"
-           th:text="#{notifications.empty}">Keine Benachrichtigungen</p>
-        <div class="notification-page-more" th:if="${notifHasMore}">
+        <div data-notif-empty th:classappend="${#lists.isEmpty(notifications)} ? '' : 'notification-badge-hidden'">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='notifications.empty', textKey='notifications.empty.text')}"></th:block>
+        </div>
+        <div class="notification-inbox__unread-empty" data-testid="notifications-unread-empty">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='notifications.empty.unread', textKey='notifications.empty.unread.text')}"></th:block>
+        </div>
+        <div class="notification-page-more list-foot" th:if="${notifHasMore}">
             <p class="notification-page-hint" data-notif-hint
                th:attr="data-notif-hint-template=#{notifications.showingLatest('{shown}', '{total}')}"
                th:text="#{notifications.showingLatest(${#lists.size(notifications)}, ${notifTotal})}">Zeige die neuesten 50 von 123 Benachrichtigungen</p>
-            <button type="button" class="btn btn-secondary" data-notif-load-more
+            <button type="button" class="btn btn-ghost" data-notif-load-more
                     data-notif-next-page="1"
                     th:text="#{notifications.loadMore}">Mehr laden</button>
         </div>
     </div>
 </main>
+<script th:src="@{/js/notifications-page.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

@@ -14,50 +14,54 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.mission_data.title}">Missionsdaten verwalten</h1>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.mission_data.title})}"></th:block>
 
-    <div class="hud-box data-section mt-2" id="squadrons-box">
-        <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="squadrons-box">
-            <h2 th:text="#{admin.mission_data.squadrons}" class="m-0">Staffeln</h2>
-            <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
-                <form th:action="@{/admin/mission-data}" method="get" id="squadron-filter-form" class="no-track m-0 flex-gap-sm">
+    <section class="card card--flush md-box" id="squadrons-box">
+        <div class="card-head md-box__head">
+            <h2 class="card-title" th:text="#{admin.mission_data.squadrons}">Staffeln</h2>
+            <div class="cluster gap-3">
+                <form th:action="@{/admin/mission-data}" method="get" id="squadron-filter-form" class="no-track md-filter">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
-                    <input type="checkbox" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}">
-                    <label for="includeInactiveSquadrons" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</label>
+                    <label class="switch" for="includeInactiveSquadrons">
+                        <input type="checkbox" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}">
+                        <span class="switch__track" aria-hidden="true"></span>
+                        <span th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</span>
+                    </label>
                 </form>
-                <button id="add-squadron-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/squadrons}" th:text="#{admin.squadron.create}">Neue Staffel</button>
-                <span class="toggle-icon krtm-font-size-1-5rem-color-var-color-primary-fon-d51a">-</span>
+                <button type="button" id="add-squadron-btn" class="btn btn-ghost" th:data-action="@{/admin/mission-data/squadrons}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{admin.squadron.create}">Neue Staffel</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon md-box__toggle" data-trigger="mission-data-toggle-box" data-box-id="squadrons-box"
+                        aria-expanded="true" aria-controls="squadrons-results"
+                        th:attr="aria-label=#{admin.mission_data.toggle},title=#{admin.mission_data.toggle}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg></button>
             </div>
         </div>
-        
+
         <div class="box-content" id="squadrons-results">
             <th:block th:fragment="squadrons-results">
             <th:block th:if="${squadronsTruncated}">
-                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
+                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
             </th:block>
-            <div class="table-responsive">
-            <table>
+            <table th:if="${!#lists.isEmpty(squadrons)}" class="data-table data-table--stack">
                 <thead>
                     <tr>
                         <th th:text="#{admin.squadron.name}">Name</th>
-                        <th th:text="#{admin.squadron.shorthand}">Kürzel</th>
+                        <th th:text="#{admin.squadron.shorthand}">K&uuml;rzel</th>
                         <th th:text="#{admin.squadron.description}">Beschreibung</th>
-                        <th>Aktion</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="sq : ${squadrons}" th:classappend="${!sq.active} ? 'krtm-opacity-06' : ''">
+                    <tr th:each="sq : ${squadrons}" th:classappend="${!sq.active} ? 'md-row--inactive' : ''">
                         <td>
-                            <span th:text="${sq.name}">Name</span>
-                            <span th:if="${!sq.active}" class="badge-inactive" th:text="#{admin.squadron.inactive}">Inaktiv</span>
+                            <span class="cell-title"><span th:text="${sq.name}">Name</span><span th:if="${!sq.active}" class="badge-inactive" th:text="#{admin.squadron.inactive}">Inaktiv</span></span>
                         </td>
-                        <td th:text="${sq.shorthand}">Kürzel</td>
-                        <td th:text="${sq.description}">Desc</td>
-                        <td class="flex-gap-xs">
-                            <button class="btn btn-ghost btn-icon edit-squadron-btn"
+                        <td th:attr="data-label=#{admin.squadron.shorthand}" th:text="${sq.shorthand}">K&uuml;rzel</td>
+                        <td class="md-desc" th:text="${sq.description}">Desc</td>
+                        <td class="cell-actions">
+                            <button type="button" class="btn btn-ghost btn-icon edit-squadron-btn"
                                     th:data-action="@{/admin/mission-data/squadrons/{id}/update(id=${sq.id})}"
                                     th:data-id="${sq.id}"
                                     th:data-name="${sq.name}"
@@ -68,63 +72,72 @@
                             <button th:if="${sq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                     th:data-action="@{/admin/mission-data/squadrons/{id}/delete(id=${sq.id})}"
                                     th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            <form th:if="${!sq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/squadrons/{id}/activate(id=${sq.id})}" method="post" class="m-0">
-                                <button type="submit" class="btn btn-ghost" th:text="#{admin.squadron.activate}">Aktivieren</button>
+                            <form th:if="${!sq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/squadrons/{id}/activate(id=${sq.id})}" method="post" class="md-inline-form">
+                                <button type="submit" class="btn btn-success btn-xs" th:text="#{admin.squadron.activate}">Aktivieren</button>
                             </form>
                         </td>
                     </tr>
                 </tbody>
             </table>
-            </div>
+            <th:block th:if="${#lists.isEmpty(squadrons)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.mission_data.empty.title', textKey='admin.mission_data.empty.squadrons')}"></th:block>
+            </th:block>
             </th:block>
         </div>
-    </div>
+    </section>
 
-    <div class="hud-box data-section mt-2" id="jobtypes-box">
-        <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="jobtypes-box">
-            <h2 th:text="#{admin.mission_data.job_types}" class="m-0">Aufgabenwünsche</h2>
-            <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
-                <form th:action="@{/admin/mission-data}" method="get" id="jobtype-filter-form" class="no-track m-0 flex-gap-sm">
+    <section class="card card--flush md-box" id="jobtypes-box">
+        <div class="card-head md-box__head">
+            <h2 class="card-title" th:text="#{admin.mission_data.job_types}">Aufgaben</h2>
+            <div class="cluster gap-3">
+                <form th:action="@{/admin/mission-data}" method="get" id="jobtype-filter-form" class="no-track md-filter">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
-                    <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}">
-                    <label for="includeInactiveJobTypes" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
+                    <label class="switch" for="includeInactiveJobTypes">
+                        <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}">
+                        <span class="switch__track" aria-hidden="true"></span>
+                        <span th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</span>
+                    </label>
                 </form>
-                <button id="add-jobtype-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/job-types}" th:text="#{admin.job_type.create}">Neuer Job</button>
-                <span class="toggle-icon krtm-font-size-1-5rem-color-var-color-primary-fon-d51a">-</span>
+                <button type="button" id="add-jobtype-btn" class="btn btn-ghost" th:data-action="@{/admin/mission-data/job-types}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{admin.job_type.create}">Neue Aufgabe</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon md-box__toggle" data-trigger="mission-data-toggle-box" data-box-id="jobtypes-box"
+                        aria-expanded="true" aria-controls="jobtypes-results"
+                        th:attr="aria-label=#{admin.mission_data.toggle},title=#{admin.mission_data.toggle}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg></button>
             </div>
         </div>
 
         <div class="box-content" id="jobtypes-results">
             <th:block th:fragment="jobtypes-results">
             <th:block th:if="${jobTypesTruncated}">
-                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
+                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
             </th:block>
-            <div class="table-responsive">
-            <table>
+            <table th:if="${!#lists.isEmpty(jobTypes)}" class="data-table data-table--stack">
                 <thead>
                     <tr>
                         <th th:text="#{admin.job_type.name}">Name</th>
                         <th th:text="#{admin.job_type.archetype}">Archetyp</th>
-                        <th th:text="#{admin.job_type.is_leadership_role}">Führungsposition</th>
+                        <th th:text="#{admin.job_type.is_leadership_role}">F&uuml;hrungsposition</th>
                         <th th:text="#{admin.job_type.description}">Beschreibung</th>
-                        <th>Aktion</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="job : ${jobTypes}" th:classappend="${!job.active} ? 'krtm-opacity-06' : ''">
+                    <tr th:each="job : ${jobTypes}" th:classappend="${!job.active} ? 'md-row--inactive' : ''">
                         <td>
-                            <span th:text="${job.name}">Name</span>
-                            <span th:if="${!job.active}" class="badge-inactive" th:text="#{admin.job_type.inactive}">Inaktiv</span>
+                            <span class="cell-title"><span th:text="${job.name}">Name</span><span th:if="${!job.active}" class="badge-inactive" th:text="#{admin.job_type.inactive}">Inaktiv</span></span>
                         </td>
-                        <td th:text="${job.archetype}">Archetype</td>
-                        <td>
-                            <span th:text="${job.isLeadershipRole ? 'Ja' : 'Nein'}">Leadership</span>
+                        <td th:attr="data-label=#{admin.job_type.archetype}"
+                            th:text="${job.archetype == null} ? '—' : (${#messages.msgOrNull('admin.job_type.archetype.' + job.archetype)} ?: ${job.archetype})">Einsatz</td>
+                        <td th:attr="data-label=#{admin.job_type.is_leadership_role}">
+                            <span th:text="${job.isLeadershipRole} ? #{general.yes} : #{general.no}">Ja</span>
                             <span th:if="${job.isMissionLead}" class="chip chip--primary chip-xs" th:text="#{admin.job_type.is_mission_lead}">Einsatzleiter</span>
                         </td>
-                        <td th:text="${job.description}">Desc</td>
-                        <td class="flex-gap-xs">
-                            <button class="btn btn-ghost btn-icon edit-jobtype-btn"
+                        <td class="md-desc" th:text="${job.description}">Desc</td>
+                        <td class="cell-actions">
+                            <button type="button" class="btn btn-ghost btn-icon edit-jobtype-btn"
                                     th:data-action="@{/admin/mission-data/job-types/{id}/update(id=${job.id})}"
                                     th:data-id="${job.id}"
                                     th:data-name="${job.name}"
@@ -137,57 +150,65 @@
                             <button th:if="${job.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                     th:data-action="@{/admin/mission-data/job-types/{id}/delete(id=${job.id})}"
                                     th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            <form th:if="${!job.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/job-types/{id}/activate(id=${job.id})}" method="post" class="m-0">
-                                <button type="submit" class="btn btn-ghost" th:text="#{admin.job_type.activate}">Aktivieren</button>
+                            <form th:if="${!job.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/job-types/{id}/activate(id=${job.id})}" method="post" class="md-inline-form">
+                                <button type="submit" class="btn btn-success btn-xs" th:text="#{admin.job_type.activate}">Aktivieren</button>
                             </form>
                         </td>
                     </tr>
                 </tbody>
             </table>
-            </div>
+            <th:block th:if="${#lists.isEmpty(jobTypes)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.mission_data.empty.title', textKey='admin.mission_data.empty.jobTypes')}"></th:block>
+            </th:block>
             </th:block>
         </div>
-    </div>
+    </section>
 
-    <div class="hud-box data-section mt-2" id="freqtypes-box">
-        <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="freqtypes-box">
-            <h2 th:text="#{admin.mission_data.frequency_types}" class="m-0">Frequenztypen</h2>
-            <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
-                <form th:action="@{/admin/mission-data}" method="get" id="freqtype-filter-form" class="no-track m-0 flex-gap-sm">
+    <section class="card card--flush md-box" id="freqtypes-box">
+        <div class="card-head md-box__head">
+            <h2 class="card-title" th:text="#{admin.mission_data.frequency_types}">Frequenztypen</h2>
+            <div class="cluster gap-3">
+                <form th:action="@{/admin/mission-data}" method="get" id="freqtype-filter-form" class="no-track md-filter">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
-                    <input type="checkbox" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}">
-                    <label for="includeInactiveFrequencyTypes" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
+                    <label class="switch" for="includeInactiveFrequencyTypes">
+                        <input type="checkbox" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}">
+                        <span class="switch__track" aria-hidden="true"></span>
+                        <span th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</span>
+                    </label>
                 </form>
-                <button id="add-freqtype-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/frequency-types}" th:text="#{admin.frequency_type.create}">Neuer Frequenztyp</button>
-                <span class="toggle-icon krtm-font-size-1-5rem-color-var-color-primary-fon-d51a">-</span>
+                <button type="button" id="add-freqtype-btn" class="btn btn-ghost" th:data-action="@{/admin/mission-data/frequency-types}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{admin.frequency_type.create}">Neuer Frequenztyp</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon md-box__toggle" data-trigger="mission-data-toggle-box" data-box-id="freqtypes-box"
+                        aria-expanded="true" aria-controls="freqtypes-results"
+                        th:attr="aria-label=#{admin.mission_data.toggle},title=#{admin.mission_data.toggle}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg></button>
             </div>
         </div>
 
         <div class="box-content" id="freqtypes-results">
             <th:block th:fragment="freqtypes-results">
             <th:block th:if="${frequencyTypesTruncated}">
-                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
+                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
             </th:block>
-            <div class="table-responsive">
-            <table>
+            <table th:if="${!#lists.isEmpty(frequencyTypes)}" class="data-table data-table--stack">
                 <thead>
                     <tr>
                         <th th:text="#{admin.job_type.name}">Name</th>
                         <th th:text="#{admin.job_type.description}">Beschreibung</th>
-                        <th>Aktion</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="freq : ${frequencyTypes}" th:classappend="${!freq.active} ? 'krtm-opacity-06' : ''"
-                        draggable="true" class="draggable-row krtm-cursor-grab-c8dc" th:data-id="${freq.id}">
+                    <tr th:each="freq : ${frequencyTypes}" th:classappend="${!freq.active} ? 'md-row--inactive' : ''"
+                        draggable="true" class="draggable-row" th:data-id="${freq.id}">
                         <td>
-                            <span th:text="${freq.name}">Name</span>
-                            <span th:if="${!freq.active}" class="badge-inactive" th:text="#{admin.job_type.inactive}">Inaktiv</span>
+                            <span class="cell-title"><span th:text="${freq.name}">Name</span><span th:if="${!freq.active}" class="badge-inactive" th:text="#{admin.job_type.inactive}">Inaktiv</span></span>
                         </td>
-                        <td th:text="${freq.description}">Desc</td>
-                        <td class="flex-gap-xs">
-                            <button class="btn btn-ghost btn-icon edit-freqtype-btn"
+                        <td class="md-desc" th:text="${freq.description}">Desc</td>
+                        <td class="cell-actions">
+                            <button type="button" class="btn btn-ghost btn-icon edit-freqtype-btn"
                                     th:data-action="@{/admin/mission-data/frequency-types/{id}/update(id=${freq.id})}"
                                     th:data-id="${freq.id}"
                                     th:data-name="${freq.name}"
@@ -197,17 +218,19 @@
                             <button th:if="${freq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                     th:data-action="@{/admin/mission-data/frequency-types/{id}/delete(id=${freq.id})}"
                                     th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            <form th:if="${!freq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/frequency-types/{id}/activate(id=${freq.id})}" method="post" class="m-0">
-                                <button type="submit" class="btn btn-ghost" th:text="#{admin.job_type.activate}">Aktivieren</button>
+                            <form th:if="${!freq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/frequency-types/{id}/activate(id=${freq.id})}" method="post" class="md-inline-form">
+                                <button type="submit" class="btn btn-success btn-xs" th:text="#{admin.job_type.activate}">Aktivieren</button>
                             </form>
                         </td>
                     </tr>
                 </tbody>
             </table>
-            </div>
+            <th:block th:if="${#lists.isEmpty(frequencyTypes)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.mission_data.empty.title', textKey='admin.mission_data.empty.frequencyTypes')}"></th:block>
+            </th:block>
             </th:block>
         </div>
-    </div>
+    </section>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='squadron-modal', titleKey='admin.squadron.create', variant='krt-modal--wide', titleId='squadron-modal-title', open=${openModal == 'squadron-modal'}, closeTrigger='', closeClass='close-squadron-modal', body=~{::squadron-modal-body})}">
         <th:block th:ref="squadron-modal-body">
@@ -251,20 +274,20 @@
                     <div class="form-group">
                         <label th:text="#{admin.job_type.archetype}">Archetyp</label>
                         <select name="archetype" id="jt-archetype">
-                            <option value="MISSION" th:selected="*{archetype == 'MISSION'}">MISSION</option>
-                            <option value="CREW" th:selected="*{archetype == 'CREW'}">CREW</option>
+                            <option value="MISSION" th:selected="*{archetype == 'MISSION'}" th:text="#{admin.job_type.archetype.MISSION}">Einsatz</option>
+                            <option value="CREW" th:selected="*{archetype == 'CREW'}" th:text="#{admin.job_type.archetype.CREW}">Crew</option>
                         </select>
                         <div th:if="${#fields.hasErrors('archetype')}" th:errors="*{archetype}" class="field-error"></div>
                     </div>
                     <div class="form-group" id="jt-leadership-group">
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
+                        <label class="md-check">
                             <input type="checkbox" name="isLeadershipRole" id="jt-leadership" th:checked="*{isLeadershipRole}">
                             <span th:text="#{admin.job_type.is_leadership_role}">Führungsposition</span>
                         </label>
                         <div th:if="${#fields.hasErrors('isLeadershipRole')}" th:errors="*{isLeadershipRole}" class="field-error"></div>
                     </div>
                     <div class="form-group" id="jt-missionlead-group">
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
+                        <label class="md-check">
                             <input type="checkbox" name="isMissionLead" id="jt-missionlead" th:checked="*{isMissionLead}">
                             <span th:text="#{admin.job_type.is_mission_lead}">Einsatzleiter</span>
                         </label>

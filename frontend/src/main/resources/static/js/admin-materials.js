@@ -62,12 +62,16 @@ document.addEventListener('DOMContentLoaded', function () {
         const tr = document.createElement('tr');
         tr.setAttribute('data-category-row', '');
         const nameTd = document.createElement('td');
-        nameTd.textContent = cat.name;
+        const title = document.createElement('span');
+        title.className = 'cell-title';
+        title.textContent = cat.name;
+        nameTd.appendChild(title);
         const actionTd = document.createElement('td');
+        actionTd.className = 'cell-actions';
         const form = document.createElement('form');
         form.method = 'post';
         form.action = '/admin/materials/categories/' + encodeURIComponent(cat.id) + '/delete';
-        form.style.display = 'inline';
+        form.className = 'm-0';
         form.setAttribute('data-krt-confirm', '');
         form.setAttribute('data-krt-confirm-message', CAT_MSG.deleteConfirm);
         form.setAttribute('data-category-id', cat.id);
@@ -85,14 +89,19 @@ document.addEventListener('DOMContentLoaded', function () {
         return tr;
     }
 
-    function buildEmptyCategoryRow() {
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-category-empty', '');
-        const td = document.createElement('td');
-        td.colSpan = 2;
-        td.textContent = CAT_MSG.noEntries;
-        tr.appendChild(td);
-        return tr;
+    /**
+     * Shows the category table while it holds a row and the empty state otherwise.
+     */
+    function syncCategoryEmpty() {
+        const tableWrap = document.querySelector('[data-category-table]');
+        const emptyState = document.querySelector('[data-category-empty]');
+        const hasRows = !!document.querySelector('[data-category-table] tr[data-category-row]');
+        if (tableWrap instanceof HTMLElement) {
+            tableWrap.hidden = !hasRows;
+        }
+        if (emptyState instanceof HTMLElement) {
+            emptyState.hidden = hasRows;
+        }
     }
 
     document.addEventListener('submit', function (event) {
@@ -125,13 +134,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 addCategoryOption(created);
-                const tbody = form.closest('.data-section').querySelector('tbody');
+                const tbody = document.querySelector('[data-category-table] tbody');
                 if (tbody) {
-                    const emptyRow = tbody.querySelector('[data-category-empty]');
-                    if (emptyRow) {
-                        emptyRow.remove();
-                    }
                     tbody.appendChild(buildCategoryRow(created));
+                    syncCategoryEmpty();
                 }
                 if (nameInput) {
                     nameInput.value = '';
@@ -166,13 +172,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     onSuccess() {
                         removeCategoryOption(categoryId);
                         const row = form.closest('tr');
-                        const tbody = row ? row.parentElement : null;
                         if (row) {
                             row.remove();
                         }
-                        if (tbody && !tbody.querySelector('tr:not([data-category-empty])')) {
-                            tbody.appendChild(buildEmptyCategoryRow());
-                        }
+                        syncCategoryEmpty();
                     },
                 });
                 return;
@@ -335,10 +338,10 @@ function refreshMaterialsTable() {
                 return false;
             }
             const fresh = new DOMParser().parseFromString(html, 'text/html');
-            if (!fresh.querySelector('#materialsTable tbody')) {
+            if (!fresh.querySelector('#materials-results #materialsTable tbody')) {
                 return false;
             }
-            replaceFromDocument(fresh, '#materialsTable tbody');
+            replaceFromDocument(fresh, '#materials-results');
             replaceFromDocument(fresh, '#materialNames-data');
             replaceFromDocument(fresh, '#cm-refined');
             readMaterialNames();
@@ -348,9 +351,9 @@ function refreshMaterialsTable() {
             if (filterInput && filterInput.value) {
                 filterTable('materialsTable', filterInput.value);
             }
-            const table = document.getElementById('materialsTable');
+            const results = document.getElementById('materials-results');
             document.dispatchEvent(
-                new CustomEvent('krt:swapped', { detail: { container: table } }),
+                new CustomEvent('krt:swapped', { detail: { container: results } }),
             );
             return true;
         })

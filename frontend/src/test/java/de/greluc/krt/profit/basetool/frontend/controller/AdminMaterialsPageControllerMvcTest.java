@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -40,7 +41,9 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -118,6 +121,98 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"Aluminum\"")))
         .andExpect(content().string(containsString("src=\"/js/admin-materials.js\"")))
         .andExpect(content().string(containsString("</html>")));
+  }
+
+  /**
+   * Renders {@code /admin/materials} in German with the given materials and categories.
+   *
+   * @param materials the materials the catalogue returns
+   * @param categories the material categories
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String renderList(
+      @NotNull List<MaterialDto> materials, @NotNull List<MaterialCategoryDto> categories)
+      throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
+            anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(materials, 0, 1000, materials.size(), 1, Collections.emptyList()));
+    when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
+        .thenReturn(categories);
+    return mockMvc
+        .perform(get("/admin/materials").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * The list renders on the list pattern: one primary action in the page head, the editable rows in
+   * a stacked data table, the categories with their delete forms, no migrated one-off classes.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listMaterials_rendersTheListPattern() throws Exception {
+    MaterialDto material =
+        new MaterialDto(
+            UUID.randomUUID(),
+            "Aluminum",
+            "RAW",
+            "SCU",
+            null,
+            null,
+            null,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            0L);
+    String html =
+        renderList(
+            List.of(material), List.of(new MaterialCategoryDto(UUID.randomUUID(), "Metalle", 0L)));
+
+    assertThat(html)
+        .contains("data-testid=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .contains("data-list-count-for=\"materials-results\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertThat(main.split("btn--cta", -1)).hasSize(2);
+    assertThat(main)
+        .containsPattern("class=\"page-actions\">\\s*<button[^>]*class=\"btn btn--cta\"")
+        .doesNotContain("krtm-")
+        .doesNotContain("colspan")
+        .contains("data-testid=\"toolbar-search\"")
+        .contains("class=\"data-table data-table--stack admin-materials-table\"")
+        .containsPattern("class=\"cell-title\">Aluminum<")
+        .contains("class=\"text-danger admin-material-flag\"")
+        .contains(">Rohmaterial<")
+        .contains("data-list-total=\"1\"")
+        .contains("data-category-row")
+        .containsPattern("data-category-empty hidden=\"hidden\"")
+        .doesNotContain("data-testid=\"empty-state\" data-category-empty>");
+  }
+
+  /** Neither materials nor categories: both lists show their empty state. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listMaterials_rendersTheEmptyStates() throws Exception {
+    String html = renderList(List.of(), List.of());
+
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertThat(main)
+        .containsPattern("data-materials-table[^>]*hidden=\"hidden\"")
+        .containsPattern("data-category-table hidden=\"hidden\"")
+        .contains("data-category-empty>");
+    assertThat(main.split("data-testid=\"empty-state\"", -1)).hasSize(3);
   }
 
   @Test

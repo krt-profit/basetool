@@ -1996,6 +1996,13 @@
         border-left: 4px solid var(--color-warning);
     }
 
+    .alert-info {
+        background-color: rgb(53 93 220 / 15%);
+        border-color: var(--color-info);
+        color: var(--color-gray-1);
+        border-left: 4px solid var(--color-info);
+    }
+
     .pagination {
         display: flex;
         gap: 0.4rem;
@@ -7229,6 +7236,16 @@
     }
 
     .filter-popover__panel[hidden] {
+        display: none;
+    }
+
+    .filter-popover__panel--start {
+        right: auto;
+        left: 0;
+    }
+
+    .data-table[hidden],
+    .data-table--stack tr[hidden] {
         display: none;
     }
 

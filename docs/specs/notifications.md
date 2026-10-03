@@ -710,6 +710,38 @@ bundle) · **Code:** `frontend controller/NotificationPageController#page` / `#p
 (`SORTABLE_FIELDS` with `id`), `templates/notifications.html`, `static/js/notifications.js`
 (`loadMorePage` / `updatePageHint`) · **Issues:** — (ADR-0100 silent-truncation audit follow-up)
 
+### REQ-NOTIF-022 — The inbox page filters unread/all and links each notification to its subject
+
+The `/notifications` page follows the list pattern of REQ-UI-027. A segmented control „Ungelesen ·
+Alle" (`name=filter`, default „Ungelesen") hides read rows client-side — `data-notif-filter` on
+`#notification-inbox` and a CSS rule, so a row marked read, deleted or appended by load-more
+(REQ-NOTIF-019) obeys it with no extra code. The choice persists per browser
+(`notifications_filter`, REQ-UI-017). When rows are loaded but none is unread, an empty state says so
+(„Alle geladenen Benachrichtigungen sind gelesen"); the load-more control stays, because older pages
+may still hold unread rows.
+
+Every row whose subject has a page is a link to it. `NotificationViewDto` carries an `href`, set by
+`NotificationPageController.targetOf(type, entityType, entityId)`:
+
+| Notification types | Link |
+| --- | --- |
+| `JOB_ORDER_CREATED`, `JOB_ORDER_UPDATED_BY_REQUESTER` | `/orders/{id}` |
+| `MATERIAL_EXCHANGE_INTEREST_REGISTERED`, `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | `/materialboerse` |
+| `EXCHANGE_INSTALLATION_CONNECTED`, `EXCHANGE_BULK_UNDO_APPLIED` | `/connected-apps` |
+| `ACCOUNT_DELETION_REQUEST_DECLINED` | `/profile` |
+| `ACCOUNT_DELETION_REQUESTED` | `/admin/deletion-requests` |
+| `DISCORD_REGISTRATION_PENDING` | `/admin/discord-registrations` |
+| bank booking types | none — a recipient may lack access to the request queue |
+
+The link passes `safeSameOriginUrl` before it is rendered; following it does not mark the row read.
+„Alle als gelesen markieren" is a ghost action in the page head, „Gelesene löschen" a danger entry of
+the overflow menu. The bell dropdown keeps its rows without links.
+
+**Enforced by:** `NotificationPageRenderMvcTest`, `NotificationPageControllerTest` (`targetOf`,
+`href` on `/page-items`) · `NotificationCenterE2eTest` · **Code:** `notifications.html`,
+`static/js/notifications-page.js`, `static/js/notifications.js` (`buildItem(item, linkable)`),
+`NotificationPageController`, `NotificationViewDto` · **Related:** REQ-NOTIF-019, REQ-UI-027
+
 ## Out of scope (v1)
 
 - Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), user

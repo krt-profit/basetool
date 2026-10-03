@@ -4,6 +4,7 @@
     <title th:text="#{admin.personalInventory.blueprints.title}">Admin: Blueprints</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/personal-inventory.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/admin-personal-blueprints.css}">
     </th:block>
 </head>
 <body>
@@ -12,37 +13,39 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="krt-admin-banner" th:text="#{admin.personalInventory.bannerMode}">ADMIN MODE</div>
+    <th:block th:with="hasUser=${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personalInventory.blueprints.title},
+        count=${hasUser ? #lists.size(blueprints) : null}, countId='bp-count', countFor='bp-results', actions=~{::bp-actions})}">
+        <th:block th:ref="bp-actions">
+            <th:block th:if="${hasUser}">
+                <input type="file" id="krt-bp-import-file" accept=".json,application/json" hidden>
+                <button type="button" id="krt-bp-import-open" class="btn btn-ghost"
+                        data-trigger="bp-import-pick"
+                        th:text="#{personalInventory.blueprints.import.button}">JSON importieren</button>
+            </th:block>
+            <th:block th:replace="~{fragments/components :: overflowMenu(id='bp-admin-menu', items=~{::bp-menu-items})}">
+                <th:block th:ref="bp-menu-items">
+                    <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                            data-trigger="open-modal-display" data-modal-id="bp-purge-modal" data-testid="bp-purge-open"
+                            th:text="#{admin.personalInventory.blueprints.purge.title}">Alle Blueprints aller Nutzer l&ouml;schen</button>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
 
-    <div class="greeting hud-box krt-personal-inventory-header">
-        <h1 th:text="#{admin.personalInventory.blueprints.title}">Admin: Blueprints</h1>
-        <p class="krt-subtitle" th:text="#{admin.personalInventory.blueprints.subtitle}">Verwaltung fremder Blueprints</p>
-    </div>
+    <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-userform no-track">
+        <label for="krt-bp-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
+        <select id="krt-bp-user-select" name="userSub" data-trigger="submit-form" data-krt-combobox="remote-users">
+            <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
+            <option th:if="${selectedUser != null}"
+                    th:value="${selectedUser.id}"
+                    th:selected="true"
+                    th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}">User</option>
+        </select>
+    </form>
 
-    <div class="hud-box krt-personal-inventory mt-2">
-        <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-userform no-track">
-            <label for="krt-bp-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-            <select id="krt-bp-user-select" name="userSub" data-trigger="submit-form" data-krt-combobox="remote-users">
-                <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
-                <option th:if="${selectedUser != null}"
-                        th:value="${selectedUser.id}"
-                        th:selected="true"
-                        th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}">User</option>
-            </select>
-        </form>
-
-        <div th:if="${selectedUserSub == null or #strings.isEmpty(selectedUserSub)}" class="krt-pi-empty"
-             th:text="#{admin.personalInventory.userSelect.empty}">Bitte zunaechst ein Mitglied auswaehlen.</div>
-    </div>
-
-    <div class="hud-box mt-2 krtm-border-color-var-color-danger-b169" data-testid="bp-purge-card">
-        <h2 class="krt-bp-section-title" th:text="#{admin.personalInventory.blueprints.purge.title}">Alle Blueprints aller Nutzer l&ouml;schen</h2>
-        <p class="krt-subtitle" th:text="#{admin.personalInventory.blueprints.purge.text}">Entfernt unwiderruflich die Blueprints ALLER Nutzer. Standard-Blueprints bleiben erhalten.</p>
-        <button type="button" class="btn btn-danger" data-trigger="open-modal-display"
-                data-modal-id="bp-purge-modal" data-testid="bp-purge-open">
-            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
-            <span th:text="#{admin.personalInventory.blueprints.purge.button}">Alle l&ouml;schen</span>
-        </button>
+    <div th:if="${!hasUser}" class="card card--flush">
+        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.userSelect.emptyTitle', textKey='admin.personalInventory.userSelect.empty')}"></th:block>
     </div>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bp-purge-modal', titleKey='admin.personalInventory.blueprints.purge.modal.title', variant='krt-modal--danger', body=~{::bp-purge-modal-body})}">
@@ -51,9 +54,10 @@
                   th:data-purge-success="#{admin.personalInventory.blueprints.purge.toast.count}"
                   th:data-purge-error="#{admin.personalInventory.blueprints.purge.error}">
                 <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                <div class="krt-modal-body">
-                    <p th:text="#{admin.personalInventory.blueprints.purge.modal.text}">Diese Aktion l&ouml;scht die Blueprints ALLER Nutzer unwiderruflich. Standard-Blueprints bleiben erhalten. Tippe LOESCHEN, um zu best&auml;tigen.</p>
-                    <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="krt-modal-body stack gap-3">
+                    <p th:text="#{admin.personalInventory.blueprints.purge.text}">Entfernt unwiderruflich die Blueprints ALLER Nutzer. Standard-Blueprints bleiben erhalten.</p>
+                    <p th:text="#{admin.personalInventory.blueprints.purge.modal.text}">Diese Aktion l&ouml;scht die Blueprints ALLER Nutzer unwiderruflich. Tippe LOESCHEN, um zu best&auml;tigen.</p>
+                    <div class="form-group">
                         <label for="bp-purge-confirm" th:text="#{admin.personalInventory.blueprints.purge.modal.label}">Best&auml;tigung</label>
                         <input type="text" id="bp-purge-confirm" name="confirm" autocomplete="off"
                                data-confirm-token="LOESCHEN" data-confirm-submit="bp-purge-submit"
@@ -73,16 +77,10 @@
         </th:block>
     </th:block>
 
-    <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
-        <div class="hud-box krt-personal-inventory mt-2">
-            <div class="krt-bp-addbar-head">
-                <h2 class="krt-bp-section-title" th:text="#{personalInventory.blueprints.add.heading}">Blueprints hinzufuegen</h2>
-                <div class="krt-bp-import-trigger">
-                    <input type="file" id="krt-bp-import-file" accept=".json,application/json" hidden>
-                    <button type="button" id="krt-bp-import-open" class="btn btn-outline"
-                            data-trigger="bp-import-pick"
-                            th:text="#{personalInventory.blueprints.import.button}">JSON importieren</button>
-                </div>
+    <th:block th:if="${hasUser}">
+        <section class="card krt-personal-inventory">
+            <div class="card-head">
+                <h2 class="card-title" th:text="#{personalInventory.blueprints.add.heading}">Blueprints hinzuf&uuml;gen</h2>
             </div>
 
             <div class="form-group krt-pi-typeahead krt-bp-search">
@@ -96,77 +94,69 @@
                 <span class="krt-bp-staging-label" th:text="#{personalInventory.blueprints.add.selectedHeading}">Auswahl</span>
                 <div id="krt-bp-staging-list" class="krt-bp-chip-list"
                      th:attr="data-empty-text=#{personalInventory.blueprints.add.empty}">
-                    <span class="krt-bp-staging-empty" th:text="#{personalInventory.blueprints.add.empty}">Noch keine Blueprints ausgewaehlt.</span>
+                    <span class="krt-bp-staging-empty" th:text="#{personalInventory.blueprints.add.empty}">Noch keine Blueprints ausgew&auml;hlt.</span>
                 </div>
                 <div class="krt-pi-modal-actions">
                     <button type="button" id="krt-bp-add-selected" class="btn btn--cta" disabled
-                            th:text="#{personalInventory.blueprints.add.submit}">Auswahl hinzufuegen</button>
+                            th:text="#{personalInventory.blueprints.add.submit}">Auswahl hinzuf&uuml;gen</button>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="hud-box krt-personal-inventory mt-2">
-            <div class="krt-pi-actionbar">
-                <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-filter no-track">
-                    <input type="hidden" name="userSub" th:value="${selectedUserSub}">
-                    <label for="krt-bp-q" class="visually-hidden" th:text="#{personalInventory.filter.search}">Suche</label>
-                    <input id="krt-bp-q" type="search" name="q" th:value="${filterQuery}"
-                           th:placeholder="#{personalInventory.filter.search}"
-                           class="krt-pi-search-input">
-                    <button type="submit" class="btn btn-ghost" th:text="#{personalInventory.filter.apply}">Filtern</button>
-                </form>
+        <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-filter no-track">
+            <input type="hidden" name="userSub" th:value="${selectedUserSub}">
+            <div class="toolbar">
+                <th:block th:replace="~{fragments/components :: toolbarSearch('krt-bp-q', 'q', ${filterQuery}, 'personalInventory.filter.search')}"></th:block>
             </div>
+        </form>
 
-            <div id="bp-results">
-            <th:block th:fragment="results">
-            <div class="table-responsive krt-pi-table-wrapper">
-                <table class="data-table">
-                    <thead>
-                    <tr>
-                        <th th:text="#{personalInventory.blueprints.field.product}">Produkt</th>
-                        <th th:text="#{personalInventory.blueprints.field.acquired}">Erhalten am</th>
-                        <th th:text="#{personalInventory.blueprints.field.note}">Notiz</th>
-                        <th th:text="#{personalInventory.blueprints.field.actions}">Aktionen</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:if="${#lists.isEmpty(blueprints)}">
-                        <td colspan="4" class="krt-pi-empty" th:text="#{personalInventory.blueprints.empty}">Keine Blueprints.</td>
-                    </tr>
-                    <tr th:each="bp : ${blueprints}" th:attr="data-bp-id=${bp.id}">
-                        <td th:text="${bp.productName}">Produkt</td>
-                        <td>
-                            <span th:if="${bp.acquiredAt != null}" class="utc-time" th:text="${bp.acquiredAt}">2026-01-01</span>
-                            <span th:unless="${bp.acquiredAt != null}" class="krt-bp-dash">&mdash;</span>
-                        </td>
-                        <td class="krt-pi-note" th:text="${bp.note}">Notiz</td>
-                        <td>
-                            <div class="krt-pi-actions">
-                                <button type="button" class="btn btn-ghost btn-icon"
-                                        data-trigger="bp-open-edit"
-                                        th:attr="data-id=${bp.id},
-                                                 data-version=${bp.version},
-                                                 data-name=${bp.productName},
-                                                 data-note=${bp.note},
-                                                 data-acquired-at=${bp.acquiredAt}"
-                                        th:title="#{personalInventory.blueprints.action.editNote}"
-                                        th:aria-label="#{personalInventory.blueprints.action.editNote}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                <button type="button" class="btn btn-quiet-danger btn-icon"
-                                        th:if="${bp.removable}"
-                                        data-trigger="bp-open-delete"
-                                        th:attr="data-id=${bp.id},
-                                                 data-name=${bp.productName}"
-                                        th:title="#{personalInventory.blueprints.action.remove}"
-                                        th:aria-label="#{personalInventory.blueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            </div>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
+        <div id="bp-results" class="card card--flush">
+        <th:block th:fragment="results">
+            <table th:if="${!#lists.isEmpty(blueprints)}" class="data-table data-table--stack"
+                   th:data-list-total="${#lists.size(blueprints)}">
+                <thead>
+                <tr>
+                    <th th:text="#{personalInventory.blueprints.field.product}">Produkt</th>
+                    <th th:text="#{personalInventory.blueprints.field.acquired}">Erhalten am</th>
+                    <th th:text="#{personalInventory.blueprints.field.note}">Notiz</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{personalInventory.blueprints.field.actions}">Aktionen</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="bp : ${blueprints}" th:attr="data-bp-id=${bp.id}">
+                    <td><span class="cell-title" th:text="${bp.productName}">Produkt</span></td>
+                    <td th:attr="data-label=#{personalInventory.blueprints.field.acquired}">
+                        <span th:if="${bp.acquiredAt != null}" class="utc-time" th:text="${bp.acquiredAt}">2026-01-01</span>
+                        <span th:unless="${bp.acquiredAt != null}" class="krt-bp-dash">&mdash;</span>
+                    </td>
+                    <td class="krt-pi-note" th:attr="data-label=#{personalInventory.blueprints.field.note}" th:text="${bp.note}">Notiz</td>
+                    <td class="cell-actions">
+                        <button type="button" class="btn btn-ghost btn-icon"
+                                data-trigger="bp-open-edit"
+                                th:attr="data-id=${bp.id},
+                                         data-version=${bp.version},
+                                         data-name=${bp.productName},
+                                         data-note=${bp.note},
+                                         data-acquired-at=${bp.acquiredAt}"
+                                th:title="#{personalInventory.blueprints.action.editNote}"
+                                th:aria-label="#{personalInventory.blueprints.action.editNote}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                        <button type="button" class="btn btn-quiet-danger btn-icon"
+                                th:if="${bp.removable}"
+                                data-trigger="bp-open-delete"
+                                th:attr="data-id=${bp.id},
+                                         data-name=${bp.productName}"
+                                th:title="#{personalInventory.blueprints.action.remove}"
+                                th:aria-label="#{personalInventory.blueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <th:block th:if="${#lists.isEmpty(blueprints)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.blueprints.empty.title', textKey='admin.personalInventory.blueprints.empty.text')}"></th:block>
             </th:block>
-            </div>
+        </th:block>
         </div>
+    </th:block>
     </th:block>
 </main>
 
@@ -179,7 +169,7 @@
                 <input type="hidden" name="version" id="krt-bp-edit-version">
                 <input type="hidden" name="acquiredAt" id="krt-bp-edit-acquired">
                 <p class="krt-bp-edit-product" id="krt-bp-edit-product"></p>
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label for="krt-bp-edit-note" th:text="#{personalInventory.blueprints.field.note}">Notiz</label>
                     <textarea id="krt-bp-edit-note" name="note" maxlength="2000" rows="4"></textarea>
                 </div>
@@ -195,7 +185,7 @@
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-modal', titleKey='personalInventory.blueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='bp-close-delete', body=~{::krt-bp-delete-modal-body})}">
     <th:block th:ref="krt-bp-delete-modal-body">
         <div class="krt-modal-body">
-            <p id="krt-bp-delete-message" class="krtm-margin-0-2a0c" th:text="#{personalInventory.blueprints.modal.remove.body}">Wirklich entfernen?</p>
+            <p id="krt-bp-delete-message" th:text="#{personalInventory.blueprints.modal.remove.body}">Wirklich entfernen?</p>
         </div>
         <form id="krt-bp-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />

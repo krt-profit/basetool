@@ -55,8 +55,8 @@ function applyGroupingView() {
     const grouped = isGroupedMode();
     const groupedEl = document.getElementById('materialsGrouped');
     const flatEl = document.getElementById('materialsFlat');
-    if (groupedEl) groupedEl.style.display = grouped ? '' : 'none';
-    if (flatEl) flatEl.style.display = grouped ? 'none' : 'grid';
+    if (groupedEl) groupedEl.hidden = !grouped;
+    if (flatEl) flatEl.hidden = grouped;
     filterMaterials();
 }
 
@@ -76,19 +76,40 @@ function onToggleGrouping() {
     applyGroupingView();
 }
 
-function toggleKindGroup(element) {
-    const content = element.nextElementSibling;
-    const icon = element.querySelector('.toggle-icon');
-    if (
-        window.getComputedStyle(content).display === 'none' ||
-        window.getComputedStyle(content).display === ''
-    ) {
-        content.style.display = 'grid';
-        icon.textContent = '−';
-    } else {
-        content.style.display = 'none';
-        icon.textContent = '+';
-    }
+/**
+ * Opens or closes one category: the toggle's aria-expanded and the hidden state of the card grid
+ * it controls.
+ *
+ * @param {Element} toggle the category's [data-trigger="materials-toggle-kind"] button
+ * @param {boolean} expanded whether the category is open afterwards
+ */
+function setKindExpanded(toggle, expanded) {
+    const content = document.getElementById(toggle.getAttribute('aria-controls') || '');
+    toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    if (content) content.hidden = !expanded;
+}
+
+function toggleKindGroup(toggle) {
+    setKindExpanded(toggle, toggle.getAttribute('aria-expanded') !== 'true');
+}
+
+/**
+ * Shows the cards whose title contains the filter and hides the others.
+ *
+ * @param {ParentNode} scope the element holding the cards
+ * @param {string} filter the upper-cased filter text
+ * @returns {number} the number of visible cards
+ */
+function filterCards(scope, filter) {
+    let visibleCount = 0;
+    scope.querySelectorAll('.material-card').forEach(function (card) {
+        const title = card.querySelector('.material-title');
+        const text = title ? title.textContent || '' : '';
+        const visible = text.toUpperCase().indexOf(filter) > -1;
+        card.hidden = !visible;
+        if (visible) visibleCount++;
+    });
+    return visibleCount;
 }
 
 function filterMaterials() {
@@ -98,71 +119,32 @@ function filterMaterials() {
 
     const noResults = document.getElementById('noResultsMsg');
     if (noResults) {
-        noResults.style.display = totalVisibleCount === 0 ? 'block' : 'none';
+        noResults.hidden = totalVisibleCount !== 0;
     }
 }
 
 function filterGroupedView(filter) {
-    const groups = document.getElementsByClassName('kind-group');
     let totalVisibleCount = 0;
-
-    for (let j = 0; j < groups.length; j++) {
-        const group = groups[j];
-        const cards = group.getElementsByClassName('material-card');
-        let visibleInGroup = 0;
-
-        for (let i = 0; i < cards.length; i++) {
-            const title = cards[i].getElementsByClassName('material-title')[0];
-            if (title) {
-                const txtValue = title.textContent || title.innerText;
-                if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                    cards[i].style.display = '';
-                    visibleInGroup++;
-                } else {
-                    cards[i].style.display = 'none';
-                }
-            }
+    document.querySelectorAll('#materialsGrouped .kind-group').forEach(function (group) {
+        const visibleInGroup = filterCards(group, filter);
+        group.hidden = visibleInGroup === 0;
+        totalVisibleCount += visibleInGroup;
+        const toggle = group.querySelector('[data-trigger="materials-toggle-kind"]');
+        if (visibleInGroup > 0 && filter.length > 0 && toggle) {
+            setKindExpanded(toggle, true);
         }
-
-        if (visibleInGroup === 0) {
-            group.style.display = 'none';
-        } else {
-            group.style.display = '';
-            totalVisibleCount += visibleInGroup;
-
-            const content = group.querySelector('.materialsGrid');
-            const icon = group.querySelector('.toggle-icon');
-            if (filter.length > 0) {
-                content.style.display = 'grid';
-                icon.textContent = '−';
-            }
-        }
-    }
+    });
     return totalVisibleCount;
 }
 
 function filterFlatView(filter) {
     const container = document.getElementById('materialsFlat');
-    if (!container) {
-        return 0;
-    }
-    const cards = container.getElementsByClassName('material-card');
-    let visibleCount = 0;
-    for (let i = 0; i < cards.length; i++) {
-        const title = cards[i].getElementsByClassName('material-title')[0];
-        const txtValue = title ? title.textContent || title.innerText : '';
-        if (txtValue.toUpperCase().indexOf(filter) > -1) {
-            cards[i].style.display = '';
-            visibleCount++;
-        } else {
-            cards[i].style.display = 'none';
-        }
-    }
-    return visibleCount;
+    return container ? filterCards(container, filter) : 0;
 }
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('keyup', 'materials-filter', filterMaterials);
+    window.krtEvents.on('input', 'materials-filter', filterMaterials);
+    window.krtEvents.on('change', 'materials-filter', filterMaterials);
     window.krtEvents.on('click', 'materials-toggle-kind', function (el) {
         toggleKindGroup(el);
     });

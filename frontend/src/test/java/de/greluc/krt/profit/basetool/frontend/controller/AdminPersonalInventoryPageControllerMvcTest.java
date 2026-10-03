@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -115,12 +116,63 @@ class AdminPersonalInventoryPageControllerMvcTest {
             get("/admin/personal-inventory").param("userSub", userSub).param("fragment", "results"))
         .andExpect(status().isOk())
         .andExpect(view().name("admin/personal-inventory :: results"))
-        .andExpect(content().string(containsString("krt-pi-table")))
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(containsString("class=\"krt-pi-filter no-track\"")))
+        .andExpect(content().string(not(containsString("colspan"))))
         .andExpect(content().string(not(containsString("krt-pi-userform"))))
         .andExpect(content().string(not(containsString("id=\"pi-results\""))))
         .andExpect(content().string(not(containsString("krt-admin-banner"))));
 
     verify(backendApiClient, never()).get(eq("/api/v1/users?size=1000"), anyTypeRef());
+  }
+
+  /**
+   * The results follow the list pattern (REQ-UI-027): live search and the create action in the
+   * toolbar, the stacked table, and a list foot whose total feeds the page-head count chip.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_fragmentResults_rendersTheListPattern() throws Exception {
+    String userSub = UUID.randomUUID().toString();
+    PersonalInventoryItemDto item =
+        new PersonalInventoryItemDto(
+            UUID.randomUUID(), "Kiste", "n", 7, null, "Lorville", 3, 0L, null, null);
+    when(backendApiClient.get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(item), 0, 50, 51L, 2, List.of()));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/personal-inventory")
+                    .param("userSub", userSub)
+                    .param("fragment", "results"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"data-table data-table--stack krt-pi-table\"")
+        .contains("id=\"krt-pi-q\"")
+        .contains("data-trigger=\"pi-open-create\"")
+        .contains("data-list-total=\"51\"")
+        .contains("/admin/personal-inventory?userSub=" + userSub + "&amp;page=1")
+        .doesNotContain(">Filtern<")
+        .doesNotContain("colspan");
+  }
+
+  /** The full page carries the page head with the admin eyebrow and no greeting banner. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_rendersThePageHead() throws Exception {
+    mockMvc
+        .perform(get("/admin/personal-inventory"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"page-head\"")))
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(not(containsString("class=\"greeting"))))
+        .andExpect(content().string(not(containsString("hud-box"))))
+        .andExpect(content().string(not(containsString("krt-admin-banner"))));
   }
 
   @Test

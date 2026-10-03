@@ -1,9 +1,6 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    .data-section {
-        margin-bottom: 3rem;
-    }
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
@@ -20,5 +17,42 @@
         color: var(--color-gray-1);
         font-family: var(--font-body);
         box-sizing: border-box;
+    }
+    .form-group .md-check {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0;
+    }
+    .md-box__head {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-hairline);
+    }
+    .md-box.is-collapsed .md-box__head {
+        border-bottom: 0;
+    }
+    .md-box__toggle .krt-icon {
+        transition: transform 0.2s;
+    }
+    .md-box.is-collapsed .md-box__toggle .krt-icon {
+        transform: rotate(-90deg);
+    }
+    .md-filter {
+        margin: 0;
+    }
+    .md-row--inactive td:not(.cell-actions) {
+        opacity: 0.6;
+    }
+    .md-desc {
+        max-width: 40rem;
+        word-break: break-word;
+    }
+    .md-inline-form {
+        display: inline-block;
+        margin: 0;
+    }
+    .draggable-row {
+        cursor: grab;
     }
 }

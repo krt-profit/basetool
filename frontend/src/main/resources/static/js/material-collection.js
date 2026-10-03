@@ -23,6 +23,83 @@ function collectionRow(inventoryId) {
     return document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
 }
 
+/**
+ * Formats an amount in the page language with up to three fraction digits.
+ *
+ * @param {number} value the amount
+ * @returns {string} the formatted amount
+ */
+function formatCollectionAmount(value) {
+    return value.toLocaleString(document.documentElement.lang || undefined, {
+        maximumFractionDigits: 3,
+    });
+}
+
+/**
+ * Writes one progress bar: its fill width, its aria value and its label from the
+ * data-progress-template, whose %0 and %1 take the delivered and the total amount, or the
+ * percentage for the overall bar.
+ *
+ * @param {Element | null} el the [data-collection-progress] element
+ * @param {number} delivered the delivered amount
+ * @param {number} total the earmarked amount
+ */
+function renderCollectionProgress(el, delivered, total) {
+    if (!el) return;
+    const percent = total > 0 ? Math.round((Math.min(delivered, total) * 100) / total) : 0;
+    el.setAttribute('aria-valuenow', String(percent));
+    const fill = el.querySelector('.collection-progress__fill');
+    if (fill instanceof HTMLElement) {
+        fill.setAttribute('data-krtm-width', String(percent));
+        fill.style.width = percent + '%';
+    }
+    const label = el.querySelector('.collection-progress__label');
+    const template = el.getAttribute('data-progress-template');
+    if (label && template) {
+        const isGroup = el.getAttribute('data-collection-progress') === 'group';
+        label.textContent = isGroup
+            ? template
+                  .replace('%0', formatCollectionAmount(delivered))
+                  .replace('%1', formatCollectionAmount(total))
+            : template.replace('%0', String(percent));
+    }
+}
+
+/**
+ * Recomputes every group bar and the overall bar from the rows' data-allocated amounts and their
+ * delivered checkboxes.
+ */
+function updateCollectionProgress() {
+    const table = document.getElementById('material-collection-table');
+    if (!table) return;
+    let delivered = 0;
+    let total = 0;
+    table.querySelectorAll('tbody[data-collection-group]').forEach(function (group) {
+        let groupDelivered = 0;
+        let groupTotal = 0;
+        group.querySelectorAll('tr[data-allocated]').forEach(function (row) {
+            const amount = parseFloat(row.getAttribute('data-allocated') || '') || 0;
+            const checkbox = row.querySelector('.delivered-checkbox');
+            groupTotal += amount;
+            if (checkbox instanceof HTMLInputElement && checkbox.checked) {
+                groupDelivered += amount;
+            }
+        });
+        renderCollectionProgress(
+            group.querySelector('[data-collection-progress="group"]'),
+            groupDelivered,
+            groupTotal,
+        );
+        delivered += groupDelivered;
+        total += groupTotal;
+    });
+    renderCollectionProgress(
+        document.querySelector('[data-collection-progress="total"]'),
+        delivered,
+        total,
+    );
+}
+
 function broadcastCollectionChanged() {
     if (
         window.orderId &&
@@ -76,6 +153,7 @@ async function collectionTransfer(inventoryId, target, successMessage) {
     row.querySelectorAll('select').forEach(function (s) {
         s.disabled = false;
     });
+    updateCollectionProgress();
 }
 
 document.addEventListener('change', function (e) {
@@ -122,6 +200,7 @@ async function onDeliveredToggle(cb) {
     if (!result || !result.ok) {
         cb.checked = previous;
     }
+    updateCollectionProgress();
 }
 
 const MATERIAL_COLLECTION_SECTIONS = {

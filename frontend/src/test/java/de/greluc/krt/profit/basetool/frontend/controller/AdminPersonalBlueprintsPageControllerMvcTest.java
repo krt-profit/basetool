@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -286,6 +287,70 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("data-bp-purge")))
         .andExpect(content().string(containsString("data-confirm-token=\"LOESCHEN\"")))
         .andExpect(content().string(containsString("/admin/personal-blueprints/delete-all-users")));
+  }
+
+  /**
+   * The page follows the list pattern (REQ-UI-027): page head with the admin eyebrow and count, the
+   * purge in the overflow menu, a live search in the toolbar and the stacked table.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_withMember_rendersTheListPattern() throws Exception {
+    PersonalBlueprintDto bp =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "arclight",
+            "Arclight Pistol",
+            UUID.randomUUID(),
+            null,
+            "n",
+            true,
+            0L,
+            null,
+            null,
+            null,
+            null,
+            null);
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(bp), 0, 200, 1L, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/personal-blueprints")
+                    .param("userSub", "00000000-0000-0000-0000-000000000009")
+                    .locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+
+    assertThat(html)
+        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .contains("data-list-count-for=\"bp-results\"")
+        .containsPattern("overflow-menu__item--danger\"[^>]*data-testid=\"bp-purge-open\"")
+        .contains("id=\"krt-bp-q\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("data-list-total=\"1\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("krt-admin-banner")
+        .doesNotContain("colspan");
+    assertThat(main.split("btn--cta", -1)).hasSizeLessThanOrEqualTo(2);
+    assertThat(main).doesNotContain(">Filtern<");
+  }
+
+  /** Without a member the page shows the empty state instead of a bare hint. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_withoutMember_rendersTheEmptyState() throws Exception {
+    mockMvc
+        .perform(get("/admin/personal-blueprints"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(not(containsString("id=\"bp-results\""))));
   }
 
   @Test

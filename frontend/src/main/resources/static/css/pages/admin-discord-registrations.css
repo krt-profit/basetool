@@ -1,14 +1,25 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
+    .reg-tabs {
+        margin-bottom: var(--space-4);
+    }
     .reg-actions {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
+        justify-content: flex-end;
     }
     .reg-when {
         color: var(--color-gray-2-text);
         font-size: 0.85rem;
+    }
+    .reg-hint {
+        margin: 0 0 var(--space-3);
+    }
+    .reg-empty > .empty-state {
+        border: 0;
+    }
+    .reg-empty[hidden],
+    .data-table[hidden] {
+        display: none;
     }
     #reject-reason,
     #reopen-reason {
@@ -20,5 +31,11 @@
         border: 1px solid var(--color-gray-3);
         color: var(--color-gray-1);
         font-family: var(--font-body);
+    }
+
+    @media (width <= 768px) {
+        .reg-actions {
+            justify-content: flex-start;
+        }
     }
 }

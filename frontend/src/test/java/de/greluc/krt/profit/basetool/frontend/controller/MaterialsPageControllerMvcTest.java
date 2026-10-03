@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -108,6 +110,83 @@ class MaterialsPageControllerMvcTest {
             PageStylesheets.content(
                 containsString(
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+  }
+
+  /**
+   * Renders {@code /materials} in German with the given materials from the backend.
+   *
+   * @param materials the materials the backend returns
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private String renderListing(List<MaterialPriceOverviewDto> materials) throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/materials/prices-overview?size=10000&sort=name,asc"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(materials, 0, 10000, materials.size(), 1, List.of()));
+    return mockMvc
+        .perform(get("/materials").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * The listing renders on the list pattern (REQ-UI-027): page head with eyebrow and count, the
+   * toolbar search, the grouping switch, one collapsed section per category and a hidden empty
+   * state.
+   */
+  @Test
+  @WithMockUser
+  void listMaterials_rendersTheListPattern() throws Exception {
+    String html =
+        renderListing(
+            List.of(
+                new MaterialPriceOverviewDto(
+                    UUID.randomUUID(),
+                    "Aluminum",
+                    new MaterialCategoryDto(UUID.randomUUID(), "Mineral", 0L),
+                    false,
+                    false,
+                    false,
+                    new BigDecimal("5.0"),
+                    new BigDecimal("7.0"))));
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Handel<")
+        .containsPattern("<h1>Material-Übersicht</h1>")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("class=\"hud-box mt-2\"")
+        .doesNotContain("btn--cta")
+        .doesNotContain("krtm-display-none")
+        .doesNotContain("kind-header");
+    assertThat(html)
+        .contains("class=\"toolbar__search\"")
+        .containsPattern("type=\"search\" id=\"materialFilter\" data-trigger=\"materials-filter\"")
+        .containsPattern(
+            "<label class=\"switch\"[^>]*>\\s*<input type=\"checkbox\" id=\"groupByCategory\"")
+        .containsPattern(
+            "class=\"kind-toggle\"[^>]*aria-expanded=\"false\"[^>]*aria-controls=\"materials-kind-0\"")
+        .contains(">Mineral<")
+        .containsPattern("id=\"materials-kind-0\" hidden")
+        .containsPattern("id=\"materialsFlat\" class=\"grid-auto-cards\" hidden")
+        .containsPattern("id=\"noResultsMsg\"[^>]*hidden")
+        .contains("data-testid=\"empty-state\"");
+  }
+
+  /** An empty catalogue shows the empty state right away. */
+  @Test
+  @WithMockUser
+  void listMaterials_withoutMaterials_showsTheEmptyState() throws Exception {
+    String html = renderListing(List.of());
+
+    assertThat(html)
+        .contains("id=\"noResultsMsg\" class=\"card card--flush\">")
+        .contains("data-testid=\"empty-state\"")
+        .contains("Keine Materialien gefunden.")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>0<");
   }
 
   /**

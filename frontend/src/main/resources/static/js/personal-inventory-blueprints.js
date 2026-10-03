@@ -117,16 +117,31 @@
 
     /**
      * Makes the admin page's owned-blueprint search filter re-render only the #bp-results table in
-     * place (REQ-FE-002); a no-op without #bp-results or krtFetch. The member select still reloads.
+     * place while typing (REQ-FE-002); a no-op without #bp-results or krtFetch. The member select
+     * still reloads.
      */
     function wireAdminSwap() {
         if (!window.krtFetch || !document.getElementById('bp-results')) return;
+        let filterTimer = null;
+        function swapFilter(form) {
+            const params = new URLSearchParams(new FormData(form)).toString();
+            const url = form.getAttribute('action') + (params ? '?' + params : '');
+            window.krtFetch.swap({ url, container: '#bp-results', history: true });
+        }
         document.addEventListener('submit', function (e) {
             if (!e.target.classList || !e.target.classList.contains('krt-pi-filter')) return;
             e.preventDefault();
-            const params = new URLSearchParams(new FormData(e.target)).toString();
-            const url = e.target.getAttribute('action') + (params ? '?' + params : '');
-            window.krtFetch.swap({ url, container: '#bp-results', history: true });
+            if (filterTimer) clearTimeout(filterTimer);
+            swapFilter(e.target);
+        });
+        document.addEventListener('input', function (e) {
+            const input = e.target;
+            const form = input && input.form;
+            if (!form || !form.classList.contains('krt-pi-filter') || input.name !== 'q') return;
+            if (filterTimer) clearTimeout(filterTimer);
+            filterTimer = setTimeout(function () {
+                swapFilter(form);
+            }, 300);
         });
     }
 
@@ -286,6 +301,14 @@
 
     function reswapList() {
         if (!window.krtFetch) {
+            return;
+        }
+        if (!document.getElementById('krt-bp-list') && document.getElementById('bp-results')) {
+            window.krtFetch.swap({
+                url: window.location.pathname + window.location.search,
+                container: '#bp-results',
+                history: false,
+            });
             return;
         }
         window.krtFetch.swap({
@@ -493,6 +516,10 @@
 
     function patchBlueprintRow(dto) {
         if (!dto || !dto.id) {
+            return;
+        }
+        if (!document.getElementById('krt-bp-list') && document.getElementById('bp-results')) {
+            reswapList();
             return;
         }
         const newNote = dto.note == null ? '' : dto.note;
