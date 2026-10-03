@@ -2,171 +2,19 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <body>
 <th:block th:fragment="sidebar">
-    <div sec:authorize="isAuthenticated()" id="notification-bell" class="notification-bell">
-        <span id="notification-i18n" hidden
-              th:attr="data-loading=#{notifications.loading},data-empty=#{notifications.empty},data-mark-read=#{notifications.markRead},data-delete=#{notifications.delete},data-deleted=#{notifications.success.deleted},data-all-read=#{notifications.success.allRead},data-cleared=#{notifications.success.cleared},data-confirm-clear-title=#{notifications.confirm.clear.title},data-confirm-clear-body=#{notifications.confirm.clear.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-error=#{notification.error.title}"></span>
-        <button type="button" id="notification-toggle" class="notification-bell-btn"
-                th:title="#{notifications.bell.title}" th:aria-label="#{notifications.bell.aria}"
-                aria-haspopup="true" aria-expanded="false">
-            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
-            <span id="notification-badge" class="notification-badge"
-                  th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
-                  th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span>
-        </button>
-        <div id="notification-dropdown" class="notification-dropdown notification-dropdown-hidden"
-             role="region" th:aria-label="#{notifications.bell.title}">
-            <div class="notification-dropdown-header">
-                <span th:text="#{notifications.title}">Notifications</span>
-                <button type="button" class="notification-link-btn" data-notif-mark-all
-                        th:text="#{notifications.markAllRead}">Mark all read</button>
-            </div>
-            <ul id="notification-dropdown-list" class="notification-dropdown-list"></ul>
-            <p id="notification-dropdown-empty" class="notification-dropdown-empty notification-badge-hidden"
-               data-notif-empty th:text="#{notifications.empty}">No notifications</p>
-            <div class="notification-dropdown-footer">
-                <a th:href="@{/notifications}" th:text="#{notifications.viewAll}">View all</a>
-            </div>
+    <div id="sidebar" class="sidebar" inert
+         th:aria-label="#{nav.drawer.aria}" role="navigation">
+        <div class="nav-grip" aria-hidden="true"></div>
+        <div class="nav-head">
+            <img th:src="@{/logos/basetool-logo.svg}" alt="" width="30" height="30">
+            <span class="nav-head-title" th:text="${appTitle}">Profit Basetool</span>
+            <button id="close-sidebar" class="close-sidebar-btn" type="button"
+                    th:aria-label="#{nav.close}" th:title="#{nav.close}">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"></use></svg>
+            </button>
         </div>
-    </div>
-    <div id="sidebar" class="sidebar" th:data-admin-mode-label="#{nav.administration}"
-         th:data-admin-mode-chip="#{nav.adminMode.chip}">
-        <div class="sidebar-content">
-            <button id="close-sidebar" class="close-sidebar-btn">&times;</button>
-            <div class="sidebar-links">
-                <a th:href="@{/}" th:text="#{nav.home}">Home</a>
-                <span sec:authorize="isAuthenticated()">
-                <a th:href="@{/notifications}" data-testid="nav-notifications" th:text="#{nav.notifications}">Notifications</a>
-                <details class="sidebar-group" data-group-key="missions">
-                    <summary th:text="#{nav.section.mission_planning}">Einsatzplanung</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/missions}" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
-                        <a th:href="@{/operations}" th:text="#{nav.operations}">Operations</a>
-                    </div>
-                </details>
-                <details class="sidebar-group" data-group-key="logistics">
-                    <summary th:text="#{nav.section.logistics}">Flotte &amp; Logistik</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/hangar}" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
-                        <a th:href="@{/inventory}" th:text="#{nav.inventory}">Lager</a>
-                        <a th:href="@{/materialboerse}" data-testid="nav-materialboerse"
-                           sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)"
-                           th:text="#{nav.materialboerse}">Materialbörse</a>
-                        <a th:href="@{/refinery-orders}" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
-                        <a th:href="@{/orders}" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
-                        <a th:href="@{/orders}" th:if="${!canViewJobOrders and canViewOwnJobOrders}" data-testid="nav-orders-own" th:text="#{nav.orders.own}">Meine Aufträge</a>
-                        <a th:href="@{/orders/material-demand}" th:if="${canViewJobOrders}" data-testid="nav-orders-material-demand" th:text="#{nav.orders.materialDemand}">Materialbedarf</a>
-                        <a th:href="@{/orders/create}" th:unless="${canViewJobOrders or canViewOwnJobOrders}" data-testid="nav-orders-create" th:text="#{orders.create.link}">Auftrag anlegen</a>
-                        <a th:href="@{/blueprint-overview}" th:if="${canSeeBlueprintOverview}" data-testid="nav-blueprint-overview" th:text="#{nav.blueprint_overview}">Blueprint Availability</a>
-                    </div>
-                </details>
-                <details class="sidebar-group" data-group-key="trade">
-                    <summary th:text="#{nav.materials}">Handel</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/materials}" th:text="#{nav.materials.list}">Material-Liste</a>
-                        <a th:href="@{/materials/overview}" th:text="#{nav.materials.overview}">Material-Übersicht</a>
-                        <a th:href="@{/materials/profit-calculation}" th:text="#{nav.materials.profit_calculation}">Profitberechnung</a>
-                    </div>
-                </details>
-                <details class="sidebar-group" data-group-key="personal">
-                    <summary th:text="#{nav.section.personal}">Pers\u00f6nlich</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/personal-inventory}" th:text="#{nav.personal.items}">Mein Inventar</a>
-                        <a th:href="@{/personal-inventory/blueprints}" th:text="#{nav.personal.blueprints}">Meine Blueprints</a>
-                        <a th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>
-                        <a th:href="@{/connected-apps}" data-testid="nav-connected-apps" th:text="#{nav.personal.connectedApps}">Verbundene Anwendungen</a>
-                    </div>
-                </details>
-                <details class="sidebar-group" data-group-key="promotion" th:if="${promotionFeatureEnabled}">
-                    <summary th:text="#{nav.promotion}">Bef\u00f6rderung</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/promotion/overview}" th:text="#{nav.promotion.overview}">Bef\u00f6rderungssystem</a>
-                        <a th:href="@{/promotion/my-evaluations}" th:text="#{nav.promotion.my_evaluations}">Meine Bewertungen</a>
-                        <a th:href="@{/promotion/manage}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.manage}">Bewertungsverwaltung</a>
-                        <a th:href="@{/promotion/admin/topics}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.admin_topics}">Themenbereiche</a>
-                        <a th:href="@{/promotion/admin/rank-requirements}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.admin_ranks}">Rangvoraussetzungen</a>
-                    </div>
-                </details>
-                <details class="sidebar-group" data-group-key="organisation">
-                    <summary th:text="#{nav.section.organisation}">Organisation</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
-                        <a th:href="@{/organisation/leitung}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
-                        <a th:href="@{/org-unit-bank}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
-                    </div>
-                </details>
-                <details class="sidebar-group" data-group-key="resources">
-                    <summary th:text="#{nav.section.resources}">Ressourcen</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/sc-links}" data-testid="nav-sc-links" th:text="#{nav.scLinks}">Star-Citizen-Links</a>
-                    </div>
-                </details>
-                <details class="sidebar-group" data-group-key="bank" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_EMPLOYEE)">
-                    <summary th:text="#{nav.section.bank}">Bank</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/bank}" data-testid="nav-bank" th:text="#{nav.bank.dashboard}">Bank-Dashboard</a>
-                        <a th:href="@{/bank/manage}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_EMPLOYEE)" data-testid="nav-bank-manage" th:text="#{nav.bank.manage}">Bankverwaltung</a>
-                        <a th:href="@{/bank/grants}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)" data-testid="nav-bank-grants" th:text="#{nav.bank.grants}">Berechtigungen</a>
-                        <a th:href="@{/bank/requests}" data-testid="nav-bank-requests" th:text="#{nav.bank.requests}">Antr&auml;ge</a>
-                    </div>
-                </details>
-                <details class="sidebar-group" data-group-key="admin" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-                    <summary th:text="#{nav.administration}">Administration</summary>
-                    <div class="sidebar-sublinks">
-                        <span class="sidebar-subheading" th:text="#{nav.admin.group.members}">Benutzer &amp; Inhalte</span>
-                        <a th:href="@{/members}" th:text="#{nav.members}">Mitgliederverwaltung</a>
-                        <a th:href="@{/admin/special-commands}" th:text="#{nav.admin.specialcommands}">Spezialkommandos</a>
-                        <a th:href="@{/admin/org-structure}" data-testid="nav-admin-org-structure" th:text="#{nav.admin.orgStructure}">Organisationsstruktur</a>
-                        <a th:href="@{/admin/announcement}" th:text="#{info.title}">Informationen</a>
-                        <a th:href="@{/admin/terms}" data-testid="nav-admin-terms" th:text="#{nav.admin.terms}">Nutzungsbedingungen</a>
-                        <span class="sidebar-subheading" th:text="#{nav.admin.group.masterdata}">Stammdaten</span>
-                        <a th:href="@{/admin/mission-data}" th:text="#{nav.mission_data}">Missionsdaten</a>
-                        <a th:href="@{/admin/locations}" th:text="#{nav.locations}">Orte</a>
-                        <a th:href="@{/ship-data}" th:text="#{nav.hangar_data}">Schiffsdaten</a>
-                        <a th:href="@{/admin/materials}" th:text="#{nav.admin.materials}">Materialien</a>
-                        <a th:href="@{/admin/material-aliases}" th:text="#{nav.admin.materialAliases}">Material-Aliase</a>
-                        <a th:href="@{/admin/blueprints}" th:text="#{nav.admin.blueprints}">Blueprints</a>
-                        <a th:href="@{/admin/default-blueprints}" th:text="#{nav.admin.defaultBlueprints}">Standard-Blueprints</a>
-                        <a th:href="@{/admin/uex-data}" th:text="#{nav.admin.uex}">UEX-Daten</a>
-                        <a th:href="@{/admin/p4k-import}" th:text="#{nav.admin.p4kImport}">P4K-Import</a>
-                        <span class="sidebar-subheading" th:text="#{nav.admin.group.bank}">Bank</span>
-                        <a th:href="@{/admin/bank}" data-testid="nav-admin-bank" th:text="#{nav.admin.bank}">Bank-Administration</a>
-                        <span class="sidebar-subheading" th:text="#{nav.admin.group.system}">System &amp; Daten</span>
-                        <a th:href="@{/admin/audit-log}" data-testid="nav-admin-audit-log" th:text="#{nav.admin.auditLog}">Audit-Logs</a>
-                        <a th:href="@{/admin/settings}" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
-                        <a th:href="@{/admin/exchange-clients}" data-testid="nav-admin-exchange-clients" th:text="#{nav.admin.exchangeClients}">Verbundene Anwendungen</a>
-                        <a th:href="@{/admin/notification-rules}" th:text="#{nav.admin.notificationRules}">Notification rules</a>
-                        <a th:href="@{/admin/sync-reports}" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>
-                        <a th:href="@{/admin/discord-registrations}" data-testid="nav-admin-discord-registrations" th:text="#{nav.admin.discordRegistrations}">Discord-Registrierungen</a>
-                        <a th:href="@{/admin/deletion-requests}" data-testid="nav-admin-deletion-requests" th:text="#{nav.admin.deletionRequests}">L&ouml;schantr&auml;ge</a>
-                        <a th:href="@{/admin/person-search}" data-testid="nav-admin-person-search" th:text="#{nav.admin.personSearch}">Personensuche</a>
-                        <a th:href="@{/admin/personal-inventory}" th:text="#{admin.personalInventory.menu}">Pers. Inventar (Admin)</a>
-                        <a th:href="@{/admin/personal-blueprints}" th:text="#{admin.personalInventory.blueprints.menu}">Pers. Blueprints (Admin)</a>
-                    </div>
-                </details>
-                <form th:action="@{/logout}" method="post" class="sidebar-logout-form">
-                    <button type="submit" class="sidebar-logout-btn" data-testid="nav-logout" th:text="#{nav.logout}">Logout</button>
-                </form>
-            </span>
-                <span sec:authorize="isAnonymous()">
-                <a th:href="@{/oauth2/authorization/keycloak}" data-testid="nav-login" th:text="#{nav.login}">Login</a>
-                <a th:href="@{/oauth2/authorization/keycloak(idp='discord')}"
-                   data-testid="nav-login-discord" class="sidebar-discord-login">
-                    <span th:text="#{nav.login.discord}">Mit Discord anmelden</span>
-                    <svg class="krt-icon" aria-hidden="true" focusable="false"><use href="#krt-icon-discord"/></svg>
-                </a>
-            </span>
-                <details class="sidebar-group" data-group-key="legal">
-                    <summary th:text="#{nav.legal}">Rechtliches</summary>
-                    <div class="sidebar-sublinks">
-                        <a th:href="@{/terms}" th:text="#{nav.terms}">Nutzungsbedingungen</a>
-                        <a th:href="@{/privacy}" th:text="#{nav.privacy}">Datenschutz</a>
-                        <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
-                        <a th:href="@{/licenses}" th:text="#{nav.licenses}">Open-Source-Lizenzen</a>
-                    </div>
-                </details>
-            </div>
+        <div class="nav-context" sec:authorize="isAuthenticated()">
             <form id="squadron-switcher-form"
-                  sec:authorize="isAuthenticated()"
                   th:if="${availableOrgUnits != null and availableOrgUnits.size() > 1}"
                   th:action="@{/me/active-org-unit}" method="post" class="squadron-switcher no-track">
                 <input type="hidden" name="_referer" th:value="${currentRequestUri}" />
@@ -190,32 +38,324 @@
                     <button type="submit" class="squadron-switcher-submit">&#x2713;</button>
                 </noscript>
             </form>
-            <div class="dropdown">
-                <button class="dropbtn">
-                <span th:if="${#locale.language == 'de'}" class="flex-gap-sm">
-                     <img th:src="@{/images/flags/de.svg}" width="24" height="16" class="flag-icon" alt="DE">
-                     <span th:text="#{lang.de}">DE</span>
-                </span>
-                    <span th:unless="${#locale.language == 'de'}" class="flex-gap-sm">
-                     <img th:src="@{/images/flags/gb.svg}" width="24" height="16" class="flag-icon" alt="EN">
-                     <span th:text="#{lang.en}">EN</span>
-                </span>
+            <div class="nav-filter">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"></use></svg>
+                <input type="search" id="nav-filter" class="nav-filter-input" data-testid="nav-filter"
+                       autocomplete="off" spellcheck="false"
+                       th:placeholder="#{nav.filter.placeholder}" th:aria-label="#{nav.filter.aria}">
+            </div>
+        </div>
+        <div class="nav-list" id="nav-list">
+            <th:block sec:authorize="isAuthenticated()">
+                <div class="nav-admin-bar" hidden
+                     sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                    <button type="button" class="nav-admin-back" data-testid="nav-admin-back">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"></use></svg>
+                        <span th:text="#{nav.admin.back}">Hauptmenü</span>
+                    </button>
+                    <span class="admin-mode-chip" th:text="#{nav.adminMode.chip}">ADMIN</span>
+                </div>
+                <div class="nav-mode nav-mode-main" data-nav-mode="main">
+                    <div class="nav-top" th:data-nav-group="#{nav.group.general}">
+                        <a th:href="@{/}" class="nav-top-link" data-nav-icon="list"
+                           th:text="#{nav.home}">Home</a>
+                        <a th:href="@{/notifications}" class="nav-top-link" data-testid="nav-notifications"
+                           data-nav-icon="bell">
+                            <span class="nav-top-label" th:text="#{nav.notifications}">Notifications</span>
+                            <span class="nav-count-pill" data-notif-badge
+                                  th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
+                                  th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span>
+                        </a>
+                    </div>
+                    <section class="nav-group" data-group-key="missions" data-nav-icon="clipboard-check"
+                             th:data-nav-group="#{nav.section.mission_planning}">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-missions">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.section.mission_planning}">Einsatzplanung</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-missions">
+                            <a th:href="@{/missions}" class="nav-link" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
+                            <a th:href="@{/operations}" class="nav-link" th:text="#{nav.operations}">Operations</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="logistics" data-nav-icon="bookout"
+                             th:data-nav-group="#{nav.section.logistics}">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-logistics">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-bookout"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.section.logistics}">Flotte &amp; Logistik</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-logistics">
+                            <a th:href="@{/hangar}" class="nav-link" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
+                            <a th:href="@{/inventory}" class="nav-link" th:text="#{nav.inventory}">Lager</a>
+                            <a th:href="@{/materialboerse}" class="nav-link" data-testid="nav-materialboerse"
+                               sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)"
+                               th:text="#{nav.materialboerse}">Materialbörse</a>
+                            <a th:href="@{/refinery-orders}" class="nav-link" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
+                            <a th:href="@{/orders}" class="nav-link" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
+                            <a th:href="@{/orders}" class="nav-link" th:if="${!canViewJobOrders and canViewOwnJobOrders}" data-testid="nav-orders-own" th:text="#{nav.orders.own}">Meine Aufträge</a>
+                            <a th:href="@{/orders/material-demand}" class="nav-link" th:if="${canViewJobOrders}" data-testid="nav-orders-material-demand" th:text="#{nav.orders.materialDemand}">Materialbedarf</a>
+                            <a th:href="@{/orders/create}" class="nav-link" th:unless="${canViewJobOrders or canViewOwnJobOrders}" data-testid="nav-orders-create" th:text="#{orders.create.link}">Auftrag anlegen</a>
+                            <a th:href="@{/blueprint-overview}" class="nav-link" th:if="${canSeeBlueprintOverview}" data-testid="nav-blueprint-overview" th:text="#{nav.blueprint_overview}">Blueprint Availability</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="trade" data-nav-icon="swap"
+                             th:data-nav-group="#{nav.materials}">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-trade">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-swap"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.materials}">Handel</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-trade">
+                            <a th:href="@{/materials}" class="nav-link" th:text="#{nav.materials.list}">Material-Liste</a>
+                            <a th:href="@{/materials/overview}" class="nav-link" th:text="#{nav.materials.overview}">Material-Übersicht</a>
+                            <a th:href="@{/materials/profit-calculation}" class="nav-link" th:text="#{nav.materials.profit_calculation}">Profitberechnung</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="organisation" data-nav-icon="users"
+                             th:data-nav-group="#{nav.section.organisation}">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-organisation">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-users"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.section.organisation}">Organisation</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-organisation">
+                            <a th:href="@{/org-chart}" class="nav-link" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
+                            <a th:href="@{/organisation/leitung}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
+                            <a th:href="@{/org-unit-bank}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="promotion" data-nav-icon="user-plus"
+                             th:if="${promotionFeatureEnabled}" th:data-nav-group="#{nav.promotion}">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-promotion">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-user-plus"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.promotion}">Beförderung</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-promotion">
+                            <a th:href="@{/promotion/overview}" class="nav-link" th:text="#{nav.promotion.overview}">Beförderungssystem</a>
+                            <a th:href="@{/promotion/my-evaluations}" class="nav-link" th:text="#{nav.promotion.my_evaluations}">Meine Bewertungen</a>
+                            <a th:href="@{/promotion/manage}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.manage}">Bewertungsverwaltung</a>
+                            <a th:href="@{/promotion/admin/topics}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.admin_topics}">Themenbereiche</a>
+                            <a th:href="@{/promotion/admin/rank-requirements}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.admin_ranks}">Rangvoraussetzungen</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="bank" data-nav-icon="bank-in"
+                             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_EMPLOYEE)"
+                             th:data-nav-group="#{nav.section.bank}">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-bank">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-bank-in"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.section.bank}">Kartellbank</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-bank">
+                            <a th:href="@{/bank}" class="nav-link" data-testid="nav-bank" th:text="#{nav.bank.dashboard}">Bank-Dashboard</a>
+                            <a th:href="@{/bank/manage}" class="nav-link" data-testid="nav-bank-manage" th:text="#{nav.bank.manage}">Bankverwaltung</a>
+                            <a th:href="@{/bank/grants}" class="nav-link" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)" data-testid="nav-bank-grants" th:text="#{nav.bank.grants}">Berechtigungen</a>
+                            <a th:href="@{/bank/requests}" class="nav-link" data-testid="nav-bank-requests" th:text="#{nav.bank.requests}">Anträge</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="resources" data-nav-icon="external-link"
+                             th:data-nav-group="#{nav.section.resources}">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-resources">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-external-link"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.section.resources}">Ressourcen</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-resources">
+                            <a th:href="@{/sc-links}" class="nav-link" data-testid="nav-sc-links" th:text="#{nav.scLinks}">Star-Citizen-Links</a>
+                        </div>
+                    </section>
+                    <section class="nav-group nav-group-filter-only" data-group-key="personal" data-nav-icon="user"
+                             th:data-nav-group="#{nav.section.personal}" hidden>
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-personal" tabindex="-1">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-user"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.section.personal}">Persönlich</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-personal">
+                            <a th:href="@{/personal-inventory}" class="nav-link" data-nav-skip th:text="#{nav.personal.items}">Mein Inventar</a>
+                            <a th:href="@{/personal-inventory/blueprints}" class="nav-link" data-nav-skip th:text="#{nav.personal.blueprints}">Meine Blueprints</a>
+                            <a th:href="@{/profile}" class="nav-link" data-nav-skip th:text="#{nav.profile}">Profile</a>
+                            <a th:href="@{/connected-apps}" class="nav-link" data-nav-skip th:text="#{nav.personal.connectedApps}">Verbundene Anwendungen</a>
+                        </div>
+                    </section>
+                </div>
+                <div class="nav-mode nav-mode-admin" data-nav-mode="admin"
+                     sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                    <section class="nav-group" data-group-key="admin-members" data-nav-icon="users"
+                             th:data-nav-group="|#{nav.admin.crumb} · #{nav.admin.group.members}|">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-admin-members">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-users"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.admin.group.members}">Benutzer &amp; Inhalte</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-admin-members">
+                            <a th:href="@{/members}" class="nav-link" th:text="#{nav.members}">Mitgliederverwaltung</a>
+                            <a th:href="@{/admin/special-commands}" class="nav-link" th:text="#{nav.admin.specialcommands}">Spezialkommandos</a>
+                            <a th:href="@{/admin/org-structure}" class="nav-link" data-testid="nav-admin-org-structure" th:text="#{nav.admin.orgStructure}">Organisationsstruktur</a>
+                            <a th:href="@{/admin/announcement}" class="nav-link" th:text="#{info.title}">Informationen</a>
+                            <a th:href="@{/admin/terms}" class="nav-link" data-testid="nav-admin-terms" th:text="#{nav.admin.terms}">Nutzungsbedingungen</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="admin-masterdata" data-nav-icon="list"
+                             th:data-nav-group="|#{nav.admin.crumb} · #{nav.admin.group.masterdata}|">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-admin-masterdata">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-list"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.admin.group.masterdata}">Stammdaten</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-admin-masterdata">
+                            <a th:href="@{/admin/mission-data}" class="nav-link" th:text="#{nav.mission_data}">Missionsdaten</a>
+                            <a th:href="@{/admin/locations}" class="nav-link" th:text="#{nav.locations}">Orte</a>
+                            <a th:href="@{/ship-data}" class="nav-link" th:text="#{nav.hangar_data}">Schiffsdaten</a>
+                            <a th:href="@{/admin/materials}" class="nav-link" th:text="#{nav.admin.materials}">Materialien</a>
+                            <a th:href="@{/admin/material-aliases}" class="nav-link" th:text="#{nav.admin.materialAliases}">Material-Aliase</a>
+                            <a th:href="@{/admin/blueprints}" class="nav-link" th:text="#{nav.admin.blueprints}">Blueprints</a>
+                            <a th:href="@{/admin/default-blueprints}" class="nav-link" th:text="#{nav.admin.defaultBlueprints}">Standard-Blueprints</a>
+                            <a th:href="@{/admin/uex-data}" class="nav-link" th:text="#{nav.admin.uex}">UEX-Daten</a>
+                            <a th:href="@{/admin/p4k-import}" class="nav-link" th:text="#{nav.admin.p4kImport}">P4K-Import</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="admin-bank" data-nav-icon="bank-in"
+                             th:data-nav-group="|#{nav.admin.crumb} · #{nav.admin.group.bank}|">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-admin-bank">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-bank-in"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.admin.group.bank}">Kartellbank</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-admin-bank">
+                            <a th:href="@{/admin/bank}" class="nav-link" data-testid="nav-admin-bank" th:text="#{nav.admin.bank}">Bank-Administration</a>
+                        </div>
+                    </section>
+                    <section class="nav-group" data-group-key="admin-system" data-nav-icon="gear"
+                             th:data-nav-group="|#{nav.admin.crumb} · #{nav.admin.group.system}|">
+                        <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-admin-system">
+                            <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-gear"></use></svg>
+                            <span class="nav-group-label" th:text="#{nav.admin.group.system}">System &amp; Daten</span>
+                            <span class="nav-group-count"></span>
+                            <svg class="krt-icon nav-group-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+                        </button>
+                        <div class="nav-group-links" id="nav-group-admin-system">
+                            <a th:href="@{/admin/audit-log}" class="nav-link" data-testid="nav-admin-audit-log" th:text="#{nav.admin.auditLog}">Audit-Logs</a>
+                            <a th:href="@{/admin/settings}" class="nav-link" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
+                            <a th:href="@{/admin/exchange-clients}" class="nav-link" data-testid="nav-admin-exchange-clients" th:text="#{nav.admin.exchangeClients}">Verbundene Anwendungen</a>
+                            <a th:href="@{/admin/notification-rules}" class="nav-link" th:text="#{nav.admin.notificationRules}">Notification rules</a>
+                            <a th:href="@{/admin/sync-reports}" class="nav-link" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>
+                            <a th:href="@{/admin/discord-registrations}" class="nav-link" data-testid="nav-admin-discord-registrations" th:text="#{nav.admin.discordRegistrations}">Discord-Registrierungen</a>
+                            <a th:href="@{/admin/deletion-requests}" class="nav-link" data-testid="nav-admin-deletion-requests" th:text="#{nav.admin.deletionRequests}">Löschanträge</a>
+                            <a th:href="@{/admin/person-search}" class="nav-link" data-testid="nav-admin-person-search" th:text="#{nav.admin.personSearch}">Personensuche</a>
+                            <a th:href="@{/admin/personal-inventory}" class="nav-link" th:text="#{admin.personalInventory.menu}">Pers. Inventar (Admin)</a>
+                            <a th:href="@{/admin/personal-blueprints}" class="nav-link" th:text="#{admin.personalInventory.blueprints.menu}">Pers. Blueprints (Admin)</a>
+                        </div>
+                    </section>
+                </div>
+                <p class="nav-filter-empty" hidden th:text="#{nav.filter.empty}">Kein Menüeintrag gefunden.</p>
+                <button type="button" class="nav-filter-to-palette" data-testid="nav-filter-to-palette" hidden>
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
+                    <span class="nav-filter-to-palette-label" th:text="#{nav.filter.toPalette}">Im Schnellzugriff suchen</span>
+                    <span class="nav-filter-to-palette-label-short" th:text="#{nav.filter.toPaletteShort}">Überall suchen</span>
+                    <span class="nav-kbd" data-palette-kbd th:text="#{palette.kbd}">STRG K</span>
                 </button>
-                <div class="dropdown-content">
-                    <a th:href="@{''(lang='de')}">
-                        <img th:src="@{/images/flags/de.svg}" width="24" height="16" class="flag-icon" alt="DE">
-                        <span th:text="#{lang.de}">DE</span>
-                    </a>
-                    <a th:href="@{''(lang='en')}">
-                        <img th:src="@{/images/flags/gb.svg}" width="24" height="16" class="flag-icon" alt="EN">
-                        <span th:text="#{lang.en}">EN</span>
+            </th:block>
+            <div class="nav-mode nav-mode-main" sec:authorize="isAnonymous()">
+                <div class="nav-top">
+                    <a th:href="@{/}" class="nav-top-link" th:text="#{nav.home}">Home</a>
+                    <a th:href="@{/oauth2/authorization/keycloak}" class="nav-top-link" data-testid="nav-login" th:text="#{nav.login}">Login</a>
+                    <a th:href="@{/oauth2/authorization/keycloak(idp='discord')}"
+                       data-testid="nav-login-discord" class="nav-top-link nav-discord-login">
+                        <span th:text="#{nav.login.discord}">Mit Discord anmelden</span>
+                        <svg class="krt-icon" aria-hidden="true" focusable="false"><use href="#krt-icon-discord"/></svg>
                     </a>
                 </div>
+            </div>
+            <div class="nav-legal" th:data-nav-group="#{nav.legal}" data-nav-icon="info">
+                <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
+                <a th:href="@{/privacy}" th:text="#{nav.privacy}">Datenschutz</a>
+                <a th:href="@{/terms}" th:text="#{nav.terms}">Nutzungsbedingungen</a>
+                <a th:href="@{/licenses}" th:text="#{nav.licenses}">Open-Source-Lizenzen</a>
+                <a href="https://github.com/krt-profit/basetool/wiki" target="_blank" rel="noopener noreferrer"
+                   data-nav-skip th:text="#{footer.handbook}">Handbuch</a>
+                <span class="nav-legal-version" th:text="#{app.version.display(${appVersion})}">v0.0.1</span>
+            </div>
+        </div>
+        <div class="nav-foot">
+            <button type="button" class="nav-admin-entry" data-testid="nav-admin-toggle"
+                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                <svg class="krt-icon nav-admin-entry-icon" aria-hidden="true"><use href="#krt-icon-gear"></use></svg>
+                <span class="nav-admin-entry-label" th:text="#{nav.administration}">Administration</span>
+                <svg class="krt-icon nav-admin-entry-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
+            </button>
+            <div class="nav-personal" id="nav-personal" hidden sec:authorize="isAuthenticated()"
+                 th:data-nav-group="#{nav.section.personal}" data-nav-icon="user">
+                <span class="nav-personal-title" th:text="#{nav.section.personal}">Persönlich</span>
+                <a th:href="@{/personal-inventory}" class="nav-link" th:text="#{nav.personal.items}">Mein Inventar</a>
+                <a th:href="@{/personal-inventory/blueprints}" class="nav-link" th:text="#{nav.personal.blueprints}">Meine Blueprints</a>
+                <a th:href="@{/profile}" class="nav-link" th:text="#{nav.profile}">Profile</a>
+                <a th:href="@{/connected-apps}" class="nav-link" data-testid="nav-connected-apps" th:text="#{nav.personal.connectedApps}">Verbundene Anwendungen</a>
+            </div>
+            <div class="nav-user-row">
+                <button type="button" class="nav-user-toggle" data-testid="nav-user-toggle"
+                        aria-expanded="false" aria-controls="nav-personal"
+                        sec:authorize="isAuthenticated()" th:title="#{nav.user.toggle}">
+                    <span class="nav-user-avatar" aria-hidden="true">
+                        <svg class="krt-icon"><use href="#krt-icon-user"></use></svg>
+                    </span>
+                    <span class="nav-user-text">
+                        <span class="nav-user-name" sec:authentication="name">greluc</span>
+                        <span class="nav-user-meta">
+                            <th:block th:if="${activeOrgUnit != null}"><span th:text="${activeOrgUnit.orgUnitName()}">IRIDIUM</span> · </th:block><span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{nav.user.role.admin}">Admin</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN) and hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.user.role.officer}">Offizier</span><span sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.user.role.member}">Mitglied</span>
+                        </span>
+                    </span>
+                    <svg class="krt-icon nav-user-chevron" aria-hidden="true"><use href="#krt-icon-chevron-up"></use></svg>
+                </button>
+                <div class="nav-lang">
+                    <button type="button" class="nav-lang-btn" aria-haspopup="true" aria-expanded="false"
+                            aria-controls="nav-lang-menu" th:title="#{nav.language}" th:aria-label="#{nav.language}">
+                        <img th:src="@{${#locale.language == 'de'} ? '/images/flags/de.svg' : '/images/flags/gb.svg'}"
+                             width="18" height="12" class="nav-flag" alt="">
+                        <span th:text="${#locale.language == 'de'} ? #{lang.de} : #{lang.en}">DE</span>
+                    </button>
+                    <div class="nav-lang-menu" id="nav-lang-menu" hidden>
+                        <a th:href="@{''(lang='de')}" lang="de">
+                            <img th:src="@{/images/flags/de.svg}" width="18" height="12" class="nav-flag" alt="">
+                            <span th:text="#{lang.de}">DE</span>
+                        </a>
+                        <a th:href="@{''(lang='en')}" lang="en">
+                            <img th:src="@{/images/flags/gb.svg}" width="18" height="12" class="nav-flag" alt="">
+                            <span th:text="#{lang.en}">EN</span>
+                        </a>
+                    </div>
+                </div>
+                <form th:action="@{/logout}" method="post" class="nav-logout-form" id="nav-logout-form"
+                      sec:authorize="isAuthenticated()">
+                    <button type="submit" class="nav-logout-btn" data-testid="nav-logout"
+                            th:aria-label="#{nav.logout}" th:title="#{nav.logout}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-logout"></use></svg>
+                    </button>
+                </form>
             </div>
         </div>
     </div>
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
+    <th:block sec:authorize="isAuthenticated()">
+        <th:block th:replace="~{fragments/mobile-nav :: tabbar}" />
+        <th:block th:replace="~{fragments/palette :: palette}" />
+    </th:block>
     <script th:src="@{/js/sidebar.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/krt-palette.js}" defer th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <th:block th:replace="~{fragments/toast :: toast}" />
     <th:block th:replace="~{fragments/unsaved-modal :: unsavedModal}" />
     <th:block th:replace="~{fragments/footer :: footer}" />

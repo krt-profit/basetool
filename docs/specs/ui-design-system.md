@@ -11,7 +11,8 @@
 > [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
 > [0212](../adr/0212-every-stylesheet-sits-in-a-cascade-layer.md) (REQ-UI-024) ·
-> **Next free id:** `REQ-UI-026` · **Visual source of truth:** the design
+> [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
+> **Next free id:** `REQ-UI-027` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -1117,8 +1118,8 @@ this requirement is the user-facing one. The Android app has the same screen (`R
 `basetool-android`), and the web page follows it.
 
 - **Where.** `/licenses`, titled „Open-Source-Lizenzen" / "Open-source licences". Linked from the
-  footer directly after „Nutzungsbedingungen", from the sidebar's „Rechtliches" group and from the
-  landing page's legal links. **Public** (`REQ-SEC-052`) and a legal page for both session gates.
+  footer directly after „Nutzungsbedingungen", from the legal links at the end of the phone menu
+  sheet (REQ-UI-026) and from the landing page's legal links. **Public** (`REQ-SEC-052`) and a legal page for both session gates.
 - **What.** Every runtime library of the four shipped modules (`backend`, `frontend`, `ingest`,
   `keycloak-spi`), read from each module's Licensee report, plus the non-Maven components listed in
   `frontend/oss-bundled-components.json` (the Lato font, the Temurin JRE and the Alpine layer of the
@@ -1291,8 +1292,8 @@ ship databases, crafting, the org's own sites and the game's official ones. The 
 them in one place so nobody has to collect the addresses from Discord.
 
 - **Where.** `/sc-links`, titled „Star-Citizen-Links" / "Star Citizen links". Reached from the
-  sidebar group „Ressourcen" / "Resources", placed after „Organisation" as the last group every
-  member sees. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
+  drawer group „Ressourcen" / "Resources", the last group of the main menu (REQ-UI-026), and from
+  the quick access. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
   since every account is at least a member, that is „every member". Not on the public surface: an
   anonymous caller is sent to the login like on every other page.
 - **What.** Thirty-eight links in six sections, in this order:
@@ -1329,6 +1330,82 @@ SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageC
 (renders every card with its logo and address in DE and EN, the sidebar entry under „Ressourcen") ·
 `AnonymousSurfaceSweepMvcTest` (anonymous navigation is sent to the login) ·
 **Related:** REQ-UI-018, REQ-SEC-052
+
+### REQ-UI-026 — Navigation: a structured drawer, a quick access and a phone tab bar
+
+The navigation has grown to about 65 links for a member with many roles, several viewport heights
+of one flat drawer. It is one model on every device
+([ADR-0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md)),
+built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a desktop, 2b phone).
+
+- **One header.** Every app page renders `fragments/header.html :: header` — hamburger, brand with
+  `appTitle`, the quick-access trigger („Seite oder Aktion suchen …", `Strg K` / `⌘ K`) and the
+  notification bell, which sits in the header's flex row instead of `position: fixed`. The admin
+  chip shows on `/admin/**` pages as before. The seven pages without the app shell (error pages,
+  pending approval, terms acceptance) keep their own header.
+- **The drawer (≥ 769 px)** is a 320 px overlay in three zones; only the middle one scrolls:
+  - *Head* — logo, `appTitle`, close.
+  - *Context* — the active-org-unit switcher (only with more than one org unit) and the menu filter.
+    Up to 1024 px the switcher keeps the 44 px touch floor of REQ-UI-009; the hand-off's 40 px
+    applies above it.
+  - *List* — „Startseite" and „Benachrichtigungen" (with the unread count) on top, then the groups
+    Einsatzplanung · Flotte & Logistik · Handel · Organisation · Beförderung (only with the
+    promotion feature) · Kartellbank · Ressourcen, each with its icon. Group headings are
+    upper-case; the links are normal case (Lato 400, 0.9 rem), a deliberate, product-owner-approved
+    exception to „navigation is upper-case". Every group is open by default; collapsing one is
+    remembered per browser (`localStorage` `krt.sidebar.<key>`); the group holding the current page
+    is always open, and the current page is marked (`aria-current="page"`, inset primary bar).
+  - *Foot* — „Administration" (administrators only), the personal panel, and the user row: name,
+    `<org unit> · <role>`, the language menu and logout.
+- **Information architecture.** „Rechtliches" is not in the menu — the legal links stay in the
+  fixed footer. „Persönlich" (Mein Inventar, Meine Blueprints, Profil, Verbundene Anwendungen) is
+  the panel the user row opens. **Administration is a mode:** the entry replaces the groups with the
+  four admin groups (Benutzer & Inhalte, Stammdaten, Kartellbank, System & Daten) and a „Hauptmenü"
+  control; on `/admin/**` pages and on any page whose link lives in an admin group the drawer opens
+  in that mode.
+- **The menu filter** searches every group the member has, the personal links and — for
+  administrators — the admin groups. A link matches when its label or its group's label contains
+  the text (case-insensitive); only matching groups show, all open, and the top entries hide. With
+  no match it says „Kein Menüeintrag gefunden."; with any text it offers „Im Schnellzugriff suchen",
+  which closes the drawer and opens the quick access with the text.
+- **The quick access** (`Strg`/`⌘` + `K` from anywhere, inputs included; the header trigger; the
+  phone's search button) is a dialog of the one dialog shape (REQ-UI-013, `#nav-palette`). Empty, it
+  offers up to four recently visited pages (`localStorage` `krt.recent`, recorded on every page whose
+  link is in the menu) and the actions „Neuen Auftrag anlegen", „Org-Einheit wechseln" (only with a
+  switcher) and „Abmelden". With text it lists up to eight pages, label hits before breadcrumb hits,
+  then the matching actions, with the hit marked; „Keine Treffer. Signal verloren." when nothing
+  matches. ↑/↓ move the selection, Enter opens, Escape and the scrim close.
+- **Rights stay on the server.** The quick access builds its index from the links the server
+  rendered into the drawer (`data-nav-group` / `data-nav-icon` on each group), so it offers exactly
+  the pages this member may see and needs no endpoint. A recently visited page that is no longer in
+  the menu is not offered.
+- **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
+  safe area) holds Einsätze · Lager · Aufträge · Meldungen (with the unread count) · Menü; the current
+  area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
+  accordion with the current page's group open, the legal links, the handbook and the version at the
+  end of the list, the same foot with 44–48 px rows. The fixed footer is hidden while the tab bar
+  shows; `main` reserves the tab bar, `--krt-footer-height` stays `0px`, and bars pinned to the
+  bottom of the viewport sit above the tab bar (`--krt-tabbar-height`). Pointer drags that scroll at
+  the viewport's bottom edge measure that edge from the top of the tab bar, and a drop released over
+  the tab bar is cancelled (the crew board, REQ-MISSION-005). The quick access opens full
+  screen with „Abbrechen". A signed-out visitor of a legal page has no tab bar and keeps the
+  hamburger and the footer.
+- **Accessibility.** The closed drawer is `inert`; opening it focuses the filter (desktop) and
+  closing it returns focus to the opener. Escape closes the drawer. Group heads are buttons with
+  `aria-expanded`; the quick access is a combobox over a listbox with `aria-activedescendant`.
+  Motion is limited to colour transitions and the 0.4 s drawer slide, and `prefers-reduced-motion`
+  removes both.
+- **No data, nothing mutates.** The org-unit switch and logout keep their existing forms, so no
+  live-update wiring, audit event or metric changes.
+
+**Enforced by:** `NavigationRenderMvcTest` (header, drawer zones and groups, admin mode only for
+administrators, the quick-access metadata, no „Rechtliches" group, nothing of it for a signed-out
+visitor) · `NavigationE2eTest` (filter and hand-over, `Ctrl+K`, admin mode, the phone tab bar and
+sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
+`TouchClassLayoutE2eTest` (`main` reserves the tab bar; header, footer and tab bar within the
+chrome budget) · **Code:** `fragments/header.html`, `fragments/sidebar.html`,
+`fragments/palette.html`, `fragments/mobile-nav.html`, `static/js/sidebar.js`,
+`static/js/krt-palette.js` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019
 
 ## Out of scope
 
