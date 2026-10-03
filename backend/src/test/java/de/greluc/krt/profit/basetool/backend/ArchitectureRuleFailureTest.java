@@ -54,13 +54,11 @@ import de.greluc.krt.profit.basetool.architecture.fixtures.security.CascadeFixtu
 import de.greluc.krt.profit.basetool.architecture.fixtures.security.LeakyService;
 import de.greluc.krt.profit.basetool.architecture.fixtures.security.ScopeFixture;
 import de.greluc.krt.profit.basetool.architecture.fixtures.tenancy.GuardFixture;
-import de.greluc.krt.profit.basetool.architecture.fixtures.tenancy.ScopedFixtureController;
 import de.greluc.krt.profit.basetool.architecture.fixtures.tenancy.ScopedFixtureService;
 import de.greluc.krt.profit.basetool.architecture.fixtures.unclassified.FixtureBankThing;
 import de.greluc.krt.profit.basetool.architecture.fixtures.web.FixtureAudit;
 import de.greluc.krt.profit.basetool.architecture.fixtures.web.FixtureMembershipMapper;
 import de.greluc.krt.profit.basetool.architecture.fixtures.web.FixturePiiDto;
-import de.greluc.krt.profit.basetool.architecture.fixtures.web.ResponseOnlyFixtureDto;
 import de.greluc.krt.profit.basetool.architecture.fixtures.web.UngatedController;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -188,15 +186,6 @@ class ArchitectureRuleFailureTest {
   void thePermitAllAllowListFails() {
     assertReports(
         ArchitectureTest.permitAllRule(Set.of(), Set.of()), WEB, "PublicController.open()");
-  }
-
-  @Test
-  void theMassAssignmentRuleFails() {
-    assertReports(
-        ArchitectureTest.responseOnlyDtosRule(
-            ArchitectureTest.bodyAcceptingWrites(), Set.of(ResponseOnlyFixtureDto.class)),
-        WEB,
-        "UngatedController.write(");
   }
 
   @Test
@@ -337,12 +326,6 @@ class ArchitectureRuleFailureTest {
             Set.of(GuardFixture.class)),
         TENANCY,
         "ScopedFixtureService");
-    assertReports(
-        ArchitectureTest.staffelScopedWriteEndpointsRule(
-            ArchitectureTest.staffelScopedWrites(Set.of(ScopedFixtureController.class)),
-            Set.of(GuardFixture.class)),
-        TENANCY,
-        "ScopedFixtureController.update(");
   }
 
   @Test

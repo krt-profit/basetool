@@ -51,6 +51,14 @@
   tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
   die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
 
+### Security
+
+- **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
+  tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
+  Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
+  (REQ-ORG-028, REQ-SEC-077, REQ-API-015). 13 Admin-/SPI-Endpunkte validieren ihren Body jetzt;
+  gültige Anfragen ändern sich nicht.
+
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 
 ### Added

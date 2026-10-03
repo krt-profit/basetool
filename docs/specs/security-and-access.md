@@ -67,7 +67,7 @@ Roles.ADMIN + "')`. This is safe by construction: `"literal" + Roles.X + "litera
 compile-time constant (JLS 4.12.4 / 15.28 — a `public static final String` field initialized from a
 literal, referenced from another compilation unit, is a constant expression), so javac folds it to
 the byte-identical original string before the annotation is even written to the class file — the
-wire behavior, and everything ArchUnit's `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` /
+wire behavior, and everything the write-gate rule of `TenancyGuardTest` /
 `writeEndpointsMustDeclareAnAuthorisationAnnotation` inspect via the resolved annotation value, is
 unchanged. Bean-method-only expressions (`@ownerScopeService.canEdit*`, `isAuthenticated()`,
 `permitAll()`) are untouched — only the literal-role/permission subset was in scope, matching the
@@ -183,10 +183,20 @@ equivalents — a new violation fails `./gradlew test`:
   `everyPostMappingShouldBeAuthorisationAnnotated`).
 - `permitAll()` appears on exactly four backend handlers — the two anonymous reads, the Keycloak SPI
   precheck and `/error` (`permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`, REQ-SEC-052).
-- Staffel-scoped write endpoints gate on `OwnerScopeService`
-  (`staffelScopedWriteEndpointsMustGateOnOwnerScopeService`,
-  `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
-  the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007).
+- Staffel-scoped services wire `OwnerScopeService` or `AuthHelperService`
+  (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
+  the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007). Write endpoints of
+  every controller that writes tenant data gate on a scope service, selected by the `@TenantScoped`
+  marker (`TenancyGuardTest`, REQ-ORG-028); it replaced the list-keyed
+  `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` and still selects all seven controllers
+  that rule named.
+- No type is both returned and bound as a request body beyond a reviewed list, no request type
+  carries a server-managed component, and every body is `@Valid` (`MassAssignmentGuardTest`,
+  REQ-SEC-077, REQ-API-015); the first rule replaced the single-DTO
+  `responseOnlyDtosMustNotBeAcceptedAsRequestBodyOnWriteEndpoints`. The Mission write requests keep
+  their own name list (`missionWriteRequestDtosMustNotCarryServerManagedFields`), which forbids
+  components such as `version`, `parent` and `participants` that the generic rule does not treat as
+  server-managed.
 - Controllers never return JPA entities (DTOs only — see [`api-conventions.md`](api-conventions.md)).
 - No controller depends on `OrgUnitMembershipMapper` — the membership entity→DTO projection runs
   inside `OrgUnitMembershipService`'s own transactions, never controller-side after commit
@@ -222,8 +232,8 @@ therefore:
   domain package segment (`exchange`), which survives both today's layer layout and a module
   package.
 - **Names its keys by class literal**, never by a fully qualified name string: targets, allow-lists
-  (`permitAll()` handlers resolved as `java.lang.reflect.Method`), the staffel-scoped services and
-  controllers, the PII-carrying DTOs, the bank ledger repositories. A method name a rule keys on is
+  (`permitAll()` handlers resolved as `java.lang.reflect.Method`), the staffel-scoped services,
+  the PII-carrying DTOs, the bank ledger repositories. A method name a rule keys on is
   checked against its class when the rule is built, and a SpEL bean name is derived from the bean
   class. A meta-test (`ArchitectureFqcnLiteralsTest`) fails on any string literal in the
   architecture tests that looks like a fully qualified class name and does not resolve.
@@ -1076,11 +1086,11 @@ here:
   closed to it.
 - **Strict silo:** a Bereichsleitung sees/edits only its own Bereich's descendants; only the OL crosses
   Bereiche. No peer-Bereich access, even read-only.
-- **ArchUnit-whitelist obligation:** the list-keyed rules `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
-  and `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` (class literals since REQ-SEC-073)
-  check only the classes in their lists; **every** new scoped controller/service added by the
-  restructure MUST be added to the relevant whitelist in the same PR (or covered by an
-  annotation/package-based rule), so no new write endpoint ships ungated.
+- **ArchUnit-whitelist obligation:** the list-keyed rule `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
+  (class literals since REQ-SEC-073) checks only the classes in its list; **every** new scoped
+  service added by the restructure MUST be added to it in the same PR. Write endpoints are covered
+  by the `@TenantScoped` marker rule (`TenancyGuardTest`, REQ-ORG-028), so no new write endpoint of
+  a controller writing tenant data ships ungated.
 
 **Acceptance**
 
@@ -1093,7 +1103,7 @@ here:
 strict-silo foreign-unit denial, OL concrete-union) and `OrgUnitCascadeServiceTest`;
 `ArchitectureTest` — `cascadeServiceMustNotConsultTheSecurityContext` (the cascade can never branch on
 admin status, so it can never grant admin), the `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
-whitelist (incl. the new `OrgUnitBankAccessService`) and `staffelScopedWriteEndpointsMustGateOnOwnerScopeService`
+whitelist (incl. the new `OrgUnitBankAccessService`); `TenancyGuardTest`'s write-gate rule
 (a new ungated scoped endpoint fails the build); and the `OrgHierarchyVisibilityMatrixE2eTest` cross-Bereich
 matrix on the ephemeral stack (Phase 7, `e2e`-label-gated) · **ADR:**
 [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:** #692, #696, #700.
@@ -5288,6 +5298,58 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 `MemberManagementController`, `profile.html`, `profile.js`, `member-edit.html` · **Record:**
 [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md) (A1) · **Related:**
 REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
+
+### REQ-SEC-077 — A request body never carries what the server manages
+
+Mass assignment is closed by structure, not by the care of each mapper:
+
+1. **No type is both returned and bound.** A type a handler returns — directly or inside
+   `ResponseEntity`, `PageResponse`, `List` or another generic — is never a `@RequestBody` type. A
+   dual-use type turns every read field added later into a writable one.
+2. **A request type carries no server-managed component.** Neither a body type nor any project type
+   nested in one declares the owner (`owner`, `ownerId`, …), an `owning…` component, a component
+   naming an org unit, a creation or modification timestamp or a `…SyncedAt`, or a `status` unless
+   every path binding the type ends in `/status` (a transition endpoint). The body type itself
+   declares no `id`: the identity of the written row comes from the path or the server. A nested
+   `id` names a referenced row and is allowed.
+3. **Every body is validated** (REQ-API-015).
+
+Two reviewed lists hold today's deliberate exceptions, and a stale entry fails the build:
+
+- **Thirteen dual-use types** whose split would rename a frozen OpenAPI schema the app consumes, which
+  the modularisation's Phase 0 forbids: `BereichDto`, `FrequencyTypeDto`, `JobTypeDto`,
+  `LocationDto`, `MaterialCategoryDto`, `MaterialDto`, `OrganisationsleitungDto`,
+  `RefineryOrderDto`, `RefiningMethodDto`, `SpecialCommandDto`, `SquadronDto`, `StarSystemDto`,
+  `TerminalDto`. Each entry names which of its server-managed components a MockMvc test proves
+  unwritable — a forged `id` naming another existing row neither overwrites that row on create nor
+  retargets an update; the refinery order's forged owner (outside the caller's units), owning
+  Staffel and create status are not persisted; a terminal update writes only `hidden` — and which
+  are deliberate client input, with the check that validates each. The guard refuses an entry whose
+  components and proof do not match, so the exception is proven safe rather than frozen. The split
+  follows each domain's API cut (ADR-0060).
+- **Reviewed client inputs:** components that look server-managed but are a validated choice — the
+  create-time owning unit resolved by `OwnerScopeService.resolveOrgUnitForPickerOutput`
+  (REQ-ORG-004), a move or rebook target, the job order's processing and customer unit, a bank
+  counterparty, an ADMIN's org-chart or hierarchy choice, and the lifecycle `status` of the mission
+  and operation sections, each with its reason.
+
+A new request type complies with no exception.
+
+**Acceptance**
+
+- [x] No type beyond the thirteen is returned and bound (573 handlers, 161 body types today,
+  floors).
+- [x] No request type declares a server-managed component beyond the reviewed inputs.
+- [x] Every dual-use entry accounts for each server-managed component, and
+  `DualUseRequestBodyProofTest` holds a proof per type.
+- [x] Each rule fails on planted fixtures: a returned-and-bound DTO, `id` / `ownerId` /
+  `createdAt` / `status` on a body, a `status` outside `/status`, a nested `owningOrgUnitId`, and a
+  stale list entry; a `status` on a `/status`-only type and a nested `id` pass.
+
+**Enforced by:** `MassAssignmentGuardTest`, `MassAssignmentGuardRules`,
+`DualUseRequestBodyProofTest`, `RefineryOrderServiceLifecycleTest`
+(`clientSuppliedServerManagedFields_areIgnoredOnCreate`) · **Related:** REQ-API-002, REQ-API-015,
+REQ-ORG-028, REQ-SEC-005, ADR-0060
 
 ## Out of scope
 

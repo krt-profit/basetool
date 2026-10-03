@@ -17,27 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.architecture.fixtures.tenancy;
+package de.greluc.krt.profit.basetool.guardfixture.tenancy;
 
-import java.util.Objects;
 import java.util.UUID;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-/** Planted violation: an id write on a staffel-scoped controller gated by a role only. */
-@RestController
-public class ScopedFixtureController {
-
-  /**
-   * Updates a resource by role only.
-   *
-   * @param id the resource id
-   */
-  @PreAuthorize("hasRole('OFFICER')")
-  @PutMapping("/fixture/{id}")
-  public void update(@PathVariable UUID id) {
-    Objects.requireNonNull(id);
-  }
-}
+/** Fixture repository whose domain type is the marked fixture aggregate. */
+public interface FixtureAggregateRepository extends JpaRepository<FixtureAggregate, UUID> {}

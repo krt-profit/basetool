@@ -74,7 +74,7 @@ one real gap — the job type a mission embeds never carried `isMissionLead`.
 
 ### REQ-API-003 — Validation on writes
 
-`@Valid` on every `@RequestBody` for write operations (POST/PUT/PATCH).
+`@Valid` on every `@RequestBody` for write operations (POST/PUT/PATCH). Enforced since REQ-API-015.
 
 ### REQ-API-004 — RFC 7807 error format
 
@@ -1038,5 +1038,29 @@ them, per REQ-API-009.
 `UserProxyControllerTest`, `LayoutModelScopeMvcTest`, `LayoutContextLoaderTest` (frontend) ·
 **Related:** REQ-API-005, REQ-API-009, REQ-DATA-003, REQ-FE-016, REQ-SEC-037, REQ-SEC-047, ADR-0089,
 ADR-0151
+
+---
+
+### REQ-API-015 — Every request body is `@Valid`, and a test refuses one that is not
+
+Every `@RequestBody` parameter of every handler carries `@Valid` (or `@Validated`), whatever the verb
+and whatever the body type — a record, a collection or a plain `String`. REQ-API-003 stated it; until
+this requirement nothing checked it, and thirteen bodies lacked it: nine catalogue writes
+(frequency types, material categories, refining methods, star systems), the two role-catalogue
+writes, the registration approval, and the Discord account-existence pre-check the Keycloak SPI
+calls with its shared secret.
+
+The thirteen now carry `@Valid`. None of their body types declares a Jakarta constraint, so no
+request that passed before is refused now; the annotation makes a constraint added later effective
+instead of silently ignored. A body type that has no constraint is a REQ-API-002 gap, not a reason
+to leave the annotation off.
+
+**Acceptance**
+
+- [x] Every `@RequestBody` of the backend carries `@Valid` (208 bodies today, a floor).
+- [x] The rule fails on a planted fixture body without it.
+
+**Enforced by:** `MassAssignmentGuardTest#everyRequestBodyIsValidated`,
+`MassAssignmentGuardRules#unvalidatedBodies` · **Related:** REQ-API-002, REQ-API-003, REQ-SEC-077
 
 ---
