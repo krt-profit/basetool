@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -54,7 +55,7 @@ import tools.jackson.databind.ObjectMapper;
 public class RetiredOperationFilter extends OncePerRequestFilter {
 
   /** Stable machine-readable code the Android app maps to its update wall. */
-  public static final String CODE_APP_UPDATE_REQUIRED = "APP_UPDATE_REQUIRED";
+  public static final String CODE_APP_UPDATE_REQUIRED = CoreProblemCode.APP_UPDATE_REQUIRED.code();
 
   /** Problem-type suffix appended to the problem base URI. */
   static final String TYPE_SUFFIX = "app-update-required";

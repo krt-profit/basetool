@@ -36,7 +36,7 @@ public enum AppExceptionKind {
   /** {@code BadRequestException} — service-layer rule {@code @Valid} cannot express. */
   BAD_REQUEST(
       HttpStatus.BAD_REQUEST,
-      "BAD_REQUEST",
+      CoreProblemCode.BAD_REQUEST.code(),
       "problem.bad_request.title",
       "problem.bad_request.detail",
       "bad-request",
@@ -49,7 +49,7 @@ public enum AppExceptionKind {
    */
   NOT_FOUND(
       HttpStatus.NOT_FOUND,
-      "NOT_FOUND",
+      CoreProblemCode.NOT_FOUND.code(),
       "problem.not_found.title",
       "problem.not_found.detail",
       "not-found",
@@ -59,7 +59,7 @@ public enum AppExceptionKind {
   /** {@code BusinessConflictException} — cross-aggregate invariant or state-machine refusal. */
   BUSINESS_CONFLICT(
       HttpStatus.CONFLICT,
-      "BUSINESS_CONFLICT",
+      CoreProblemCode.BUSINESS_CONFLICT.code(),
       "problem.business_conflict.title",
       "problem.business_conflict.detail",
       "business-conflict",
@@ -73,7 +73,7 @@ public enum AppExceptionKind {
    */
   OVER_ALLOCATION(
       HttpStatus.UNPROCESSABLE_CONTENT,
-      "OVER_ALLOCATION",
+      CoreProblemCode.OVER_ALLOCATION.code(),
       "problem.over_allocation.title",
       "problem.over_allocation.detail",
       "over-allocation",
@@ -88,7 +88,7 @@ public enum AppExceptionKind {
    */
   PRODUCTION_ALLOCATION(
       HttpStatus.UNPROCESSABLE_CONTENT,
-      "PRODUCTION_ALLOCATION",
+      CoreProblemCode.PRODUCTION_ALLOCATION.code(),
       "problem.production_allocation.title",
       "problem.production_allocation.detail",
       "production-allocation",
@@ -105,7 +105,7 @@ public enum AppExceptionKind {
    */
   OWNER_ORG_UNIT_REQUIRED(
       HttpStatus.BAD_REQUEST,
-      "OWNER_ORG_UNIT_REQUIRED",
+      CoreProblemCode.OWNER_ORG_UNIT_REQUIRED.code(),
       "problem.owner_org_unit_required.title",
       "problem.owner_org_unit_required.detail",
       "owner-org-unit-required",
@@ -120,7 +120,7 @@ public enum AppExceptionKind {
    */
   MISSION_PARTICIPANT_REQUIRED(
       HttpStatus.BAD_REQUEST,
-      "MISSION_PARTICIPANT_REQUIRED",
+      CoreProblemCode.MISSION_PARTICIPANT_REQUIRED.code(),
       "problem.mission_participant_required.title",
       "problem.mission_participant_required.detail",
       "mission-participant-required",
@@ -130,7 +130,7 @@ public enum AppExceptionKind {
   /** {@code DuplicateEntityException} — service-layer uniqueness check. */
   DUPLICATE_ENTITY(
       HttpStatus.CONFLICT,
-      "DUPLICATE_ENTITY",
+      CoreProblemCode.DUPLICATE_ENTITY.code(),
       "problem.duplicate_entity.title",
       "problem.duplicate_entity.detail",
       "duplicate-entity",
@@ -140,7 +140,7 @@ public enum AppExceptionKind {
   /** {@code EntityInUseException} — delete blocked by an existing referencing entity. */
   ENTITY_IN_USE(
       HttpStatus.CONFLICT,
-      "ENTITY_IN_USE",
+      CoreProblemCode.ENTITY_IN_USE.code(),
       "problem.entity_in_use.title",
       "problem.entity_in_use.detail",
       "entity-in-use",
@@ -155,7 +155,7 @@ public enum AppExceptionKind {
    */
   EXTERNAL_SERVICE_ERROR(
       HttpStatus.BAD_GATEWAY,
-      "EXTERNAL_SERVICE_ERROR",
+      CoreProblemCode.EXTERNAL_SERVICE_ERROR.code(),
       "problem.external_service.title",
       "problem.external_service.detail",
       "external-service-error",
@@ -170,7 +170,7 @@ public enum AppExceptionKind {
    */
   REPORT_GENERATION_FAILED(
       HttpStatus.INTERNAL_SERVER_ERROR,
-      "REPORT_GENERATION_FAILED",
+      CoreProblemCode.REPORT_GENERATION_FAILED.code(),
       "problem.report_generation_failed.title",
       "problem.report_generation_failed.detail",
       "report-generation-failed",

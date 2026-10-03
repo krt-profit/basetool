@@ -127,6 +127,10 @@
   `api/contract-tiers.txt`); die Change-Set-`Op`s von Blueprint und Schiff sind erstmals richtig
   dokumentiert, und der Generator prüft das Dokument vor dem Schreiben (REQ-API-018).
 
+- **Fehlercodes: ein Register statt verstreuter Strings.** Alle 49 Problem-Codes des Backends stehen in
+  `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
+  `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die

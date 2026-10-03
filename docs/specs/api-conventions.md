@@ -133,7 +133,20 @@ challenge is preserved, then writes the problem body on top. Unlike the backend'
 name it mints no correlation id: the gateway's `CorrelationIdFilter` runs *outside* the security
 chain, so the MDC is already populated and the header already echoed.
 
-Document the format in OpenAPI and keep frontend error display in sync.
+Document the format in OpenAPI and keep frontend error display in sync. **Every `code` value comes
+from the error-code registry (REQ-API-019)**, and the document's `ProblemDetail` schema carries
+`code` (with the registered values), `correlationId`, `errors` and `fieldErrors`, plus a `429` on
+every `/api/**` operation, since both rate limiters answer it there.
+
+> [!note] Corrected 2026-10-03
+> Until REQ-API-019 the document's `ProblemDetail` listed none of `code`, `correlationId` or
+> `fieldErrors` — the fields this requirement calls the contract — and its properties carried no
+> `type`, because the OpenAPI 3.1 writer ignores the 3.0 setter the customizer used; `429` was
+> documented on one operation. Five producers are missing from the list above and are sanctioned
+> the same way: `TermsAcceptanceAccessFilter` (403 `TERMS_NOT_ACCEPTED`), `ActingMemberFilter`
+> (403 `ACTING_MEMBER_REFUSED`), `IdentityProviderUnavailableFilter` (503 `SERVICE_UNAVAILABLE`),
+> `SubjectRateLimitingFilter` (429 `RATE_LIMIT_EXCEEDED`) and `RequestBodySizeLimitFilter` (413
+> `REQUEST_BODY_TOO_LARGE`); `PendingApprovalAccessFilter` also answers `NO_ROLE`.
 
 **A raw `IllegalStateException` is a 500, never a 400 (APPSEC-06, 2026-09-22).** The handler used to
 answer every `IllegalStateException` with a 400 and echo its message as `detail`, on the assumption
@@ -187,6 +200,55 @@ joins this hierarchy by extending `AppException` and either passing a new `AppEx
 constant to the superclass constructor (the common case, requiring zero accessor overrides) or
 implementing the accessors directly (only if its identity is genuinely per-instance, as
 `BankConflictException`'s is) — never by hand-rolling a new `@ExceptionHandler` method.
+
+### REQ-API-019 — Every problem code is registered once and documented
+
+A client branches on `code`, never on the localized `title` or `detail`, so the set of codes is a
+contract — and until 2026-10-03 it lived as about fifty string literals across the exception package,
+the handler, six filters and the error controller, with no list, no uniqueness check and no
+documentation. The app once listened for `TERMS_ACCEPTANCE_REQUIRED` while the server sends
+`TERMS_NOT_ACCEPTED`. This is the registry and documentation half of ADR-0235; the exception
+hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) follows in Phase 1.
+
+- **`exception.ProblemCode`** — a code's wire value (`code()`) and its HTTP status (`status()`). The
+  code string is the contract; the Java name is not.
+- **`exception.CoreProblemCode`** — one kernel enum listing every code the backend emits outside the
+  exchange: the handler's, the eleven `AppExceptionKind` codes, the 18 bank codes, the filters'
+  (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`, `NO_ROLE`, `ACTING_MEMBER_REFUSED`,
+  `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`) — 49 in all. Three are
+  **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039),
+  `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109) and `APP_UPDATE_REQUIRED`, which retired paths will
+  answer (ADR-0234, D-11; registered with `410`). Every producer references the enum; no code is a
+  literal any more.
+- **The committed list** `backend/src/test/resources/api/problem-codes.txt`, one `<CODE> <status>`
+  line per code, sorted. A new, renamed or removed code changes it in the same PR, so the change is
+  reviewed.
+- **The exchange's own registry stays separate.** Its nine codes are constants of
+  `ExchangeProblemException`, frozen with the exchange contract (REQ-XCH, ADR-0216); the registry
+  only asserts that no kernel code clashes with one of them.
+- **The document lists the codes.** `ProblemDetail.code` is a string whose `x-problem-codes`
+  extension and description list the registered values — never a required enum, because
+  `theContractRequiredEnumsAreFrozen` would then freeze the list against every addition — beside
+  `correlationId`, `errors` and `fieldErrors` (`{field, message}`); every `/api/**` operation
+  documents `429` (`OpenApiProblemDetailsConfig`).
+
+**Acceptance**
+
+- [x] Every registered code is unique, also against the exchange's; the registry equals the committed
+  list, code and status (`ProblemCodeRegistryTest`).
+- [x] Every code `AppExceptionKind`, `GlobalExceptionHandler`, `BankConflictException` and the six
+  filters declare is registered; no main source writes a code as a literal (a source scan whose four
+  site shapes are each proven on a planted line); runtime probes through the real filter chain — an
+  anonymous read, a wrong verb, an unreadable body, a path no controller serves — answer
+  registered codes (`ProblemCodeRuntimeProbeTest`).
+- [x] A planted enum repeating `NOT_FOUND` is caught.
+- [x] The committed document's `ProblemDetail` lists exactly the registered codes, keeps `code`
+  optional and not an enum.
+- [ ] One `ProblemCode` enum per module and the app generating its constants from the document —
+  **open**, plan Phase 1 (ADR-0235) and the app.
+
+**Enforced by:** `ProblemCodeRegistryTest`, `ProblemCodeRuntimeProbeTest` (backend) ·
+**Related:** REQ-API-004, REQ-API-007, REQ-API-009, ADR-0234, ADR-0235
 
 ### REQ-API-005 — Pagination & sorting
 

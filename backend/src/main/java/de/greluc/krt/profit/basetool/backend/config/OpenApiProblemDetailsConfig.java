@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
+import de.greluc.krt.profit.basetool.backend.exception.ProblemCode;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.Content;
@@ -26,87 +28,178 @@ import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * SpringDoc customizer that documents the RFC&nbsp;7807 {@code application/problem+json} error
- * responses of every operation and registers the {@code ProblemDetail} schema.
+ * responses of every operation and registers the {@code ProblemDetail} schema (REQ-API-004,
+ * REQ-API-019).
  */
 @Configuration
 public class OpenApiProblemDetailsConfig {
 
+  /** The schema every problem response refers to. */
+  public static final String PROBLEM_SCHEMA = "ProblemDetail";
+
+  /** The extension of the {@code code} property that lists every registered code. */
+  public static final String CODES_EXTENSION = "x-problem-codes";
+
+  /** The path prefix both rate limiters guard, so every operation under it can answer 429. */
+  private static final String RATE_LIMITED_PREFIX = "/api/";
+
   /**
    * Returns SpringDoc customizer that decorates every operation with the standard error responses
-   * ({@code 400/401/403/404/409/500}) and ensures the {@code ProblemDetail} schema is present.
+   * ({@code 400/401/403/404/409/500}, and {@code 429} under {@code /api/}) and registers the {@code
+   * ProblemDetail} schema.
    *
    * @return SpringDoc customizer that decorates every operation with the standard error responses
-   *     ({@code 400/401/403/404/409/500}) and ensures the {@code ProblemDetail} schema is present
+   *     and registers the {@code ProblemDetail} schema
    */
   @Bean
   public OpenApiCustomizer problemDetailsCustomizer() {
-    return this::customizeOpenApi;
+    return OpenApiProblemDetailsConfig::customizeOpenApi;
   }
 
-  private void customizeOpenApi(OpenAPI openApi) {
-    ensureProblemDetailSchema(openApi);
+  /**
+   * Registers the schema and adds the problem responses to every operation.
+   *
+   * @param openApi the document under construction
+   */
+  private static void customizeOpenApi(@NotNull OpenAPI openApi) {
+    registerProblemDetailSchema(openApi);
     if (openApi.getPaths() == null) {
       return;
     }
     openApi
         .getPaths()
-        .values()
         .forEach(
-            pathItem -> {
-              pathItem
-                  .readOperations()
-                  .forEach(
-                      operation -> {
-                        ApiResponses responses = operation.getResponses();
-                        if (responses == null) {
-                          return;
-                        }
-                        addProblemResponse(responses, "400", "Bad Request");
-                        addProblemResponse(responses, "401", "Unauthorized");
-                        addProblemResponse(responses, "403", "Forbidden");
-                        addProblemResponse(responses, "404", "Not Found");
-                        addProblemResponse(responses, "409", "Conflict");
-                        addProblemResponse(responses, "500", "Internal Server Error");
-                      });
-            });
+            (path, pathItem) ->
+                pathItem
+                    .readOperations()
+                    .forEach(
+                        operation -> {
+                          ApiResponses responses = operation.getResponses();
+                          if (responses == null) {
+                            return;
+                          }
+                          addProblemResponse(responses, "400", "Bad Request");
+                          addProblemResponse(responses, "401", "Unauthorized");
+                          addProblemResponse(responses, "403", "Forbidden");
+                          addProblemResponse(responses, "404", "Not Found");
+                          addProblemResponse(responses, "409", "Conflict");
+                          if (path.startsWith(RATE_LIMITED_PREFIX)) {
+                            addProblemResponse(
+                                responses,
+                                "429",
+                                "Too Many Requests: a rate limit was exceeded"
+                                    + " (RATE_LIMIT_EXCEEDED); the X-Rate-Limit headers say when"
+                                    + " to retry");
+                          }
+                          addProblemResponse(responses, "500", "Internal Server Error");
+                        }));
   }
 
-  private void addProblemResponse(ApiResponses responses, String code, String description) {
+  /**
+   * Adds one problem response, replacing whatever the operation documented for that status.
+   *
+   * @param responses the operation's responses
+   * @param code the status code
+   * @param description the response description
+   */
+  private static void addProblemResponse(
+      @NotNull ApiResponses responses, @NotNull String code, @NotNull String description) {
     Content content =
         new Content()
             .addMediaType(
                 "application/problem+json",
-                new MediaType().schema(new Schema<>().$ref("#/components/schemas/ProblemDetail")));
+                new MediaType()
+                    .schema(new Schema<>().$ref("#/components/schemas/" + PROBLEM_SCHEMA)));
     responses.addApiResponse(code, new ApiResponse().description(description).content(content));
   }
 
-  private void ensureProblemDetailSchema(@NotNull OpenAPI openApi) {
+  /**
+   * Registers the {@code ProblemDetail} schema with the body's contract fields: the RFC 7807
+   * members, {@code code} with the registered values, {@code correlationId}, {@code errors} and
+   * {@code fieldErrors}.
+   *
+   * @param openApi the document under construction
+   */
+  private static void registerProblemDetailSchema(@NotNull OpenAPI openApi) {
     Components components = openApi.getComponents();
     if (components == null) {
       components = new Components();
       openApi.setComponents(components);
     }
-    Map<String, Schema> schemas = components.getSchemas();
-    if (schemas == null || !schemas.containsKey("ProblemDetail")) {
-      @SuppressWarnings("rawtypes")
-      Schema<?> problem =
-          new Schema<>()
-              .type("object")
-              .addProperty("type", new Schema<String>().type("string").format("uri"))
-              .addProperty("title", new Schema<String>().type("string"))
-              .addProperty("status", new Schema<Integer>().type("integer").format("int32"))
-              .addProperty("detail", new Schema<String>().type("string"))
-              .addProperty("instance", new Schema<String>().type("string").format("uri"))
-              .addProperty("errors", new Schema<Map<String, String>>().type("object"));
-      components.addSchemas("ProblemDetail", problem);
-    }
+    List<String> codes = Arrays.stream(CoreProblemCode.values()).map(ProblemCode::code).toList();
+
+    Schema<Object> fieldError = typed("object", null, null);
+    fieldError.addProperty("field", typed("string", null, "The field or parameter path."));
+    fieldError.addProperty("message", typed("string", null, "The localized message."));
+
+    Schema<Object> code =
+        typed(
+            "string",
+            null,
+            "The stable reason, one of the values in x-problem-codes (registry CoreProblemCode,"
+                + " REQ-API-019). The exchange operations under /api/v1/exchange answer the codes"
+                + " of the frozen exchange contract instead (ExchangeProblemException). The list"
+                + " grows; a client treats an unknown code by its status.");
+    code.addExtension(CODES_EXTENSION, codes);
+
+    Schema<Object> errors =
+        typed("object", null, "Validation failures as field to message; see fieldErrors.");
+    errors.setAdditionalProperties(typed("string", null, null));
+
+    Schema<Object> fieldErrors =
+        typed(
+            "array",
+            null,
+            "Validation failures, one per field or parameter (VALIDATION_FAILED,"
+                + " CONSTRAINT_VIOLATION).");
+    fieldErrors.setItems(fieldError);
+
+    Schema<Object> problem =
+        typed(
+            "object",
+            null,
+            "An RFC 7807 problem. code is the stable, machine-readable reason; a client compares"
+                + " it, never the localized title or detail.");
+    problem.addProperty("type", typed("string", "uri", null));
+    problem.addProperty("title", typed("string", null, null));
+    problem.addProperty("status", typed("integer", "int32", null));
+    problem.addProperty("detail", typed("string", null, null));
+    problem.addProperty("instance", typed("string", "uri", null));
+    problem.addProperty("code", code);
+    problem.addProperty(
+        "correlationId", typed("string", null, "Finds the request in the server log."));
+    problem.addProperty("errors", errors);
+    problem.addProperty("fieldErrors", fieldErrors);
+    components.addSchemas(PROBLEM_SCHEMA, problem);
+  }
+
+  /**
+   * Creates a schema of one JSON type, written as {@code type} by the OpenAPI 3.1 serializer.
+   *
+   * @param type the JSON type
+   * @param format the format, or {@code null} for none
+   * @param description the description, or {@code null} for none
+   * @return the schema
+   */
+  @NotNull
+  private static Schema<Object> typed(
+      @NotNull String type, @Nullable String format, @Nullable String description) {
+    Schema<Object> schema = new Schema<>();
+    schema.setType(type);
+    schema.setTypes(Set.of(type));
+    schema.setFormat(format);
+    schema.setDescription(description);
+    return schema;
   }
 }

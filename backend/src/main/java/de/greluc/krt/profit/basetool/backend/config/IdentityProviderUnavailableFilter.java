@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -58,7 +59,7 @@ import tools.jackson.databind.ObjectMapper;
 public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
 
   /** Stable RFC-7807 code echoed in the body and used as the metric tag value. */
-  static final String CODE_SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
+  static final String CODE_SERVICE_UNAVAILABLE = CoreProblemCode.SERVICE_UNAVAILABLE.code();
 
   /** Problem-type suffix appended to {@link AppProblemProperties#getBaseUri()}. */
   private static final String TYPE_SUFFIX = "service-unavailable";

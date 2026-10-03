@@ -155,6 +155,8 @@ class LikePatterns kernel LIKE escaping
 class RequestMemo platform request-scoped memo
 class DtoConstraints kernel shared validation constants
 class OnUpdate kernel validation group
+class ProblemCode kernel the sealed problem-code contract every module's codes implement (ADR-0235)
+class CoreProblemCode kernel the generic problem codes of the error kernel (ADR-0235)
 class WholeNumber kernel validation constraint
 class WholeNumberValidator kernel validation constraint
 class QuantityAware catalogue material/item amount validation contract
