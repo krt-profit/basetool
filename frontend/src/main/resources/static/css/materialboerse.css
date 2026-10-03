@@ -120,7 +120,7 @@
         overflow-y: auto;
         border: none;
     }
-    @media (width <= 900px) {
+    @media (width <= 1024px) {
         .mb-md {
             grid-template-columns: 1fr;
         }
@@ -244,7 +244,7 @@
     .mb-dp-back {
         display: none;
     }
-    @media (width <= 900px) {
+    @media (width <= 1024px) {
         .mb-dp-back {
             display: inline-flex;
         }
@@ -260,7 +260,7 @@
         align-items: start;
         padding: 16px 18px;
     }
-    @media (width <= 720px) {
+    @media (width <= 768px) {
         .mb-dp-body {
             grid-template-columns: 1fr;
         }

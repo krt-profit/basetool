@@ -54,7 +54,7 @@
         font-size: 0.9rem;
     }
 
-    @media (width <= 480px) {
+    @media (width <= 768px) {
         .terms-accept-actions {
             flex-direction: column;
             align-items: stretch;

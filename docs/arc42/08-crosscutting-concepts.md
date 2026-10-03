@@ -222,6 +222,12 @@ Two binding rules shape every UI change:
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it, so `sec:authorize`
   in that one template stays the only place that decides which pages a member is offered
   (REQ-UI-026, ADR-0240, `NavigationRenderMvcTest`, `NavigationE2eTest`).
+- **Work pages follow three patterns, built from fragments** (2026-10-03). A list (A), the
+  overview of the home page (B) or a form (C): one page head with at most one primary action and an
+  overflow menu, a toolbar with live filters and removable filter chips, a list table that stacks on
+  phones, a sectioned form with a sticky action bar. The markup lives in `fragments/page-head` and
+  `fragments/components`, driven by two global scripts; breakpoints are only 768, 1024 and 1440 px,
+  enforced by Stylelint (REQ-UI-027, REQ-UI-009, ADR-0242, `PagePatternFragmentsRenderTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

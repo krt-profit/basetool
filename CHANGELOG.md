@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Neues Erscheinungsbild der Website, Grundlage (Phase 0).** Fließtext in Lato 400 statt 300, nur
+  noch die Seitentitel orange, Zwischenüberschriften weiß; dazu neue Bausteine für Seitenkopf mit
+  „⋯“-Menü, Werkzeugleiste mit Filter-Chips, Segment-Schalter, Listentabellen, die auf dem Smartphone
+  stapeln, und Formulare mit fixierter Aktionsleiste. Breakpoints nur noch 768/1024/1440 px
+  (REQ-UI-027, REQ-UI-009, ADR-0242).
+
 - **Eigenes internes OpenAPI-Dokument für die Exchange-Relay-Schnittstelle.** Die 14 Operationen
   unter `/api/v1/exchange/**` stehen jetzt in `exchange-relay.openapi.json` mit eigener
   Aktualitätsprüfung statt in `openapi.json`; der Vergleich mit dem letzten Release prüft beide
