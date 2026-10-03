@@ -1,6 +1,6 @@
 # ADR-0047 — Backend packages form an acyclic dependency graph
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (module cycles in a frozen baseline, layer cycles per module, see below)
 - **Date:** 2026-06-27
 - **Deciders:** @greluc
 - **Amended:** 2026-10-02 — `support` is an allow-list leaf, the layer rules select by role, and the layers inside each module are acyclic (REQ-SEC-073, see the Amendment section below)
@@ -134,3 +134,20 @@ domain packages cannot disarm these rules silently:
   top-level package is a domain module whose sub-packages are its layers. Cycles between modules
   are not this rule's subject. Today only the root module exists, so it checks exactly the slices
   of `backendPackagesShouldBeFreeOfDependencyCycles`, which stays.
+
+## Amendment — 2026-10-02: module cycles frozen, layer cycles per module
+
+Domain modularisation plan §5.7, guards G-01 and G-09; ADR-0231, ADR-0233. The backend gets a
+second level of slices — the domain modules — whose graph is not acyclic today (21 of 23 domains in
+one strongly connected component). Two rules follow:
+
+- **Module cycles are frozen in a baseline.** The ArchUnit `modules()` rule over the domain map,
+  wrapped in `FreezingArchRule`, records today's violating edges, cycles included, in a committed
+  store that may only shrink. This is the alternative the decision above rejected for the layers;
+  it is accepted for the modules because their cycles cannot be removed before the gate is needed,
+  and the store makes every removal visible.
+- **Layer cycles are checked per module.** `backendPackagesShouldBeFreeOfDependencyCycles` keeps
+  guarding the layer packages while they exist, and a second cycle rule checks the layers inside
+  each module (`api`, `internal`, `web`), never frozen.
+
+The leaf-SPI inversion of the decision above is also how an upward module edge is broken (ADR-0232).

@@ -1,6 +1,6 @@
 # ADR-0032 — Single frontend resilience pass at the WebClient filter
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (one filter chain under per-domain typed clients, see below)
 - **Date:** 2026-06-21
 - **Deciders:** @greluc
 - **Related:** ADR-0019 (frontend reauth + single-flight refresh) · spec [`security-and-access.md`](../specs/security-and-access.md) (REQ-SEC-012) · `WebClientConfig` · `BackendApiClient` · PR #766
@@ -65,3 +65,21 @@ We will make the **WebClient exchange filter the single resilience pass** for th
   the reactive chain (its operators compose with the WebClient pipeline and its
   `CallNotPermittedException` is mapped), the only one with a `TimeLimiter`, and the one that already
   special-cases idempotent-only retry and `ignoreExceptions` for reauth.
+
+## Amendment — 2026-10-02: one filter chain under per-domain typed clients
+
+Domain modularisation plan §5.9, track step F3, guard G-17. The frontend gets one typed backend
+client per domain — first a thin class over `BackendApiClient`, then, with the domain's REST cut, a
+Spring HTTP interface created by `HttpServiceProxyFactory.builderFor(WebClientAdapter.create(webClient))`
+over the **same** `webClient` bean. The decision above holds unchanged for every one of them: the
+resilience filter on that bean stays the single pass, together with the OAuth2 bearer relay and
+the correlation, org-unit, locale and client-IP relays, and `BackendApiClient`'s error mapping
+stays the one mapping. What changes is only that more than one class calls through the chain.
+
+Rules (G-17): only the backend kernel builds or injects a `WebClient` (named exceptions: the SSE
+relay and the live-sync probe); an `@ImportHttpServices` group is allowed only with a
+highest-precedence configurer that supplies `webClient.mutate()`, because a default group builds a
+fresh client without the filters; client interfaces take no `java.net.URI`, `UriBuilderFactory` or
+`@CookieValue` parameter, carry no `@Cacheable` and use only relative `/api/` paths; and a filter
+on the `webClient` bean refuses any request not addressed to the backend's own host, because the
+OAuth2 filter attaches the member's token without a host check.
