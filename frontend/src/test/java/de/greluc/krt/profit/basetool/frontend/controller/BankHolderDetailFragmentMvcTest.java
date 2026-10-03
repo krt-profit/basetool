@@ -149,9 +149,15 @@ class BankHolderDetailFragmentMvcTest {
             .andExpect(content().string(containsString("KB-0001")))
             .andExpect(content().string(containsString("carol")))
             .andExpect(content().string(containsString("497")))
-            .andExpect(content().string(containsString("bank-holder-back-link")))
+            .andExpect(content().string(containsString("data-testid=\"page-eyebrow\"")))
+            .andExpect(content().string(containsString("/bank/manage?tab=halter")))
             .andExpect(content().string(containsString("bank-holder-balance-calc")))
             .andExpect(content().string(containsString("bank-holder-balance-input")))
+            .andExpect(content().string(containsString("data-testid=\"bank-holder-balance-bar\"")))
+            .andExpect(content().string(containsString("class=\"stack-bar")))
+            .andExpect(content().string(containsString("data-table data-table--stack")))
+            .andExpect(content().string(not(containsString("hud-box"))))
+            .andExpect(content().string(not(containsString("class=\"greeting"))))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -172,7 +178,7 @@ class BankHolderDetailFragmentMvcTest {
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("/bank/holders/" + holderId + "?page=1")))
         .andExpect(content().string(not(containsString("id=\"bank-holder-bookings-results\""))))
-        .andExpect(content().string(not(containsString("bank-holder-back-link"))))
+        .andExpect(content().string(not(containsString("page-eyebrow"))))
         .andExpect(content().string(not(containsString("bank-holder-balance-calc"))));
   }
 }

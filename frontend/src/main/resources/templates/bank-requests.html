@@ -4,6 +4,7 @@
     <title th:text="#{bank.requests.title} + ' - ' + ${appTitle}">Antr&auml;ge - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/bank-requests.css}">
     </th:block>
 </head>
 <body>
@@ -12,77 +13,123 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
-    <div class="greeting hud-box flex-between">
-        <div>
-            <h1 th:text="#{bank.requests.title}">Buchungsantr&auml;ge</h1>
-            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
-               th:text="#{bank.requests.subtitle}">Antr&auml;ge der Org-Einheiten best&auml;tigen oder ablehnen.</p>
-        </div>
-        <div class="bank-requests-head-right">
-            <button type="button" class="btn btn--cta" th:if="${canBook}"
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', titleText=#{bank.requests.title}, actions=~{::bank-requests-actions})}">
+        <th:block th:ref="bank-requests-actions">
+            <button type="button" class="btn btn-outline" th:if="${canBook}"
                     data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
                     data-testid="bank-movement-open">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
-                <span th:text="#{bank.action.movement}">Kontobewegung</span>
+                <span th:text="#{bank.action.movementRecord}">Kontobewegung erfassen</span>
             </button>
-            <div class="bank-status-filter" role="group" data-bank-status-filter-bar
-                 th:aria-label="#{bank.requests.filter.aria}">
-                <label class="bank-check-inline">
-                    <input type="checkbox" data-bank-status-filter="PENDING"
-                           th:checked="${#lists.contains(selectedStatuses, 'PENDING')}">
-                    <span th:text="#{bank.request.status.PENDING}">Ausstehend</span>
-                </label>
-                <label class="bank-check-inline">
-                    <input type="checkbox" data-bank-status-filter="CONFIRMED"
-                           th:checked="${#lists.contains(selectedStatuses, 'CONFIRMED')}">
-                    <span th:text="#{bank.request.status.CONFIRMED}">Best&auml;tigt</span>
-                </label>
-                <label class="bank-check-inline">
-                    <input type="checkbox" data-bank-status-filter="REJECTED"
-                           th:checked="${#lists.contains(selectedStatuses, 'REJECTED')}">
-                    <span th:text="#{bank.request.status.REJECTED}">Abgelehnt</span>
-                </label>
-                <label class="bank-check-inline">
-                    <input type="checkbox" data-bank-status-filter="CANCELLED"
-                           th:checked="${#lists.contains(selectedStatuses, 'CANCELLED')}">
-                    <span th:text="#{bank.request.status.CANCELLED}">Zur&uuml;ckgezogen</span>
-                </label>
-            </div>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
-    <div id="bank-request-queue-results" th:fragment="requestQueue">
-        <div class="hud-box mt-2">
-            <p class="text-center" th:if="${#lists.isEmpty(selectedStatuses)}"
-               data-testid="bank-requests-nofilter" th:text="#{bank.requests.empty.noFilter}">
-                Kein Status-Filter aktiv.
-            </p>
-            <p class="text-center"
-               th:if="${!#lists.isEmpty(selectedStatuses) and (requests == null or #lists.isEmpty(requests.content()))}"
-               data-testid="bank-requests-empty" th:text="#{bank.requests.empty}">
-                Keine Antr&auml;ge in diesem Status.
-            </p>
-            <div class="table-responsive"
-                 th:if="${requests != null and !#lists.isEmpty(requests.content())}">
-            <table class="data-table" data-testid="bank-requests-table">
-                <thead>
-                <tr>
-                    <th class="bank-expand-cell"></th>
-                    <th th:text="#{bank.request.col.account}">Konto</th>
-                    <th th:text="#{bank.request.col.type}">Typ</th>
-                    <th th:text="#{bank.request.col.amount}">Betrag</th>
-                    <th th:text="#{bank.request.col.requester}">Antragsteller</th>
-                    <th th:text="#{bank.request.col.status}">Status</th>
-                    <th th:text="#{bank.request.col.created}">Erstellt</th>
-                    <th th:text="#{bank.request.col.decision}">Entscheidung</th>
-                </tr>
-                </thead>
-                <tbody>
-                <th:block th:each="r : ${requests.content()}"
-                          th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='bank-req-' + ${r.id()}">
-                <tr data-testid="bank-request-row" class="bank-booking-row"
-                    th:classappend="${hasDetail} ? ' is-expandable' : ''">
-                    <td class="bank-expand-cell">
+    <form id="bank-requests-filter-form" method="get" th:action="@{/bank/requests}" class="no-track">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: segmented(name='status', labelKey='bank.requests.filter.aria', selected=${selectedStatus}, options=${statusOptions})}"></th:block>
+            <span class="toolbar__spacer"></span>
+            <span class="toolbar__count" data-bank-waiting-count data-testid="bank-requests-waiting"
+                  th:attr="data-template=#{bank.request.waitingForYou('{0}')}"
+                  th:text="#{bank.request.waitingForYou(${waitingForYouCount})}">2 warten auf dich</span>
+        </div>
+    </form>
+
+    <div id="bank-request-queue-results" class="card card--flush">
+        <th:block th:fragment="requestQueue">
+        <span hidden data-bank-request-counts
+              th:attr="data-count-pending=${statusCounts['PENDING']},data-count-confirmed=${statusCounts['CONFIRMED']},data-count-rejected=${statusCounts['REJECTED']},data-count-waiting=${waitingForYouCount}"></span>
+        <table class="data-table data-table--stack" data-testid="bank-requests-table"
+               th:if="${requests != null and !#lists.isEmpty(requests.content())}">
+            <thead>
+            <tr>
+                <th th:text="#{bank.request.col.request}">Antrag</th>
+                <th th:text="#{bank.request.col.requester}">Antragsteller</th>
+                <th class="num" th:text="#{bank.request.col.amount}">Betrag</th>
+                <th class="cell-status" th:text="#{bank.request.col.status}">Status</th>
+                <th class="cell-actions"><span class="visually-hidden" th:text="#{bank.request.col.decision}">Entscheidung</span></th>
+            </tr>
+            </thead>
+            <tbody>
+            <th:block th:each="r : ${requests.content()}"
+                      th:with="hasDetail=${!#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='bank-req-' + ${r.id()},pending=${r.status() == 'PENDING'},approvalOpen=${r.requiresOwnerApproval() and !r.ownerApprovalGranted()},approverKey=${r.requiredApprover() != null ? r.requiredApprover() : 'RESPONSIBLE_HOLDER'},approverLabel=#{'bank.request.approver.' + ${approverKey}}">
+            <tr data-testid="bank-request-row" class="bank-booking-row bank-req-row"
+                th:classappend="${(hasDetail ? ' is-expandable' : '') + (pending and !approvalOpen ? ' bank-req-row--ready' : '')}">
+                <td>
+                    <div class="bank-req-head">
+                        <span class="chip"
+                              th:classappend="${r.type() == 'DEPOSIT'} ? ' chip--success' : (${r.type() == 'WITHDRAWAL'} ? ' chip--danger' : ' chip--info')"
+                              th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</span>
+                        <span class="cell-title" th:switch="${r.type()}">
+                            <th:block th:case="'DEPOSIT'"><th:block th:if="${r.counterpartyHandle() != null}" th:text="${@handles.display(r.counterpartyHandle())} + ' &#8594; '">greluc &#8594; </th:block><th:block th:text="${r.accountName()}">Staffel IRIDIUM</th:block></th:block>
+                            <th:block th:case="'WITHDRAWAL'"><th:block th:text="${r.accountName()}">Staffel IRIDIUM</th:block><th:block th:if="${r.counterpartyHandle() != null}" th:text="' &#8594; ' + ${@handles.display(r.counterpartyHandle())}"> &#8594; greluc</th:block></th:block>
+                            <th:block th:case="*"><th:block th:text="${r.accountName()}">Staffel IRIDIUM</th:block><th:block th:if="${r.targetAccountNo() != null}" th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</th:block></th:block>
+                        </span>
+                    </div>
+                    <span class="cell-sub">
+                        <span th:text="${r.accountNo()}">KB-0001</span>
+                        <th:block th:if="${!#strings.isEmpty(r.justification())}">
+                            <span aria-hidden="true">&middot;</span>
+                            <span class="bank-req-justification" data-testid="bank-request-justification"
+                                  th:text="'&#8222;' + ${r.justification()} + '&#8220;'">&#8222;Missionsfreigabe&#8220;</span>
+                        </th:block>
+                    </span>
+                </td>
+                <td>
+                    <span class="bank-req-requester"
+                          th:text="${@handles.display(r.requesterHandle())} + (${r.orgUnitShorthand() != null} ? ' (' + ${r.orgUnitShorthand()} + ')' : '')">greluc (IRI)</span>
+                    <span class="cell-sub utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span>
+                </td>
+                <td class="num">
+                    <span class="bank-req-amount" th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</span>
+                    <span th:if="${pending and approvalOpen}" class="chip chip--warning bank-req-route"
+                          data-testid="bank-request-approval-pending"
+                          th:text="'&#8594; ' + ${approverLabel}">&#8594; Bankleitung</span>
+                </td>
+                <td class="cell-status">
+                    <span class="chip"
+                          th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : '')"
+                          th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                    <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
+                          class="chip chip--success" data-testid="bank-request-approval-granted"
+                          th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
+                    <span th:if="${!pending and approvalOpen}"
+                          class="chip chip--muted" data-testid="bank-request-approval-pending"
+                          th:text="#{bank.approvalLimit.overLimit}">&Uuml;ber Limit</span>
+                </td>
+                <td class="cell-actions">
+                    <div class="bank-req-actions">
+                        <th:block th:if="${pending and !approvalOpen}">
+                            <button type="button" class="btn btn-success btn-xs"
+                                    data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
+                                    data-testid="bank-request-confirm-btn"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"
+                                    th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
+                            <button type="button" class="btn btn-ghost btn-xs"
+                                    data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
+                                    data-testid="bank-request-reject-btn"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
+                                    th:text="#{bank.request.action.reject}">Ablehnen</button>
+                        </th:block>
+                        <th:block th:if="${pending and approvalOpen}">
+                            <span class="bank-req-waiting" data-testid="bank-request-waiting"
+                                  th:text="#{bank.request.waitingFor(${approverLabel})}">wartet auf Bankleitung</span>
+                            <th:block th:replace="~{fragments/components :: overflowMenu(id=${'bank-req-more-' + r.id()}, items=~{::bank-req-more-items})}">
+                                <th:block th:ref="bank-req-more-items">
+                                    <button type="button" class="overflow-menu__item" role="menuitem"
+                                            data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
+                                            data-testid="bank-request-confirm-btn"
+                                            th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"
+                                            th:text="#{bank.request.action.confirmAttested}">Best&auml;tigen, Freigabe liegt vor &hellip;</button>
+                                    <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                            data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
+                                            data-testid="bank-request-reject-btn"
+                                            th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
+                                            th:text="#{bank.request.action.reject}">Ablehnen</button>
+                                </th:block>
+                            </th:block>
+                        </th:block>
+                        <span th:unless="${pending}" class="bank-req-decider"
+                              th:text="${r.deciderHandle() != null} ? ${@handles.display(r.deciderHandle())} : '&ndash;'">&ndash;</span>
                         <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
                                 data-trigger="bank-row-expand" aria-expanded="false"
                                 th:attr="aria-controls=${detailId}"
@@ -90,73 +137,31 @@
                                 data-testid="bank-request-expand">
                             <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                         </button>
-                    </td>
-                    <td>
-                        <span th:text="${r.accountName()}">Staffel IRIDIUM</span>
-                        <br>
-                        <span class="text-muted krtm-font-size-0-8rem-0fed" th:text="${r.accountNo()}">KB-0001</span>
-                    </td>
-                    <td>
-                        <span th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</span>
-                        <span class="text-muted" th:if="${r.type() == 'TRANSFER' and r.targetAccountNo() != null}"
-                              th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</span>
-                    </td>
-                    <td th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
-                    <td th:text="${@handles.display(r.requesterHandle())}">greluc</td>
-                    <td>
-                        <span class="chip"
-                              th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : ''"
-                              th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
-                        <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
-                              class="chip chip--success" data-testid="bank-request-approval-granted"
-                              th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
-                        <span th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted()}"
-                              class="chip" data-testid="bank-request-approval-pending"
-                              th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : ' chip--muted'"
-                              th:text="#{bank.approvalLimit.overLimit}">&Uuml;ber Limit</span>
-                    </td>
-                    <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
-                    <td>
-                        <div th:if="${r.status() == 'PENDING'}" class="bank-row-actions">
-                            <button type="button" class="btn btn--cta btn-sm"
-                                    data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
-                                    data-testid="bank-request-confirm-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"
-                                    th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
-                            <button type="button" class="btn btn-ghost btn-sm"
-                                    data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
-                                    data-testid="bank-request-reject-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
-                                    th:text="#{bank.request.action.reject}">Ablehnen</button>
+                    </div>
+                </td>
+            </tr>
+            <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                data-testid="bank-request-detail">
+                <td colspan="5" class="bank-booking-detail-cell">
+                    <div class="bank-booking-detail-body">
+                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
+                            <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                            <span class="bank-detail-value" data-testid="bank-request-note" th:text="${r.note()}">Missionsertrag</span>
                         </div>
-                        <span th:unless="${r.status() == 'PENDING'}" class="text-muted"
-                              th:text="${r.deciderHandle() != null} ? ${@handles.display(r.deciderHandle())} : '&ndash;'">&ndash;</span>
-                    </td>
-                </tr>
-                <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
-                    data-testid="bank-request-detail">
-                    <td colspan="8" class="bank-booking-detail-cell">
-                        <div class="bank-booking-detail-body">
-                            <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
-                                <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
-                                <span class="bank-detail-value" data-testid="bank-request-justification" th:text="${r.justification()}">Missionsfreigabe</span>
-                            </div>
-                            <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
-                                <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
-                                <span class="bank-detail-value" data-testid="bank-request-note" th:text="${r.note()}">Missionsertrag</span>
-                            </div>
-                            <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.staffNote())}">
-                                <span class="bank-detail-label" th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span>
-                                <span class="bank-detail-value" data-testid="bank-request-staff-note" th:text="${r.staffNote()}">Nach Rücksprache</span>
-                            </div>
+                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.staffNote())}">
+                            <span class="bank-detail-label" th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span>
+                            <span class="bank-detail-value" data-testid="bank-request-staff-note" th:text="${r.staffNote()}">Nach R&uuml;cksprache</span>
                         </div>
-                    </td>
-                </tr>
-                </th:block>
-                </tbody>
-            </table>
-            </div>
-        </div>
+                    </div>
+                </td>
+            </tr>
+            </th:block>
+            </tbody>
+        </table>
+        <th:block th:if="${requests == null or #lists.isEmpty(requests.content())}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.requests.empty.title', textKey='bank.requests.empty', emptyId='bank-requests-empty')}"></th:block>
+        </th:block>
+        </th:block>
     </div>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-confirm-request-modal', titleKey='bank.request.confirm.modal.title', body=~{::bank-confirm-request-modal-body})}">
@@ -239,7 +244,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reject-request-modal', titleKey='bank.request.reject.modal.title', body=~{::bank-reject-request-modal-body})}">
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reject-request-modal', titleKey='bank.request.reject.modal.title', variant='krt-modal--danger', body=~{::bank-reject-request-modal-body})}">
         <th:block th:ref="bank-reject-request-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
                   data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank"
@@ -259,7 +264,7 @@
                 <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
                             data-modal-id="bank-reject-request-modal" th:text="#{general.cancel}">Abbrechen</button>
-                    <button type="submit" class="btn btn--danger" data-testid="bank-reject-submit"
+                    <button type="submit" class="btn btn-danger" data-testid="bank-reject-submit"
                             th:text="#{bank.request.action.reject}">Ablehnen</button>
                 </div>
             </form>
@@ -273,5 +278,6 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/bank-requests.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

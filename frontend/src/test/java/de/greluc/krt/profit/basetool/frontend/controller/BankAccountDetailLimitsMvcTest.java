@@ -56,7 +56,7 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * MVC render test for the read-only approval-limit box on the bank-staff account view
  * (REQ-BANK-041): it renders identically for {@code BANK_EMPLOYEE} and {@code BANK_MANAGEMENT}, and
- * outside the collapsed Konto-Info tile.
+ * above the tabs instead of inside the Konto-Info tab.
  */
 @SpringBootTest
 class BankAccountDetailLimitsMvcTest {
@@ -66,7 +66,7 @@ class BankAccountDetailLimitsMvcTest {
    */
   private static final String LIMITS_BOX = "data-testid=\"bank-approval-limits-display\"";
 
-  /** Marker of the collapsible Konto-Info tile the limits box must not be nested in. */
+  /** Marker of the Konto-Info card in its tab, which the limits box must not be nested in. */
   private static final String INFO_PANEL = "data-testid=\"bank-info-panel\"";
 
   @Autowired private WebApplicationContext context;
@@ -135,14 +135,14 @@ class BankAccountDetailLimitsMvcTest {
   }
 
   /**
-   * A plain bank employee sees the configured ceilings, and sees them without expanding the
-   * default-collapsed Konto-Info tile.
+   * A plain bank employee sees the configured ceilings, and sees them without opening the
+   * Konto-Info tab.
    *
    * @throws Exception when the MockMvc exchange fails
    */
   @Test
   @WithMockUser(roles = {"BANK_EMPLOYEE"})
-  void accountDetail_asBankEmployee_showsLimitsOutsideTheCollapsedInfoTile() throws Exception {
+  void accountDetail_asBankEmployee_showsLimitsAboveTheTabs() throws Exception {
     UUID accountId = UUID.randomUUID();
     stubDetail(accountId);
 
@@ -158,10 +158,10 @@ class BankAccountDetailLimitsMvcTest {
 
     int limitsAt = html.indexOf(LIMITS_BOX);
     int infoPanelAt = html.indexOf(INFO_PANEL);
-    assertTrue(infoPanelAt > 0, "the Konto-Info tile should still render");
+    assertTrue(infoPanelAt > 0, "the Konto-Info card should still render");
     assertTrue(
         limitsAt < infoPanelAt,
-        "the read-only limits box must render ABOVE the collapsed Konto-Info tile, not inside it");
+        "the read-only limits box must render above the tabs, not inside the Konto-Info tab");
   }
 
   /**

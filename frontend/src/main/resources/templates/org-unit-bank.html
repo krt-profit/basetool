@@ -4,6 +4,7 @@
     <title th:text="#{bank.orgUnit.title} + ' - ' + ${appTitle}">Bank meiner Org-Einheit - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/org-unit-bank.css}">
     </th:block>
 </head>
 <body>
@@ -12,32 +13,31 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
-    <div class="greeting hud-box flex-between">
-        <div>
-            <h1 th:text="#{bank.orgUnit.title}">Bank meiner Org-Einheit</h1>
-            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
-               th:text="#{bank.orgUnit.subtitle}">Kontostand und Ein-/Auszahlungsantr&auml;ge deiner Org-Einheit.</p>
-        </div>
-        <div class="bank-head-actions" th:if="${canRequestAny}">
-            <button type="button" class="btn btn--cta"
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.organisation',
+        titleText=#{bank.orgUnit.title}, actions=~{::ou-head-actions})}">
+        <th:block th:ref="ou-head-actions">
+            <button type="button" class="btn btn--cta" th:if="${canRequestAny}"
                     data-trigger="open-modal-display" data-modal-id="org-unit-request-modal"
-                    data-testid="org-unit-bank-request-btn"
-                    th:text="#{bank.orgUnit.requestAction}">Ein-/Auszahlung beantragen</button>
-        </div>
-    </div>
+                    data-testid="org-unit-bank-request-btn">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{bank.request.action.submit}">Antrag stellen</span>
+            </button>
+        </th:block>
+    </th:block>
 
     <div id="org-unit-bank-results" th:fragment="orgUnitBank"
          th:with="showKonten=${!#lists.isEmpty(balances)},
                   showTabs=${!#lists.isEmpty(balances) or !#lists.isEmpty(ownRequests) or hasResponsibleAccounts}">
 
-        <div class="empty-state mt-2" th:unless="${showTabs}">
-            <div class="empty-text" data-testid="org-unit-bank-empty" th:text="#{bank.orgUnit.empty}">
-                Du beaufsichtigst keine Org-Einheit mit einem Bankkonto.
+        <th:block th:unless="${showTabs}">
+            <div class="card card--flush" data-testid="org-unit-bank-empty">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.orgUnit.emptyTitle',
+                    textKey='bank.orgUnit.empty')}"></th:block>
             </div>
-        </div>
+        </th:block>
 
         <div th:if="${showTabs}">
-            <div class="tab-nav mt-2" role="tablist" th:aria-label="#{bank.orgUnit.title}">
+            <div class="tab-nav" role="tablist" th:aria-label="#{bank.orgUnit.title}">
                 <button type="button" class="tab active" role="tab" aria-selected="true"
                         th:if="${showKonten}"
                         id="ou-tab-konten" aria-controls="ou-panel-konten" data-tab="konten"
@@ -56,14 +56,14 @@
                 <button type="button" class="tab" role="tab" aria-selected="false"
                         id="ou-tab-fremde" aria-controls="ou-panel-fremde" data-tab="fremde"
                         th:if="${hasResponsibleAccounts}" data-testid="org-unit-bank-tab-foreign">
-                    <span th:text="#{bank.orgUnit.tab.foreignRequests}">Fremde Antr&auml;ge</span>
+                    <span th:text="#{bank.tab.foreignRequests}">Antr&auml;ge an unsere Konten</span>
                     <span class="tab-count" th:text="${#lists.size(foreignRequests)}">0</span>
                 </button>
             </div>
 
-            <div class="mt-2" id="ou-panel-konten" data-tabpanel="konten" role="tabpanel"
+            <div class="ou-panel stack" id="ou-panel-konten" data-tabpanel="konten" role="tabpanel"
                  aria-labelledby="ou-tab-konten" th:if="${showKonten}">
-                <div class="ou-konten-toolbar mb-2">
+                <div class="toolbar ou-konten-toolbar">
                     <th:block th:replace="~{fragments/components :: bankAccSearch('ou-acc-filter', '#ou-acc-results', '#ou-acc-filter-empty')}"></th:block>
                     <div class="bank-view-toggles" role="group" data-ou-view-toggles
                          th:aria-label="#{bank.dashboard.view.aria}">
@@ -82,99 +82,162 @@
                         <th:block th:replace="~{fragments/org-unit-bank-views :: ouAccGrid(${balances}, ${sparks})}"></th:block>
                     </th:block>
                 </div>
-                <div id="ou-acc-filter-empty" class="empty-state mt-2" hidden>
-                    <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
+                <div id="ou-acc-filter-empty" class="card card--flush" hidden>
+                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.filter.emptyTitle',
+                        textKey='bank.filter.empty')}"></th:block>
                 </div>
-            </div>
 
-            <div class="mt-2" id="ou-panel-antraege" data-tabpanel="antraege" role="tabpanel"
-                 aria-labelledby="ou-tab-antraege" th:attr="hidden=${showKonten} ? 'hidden' : null">
-                <div class="empty-state" th:if="${#lists.isEmpty(ownRequests)}">
-                    <div class="empty-text" data-testid="org-unit-bank-requests-empty"
-                         th:text="#{bank.orgUnit.requests.empty}">Noch keine Antr&auml;ge.</div>
-                </div>
-                <div class="table-responsive" th:if="${!#lists.isEmpty(ownRequests)}">
-                    <table class="data-table" data-testid="org-unit-bank-requests">
+                <section class="card card--flush ou-open-requests" th:if="${!#lists.isEmpty(openRequests)}"
+                         data-testid="org-unit-bank-open-requests">
+                    <div class="card-head ou-open-head">
+                        <h2 class="card-title" th:text="#{bank.orgUnit.pending.title}">Laufende Antr&auml;ge</h2>
+                        <span class="chip chip--muted" th:text="${#lists.size(openRequests)}">3</span>
+                    </div>
+                    <table class="data-table data-table--stack ou-open-table">
                         <thead>
                         <tr>
-                            <th class="bank-expand-cell"></th>
-                            <th th:text="#{bank.request.col.type}">Typ</th>
-                            <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
-                            <th th:text="#{bank.request.col.status}">Status</th>
-                            <th th:text="#{bank.request.col.holder}">Halter</th>
-                            <th th:text="#{bank.request.col.created}">Erstellt</th>
-                            <th th:text="#{bank.request.col.actions}">Aktionen</th>
+                            <th th:text="#{bank.request.field.type}">Vorgang</th>
+                            <th th:text="#{bank.orgUnit.pending.col.request}">Antrag</th>
+                            <th th:text="#{bank.orgUnit.step.label}">Freigabeweg</th>
+                            <th class="num" th:text="#{bank.request.col.amount}">Betrag</th>
                         </tr>
                         </thead>
                         <tbody>
-                        <th:block th:each="r : ${ownRequests}"
-                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-own-req-' + ${r.id()}">
-                        <tr data-testid="org-unit-bank-request-row" class="bank-booking-row"
-                            th:classappend="${hasDetail} ? ' is-expandable' : ''">
-                            <td class="bank-expand-cell">
-                                <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
-                                        data-trigger="bank-row-expand" aria-expanded="false"
-                                        th:attr="aria-controls=${detailId}"
-                                        th:aria-label="#{bank.detail.toggleDetails}"
-                                        data-testid="org-unit-bank-request-expand">
-                                    <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                                </button>
+                        <tr th:each="o : ${openRequests}" th:with="r=${o.request()}"
+                            data-testid="org-unit-bank-open-row">
+                            <td class="ou-open-type" th:switch="${r.type()}">
+                                <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</span>
+                                <span th:case="'WITHDRAWAL'" class="chip chip--danger" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</span>
+                                <span th:case="*" class="chip chip--info" th:text="#{'bank.request.type.' + ${r.type()}}">Transfer</span>
                             </td>
-                            <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
-                            <td class="text-right bank-amount"
-                                th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
-                            <td>
-                                <span class="chip"
-                                      th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
-                                      th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
-                                <span class="reason text-muted" th:if="${r.status() == 'REJECTED' and r.rejectReason() != null}"
-                                      th:text="' &mdash; ' + ${r.rejectReason()}"></span>
+                            <td class="ou-open-title">
+                                <span class="cell-title" th:switch="${r.type()}">
+                                    <th:block th:case="'DEPOSIT'"
+                                              th:text="(${r.counterpartyHandle() != null} ? ${@handles.display(r.counterpartyHandle())} : ${@handles.display(r.requesterHandle())}) + ' &#8594; ' + ${r.accountName()}">vexx &#8594; IRI R&uuml;cklage</th:block>
+                                    <th:block th:case="'TRANSFER'"
+                                              th:text="${r.accountName()} + (${r.targetAccountNo() != null} ? ' &#8594; ' + ${r.targetAccountNo()} : '')">IRI Betriebskonto &#8594; KB-0002</th:block>
+                                    <th:block th:case="*"
+                                              th:text="${r.accountName()} + (${r.counterpartyHandle() != null} ? ' &#8594; ' + ${@handles.display(r.counterpartyHandle())} : '')">IRI Betriebskonto &#8594; greluc</th:block>
+                                </span>
+                                <span class="cell-sub" th:if="${!#strings.isEmpty(r.justification())}"
+                                      th:text="${r.justification()}">Treibstoff + Munition Flotten&uuml;bung</span>
+                                <span class="cell-sub" th:if="${#strings.isEmpty(r.justification()) and !#strings.isEmpty(r.note())}"
+                                      th:text="${r.note()}">Quartalsabgabe Q3</span>
                             </td>
-                            <td th:text="${r.holderHandle() != null} ? ${@handles.display(r.holderHandle())} : '&ndash;'">&ndash;</td>
-                            <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
-                            <td>
-                                <button type="button" class="btn btn-ghost btn-xs"
-                                        th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
-                                        data-trigger="open-modal-display"
-                                        th:attr="data-modal-id='ou-req-edit-' + ${r.id()}"
-                                        data-testid="org-unit-bank-edit-btn"
-                                        th:text="#{bank.request.action.edit}">Bearbeiten</button>
-                                <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
-                                      data-endpoint="/api/proxy/org-units/bank/requests/{id}/cancel" data-method="POST">
-                                    <input type="hidden" name="_id" th:value="${r.id()}">
-                                    <input type="hidden" name="version" th:value="${r.version()}">
-                                    <button type="submit" class="btn btn-ghost btn-xs" data-testid="org-unit-bank-cancel-btn"
-                                            th:text="#{bank.request.action.cancel}">Zur&uuml;ckziehen</button>
-                                    <span class="bank-field-error" data-error-for="_global"></span>
-                                </form>
-                                <span th:unless="${r.status() == 'PENDING'}" class="text-muted">&ndash;</span>
+                            <td class="ou-open-steps">
+                                <ol class="ou-steps" th:attr="aria-label=#{bank.orgUnit.step.label}">
+                                    <li th:each="s : ${o.steps()}" class="ou-step"
+                                        th:classappend="${'ou-step--' + s.modifier()}"
+                                        th:attr="aria-current=${s.modifier() == 'current'} ? 'step' : null,data-testid='org-unit-bank-step-' + ${s.modifier()}">
+                                        <span class="ou-step-mark" aria-hidden="true"></span>
+                                        <span th:text="#{__${s.labelKey()}__}">Eingereicht</span>
+                                        <span class="visually-hidden" th:text="#{'bank.orgUnit.step.state.' + ${s.modifier()}}">erledigt</span>
+                                    </li>
+                                </ol>
+                            </td>
+                            <td class="num ou-open-amount">
+                                <span class="bank-amount"
+                                      th:classappend="${r.type() == 'DEPOSIT'} ? ' bank-amount--pos' : (${r.type() == 'WITHDRAWAL'} ? ' bank-amount--neg' : '')"
+                                      th:text="(${r.type() == 'DEPOSIT'} ? '+ ' : '&#8722; ') + ${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')}">&#8722; 180.000</span>
                             </td>
                         </tr>
-                        <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
-                            data-testid="org-unit-bank-request-detail">
-                            <td colspan="7" class="bank-booking-detail-cell">
-                                <div class="bank-booking-detail-body">
-                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
-                                        <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
-                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-counterparty"
-                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
-                                    </div>
-                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
-                                        <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
-                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-justification"
-                                              th:text="${r.justification()}">Missionsfreigabe</span>
-                                    </div>
-                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
-                                        <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
-                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-note"
-                                              th:text="${r.note()}">Missionsertrag</span>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        </th:block>
                         </tbody>
                     </table>
+                </section>
+            </div>
+
+            <div class="ou-panel" id="ou-panel-antraege" data-tabpanel="antraege" role="tabpanel"
+                 aria-labelledby="ou-tab-antraege" th:attr="hidden=${showKonten} ? 'hidden' : null">
+                <div class="card card--flush">
+                    <th:block th:if="${#lists.isEmpty(ownRequests)}">
+                        <div data-testid="org-unit-bank-requests-empty">
+                            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.orgUnit.requests.emptyTitle',
+                                textKey='bank.orgUnit.requests.empty')}"></th:block>
+                        </div>
+                    </th:block>
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(ownRequests)}">
+                        <table class="data-table" data-testid="org-unit-bank-requests">
+                            <thead>
+                            <tr>
+                                <th class="bank-expand-cell"></th>
+                                <th th:text="#{bank.request.col.type}">Typ</th>
+                                <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
+                                <th th:text="#{bank.request.col.status}">Status</th>
+                                <th th:text="#{bank.request.col.holder}">Halter</th>
+                                <th th:text="#{bank.request.col.created}">Erstellt</th>
+                                <th th:text="#{bank.request.col.actions}">Aktionen</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <th:block th:each="r : ${ownRequests}"
+                                      th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-own-req-' + ${r.id()}">
+                            <tr data-testid="org-unit-bank-request-row" class="bank-booking-row"
+                                th:classappend="${hasDetail} ? ' is-expandable' : ''">
+                                <td class="bank-expand-cell">
+                                    <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
+                                            data-trigger="bank-row-expand" aria-expanded="false"
+                                            th:attr="aria-controls=${detailId}"
+                                            th:aria-label="#{bank.detail.toggleDetails}"
+                                            data-testid="org-unit-bank-request-expand">
+                                        <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                                    </button>
+                                </td>
+                                <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
+                                <td class="text-right bank-amount"
+                                    th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
+                                <td>
+                                    <span class="chip"
+                                          th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
+                                          th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                                    <span class="reason text-muted" th:if="${r.status() == 'REJECTED' and r.rejectReason() != null}"
+                                          th:text="' &mdash; ' + ${r.rejectReason()}"></span>
+                                </td>
+                                <td th:text="${r.holderHandle() != null} ? ${@handles.display(r.holderHandle())} : '&ndash;'">&ndash;</td>
+                                <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
+                                <td class="cell-actions">
+                                    <button type="button" class="btn btn-ghost btn-xs"
+                                            th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
+                                            data-trigger="open-modal-display"
+                                            th:attr="data-modal-id='ou-req-edit-' + ${r.id()}"
+                                            data-testid="org-unit-bank-edit-btn"
+                                            th:text="#{bank.request.action.edit}">Bearbeiten</button>
+                                    <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track bank-inline-form" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+                                          data-endpoint="/api/proxy/org-units/bank/requests/{id}/cancel" data-method="POST">
+                                        <input type="hidden" name="_id" th:value="${r.id()}">
+                                        <input type="hidden" name="version" th:value="${r.version()}">
+                                        <button type="submit" class="btn btn-ghost btn-xs" data-testid="org-unit-bank-cancel-btn"
+                                                th:text="#{bank.request.action.cancel}">Zur&uuml;ckziehen</button>
+                                        <span class="bank-field-error" data-error-for="_global"></span>
+                                    </form>
+                                    <span th:unless="${r.status() == 'PENDING'}" class="text-muted">&ndash;</span>
+                                </td>
+                            </tr>
+                            <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                                data-testid="org-unit-bank-request-detail">
+                                <td colspan="7" class="bank-booking-detail-cell">
+                                    <div class="bank-booking-detail-body">
+                                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
+                                            <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                            <span class="bank-detail-value" data-testid="org-unit-bank-request-counterparty"
+                                                  th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
+                                        </div>
+                                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
+                                            <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
+                                            <span class="bank-detail-value" data-testid="org-unit-bank-request-justification"
+                                                  th:text="${r.justification()}">Missionsfreigabe</span>
+                                        </div>
+                                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
+                                            <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                                            <span class="bank-detail-value" data-testid="org-unit-bank-request-note"
+                                                  th:text="${r.note()}">Missionsertrag</span>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            </th:block>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
                 <th:block th:each="r : ${ownRequests}" th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}">
@@ -269,206 +332,113 @@
                 </th:block>
                 </th:block>
 
-            <div class="mt-2" id="ou-panel-fremde" data-tabpanel="fremde" role="tabpanel"
+            <div class="ou-panel" id="ou-panel-fremde" data-tabpanel="fremde" role="tabpanel"
                  aria-labelledby="ou-tab-fremde" th:if="${hasResponsibleAccounts}" hidden>
-                <div class="empty-state" th:if="${#lists.isEmpty(foreignRequests)}">
-                    <div class="empty-text" data-testid="org-unit-bank-foreign-empty"
-                         th:text="#{bank.orgUnit.foreignRequests.empty}">Keine Antr&auml;ge auf deinen Konten.</div>
-                </div>
-                <div class="table-responsive" th:if="${!#lists.isEmpty(foreignRequests)}">
-                    <table class="data-table" data-testid="org-unit-bank-foreign-requests">
-                        <thead>
-                        <tr>
-                            <th class="bank-expand-cell"></th>
-                            <th th:text="#{bank.request.col.account}">Konto</th>
-                            <th th:text="#{bank.request.col.type}">Typ</th>
-                            <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
-                            <th th:text="#{bank.request.col.requester}">Antragsteller</th>
-                            <th th:text="#{bank.request.col.status}">Status</th>
-                            <th th:text="#{bank.approvalLimit.col.approval}">Freigabe</th>
-                            <th th:text="#{bank.request.col.created}">Erstellt</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <th:block th:each="r : ${foreignRequests}"
-                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-foreign-req-' + ${r.id()}">
-                        <tr data-testid="org-unit-bank-foreign-row" class="bank-booking-row"
-                            th:classappend="${hasDetail} ? ' is-expandable' : ''">
-                            <td class="bank-expand-cell">
-                                <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
-                                        data-trigger="bank-row-expand" aria-expanded="false"
-                                        th:attr="aria-controls=${detailId}"
-                                        th:aria-label="#{bank.detail.toggleDetails}"
-                                        data-testid="org-unit-bank-foreign-expand">
-                                    <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                                </button>
-                            </td>
-                            <td>
-                                <span th:text="${r.accountNo()}">KB-0001</span>
-                                <span th:if="${r.type() == 'TRANSFER' and r.targetAccountNo() != null}"
-                                      class="text-muted" th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</span>
-                            </td>
-                            <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
-                            <td class="text-right bank-amount"
-                                th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
-                            <td th:text="${@handles.display(r.requesterHandle())}">greluc</td>
-                            <td>
-                                <span class="chip"
-                                      th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
-                                      th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
-                            </td>
-                            <td>
-                                <span th:if="${!r.requiresOwnerApproval()}" class="text-muted">&ndash;</span>
-                                <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
-                                      class="chip chip--success" data-testid="org-unit-bank-foreign-granted"
-                                      th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
-                                <form th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() == 'PENDING'}"
-                                      class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
-                                      data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST">
-                                    <input type="hidden" name="_id" th:value="${r.id()}">
-                                    <button type="submit" class="btn btn-xs btn-outline"
-                                            data-testid="org-unit-bank-grant-approval-btn"
-                                            th:text="#{bank.approvalLimit.grant}">Freigabe erteilen</button>
-                                    <span class="bank-field-error" data-error-for="_global"></span>
-                                </form>
-                                <span th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() != 'PENDING'}"
-                                      class="text-muted">&ndash;</span>
-                            </td>
-                            <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
-                        </tr>
-                        <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
-                            data-testid="org-unit-bank-foreign-detail">
-                            <td colspan="8" class="bank-booking-detail-cell">
-                                <div class="bank-booking-detail-body">
-                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
-                                        <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
-                                        <span class="bank-detail-value" data-testid="org-unit-bank-foreign-counterparty"
-                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
+                <div class="card card--flush">
+                    <th:block th:if="${#lists.isEmpty(foreignRequests)}">
+                        <div data-testid="org-unit-bank-foreign-empty">
+                            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.orgUnit.foreignRequests.emptyTitle',
+                                textKey='bank.orgUnit.foreignRequests.empty')}"></th:block>
+                        </div>
+                    </th:block>
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(foreignRequests)}">
+                        <table class="data-table" data-testid="org-unit-bank-foreign-requests">
+                            <thead>
+                            <tr>
+                                <th class="bank-expand-cell"></th>
+                                <th th:text="#{bank.request.col.account}">Konto</th>
+                                <th th:text="#{bank.request.col.type}">Typ</th>
+                                <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
+                                <th th:text="#{bank.request.col.requester}">Antragsteller</th>
+                                <th th:text="#{bank.request.col.status}">Status</th>
+                                <th th:text="#{bank.approvalLimit.col.approval}">Freigabe</th>
+                                <th th:text="#{bank.request.col.created}">Erstellt</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <th:block th:each="r : ${foreignRequests}"
+                                      th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-foreign-req-' + ${r.id()}">
+                            <tr data-testid="org-unit-bank-foreign-row" class="bank-booking-row"
+                                th:classappend="${hasDetail} ? ' is-expandable' : ''">
+                                <td class="bank-expand-cell">
+                                    <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
+                                            data-trigger="bank-row-expand" aria-expanded="false"
+                                            th:attr="aria-controls=${detailId}"
+                                            th:aria-label="#{bank.detail.toggleDetails}"
+                                            data-testid="org-unit-bank-foreign-expand">
+                                        <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                                    </button>
+                                </td>
+                                <td>
+                                    <span th:text="${r.accountNo()}">KB-0001</span>
+                                    <span th:if="${r.type() == 'TRANSFER' and r.targetAccountNo() != null}"
+                                          class="text-muted" th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</span>
+                                </td>
+                                <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
+                                <td class="text-right bank-amount"
+                                    th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
+                                <td th:text="${@handles.display(r.requesterHandle())}">greluc</td>
+                                <td>
+                                    <span class="chip"
+                                          th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
+                                          th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                                </td>
+                                <td>
+                                    <span th:if="${!r.requiresOwnerApproval()}" class="text-muted">&ndash;</span>
+                                    <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
+                                          class="chip chip--success" data-testid="org-unit-bank-foreign-granted"
+                                          th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
+                                    <form th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() == 'PENDING'}"
+                                          class="bank-ajax-form no-track bank-inline-form" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+                                          data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST">
+                                        <input type="hidden" name="_id" th:value="${r.id()}">
+                                        <button type="submit" class="btn btn-xs btn-success"
+                                                data-testid="org-unit-bank-grant-approval-btn"
+                                                th:text="#{bank.approvalLimit.grant}">Freigabe erteilen</button>
+                                        <span class="bank-field-error" data-error-for="_global"></span>
+                                    </form>
+                                    <span th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() != 'PENDING'}"
+                                          class="text-muted">&ndash;</span>
+                                </td>
+                                <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
+                            </tr>
+                            <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                                data-testid="org-unit-bank-foreign-detail">
+                                <td colspan="8" class="bank-booking-detail-cell">
+                                    <div class="bank-booking-detail-body">
+                                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
+                                            <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                            <span class="bank-detail-value" data-testid="org-unit-bank-foreign-counterparty"
+                                                  th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
+                                        </div>
+                                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
+                                            <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
+                                            <span class="bank-detail-value" data-testid="org-unit-bank-foreign-justification"
+                                                  th:text="${r.justification()}">Missionsfreigabe</span>
+                                        </div>
+                                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
+                                            <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                                            <span class="bank-detail-value" data-testid="org-unit-bank-foreign-note"
+                                                  th:text="${r.note()}">Missionsertrag</span>
+                                        </div>
+                                        <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.staffNote())}">
+                                            <span class="bank-detail-label" th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span>
+                                            <span class="bank-detail-value" data-testid="org-unit-bank-foreign-staff-note" th:text="${r.staffNote()}">Nach R&uuml;cksprache</span>
+                                        </div>
                                     </div>
-                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
-                                        <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
-                                        <span class="bank-detail-value" data-testid="org-unit-bank-foreign-justification"
-                                              th:text="${r.justification()}">Missionsfreigabe</span>
-                                    </div>
-                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
-                                        <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
-                                        <span class="bank-detail-value" data-testid="org-unit-bank-foreign-note"
-                                              th:text="${r.note()}">Missionsertrag</span>
-                                    </div>
-                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.staffNote())}">
-                                        <span class="bank-detail-label" th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span>
-                                        <span class="bank-detail-value" data-testid="org-unit-bank-foreign-staff-note" th:text="${r.staffNote()}">Nach Rücksprache</span>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        </th:block>
-                        </tbody>
-                    </table>
+                                </td>
+                            </tr>
+                            </th:block>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <th:block th:if="${canRequestAny}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='org-unit-request-modal', titleKey='bank.request.modal.title', body=~{::org-unit-request-modal-body})}">
-        <th:block th:ref="org-unit-request-modal-body">
-            <form class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
-                  data-endpoint="/api/proxy/org-units/bank/requests" data-method="POST">
-                <div class="krt-modal-body">
-                    <div class="bank-form-row">
-                        <label for="org-unit-request-account" th:text="#{bank.request.col.account}">Konto</label>
-                        <select id="org-unit-request-account" name="sourceAccountId" required
-                                data-role="org-unit-request-account" data-testid="org-unit-request-account">
-                            <option th:each="t : ${requestTransferTargets}"
-                                    th:value="${t.id()}"
-                                    th:attr="data-can-debit=${debitableAccountIds.contains(t.id())},data-limit=${requestLimits.get(t.id())},data-exempt=${approvalExemptAccountIds.contains(t.id())},data-requires-justification=${t.type() == 'CARTEL' or t.type() == 'CARTEL_BANK' or t.type() == 'SPECIAL'}"
-                                    th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
-                        </select>
-                        <span class="bank-field-hint" data-deposit-hint th:text="#{bank.orgUnit.request.deposit.accountHint}">Einzahlungen sind f&uuml;r jedes aktive Konto m&ouml;glich.</span>
-                        <span class="bank-field-hint" data-debit-hint hidden th:text="#{bank.orgUnit.request.accountHint}">Nur Konten, f&uuml;r die du antragsberechtigt bist.</span>
-                        <span class="bank-field-error" data-error-for="sourceAccountId"></span>
-                    </div>
-                    <div class="bank-form-row">
-                        <label for="org-unit-request-type" th:text="#{bank.request.field.type}">Vorgang</label>
-                        <select id="org-unit-request-type" name="type" required
-                                data-role="org-unit-request-type" data-testid="org-unit-request-type">
-                            <option value="DEPOSIT" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</option>
-                            <option value="WITHDRAWAL" th:if="${anyCanRequest}" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</option>
-                            <option value="TRANSFER" th:if="${anyCanRequest}" th:text="#{bank.request.type.TRANSFER}">Transfer</option>
-                        </select>
-                        <span class="bank-field-error" data-error-for="type"></span>
-                    </div>
-                    <div class="bank-form-row" data-request-transfer-only hidden>
-                        <label for="org-unit-request-destination" th:text="#{bank.field.destinationAccount}">Zielkonto</label>
-                        <select id="org-unit-request-destination" name="targetAccountId" disabled
-                                data-testid="org-unit-request-destination">
-                            <option value="" th:text="#{bank.field.destinationAccount.placeholder}">Zielkonto w&auml;hlen &hellip;</option>
-                            <option th:each="t : ${requestTransferTargets}" th:value="${t.id()}"
-                                    th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">KRT (KB-0002)</option>
-                        </select>
-                        <span class="bank-field-error" data-error-for="targetAccountId"></span>
-                    </div>
-                    <div class="bank-form-row">
-                        <label for="org-unit-request-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
-                        <input type="number" id="org-unit-request-amount" name="amount" min="1" step="1" required
-                               data-testid="org-unit-request-amount" th:placeholder="#{bank.field.amount.placeholder}">
-                        <span class="bank-field-hint" th:text="#{bank.field.amount.hint}">Nur ganze aUEC-Betr&auml;ge.</span>
-                        <span class="bank-field-error" data-error-for="amount"></span>
-                        <p class="bank-limit-warning" data-limit-warning hidden
-                           data-testid="org-unit-request-limit-warning"
-                           th:text="#{bank.approvalLimit.requesterWarning}">Der Betrag &uuml;berschreitet dein Freigabe-Limit.</p>
-                    </div>
-                    <div data-split-deposit-only>
-                        <div class="bank-form-row">
-                            <label class="bank-check-label">
-                                <input type="checkbox" name="splitEnabled" value="true" disabled
-                                       data-role="bank-split-toggle" data-testid="org-unit-request-split-toggle">
-                                <span th:text="#{bank.split.toggle}">Anteil auf alle Staffelkonten verteilen</span>
-                            </label>
-                        </div>
-                        <div class="bank-form-row" data-split-row hidden>
-                            <label for="org-unit-request-split-percent" th:text="#{bank.split.percent}">Prozentsatz (%)</label>
-                            <input type="number" id="org-unit-request-split-percent" name="splitPercent"
-                                   min="1" max="100" step="1" disabled
-                                   data-testid="org-unit-request-split-percent" th:placeholder="#{bank.split.percent.placeholder}">
-                            <span class="bank-field-hint" th:text="#{bank.split.hint}">Dieser Anteil wird gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt; das Zielkonto erh&auml;lt den Rest.</span>
-                            <p class="bank-field-hint bank-split-preview" data-split-preview hidden
-                               data-testid="org-unit-request-split-preview">
-                                <span th:text="#{bank.split.preview.label}">Aufteilung:</span>
-                                <span data-split-slice>0</span>
-                                <span th:text="#{bank.split.preview.toSquadrons}">aUEC auf die Staffelkonten,</span>
-                                <span data-split-remainder>0</span>
-                                <span th:text="#{bank.split.preview.remainder}">aUEC verbleiben auf dem Zielkonto.</span>
-                            </p>
-                            <span class="bank-field-error" data-error-for="splitPercent"></span>
-                        </div>
-                    </div>
-                    <div class="bank-form-row" data-request-justification-only hidden>
-                        <label for="org-unit-request-justification" th:text="#{bank.field.justification}">Begr&uuml;ndung</label>
-                        <input type="text" id="org-unit-request-justification" name="justification" maxlength="500" disabled
-                               data-testid="org-unit-request-justification" th:placeholder="#{bank.field.justification.placeholder}">
-                        <span class="bank-field-hint" th:text="#{bank.field.justification.hint}">Pflicht bei Abrufen aus dem KRT-, Bank- oder Sonderkonto.</span>
-                        <span class="bank-field-error" data-error-for="justification"></span>
-                    </div>
-                    <th:block th:replace="~{fragments/bank-counterparty :: requestCounterpartyBlock(${requesterId}, ${requesterHandle})}"></th:block>
-                    <div class="bank-form-row">
-                        <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>
-                        <input type="text" id="org-unit-request-note" name="note" maxlength="500"
-                               th:placeholder="#{bank.field.note.placeholder}">
-                    </div>
-                    <p class="bank-field-hint" th:text="#{bank.request.modal.hint}">Der Antrag wird erst verbucht, wenn ihn ein Bankmitarbeiter best&auml;tigt.</p>
-                    <span class="bank-field-error" data-error-for="_global"></span>
-                </div>
-                <div class="krt-modal-foot">
-                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
-                            data-modal-id="org-unit-request-modal" th:text="#{general.cancel}">Abbrechen</button>
-                    <button type="submit" class="btn btn--cta" data-testid="org-unit-request-submit"
-                            th:text="#{bank.request.action.submit}">Antrag stellen</button>
-                </div>
-            </form>
-        </th:block>
-    </th:block>
+        <th:block th:replace="~{fragments/org-unit-bank-views :: requestModal(refreshKey='orgUnitBank')}"></th:block>
     </th:block>
 </main>
 
