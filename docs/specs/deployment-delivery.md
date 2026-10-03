@@ -2343,6 +2343,10 @@ that has no entry at all, before it is used.
   on 2026-09-23) and the release workflows run in the default strict mode.
   `dependency-submission.yml` alone runs lenient — it ships nothing, and its action injects an
   init-script plugin the file does not describe.
+- **The submitted graph reports what the classpaths resolve.** The submission records every
+  resolution, detached ones included, so a plugin probe that resolves without the Boot BOM reports
+  versions nothing uses. PIT's `addJUnitPlatformLauncher` probe is switched off for that reason; the
+  launcher reaches PIT through the test runtime classpath ([`dependency-pins.md`](../dependency-pins.md)).
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
 - **`-sources.jar`, `-javadoc.jar` and the Gradle distribution's `gradle-<version>-src.zip` are
   trusted** by pattern: IDE downloads, never on a build classpath.
