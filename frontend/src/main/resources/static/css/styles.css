@@ -3491,10 +3491,6 @@
             white-space: nowrap;
         }
 
-        .nav-context .squadron-switcher-select {
-            min-height: var(--touch-target);
-        }
-
         .nav-filter .krt-icon {
             left: var(--space-3);
         }
@@ -4884,6 +4880,10 @@
 
         .nav-top-link,
         .nav-link {
+            min-height: var(--touch-target);
+        }
+
+        .nav-context .squadron-switcher-select {
             min-height: var(--touch-target);
         }
     }
