@@ -76,11 +76,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 @Transactional
-@TestPropertySource(
-    properties = {
-      "app.security.ingest-gateway.client-ids=test-ingest-gateway",
-      "app.security.terms.armed-in-test=true"
-    })
+@TestPropertySource(properties = "app.security.terms.armed-in-test=true")
 class ActingMemberIdentityChainTest {
 
   private static final UUID MEMBER = UUID.fromString("44444444-4444-4444-4444-444444444444");

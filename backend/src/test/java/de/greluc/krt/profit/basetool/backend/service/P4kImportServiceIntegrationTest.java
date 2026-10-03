@@ -47,8 +47,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -56,8 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
  * without constraint violations, round-trips the P4K provenance columns and resolves references to
  * rows seeded in the same run.
  *
- * <p>Transactional, so seeded rows roll back; {@link JwtDecoder} is mocked. The mocked-repository
- * counterpart is {@link de.greluc.krt.profit.basetool.backend.service.P4kImportServiceTest}.
+ * <p>Transactional, so seeded rows roll back. The mocked-repository counterpart is {@link
+ * de.greluc.krt.profit.basetool.backend.service.P4kImportServiceTest}.
  */
 @SpringBootTest
 @Transactional
@@ -69,8 +67,6 @@ class P4kImportServiceIntegrationTest {
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private BlueprintRepository blueprintRepository;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   /**
    * Encodes a catalog JSON string as the {@code byte[]} the import service consumes.

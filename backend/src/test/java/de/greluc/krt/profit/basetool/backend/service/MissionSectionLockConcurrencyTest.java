@@ -45,8 +45,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Proves under real contention that same-section writers to a mission produce exactly one winner
@@ -65,8 +63,6 @@ class MissionSectionLockConcurrencyTest {
   @Autowired private MissionTimelineService missionTimelineService;
   @Autowired private MissionParticipantService missionParticipantService;
   @Autowired private MissionService missionService;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private UUID seedMissionId;
 

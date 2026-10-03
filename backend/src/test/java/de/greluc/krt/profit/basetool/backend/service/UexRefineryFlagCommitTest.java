@@ -21,17 +21,15 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Verifies that {@code UexUniverseSyncService.reconcileRefineryTerminalFlags()} commits its flags
@@ -40,12 +38,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  *
  * <p>Writes are committed, so {@link #cleanUp()} removes the fixture.
  */
-@SpringBootTest
+@LeafServiceMockTest
 class UexRefineryFlagCommitTest {
 
   private static final String STATION_NAME = "Commit-Probe Refinery Station";
-
-  @MockitoBean private UexClient uexClient;
 
   @Autowired private UexUniverseSyncService service;
 

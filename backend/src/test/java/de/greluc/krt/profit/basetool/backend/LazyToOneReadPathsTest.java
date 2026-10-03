@@ -86,8 +86,6 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -137,8 +135,6 @@ class LazyToOneReadPathsTest {
    * the subject here is the read path, not the authorization matrix.
    */
   private static final List<GrantedAuthority> ADMIN_AUTHORITIES = adminAuthorities();
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private MockMvc mockMvc;
 

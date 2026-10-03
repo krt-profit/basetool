@@ -63,7 +63,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -74,7 +73,6 @@ import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
 @Transactional
-@TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeCatalogControllerTest {
 
   private static final String PATH = "/api/v1/exchange/catalog/locations";

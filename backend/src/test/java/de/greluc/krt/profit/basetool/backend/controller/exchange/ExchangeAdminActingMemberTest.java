@@ -63,7 +63,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -75,7 +74,6 @@ import org.springframework.web.context.WebApplicationContext;
  * and ships, even with an admin pin on the request (REQ-XCH-009).
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeAdminActingMemberTest {
 
   private static final String BASE = "/api/v1/exchange/me";
