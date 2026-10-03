@@ -47,7 +47,7 @@ class OnBehalfOfHeaderParityTest {
     Path gatewaySource =
         findRepoRoot()
             .resolve(
-                "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/exchange/"
+                "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/"
                     + "ExchangeRelay.java");
     assertThat(gatewaySource).as("the gateway's relay client must exist").exists();
 

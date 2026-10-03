@@ -122,7 +122,7 @@ public class DiscordRegistrationAdminController {
   public PendingRegistrationDto approve(
       @PathVariable UUID id,
       @AuthenticationPrincipal Jwt jwt,
-      @Nullable @RequestBody(required = false) ApproveRegistrationRequest body) {
+      @Nullable @RequestBody(required = false) @Valid ApproveRegistrationRequest body) {
     Long version = body == null ? null : body.version();
     return toDto(
         userRegistrationService.approveUser(id, version, userService.getUserIdFromJwt(jwt)));

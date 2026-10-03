@@ -31,11 +31,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nimbusds.jose.jwk.ECKey;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRegistryReader;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRelay;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRevocationReader;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeTestSupport;
-import de.greluc.krt.profit.basetool.ingest.service.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistryReader;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRevocationReader;
+import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
+import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;

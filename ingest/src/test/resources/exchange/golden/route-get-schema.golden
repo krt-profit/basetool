@@ -1,0 +1,14 @@
+=== request
+GET /exchange/v1/schemas/page.schema.json
+=== response
+200
+cache-control: max-age=3600, public
+content-length: 1411
+content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+content-type: application/schema+json
+vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+x-content-type-options: nosniff
+x-correlation-id: <correlation-id>
+x-frame-options: DENY
+x-xss-protection: 0
+sha-256 630d0a39acf9802e72fc4071e54704a86c69fd55f832d6dc87b0b03845228edb

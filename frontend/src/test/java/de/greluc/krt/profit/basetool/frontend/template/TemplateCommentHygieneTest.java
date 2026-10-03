@@ -36,6 +36,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Keeps developer text and page CSS out of every HTML response by scanning template sources:
@@ -56,7 +57,7 @@ class TemplateCommentHygieneTest {
 
   /** A link to a page stylesheet, as the templates write it. */
   private static final Pattern PAGE_CSS_LINK =
-      Pattern.compile("@\\{/css/pages/([A-Za-z0-9._-]+\\.css)}");
+      Pattern.compile("@\\{/css/pages/((?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\\.css)}");
 
   @Test
   void noTemplateEmitsAPlainHtmlComment() throws IOException, URISyntaxException {
@@ -120,21 +121,31 @@ class TemplateCommentHygieneTest {
   void everyPageStylesheetIsLinkedExactlyOnceAndExists() throws IOException, URISyntaxException {
     Path pagesDir =
         Paths.get(resource("/static/css/styles.css").toURI()).getParent().resolve("pages");
-    Set<String> files = new TreeSet<>();
-    try (Stream<Path> tree = Files.list(pagesDir)) {
-      tree.map(p -> p.getFileName().toString()).filter(n -> n.endsWith(".css")).forEach(files::add);
-    }
+    Set<String> files = pageStylesheets(pagesDir);
     List<String> linked = new ArrayList<>();
     for (Path template : templates()) {
-      Matcher link = PAGE_CSS_LINK.matcher(Files.readString(template, StandardCharsets.UTF_8));
-      while (link.find()) {
-        linked.add(link.group(1));
-      }
+      linked.addAll(pageStylesheetLinks(Files.readString(template, StandardCharsets.UTF_8)));
     }
-    assertThat(files).as("the page stylesheets exist at all").hasSizeGreaterThan(40);
+    assertThat(files).as("the page stylesheets exist at all").hasSizeGreaterThanOrEqualTo(54);
     assertThat(new TreeSet<>(linked)).as("every link names an existing file").isSubsetOf(files);
     assertThat(linked).as("every page stylesheet is linked exactly once").doesNotHaveDuplicates();
     assertThat(new TreeSet<>(linked)).as("no orphaned page stylesheet").isEqualTo(files);
+  }
+
+  @Test
+  void pageStylesheetsInSubfoldersAreFoundAndMatchTheirLinks(@TempDir Path pagesDir)
+      throws IOException {
+    Path nested = pagesDir.resolve("bank").resolve("bank-grants.css");
+    Files.createDirectories(nested.getParent());
+    Files.writeString(nested, ".x {}\n", StandardCharsets.UTF_8);
+    Files.writeString(pagesDir.resolve("home.css"), ".y {}\n", StandardCharsets.UTF_8);
+
+    assertThat(pageStylesheets(pagesDir)).containsExactly("bank/bank-grants.css", "home.css");
+    assertThat(
+            pageStylesheetLinks(
+                "<link th:href=\"@{/css/pages/bank/bank-grants.css}\">"
+                    + "<link th:href=\"@{/css/pages/home.css}\">"))
+        .containsExactly("bank/bank-grants.css", "home.css");
   }
 
   @Test
@@ -180,6 +191,39 @@ class TemplateCommentHygieneTest {
       }
     }
     return found;
+  }
+
+  /**
+   * Lists every page stylesheet below the pages directory, in subfolders too (REQ-OPS-038).
+   *
+   * @param pagesDir the {@code static/css/pages} directory
+   * @return each stylesheet's path below {@code pagesDir}, with {@code /} separators
+   * @throws IOException if the tree cannot be walked
+   */
+  static Set<String> pageStylesheets(Path pagesDir) throws IOException {
+    Set<String> files = new TreeSet<>();
+    try (Stream<Path> tree = Files.walk(pagesDir)) {
+      tree.filter(Files::isRegularFile)
+          .filter(p -> p.getFileName().toString().endsWith(".css"))
+          .map(p -> pagesDir.relativize(p).toString().replace('\\', '/'))
+          .forEach(files::add);
+    }
+    return files;
+  }
+
+  /**
+   * Lists the page stylesheets a template links, in link order.
+   *
+   * @param html the template source
+   * @return each linked stylesheet's path below {@code /css/pages/}
+   */
+  static List<String> pageStylesheetLinks(String html) {
+    List<String> linked = new ArrayList<>();
+    Matcher link = PAGE_CSS_LINK.matcher(html);
+    while (link.find()) {
+      linked.add(link.group(1));
+    }
+    return linked;
   }
 
   /**

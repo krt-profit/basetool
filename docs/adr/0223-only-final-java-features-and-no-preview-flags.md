@@ -1,6 +1,7 @@
 # ADR-0223 — Only final Java features, and no preview flags
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (corrections, and `ScopedValue` for the backend's change
+  source, see below)
 - **Date:** 2026-09-27
 - **Deciders:** @greluc (owner)
 - **Related:** [ADR-0209](0209-the-images-ship-a-java-aot-cache-trained-eagerly-and-verified-at-build.md)
@@ -105,3 +106,28 @@ Each was checked against the code as it stands:
   where a type comes from, and brings in name ambiguities between modules.
 - **Rewrite the two static-helper constructors with JEP 513** — rejected as churn with no
   behavioural gain.
+
+## Amendment — 2026-10-02: corrections, and `ScopedValue` for the backend's change source
+
+**Corrections** (domain modularisation plan §8.1 and §15; the code is right):
+
+- **JDK 26 does add a final library feature:** JEP 517, HTTP/3 for the HTTP Client API. The Context
+  listed it among the runtime changes. The decision is unaffected — the project stays on the JDK 25
+  LTS — but the next toolchain check starts from the corrected list.
+- **JEP 510, the Key Derivation Function API, is final in 25** and was missing from the table of
+  Java 25's developer-facing JEPs. Nothing in the code needs it.
+- **Checkstyle already enforces two of the bans, in `main` only.** `config/checkstyle/google_checks.xml`
+  carries `AvoidModuleImport` and the `CompactSourceFileNotAllowed` check, which only
+  `checkstyleMain` runs; the `test` and `e2e` source sets run `javadoc_position.xml` (ADR-0222) and
+  are not covered. "Nothing enforces decision 3 in CI" was therefore wrong for `main`.
+- **There are 42 explicit `super(args)` calls in `src/main`, not 34** (recounted on 2026-10-02:
+  backend 27, ingest 9, frontend 4, keycloak-spi 2).
+- **A `--enable-preview` gate is still missing**: decision 1 is held by review alone.
+
+**`ScopedValue` for `ChangeSource.ON_BEHALF`.** The backend's `ChangeSource` keeps the exchange
+client a confirmed write is recorded for in a `ThreadLocal` that `asClient` sets and restores
+around one block, and the change-feed attribution (ADR-0224) reads it. That is exactly the binding a
+`ScopedValue` (JEP 506, final in 25) expresses, without a value that can leak into a reused thread.
+It becomes a `ScopedValue` bound with `ScopedValue.where(…).call(…)`, guarded by the
+`ChangeSourceTransactionManager` integration test. Decision 4 is unchanged: it concerns the
+frontend's request-context holders, which the Reactor relay still cannot carry as scoped values.
