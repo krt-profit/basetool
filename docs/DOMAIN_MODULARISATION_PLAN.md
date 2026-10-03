@@ -1,6 +1,6 @@
 > **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29, every
 > open decision on 2026-10-01. **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312);
-> Phase 0 done (2026-10-03, merged as one chain of pull requests, #2355 … #2353): the decision
+> Phase 0 done (2026-10-03, merged as one chain of pull requests, #2350 … #2353): the decision
 > records (ADR-0231 … ADR-0239 and the amendments of §14) and every guard of §6.1 that Phase 0 owns;
 > the app's re-read of the version policy waits for the app release (basetool-android#209). No
 > class has moved yet. Last reviewed: 2026-10-03.
