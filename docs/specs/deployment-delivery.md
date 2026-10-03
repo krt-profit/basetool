@@ -2471,7 +2471,7 @@ Values at introduction, identical to the name-keyed maps they replace:
 
 | Module | Test heap | Instruction / branch floor | PIT targets |
 | --- | --- | --- | --- |
-| `backend` | 3072m | 0.82 / 0.65 | `…backend.service.*` |
+| `backend` | 4096m | 0.82 / 0.65 | `…backend.service.*` |
 | `frontend` | 2048m | 0.60 / 0.46 | `…frontend.service.*` |
 | `ingest` | 1024m | 0.93 / 0.85 | the three former `…ingest.service` classes, by name in their concern packages (`contract`, `handoff`, `relay`); since the ingest PIT leg every concern package but `assembly`, `config`, `problem` and `web`, tests `…ingest.*Test` |
 | `keycloak-spi` | 1024m | 0.66 / 0.60 | — |
