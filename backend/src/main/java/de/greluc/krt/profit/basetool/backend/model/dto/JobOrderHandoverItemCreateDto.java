@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -34,8 +35,11 @@ import org.jetbrains.annotations.Nullable;
  * @param amount the SCU amount handed over from that entry
  * @param missionReductions per-mission deductions for the handed amount, or {@code null} to clamp
  *     the mission earmarks automatically
+ * @param qualityRequirement the code of the quality tier the amount is booked against
+ *     (REQ-ORDERS-038); {@code null} books it against the highest tier the entry's quality meets
  */
 public record JobOrderHandoverItemCreateDto(
     @NotNull UUID inventoryItemId,
     @NotNull @Positive Double amount,
-    @Nullable List<@Valid AllocationReductionDto> missionReductions) {}
+    @Nullable List<@Valid AllocationReductionDto> missionReductions,
+    @Nullable @Size(max = 32) String qualityRequirement) {}

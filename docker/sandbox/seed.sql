@@ -237,14 +237,17 @@ VALUES ('5a4d0000-0000-4000-8000-000000002201', NULL, 2, now(), now(), 0, 'OPEN'
         'Sandbox squadron ore order', 'MATERIAL')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_order_material (id, job_order_id, material_id, min_quality, amount, created_at,
-                                updated_at, version)
+INSERT INTO job_order_material (id, job_order_id, material_id, quality_tier_id, amount,
+                                created_at, updated_at, version)
 VALUES ('5a4d0000-0000-4000-8000-000000002211', '5a4d0000-0000-4000-8000-000000002201',
-        '5a4d0000-0000-4000-8000-000000001402', 600, 30, now(), now(), 0),
+        '5a4d0000-0000-4000-8000-000000001402', '6b1f2e0a-3c1d-4f5e-9a10-000000000650', 30, now(), now(),
+        0),
        ('5a4d0000-0000-4000-8000-000000002212', '5a4d0000-0000-4000-8000-000000002201',
-        '5a4d0000-0000-4000-8000-000000001403', NULL, 10, now(), now(), 0),
+        '5a4d0000-0000-4000-8000-000000001403', '6b1f2e0a-3c1d-4f5e-9a10-000000000000', 10, now(), now(),
+        0),
        ('5a4d0000-0000-4000-8000-000000002213', '5a4d0000-0000-4000-8000-000000002203',
-        '5a4d0000-0000-4000-8000-000000001401', 400, 50, now(), now(), 0)
+        '5a4d0000-0000-4000-8000-000000001401', '6b1f2e0a-3c1d-4f5e-9a10-000000000650', 50, now(), now(),
+        0)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO job_order_item (id, job_order_id, game_item_id, blueprint_id, amount, created_at,
@@ -255,11 +258,13 @@ VALUES ('5a4d0000-0000-4000-8000-000000002221', '5a4d0000-0000-4000-8000-0000000
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO job_order_item_material (id, job_order_item_id, material_id, required_quantity,
-                                     quality_requirement, created_at, updated_at, version)
+                                     quality_tier_id, created_at, updated_at, version)
 VALUES ('5a4d0000-0000-4000-8000-000000002231', '5a4d0000-0000-4000-8000-000000002221',
-        '5a4d0000-0000-4000-8000-000000001402', 1, 'GOOD', now(), now(), 0),
+        '5a4d0000-0000-4000-8000-000000001402', 1, '6b1f2e0a-3c1d-4f5e-9a10-000000000650', now(), now(),
+        0),
        ('5a4d0000-0000-4000-8000-000000002232', '5a4d0000-0000-4000-8000-000000002221',
-        '5a4d0000-0000-4000-8000-000000001404', 4, 'NONE', now(), now(), 0)
+        '5a4d0000-0000-4000-8000-000000001404', 4, '6b1f2e0a-3c1d-4f5e-9a10-000000000000', now(), now(),
+        0)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO exchange_client (id, client_id, display_name, status, contact_url, created_at, version)

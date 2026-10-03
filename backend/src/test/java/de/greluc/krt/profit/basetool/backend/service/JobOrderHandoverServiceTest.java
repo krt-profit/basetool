@@ -93,6 +93,8 @@ class JobOrderHandoverServiceTest {
     jobOrderMaterial.setId(UUID.randomUUID());
     jobOrderMaterial.setMaterial(material);
     jobOrderMaterial.setAmount(10.0);
+    jobOrderMaterial.setQualityTier(
+        de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     order.addMaterial(jobOrderMaterial);
 
     inventoryItem = new InventoryItem();
@@ -106,7 +108,7 @@ class JobOrderHandoverServiceTest {
   void createHandover_shouldRejectItemOrder_soProductionRemainsTheSoleMaterialConsumer() {
     order.setType(de.greluc.krt.profit.basetool.backend.model.JobOrderType.ITEM);
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -120,7 +122,7 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldReduceInventoryAmount_whenAmountIsSmallerThanStock() {
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
@@ -153,7 +155,7 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addMission(inventoryItem, mission, 10.0);
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
@@ -185,7 +187,7 @@ class JobOrderHandoverServiceTest {
 
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(
-            inventoryId, 4.0, List.of(new AllocationReductionDto(missionA.getId(), 4.0)));
+            inventoryId, 4.0, List.of(new AllocationReductionDto(missionA.getId(), 4.0)), null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
@@ -225,7 +227,7 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem, siblingOrder, 70.0, false);
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 50.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 50.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
@@ -245,7 +247,7 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldDeleteInventoryItem_whenAmountIsFullyHandedOver() {
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -287,7 +289,7 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldThrowException_whenAmountExceedsStock() {
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 11.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 11.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -305,7 +307,7 @@ class JobOrderHandoverServiceTest {
     inventoryItem.getJobOrderAllocations().clear();
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
@@ -329,6 +331,8 @@ class JobOrderHandoverServiceTest {
 
     de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
         new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    jobOrderMaterial2.setQualityTier(
+        de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());
     jobOrderMaterial2.setMaterial(material2);
     jobOrderMaterial2.setAmount(8.0);
@@ -341,9 +345,9 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto1 =
-        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null, null);
     JobOrderHandoverItemCreateDto itemDto2 =
-        new JobOrderHandoverItemCreateDto(inventoryId2, 8.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId2, 8.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto1, itemDto2));
 
@@ -387,6 +391,8 @@ class JobOrderHandoverServiceTest {
 
     de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
         new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    jobOrderMaterial2.setQualityTier(
+        de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());
     jobOrderMaterial2.setMaterial(material2);
     jobOrderMaterial2.setAmount(5.0);
@@ -399,9 +405,9 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto1 =
-        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverItemCreateDto itemDto2 =
-        new JobOrderHandoverItemCreateDto(inventoryId2, 3.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId2, 3.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto1, itemDto2));
 
@@ -426,7 +432,7 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldNotCompleteOrder_whenMaterialStillOpen() {
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -446,7 +452,7 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldNotCompleteOrder_whenInventoryItemLinkedToOrder() {
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -474,7 +480,7 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem, otherOrder, inventoryItem.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -490,7 +496,7 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldThrowException_whenAmountExceedsRemainingAmount() {
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 15.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 15.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -509,7 +515,7 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldCallCompleteJobOrderWithinTransaction_whenAllMaterialsHandedOver() {
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
@@ -536,7 +542,7 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem, order, 4.0, false);
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
@@ -562,7 +568,7 @@ class JobOrderHandoverServiceTest {
     jobOrderMaterial.setAmount(5.0);
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 2.5, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 2.5, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -594,7 +600,7 @@ class JobOrderHandoverServiceTest {
     inventoryItem.setOwningOrgUnit(squadronB);
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(
             Instant.now(), "CrossSquadronHandler", "BRV", List.of(itemDto));
@@ -625,6 +631,8 @@ class JobOrderHandoverServiceTest {
 
     de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
         new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    jobOrderMaterial2.setQualityTier(
+        de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());
     jobOrderMaterial2.setMaterial(material2);
     jobOrderMaterial2.setAmount(8.0);
@@ -637,9 +645,9 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto1 =
-        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverItemCreateDto itemDto2 =
-        new JobOrderHandoverItemCreateDto(inventoryId2, 8.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId2, 8.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto1, itemDto2));
 
@@ -675,7 +683,7 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_handoverCreatedAudit_flagsAutoCompletedFalse_whenPartial() {
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -714,7 +722,7 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem, order, 10.00003, false);
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -752,7 +760,7 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem, order, 10.0002, false);
 
     JobOrderHandoverItemCreateDto itemDto =
-        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
