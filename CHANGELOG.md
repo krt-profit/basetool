@@ -21,6 +21,11 @@
   Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
   Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
 
+- **Build: die Node-Skripte unter `frontend/scripts/` werden gelintet und auf Formatierung geprüft.**
+  `:frontend:lintJs` und `:frontend:prettierCheck` lasen `scripts/**/*.mjs` entgegen ADR-0130 nicht; jetzt
+  tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
+  die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
+
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 
 ### Added
