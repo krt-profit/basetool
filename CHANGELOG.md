@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Materialbörse im neuen Muster.** Tabs „Angebote · Gesuche" mit „Alle · Meine" statt vier Tabs,
+  eine Schaltfläche „Angebot erstellen" bzw. „Gesuch erstellen" mit Auswahl Material/Item statt vier
+  Buttons, Filter als Popover mit Chips und Sortiermenü. Alte Links auf die Börse funktionieren
+  weiter (REQ-MARKET-009/-018).
+
 - **Startseite und Formulare im neuen Muster (Phase 2).** Die Startseite zeigt die nächsten 7 Tage als
   Liste mit Datumsblock, daneben Information und die neuesten Benachrichtigungen. Neuer Auftrag,
   Einbuchen, Mitglied bearbeiten (mit Reitern), Systemeinstellungen, Information und
