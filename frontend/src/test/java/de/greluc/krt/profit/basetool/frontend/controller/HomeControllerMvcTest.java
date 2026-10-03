@@ -87,6 +87,62 @@ class HomeControllerMvcTest {
   }
 
   /**
+   * The home page renders the overview pattern (REQ-UI-027): the greeting without a description,
+   * the upcoming missions as row links with a date block and translated status, and the
+   * notifications card; no hud-box and no call to action per mission.
+   */
+  @Test
+  void home_ShouldRenderTheOverviewPattern() throws Exception {
+    java.time.Instant start = java.time.Instant.now().plus(2, java.time.temporal.ChronoUnit.DAYS);
+    MissionListDto mission =
+        new MissionListDto(
+            UUID.fromString("00000000-0000-0000-0000-0000000000a1"),
+            "Salvage-Lauf",
+            null,
+            null,
+            "PLANNED",
+            start.minus(30, java.time.temporal.ChronoUnit.MINUTES),
+            start,
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            "GrimHEX",
+            6L,
+            0L);
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/").with(oidcLogin()).locale(java.util.Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(html)
+        .contains("data-testid=\"home-head\"")
+        .contains("data-testid=\"home-eyebrow\"")
+        .doesNotContain("hud-box")
+        .doesNotContain("mission-tile")
+        .contains("data-testid=\"home-upcoming\"")
+        .containsPattern(
+            "class=\"home-mission\"[^>]*href=\"/missions/00000000-0000-0000-0000-0000000000a1\"")
+        .contains("class=\"home-date\"")
+        .contains(">GEPLANT<")
+        .doesNotContain(">PLANNED<")
+        .contains("GrimHEX")
+        .contains("data-testid=\"home-notifications\"")
+        .contains("Alle Einsätze →");
+    org.assertj.core.api.Assertions.assertThat(
+            html.substring(html.indexOf("<main"), html.indexOf("</main>")).split("btn--cta", -1))
+        .hasSize(1);
+  }
+
+  /**
    * An {@code ?error=} value matching the key pattern renders the page with the parameter toast.
    */
   @Test

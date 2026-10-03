@@ -2,72 +2,99 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${appTitle}">Profit Basetool</title>
-    <th:block th:fragment="extraLinks"></th:block>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/index.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="greeting hud-box">
-        <h1 th:if="${username}" th:text="#{home.welcome_user(${currentUser != null ? currentUser.effectiveName : username})}">Welcome, <span th:text="${username}">User</span>!</h1>
-        <h1 th:unless="${username}" th:text="#{home.welcome_generic}">Welcome to Profit Basetool!</h1>
-        <p th:text="#{home.description}">This is the central platform for mission planning and fleet management.</p>
-        <div class="mt-1-5">
-            
-        </div>
+    <div class="greeting home-head" data-testid="home-head">
+        <span class="page-eyebrow" data-testid="home-eyebrow"
+              th:text="${activeOrgUnit != null} ? ${activeOrgUnit.orgUnitName()} + ' · ' + ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')} : ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')}">IRIDIUM · Samstag, 03.10.</span>
+        <h1 th:if="${username}" th:text="#{home.welcome(${currentUser != null ? currentUser.effectiveName : username})}">Willkommen, Pilot</h1>
+        <h1 th:unless="${username}" th:text="#{home.welcome_generic}">Willkommen beim Profit Basetool!</h1>
     </div>
 
-    <div sec:authorize="isAuthenticated()" class="hud-box mt-2" th:if="${announcement}" id="info-section">
-        <div class="krtm-display-flex-justify-content-space-between-a-a0eb" id="info-header" data-trigger="index-toggle-info">
-             <div class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
-                 <span id="info-toggle-icon" th:text="${unreadAnnouncement ? '▼' : '▶'}">▼</span>
-                 <h2 th:text="#{info.title}" class="m-0">Information</h2>
-             </div>
-             <form id="announcement-read-form" th:if="${unreadAnnouncement}" th:action="@{/announcement/read}" method="post" class="m-0" data-trigger="stop-propagation">
-                 <input type="hidden" name="id" th:value="${announcement.id}" />
-                 <button type="submit" class="btn btn-ghost" th:text="#{info.mark_read}">Als gelesen markieren</button>
-             </form>
-        </div>
-
-        <div id="info-body" class="mt-1" th:classappend="${!unreadAnnouncement} ? 'krtm-hidden' : ''">
-            <div id="info-content" class="markdown-content"
-                 th:with="announcementHtml=${@markdown.render(announcement.content)}"
-                 th:utext="${announcementHtml}"></div>
-        </div>
-    </div>
-
-    <section class="mt-2">
-        <h2 th:text="#{home.upcoming.title}">Einsätze der nächsten 7 Tage</h2>
-
-        <div th:if="${not #lists.isEmpty(upcomingMissions)}" class="grid-auto-cards mt-1">
-            <div th:each="mission : ${upcomingMissions}" class="hud-box mission-tile">
-                <div class="mission-info-grid">
-                     <strong th:text="#{mission.name} + ':'">Name:</strong> <span th:text="${mission.name}">Mission Name</span>
-                     <strong th:text="#{mission.owningOrgUnit} + ':'">Verantwortliche Einheit:</strong> <span th:text="${mission.owningSquadron != null ? mission.owningSquadron.name : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
-                     <th:block sec:authorize="isAuthenticated()" th:if="${mission.description != null and !#strings.isEmpty(mission.description)}">
-                         <strong class="mission-tile__desc-label" th:text="#{mission.description} + ':'">Beschreibung:</strong>
-                         <div class="markdown-content mission-tile__desc"
-                              th:with="descriptionHtml=${@markdown.render(mission.description)}"
-                              th:utext="${descriptionHtml}">Desc</div>
-                     </th:block>
-                     <strong th:if="${mission.calendarLink != null and !#strings.isEmpty(mission.calendarLink)}" th:text="#{mission.calendar_link} + ':'">Kalender:</strong>
-                     <span th:if="${mission.calendarLink != null and !#strings.isEmpty(mission.calendarLink)}"><a th:href="${mission.calendarLink}" target="_blank" rel="noopener noreferrer" th:text="#{mission.calendar_link_open}">Öffnen</a></span>
-                     <strong th:text="#{mission.status} + ':'">Status:</strong> <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}" th:text="${mission.status}">Status</span>
-                     <strong th:if="${!#strings.isEmpty(mission.meetingPoint)}" th:text="#{mission.meeting_point} + ':'">Treffpunkt:</strong>
-                     <span th:if="${!#strings.isEmpty(mission.meetingPoint)}" th:text="${mission.meetingPoint}">Treffpunkt</span>
-                     <strong th:text="#{mission.meeting_time} + ':'">Treffen Teamspeak:</strong> <span class="utc-time" th:text="${mission.meetingTime}">Time</span>
-                     <strong th:text="#{mission.start} + ':'">Serverjoin:</strong> <span class="utc-time" th:text="${mission.plannedStartTime}">Time</span>
-                </div>
-                <div sec:authorize="isAuthenticated()" class="mission-tile__actions">
-                    <a th:href="@{/missions/{id}(id=${mission.id})}" class="btn btn--cta" th:text="#{mission.open_mission}">Einsatz öffnen</a>
-                    <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}" class="chip chip--primary mission-tile__badge" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
-                </div>
+    <div class="home-grid">
+        <section class="card card--flush home-upcoming" aria-labelledby="home-upcoming-title" data-testid="home-upcoming">
+            <div class="home-card-head">
+                <h2 id="home-upcoming-title" class="home-card-title" th:text="#{home.upcoming.next7}">Nächste 7 Tage</h2>
+                <span class="chip chip--muted" data-testid="home-upcoming-count" th:text="${#lists.size(upcomingMissions)}">4</span>
+                <span class="grow"></span>
+                <a class="home-card-link" th:href="@{/missions}" th:text="#{home.upcoming.all}">Alle Einsätze →</a>
             </div>
-        </div>
+            <ul th:if="${not #lists.isEmpty(upcomingMissions)}" class="home-missions">
+                <li th:each="mission : ${upcomingMissions}"
+                    th:with="start=${@relativeDays.local(mission.plannedStartTime)}, meet=${@relativeDays.local(mission.meetingTime)}">
+                    <a class="home-mission" data-testid="home-mission" th:href="@{/missions/{id}(id=${mission.id})}">
+                        <span class="home-date" aria-hidden="true" th:if="${start != null}">
+                            <span class="home-date__dow" th:text="${#temporals.format(start, 'EE')}">Sa</span>
+                            <span class="home-date__day" th:text="${#temporals.format(start, 'dd')}">03</span>
+                            <span class="home-date__mon" th:text="${#temporals.format(start, 'MMM')}">Okt</span>
+                        </span>
+                        <span class="home-mission__main">
+                            <span class="cell-title" th:text="${mission.name}">Einsatz</span>
+                            <span class="cell-sub">
+                                <th:block th:if="${meet != null}"><span th:text="#{home.mission.ts(${#temporals.format(meet, 'HH:mm')})}">TS 13:30</span> · </th:block><th:block th:if="${start != null}"><span th:text="#{home.mission.join(${#temporals.format(start, 'HH:mm')})}">Join 14:00</span></th:block><th:block th:if="${mission.meetingPoint != null and !#strings.isEmpty(mission.meetingPoint)}"> · <span th:text="${mission.meetingPoint}">GrimHEX</span></th:block>
+                                · <span th:text="${mission.owningSquadron != null ? mission.owningSquadron.name : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
+                            </span>
+                        </span>
+                        <span class="home-mission__status">
+                            <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
+                                  th:text="#{${'mission.status.' + #strings.toLowerCase(mission.status)}}">GEPLANT</span>
+                            <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}"
+                                  class="chip chip--primary" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
+                        </span>
+                        <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                    </a>
+                </li>
+            </ul>
+            <th:block th:if="${#lists.isEmpty(upcomingMissions)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='home.upcoming.empty', textKey='home.upcoming.empty.text', actionHref='/missions', actionKey='home.upcoming.all')}"></th:block>
+            </th:block>
+        </section>
 
-        <p th:if="${#lists.isEmpty(upcomingMissions)}" th:text="#{home.upcoming.empty}">Keine Einsätze in den nächsten 7 Tagen.</p>
-    </section>
+        <div class="stack home-side">
+            <section sec:authorize="isAuthenticated()" th:if="${announcement}" id="info-section"
+                     class="card card--accent home-info" aria-labelledby="info-title" data-testid="home-info"
+                     th:classappend="${unreadAnnouncement} ? 'is-unread'">
+                <div class="home-card-head">
+                    <span class="home-info__dot" th:if="${unreadAnnouncement}" aria-hidden="true"></span>
+                    <h2 id="info-title" class="home-card-title" th:text="#{info.title}">Information</h2>
+                    <span class="grow"></span>
+                    <span class="home-info__date utc-time" data-format="short" th:if="${announcement.updatedAt != null}" th:text="${announcement.updatedAt}">01.10.</span>
+                </div>
+                <div id="info-content" class="markdown-content home-info__body is-clamped"
+                     th:with="announcementHtml=${@markdown.render(announcement.content)}"
+                     th:utext="${announcementHtml}"></div>
+                <div class="split home-info__foot">
+                    <button type="button" class="home-card-link home-info__more" data-trigger="index-toggle-info"
+                            aria-controls="info-content" aria-expanded="false"
+                            th:text="#{home.info.more}" th:attr="data-less=#{home.info.less},data-more=#{home.info.more}">Weiterlesen</button>
+                    <form id="announcement-read-form" th:if="${unreadAnnouncement}" th:action="@{/announcement/read}" method="post" class="m-0">
+                        <input type="hidden" name="id" th:value="${announcement.id}" />
+                        <button type="submit" class="btn btn-ghost btn-xs" th:text="#{home.info.read}">Gelesen</button>
+                    </form>
+                </div>
+            </section>
+
+            <section class="card card--flush home-notifs" aria-labelledby="home-notifs-title" data-testid="home-notifications"
+                     th:attr="data-empty=#{home.notifications.empty}">
+                <div class="home-card-head">
+                    <h2 id="home-notifs-title" class="home-card-title" th:text="#{home.notifications.title}">Benachrichtigungen</h2>
+                    <span class="filter-badge" data-home-notif-count hidden>0</span>
+                </div>
+                <ul class="home-notifs__list" data-home-notif-list aria-live="polite"></ul>
+                <p class="home-notifs__empty" data-home-notif-empty hidden th:text="#{home.notifications.empty}">Keine Benachrichtigungen.</p>
+                <div class="home-card-foot">
+                    <a class="home-card-link" th:href="@{/notifications}" th:text="#{home.notifications.all}">Alle anzeigen →</a>
+                </div>
+            </section>
+        </div>
+    </div>
 
     <th:block th:replace="~{fragments/fankit :: band}" />
 

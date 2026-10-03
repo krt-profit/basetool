@@ -182,6 +182,49 @@ class AdminQualityTiersPageControllerMvcTest {
         .contains("class=\"chip chip--success\">aktiv<");
   }
 
+  /**
+   * The create/edit dialog lays its six fields out on the form grid, offers the status as an
+   * active/inactive segment posting the same {@code active} name with active preselected, and keeps
+   * the ids the page script binds.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theTierDialogRendersTheFormGrid() throws Exception {
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(catalogue());
+
+    String html =
+        mockMvc
+            .perform(get(PAGE).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String dialog =
+        html.substring(html.indexOf("id=\"qt-modal\""), html.indexOf("id=\"qt-delete-modal\""));
+    assertThat(dialog)
+        .contains("krt-modal--wide")
+        .contains("<form id=\"qt-form\" class=\"qt-form\"")
+        .contains("<div class=\"form-grid\">")
+        .doesNotContain("qt-form-grid")
+        .doesNotContain("type=\"checkbox\"")
+        .contains("id=\"qt-code\"")
+        .contains("id=\"qt-min-quality\"")
+        .contains("id=\"qt-label-de\"")
+        .contains("id=\"qt-label-en\"")
+        .contains("id=\"qt-sort-order\"")
+        .contains("id=\"qt-base-hint\"")
+        .contains("class=\"segmented segmented--block segmented--lg\"")
+        .contains("data-testid=\"segment-active-true\"")
+        .contains("data-testid=\"segment-active-false\"")
+        .containsPattern("name=\"active\" value=\"true\" checked")
+        .doesNotContain("value=\"false\" checked")
+        .contains(">aktiv<")
+        .contains(">inaktiv<")
+        .contains("Stufe speichern");
+    assertThat(dialog.split("btn--cta", -1)).hasSize(2);
+  }
+
   /** An empty catalogue renders the empty state in the results fragment, without a table. */
   @Test
   @WithMockUser(roles = "ADMIN")

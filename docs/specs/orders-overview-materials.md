@@ -288,7 +288,7 @@ query) · **Code:** `templates/orders-index.html`, `static/js/orders-index.js`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders`
 
-### REQ-ORDERS-038 — Overview scope segment „Meine · Alle"
+### REQ-ORDERS-040 — Overview scope segment „Meine · Alle"
 
 A member who may see both the full queue (`canViewJobOrders`) and their own requested orders
 (`canViewOwnJobOrders`) chooses between them with a segmented control on the overview (`scope`,

@@ -145,16 +145,23 @@
                     <input type="text" id="ship-name" name="name" th:field="*{name}">
                     <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="text-danger"></div>
                 </div>
-                <div class="form-group">
-                    <label for="ship-insurance" th:text="#{hangar.ship.insurance}">Versicherung</label>
-                    <select id="ship-insurance" name="insurance" th:field="*{insurance}" required>
-                        <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte wählen...</option>
-                        <option value="0" th:text="#{hangar.ship.insurance.none}">Keine</option>
-                        <option value="LTI" th:text="#{hangar.ship.insurance.lti}">LTI</option>
-                        <option th:each="i : ${#numbers.sequence(1, 120)}" th:value="${i}" th:text="${i == 1 ? #messages.msg('hangar.ship.insurance.month') : #messages.msg('hangar.ship.insurance.months', i)}"></option>
-                    </select>
-                    <div th:if="${#fields.hasErrors('insurance')}" th:errors="*{insurance}" class="text-danger"></div>
-                </div>
+                <fieldset class="form-group ship-insurance" data-testid="ship-insurance"
+                          th:with="insVal=*{insurance}, insKind=${insVal == null or insVal == '' ? null : (insVal == '0' ? 'NONE' : (insVal == 'LTI' ? 'LTI' : 'MONTHS'))}">
+                    <legend th:text="#{hangar.ship.insurance}">Versicherung</legend>
+                    <th:block th:replace="~{fragments/components :: segmented(name='insuranceKind', labelKey='hangar.ship.insurance',
+                        selected=${insKind}, variant='segmented--block segmented--lg',
+                        options=${ {{value: 'NONE', labelKey: 'hangar.ship.insurance.none'},
+                                    {value: 'MONTHS', labelKey: 'hangar.ship.insurance.kind.months'},
+                                    {value: 'LTI', labelKey: 'hangar.ship.insurance.lti'}} })}"></th:block>
+                    <div class="ship-insurance-months" id="ship-insurance-months-row" th:hidden="${insKind != 'MONTHS'}">
+                        <label for="ship-insurance-months" th:text="#{hangar.ship.insurance.monthsField}">Laufzeit in Monaten (1–120)</label>
+                        <input type="number" id="ship-insurance-months" min="1" max="120" step="1" inputmode="numeric"
+                               data-testid="ship-insurance-months"
+                               th:value="${insKind == 'MONTHS' ? insVal : ''}" th:required="${insKind == 'MONTHS'}">
+                    </div>
+                    <input type="hidden" id="ship-insurance" th:field="*{insurance}">
+                    <div th:if="${#fields.hasErrors('insurance')}" th:errors="*{insurance}" class="field-error"></div>
+                </fieldset>
                 <div class="form-group">
                     <label for="ship-location" th:text="#{hangar.ship.location}">Ort</label>
                     <select id="ship-location" name="locationId" th:field="*{locationId}">

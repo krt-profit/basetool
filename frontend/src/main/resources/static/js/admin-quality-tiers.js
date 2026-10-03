@@ -46,7 +46,10 @@
         document.getElementById('qt-sort-order')
     );
     const activeInput = /** @type {HTMLInputElement | null} */ (
-        document.getElementById('qt-active')
+        form ? form.querySelector('input[name="active"][value="true"]') : null
+    );
+    const inactiveInput = /** @type {HTMLInputElement | null} */ (
+        form ? form.querySelector('input[name="active"][value="false"]') : null
     );
     const baseHint = document.getElementById('qt-base-hint');
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
@@ -72,7 +75,8 @@
         !labelDeInput ||
         !labelEnInput ||
         !sortInput ||
-        !activeInput
+        !activeInput ||
+        !inactiveInput
     ) {
         return;
     }
@@ -85,15 +89,28 @@
     }
 
     /**
-     * Locks the active toggle and the floor for the base tier, whose floor stays 0 and which stays
+     * Checks the active or the inactive option of the status segment.
+     * @param {boolean} active
+     */
+    function setActive(active) {
+        if (!activeInput || !inactiveInput) {
+            return;
+        }
+        activeInput.checked = active;
+        inactiveInput.checked = !active;
+    }
+
+    /**
+     * Locks the status segment and the floor for the base tier, whose floor stays 0 and which stays
      * active.
      * @param {boolean} isBase
      */
     function applyBaseLock(isBase) {
-        if (!activeInput || !floorInput) {
+        if (!activeInput || !inactiveInput || !floorInput) {
             return;
         }
         activeInput.disabled = isBase;
+        inactiveInput.disabled = isBase;
         floorInput.readOnly = isBase;
         if (baseHint) {
             baseHint.hidden = !isBase;
@@ -101,7 +118,7 @@
     }
 
     function openCreate() {
-        if (!form || !idInput || !versionInput || !activeInput) {
+        if (!form || !idInput || !versionInput) {
             return;
         }
         form.reset();
@@ -110,7 +127,7 @@
         }
         idInput.value = '';
         versionInput.value = '';
-        activeInput.checked = true;
+        setActive(true);
         applyBaseLock(false);
         window.krtModal.open(modal);
     }
@@ -125,8 +142,7 @@
             !floorInput ||
             !labelDeInput ||
             !labelEnInput ||
-            !sortInput ||
-            !activeInput
+            !sortInput
         ) {
             return;
         }
@@ -141,7 +157,7 @@
         labelDeInput.value = btn.dataset.labelDe || '';
         labelEnInput.value = btn.dataset.labelEn || '';
         sortInput.value = btn.dataset.sortOrder || '0';
-        activeInput.checked = btn.dataset.active === 'true';
+        setActive(btn.dataset.active === 'true');
         applyBaseLock(btn.dataset.base === 'true');
         window.krtModal.open(modal);
     }

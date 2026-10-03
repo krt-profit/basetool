@@ -132,8 +132,8 @@ class MemberEditInPlaceE2eTest {
   }
 
   /**
-   * Clicks "Zweite Staffel hinzufügen" and asserts the second Staffel slot is revealed by toggling
-   * its {@code krtm-hidden} class (REQ-ORG-017, ADR-0093).
+   * Opens the Mitgliedschaften tab, clicks "Zweite Staffel hinzufügen" and asserts the second
+   * Staffel slot is revealed and the tab is deep-linked (REQ-ORG-017, ADR-0093).
    *
    * <p>A pure client-side toggle; mutates nothing.
    */
@@ -146,7 +146,15 @@ class MemberEditInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/members/" + memberUserId + "/edit?source=members");
         page.waitForLoadState();
         assertThat(page.locator("#member-edit-form")).isVisible();
+        assertThat(page.locator("#staffel-add-2")).isHidden();
 
+        page.getByTestId("member-tab-memberships").click();
+        assertThat(page.getByTestId("member-tab-memberships"))
+            .hasAttribute("aria-selected", "true");
+        assertEquals(
+            "memberships",
+            page.evaluate("() => new URLSearchParams(location.search).get('tab')"),
+            "the open tab is kept in the address");
         assertThat(page.locator("#staffel-add-2")).isVisible();
         assertThat(page.locator("#staffel-slot-2")).isHidden();
 

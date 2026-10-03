@@ -42,8 +42,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Verifies that choosing an SCU-typed material in the {@code /orders/create} material editor
- * reveals the row's SCU hint by toggling {@code krtm-hidden}, without a {@code style-src-attr} CSP
- * violation (ADR-0093).
+ * reveals the row's SCU hint through its {@code hidden} attribute, without a {@code style-src-attr}
+ * CSP violation (ADR-0093).
  *
  * <p>Read-only: never submits. Without an SCU material only the console guard runs.
  */

@@ -21,7 +21,8 @@
 
 function buildScuHint() {
     const hint = document.createElement('span');
-    hint.className = 'scu-hint krtm-hidden';
+    hint.className = 'scu-hint';
+    hint.hidden = true;
     hint.setAttribute('data-role', 'scu-hint');
     hint.setAttribute('tabindex', '0');
     hint.setAttribute('role', 'img');
@@ -68,6 +69,35 @@ function fillQualityTierOptions(select, selectedCode) {
     });
 }
 
+/**
+ * Shows or hides an SCU hint through the `hidden` attribute.
+ *
+ * @param {Element | null} hint the `.scu-hint` element
+ * @param {boolean} visible whether the hint is shown
+ */
+function setHintVisible(hint, visible) {
+    if (!hint) return;
+    hint.classList.remove('krtm-hidden');
+    /** @type {HTMLElement} */ (hint).hidden = !visible;
+}
+
+/**
+ * Reads the quantity type of a material picker: the combobox mirrors it onto the hidden input,
+ * a plain select carries it on the chosen option.
+ *
+ * @param {Element | null} sel the material picker
+ * @returns {string} `SCU`, `PIECE` or an empty string
+ */
+function quantityTypeOf(sel) {
+    if (!sel) return '';
+    let qt = /** @type {HTMLElement} */ (sel).dataset.quantityType || '';
+    if (!qt && sel.tagName === 'SELECT') {
+        const opt = /** @type {HTMLSelectElement} */ (sel).selectedOptions[0];
+        qt = (opt && opt.getAttribute('data-quantity-type')) || '';
+    }
+    return qt;
+}
+
 function refreshMaterialUnit(row) {
     if (!row) {
         return;
@@ -79,24 +109,174 @@ function refreshMaterialUnit(row) {
     if (!sel || !amountInput) {
         return;
     }
-    let qt = sel.dataset.quantityType || '';
-    if (!qt && sel.tagName === 'SELECT') {
-        const opt = sel.selectedOptions && sel.selectedOptions[0];
-        qt = (opt && opt.getAttribute('data-quantity-type')) || '';
-    }
+    const qt = quantityTypeOf(sel);
     if (qt === 'PIECE') {
         amountInput.setAttribute('step', '1');
-        if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-        if (hint) hint.classList.add('krtm-hidden');
+        if (unitSpan) unitSpan.textContent = MSG_UNIT_PIECE;
+        setHintVisible(hint, false);
     } else if (qt === 'SCU') {
         amountInput.setAttribute('step', '0.001');
-        if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
-        if (hint) hint.classList.remove('krtm-hidden');
+        if (unitSpan) unitSpan.textContent = MSG_UNIT_SCU;
+        setHintVisible(hint, true);
     } else {
         amountInput.setAttribute('step', '0.001');
         if (unitSpan) unitSpan.textContent = '';
-        if (hint) hint.classList.add('krtm-hidden');
+        setHintVisible(hint, false);
     }
+    updateMaterialSummary();
+}
+
+/**
+ * Parses a typed amount with either decimal separator.
+ *
+ * @param {string} raw the field value
+ * @returns {number} the amount, or NaN when it is not a number
+ */
+function parseAmount(raw) {
+    if (window.krtScuInput) return window.krtScuInput.parse(raw);
+    return parseFloat(String(raw).replace(',', '.'));
+}
+
+/**
+ * Formats a number for the summary in the page language.
+ *
+ * @param {number} value the number
+ * @returns {string} the formatted number with at most three decimals
+ */
+function formatSummaryNumber(value) {
+    return value.toLocaleString(document.documentElement.lang || undefined, {
+        maximumFractionDigits: 3,
+    });
+}
+
+/**
+ * Returns the name of the unit chosen in an org-unit select, or an empty string.
+ *
+ * @param {string} selectId the select's id
+ * @returns {string} the selected option's text
+ */
+function selectedUnitName(selectId) {
+    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById(selectId));
+    if (!sel || !sel.value) return '';
+    const opt = sel.selectedOptions[0];
+    return opt ? (opt.textContent || '').trim() : '';
+}
+
+/**
+ * Writes a live summary line: the count phrase, an optional emphasised quantity, and the
+ * requesting unit; the phrases come from the element's `data-one`, `data-other` and `data-for`.
+ *
+ * @param {HTMLElement} el the `.form-actions__summary` element
+ * @param {number} count the number of filled lines
+ * @param {string} strong the emphasised quantity, or an empty string
+ * @param {string} unitName the requesting unit's name, or an empty string
+ */
+function renderSummary(el, count, strong, unitName) {
+    const pattern = (count === 1 ? el.dataset.one : el.dataset.other) || '{0}';
+    const parts = [];
+    parts.push(document.createTextNode(pattern.replace('{0}', formatSummaryNumber(count))));
+    if (strong) {
+        const s = document.createElement('strong');
+        s.textContent = strong;
+        parts.push(s);
+    }
+    if (unitName) {
+        parts.push(document.createTextNode((el.dataset.for || '{0}').replace('{0}', unitName)));
+    }
+    el.replaceChildren();
+    parts.forEach(function (part, i) {
+        if (i > 0) el.appendChild(document.createTextNode(' · '));
+        el.appendChild(part);
+    });
+}
+
+/** Recomputes the material form's summary: filled lines, their SCU total and the requester. */
+function updateMaterialSummary() {
+    const el = document.getElementById('orders-material-summary');
+    const container = document.getElementById('materials-container');
+    if (!el || !container) return;
+    let count = 0;
+    let scu = 0;
+    container.querySelectorAll('.material-row').forEach(function (row) {
+        const sel = row.querySelector('[data-role="material-select"]');
+        if (!sel || !(/** @type {HTMLInputElement} */ (sel).value)) return;
+        count++;
+        if (quantityTypeOf(sel) !== 'SCU') return;
+        const amount = row.querySelector('[data-role="material-amount"]');
+        const value = amount ? parseAmount(/** @type {HTMLInputElement} */ (amount).value) : NaN;
+        if (!isNaN(value)) scu += value;
+    });
+    const scuText = scu > 0 ? formatSummaryNumber(scu) + ' ' + (el.dataset.unit || '') : '';
+    renderSummary(el, count, scuText.trim(), selectedUnitName('requestingOrgUnitId'));
+}
+
+/** Recomputes the item form's summary: lines with a chosen item and the requester. */
+function updateItemSummary() {
+    const el = document.getElementById('orders-item-summary');
+    const container = document.getElementById('item-lines');
+    if (!el || !container) return;
+    let count = 0;
+    container.querySelectorAll('.item-line').forEach(function (row) {
+        const sel = row.querySelector('[data-role="item-select"]');
+        if (sel && /** @type {HTMLInputElement} */ (sel).value) count++;
+    });
+    renderSummary(el, count, '', selectedUnitName('item-requestingOrgUnitId'));
+}
+
+/**
+ * Enables a material row's remove button only while more than one row exists.
+ */
+function syncMaterialRemoveButtons() {
+    const container = document.getElementById('materials-container');
+    if (!container) return;
+    const buttons = container.querySelectorAll('[data-trigger="orders-remove-material"]');
+    buttons.forEach(function (btn) {
+        /** @type {HTMLButtonElement} */ (btn).disabled = buttons.length <= 1;
+    });
+}
+
+/**
+ * Renames every row's fields to consecutive `materials[i]` indexes, so the bound list has no gap,
+ * and continues new rows after the last one.
+ */
+function renumberMaterialRows() {
+    const container = document.getElementById('materials-container');
+    if (!container) return;
+    const rows = container.querySelectorAll('.material-row');
+    rows.forEach(function (row, i) {
+        row.querySelectorAll('[name^="materials["]').forEach(function (field) {
+            const name = field.getAttribute('name') || '';
+            field.setAttribute('name', name.replace(/^materials\[\d+\]/, 'materials[' + i + ']'));
+        });
+    });
+    materialIndex = rows.length;
+}
+
+/**
+ * Removes the material row of the clicked remove button while another row remains.
+ *
+ * @param {Element} btn the clicked remove button
+ */
+function removeMaterialRow(btn) {
+    const container = document.getElementById('materials-container');
+    const row = btn.closest('.material-row');
+    if (!container || !row || container.querySelectorAll('.material-row').length <= 1) return;
+    row.remove();
+    renumberMaterialRows();
+    syncMaterialRemoveButtons();
+    updateMaterialSummary();
+}
+
+/**
+ * Updates the `n / max` counter named by a textarea's `data-counter`.
+ *
+ * @param {HTMLTextAreaElement} area the textarea
+ */
+function updateCounter(area) {
+    const counter = document.getElementById(area.dataset.counter || '');
+    if (!counter) return;
+    const max = area.maxLength > 0 ? area.maxLength : 1000;
+    counter.textContent = area.value.length + ' / ' + max;
 }
 
 async function findJobOrderMaterialByName(normalizedName) {
@@ -179,6 +359,11 @@ async function importFromScmdb() {
 
     if (foundAny) {
         document.getElementById('scmdb-import-text').value = '';
+        syncMaterialRemoveButtons();
+        updateMaterialSummary();
+        if (window.krtModal) {
+            window.krtModal.close('orders-scmdb-modal');
+        }
         let successMsg = MSG_SCMDB_SUCCESS;
         if (unknownMaterials.length > 0) {
             successMsg += ' (' + MSG_SCMDB_SOME_UNKNOWN + ': ' + unknownMaterials.join(', ') + ')';
@@ -203,26 +388,26 @@ function addMaterialRow() {
     const container = document.getElementById('materials-container');
 
     const row = document.createElement('div');
-    row.className = 'material-row';
+    row.className = 'material-row material-grid';
+    const removeLabel = container.dataset.removeLabel || '';
 
     row.innerHTML = `
-        <div class="form-group flex-2 mb-0">
-            <label>${escapeHtml(MSG_MATERIAL_LABEL)}</label>
+        <div class="form-group">
+            <label class="visually-hidden">${escapeHtml(MSG_MATERIAL_LABEL)}</label>
             <select name="materials[${escapeAttr(materialIndex)}].materialId" data-role="material-select" data-krt-combobox="remote-materials-joborder" required></select>
         </div>
-        <div class="form-group flex-1 mb-0">
-            <label data-role="amount-label">${escapeHtml(MSG_AMOUNT_LABEL)} <span data-role="amount-unit"></span></label>
-            <input type="text" inputmode="decimal" data-scu-decimal name="materials[${escapeAttr(materialIndex)}].amount" value="" data-role="material-amount" step="0.001" min="0" required>
+        <div class="form-group material-row__amount">
+            <input type="text" inputmode="decimal" data-scu-decimal name="materials[${escapeAttr(materialIndex)}].amount" value="" data-role="material-amount" step="0.001" min="0" required aria-label="${escapeAttr(MSG_AMOUNT_LABEL)}">
+            <span class="material-row__unit" data-role="amount-unit"></span>
         </div>
-        <div class="form-group flex-1 mb-0">
-            <label>${escapeHtml(MSG_MINQUALITY_LABEL)}</label>
-            <select name="materials[${escapeAttr(materialIndex)}].minQuality"></select>
+        <div class="form-group">
+            <select name="materials[${escapeAttr(materialIndex)}].minQuality" aria-label="${escapeAttr(MSG_MINQUALITY_LABEL)}"></select>
         </div>
+        <button type="button" class="btn btn-ghost btn-icon material-row__remove" data-trigger="orders-remove-material" data-testid="order-material-remove" aria-label="${escapeAttr(removeLabel)}" title="${escapeAttr(removeLabel)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
     `;
-    const amountLabel = row.querySelector('[data-role="amount-label"]');
-    if (amountLabel) {
-        amountLabel.removeAttribute('data-role');
-        amountLabel.appendChild(buildScuHint());
+    const amountCell = row.querySelector('.material-row__amount');
+    if (amountCell) {
+        amountCell.appendChild(buildScuHint());
     }
     copyTemplateOptions(
         'minquality-options-template',
@@ -233,8 +418,9 @@ function addMaterialRow() {
     if (window.krtEnhanceComboboxes) {
         window.krtEnhanceComboboxes(row);
     }
-    refreshMaterialUnit(row);
     materialIndex++;
+    syncMaterialRemoveButtons();
+    refreshMaterialUnit(row);
 }
 
 let itemLineIndex = 0;
@@ -271,6 +457,9 @@ function toggleOrderMode() {
     document.getElementById('mode-item').hidden = mode !== 'item';
     setFormDisabled('mode-material', mode !== 'material');
     setFormDisabled('mode-item', mode !== 'item');
+    if (mode === 'material') {
+        syncMaterialRemoveButtons();
+    }
 }
 
 function addItemLine(prefill) {
@@ -281,7 +470,6 @@ function addItemLine(prefill) {
     const row = document.createElement('div');
     row.className = 'item-line';
     row.dataset.lineIndex = idx;
-    row.style.cssText = 'border:1px solid var(--color-gray-3); padding:1rem; margin-bottom:1rem;';
     const manufactured = Number(prefill.manufactured) || 0;
     const minAmount = manufactured > 0 ? manufactured : 1;
     let idInput = '';
@@ -316,7 +504,7 @@ function addItemLine(prefill) {
         </div>
         ${producedNote}
         <div data-role="derived" class="oc-derived-block"></div>
-        <div data-role="unresolved" class="hud-box hud-box-error oc-note-block krtm-hidden"></div>
+        <div data-role="unresolved" class="alert alert-danger oc-note-block" hidden></div>
         <div data-role="subassemblies" class="oc-note-block"></div>
     `;
     copyTemplateOptions('item-options-template', row.querySelector('[data-role="item-select"]'));
@@ -343,13 +531,14 @@ function addItemLine(prefill) {
     if (prefill.gameItemId) {
         loadBlueprints(row, prefill.blueprintId, prefill.qualities);
     }
+    updateItemSummary();
     return row;
 }
 
 function clearDerived(row) {
     row.querySelector('[data-role="derived"]').innerHTML = '';
     const u = row.querySelector('[data-role="unresolved"]');
-    u.classList.add('krtm-hidden');
+    u.hidden = true;
     u.innerHTML = '';
     row.querySelector('[data-role="subassemblies"]').innerHTML = '';
 }
@@ -442,10 +631,10 @@ function loadDerivation(row, qualities) {
                 });
             }
             if ((d.unresolvedIngredients || []).length) {
-                unresolved.classList.remove('krtm-hidden');
+                unresolved.hidden = false;
                 unresolved.innerHTML = `<p>${escapeHtml(ITEM_I18N.unresolved)} ${escapeHtml(d.unresolvedIngredients.map(String).join(', '))}</p>`;
             } else {
-                unresolved.classList.add('krtm-hidden');
+                unresolved.hidden = true;
                 unresolved.innerHTML = '';
             }
             let s = '';
@@ -485,6 +674,7 @@ if (itemLinesContainer) {
             const row = removeBtn.closest('.item-line');
             if (row) {
                 row.remove();
+                updateItemSummary();
             }
             return;
         }
@@ -519,9 +709,29 @@ if (materialsContainerEl) {
     materialsContainerEl.querySelectorAll('.material-row').forEach(refreshMaterialUnit);
 }
 
+const materialModeEl = document.getElementById('mode-material');
+if (materialModeEl) {
+    materialModeEl.addEventListener('input', updateMaterialSummary);
+    materialModeEl.addEventListener('change', updateMaterialSummary);
+}
+const itemModeEl = document.getElementById('mode-item');
+if (itemModeEl) {
+    itemModeEl.addEventListener('change', updateItemSummary);
+}
+document.querySelectorAll('textarea[data-counter]').forEach(function (area) {
+    const textarea = /** @type {HTMLTextAreaElement} */ (area);
+    textarea.addEventListener('input', function () {
+        updateCounter(textarea);
+    });
+    updateCounter(textarea);
+});
+updateMaterialSummary();
+updateItemSummary();
+
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
     window.krtEvents.on('click', 'orders-add-material', addMaterialRow);
+    window.krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
     window.krtEvents.on('click', 'orders-add-item', () => addItemLine());
 }
 
