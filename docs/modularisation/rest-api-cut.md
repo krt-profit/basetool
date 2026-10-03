@@ -675,6 +675,16 @@ first calls race the wall, which is harmless for showing it.
 
 ### How the floor is configured and applied
 
+> [!note] Implemented 2026-10-03 — the floor is release-bound (REQ-API-020)
+> The bullets below describe the floor as it was until then. Now the floor, the newest build and the
+> release page are literals under `app.android.version-policy.release.*` in the backend's
+> `application.yml` (17 / 17), baked into the image, so a promotion applies them and every rollback
+> restores the previous release's values. The host keeps only an emergency override under new names
+> (`APP_ANDROID_*_OVERRIDE`, empty by default, logged at `WARN`, alerted after a day); the old
+> `APP_ANDROID_MINIMUM_VERSION_CODE` / `…_LATEST_VERSION_CODE` / `…_RELEASES_URL` reach no container
+> and bind to nothing. Raising the floor is a change in the wave's pull request, not S8 — procedure in
+> [`deployment.md` → *The Android app floor*](../deployment.md#the-android-app-floor).
+
 - `app.android.minimum-version-code` comes from `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`,
   meaning no floor), with `…LATEST_VERSION_CODE` and `…RELEASES_URL` beside it
   (`backend/src/main/resources/application.yml:172-175`). `docker-compose.yml:213-215` and
@@ -705,6 +715,13 @@ exit; cached data survives.
 
 ### Release sequence per wave
 
+> [!note] Implemented 2026-10-03 — one step instead of three (REQ-API-020)
+> With the release-bound floor the wave's pull request raises the committed floor and newest build to
+> N+1 itself. The sequence is: publish app N+1, then promote; the promotion applies the new API, the
+> floor and the retired paths' `APP_UPDATE_REQUIRED` together, so old apps meet the wall at their next
+> policy read instead of after a separate S8 (steps 1 and 3 below merge, and the second outage
+> minute goes). The table is the sequence while the floor still lived in `.env`.
+
 The wave's pull request — backend, frontend, ledger lines, regenerated edge include and probe table —
 is merged and released first; its images wait for promotion. As long as the floor lives only in the
 host `.env`, the plan's order (§5.10) is:
@@ -725,6 +742,13 @@ floor lives in `.env`: a health-gate rollback would restore the old backend with
 (D-11).
 
 ### Rollback caveats
+
+> [!note] Implemented 2026-10-03 (REQ-API-020)
+> A rollback onto a release that carries the release-bound floor restores that release's floor with
+> its API, so the second caveat below no longer arises and there is no floor to revert first. It
+> still holds for a rollback onto an older release, which reads `APP_ANDROID_MINIMUM_VERSION_CODE`
+> from `.env` — the reason that line stays untouched there. The first caveat — members on N+1 broken
+> by a rollback — is inherent to a hard cut and remains.
 
 - A health-gate rollback before step 3 restores the previous release with floor N: old apps work
   again, and members who already installed N+1 are broken until the wave is re-deployed — a hard
@@ -756,6 +780,14 @@ changes REQ-API-010's "configuration, not a deploy" wording. The further options
 The plan's recommendation: the release-bound floor, plus (a) before the first cut, (c) and (d); (b)
 only if (a) proves insufficient; and, while the floor still lives in `.env`, the floor revert in the
 rollback runbook.
+
+> [!note] Status 2026-10-03
+> **Release-bound floor and (c): implemented** (REQ-API-020). The retired-operation list is
+> `backend/src/main/resources/api/retired-operations.txt`, empty today; a match answers `410` with
+> `APP_UPDATE_REQUIRED` ahead of authentication, and every entry must be a declared break of the
+> ledger. (c) reaches an app on the API vhost only once the generated include admits the ledger's
+> retired paths (G-08); until then the edge answers those paths `404`. **(a)** is the app's
+> basetool-android#209. **(d)** is an operating rule. **(b)** stays open as decided.
 
 ### Contract machinery
 

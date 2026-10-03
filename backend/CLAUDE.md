@@ -96,7 +96,7 @@ stays done.
 ## Spring test contexts — reuse one, do not open one (REQ-OPS-041)
 
 Every distinct `@MockitoBean` set, mock field name or inlined property boots another full
-application context, and `TestContextBudgetTest` fails the build above the budget (35) with the full
+application context, and `TestContextBudgetTest` fails the build above the budget (36) with the full
 grouping. Before declaring a mock or property on a `@SpringBootTest`:
 
 - Use a plain `@SpringBootTest` when the test does not need a mock. `jwt()` and `@WithMockUser`

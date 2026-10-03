@@ -745,9 +745,9 @@ parallel `/api/v2` path and no sunset window. It ships together with:
 
 > [!note] Amended 2026-10-02 — retirement by hard cut (owner decisions D-03, D-04, D-11; ADR-0234)
 > This used to read: retirement goes through `/api/v2` + `@ApiDeprecation` with a sunset rather
-> than a deletion. **Decided, implementation pending:** the ledger, the committed app call list and
-> the `APP_UPDATE_REQUIRED` answer do not exist yet (plan guard G-23, Phase 0 step 0.7); no frozen
-> operation may be retired before they do.
+> than a deletion. **Decided; partly implemented:** the `APP_UPDATE_REQUIRED` answer exists since
+> 2026-10-03 (REQ-API-020); the ledger and the committed app call list do not exist yet (plan guard
+> G-23, Phase 0 step 0.7), and no frozen operation may be retired before they do.
 
 > [!warning] Amended 2026-09-02 (owner-approved) — this sentence used to say every field it had
 > The wording was stricter than the rest of its own requirement and stricter than the gate that
@@ -831,7 +831,10 @@ move together.
 - [ ] **The frozen set covers what the app calls** — the app's call list committed per release and
   asserted against the set. **Open** (same decision; the app calls operations the set does not list
   yet).
-- [ ] **A retired path answers `APP_UPDATE_REQUIRED`.** **Open** (same decision).
+- [x] **A retired path answers `APP_UPDATE_REQUIRED`.** **Closed by REQ-API-020** (2026-10-03):
+  `RetiredOperationFilter` answers every operation of `retired-operations.txt` with `410
+  APP_UPDATE_REQUIRED` ahead of authentication; on the public API vhost once the edge admits the
+  ledger's retired paths (plan guard G-08).
 
 **Enforced by:** `ExternalContractTest` (backend) · the *Fail if a committed openapi.json is stale*
 step in `ci.yml` (since 2026-09-23), which is what keeps the document `ExternalContractTest` reads
@@ -885,14 +888,21 @@ and the old backend then walls old apps while new apps find their paths gone. Co
 - **Retired paths answer `APP_UPDATE_REQUIRED`**, which app versions that know it map to the wall.
 - **Cuts are announced and made at low usage.**
 
-> [!note] Amended 2026-10-02 — the release-bound floor (owner decision D-11; ADR-0234)
+> [!note] Amended 2026-10-02, implemented 2026-10-03 — the release-bound floor (owner decision D-11;
+> ADR-0234; REQ-API-020)
 > This used to read: configuration, not a table, because raising the floor has to work without a
-> migration, an admin screen or a deploy. **Decided, implementation pending:** today the floor is
-> still bound at backend start from `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`), which lives
-> only in the host `.env`, and is raised by runbook step S8 of
-> [`EXCHANGE_GO_LIVE_RUNBOOK.md`](../EXCHANGE_GO_LIVE_RUNBOOK.md) — after the re-cut release is
-> verified healthy, never with it, and reverted first on a rollback. That sequence holds until the
-> release-bound default ships. The app's re-read and `APP_UPDATE_REQUIRED` are not implemented yet.
+> migration, an admin screen or a deploy. Until 2026-10-03 the floor was bound at backend start from
+> `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`) in the host `.env` and raised by runbook step S8
+> of [`EXCHANGE_GO_LIVE_RUNBOOK.md`](../EXCHANGE_GO_LIVE_RUNBOOK.md), after the re-cut release was
+> verified healthy and reverted first on a rollback. Now the floor and the newest build are reviewed
+> literals in the backend's `application.yml` (`app.android.version-policy.release.*`), so they
+> deploy and roll back with the release; the host keeps only an emergency override under new names
+> (`APP_ANDROID_*_OVERRIDE`), and the retired `APP_ANDROID_MINIMUM_VERSION_CODE` /
+> `…_LATEST_VERSION_CODE` / `…_RELEASES_URL` reach no container. A raised floor is a change to that
+> literal in the wave's pull request, not runbook step S8. The code-level default stays `0`, so the
+> third property above still holds for a context without the committed block. Retired paths answer
+> `APP_UPDATE_REQUIRED`. The app's re-read on resume and after an unexpected 404 is not released yet
+> (basetool-android#209).
 
 The operation is itself in the frozen set, for an inverted reason worth stating — every other entry
 is frozen so a shipped app keeps working, this one so a shipped app can be told to stop. A renamed
@@ -1082,5 +1092,105 @@ to leave the annotation off.
 
 **Enforced by:** `MassAssignmentGuardTest#everyRequestBodyIsValidated`,
 `MassAssignmentGuardRules#unvalidatedBodies` · **Related:** REQ-API-002, REQ-API-003, REQ-SEC-077
+
+---
+
+### REQ-API-020 — The app floor rides the release, and a retired path tells the app to update
+
+Owner decision D-11 (ADR-0234): the minimum app version deploys and rolls back together with the API
+it protects, and an operation a hard-cut wave retired answers the app's update wall rather than a
+bare error.
+
+**The release-bound floor.** The three values of `GET /api/v1/app/version-policy` (REQ-API-010) are
+reviewed literals in `backend/src/main/resources/application.yml`, under
+`app.android.version-policy.release.*` — `minimum-version-code`, `latest-version-code` and
+`releases-url` (`https` only). They are packaged into the backend image, so a promotion applies them
+and a rollback — the health gate's or a promotion of an older version — restores the previous
+release's values with its API, with no host step. **Raising the floor is a change to these literals
+in the wave's pull request**, reviewed like the API change it protects; no profile file may
+redeclare them. The committed values are **17 / 17** (app v0.4.0, `versionCode` 17), the floor
+runbook step S8 of `EXCHANGE_GO_LIVE_RUNBOOK.md` set on 2026-09-28, so the release that introduces
+this requirement changes nothing on production. Without the committed block the record's own
+defaults apply — floor `0` — which keeps REQ-API-010's "an unconfigured server walls nobody".
+
+**The emergency override.** `APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE`,
+`APP_ANDROID_LATEST_VERSION_CODE_OVERRIDE` and `APP_ANDROID_RELEASES_URL_OVERRIDE` — empty by
+default — replace the release default field by field (`app.android.version-policy.emergency-override.*`).
+They are break-glass: a floor that walls a working build, or one that must rise before a release can
+ship. An override may lower the floor to `0`. A negative number, a non-number or a non-`https` URL
+fails startup (`@Validated`). The backend logs every value with its source at startup — `WARN` while
+an override is in force — publishes `basetool_android_version_policy_override{field}`, and
+`AndroidVersionPolicyOverrideActive` fires after a day: an override does **not** roll back with a
+release, so it is folded into the next release's literal and emptied again.
+
+**A stale host value cannot pin the floor.** The variables the floor used to be read from —
+`APP_ANDROID_MINIMUM_VERSION_CODE`, `APP_ANDROID_LATEST_VERSION_CODE`, `APP_ANDROID_RELEASES_URL` —
+are passed by no compose file and no `env.d` template, which are closed allow-lists, and the
+properties moved under a prefix that relaxed binding cannot reach from those names, so a value left
+in a host `.env` binds to nothing even if it were passed. On production that line stays the floor of
+a rollback to a release older than this requirement (1.13.x and before still read it), so it is left
+in place until no such release is a rollback target, and never edited again.
+
+**`APP_UPDATE_REQUIRED` for retired paths** (ADR-0234 decision 7, plan option c). The committed list
+`backend/src/main/resources/api/retired-operations.txt` holds one retired operation per line,
+`VERB /api/v1/path`, a segment being a literal or a `{name}` placeholder for exactly one segment. A
+wildcard, a path outside `/api/`, a T0 operation (`/api/v1/app/version-policy`,
+`/api/v1/exchange/**`, `/api/v1/live-sync/**`, `/api/v1/notifications/stream`), an unsupported verb
+or a duplicate fails startup. A request whose verb and full path match an entry is answered
+`410 Gone` with an RFC 7807 problem — `code` `APP_UPDATE_REQUIRED`, type suffix
+`app-update-required`, the localised `problem.app_update_required.*` title and detail and the
+`correlationId` — counted as `basetool_http_error_total{code="APP_UPDATE_REQUIRED"}`. App releases
+that know the code map it to the update wall at any status (basetool-android#209); `410` and not
+`426`, because `426` is a protocol upgrade that requires an `Upgrade` header, while `410` says what
+is true — the operation is gone for good. **The list is empty today**; while it is, the filter is
+skipped for every request.
+
+- **Placement: ahead of authentication.** `RetiredOperationFilter` runs in the API chain before CSRF
+  and the bearer-token filter, so an old app whose login is what the cut broke, or whose token no
+  longer validates, still meets the wall instead of an authentication error — the reason
+  REQ-API-010's version gate is anonymous.
+- **No bypass.** A matched request is answered and never forwarded; another verb on the same path, a
+  longer path and every unlisted path continue to authentication unchanged. The retired operation
+  has no handler any more, and an entry that matches an operation the backend still documents fails
+  the build (`RetiredOperationsContractTest`), so the answer can never stand in front of a live one.
+- **No oracle.** The answer is the same for every value of a placeholder, reads nothing and names no
+  resource; all it says is that the operation was once part of the published API, which the public
+  repository's ledger already says.
+- **Only previously admitted paths.** Every entry is a declared break of the ledger
+  `backend/src/test/resources/api/declared-breaks.txt` (REQ-API-009, plan guard G-23); the build
+  fails on an entry the ledger does not declare, and on a non-empty list without a ledger.
+- **The edge comes first.** On the public API vhost the edge allow-list refuses a path it does not
+  admit with a bare `404` before the backend sees it. Until the generated edge include (plan guard
+  G-08) also admits the ledger's retired paths, an app on the API vhost meets that `404` — which the
+  app answers by re-reading the policy — and not this answer.
+
+**A wave's pull request** therefore carries, together: the re-cut operations; one ledger line per
+break; one line here per retired operation; and the release floor and newest build raised to the
+absorbing app release. The app release is published first; the promotion then applies API, floor
+and retired answers at once, and a rollback takes all three back.
+
+**Acceptance**
+
+- [x] The floor, the newest build and the release page are committed literals; a stale value under
+  the retired names cannot reach them; an override replaces them field by field; an invalid override
+  fails startup (`AndroidClientPropertiesTest`, `AppVersionPolicyControllerTest`).
+- [x] No compose file, `env.d` template or profile passes a retired name; the backend template passes
+  the three overrides, empty by default (`AppVersionPolicyDeploySeamTest`, `render-env-d.test.sh`).
+- [x] The source of every value is logged and gauged; a lingering override alerts
+  (`AndroidVersionPolicyReportTest`, `android_version_policy_override_test.yml`).
+- [x] A retired operation answers `410 APP_UPDATE_REQUIRED` ahead of authentication, without a token
+  and with an invalid one, and nothing else does (`RetiredOperationFilterTest`,
+  `RetiredOperationChainTest`).
+- [x] The list refuses wildcards, T0 operations and duplicates, is dormant while empty, never shadows
+  a documented operation, and is tied to the ledger (`RetiredOperationsTest`,
+  `RetiredOperationsContractTest`).
+- [ ] The edge admits the ledger's retired paths, so the answer reaches the app on the API vhost.
+  **Open** — plan guard G-08.
+
+**Enforced by:** `AndroidClientPropertiesTest`, `AppVersionPolicyDeploySeamTest`,
+`AndroidVersionPolicyReportTest`, `AppVersionPolicyControllerTest`, `RetiredOperationsTest`,
+`RetiredOperationFilterTest`, `RetiredOperationsContractTest`, `RetiredOperationChainTest` (backend) ·
+`scripts/render-env-d.test.sh` · `monitoring/prometheus/tests/android_version_policy_override_test.yml` ·
+**Related:** REQ-API-009, REQ-API-010, REQ-SEC-037, REQ-SEC-052, REQ-OBS-011, ADR-0135, ADR-0234
 
 ---

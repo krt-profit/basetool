@@ -730,6 +730,15 @@ groups:
           summary: "Ingest gateway runs without its JWT audience check"
           description: "basetool_ingest_gate_enforcing{gate=\"audience\"} is 0: the ingest gateway accepts any valid realm token at the decoder, including frontend session tokens. Set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest (never the backend's audience), the audience the exchange.* client scopes stamp — docs/INGEST_KEYCLOAK_SETUP.md step 7a — then re-render env.d and restart ingest."
 
+      - alert: AndroidVersionPolicyOverrideActive
+        expr: max by (application, field) (basetool_android_version_policy_override{application="basetool-backend"}) == 1
+        for: 24h
+        labels:
+          severity: warning
+        annotations:
+          summary: "The Android version policy runs on an emergency override"
+          description: "basetool_android_version_policy_override{field=\"{{ $labels.field }}\"} has been 1 for a day: the host's APP_ANDROID_*_OVERRIDE replaces the release default committed in application.yml, so this value no longer deploys or rolls back with the release (REQ-API-020). Raise the release default in a PR to the overridden value, release it, then empty the override in .env and re-render env.d — docs/deployment.md, The Android app floor."
+
       - alert: ApiUnknownClient
         expr: sum (rate(basetool_api_client_requests_total{client_id="other"}[10m])) > 0
         for: 10m

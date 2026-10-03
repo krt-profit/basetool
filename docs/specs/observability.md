@@ -2439,6 +2439,13 @@ and `exchange_installation_invalid`.
 status) and missions (a free-text `status` column, not a bounded enum, so it cannot back a
 bounded label). Bank amounts and per-user breakdowns are out of scope by rule.
 
+**The Android version policy's source** (REQ-API-020). `basetool_android_version_policy_override{field}`
+(gauge, backend) is `1` while the host's emergency override replaces that field's release default and
+`0` otherwise; `field` is one of `minimum_version_code`, `latest_version_code`, `releases_url`. It is
+registered once at startup with a constant value, like `basetool_tracing_enabled`, and backs
+`AndroidVersionPolicyOverrideActive` (an override in force for 24 hours: it no longer rides the
+release). A retired Android operation's answer counts as `basetool_http_error_total{code="APP_UPDATE_REQUIRED"}`.
+
 **Metrics move with the code.** Every change that adds, renames or removes one of these surfaces
 updates its metric in the same change — a new scheduled job without `TaskMetrics`, a new bounded
 status queue without a gauge, or a renamed metric that silently breaks a dashboard/alert is
