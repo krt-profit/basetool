@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.Quality;
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -164,11 +165,15 @@ public class JobOrderItemProductionService {
         dto.skippedMaterialIds() == null ? Set.of() : new HashSet<>(dto.skippedMaterialIds());
 
     Map<UUID, Double> demandByMaterial = new LinkedHashMap<>();
+    final Map<UUID, Integer> floorByMaterial = new LinkedHashMap<>();
     final Set<UUID> skippedRequiredMaterials = new LinkedHashSet<>();
     for (JobOrderItemMaterial req : line.getMaterials()) {
       Material material = req.getMaterial();
       if (material == null) {
         continue;
+      }
+      if (req.getQualityTier() != null) {
+        floorByMaterial.merge(material.getId(), req.getQualityTier().getMinQuality(), Math::max);
       }
       if (skippedMaterials.contains(material.getId())) {
         skippedRequiredMaterials.add(material.getId());
@@ -216,6 +221,10 @@ public class JobOrderItemProductionService {
           || !inventoryItem.getMaterial().getId().equals(c.materialId())) {
         throw new BadRequestException(
             "Consumed inventory entry does not hold the claimed material");
+      }
+      if (Quality.orMin(inventoryItem.getQuality())
+          < floorByMaterial.getOrDefault(c.materialId(), Quality.MIN)) {
+        throw new BadRequestException(JobOrderHandoverService.ERROR_QUALITY_BELOW_FLOOR);
       }
 
       double consumed = c.amount() == null ? 0.0 : c.amount();

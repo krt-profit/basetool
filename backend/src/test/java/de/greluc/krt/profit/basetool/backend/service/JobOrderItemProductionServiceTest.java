@@ -296,6 +296,48 @@ class JobOrderItemProductionServiceTest {
   }
 
   @Test
+  void bookProduction_consumedEntryBelowTheTiersFloor_throwsBadRequest_noWrites() {
+    line.getMaterials().iterator().next().setQualityTier(QualityTierFixtures.good());
+    inventoryItem.setQuality(649);
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(
+                new JobOrderItemProductionConsumptionDto(
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION)),
+            List.of(),
+            defaultBookIn());
+
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(JobOrderHandoverService.ERROR_QUALITY_BELOW_FLOOR);
+    assertThat(line.getManufacturedAmount()).isZero();
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).delete(any());
+  }
+
+  @Test
+  void bookProduction_consumedEntryAtTheTiersFloor_isAccepted() {
+    line.getMaterials().iterator().next().setQualityTier(QualityTierFixtures.good());
+    inventoryItem.setQuality(650);
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(
+                new JobOrderItemProductionConsumptionDto(
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION)),
+            List.of(),
+            defaultBookIn());
+
+    service.bookProduction(orderId, lineId, dto);
+
+    assertThat(line.getManufacturedAmount()).isEqualTo(1);
+    assertThat(inventoryItem.getAmount()).isEqualTo(60.0);
+  }
+
+  @Test
   void bookProduction_consumedEntryHasNoOrderSlice_throwsBadRequest() {
     inventoryItem.getJobOrderAllocations().clear();
     JobOrderItemProductionCreateDto dto =

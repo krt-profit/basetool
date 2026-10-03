@@ -864,7 +864,10 @@ public class JobOrderWriteController {
               .map(
                   item ->
                       new JobOrderHandoverItemCreateDto(
-                          item.getInventoryItemId(), item.getAmount(), item.getMissionReductions()))
+                          item.getInventoryItemId(),
+                          item.getAmount(),
+                          item.getMissionReductions(),
+                          item.getQualityRequirement()))
               .toList();
 
       if (items.isEmpty()) {
@@ -1046,7 +1049,10 @@ public class JobOrderWriteController {
             .map(
                 item ->
                     new JobOrderHandoverItemCreateDto(
-                        item.getInventoryItemId(), item.getAmount(), item.getMissionReductions()))
+                        item.getInventoryItemId(),
+                        item.getAmount(),
+                        item.getMissionReductions(),
+                        item.getQualityRequirement()))
             .toList();
     if (items.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();

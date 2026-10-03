@@ -356,6 +356,7 @@ subprojects {
     val mutationSettings = moduleBuildSettings()
     extensions.configure<info.solidsoft.gradle.pitest.PitestPluginExtension>("pitest") {
       junit5PluginVersion.set(libs.versions.pitestJunit5.get())
+      addJUnitPlatformLauncher.set(false)
       targetClasses.set(mutationSettings.mutationTargetClasses)
       targetTests.set(mutationSettings.mutationTargetTests)
       threads.set(4)
