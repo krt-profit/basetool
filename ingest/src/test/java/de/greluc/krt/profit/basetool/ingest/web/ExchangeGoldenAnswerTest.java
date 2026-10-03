@@ -292,6 +292,9 @@ class ExchangeGoldenAnswerTest {
     refusals.put("failed-org-demand-backend-error", get("/me/org-demand"));
     refusals.put("failed-locations-answer-breaks-schema", get("/catalog/locations"));
     refusals.put("refused-service-document-exchange-disabled", get(""));
+    refusals.put(
+        "refused-refinery-draft-no-orders",
+        post("/me/drafts/refinery-orders", fixture("refinery-draft/invalid/no-orders.json")));
     for (Map.Entry<String, Call> entry : refusals.entrySet()) {
       if (!matches(entry.getKey(), record(entry.getValue()))) {
         mismatched.add(entry.getKey());
@@ -371,7 +374,7 @@ class ExchangeGoldenAnswerTest {
         post("/me/drafts/blueprints", fixture("blueprint-draft/valid/corpus-slice.json")));
     routes.put(
         "route-post-refinery-draft",
-        post("/me/drafts/refinery-orders", fixture("refinery-draft/valid/minimal.json")));
+        post("/me/drafts/refinery-orders", fixture("refinery-draft/valid/one-order.json")));
     routes.put("route-get-openapi", get("/openapi.json"));
     routes.put("route-get-schema", get("/schemas/page.schema.json"));
     return routes;

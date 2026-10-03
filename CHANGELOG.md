@@ -17,6 +17,10 @@
 
 ### Changed
 
+- **Datenaustausch: ein Refinery-Entwurf verlangt laut Schema mindestens einen Auftrag.**
+  `refinery-draft.schema.json` setzt `minItems: 1` auf `orders`, wie das Backend es schon immer verlangt; eine
+  leere Liste lehnt jetzt das Gateway selbst mit `400 SCHEMA_INVALID` und `errors[]` ab statt des weitergereichten
+  Backend-Fehlers. Keine Vertragsänderung im Sinne von v2 (REQ-XCH-026).
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
   Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob
   dasselbe Material in derselben Qualität am selben Ort mit demselben Besitzer und derselben Einheit schon

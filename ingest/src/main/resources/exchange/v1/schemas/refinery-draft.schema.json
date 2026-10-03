@@ -25,7 +25,7 @@
         "$ref": "#/$defs/order"
       },
       "maxItems": 5,
-      "minItems": 0
+      "minItems": 1
     },
     "schemaVersion": {
       "type": "integer"
