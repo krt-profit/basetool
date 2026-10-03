@@ -237,6 +237,10 @@
   einen anderen Host als `app.backend-url` ab, bevor das Bearer-Token angehängt wird; ArchUnit hält die Clients im
   Backend-Kern (REQ-FE-029).
 
+- **Build: Jackson-3.2.1-Fehlalarm aus dem Abhängigkeitsgraphen entfernt.** Die Launcher-Suche des
+  PIT-Plugins löste die Testabhängigkeiten ohne Spring-Boot-BOM auf und meldete so Jackson 3.2.1
+  (Dependabot #40–#46); sie ist abgeschaltet. Ausgeliefert wird weiter das gepatchte Jackson 3.1.7 bzw. 2.21.7.
+
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 
 ### Added
