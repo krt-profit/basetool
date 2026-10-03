@@ -143,6 +143,11 @@
 
 ### Fixed
 
+- **Deploy: kein Fehlalarm mehr während einer Promotion.** Trifft ein Deploy-Tick das kurze Fenster, in dem
+  `promote.yml` die fünf `:stable`-Tags nacheinander verschiebt, wartet `deploy.sh` jetzt ab, statt
+  `DeployFailed` auszulösen. Erst ein Satz, der länger als `IRI_MIXED_RELEASE_GRACE` (900 s) gemischt bleibt, gilt
+  als Fehler.
+
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
   Seite jetzt schon oberhalb der Tab-Leiste, sodass eine verdeckte Einheit erreichbar wird; Loslassen über
   der Tab-Leiste bricht ab, statt die Zuweisung zu entfernen.

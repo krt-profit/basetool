@@ -37,6 +37,7 @@ COSIGN_OIDC_ISSUER="${IRI_COSIGN_OIDC_ISSUER:-https://token.actions.githubuserco
 COSIGN_VERIFY_ATTEMPTS="${IRI_COSIGN_VERIFY_ATTEMPTS:-3}"
 COSIGN_VERIFY_DELAY="${IRI_COSIGN_VERIFY_DELAY:-5}"
 REQUIRE_ONE_RELEASE="${IRI_REQUIRE_ONE_RELEASE:-true}"
+MIXED_RELEASE_GRACE="${IRI_MIXED_RELEASE_GRACE:-900}"
 COSIGN_SEARCH_PATH="${IRI_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosign/bin}"
 VERIFY_LAST_ERROR=""
 
@@ -126,6 +127,8 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_COSIGN_VERIFY_DELAY=5      (first retry delay in seconds, then doubling)
   IRI_REQUIRE_ONE_RELEASE=true   (refuse a target set whose images do not share one
                                   org.opencontainers.image.revision; false = break-glass)
+  IRI_MIXED_RELEASE_GRACE=900   (seconds a mixed target set is waited out as a
+                                  promotion in progress before it fails the deploy)
   DOCKER_CONFIG=/var/lib/iri/.docker   (the registry credential cosign reads
                                         and skopeo shares via
                                         REGISTRY_AUTH_FILE; under STATE_DIR
@@ -561,7 +564,7 @@ release_revision_problem() {
     revision="$(rt_image_revision "${ref}")" || revision=""
     if [[ -z "${revision}" ]]; then
       echo "${label} (${ref}) carries no readable org.opencontainers.image.revision label"
-      return 0
+      return 2
     fi
     log "  ${label}: built from ${revision}" >&2
     if [[ -z "${first_revision}" ]]; then
@@ -569,10 +572,23 @@ release_revision_problem() {
       first_revision="${revision}"
     elif [[ "${revision}" != "${first_revision}" ]]; then
       echo "${label} is built from ${revision} but ${first_label} from ${first_revision}"
-      return 0
+      return 1
     fi
   done
   return 0
+}
+
+mixed_release_waited_seconds() {
+  local now since=""
+  now="$(date +%s)"
+  if [[ -f "${MIXED_RELEASE_FILE}" ]]; then
+    read -r since _ < "${MIXED_RELEASE_FILE}" || true
+  fi
+  if ! [[ "${since}" =~ ^[0-9]+$ ]] || (( 10#${since} > now )); then
+    since="${now}"
+    printf '%d\n' "${since}" > "${MIXED_RELEASE_FILE}"
+  fi
+  echo $(( now - 10#${since} ))
 }
 
 assert_one_release_or_die() {
@@ -580,13 +596,24 @@ assert_one_release_or_die() {
     log "WARNING: release-revision gate DISABLED (IRI_REQUIRE_ONE_RELEASE=false) — NOT comparing the images' source revisions"
     return 0
   fi
-  local problem
-  problem="$(release_revision_problem)"
-  if [[ -n "${problem}" ]]; then
-    write_deploy_metric failure
-    fail "the ${TARGET_TAG} set is not one release: ${problem} — a promotion is probably still in progress or was interrupted; refusing to deploy a mixed release, the next tick retries (IRI_REQUIRE_ONE_RELEASE=false is the break-glass)"
+  local problem rc=0 waited
+  problem="$(release_revision_problem)" || rc=$?
+  if [[ "${rc}" -eq 0 ]]; then
+    rm -f "${MIXED_RELEASE_FILE}"
+    log "release revision: all target images share one source revision"
+    return 0
   fi
-  log "release revision: all target images share one source revision"
+  if [[ "${rc}" -ne 1 ]]; then
+    write_deploy_metric failure
+    fail "the ${TARGET_TAG} set cannot be shown to be one release: ${problem} — refusing to deploy, the next tick retries (IRI_REQUIRE_ONE_RELEASE=false is the break-glass)"
+  fi
+  waited="$(mixed_release_waited_seconds)"
+  if (( waited < MIXED_RELEASE_GRACE )); then
+    log "the ${TARGET_TAG} set is not one release yet: ${problem} — a promotion is probably in progress; waiting for it to finish (${waited}s/${MIXED_RELEASE_GRACE}s), nothing applied, the next tick retries"
+    exit 0
+  fi
+  write_deploy_metric failure
+  fail "the ${TARGET_TAG} set has not been one release for ${waited}s: ${problem} — a promotion was probably interrupted; refusing to deploy a mixed release, re-run promote.yml for one version to finish it (IRI_REQUIRE_ONE_RELEASE=false is the break-glass)"
 }
 
 check_only_verify_one() {
@@ -676,6 +703,7 @@ KEYCLOAK_SPI_JAR="${COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
 KEYCLOAK_SPI_STAGE_JAR="${STATE_DIR}/keycloak-spi-stage.jar"
 KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
 HEALTH_RESTART_FILE="${STATE_DIR}/health-restart.digests"
+MIXED_RELEASE_FILE="${STATE_DIR}/mixed-release.since"
 
 TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
 DEPLOY_METRIC_FILE="${TEXTFILE_DIR}/deploy.prom"
@@ -1160,7 +1188,7 @@ if [[ "${CHECK_ONLY}" == "true" ]]; then
     check_only_verify_one "keycloak-spi" "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}" || co_rc=1
   fi
   if [[ "${co_rc}" -eq 0 && "${REAPPLY_REQUESTED}" != "true" && "${REQUIRE_ONE_RELEASE}" == "true" ]]; then
-    rev_problem="$(release_revision_problem)"
+    rev_problem="$(release_revision_problem)" || true
     if [[ -n "${rev_problem}" ]]; then
       log "check-only: the ${TARGET_TAG} set is not one release: ${rev_problem}"
       co_rc=1
