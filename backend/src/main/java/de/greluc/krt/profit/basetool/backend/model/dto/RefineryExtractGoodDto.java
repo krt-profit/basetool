@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -42,7 +43,7 @@ import jakarta.validation.constraints.Size;
 public record RefineryExtractGoodDto(
     @PositiveOrZero Integer rowIndex,
     @NotNull @Size(max = 255) String rawMaterialName,
-    Integer quality,
+    @QualityValue Integer quality,
     @NotNull @PositiveOrZero Integer inputQuantity,
     @PositiveOrZero Integer outputQuantity,
     @NotNull Boolean refine,

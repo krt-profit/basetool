@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
@@ -35,5 +36,5 @@ public record RefineryGoodDto(
     @NotNull @Min(1) Integer inputQuantity,
     MaterialDto outputMaterial,
     @NotNull @Min(1) Integer outputQuantity,
-    Integer quality,
+    @QualityValue Integer quality,
     Integer yieldBonusPercent) {}

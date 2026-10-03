@@ -29,12 +29,14 @@ import java.util.UUID;
  * @param id the requirement row id
  * @param material the required material (carries {@code quantityType} for unit-aware display)
  * @param requiredQuantity the amount needed for the line
- * @param qualityRequirement the quality bucket name ({@code GOOD} or {@code NONE})
+ * @param qualityRequirement the code of the bucket's quality tier
+ * @param qualityTier the bucket's quality tier, with its labels and floor
  * @param version optimistic-lock version
  */
 public record JobOrderItemMaterialDto(
     UUID id,
     MaterialDto material,
     Double requiredQuantity,
-    @BackendEnumAsString String qualityRequirement,
+    String qualityRequirement,
+    QualityTierDto qualityTier,
     Long version) {}

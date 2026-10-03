@@ -28,13 +28,13 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.repository.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.ArrayList;
@@ -91,6 +91,7 @@ class MaterialClaimConcurrencyTest {
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private TransactionTemplate transactionTemplate;
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -247,7 +248,7 @@ class MaterialClaimConcurrencyTest {
           order.addMaterial(
               JobOrderMaterial.builder()
                   .material(mat)
-                  .minQuality(700)
+                  .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
                   .amount(REQUIRED_AMOUNT)
                   .build());
           order = jobOrderRepository.save(order);
@@ -348,8 +349,7 @@ class MaterialClaimConcurrencyTest {
    * @return the create-claim payload
    */
   private CreateClaimDto claim(double amount) {
-    return new CreateClaimDto(
-        fixture.materialId(), QualityRequirement.GOOD, fixture.squadronId(), amount);
+    return new CreateClaimDto(fixture.materialId(), "GOOD", fixture.squadronId(), amount);
   }
 
   /**
@@ -360,7 +360,7 @@ class MaterialClaimConcurrencyTest {
    * @return the create-claim payload
    */
   private CreateClaimDto claimFor(UUID squadronId, double amount) {
-    return new CreateClaimDto(fixture.materialId(), QualityRequirement.GOOD, squadronId, amount);
+    return new CreateClaimDto(fixture.materialId(), "GOOD", squadronId, amount);
   }
 
   /**
@@ -406,7 +406,7 @@ class MaterialClaimConcurrencyTest {
           order.addMaterial(
               JobOrderMaterial.builder()
                   .material(mat)
-                  .minQuality(700)
+                  .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
                   .amount(REQUIRED_AMOUNT)
                   .build());
           order = jobOrderRepository.save(order);

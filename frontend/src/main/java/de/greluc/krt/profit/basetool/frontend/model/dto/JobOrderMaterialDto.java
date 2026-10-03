@@ -28,7 +28,8 @@ import java.util.UUID;
  *
  * @param id material-line primary key
  * @param material the required material (carries {@code quantityType} for unit-aware display)
- * @param minQuality the minimum acceptable quality (650) or {@code null} for "Keine"
+ * @param minQuality the floor of the line's quality tier, or {@code null} for the base tier
+ * @param qualityTier the line's quality tier, with its labels and floor
  * @param amount the required amount
  * @param currentStock the summed linked-inventory stock
  * @param claims the per-squadron claims on this bucket (empty for non-SK orders)
@@ -39,6 +40,7 @@ public record JobOrderMaterialDto(
     UUID id,
     MaterialDto material,
     Integer minQuality,
+    QualityTierDto qualityTier,
     Double amount,
     Double currentStock,
     List<ClaimDto> claims,

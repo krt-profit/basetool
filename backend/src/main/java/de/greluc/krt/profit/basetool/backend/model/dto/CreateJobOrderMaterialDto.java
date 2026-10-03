@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import de.greluc.krt.profit.basetool.backend.validation.QuantityAware;
 import de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -32,18 +32,17 @@ import org.jetbrains.annotations.Nullable;
  * One material line of a material job order create / update payload.
  *
  * <p>The amount is validated like an inventory book-in: {@code > 0}, whole for {@code PIECE}, SCU
- * rounded to three decimals at persistence.
+ * rounded to three decimals at persistence. The line's quality tier is the one whose floor equals
+ * {@code minQuality}, or the base tier when it is {@code null} (REQ-ORDERS-036).
  */
 @ValidQuantityAmount
 public record CreateJobOrderMaterialDto(
     @NotNull UUID materialId,
     @Nullable
-        @Min(650)
-        @Max(650)
+        @QualityValue
         @Schema(
             description =
-                "Minimale Qualität: 650 (vorgegeben) oder null für \"Keine\" (keine"
-                    + " Mindestqualität).",
+                "Mindestqualität einer Qualitätsstufe; null für die Stufe ohne Mindestqualität.",
             example = "650")
         Integer minQuality,
     @NotNull @Max(100_000) Double amount)

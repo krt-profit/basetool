@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -42,7 +40,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * A squadron's claim ("Eintragung") for part of one material bucket {@code (jobOrder, material,
- * qualityRequirement)} on a public Spezialkommando job order.
+ * qualityTier)} on a public Spezialkommando job order.
  *
  * <p>One claim per bucket and claiming org unit. Claims are signal-only and never move inventory;
  * they form an independent aggregate, so changing one never bumps the order's {@code @Version}.
@@ -72,14 +70,10 @@ public class MaterialClaim extends AbstractEntity<UUID> {
   @JoinColumn(name = "material_id", nullable = false)
   private Material material;
 
-  /**
-   * The quality bucket this claim falls into — {@code GOOD} (650+) or {@code NONE} (no floor) —
-   * matching the {@code aggregateMaterials()} bucket scheme so a material required in both
-   * qualities is claimed separately per quality.
-   */
-  @Enumerated(EnumType.STRING)
-  @Column(name = "quality_requirement", nullable = false, length = 8)
-  private QualityRequirement qualityRequirement;
+  /** The quality tier of the claimed bucket; a material required at two tiers is two buckets. */
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
+  @JoinColumn(name = "quality_tier_id", nullable = false)
+  private QualityTier qualityTier;
 
   /**
    * The squadron making the claim. Always an {@code OrgUnit} of kind {@code SQUADRON} (validated at
@@ -131,8 +125,8 @@ public class MaterialClaim extends AbstractEntity<UUID> {
         + (jobOrder != null ? jobOrder.getId() : null)
         + ", materialId="
         + (material != null ? material.getId() : null)
-        + ", qualityRequirement="
-        + qualityRequirement
+        + ", qualityTierId="
+        + (qualityTier != null ? qualityTier.getId() : null)
         + ", claimingOrgUnitId="
         + (claimingOrgUnit != null ? claimingOrgUnit.getId() : null)
         + ", amount="

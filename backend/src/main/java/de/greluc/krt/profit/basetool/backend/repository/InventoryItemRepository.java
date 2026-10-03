@@ -862,23 +862,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderId") UUID jobOrderId, @Param("gameItemId") UUID gameItemId);
 
   /**
-   * Sums the amounts of one material allocated to one job order from entries meeting the quality
-   * floor, or {@code 0.0} when none; a {@code null} minQuality applies no floor (REQ-INV-027).
-   */
-  @Query(
-      """
-      SELECT COALESCE(SUM(a.amount), 0.0) FROM InventoryJobOrderAllocation a
-      WHERE a.inventoryItem.material.id = :materialId AND a.jobOrder.id = :jobOrderId
-      AND (:minQuality IS NULL OR a.inventoryItem.quality >= :minQuality)
-      """)
-  Double sumAmountByMaterialAndJobOrderAndMinQuality(
-      @Param("materialId") UUID materialId,
-      @Param("jobOrderId") UUID jobOrderId,
-      @Param("minQuality") Integer minQuality);
-
-  /**
-   * Returns every material allocation of the given job orders as one row each (material, quality,
-   * amount), in a single query (REQ-DATA-003).
+   * Returns every material allocation of the given job orders as one row each (row, material,
+   * quality, amount), in a single query (REQ-DATA-003).
    *
    * @param jobOrderIds the orders whose linked stock to project; an empty collection yields an
    *     empty list.
@@ -887,7 +872,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(a.jobOrder.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(a.jobOrder.id, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
       FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id IN :jobOrderIds
       AND a.inventoryItem.material IS NOT NULL
       """)

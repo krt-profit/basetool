@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="floorOptions(tiers, selected)">
+    <option th:each="t : ${tiers}"
+            th:if="${t.active() or (selected == null ? t.minQuality() == 0 : selected == t.minQuality())}"
+            th:value="${t.minQuality() == 0 ? '' : t.minQuality()}"
+            th:text="${t.label(#locale)}"
+            th:data-quality-code="${t.code()}">Keine</option>
+</th:block>
+<th:block th:fragment="floorOptionsSelected(tiers, selected)">
+    <option th:each="t : ${tiers}"
+            th:if="${t.active() or (selected == null ? t.minQuality() == 0 : selected == t.minQuality())}"
+            th:value="${t.minQuality() == 0 ? '' : t.minQuality()}"
+            th:text="${t.label(#locale)}"
+            th:selected="${selected == null ? t.minQuality() == 0 : selected == t.minQuality()}"
+            th:data-quality-code="${t.code()}">Keine</option>
+</th:block>
+<th:block th:fragment="codeOptions(tiers)">
+    <option th:each="t : ${tiers}"
+            th:value="${t.code()}"
+            th:text="${t.label(#locale)}"
+            th:data-inactive="${t.active() ? null : 'true'}">Keine</option>
+</th:block>
+<span th:fragment="badge(tier)"
+      th:class="${tier != null and tier.hasFloor() ? 'quality-badge quality-good' : 'quality-badge quality-none'}"
+      th:text="${tier != null ? tier.label(#locale) : #messages.msg('orders.detail.quality.none')}">Keine</span>
+</body>
+</html>

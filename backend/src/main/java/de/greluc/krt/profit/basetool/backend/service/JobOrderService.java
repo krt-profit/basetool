@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto;
@@ -51,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +96,7 @@ public class JobOrderService {
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderPriorityService jobOrderPriorityService;
+  private final QualityTierService qualityTierService;
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
@@ -123,20 +126,8 @@ public class JobOrderService {
             .requestingOrgUnit(requesting)
             .build();
 
-    for (CreateJobOrderMaterialDto matDto : createDto.materials()) {
-      Material material =
-          Entities.require(
-              materialRepository.findById(matDto.materialId()),
-              () -> "Material not found: " + matDto.materialId());
-
-      JobOrderMaterial jobOrderMaterial =
-          JobOrderMaterial.builder()
-              .material(material)
-              .minQuality(matDto.minQuality())
-              .amount(matDto.amount())
-              .build();
-
-      jobOrder.addMaterial(jobOrderMaterial);
+    for (JobOrderMaterial line : buildMaterialLines(createDto.materials(), Set.of())) {
+      jobOrder.addMaterial(line);
     }
 
     jobOrder = jobOrderRepository.save(jobOrder);
@@ -439,18 +430,14 @@ public class JobOrderService {
       }
     }
 
+    Set<UUID> keptTierIds = new LinkedHashSet<>();
+    for (JobOrderMaterial mat : managed.getMaterials()) {
+      keptTierIds.add(mat.getQualityTier().getId());
+    }
+    List<JobOrderMaterial> lines = buildMaterialLines(materials, keptTierIds);
     managed.getMaterials().clear();
-    for (CreateJobOrderMaterialDto matDto : materials) {
-      Material material =
-          Entities.require(
-              materialRepository.findById(matDto.materialId()),
-              () -> "Material not found: " + matDto.materialId());
-      managed.addMaterial(
-          JobOrderMaterial.builder()
-              .material(material)
-              .minQuality(matDto.minQuality())
-              .amount(matDto.amount())
-              .build());
+    for (JobOrderMaterial line : lines) {
+      managed.addMaterial(line);
     }
     jobOrderRepository.saveAndFlush(managed);
 
@@ -464,6 +451,46 @@ public class JobOrderService {
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(refreshed);
     return new MaterialReplaceOutcome(
         refreshed, removedMaterialIds.size(), orphanedClaimsWithdrawn);
+  }
+
+  /**
+   * Builds the material lines of a {@code MATERIAL} order, resolving each line's quality tier and
+   * merging lines that name the same material at the same tier into one (REQ-ORDERS-036).
+   *
+   * @param materials the payload lines
+   * @param keptTierIds tiers the order already used, which stay allowed when inactive
+   * @return one detached line per {@code (material, tier)}, in payload order
+   * @throws NotFoundException when a material does not exist
+   * @throws BadRequestException when a tier is unknown, or inactive and not kept
+   */
+  @NotNull
+  private List<JobOrderMaterial> buildMaterialLines(
+      @NotNull List<CreateJobOrderMaterialDto> materials, @NotNull Set<UUID> keptTierIds) {
+    record LineKey(UUID materialId, UUID tierId) {}
+
+    Map<LineKey, JobOrderMaterial> lines = new LinkedHashMap<>();
+    for (CreateJobOrderMaterialDto matDto : materials) {
+      Material material =
+          Entities.require(
+              materialRepository.findById(matDto.materialId()),
+              () -> "Material not found: " + matDto.materialId());
+      QualityTier tier =
+          qualityTierService.resolveForRequirement(null, matDto.minQuality(), keptTierIds);
+      LineKey key = new LineKey(material.getId(), tier.getId());
+      JobOrderMaterial existing = lines.get(key);
+      if (existing == null) {
+        lines.put(
+            key,
+            JobOrderMaterial.builder()
+                .material(material)
+                .qualityTier(tier)
+                .amount(matDto.amount())
+                .build());
+      } else {
+        existing.setAmount(existing.getAmount() + matDto.amount());
+      }
+    }
+    return new ArrayList<>(lines.values());
   }
 
   /**

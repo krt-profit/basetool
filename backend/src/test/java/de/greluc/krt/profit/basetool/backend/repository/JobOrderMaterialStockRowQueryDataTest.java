@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -44,8 +45,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Verifies {@link InventoryItemRepository#findMaterialStockRowsByJobOrderIds} against PostgreSQL:
- * the projection binds correctly, returns only allocated rows, and summing at a quality floor
- * matches the per-bucket native aggregate (REQ-DATA-003). Each test rolls back.
+ * the projection binds correctly, returns only allocated rows with their inventory row id, and
+ * summing at a quality floor yields the order's linked stock per bucket (REQ-DATA-003). Each test
+ * rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -63,12 +65,12 @@ class JobOrderMaterialStockRowQueryDataTest {
 
   /**
    * Seeds one order with three linked inventory rows at mixed quality grades plus one unlinked row,
-   * then asserts the batched projection returns exactly the three linked rows (carrying the right
-   * material/quality/amount) and that an in-memory floor sum over them equals the native per-bucket
-   * {@code SUM} at three representative floors (no floor, mid floor, above-all floor).
+   * then asserts the batched projection returns exactly the three linked rows, each carrying its
+   * inventory row id, material, quality and allocated amount, and that a floor sum over them gives
+   * the linked stock at three representative floors (no floor, mid floor, above-all floor).
    */
   @Test
-  void findMaterialStockRowsByJobOrderIds_returnsOnlyLinkedRowsAndMatchesNativeSumAtEachFloor() {
+  void findMaterialStockRowsByJobOrderIds_returnsOnlyLinkedRowsWithTheirIdsAndSumsAtEachFloor() {
     OrgUnit iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
 
     JobOrder order =
@@ -94,9 +96,9 @@ class JobOrderMaterialStockRowQueryDataTest {
     material.setType(MaterialType.RAW);
     materialRepository.save(material);
 
-    saveLinkedItem(user, location, material, iridium, order, 300, 10.0);
-    saveLinkedItem(user, location, material, iridium, order, 600, 20.0);
-    saveLinkedItem(user, location, material, iridium, order, 900, 5.0);
+    InventoryItem low = saveLinkedItem(user, location, material, iridium, order, 300, 10.0);
+    InventoryItem mid = saveLinkedItem(user, location, material, iridium, order, 600, 20.0);
+    InventoryItem high = saveLinkedItem(user, location, material, iridium, order, 900, 5.0);
     InventoryItem unlinked = new InventoryItem();
     unlinked.setUser(user);
     unlinked.setLocation(location);
@@ -120,22 +122,35 @@ class JobOrderMaterialStockRowQueryDataTest {
               assertThat(r.materialId()).isEqualTo(material.getId());
             });
     assertThat(rows)
-        .extracting(JobOrderMaterialStockRow::amount)
-        .containsExactlyInAnyOrder(10.0, 20.0, 5.0);
+        .extracting(
+            JobOrderMaterialStockRow::inventoryItemId,
+            JobOrderMaterialStockRow::quality,
+            JobOrderMaterialStockRow::amount)
+        .containsExactlyInAnyOrder(
+            tuple(low.getId(), 300, 10.0),
+            tuple(mid.getId(), 600, 20.0),
+            tuple(high.getId(), 900, 5.0));
+    assertThat(rows)
+        .extracting(JobOrderMaterialStockRow::inventoryItemId)
+        .doesNotContain(unlinked.getId());
 
-    for (Integer floor : new Integer[] {null, 600, 1000}) {
-      double inMemorySum =
-          rows.stream()
-              .filter(r -> floor == null || (r.quality() != null && r.quality() >= floor))
-              .mapToDouble(JobOrderMaterialStockRow::amount)
-              .sum();
-      double nativeSum =
-          inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-              material.getId(), order.getId(), floor);
-      assertThat(inMemorySum)
-          .as("in-memory floor sum must equal the native per-bucket SUM at floor %s", floor)
-          .isEqualTo(nativeSum);
-    }
+    assertThat(sumAtFloor(rows, null)).isEqualTo(35.0);
+    assertThat(sumAtFloor(rows, 600)).isEqualTo(25.0);
+    assertThat(sumAtFloor(rows, 1000)).isZero();
+  }
+
+  /**
+   * Sums the projected amounts whose quality reaches the floor.
+   *
+   * @param rows the projected stock rows
+   * @param floor the minimum quality, or {@code null} for every row
+   * @return the summed amount
+   */
+  private static double sumAtFloor(List<JobOrderMaterialStockRow> rows, Integer floor) {
+    return rows.stream()
+        .filter(r -> floor == null || (r.quality() != null && r.quality() >= floor))
+        .mapToDouble(JobOrderMaterialStockRow::amount)
+        .sum();
   }
 
   /**
@@ -148,8 +163,9 @@ class JobOrderMaterialStockRowQueryDataTest {
    * @param order the job order the row is linked to.
    * @param quality the quality grade (NOT NULL column).
    * @param amount the stocked amount in SCU (NOT NULL column).
+   * @return the saved inventory item.
    */
-  private void saveLinkedItem(
+  private InventoryItem saveLinkedItem(
       User user,
       Location location,
       Material material,
@@ -166,6 +182,6 @@ class JobOrderMaterialStockRowQueryDataTest {
     inv.setPersonal(false);
     inv.setOwningOrgUnit(owner);
     InventoryAllocations.addJobOrder(inv, order, amount, false);
-    inventoryItemRepository.save(inv);
+    return inventoryItemRepository.save(inv);
   }
 }

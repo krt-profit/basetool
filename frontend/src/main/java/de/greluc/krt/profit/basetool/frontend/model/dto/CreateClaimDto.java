@@ -27,12 +27,9 @@ import java.util.UUID;
  * re-posting updates its amount.
  *
  * @param materialId the material being claimed
- * @param qualityRequirement the quality bucket name ({@code GOOD} or {@code NONE})
+ * @param qualityRequirement the code of the bucket's quality tier
  * @param claimingOrgUnitId the squadron making the claim
  * @param amount the claimed partial quantity (strictly positive)
  */
 public record CreateClaimDto(
-    UUID materialId,
-    @BackendEnumAsString String qualityRequirement,
-    UUID claimingOrgUnitId,
-    Double amount) {}
+    UUID materialId, String qualityRequirement, UUID claimingOrgUnitId, Double amount) {}

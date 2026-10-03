@@ -56,6 +56,8 @@ public enum CacheDomain {
   MANUFACTURER("manufacturerCatalogue", Duration.ofHours(6)),
   /** Orderable-item reference catalogue. */
   ITEM_CATALOG("itemCatalogue", Duration.ofHours(6)),
+  /** The quality-tier catalogue the order pages label and pick tiers from (REQ-ORDERS-036). */
+  QUALITY_TIER("qualityTierCatalogue", Duration.ofHours(1)),
   /** Global system settings surfaced on the orders pages (job-order age thresholds). */
   SETTINGS("settingsCatalogue", Duration.ofHours(2));
 

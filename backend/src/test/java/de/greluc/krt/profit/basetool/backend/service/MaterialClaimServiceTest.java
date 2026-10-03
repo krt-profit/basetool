@@ -35,6 +35,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapperImpl;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -46,7 +48,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
@@ -56,6 +58,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -68,6 +71,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -89,6 +93,7 @@ class MaterialClaimServiceTest {
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private MaterialMapper materialMapper;
   @Mock private SquadronMapper squadronMapper;
+  @Spy private QualityTierMapper qualityTierMapper = new QualityTierMapperImpl();
 
   @Mock private AuditService auditService;
 
@@ -107,6 +112,8 @@ class MaterialClaimServiceTest {
   private static final UUID SK_ID = UUID.randomUUID();
   private static final UUID SQUADRON_A = UUID.randomUUID();
   private static final UUID SQUADRON_B = UUID.randomUUID();
+  private static final QualityTier GOOD = QualityTierFixtures.good();
+  private static final QualityTier NONE = QualityTierFixtures.none();
 
   private Material material;
   private SpecialCommand responsibleSk;
@@ -139,19 +146,18 @@ class MaterialClaimServiceTest {
 
     @Test
     void materialOrder_computesRequiredClaimedOpenRemaining() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
           .thenReturn(
-              List.of(
-                  claim(order, QualityRequirement.GOOD, squadronA, 3.0),
-                  claim(order, QualityRequirement.GOOD, squadronB, 2.0)));
+              List.of(claim(order, GOOD, squadronA, 3.0), claim(order, GOOD, squadronB, 2.0)));
 
       List<ClaimBucketDto> buckets = service.getClaimBuckets(ORDER_ID);
 
       assertEquals(1, buckets.size());
       ClaimBucketDto bucket = buckets.get(0);
-      assertEquals(QualityRequirement.GOOD, bucket.qualityRequirement());
+      assertEquals("GOOD", bucket.qualityRequirement());
+      assertEquals(QualityTierFixtures.GOOD_ID, bucket.qualityTier().id());
       assertEquals(10.0, bucket.requiredAmount());
       assertEquals(5.0, bucket.claimedAmount());
       assertEquals(5.0, bucket.openRemaining());
@@ -168,9 +174,7 @@ class MaterialClaimServiceTest {
       JobOrderItem item = new JobOrderItem();
       item.setMaterials(
           new HashSet<>(
-              Set.of(
-                  itemMaterial(material, QualityRequirement.GOOD, 4.0),
-                  itemMaterial(material, QualityRequirement.GOOD, 6.0))));
+              Set.of(itemMaterial(material, GOOD, 4.0), itemMaterial(material, GOOD, 6.0))));
       order.setItems(new HashSet<>(Set.of(item)));
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
@@ -202,7 +206,7 @@ class MaterialClaimServiceTest {
 
     @Test
     void nonSkOrder_rejected() {
-      JobOrder order = materialOrder(squadronA, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(squadronA, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
 
       assertThrows(
@@ -212,7 +216,7 @@ class MaterialClaimServiceTest {
 
     @Test
     void terminalOrder_rejected() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.COMPLETED, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.COMPLETED, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
 
       assertThrows(
@@ -222,24 +226,59 @@ class MaterialClaimServiceTest {
 
     @Test
     void unknownBucket_rejected() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
 
-      CreateClaimDto dto =
-          new CreateClaimDto(MATERIAL_ID, QualityRequirement.NONE, SQUADRON_A, 5.0);
+      CreateClaimDto dto = new CreateClaimDto(UUID.randomUUID(), "GOOD", SQUADRON_A, 5.0);
       assertThrows(BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto));
       verify(materialClaimRepository, never()).save(any());
     }
 
     @Test
-    void overclaim_rejected() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+    void tierCodeNotUsedByOrder_rejected() {
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
-          .thenReturn(List.of(claim(order, QualityRequirement.GOOD, squadronB, 8.0)));
+
+      CreateClaimDto dto = new CreateClaimDto(MATERIAL_ID, "NONE", SQUADRON_A, 5.0);
+      assertThrows(BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto));
+      verify(jobOrderRepository, never()).lockForClaimUpsert(any());
+      verify(materialClaimRepository, never()).save(any());
+    }
+
+    @Test
+    void lowerCaseTierCode_resolvesToGoodBucket() {
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      adminCaller();
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
+          .thenReturn(List.of());
+      when(materialClaimRepository
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
+          .thenReturn(Optional.empty());
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+      when(materialClaimRepository.save(any(MaterialClaim.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.upsertClaim(ORDER_ID, new CreateClaimDto(MATERIAL_ID, "good", SQUADRON_A, 4.0));
+
+      ArgumentCaptor<MaterialClaim> saved = ArgumentCaptor.forClass(MaterialClaim.class);
+      verify(materialClaimRepository).save(saved.capture());
+      assertEquals(QualityTierFixtures.GOOD_ID, saved.getValue().getQualityTier().getId());
+    }
+
+    @Test
+    void overclaim_rejected() {
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      adminCaller();
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
+          .thenReturn(List.of(claim(order, GOOD, squadronB, 8.0)));
 
       assertThrows(
           BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 5.0)));
@@ -248,15 +287,15 @@ class MaterialClaimServiceTest {
 
     @Test
     void exactlyFillingRemaining_isAccepted() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
-          .thenReturn(List.of(claim(order, QualityRequirement.GOOD, squadronB, 8.0)));
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
+          .thenReturn(List.of(claim(order, GOOD, squadronB, 8.0)));
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
@@ -270,15 +309,15 @@ class MaterialClaimServiceTest {
 
     @Test
     void nonProfitEligibleSquadron_rejected() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       Squadron nonProfit = new Squadron();
       nonProfit.setId(SQUADRON_A);
@@ -292,16 +331,16 @@ class MaterialClaimServiceTest {
 
     @Test
     void editOwnClaimUpwardExcludesOwnAmountFromCeiling() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
-      MaterialClaim ownExisting = claim(order, QualityRequirement.GOOD, squadronA, 8.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      MaterialClaim ownExisting = claim(order, GOOD, squadronA, 8.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of(ownExisting));
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.of(ownExisting));
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
@@ -328,15 +367,15 @@ class MaterialClaimServiceTest {
 
     @Test
     void noExistingClaim_inserts() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
@@ -351,16 +390,16 @@ class MaterialClaimServiceTest {
 
     @Test
     void existingClaim_updatesAmountInPlace() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
-      MaterialClaim existing = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      MaterialClaim existing = claim(order, GOOD, squadronA, 3.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of(existing));
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.of(existing));
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
@@ -384,15 +423,15 @@ class MaterialClaimServiceTest {
 
     @Test
     void insert_recordsUpsertEvent_withModeCreated() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
@@ -418,17 +457,17 @@ class MaterialClaimServiceTest {
 
     @Test
     void update_recordsUpsertEvent_withModeUpdated() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
-      MaterialClaim existing = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      MaterialClaim existing = claim(order, GOOD, squadronA, 3.0);
       existing.setId(UUID.randomUUID());
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of(existing));
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.of(existing));
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
@@ -460,7 +499,7 @@ class MaterialClaimServiceTest {
 
     @Test
     void neitherOwnSquadronNorSkAuthority_forbidden() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
       when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
@@ -474,17 +513,17 @@ class MaterialClaimServiceTest {
 
     @Test
     void ownSquadronLogistician_allowed() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
       when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
       when(authHelperService.canEditOrgUnit(SQUADRON_A)).thenReturn(true);
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
@@ -498,16 +537,16 @@ class MaterialClaimServiceTest {
 
     @Test
     void responsibleSkLogisticianOrLead_mayManageForeignSquadronClaim() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
       when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(true);
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
+              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());
       when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
@@ -586,10 +625,10 @@ class MaterialClaimServiceTest {
 
     @Test
     void withdrawClaim_foreignOrder_throwsNotFound() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       JobOrder otherOrder = new JobOrder();
       otherOrder.setId(UUID.randomUUID());
-      MaterialClaim claim = claim(otherOrder, QualityRequirement.GOOD, squadronA, 3.0);
+      MaterialClaim claim = claim(otherOrder, GOOD, squadronA, 3.0);
       UUID claimId = UUID.randomUUID();
       claim.setId(claimId);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
@@ -601,8 +640,8 @@ class MaterialClaimServiceTest {
 
     @Test
     void withdrawClaim_happyPath_deletes() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
-      MaterialClaim claim = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      MaterialClaim claim = claim(order, GOOD, squadronA, 3.0);
       UUID claimId = UUID.randomUUID();
       claim.setId(claimId);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
@@ -616,8 +655,8 @@ class MaterialClaimServiceTest {
 
     @Test
     void withdrawClaim_recordsWithdrawnAuditEvent() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
-      MaterialClaim claim = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      MaterialClaim claim = claim(order, GOOD, squadronA, 3.0);
       UUID claimId = UUID.randomUUID();
       claim.setId(claimId);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
@@ -643,11 +682,9 @@ class MaterialClaimServiceTest {
 
     @Test
     void withdrawAllForOrder_deletesEveryClaim() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       List<MaterialClaim> claims =
-          List.of(
-              claim(order, QualityRequirement.GOOD, squadronA, 3.0),
-              claim(order, QualityRequirement.GOOD, squadronB, 2.0));
+          List.of(claim(order, GOOD, squadronA, 3.0), claim(order, GOOD, squadronB, 2.0));
       when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
           .thenReturn(claims);
 
@@ -658,9 +695,9 @@ class MaterialClaimServiceTest {
 
     @Test
     void withdrawOrphanedClaims_deletesOnlyClaimsWhoseBucketIsGone() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
-      MaterialClaim live = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
-      MaterialClaim orphan = claim(order, QualityRequirement.NONE, squadronB, 2.0);
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
+      MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
       when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
           .thenReturn(List.of(live, orphan));
 
@@ -677,11 +714,10 @@ class MaterialClaimServiceTest {
       order.setResponsibleOrgUnit(responsibleSk);
       order.setStatus(JobOrderStatus.OPEN);
       JobOrderItem item = new JobOrderItem();
-      item.setMaterials(
-          new HashSet<>(Set.of(itemMaterial(material, QualityRequirement.GOOD, 10.0))));
+      item.setMaterials(new HashSet<>(Set.of(itemMaterial(material, GOOD, 10.0))));
       order.setItems(new HashSet<>(Set.of(item)));
-      MaterialClaim live = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
-      MaterialClaim orphan = claim(order, QualityRequirement.NONE, squadronB, 2.0);
+      MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
+      MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
       when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
           .thenReturn(List.of(live, orphan));
 
@@ -696,11 +732,11 @@ class MaterialClaimServiceTest {
   }
 
   private CreateClaimDto dto(UUID claimingOrgUnitId, double amount) {
-    return new CreateClaimDto(MATERIAL_ID, QualityRequirement.GOOD, claimingOrgUnitId, amount);
+    return new CreateClaimDto(MATERIAL_ID, "GOOD", claimingOrgUnitId, amount);
   }
 
   private JobOrder materialOrder(
-      OrgUnit responsible, JobOrderStatus status, Integer minQuality, double amount) {
+      OrgUnit responsible, JobOrderStatus status, QualityTier tier, double amount) {
     JobOrder order = new JobOrder();
     order.setId(ORDER_ID);
     order.setType(JobOrderType.MATERIAL);
@@ -708,27 +744,27 @@ class MaterialClaimServiceTest {
     order.setStatus(status);
     JobOrderMaterial jm = new JobOrderMaterial();
     jm.setMaterial(material);
-    jm.setMinQuality(minQuality);
+    jm.setQualityTier(tier);
     jm.setAmount(amount);
     order.setMaterials(new HashSet<>(Set.of(jm)));
     return order;
   }
 
   private JobOrderItemMaterial itemMaterial(
-      Material mat, QualityRequirement quality, double requiredQuantity) {
+      Material mat, QualityTier quality, double requiredQuantity) {
     JobOrderItemMaterial im = new JobOrderItemMaterial();
     im.setMaterial(mat);
-    im.setQualityRequirement(quality);
+    im.setQualityTier(quality);
     im.setRequiredQuantity(requiredQuantity);
     return im;
   }
 
   private MaterialClaim claim(
-      JobOrder order, QualityRequirement quality, OrgUnit claimingOrgUnit, double amount) {
+      JobOrder order, QualityTier quality, OrgUnit claimingOrgUnit, double amount) {
     MaterialClaim claim = new MaterialClaim();
     claim.setJobOrder(order);
     claim.setMaterial(material);
-    claim.setQualityRequirement(quality);
+    claim.setQualityTier(quality);
     claim.setClaimingOrgUnit(claimingOrgUnit);
     claim.setAmount(amount);
     return claim;

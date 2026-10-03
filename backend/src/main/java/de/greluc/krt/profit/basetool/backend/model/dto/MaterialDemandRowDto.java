@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import java.util.List;
 
 /**
@@ -27,10 +26,11 @@ import java.util.List;
  * summed over every non-terminal order of one responsible org unit (REQ-ORDERS-034).
  *
  * @param material the bucket's material, with its {@code quantityType} for formatting
- * @param qualityRequirement the quality bucket ({@code GOOD} or {@code NONE})
+ * @param qualityRequirement the code of the bucket's quality tier
+ * @param qualityTier the bucket's quality tier
  * @param requiredAmount the summed outstanding demand still to be procured
- * @param bookedAmount the summed inventory linked to those orders at or above the bucket's quality
- *     floor ({@code GOOD}: 650)
+ * @param bookedAmount the summed inventory linked to those orders and attributed to this bucket
+ *     (REQ-ORDERS-037)
  * @param claimedAmount the summed material claims on those orders' buckets (REQ-ORDERS-024)
  * @param outstandingAmount {@code requiredAmount − bookedAmount}, floored at 0; ignores claims and
  *     differs from {@link AggregatedMaterialDto}'s {@code openAmount}
@@ -38,7 +38,8 @@ import java.util.List;
  */
 public record MaterialDemandRowDto(
     MaterialDto material,
-    QualityRequirement qualityRequirement,
+    String qualityRequirement,
+    QualityTierDto qualityTier,
     Double requiredAmount,
     Double bookedAmount,
     Double claimedAmount,

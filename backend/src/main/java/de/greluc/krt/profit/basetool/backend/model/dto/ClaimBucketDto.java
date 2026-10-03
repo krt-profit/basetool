@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import java.util.List;
 
 /**
@@ -27,7 +26,8 @@ import java.util.List;
  * amount claimed across squadrons, the open remainder and the individual claims.
  *
  * @param material the bucket's material (with {@code quantityType} for unit-aware formatting)
- * @param qualityRequirement the quality bucket ({@code GOOD} or {@code NONE})
+ * @param qualityRequirement the code of the bucket's quality tier
+ * @param qualityTier the bucket's quality tier
  * @param requiredAmount total amount the order needs for this bucket
  * @param claimedAmount total already claimed across all squadrons
  * @param openRemaining {@code requiredAmount − claimedAmount}, floored at 0
@@ -35,7 +35,8 @@ import java.util.List;
  */
 public record ClaimBucketDto(
     MaterialDto material,
-    QualityRequirement qualityRequirement,
+    String qualityRequirement,
+    QualityTierDto qualityTier,
     Double requiredAmount,
     Double claimedAmount,
     Double openRemaining,

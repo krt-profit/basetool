@@ -33,7 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import jakarta.persistence.EntityManager;
@@ -66,6 +66,7 @@ class JobOrderRepositoryActiveLookupOrderingTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private GameItemRepository gameItemRepository;
   @Autowired private BlueprintRepository blueprintRepository;
+  @Autowired private QualityTierRepository qualityTierRepository;
   @PersistenceContext private EntityManager entityManager;
 
   /**
@@ -115,8 +116,11 @@ class JobOrderRepositoryActiveLookupOrderingTest {
             .status(JobOrderStatus.OPEN)
             .type(JobOrderType.MATERIAL)
             .build();
-    order.addMaterial(JobOrderMaterial.builder().material(matA).amount(10.0).build());
-    order.addMaterial(JobOrderMaterial.builder().material(matB).amount(5.0).build());
+    QualityTier none = qualityTierRepository.findByCode("NONE").orElseThrow();
+    order.addMaterial(
+        JobOrderMaterial.builder().material(matA).qualityTier(none).amount(10.0).build());
+    order.addMaterial(
+        JobOrderMaterial.builder().material(matB).qualityTier(none).amount(5.0).build());
     attachHandover(order, matA);
     UUID orderId = jobOrderRepository.saveAndFlush(order).getId();
     entityManager.clear();
@@ -247,7 +251,7 @@ class JobOrderRepositoryActiveLookupOrderingTest {
         JobOrderItemMaterial.builder()
             .material(material)
             .requiredQuantity(1.0)
-            .qualityRequirement(QualityRequirement.NONE)
+            .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
             .build());
     return item;
   }

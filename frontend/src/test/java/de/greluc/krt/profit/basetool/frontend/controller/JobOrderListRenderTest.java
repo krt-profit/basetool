@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -130,7 +131,15 @@ class JobOrderListRenderTest {
             true,
             List.of(),
             List.of(item),
-            List.of(new AggregatedMaterialDto(quantanium, "NONE", 10.0, 4.0, List.of(), null)),
+            List.of(
+                new AggregatedMaterialDto(
+                    quantanium,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    10.0,
+                    4.0,
+                    List.of(),
+                    null)),
             List.of(),
             List.of(),
             List.of(),

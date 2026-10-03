@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderDto;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderMaterialDto
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
@@ -48,14 +50,17 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -98,6 +103,8 @@ class JobOrderServiceTest {
 
   @Mock private AuditService auditService;
 
+  @Mock private QualityTierService qualityTierService;
+
   @InjectMocks private JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
   private JobOrderPriorityService jobOrderPriorityService;
@@ -134,7 +141,8 @@ class JobOrderServiceTest {
             auditService,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            jobOrderPriorityService);
+            jobOrderPriorityService,
+            qualityTierService);
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -201,13 +209,22 @@ class JobOrderServiceTest {
     JobOrderMaterial jom = new JobOrderMaterial();
     jom.setId(UUID.randomUUID());
     jom.setMaterial(material);
-    jom.setMinQuality(100);
+    QualityTier lineTier = QualityTierFixtures.tier("Q100", 100);
+    jom.setQualityTier(lineTier);
     jom.setAmount(50.0);
     jobOrder.addMaterial(jom);
 
     JobOrderMaterialDto jomDto =
         new JobOrderMaterialDto(
-            jom.getId(), materialDto, 100, 50.0, null, java.util.List.of(), null, 1L);
+            jom.getId(),
+            materialDto,
+            100,
+            QualityTierFixtures.dto(lineTier),
+            50.0,
+            null,
+            java.util.List.of(),
+            null,
+            1L);
     baseJobOrderDto =
         new JobOrderDto(
             orderId,
@@ -230,6 +247,92 @@ class JobOrderServiceTest {
             1L,
             null,
             false);
+  }
+
+  private void stubTierResolution() {
+    when(qualityTierService.resolveForRequirement(any(), any(), any()))
+        .thenAnswer(
+            inv -> {
+              Integer floor = inv.getArgument(1);
+              if (floor == null) {
+                return QualityTierFixtures.none();
+              }
+              if (floor == 650) {
+                return QualityTierFixtures.good();
+              }
+              throw new BadRequestException("No quality tier has the floor " + floor);
+            });
+  }
+
+  private void stubLinkedStock(Integer quality, double amount) {
+    when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
+        .thenReturn(
+            List.of(
+                new JobOrderMaterialStockRow(
+                    orderId, UUID.randomUUID(), materialId, quality, amount)));
+  }
+
+  private JobOrder createAndCaptureSaved(List<CreateJobOrderMaterialDto> lines) {
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class)))
+        .thenAnswer(
+            i -> {
+              JobOrder saved = i.getArgument(0);
+              saved.setId(orderId);
+              return saved;
+            });
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    stubTierResolution();
+
+    jobOrderService.createJobOrder(
+        new CreateJobOrderDto(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, lines, null));
+
+    ArgumentCaptor<JobOrder> saved = ArgumentCaptor.forClass(JobOrder.class);
+    verify(jobOrderRepository).save(saved.capture());
+    return saved.getValue();
+  }
+
+  @Test
+  void createJobOrder_sameMaterialSameTier_mergesIntoOneLineWithSummedAmount() {
+    JobOrder saved =
+        createAndCaptureSaved(
+            List.of(
+                new CreateJobOrderMaterialDto(materialId, 650, 10.0),
+                new CreateJobOrderMaterialDto(materialId, 650, 5.0)));
+
+    assertEquals(1, saved.getMaterials().size());
+    JobOrderMaterial line = saved.getMaterials().iterator().next();
+    assertEquals(15.0, line.getAmount());
+    assertEquals("GOOD", line.getQualityTier().getCode());
+    assertEquals(QualityTierFixtures.GOOD_ID, line.getQualityTier().getId());
+  }
+
+  @Test
+  void createJobOrder_sameMaterialDifferentTiers_keepsOneLinePerTier() {
+    JobOrder saved =
+        createAndCaptureSaved(
+            List.of(
+                new CreateJobOrderMaterialDto(materialId, 650, 10.0),
+                new CreateJobOrderMaterialDto(materialId, null, 5.0)));
+
+    assertEquals(2, saved.getMaterials().size());
+    JobOrderMaterial good =
+        saved.getMaterials().stream()
+            .filter(m -> "GOOD".equals(m.getQualityTier().getCode()))
+            .findFirst()
+            .orElseThrow();
+    JobOrderMaterial none =
+        saved.getMaterials().stream()
+            .filter(m -> "NONE".equals(m.getQualityTier().getCode()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(650, good.getQualityTier().getMinQuality());
+    assertEquals(10.0, good.getAmount());
+    assertTrue(none.getQualityTier().isBaseTier());
+    assertEquals(5.0, none.getAmount());
   }
 
   @Test
@@ -264,8 +367,8 @@ class JobOrderServiceTest {
               return saved;
             });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
-        .thenReturn(25.0);
+    stubTierResolution();
+    stubLinkedStock(700, 25.0);
 
     JobOrderDto result = jobOrderService.createJobOrder(createDto);
 
@@ -305,21 +408,25 @@ class JobOrderServiceTest {
               return saved;
             });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
-        .thenReturn(0.0);
+    stubTierResolution();
 
     jobOrderService.createJobOrder(createDto);
 
+    verify(qualityTierService).resolveForRequirement(null, 650, Set.of());
     verify(jobOrderRepository)
         .save(
             argThat(
                 jo ->
                     jo.getMaterials().stream()
-                        .allMatch(m -> m.getMinQuality() != null && m.getMinQuality() == 650)));
+                        .allMatch(
+                            m ->
+                                m.getQualityTier() != null
+                                    && m.getQualityTier().getMinQuality() == 650
+                                    && "GOOD".equals(m.getQualityTier().getCode()))));
   }
 
   @Test
-  void createJobOrder_NullMinQuality_PersistsNull() {
+  void createJobOrder_NullMinQuality_PersistsBaseTier() {
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, null, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -336,13 +443,17 @@ class JobOrderServiceTest {
               return saved;
             });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
-        .thenReturn(0.0);
+    stubTierResolution();
 
     jobOrderService.createJobOrder(createDto);
 
     verify(jobOrderRepository)
-        .save(argThat(jo -> jo.getMaterials().stream().allMatch(m -> m.getMinQuality() == null)));
+        .save(
+            argThat(
+                jo ->
+                    jo.getMaterials().stream()
+                        .allMatch(
+                            m -> m.getQualityTier() != null && m.getQualityTier().isBaseTier())));
   }
 
   @Test
@@ -360,8 +471,7 @@ class JobOrderServiceTest {
               return saved;
             });
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
-        .thenReturn(0.0);
+    stubTierResolution();
 
     jobOrderService.createJobOrder(
         new CreateJobOrderDto(
@@ -432,9 +542,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.lockAllJobOrders())
         .thenReturn(new ArrayList<>(List.of(jobOrder, otherJob)));
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-            any(UUID.class), any(UUID.class), any()))
-        .thenReturn(10.0);
+    stubLinkedStock(700, 10.0);
 
     JobOrderDto result = jobOrderService.updateJobOrderPriority(orderId, 2);
 
@@ -452,9 +560,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-            any(UUID.class), any(UUID.class), any()))
-        .thenReturn(10.0);
+    stubLinkedStock(700, 10.0);
 
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
@@ -476,9 +582,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-            any(UUID.class), any(UUID.class), any()))
-        .thenReturn(10.0);
+    stubLinkedStock(700, 10.0);
 
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
@@ -499,9 +603,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-            any(UUID.class), any(UUID.class), any()))
-        .thenReturn(10.0);
+    stubLinkedStock(700, 10.0);
 
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
@@ -537,9 +639,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-            any(UUID.class), any(UUID.class), any()))
-        .thenReturn(10.0);
+    stubLinkedStock(700, 10.0);
 
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
@@ -617,6 +717,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(bravoId)).thenReturn(Optional.of(bravo));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    stubTierResolution();
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
@@ -687,6 +788,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
     when(materialRepository.findById(newMaterialId)).thenReturn(Optional.of(newMaterial));
+    stubTierResolution();
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
@@ -715,6 +817,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    stubTierResolution();
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
@@ -732,6 +835,7 @@ class JobOrderServiceTest {
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    stubTierResolution();
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
@@ -1401,9 +1505,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-            any(UUID.class), any(UUID.class), any()))
-        .thenReturn(10.0);
+    stubLinkedStock(700, 10.0);
 
     jobOrderService.updateJobOrderStatus(
         orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
@@ -1432,9 +1534,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-            any(UUID.class), any(UUID.class), any()))
-        .thenReturn(10.0);
+    stubLinkedStock(700, 10.0);
 
     jobOrderService.updateJobOrderStatus(
         orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
@@ -1809,16 +1909,18 @@ class JobOrderServiceTest {
               List.of(
                   new de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto(
                       materialDto,
-                      de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD,
+                      "GOOD",
+                      QualityTierFixtures.goodDto(),
                       10.0,
                       null,
                       List.of(),
                       null)));
       when(jobOrderItemService.buildItemLine(any()))
           .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
-      when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-              materialId, orderId, 650))
-          .thenReturn(4.0);
+      when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(List.of(orderId)))
+          .thenReturn(
+              List.of(
+                  new JobOrderMaterialStockRow(orderId, UUID.randomUUID(), materialId, 650, 4.0)));
 
       JobOrderDto result = jobOrderService.updateItemJobOrder(orderId, oneLine(1L));
 

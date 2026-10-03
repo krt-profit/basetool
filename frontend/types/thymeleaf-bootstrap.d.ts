@@ -20,6 +20,11 @@ declare const ALIAS_CONFLICT: KrtI18nDict;
 /** Injected by the page bootstrap (declared in material-aliases.html). */
 declare const ALIAS_MSG: KrtI18nDict;
 
+/** Injected by the page bootstrap (declared in admin/quality-tiers.html). */
+declare const QT_CONFLICT: KrtI18nDict;
+/** Injected by the page bootstrap (declared in admin/quality-tiers.html). */
+declare const QT_MSG: KrtI18nDict;
+
 /** Injected by the page bootstrap (declared in materials.html). */
 declare const CAT_CONFLICT: KrtI18nDict;
 /** Injected by the page bootstrap (declared in materials.html). */
@@ -252,6 +257,10 @@ declare const MSG_DELETE_MESSAGE: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_EMPTY_INVENTORY: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
+declare const MSG_INVENTORY_BELOW_FLOOR: string;
+/** Injected by the page bootstrap (declared in orders-detail.html). */
+declare const MSG_INVENTORY_PART_OF: string;
+/** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_FAILED: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_MISSION_HERKUNFT: string;
@@ -293,10 +302,6 @@ declare const MSG_STOLEN: string;
 declare const MSG_OWNER: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_QUALITY: string;
-/** Injected by the page bootstrap (declared in orders-detail.html). */
-declare const MSG_QUALITY_GOOD: string;
-/** Injected by the page bootstrap (declared in orders-detail.html). */
-declare const MSG_QUALITY_NONE: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_QUANTITY: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */

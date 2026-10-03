@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import java.util.UUID;
 
 /**
@@ -28,12 +27,14 @@ import java.util.UUID;
  * @param id the requirement row's primary key
  * @param material the required material, with its {@code quantityType}
  * @param requiredQuantity the amount needed for the owning line, already scaled by its quantity
- * @param qualityRequirement {@code GOOD} (650+) or {@code NONE} (no floor)
+ * @param qualityRequirement the code of the requested quality tier
+ * @param qualityTier the requested quality tier
  * @param version optimistic-lock version
  */
 public record JobOrderItemMaterialDto(
     UUID id,
     MaterialDto material,
     Double requiredQuantity,
-    QualityRequirement qualityRequirement,
+    String qualityRequirement,
+    QualityTierDto qualityTier,
     Long version) {}

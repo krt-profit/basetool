@@ -44,11 +44,13 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -118,6 +120,7 @@ class JobOrderServiceAssigneeAndListTest {
             auditService,
             jobOrderItemService,
             jobOrderStockProjectionService,
+            null,
             null);
     queryService =
         new JobOrderQueryService(
@@ -306,8 +309,6 @@ class JobOrderServiceAssigneeAndListTest {
       queryService.getAllJobOrders(null, pageable);
 
       verify(inventoryItemRepository, times(1)).findMaterialStockRowsByJobOrderIds(any());
-      verify(inventoryItemRepository, never())
-          .sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any());
     }
 
     @Test
@@ -329,14 +330,14 @@ class JobOrderServiceAssigneeAndListTest {
       when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
           .thenReturn(
               List.of(
-                  new JobOrderMaterialStockRow(orderId, matNoFloor, 300, 10.0),
-                  new JobOrderMaterialStockRow(orderId, matNoFloor, null, 5.0),
-                  new JobOrderMaterialStockRow(orderId, matNoFloor, 900, 20.0),
-                  new JobOrderMaterialStockRow(orderId, matNoFloor, 900, null),
-                  new JobOrderMaterialStockRow(orderId, matFloor650, 640, 7.0),
-                  new JobOrderMaterialStockRow(orderId, matFloor650, 650, 3.0),
-                  new JobOrderMaterialStockRow(orderId, matFloor650, 900, 4.0),
-                  new JobOrderMaterialStockRow(orderId, matFloor650, null, 99.0)));
+                  stockRow(orderId, matNoFloor, 300, 10.0),
+                  stockRow(orderId, matNoFloor, null, 5.0),
+                  stockRow(orderId, matNoFloor, 900, 20.0),
+                  stockRow(orderId, matNoFloor, 900, null),
+                  stockRow(orderId, matFloor650, 640, 7.0),
+                  stockRow(orderId, matFloor650, 650, 3.0),
+                  stockRow(orderId, matFloor650, 900, 4.0),
+                  stockRow(orderId, matFloor650, null, 99.0)));
 
       Page<JobOrderDto> result = queryService.getAllJobOrders(null, pageable);
 
@@ -413,7 +414,15 @@ class JobOrderServiceAssigneeAndListTest {
       when(jobOrderMapper.toDto(mat))
           .thenReturn(
               new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
-                  mat.getId(), null, 100, 1.0, 0.0, List.of(), null, 0L));
+                  mat.getId(),
+                  null,
+                  650,
+                  QualityTierFixtures.goodDto(),
+                  1.0,
+                  0.0,
+                  List.of(),
+                  null,
+                  0L));
 
       List<JobOrderReferenceDto> result = queryService.findAllActiveReference(false);
 
@@ -624,14 +633,29 @@ class JobOrderServiceAssigneeAndListTest {
   }
 
   /**
+   * Builds one order-linked stock row with its own inventory item id.
+   *
+   * @param orderId the order the row is linked to
+   * @param materialId the row's material
+   * @param quality the row's quality, or {@code null}
+   * @param amount the row's amount, or {@code null}
+   * @return the stock row
+   */
+  private static JobOrderMaterialStockRow stockRow(
+      UUID orderId, UUID materialId, Integer quality, Double amount) {
+    return new JobOrderMaterialStockRow(orderId, UUID.randomUUID(), materialId, quality, amount);
+  }
+
+  /**
    * Builds a minimal {@link JobOrderMaterialDto} line for the list-path stock test: only {@code
-   * material().id()} (the stock-index key) and {@code minQuality} (the quality floor) matter to
-   * {@link JobOrderService}'s stock resolver; {@code currentStock} starts at {@code 0.0} and is the
-   * value the service must overwrite from the page-batched index.
+   * material().id()} (the stock-index key) and the quality tier's floor matter to the stock
+   * projection; {@code currentStock} starts at {@code 0.0} and is the value the service must
+   * overwrite from the page-batched index.
    *
    * @param materialId the material identity the stock rows are keyed by.
-   * @param minQuality the bucket's quality floor, or {@code null} for "Keine" (no floor).
-   * @param requiredAmount the line's required amount (irrelevant to the sum, carried for realism).
+   * @param minQuality the bucket's quality floor, or {@code null} for the base tier.
+   * @param requiredAmount the line's required amount; it exceeds the linked stock, so every
+   *     qualifying unit counts.
    * @return the material line DTO.
    */
   private JobOrderMaterialDto materialLine(
@@ -653,8 +677,12 @@ class JobOrderServiceAssigneeAndListTest {
             null,
             null,
             0L);
+    QualityTierDto tier =
+        minQuality == null
+            ? QualityTierFixtures.noneDto()
+            : QualityTierFixtures.dto(QualityTierFixtures.tier("Q" + minQuality, minQuality));
     return new JobOrderMaterialDto(
-        UUID.randomUUID(), material, minQuality, requiredAmount, 0.0, List.of(), null, 0L);
+        UUID.randomUUID(), material, minQuality, tier, requiredAmount, 0.0, List.of(), null, 0L);
   }
 
   /**

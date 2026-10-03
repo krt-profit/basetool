@@ -1,0 +1,12 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .qt-form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0 1rem;
+    }
+    .qt-row--inactive td {
+        color: var(--color-gray-2-text);
+    }
+}

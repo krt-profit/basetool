@@ -61,15 +61,11 @@
             <fieldset class="demand-filter-field demand-filter-qualities">
                 <legend class="demand-filter-label" th:text="#{orders.demand.col.quality}">Qualit&auml;t</legend>
                 <div class="demand-filter-checks">
-                    <label class="demand-filter-check">
-                        <input type="checkbox" class="demandQualCheck" value="GOOD" checked
-                               data-trigger="demand-update-quality" data-testid="demand-quality-good">
-                        <span th:text="#{orders.detail.quality.good}">Gut (650+)</span>
-                    </label>
-                    <label class="demand-filter-check">
-                        <input type="checkbox" class="demandQualCheck" value="NONE" checked
-                               data-trigger="demand-update-quality" data-testid="demand-quality-none">
-                        <span th:text="#{orders.detail.quality.none}">Keine</span>
+                    <label class="demand-filter-check" th:each="tier : ${qualityOptions}">
+                        <input type="checkbox" class="demandQualCheck" th:value="${tier.code()}" checked
+                               data-trigger="demand-update-quality"
+                               th:data-testid="${'demand-quality-' + #strings.toLowerCase(tier.code())}">
+                        <span th:text="${tier.label(#locale)}">Keine</span>
                     </label>
                 </div>
             </fieldset>
@@ -184,10 +180,7 @@
                                     </button>
                                 </td>
                                 <td class="nowrap">
-                                    <span th:if="${row.qualityRequirement() == 'GOOD'}" class="quality-badge quality-good"
-                                          th:text="#{orders.detail.quality.good}">Gut (650+)</span>
-                                    <span th:unless="${row.qualityRequirement() == 'GOOD'}" class="quality-badge quality-none"
-                                          th:text="#{orders.detail.quality.none}">Keine</span>
+                                    <th:block th:replace="~{fragments/quality-tier :: badge(${row.qualityTier()})}"></th:block>
                                 </td>
                                 <td class="nowrap" data-testid="demand-required">
                                     <th:block th:replace="~{fragments/material-amount :: amount(${row.requiredAmount()}, ${row.material().quantityType()})}" />

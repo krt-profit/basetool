@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.RETURNS_DEFAULTS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
@@ -38,19 +40,23 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandRowDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService.OrderLinkedStockIndex;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -59,9 +65,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
@@ -80,6 +88,8 @@ class JobOrderMaterialDemandServiceTest {
   @Mock private MaterialClaimService materialClaimService;
   @Mock private MaterialMapper materialMapper;
   @Mock private SquadronMapper squadronMapper;
+  @Mock private InventoryItemRepository inventoryItemRepository;
+  @Spy private QualityTierMapper qualityTierMapper = Mappers.getMapper(QualityTierMapper.class);
 
   /**
    * Real, not mocked: these cases assert that a MATERIAL line and an ITEM order's blueprint-derived
@@ -89,7 +99,10 @@ class JobOrderMaterialDemandServiceTest {
 
   private JobOrderMaterialDemandService service;
 
-  /** Stubbed batched stock lookup; each test decides what a bucket has linked to it. */
+  /**
+   * Stubbed batched stock lookup; each test decides what a bucket has linked to it, and an
+   * unstubbed order books nothing.
+   */
   private OrderLinkedStockIndex stockIndex;
 
   private Material titanium;
@@ -105,7 +118,16 @@ class JobOrderMaterialDemandServiceTest {
             jobOrderStockProjectionService,
             materialClaimService,
             squadronMapper);
-    stockIndex = mock(OrderLinkedStockIndex.class);
+    stockIndex =
+        mock(
+            OrderLinkedStockIndex.class,
+            invocation -> {
+              if ("bookedFor".equals(invocation.getMethod().getName())) {
+                List<?> requirements = invocation.getArgument(1);
+                return new double[requirements == null ? 0 : requirements.size()];
+              }
+              return RETURNS_DEFAULTS.answer(invocation);
+            });
     titanium = material("Titanium", QuantityType.SCU);
     titaniumDto = materialDto(titanium);
   }
@@ -168,24 +190,36 @@ class JobOrderMaterialDemandServiceTest {
    * @param responsible the processing org unit.
    * @param displayId the human-readable order number.
    * @param material the required material.
-   * @param minQuality the stored quality floor, or {@code null} for "Keine".
+   * @param tier the line's quality tier.
    * @param amount the outstanding required amount.
    * @return the order.
    */
   private static JobOrder materialOrder(
-      OrgUnit responsible, int displayId, Material material, Integer minQuality, double amount) {
+      OrgUnit responsible, int displayId, Material material, QualityTier tier, double amount) {
     JobOrder order = new JobOrder();
     order.setId(UUID.randomUUID());
     order.setDisplayId(displayId);
     order.setStatus(JobOrderStatus.OPEN);
     order.setType(JobOrderType.MATERIAL);
     order.setResponsibleOrgUnit(responsible);
+    order.setMaterials(new LinkedHashSet<>(List.of(line(material, tier, amount))));
+    return order;
+  }
+
+  /**
+   * Builds one material line of a MATERIAL order.
+   *
+   * @param material the required material.
+   * @param tier the line's quality tier.
+   * @param amount the outstanding required amount.
+   * @return the line.
+   */
+  private static JobOrderMaterial line(Material material, QualityTier tier, double amount) {
     JobOrderMaterial line = new JobOrderMaterial();
     line.setMaterial(material);
-    line.setMinQuality(minQuality);
+    line.setQualityTier(tier);
     line.setAmount(amount);
-    order.setMaterials(new java.util.LinkedHashSet<>(List.of(line)));
-    return order;
+    return line;
   }
 
   /**
@@ -204,7 +238,7 @@ class JobOrderMaterialDemandServiceTest {
     order.setStatus(JobOrderStatus.IN_PROGRESS);
     order.setType(JobOrderType.ITEM);
     order.setResponsibleOrgUnit(responsible);
-    order.setItems(new java.util.LinkedHashSet<>(List.<JobOrderItem>of()));
+    order.setItems(new LinkedHashSet<>(List.<JobOrderItem>of()));
     return order;
   }
 
@@ -212,7 +246,7 @@ class JobOrderMaterialDemandServiceTest {
   @DisplayName("A MATERIAL and an ITEM order of one unit fold into a single material bucket")
   void aggregatesBothOrderKindsIntoOneBucket() {
     Squadron iridium = squadron("IRI");
-    JobOrder matOrder = materialOrder(iridium, 1, titanium, 650, 400.0);
+    JobOrder matOrder = materialOrder(iridium, 1, titanium, QualityTierFixtures.good(), 400.0);
     JobOrder itmOrder = itemOrder(iridium, 2);
     givenVisibleOrders(List.of(matOrder, itmOrder));
     when(materialMapper.toDto(titanium)).thenReturn(titaniumDto);
@@ -222,9 +256,15 @@ class JobOrderMaterialDemandServiceTest {
         .thenReturn(
             List.of(
                 new AggregatedMaterialDto(
-                    titaniumDto, QualityRequirement.GOOD, 600.0, null, List.of(), null)));
-    when(stockIndex.stockFor(matOrder.getId(), titanium.getId(), 650)).thenReturn(100.0);
-    when(stockIndex.stockFor(itmOrder.getId(), titanium.getId(), 650)).thenReturn(50.0);
+                    titaniumDto,
+                    "GOOD",
+                    QualityTierFixtures.goodDto(),
+                    600.0,
+                    null,
+                    List.of(),
+                    null)));
+    when(stockIndex.bookedFor(eq(matOrder.getId()), anyList())).thenReturn(new double[] {100.0});
+    when(stockIndex.bookedFor(eq(itmOrder.getId()), anyList())).thenReturn(new double[] {50.0});
 
     MaterialDemandOverviewDto overview = service.getMaterialDemandOverview();
 
@@ -234,7 +274,8 @@ class JobOrderMaterialDemandServiceTest {
     assertThat(group.materials()).hasSize(1);
 
     MaterialDemandRowDto row = group.materials().get(0);
-    assertThat(row.qualityRequirement()).isEqualTo(QualityRequirement.GOOD);
+    assertThat(row.qualityRequirement()).isEqualTo("GOOD");
+    assertThat(row.qualityTier().id()).isEqualTo(QualityTierFixtures.GOOD_ID);
     assertThat(row.requiredAmount()).isEqualTo(1000.0);
     assertThat(row.bookedAmount()).isEqualTo(150.0);
     assertThat(row.outstandingAmount()).isEqualTo(850.0);
@@ -246,8 +287,8 @@ class JobOrderMaterialDemandServiceTest {
   void groupsByResponsibleOrgUnit() {
     Squadron iridium = squadron("IRI");
     Squadron nova = squadron("NOV");
-    JobOrder first = materialOrder(iridium, 1, titanium, null, 10.0);
-    JobOrder second = materialOrder(nova, 2, titanium, null, 20.0);
+    JobOrder first = materialOrder(iridium, 1, titanium, QualityTierFixtures.none(), 10.0);
+    JobOrder second = materialOrder(nova, 2, titanium, QualityTierFixtures.none(), 20.0);
     givenVisibleOrders(List.of(first, second));
     when(materialMapper.toDto(titanium)).thenReturn(titaniumDto);
     when(squadronMapper.orgUnitToReferenceDto(iridium))
@@ -309,7 +350,7 @@ class JobOrderMaterialDemandServiceTest {
     skCommand.setId(UUID.randomUUID());
     skCommand.setName("Spezialkommando Logistik");
     skCommand.setShorthand("SKL");
-    JobOrder order = materialOrder(skCommand, 5, titanium, null, 500.0);
+    JobOrder order = materialOrder(skCommand, 5, titanium, QualityTierFixtures.none(), 500.0);
 
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     when(ownerScopeService.currentScopePredicate())
@@ -324,11 +365,17 @@ class JobOrderMaterialDemandServiceTest {
                 order.getId(),
                 List.of(
                     new ClaimBucketDto(
-                        titaniumDto, QualityRequirement.NONE, 500.0, 300.0, 200.0, List.of()))));
+                        titaniumDto,
+                        "NONE",
+                        QualityTierFixtures.noneDto(),
+                        500.0,
+                        300.0,
+                        200.0,
+                        List.of()))));
     when(materialMapper.toDto(titanium)).thenReturn(titaniumDto);
     when(squadronMapper.orgUnitToReferenceDto(skCommand))
         .thenReturn(new SquadronReferenceDto(skCommand.getId(), skCommand.getName(), "SKL"));
-    when(stockIndex.stockFor(order.getId(), titanium.getId(), null)).thenReturn(50.0);
+    when(stockIndex.bookedFor(eq(order.getId()), anyList())).thenReturn(new double[] {50.0});
 
     MaterialDemandRowDto row =
         service.getMaterialDemandOverview().groups().get(0).materials().get(0);
@@ -342,12 +389,12 @@ class JobOrderMaterialDemandServiceTest {
   @DisplayName("A fully covered bucket reports a zero gap rather than a negative one")
   void outstandingIsFlooredAtZeroWhenStockExceedsDemand() {
     Squadron iridium = squadron("IRI");
-    JobOrder order = materialOrder(iridium, 9, titanium, null, 100.0);
+    JobOrder order = materialOrder(iridium, 9, titanium, QualityTierFixtures.none(), 100.0);
     givenVisibleOrders(List.of(order));
     when(materialMapper.toDto(titanium)).thenReturn(titaniumDto);
     when(squadronMapper.orgUnitToReferenceDto(iridium))
         .thenReturn(new SquadronReferenceDto(iridium.getId(), iridium.getName(), "IRI"));
-    when(stockIndex.stockFor(order.getId(), titanium.getId(), null)).thenReturn(180.0);
+    when(stockIndex.bookedFor(eq(order.getId()), anyList())).thenReturn(new double[] {180.0});
 
     MaterialDemandRowDto row =
         service.getMaterialDemandOverview().groups().get(0).materials().get(0);
@@ -362,8 +409,8 @@ class JobOrderMaterialDemandServiceTest {
     Squadron iridium = squadron("IRI");
     Material core = material("Quantum Core", QuantityType.PIECE);
     MaterialDto coreDto = materialDto(core);
-    JobOrder first = materialOrder(iridium, 1, core, null, 2.4);
-    JobOrder second = materialOrder(iridium, 2, core, null, 3.4);
+    JobOrder first = materialOrder(iridium, 1, core, QualityTierFixtures.none(), 2.4);
+    JobOrder second = materialOrder(iridium, 2, core, QualityTierFixtures.none(), 3.4);
     givenVisibleOrders(List.of(first, second));
     when(materialMapper.toDto(core)).thenReturn(coreDto);
     when(squadronMapper.orgUnitToReferenceDto(iridium))
@@ -373,5 +420,49 @@ class JobOrderMaterialDemandServiceTest {
         service.getMaterialDemandOverview().groups().get(0).materials().get(0);
 
     assertThat(row.requiredAmount()).isEqualTo(6.0);
+  }
+
+  @Test
+  @DisplayName("One linked stock row is counted once across an order's GOOD and NONE buckets")
+  void linkedStockIsAllocatedAcrossQualityBucketsWithoutDoubleCounting() {
+    Squadron iridium = squadron("IRI");
+    Material stileron = material("Stileron", QuantityType.SCU);
+    MaterialDto stileronDto = materialDto(stileron);
+    JobOrder order = materialOrder(iridium, 7, stileron, QualityTierFixtures.good(), 0.1);
+    order.getMaterials().add(line(stileron, QualityTierFixtures.none(), 2.64));
+    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
+            any(), eq(true), eq(null), any()))
+        .thenReturn(List.of(order));
+    when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(List.of(order.getId())))
+        .thenReturn(
+            List.of(
+                new JobOrderMaterialStockRow(
+                    order.getId(), UUID.randomUUID(), stileron.getId(), 681, 2.64)));
+    OrderLinkedStockIndex realIndex =
+        new JobOrderStockProjectionService(inventoryItemRepository, null, null, null, null)
+            .loadOrderLinkedStockIndex(List.of(order.getId()));
+    when(jobOrderStockProjectionService.loadOrderLinkedStockIndex(any())).thenReturn(realIndex);
+    when(materialClaimService.getClaimBucketsForOrders(anyList())).thenReturn(Map.of());
+    when(materialMapper.toDto(stileron)).thenReturn(stileronDto);
+    when(squadronMapper.orgUnitToReferenceDto(iridium))
+        .thenReturn(new SquadronReferenceDto(iridium.getId(), iridium.getName(), "IRI"));
+
+    List<MaterialDemandRowDto> rows =
+        service.getMaterialDemandOverview().groups().get(0).materials();
+
+    assertThat(rows)
+        .extracting(MaterialDemandRowDto::qualityRequirement)
+        .containsExactly("GOOD", "NONE");
+    MaterialDemandRowDto good = rows.get(0);
+    assertThat(good.requiredAmount()).isEqualTo(0.1);
+    assertThat(good.bookedAmount()).isEqualTo(0.1);
+    assertThat(good.outstandingAmount()).isZero();
+    MaterialDemandRowDto none = rows.get(1);
+    assertThat(none.requiredAmount()).isEqualTo(2.64);
+    assertThat(none.bookedAmount()).isEqualTo(2.54);
+    assertThat(none.outstandingAmount()).isEqualTo(0.1);
   }
 }

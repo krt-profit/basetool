@@ -26,7 +26,8 @@ import java.util.List;
  * across an item order.
  *
  * @param material the aggregated material (carries {@code quantityType} for unit-aware display)
- * @param qualityRequirement the quality bucket name ({@code GOOD} or {@code NONE})
+ * @param qualityRequirement the code of the bucket's quality tier
+ * @param qualityTier the bucket's quality tier, with its labels and floor
  * @param totalQuantity the summed required quantity for this material+quality
  * @param currentStock the stock linked to the order for this material at or above the bucket's
  *     quality floor
@@ -35,7 +36,8 @@ import java.util.List;
  */
 public record AggregatedMaterialDto(
     MaterialDto material,
-    @BackendEnumAsString String qualityRequirement,
+    String qualityRequirement,
+    QualityTierDto qualityTier,
     Double totalQuantity,
     Double currentStock,
     List<ClaimDto> claims,

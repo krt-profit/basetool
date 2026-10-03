@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -142,6 +143,7 @@ class JobOrderMaterialDemandRenderTest {
         new MaterialDemandRowDto(
             titanium,
             "GOOD",
+            QualityTierTestData.forCode("GOOD"),
             1000.0,
             250.0,
             100.0,
@@ -188,6 +190,7 @@ class JobOrderMaterialDemandRenderTest {
         new MaterialDemandRowDto(
             material("Laranite", "SCU"),
             "NONE",
+            QualityTierTestData.forCode("NONE"),
             60.0,
             0.0,
             0.0,
@@ -232,6 +235,7 @@ class JobOrderMaterialDemandRenderTest {
                             new MaterialDemandRowDto(
                                 material("Quantum Core", "PIECE"),
                                 "NONE",
+                                QualityTierTestData.forCode("NONE"),
                                 12.0,
                                 4.0,
                                 0.0,
@@ -304,7 +308,14 @@ class JobOrderMaterialDemandRenderTest {
                         new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
                         List.of(
                             new MaterialDemandRowDto(
-                                titanium, "GOOD", 10.0, 0.0, 0.0, 10.0, List.of()))))));
+                                titanium,
+                                "GOOD",
+                                QualityTierTestData.forCode("GOOD"),
+                                10.0,
+                                0.0,
+                                0.0,
+                                10.0,
+                                List.of()))))));
 
     String html =
         mockMvc
@@ -341,9 +352,11 @@ class JobOrderMaterialDemandRenderTest {
     UUID userId = UUID.randomUUID();
     MaterialDto titanium = material("Titanium", "SCU");
     MaterialDemandRowDto good =
-        new MaterialDemandRowDto(titanium, "GOOD", 10.0, 0.0, 0.0, 10.0, List.of());
+        new MaterialDemandRowDto(
+            titanium, "GOOD", QualityTierTestData.forCode("GOOD"), 10.0, 0.0, 0.0, 10.0, List.of());
     MaterialDemandRowDto none =
-        new MaterialDemandRowDto(titanium, "NONE", 5.0, 0.0, 0.0, 5.0, List.of());
+        new MaterialDemandRowDto(
+            titanium, "NONE", QualityTierTestData.forCode("NONE"), 5.0, 0.0, 0.0, 5.0, List.of());
     when(backendApiClient.get(contains("/material-demand"), anyClass()))
         .thenReturn(
             new MaterialDemandOverviewDto(

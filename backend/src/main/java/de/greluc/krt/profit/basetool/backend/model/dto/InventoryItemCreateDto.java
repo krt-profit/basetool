@@ -19,13 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import de.greluc.krt.profit.basetool.backend.validation.QuantityAware;
 import de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
@@ -62,7 +61,7 @@ public record InventoryItemCreateDto(
     UUID materialId,
     UUID gameItemId,
     @NotNull UUID locationId,
-    @Min(0) @Max(1000) Integer quality,
+    @QualityValue Integer quality,
     @NotNull Double amount,
     Boolean personal,
     Boolean stolen,

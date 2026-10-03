@@ -46,6 +46,28 @@ function copyTemplateOptions(templateId, target) {
     });
 }
 
+/**
+ * Fills an item material's quality select from the tier template; an inactive tier is offered
+ * only when it is the stored choice (REQ-ORDERS-036).
+ *
+ * @param {HTMLSelectElement} select the select to fill
+ * @param {string | null} selectedCode the code to preselect
+ */
+function fillQualityTierOptions(select, selectedCode) {
+    const tpl = document.getElementById('item-quality-options-template');
+    if (!tpl) return;
+    Array.from(tpl.querySelectorAll('option')).forEach(function (opt) {
+        const code = opt.value;
+        const selected = code === selectedCode;
+        if (opt.getAttribute('data-inactive') === 'true' && !selected) return;
+        const option = document.createElement('option');
+        option.value = code;
+        option.textContent = opt.textContent || code;
+        option.selected = selected;
+        select.appendChild(option);
+    });
+}
+
 function refreshMaterialUnit(row) {
     if (!row) {
         return;
@@ -401,26 +423,23 @@ function loadDerivation(row, qualities) {
                         : Number((m.requiredQuantity || 0).toFixed(3));
                 const storedQ =
                     qualities && mat.id && qualities[mat.id] ? qualities[mat.id] : m.defaultQuality;
-                let goodSel = '';
-                let noneSel = ' selected';
-                if (storedQ === 'GOOD') {
-                    goodSel = ' selected';
-                    noneSel = '';
-                }
                 html += `
                     <div class="oc-material-line">
                         <input type="hidden" name="items[${escapeAttr(idx)}].materials[${escapeAttr(mi)}].materialId" value="${escapeAttr(mat.id)}">
                         <span class="flex-2">${escapeHtml(mat.name || '')}</span>
                         <span class="flex-1">${escapeHtml(qty)} ${escapeHtml(unit)}</span>
-                        <select name="items[${escapeAttr(idx)}].materials[${escapeAttr(mi)}].quality" class="flex-1">
-                            <option value="GOOD"${goodSel}>${escapeHtml(ITEM_I18N.qualityGood)}</option>
-                            <option value="NONE"${noneSel}>${escapeHtml(ITEM_I18N.qualityNone)}</option>
-                        </select>
+                        <select name="items[${escapeAttr(idx)}].materials[${escapeAttr(mi)}].quality" class="flex-1" data-quality-code="${escapeAttr(storedQ || '')}"></select>
                     </div>`;
             });
             derived.innerHTML = '';
             if ((d.materials || []).length) {
                 derived.innerHTML = html;
+                derived.querySelectorAll('select[data-quality-code]').forEach(function (sel) {
+                    fillQualityTierOptions(
+                        /** @type {HTMLSelectElement} */ (sel),
+                        sel.getAttribute('data-quality-code'),
+                    );
+                });
             }
             if ((d.unresolvedIngredients || []).length) {
                 unresolved.classList.remove('krtm-hidden');

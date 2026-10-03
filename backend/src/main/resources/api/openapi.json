@@ -31,6 +31,9 @@
     "description" : "The member's ships and their changes",
     "name" : "Exchange — ships"
   }, {
+    "description" : "The quality tiers a material requirement is stated in.",
+    "name" : "Quality tiers"
+  }, {
     "description" : "The Materialbörse Gesuche (wanted-listings) board (Flotte & Logistik).",
     "name" : "Material Requests"
   }, {
@@ -87,6 +90,9 @@
   }, {
     "description" : "Administrator endpoints for managing any user's personal inventory.",
     "name" : "Admin – Personal Inventory"
+  }, {
+    "description" : "Administrator endpoints for the quality tiers.",
+    "name" : "Admin – Quality tiers"
   }, {
     "description" : "Evaluate whether a member meets the promotion requirements.",
     "name" : "Promotion Eligibility"
@@ -3873,6 +3879,381 @@
         "tags" : [ "Admin – Personal Inventory" ]
       }
     },
+    "/api/v1/admin/quality-tiers" : {
+      "get" : {
+        "operationId" : "listAllQualityTiers",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/QualityTierDto"
+                  }
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List every quality tier.",
+        "tags" : [ "Admin – Quality tiers" ]
+      },
+      "post" : {
+        "operationId" : "createQualityTier",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/QualityTierWriteDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/QualityTierDto"
+                }
+              }
+            },
+            "description" : "Tier added."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Add a quality tier.",
+        "tags" : [ "Admin – Quality tiers" ]
+      }
+    },
+    "/api/v1/admin/quality-tiers/{id}" : {
+      "delete" : {
+        "operationId" : "deleteQualityTier",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Tier deleted."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Delete an unused quality tier.",
+        "tags" : [ "Admin – Quality tiers" ]
+      },
+      "put" : {
+        "operationId" : "updateQualityTier",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/QualityTierWriteDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/QualityTierDto"
+                }
+              }
+            },
+            "description" : "Tier changed."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Change a quality tier.",
+        "tags" : [ "Admin – Quality tiers" ]
+      }
+    },
     "/api/v1/admin/registrations" : {
       "get" : {
         "operationId" : "list_11",
@@ -5877,7 +6258,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED" ]
           }
         }, {
           "in" : "query",
@@ -35899,6 +36280,123 @@
         "tags" : [ "Orders" ]
       }
     },
+    "/api/v1/orders/{id}/materials/{matId}/attribution" : {
+      "get" : {
+        "description" : "Returns, per linked inventory row, the amount counted toward each quality bucket.",
+        "operationId" : "getStockAttributionForJobOrderMaterial",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "matId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/LinkedStockAttributionDto"
+                  }
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Get the quality-bucket attribution of a job order material's linked stock",
+        "tags" : [ "Orders" ]
+      }
+    },
     "/api/v1/orders/{id}/materials/{matId}/inventory" : {
       "get" : {
         "description" : "Returns all inventory items linked to a specific material in a job order.",
@@ -48261,6 +48759,117 @@
         "tags" : [ "Promotion Topics" ]
       }
     },
+    "/api/v1/quality-tiers" : {
+      "get" : {
+        "operationId" : "listQualityTiers",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "includeInactive",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/QualityTierDto"
+                  }
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the quality tiers, active ones only unless includeInactive is set.",
+        "tags" : [ "Quality tiers" ]
+      }
+    },
     "/api/v1/refinery-orders" : {
       "post" : {
         "operationId" : "createMyRefineryOrder",
@@ -59064,8 +59673,10 @@
             "format" : "double"
           },
           "qualityRequirement" : {
-            "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
+            "type" : "string"
+          },
+          "qualityTier" : {
+            "$ref" : "#/components/schemas/QualityTierDto"
           },
           "totalQuantity" : {
             "type" : "number",
@@ -59223,7 +59834,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED" ]
           },
           "id" : {
             "type" : "string",
@@ -60906,8 +61517,10 @@
             "format" : "double"
           },
           "qualityRequirement" : {
-            "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
+            "type" : "string"
+          },
+          "qualityTier" : {
+            "$ref" : "#/components/schemas/QualityTierDto"
           },
           "requiredAmount" : {
             "type" : "number",
@@ -61371,7 +61984,8 @@
           },
           "qualityRequirement" : {
             "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
+            "maxLength" : 32,
+            "minLength" : 0
           }
         },
         "required" : [ "amount", "claimingOrgUnitId", "materialId", "qualityRequirement" ]
@@ -61468,7 +62082,8 @@
           },
           "quality" : {
             "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
+            "maxLength" : 32,
+            "minLength" : 0
           }
         },
         "required" : [ "materialId", "quality" ]
@@ -61524,10 +62139,10 @@
           "minQuality" : {
             "type" : "integer",
             "format" : "int32",
-            "description" : "Minimale Qualität: 650 (vorgegeben) oder null für \"Keine\" (keine Mindestqualität).",
+            "description" : "Mindestqualität einer Qualitätsstufe; null für die Stufe ohne Mindestqualität.",
             "example" : 650,
-            "maximum" : 650,
-            "minimum" : 650
+            "maximum" : 1000,
+            "minimum" : 0
           }
         },
         "required" : [ "amount", "materialId" ]
@@ -61743,8 +62358,10 @@
         "type" : "object",
         "properties" : {
           "defaultQuality" : {
-            "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
+            "type" : "string"
+          },
+          "defaultQualityTier" : {
+            "$ref" : "#/components/schemas/QualityTierDto"
           },
           "material" : {
             "$ref" : "#/components/schemas/MaterialDto"
@@ -62864,7 +63481,9 @@
           },
           "quality" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
           },
           "quantityType" : {
             "type" : "string"
@@ -63797,8 +64416,10 @@
             "$ref" : "#/components/schemas/MaterialDto"
           },
           "qualityRequirement" : {
-            "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
+            "type" : "string"
+          },
+          "qualityTier" : {
+            "$ref" : "#/components/schemas/QualityTierDto"
           },
           "requiredQuantity" : {
             "type" : "number",
@@ -63959,6 +64580,9 @@
           "openAmount" : {
             "type" : "number",
             "format" : "double"
+          },
+          "qualityTier" : {
+            "$ref" : "#/components/schemas/QualityTierDto"
           },
           "version" : {
             "type" : "integer",
@@ -64275,6 +64899,23 @@
         },
         "required" : [ "targetUserId" ]
       },
+      "LinkedStockAttributionDto" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "inventoryItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "qualityTierId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
       "LiveSyncChangedRequest" : {
         "type" : "object",
         "description" : "Announces that a live-sync room's regions changed, so peers re-fetch them.",
@@ -64554,8 +65195,10 @@
             "format" : "double"
           },
           "qualityRequirement" : {
-            "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
+            "type" : "string"
+          },
+          "qualityTier" : {
+            "$ref" : "#/components/schemas/QualityTierDto"
           },
           "requiredAmount" : {
             "type" : "number",
@@ -69738,6 +70381,77 @@
         },
         "required" : [ "source" ]
       },
+      "QualityTierDto" : {
+        "type" : "object",
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "labelDe" : {
+            "type" : "string"
+          },
+          "labelEn" : {
+            "type" : "string"
+          },
+          "minQuality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sortOrder" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "QualityTierWriteDto" : {
+        "type" : "object",
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "code" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "^[A-Z][A-Z0-9_]{0,31}$"
+          },
+          "labelDe" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 0
+          },
+          "labelEn" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 0
+          },
+          "minQuality" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
+          },
+          "sortOrder" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "active", "code", "labelDe", "labelEn", "minQuality", "sortOrder" ]
+      },
       "Quantity" : {
         "type" : "object",
         "properties" : {
@@ -69922,7 +70636,9 @@
           },
           "quality" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
           },
           "rawMaterialName" : {
             "type" : "string",
@@ -70072,7 +70788,9 @@
           },
           "quality" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
           },
           "yieldBonusPercent" : {
             "type" : "integer",

@@ -147,18 +147,20 @@ public class ExchangeDemandService {
           order.getResponsibleOrgUnit() == null || order.getResponsibleOrgUnit().getId() == null
               ? NO_UNIT
               : order.getResponsibleOrgUnit().getId();
-      for (JobOrderMaterialRequirementResolver.MaterialRequirement requirement :
-          requirementResolver.requirementsOf(order)) {
+      List<JobOrderMaterialRequirementResolver.MaterialRequirement> requirements =
+          requirementResolver.requirementsOf(order);
+      double[] booked = stock.bookedFor(order.getId(), requirements);
+      for (int i = 0; i < requirements.size(); i++) {
+        JobOrderMaterialRequirementResolver.MaterialRequirement requirement = requirements.get(i);
         MaterialDto material = requirement.material();
-        Integer floor = JobOrderStockProjectionService.qualityFloorFor(requirement.quality());
+        int floor = requirement.tier().minQuality();
         materials.putIfAbsent(material.id(), material);
         double[] totals =
             buckets.computeIfAbsent(
-                new UnitBucket(
-                    unit, new MaterialLine(material.id(), floor == null ? 0 : floor, source)),
+                new UnitBucket(unit, new MaterialLine(material.id(), floor, source)),
                 key -> new double[2]);
         totals[0] += requirement.requiredAmount();
-        totals[1] += stock.stockFor(order.getId(), material.id(), floor);
+        totals[1] += booked[i];
       }
     }
     Map<MaterialLine, Double> open = new LinkedHashMap<>();

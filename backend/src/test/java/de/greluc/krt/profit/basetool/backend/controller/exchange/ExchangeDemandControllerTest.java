@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeSettingsReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.repository.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
@@ -87,6 +88,7 @@ class ExchangeDemandControllerTest {
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private OrgUnitRepository orgUnitRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private JdbcTemplate jdbc;
 
@@ -282,6 +284,7 @@ class ExchangeDemandControllerTest {
               order.addMaterial(
                   JobOrderMaterial.builder()
                       .material(materialRepository.getReferenceById(material))
+                      .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
                       .amount(amount)
                       .build());
               return jobOrderRepository.save(order).getId();

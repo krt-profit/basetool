@@ -1066,8 +1066,9 @@ and folding an ITEM order's requirements is a read they must not pay for. Visibi
 the projection is built from the orders the lookup already returns.
 
 **The quality marker.** An allocation is gated on the required **material** alone — never on
-quality — while the order's linked stock is summed at the bucket's own floor (`GOOD` -> 650, `NONE`
--> none). Grade-400 ore may therefore be earmarked to a 650-floor order and will simply not reduce
+quality — while the order's linked stock is distributed over its quality buckets by the
+quality-bucket allocation (REQ-ORDERS-037): each row counts toward at most one bucket whose floor it
+meets. Grade-400 ore may therefore be earmarked to a 650-floor order and will simply not reduce
 that order's need. The check-in form, which is the one surface where a grade is being chosen, marks
 such an option (`benoetigt 650+`) whenever the entered grade falls below the floor. The figure is
 still shown: the option is legitimate, and the marker is what keeps the number from misleading.

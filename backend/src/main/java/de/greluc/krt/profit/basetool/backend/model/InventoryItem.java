@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -32,7 +33,6 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -102,8 +102,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
    * no quality dimension, REQ-INV-029). The pairing is DB-enforced via {@code
    * chk_inventory_item_quality_by_kind} (V220).
    */
-  @Min(0)
-  @Max(1000)
+  @QualityValue
   @Column(nullable = true)
   private Integer quality;
 

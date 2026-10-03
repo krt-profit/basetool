@@ -36,6 +36,10 @@ DELETE /api/v1/admin/personal-inventory/items/{id} | AdminPersonalInventoryContr
 PUT /api/v1/admin/personal-inventory/items/{id} | AdminPersonalInventoryController#updateForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/admin/personal-inventory/{userId} | AdminPersonalInventoryController#listForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/admin/personal-inventory/{userId} | AdminPersonalInventoryController#createForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/admin/quality-tiers | AdminQualityTierController#listAllQualityTiers | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/admin/quality-tiers | AdminQualityTierController#createQualityTier | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/admin/quality-tiers/{id} | AdminQualityTierController#deleteQualityTier | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/admin/quality-tiers/{id} | AdminQualityTierController#updateQualityTier | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/admin/registrations | DiscordRegistrationAdminController#list | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/admin/registrations/{id}/approve | DiscordRegistrationAdminController#approve | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/admin/registrations/{id}/link | DiscordRegistrationAdminController#link | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
@@ -344,6 +348,7 @@ POST /api/v1/orders/{id}/item-handovers | JobOrderController#createItemHandover 
 PUT /api/v1/orders/{id}/items | JobOrderController#updateItemJobOrder | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/items/requested | JobOrderController#updateItemJobOrderAsRequester | pre=isAuthenticated() and @ownerScopeService.canEditJobOrderAsRequester(#id) | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/items/{itemId}/production | JobOrderController#bookProduction | pre=(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')) and @ownerScopeService.canEditJobOrder(#id) | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/materials/{matId}/attribution | JobOrderController#getStockAttributionForJobOrderMaterial | pre=isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/materials/{matId}/inventory | JobOrderController#getInventoryItemsForJobOrderMaterial | pre=isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/priority | JobOrderController#updateJobOrderPriority | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/requested | JobOrderController#updateJobOrderAsRequester | pre=isAuthenticated() and @ownerScopeService.canEditJobOrderAsRequester(#id) | url=anyRequest -> authenticated
@@ -466,6 +471,7 @@ GET /api/v1/promotion/topics/all | PromotionTopicController#listAll | pre=isAuth
 DELETE /api/v1/promotion/topics/{id} | PromotionTopicController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/promotion/topics/{id} | PromotionTopicController#get | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/promotion/topics/{id} | PromotionTopicController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/quality-tiers | QualityTierController#listQualityTiers | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/refinery-orders | RefineryOrderController#createMyRefineryOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/refinery-orders/all | RefineryOrderController#getAllRefineryOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/refinery-orders/import-extract | RefineryImportController#importExtract | pre=isAuthenticated() | url=anyRequest -> authenticated

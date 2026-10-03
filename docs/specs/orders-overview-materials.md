@@ -34,11 +34,11 @@ material name, total required amount (unit-formatted by the material's `quantity
 count. A `MATERIAL` order's column is unchanged.
 
 The progress per row is `currentStock / totalQuantity`, clamped to 100 %, where
-`currentStock` is the total of inventory **linked to that order** for the material at or above
-the aggregated bucket's quality floor (`GOOD` → 650, `NONE` → no floor) — the same per-bucket
-sum the `MATERIAL` requirement rows use (per order via `InventoryItemRepository`
-`sumAmountByMaterialAndJobOrderAndMinQuality` on the detail path, page-batched through
-`JobOrderStockProjectionService.loadOrderLinkedStockIndex` on the list path — no N+1). `currentStock` is carried on
+`currentStock` is the inventory **linked to that order** for the material that the quality-bucket
+allocation counts toward the aggregated bucket (REQ-ORDERS-037, [`orders-quality-tiers.md`](orders-quality-tiers.md))
+— the same figure the `MATERIAL` requirement rows use, resolved through
+`JobOrderStockProjectionService.loadOrderLinkedStockIndex` on both the detail and the list path
+(one query per page, no N+1). `currentStock` is carried on
 `AggregatedMaterialDto` and populated by the backend for every item order it returns (list and
 detail); it is `0.0` when nothing is linked. An item order whose blueprints derived no
 material renders the empty-materials placeholder. The requester "Meine Aufträge" view omits the

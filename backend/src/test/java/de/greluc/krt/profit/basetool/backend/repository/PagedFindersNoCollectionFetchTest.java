@@ -66,6 +66,7 @@ class PagedFindersNoCollectionFetchTest {
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private RoleService roleService;
   @Autowired private EntityManager entityManager;
   @Autowired private TransactionTemplate transactionTemplate;
@@ -206,7 +207,12 @@ class PagedFindersNoCollectionFetchTest {
             .status(JobOrderStatus.OPEN)
             .type(JobOrderType.MATERIAL)
             .build();
-    order.addMaterial(JobOrderMaterial.builder().material(material).amount(1.0).build());
+    order.addMaterial(
+        JobOrderMaterial.builder()
+            .material(material)
+            .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
+            .amount(1.0)
+            .build());
     jobOrderRepository.save(order);
   }
 }

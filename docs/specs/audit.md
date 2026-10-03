@@ -101,7 +101,8 @@ web, naming its client (REQ-AUDIT-005):
   toggle / delete / completion (a single funnel — manual and auto-completion via handover both record
   exactly one `JOB_ORDER_COMPLETED`) / reassign / assignee add/remove/note / material+inventory unlink /
   material+item handover / item-production booking (`JOB_ORDER_PRODUCTION_BOOKED` — recording
-  manufactured units and consuming the linked inventory, REQ-ORDERS-025) / claim upsert+withdraw. A requesting-owner edit (REQ-ORDERS-023) reuses the
+  manufactured units and consuming the linked inventory, REQ-ORDERS-025) / claim upsert+withdraw /
+  quality-tier catalogue create, update, deactivate and delete (`QUALITY_TIER_*`, REQ-ORDERS-036). A requesting-owner edit (REQ-ORDERS-023) reuses the
   existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` / `JOB_ORDER_MATERIAL_UNLINKED` events with a
   bounded `byRequester=true` details flag (no new event type; the actor already identifies who edited).
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the

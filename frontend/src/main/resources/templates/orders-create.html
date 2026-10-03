@@ -94,8 +94,7 @@
                         <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
                             <select th:field="*{materials[__${stat.index}__].minQuality}" th:title="#{orders.create.minQuality.hint}">
-                                <option th:value="650" th:text="650">650</option>
-                                <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
+                                <th:block th:replace="~{fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
                             </select>
                         </div>
                     </div>
@@ -155,8 +154,11 @@
     </div>
     
     <select id="minquality-options-template" class="krtm-display-none-5790">
-        <option value="650">650</option>
-        <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
+        <th:block th:replace="~{fragments/quality-tier :: floorOptionsSelected(${qualityTiers}, ${qualityTiers.?[active() and minQuality() == 650].isEmpty() ? null : 650})}"></th:block>
+    </select>
+
+    <select id="item-quality-options-template" class="krtm-display-none-5790">
+        <th:block th:replace="~{fragments/quality-tier :: codeOptions(${qualityTiers})}"></th:block>
     </select>
 
     <select id="item-options-template" class="krtm-display-none-5790">
@@ -186,8 +188,6 @@
         amount: /*[[#{orders.create.item.amount}]]*/ 'Anzahl',
         remove: /*[[#{orders.create.item.remove}]]*/ 'Entfernen',
         materialsTitle: /*[[#{orders.create.item.materials.title}]]*/ 'Materialien',
-        qualityGood: /*[[#{orders.create.item.quality.good}]]*/ 'Gut (650+)',
-        qualityNone: /*[[#{orders.create.item.quality.none}]]*/ 'Keine',
         subTitle: /*[[#{orders.create.item.subassembly.title}]]*/ 'Unterbaugruppen',
         subAdopt: /*[[#{orders.create.item.subassembly.adopt}]]*/ 'Uebernehmen',
         unresolved: /*[[#{orders.create.item.unresolved}]]*/ 'Nicht aufgeloeste Zutaten:',

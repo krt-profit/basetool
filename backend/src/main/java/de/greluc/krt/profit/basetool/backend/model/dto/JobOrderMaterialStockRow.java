@@ -22,13 +22,14 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * Internal projection of one job-order-linked inventory row, used to sum per-(order, material)
- * stock in memory from a single query (REQ-DATA-003).
+ * Internal projection of one job-order allocation of a material inventory row, used to distribute
+ * per-(order, material) stock in memory from a single query (REQ-DATA-003).
  *
  * @param jobOrderId the id of the job order the inventory row is linked to.
+ * @param inventoryItemId the id of the linked inventory row.
  * @param materialId the id of the row's material.
  * @param quality the row's quality grade, or {@code null} when ungraded.
- * @param amount the row's stocked amount (SCU); never {@code null}.
+ * @param amount the amount earmarked to the order; never {@code null}.
  */
 public record JobOrderMaterialStockRow(
-    UUID jobOrderId, UUID materialId, Integer quality, Double amount) {}
+    UUID jobOrderId, UUID inventoryItemId, UUID materialId, Integer quality, Double amount) {}

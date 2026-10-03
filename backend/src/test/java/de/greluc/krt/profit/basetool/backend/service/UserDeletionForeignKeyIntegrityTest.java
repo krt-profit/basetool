@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
@@ -91,6 +92,7 @@ class UserDeletionForeignKeyIntegrityTest {
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private EntityManager entityManager;
 
@@ -167,15 +169,16 @@ class UserDeletionForeignKeyIntegrityTest {
             .handle("fk-test")
             .status(JobOrderStatus.OPEN)
             .build();
+    QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
     order.addMaterial(
-        JobOrderMaterial.builder().material(material).minQuality(700).amount(10.0).build());
+        JobOrderMaterial.builder().material(material).qualityTier(good).amount(10.0).build());
     order = jobOrderRepository.save(order);
 
     MaterialClaim claim =
         MaterialClaim.builder()
             .jobOrder(order)
             .material(material)
-            .qualityRequirement(QualityRequirement.GOOD)
+            .qualityTier(good)
             .claimingOrgUnit(squadron)
             .amount(5.0)
             .claimedByUser(exMember)
