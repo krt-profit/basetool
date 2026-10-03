@@ -274,6 +274,77 @@ exactly `OrgUnitBankAccessService`.
 · **Related:** REQ-SEC-003, REQ-SEC-052, REQ-SEC-007, REQ-BANK-008, REQ-BANK-019, ADR-0020,
 ADR-0028, ADR-0047
 
+### REQ-SEC-075 — Every security expression names a bean that exists, by an explicit name, in constant SpEL
+
+A `@PreAuthorize` that names a bean or method the context does not have fails only when it is
+evaluated — as `400 ILLEGAL_ARGUMENT` on every call of the operation (REQ-OBS-020 counts it). A
+class rename, a moved bean or a changed signature therefore has to fail the build instead.
+
+- **Resolved against the real context.** Every `@PreAuthorize` and `@PostAuthorize` of the
+  backend's main classes, class- and method-level, is parsed with Spring's SpEL parser; each
+  `@bean.method(args)` is resolved in the running application context by bean name, then by a
+  public method of that name whose parameter count equals the argument count (a varargs method
+  accepts one less or more). 166 references to 8 beans on 2026-10-02.
+- **Explicit bean names.** Every bean a security expression names declares that name in its
+  stereotype (`@Service("ownerScopeService")`, `@Component("exchangeGate")`, …), so renaming the
+  class cannot rename the bean: `ownerScopeService`, `missionSecurityService`, `authHelperService`,
+  `orgRoleManagementSecurityService`, `bankSecurityService`, `specialCommandSecurityService`,
+  `exchangeGate`, `connectedAppsGate`.
+- **A ratchet per bean.** The number of references to each bean may not fall below its recorded
+  floor; a drop means a gate lost its bean check and is a reviewed change that lowers the floor in
+  the same pull request. A rise raises it.
+- **Constant SpEL only.** An expression may consist of literals; `and`, `or`, `not`, `==`, `!=`;
+  root functions such as `hasRole('X')` and `isAuthenticated()` whose arguments are values;
+  `#parameter`, `authentication` and `principal`, each followed only by property reads and
+  zero-argument calls (`#dto.missionId()`); and `@bean.method(values)` in a boolean position.
+  A bean reference never appears as an argument, never as a bare value and is never followed by a
+  further call. Everything else is refused: `T(…)` (allow-list empty), `+` and the other
+  arithmetic operators, `new`, assignment, `#function()`, indexers, projections, selections,
+  inline lists and maps, `matches`, Elvis and safe navigation.
+
+**Acceptance**
+
+- [x] Every bean reference resolves in the context (`SecurityExpressionBeanResolutionTest`).
+- [x] All 441 declared expressions follow the constant-SpEL rules, the per-bean floors hold and
+  every referenced bean is named explicitly (`SecurityExpressionRulesTest`).
+- [x] A missing bean, a wrong arity, a missing method and each refused construct are reported
+  (`SecurityExpressionAnalyzerTest`).
+
+**Enforced by:** `SecurityExpressionBeanResolutionTest`, `SecurityExpressionRulesTest`,
+`SecurityExpressionAnalyzerTest` · **Code:** the explicit names on `OwnerScopeService`,
+`MissionSecurityService`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
+`BankSecurityService`, `SpecialCommandSecurityService`, `ExchangeGate`, `ConnectedAppsGate` ·
+**Related:** REQ-SEC-002, REQ-OBS-020, plan guard G-04
+([`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §6.1)
+
+### REQ-SEC-076 — No class calls its own gated method
+
+A call through `this` never reaches the Spring proxy, so the callee's `@PreAuthorize` /
+`@PostAuthorize` does not run. No backend class may call a method of its own class (or a superclass
+it inherits) that carries such an annotation, or that is a public instance method of a class
+carrying one; a call from a lambda inside the class counts.
+
+- The 18 service-level gates (`MemberEvaluationService` ×3, `MissionFinanceEntryService#updateEntry`
+  / `#deleteEntry`, `PromotionCategoryService` ×3, `PromotionEligibilityService#evaluateAllForUserAsAdmin`,
+  `PromotionLevelContentService` ×3, `PromotionTopicService` ×3, `RankRequirementService` ×3) are
+  each called only from their controller (checked 2026-10-02).
+- The finance-entry edit and delete and the promotion-category writes have no role gate beyond
+  `isAuthenticated()` on their controllers, so their service annotations are the real gate; the
+  rule's test also pins those five annotations to their expressions.
+- `MeController#getLayout` composed its answer by calling the class-gated `getActiveOrgUnit`,
+  `getCapabilities` and `getPinnableOrgUnits` through `this`; it now calls the private helpers those
+  endpoints share. Behaviour is unchanged — the layout read carries the same class-level gate.
+
+**Acceptance**
+
+- [x] No main class calls its own gated method; at least 593 gated methods and 18 service gates are
+  in the rule's selection (`GatedSelfInvocationTest`).
+- [x] A planted direct, lambda and class-gated self-invocation each fail the rule; a gated method
+  calling an ungated helper does not.
+
+**Enforced by:** `GatedSelfInvocationTest` · **Related:** REQ-SEC-002, REQ-SEC-065, REQ-SEC-074,
+plan guard G-25
+
 ### REQ-SEC-004 — Roles & hierarchy
 
 Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles,

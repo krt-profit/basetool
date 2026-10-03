@@ -46,6 +46,11 @@ Beyond roles there are three mechanisms that are easy to miss:
   behind the relay (`ActingMemberFilter`, an explicit list of exchange routes, gated by
   `@exchangeGate`) the member holds a reduced exchange authentication, never their stored roles,
   and every write is journaled, undoable and bounded by a mass-change guard (§8.13).
+- **A security expression is code the compiler cannot check** — every `@bean.method(…)` in a
+  `@PreAuthorize` is resolved against the running context in a test, the security beans carry
+  explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past
+  the proxy (REQ-SEC-076), and one that still fails at runtime stays a fail-closed 400 that is
+  counted and alerted (REQ-OBS-020).
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.

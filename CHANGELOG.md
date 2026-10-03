@@ -13,6 +13,14 @@
   Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
   Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
 
+- **Sicherheitsausdrücke werden beim Build geprüft.** Jede Bean-Referenz in `@PreAuthorize` muss im
+  Kontext mit Namen und Parameterzahl auflösbar sein, die Sicherheits-Beans tragen feste Namen, und
+  kein Gate darf über `this` umgangen werden (REQ-SEC-075, REQ-SEC-076).
+
+- **Metrik und Alarm für nicht auswertbare Sicherheitsausdrücke.** Ein solcher Fehler bleibt ein
+  `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
+  löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
+
 ### Changed
 
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,

@@ -3499,3 +3499,46 @@ loosening the frontend's `http_2xx_hsts` assertion.
 `monitoring/grafana/dashboards/07-basetool-operations.json` ·
 **Related:** ADR-0135, ADR-0129 (the identity swap this filter must precede), ADR-0134, REQ-OBS-006,
 REQ-OBS-011, REQ-OBS-012, REQ-OBS-014, REQ-SEC-029, REQ-INGEST-011
+
+### REQ-OBS-020 — A security expression that cannot be evaluated is counted and alerted
+
+A `@PreAuthorize` expression that Spring Security cannot evaluate — a renamed or missing security
+bean, a method that no longer exists with that arity, an expression that yields no decision — is
+refused **fail-closed** with `400 ILLEGAL_ARGUMENT` (owner decision D-19, plan
+[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §2). The response contract is
+unchanged; what was missing is that the refusal reached only the users, never the monitoring: every
+call of the gated operation answered 400 and the only trace was a WARN line among ordinary bad
+requests.
+
+- **The counter.** `GlobalExceptionHandler#handleIllegalArgument` bumps
+  `basetool_security_expression_failures_total{kind}` when the `IllegalArgumentException` was
+  raised by Spring Security itself (its throw site is in `org.springframework.security`): `kind`
+  is `evaluation` when the SpEL evaluation threw (an `EvaluationException` cause — the
+  unresolvable bean or method) and `other` for the rest (an expression that yields neither a
+  boolean nor a decision). Two literal values, never the expression or the bean name (REQ-OBS-011);
+  the expression stays in the WARN line, where it always was. Both series are registered at zero
+  when the handler starts, so the first failure after a deploy is an increase `increase()` can see.
+  Any other `IllegalArgumentException` keeps answering the same 400 and is not counted.
+- **The alert.** `SecurityExpressionEvaluationFailed` (`business.yml`, beside
+  `AccessDeniedSpike`, warning): any increase over 10 minutes on the backend. The series is a true
+  zero — a bean method's own runtime exception (a 404, a 403) passes through SpEL unwrapped and is
+  not counted, so no ordinary client input moves it — and one failure is a
+  deploy defect, not noise. A dashboard panel on `07` plots both kinds.
+- **The guard upstream.** REQ-SEC-075 resolves every bean reference against the context at build
+  time, so this alert is the net for what a test cannot see (a bean that exists in the test
+  context but not in production, a profile-conditional bean).
+
+**Acceptance**
+
+- [x] An unresolvable bean in a real `@PreAuthorize` evaluation is counted as `evaluation`, an
+  expression without a decision as `other`, and both still answer `400 ILLEGAL_ARGUMENT`; an
+  ordinary `IllegalArgumentException` is not counted (`SecurityExpressionFailureMetricTest`).
+- [x] Both series exist at zero before the first failure.
+- [x] The alert fires on a single failure and stays silent on a flat zero and once the window has
+  passed (`tests/security_expression_failures_test.yml`).
+
+**Enforced by:** `GlobalExceptionHandler`, `MetricNames#SECURITY_EXPRESSION_FAILURES` ·
+`SecurityExpressionFailureMetricTest` · `monitoring/prometheus/alerts/business.yml`,
+`monitoring/prometheus/tests/security_expression_failures_test.yml`,
+`monitoring/grafana/dashboards/07-basetool-operations.json` · **Related:** REQ-SEC-075,
+REQ-API-004, REQ-OBS-011
