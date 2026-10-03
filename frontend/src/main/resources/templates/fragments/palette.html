@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<body>
+<th:block th:fragment="palette">
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='nav-palette', titleKey='palette.aria',
+        variant='palette-modal', body=~{fragments/palette :: palette-body})}">
+    </th:block>
+</th:block>
+<th:block th:fragment="palette-body">
+    <div class="palette"
+         th:attr="data-recent=#{palette.recent},data-pages=#{palette.pages},data-actions=#{palette.actions},data-action-crumb=#{palette.action.crumb},data-action-create-order=#{palette.action.createOrder},data-action-ou-switch=#{palette.action.ouSwitch},data-action-logout=#{nav.logout},data-create-order-href=@{/orders/create}">
+        <div class="palette-input-row">
+            <svg class="krt-icon palette-input-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
+            <input type="text" id="palette-input" class="palette-input" data-testid="palette-input" autofocus
+                   autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list"
+                   aria-expanded="true" aria-controls="palette-results"
+                   th:placeholder="#{palette.placeholder}" th:aria-label="#{palette.input.aria}">
+            <button type="button" class="palette-cancel" th:text="#{mobile.search.cancel}">Abbrechen</button>
+        </div>
+        <div id="palette-results" class="palette-results" role="listbox" th:aria-label="#{palette.aria}"></div>
+        <p class="palette-empty" hidden th:text="#{palette.empty}">Keine Treffer. Signal verloren.</p>
+        <div class="palette-foot" aria-hidden="true">
+            <span class="palette-hint"><span class="nav-kbd">&uarr; &darr;</span><span th:text="#{palette.hint.navigate}">Navigieren</span></span>
+            <span class="palette-hint"><span class="nav-kbd">&crarr;</span><span th:text="#{palette.hint.open}">Öffnen</span></span>
+            <span class="palette-hint"><span class="nav-kbd">ESC</span><span th:text="#{palette.hint.close}">Schließen</span></span>
+        </div>
+    </div>
+</th:block>
+</body>
+</html>
