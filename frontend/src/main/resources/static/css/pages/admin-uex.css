@@ -1,9 +1,6 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    .data-section {
-        margin-bottom: 3rem;
-    }
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
@@ -59,40 +56,31 @@
         text-transform: none;
         letter-spacing: 0;
     }
+    .uex-status {
+        margin-bottom: var(--space-4);
+        font-size: 0.8rem;
+    }
+    .uex-status .chip {
+        color: var(--color-gray-1);
+    }
+    .uex-status .chip strong {
+        color: var(--data-fg);
+        margin-right: 0.3rem;
+    }
     .uex-sync-stamp {
         display: inline-flex;
         align-items: baseline;
         gap: 0.4rem;
-        margin-top: 0.6rem;
-        font-family: var(--font-body);
-        font-size: 0.8rem;
         color: var(--color-gray-1);
     }
     .uex-sync-stamp__label {
         color: var(--color-gray-2-text);
-        font-family: var(--font-body);
         font-size: 0.7rem;
         letter-spacing: 0.06em;
     }
     .uex-sync-stamp__value.unknown {
         color: var(--color-gray-2-text);
         font-style: italic;
-    }
-    .uex-summary-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-        margin-top: 0.6rem;
-        font-family: var(--font-body);
-        font-size: 0.8rem;
-    }
-    .uex-summary-chips .chip {
-        color: var(--color-gray-1);
-    }
-    .uex-summary-chips .chip strong {
-        color: var(--data-fg);
-        font-family: var(--font-body);
-        margin-right: 0.3rem;
     }
     details.uex-system,
     details.uex-parent {

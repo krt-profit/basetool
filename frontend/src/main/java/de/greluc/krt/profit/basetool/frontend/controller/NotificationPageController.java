@@ -47,10 +47,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.ParameterizedTypeReference;
@@ -94,6 +96,22 @@ public class NotificationPageController {
   private static final String BACKEND_BASE = "/api/v1/notifications";
   private static final int PAGE_LIMIT = 50;
   private static final int DROPDOWN_LIMIT = 10;
+
+  /** Notification types whose subject is the job order their entity id names. */
+  private static final Set<String> JOB_ORDER_TYPES =
+      Set.of("JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER");
+
+  /** The page each notification type links to when its subject is a page rather than a record. */
+  private static final Map<String, String> PAGE_TARGETS =
+      Map.of(
+          "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "/materialboerse",
+          "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "/materialboerse",
+          "EXCHANGE_INSTALLATION_CONNECTED", "/connected-apps",
+          "EXCHANGE_BULK_UNDO_APPLIED", "/connected-apps",
+          "ACCOUNT_DELETION_REQUEST_DECLINED", "/profile",
+          "ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests",
+          "DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations");
+
   private static final DateTimeFormatter DISPLAY_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
   private static final ParameterizedTypeReference<List<NotificationDto>> LIST_TYPE =
@@ -425,7 +443,28 @@ public class NotificationPageController {
         dto.read(),
         dto.createdAt() == null ? "" : DISPLAY_FORMAT.format(dto.createdAt()),
         dto.entityType(),
-        dto.entityId());
+        dto.entityId(),
+        targetOf(dto.type(), dto.entityType(), dto.entityId()));
+  }
+
+  /**
+   * Resolves the page a notification is about, for the inbox row link.
+   *
+   * @param type the notification type
+   * @param entityType the originating aggregate's type tag
+   * @param entityId the originating aggregate's id
+   * @return a same-origin path, or {@code null} when the web app has no page for the type that its
+   *     seeded recipients can open
+   */
+  static @Nullable String targetOf(
+      @Nullable String type, @Nullable String entityType, @Nullable UUID entityId) {
+    if (type == null) {
+      return null;
+    }
+    if (JOB_ORDER_TYPES.contains(type)) {
+      return "JOB_ORDER".equals(entityType) && entityId != null ? "/orders/" + entityId : null;
+    }
+    return PAGE_TARGETS.get(type);
   }
 
   private String render(String type, Map<String, String> params, Locale locale) {

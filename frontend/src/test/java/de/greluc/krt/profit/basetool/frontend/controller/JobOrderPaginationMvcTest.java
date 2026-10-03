@@ -35,7 +35,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,16 +121,49 @@ class JobOrderPaginationMvcTest {
             content().string(containsString("/orders?status=COMPLETED&amp;page=0&amp;size=50")));
   }
 
+  /**
+   * Builds a one-order page envelope for the mocked backend, so the results table renders.
+   *
+   * @param total total number of matching orders to report
+   * @return the mocked page envelope holding one open material order
+   */
+  private static PageResponse<JobOrderDto> pageWithOneOrder(int total) {
+    JobOrderDto order =
+        new JobOrderDto(
+            UUID.randomUUID(),
+            7,
+            null,
+            null,
+            "Tester",
+            null,
+            1,
+            "OPEN",
+            "MATERIAL",
+            false,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L,
+            null,
+            false);
+    int totalPages = (int) Math.ceil((double) total / 100);
+    return new PageResponse<>(List.of(order), 0, 100, total, totalPages, List.of());
+  }
+
   @Test
   @WithMockUser
   void viewOrders_fragmentResults_rendersOnlyTableFragment() throws Exception {
     when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
-        .thenReturn(page(0, 100, 300));
+        .thenReturn(pageWithOneOrder(300));
 
     mockMvc
         .perform(get("/orders").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("class=\"data-table\"")))
+        .andExpect(content().string(containsString("class=\"data-table data-table--stack")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(not(containsString("id=\"orders-results\""))))
         .andExpect(content().string(not(containsString("id=\"orders-filter-form\""))));

@@ -12,31 +12,20 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.blueprints.title}">Blueprints</h1>
-        <p th:text="#{admin.blueprints.subtitle}">Gesyncte Crafting-Baupl&auml;ne: welche Zutat &uuml;ber ihre Qualit&auml;t welchen Stat liefert.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.blueprints.title},
+        count=${totalElements}, countId='admin-bp-count', countFor='admin-bp-results')}"></th:block>
 
-    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
-        <p th:text="#{${error}}">Fehler beim Laden.</p>
-    </div>
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
 
-    <div class="hud-box mt-2">
-        <div id="admin-bp-results">
-        <th:block th:fragment="results">
-        <div class="bp-toolbar">
-            <form method="get" th:action="@{/admin/blueprints}" class="bp-filter" id="admin-bp-filter">
-                <input type="text" name="search" th:value="${search}"
-                       th:placeholder="#{admin.blueprints.search.placeholder}" autocomplete="off">
-                <button type="submit" class="btn btn--cta" th:text="#{admin.blueprints.search.button}">Suchen</button>
-                <a th:if="${search != null and !search.isEmpty()}" th:href="@{/admin/blueprints}" data-swap
-                   class="btn btn-ghost" th:text="#{admin.blueprints.reset}">Zur&uuml;cksetzen</a>
-            </form>
-            <span class="bp-count" th:text="#{admin.blueprints.total} + ': ' + ${totalElements}">Gesamt: 0</span>
+    <form id="admin-bp-filter" method="get" th:action="@{/admin/blueprints}" class="no-track">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: toolbarSearch('admin-bp-search', 'search', ${search}, 'admin.blueprints.search.placeholder')}"></th:block>
         </div>
+    </form>
 
-        <div class="table-responsive">
-            <table class="bp-table">
+    <div id="admin-bp-results" class="card card--flush">
+        <th:block th:fragment="results">
+            <table class="bp-table" th:if="${!#lists.isEmpty(blueprints)}">
                 <thead>
                     <tr>
                         <th th:text="#{admin.blueprint.col.blueprint}">Blueprint</th>
@@ -52,7 +41,7 @@
                                 <span class="bp-name" th:text="${bp.outputName() != null ? bp.outputName() : bp.scwikiKey()}">Output</span>
                                 <span class="bp-key" th:if="${bp.scwikiKey() != null}" th:text="${bp.scwikiKey()}">BP_KEY</span>
                             </td>
-                            <td>
+                            <td th:attr="data-label=#{admin.blueprint.col.ingredients}">
                                 <span class="bp-ingredient" th:each="ing : ${g.ingredients()}">
                                     <span th:text="${ing.name() != null ? ing.name() : '?'}">Zutat</span>
                                     <span class="bp-meta" th:if="${ing.quantityScu() != null}"
@@ -66,7 +55,7 @@
                                 </span>
                                 <span class="bp-empty-hint" th:if="${#lists.isEmpty(g.ingredients())}">&ndash;</span>
                             </td>
-                            <td>
+                            <td th:attr="data-label=#{admin.blueprint.col.dependency}">
                                 <span class="bp-stat" th:each="m : ${g.modifiers()}">
                                     <span class="bp-stat-label" th:text="${m.label() != null ? m.label() : m.propertyKey()}">Stat</span>
                                     <span class="bp-stat-bw" th:if="${m.betterWhen() == 'higher'}" th:text="'(' + #{admin.blueprint.betterWhen.higher} + ')'">(h&ouml;her ist besser)</span>
@@ -105,32 +94,34 @@
                                 <span class="bp-name" th:text="${bp.outputName() != null ? bp.outputName() : bp.scwikiKey()}">Output</span>
                                 <span class="bp-key" th:if="${bp.scwikiKey() != null}" th:text="${bp.scwikiKey()}">BP_KEY</span>
                             </td>
-                            <td>
+                            <td th:attr="data-label=#{admin.blueprint.col.ingredients}">
                                 <span class="bp-ingredient" th:each="ing : ${bp.ingredients()}"
                                       th:text="${ing.name()}">Zutat</span>
                                 <span class="bp-empty-hint" th:if="${#lists.isEmpty(bp.ingredients())}">&ndash;</span>
                             </td>
-                            <td><span class="bp-empty-hint">&ndash;</span></td>
+                            <td th:attr="data-label=#{admin.blueprint.col.dependency}"><span class="bp-empty-hint">&ndash;</span></td>
                         </tr>
                     </th:block>
-                    <tr th:if="${#lists.isEmpty(blueprints)}">
-                        <td colspan="3" class="bp-empty-hint" th:text="#{general.no_entries}">Keine Eintr&auml;ge.</td>
-                    </tr>
                 </tbody>
             </table>
-        </div>
 
-        <div class="pager" th:if="${totalPages > 1}">
-            <a th:if="${currentPage > 0}" class="btn btn-secondary" data-swap
-               th:href="@{/admin/blueprints(page=${currentPage - 1}, search=${search})}"
-               th:text="#{general.pagination.previous}">Zur&uuml;ck</a>
-            <span th:text="${currentPage + 1} + ' / ' + ${totalPages}">1 / 1</span>
-            <a th:if="${currentPage + 1 < totalPages}" class="btn btn-secondary" data-swap
-               th:href="@{/admin/blueprints(page=${currentPage + 1}, search=${search})}"
-               th:text="#{general.pagination.next}">Weiter</a>
-        </div>
+            <th:block th:if="${#lists.isEmpty(blueprints)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.blueprints.empty.title', textKey='admin.blueprints.empty.text')}"></th:block>
+            </th:block>
+
+            <div class="list-foot" th:if="${totalElements > 0}" th:data-list-total="${totalElements}">
+                <span class="bp-count" data-testid="list-count" th:text="#{admin.blueprints.total} + ': ' + ${totalElements}">Gesamt: 0</span>
+                <div class="pager" th:if="${totalPages > 1}">
+                    <a th:if="${currentPage > 0}" class="btn btn-ghost" data-swap
+                       th:href="@{/admin/blueprints(page=${currentPage - 1}, search=${search})}"
+                       th:text="#{general.pagination.previous}">Zur&uuml;ck</a>
+                    <span th:text="${currentPage + 1} + ' / ' + ${totalPages}">1 / 1</span>
+                    <a th:if="${currentPage + 1 < totalPages}" class="btn btn-ghost" data-swap
+                       th:href="@{/admin/blueprints(page=${currentPage + 1}, search=${search})}"
+                       th:text="#{general.pagination.next}">Weiter</a>
+                </div>
+            </div>
         </th:block>
-        </div>
     </div>
 </main>
 

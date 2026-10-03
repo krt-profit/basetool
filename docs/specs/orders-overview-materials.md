@@ -288,6 +288,22 @@ query) · **Code:** `templates/orders-index.html`, `static/js/orders-index.js`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders`
 
+### REQ-ORDERS-038 — Overview scope segment „Meine · Alle"
+
+A member who may see both the full queue (`canViewJobOrders`) and their own requested orders
+(`canViewOwnJobOrders`) chooses between them with a segmented control on the overview (`scope`,
+REQ-UI-027): `ALL` reads `/api/v1/orders` with the status and squadron filters; `MINE` reads
+`/api/v1/orders/requested` (REQ-ORDERS-023), ignores and hides the squadron filter, sends no
+squadron parameters and hides the progress column, whose data is redacted there. A member with only
+one of the two rights sees no segment. The pagination URL carries `scope=MINE` only in that case.
+The choice persists per browser (`orders_scope_filter`, REQ-UI-017); an explicit `scope` query
+parameter wins. A third tab „Zu bearbeiten" (orders the member's unit processes) is not offered —
+no backend read answers it yet.
+
+**Enforced by:** `OrdersListPatternRenderTest` · **Code:** `JobOrderPageController.viewOrders`,
+`orders-index.html`, `static/js/orders-index.js` · **Related:** REQ-ORDERS-023, REQ-ORDERS-027,
+REQ-UI-027
+
 ## Out of scope
 
 - **Quality-floor gating on the link (REQ-ORDERS-018).** The gate and the orphaned-link check key

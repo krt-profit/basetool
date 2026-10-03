@@ -125,21 +125,20 @@ class FilterPersistenceE2eTest {
   }
 
   /**
-   * Missions list: the {@code showPast} toggle survives a reload; the checkbox is restored and the
-   * restored state drives the existing results re-fetch.
+   * Missions list: the period segment survives a reload; the radio is restored and the restored
+   * state drives the existing results re-fetch.
    */
   @Test
-  void missionsShowPastSurvivesReload() {
+  void missionsPeriodSurvivesReload() {
     try (BrowserContext context = newContext()) {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
-        E2eSupport.openFilterPanel(page);
-        page.locator("input[name='showPast']").check();
+        page.locator("[data-testid='segment-period-all']").click();
+        assertThat(page.locator("input[name='period'][value='ALL']")).isChecked();
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
-        E2eSupport.openFilterPanel(page);
-        assertThat(page.locator("input[name='showPast']")).isChecked();
+        assertThat(page.locator("input[name='period'][value='ALL']")).isChecked();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "filter-persistence-missions");
         throw failure;

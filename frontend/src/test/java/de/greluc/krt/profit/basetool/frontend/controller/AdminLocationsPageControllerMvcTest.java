@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -39,7 +40,9 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -116,6 +119,71 @@ class AdminLocationsPageControllerMvcTest {
             PageStylesheets.content(
                 containsString(
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+  }
+
+  /**
+   * Renders {@code /admin/locations} in German with the given locations from the backend.
+   *
+   * @param locations the locations the catalogue returns
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String renderList(@NotNull List<LocationDto> locations) throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=0"),
+            anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(locations, 0, 1000, locations.size(), 1, Collections.emptyList()));
+    return mockMvc
+        .perform(get("/admin/locations").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /** The list renders on the list pattern: page head, toolbar search, stacked data table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_rendersTheListPattern() throws Exception {
+    String html =
+        renderList(
+            List.of(new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp L1", false, true, 0L)));
+
+    assertThat(html)
+        .contains("data-testid=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
+        .doesNotContain("krtm-")
+        .doesNotContain("colspan");
+    assertThat(html.split("btn--cta", -1)).hasSize(1);
+    assertThat(html)
+        .contains("data-testid=\"toolbar-search\"")
+        .containsPattern(
+            "id=\"filterLocations\"[^>]*data-trigger=\"filter-table\""
+                + " data-table-id=\"locationsTable\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .containsPattern("class=\"cell-title\">ARC-L1<")
+        .contains("class=\"btn btn-ghost btn-xs\"")
+        .contains(">Ausblenden<")
+        .doesNotContain("data-testid=\"empty-state\"");
+    assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
+        .doesNotContain("btn-secondary");
+  }
+
+  /** An empty catalogue renders the empty state and no table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_rendersTheEmptyState() throws Exception {
+    String html = renderList(List.of());
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .doesNotContain("<table id=\"locationsTable\"")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>0<");
   }
 
   @Test

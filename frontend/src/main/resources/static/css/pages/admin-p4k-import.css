@@ -1,0 +1,11 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .p4k-jobs,
+    .p4k-panel {
+        margin-top: var(--space-6);
+    }
+    .p4k-section-title {
+        margin: 0 0 var(--space-3);
+    }
+}

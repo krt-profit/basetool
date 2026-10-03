@@ -248,32 +248,60 @@
         }
     }
 
+    /**
+     * Maps a job status onto the chip modifier that colours it.
+     *
+     * @param {any} job the job as the proxy returns it
+     * @returns {string} the chip modifier class
+     */
+    function statusChip(job) {
+        switch (job.status) {
+            case 'RUNNING':
+                return 'chip--info';
+            case 'SUCCEEDED':
+                return 'chip--success';
+            case 'FAILED':
+                return 'chip--danger';
+            default:
+                return 'chip--muted';
+        }
+    }
+
     function renderJobs(jobs) {
         if (!jobsBody) return;
         if (jobsEmptyEl) jobsEmptyEl.hidden = jobs.length > 0;
+        const tableWrap = jobsBody.closest('[data-p4k-jobs-table]');
+        if (tableWrap instanceof HTMLElement) tableWrap.hidden = jobs.length === 0;
+        const kindHeader = window.krtI18nText(i18n().colKind, 'krtP4kImportI18n.colKind');
+        const summaryHeader = window.krtI18nText(i18n().colSummary, 'krtP4kImportI18n.colSummary');
         let html = '';
         jobs.forEach(function (job) {
             html +=
-                '<tr>' +
-                '<td>' +
+                '<tr data-testid="p4k-job-row">' +
+                '<td><span class="cell-title">' +
+                escapeHtml(job.sourceFilename || '') +
+                '</span><span class="cell-sub">' +
                 escapeHtml(fmtTime(job.createdAt)) +
-                '</td>' +
-                '<td>' +
+                '</span></td>' +
+                '<td data-label="' +
+                escapeAttr(kindHeader) +
+                '">' +
                 escapeHtml(kindLabel(job)) +
                 '</td>' +
-                '<td>' +
+                '<td class="cell-status"><span class="chip ' +
+                escapeAttr(statusChip(job)) +
+                '">' +
                 escapeHtml(statusLabel(job)) +
-                '</td>' +
-                '<td>' +
-                escapeHtml(job.sourceFilename || '') +
-                '</td>' +
-                '<td>' +
+                '</span></td>' +
+                '<td data-label="' +
+                escapeAttr(summaryHeader) +
+                '">' +
                 escapeHtml(summaryText(job)) +
                 '</td>' +
-                '<td>';
+                '<td class="cell-actions">';
             if (job.status === 'SUCCEEDED') {
                 html +=
-                    '<button type="button" class="btn btn-ghost" data-action="view" data-job-id="' +
+                    '<button type="button" class="btn btn-ghost btn-xs" data-action="view" data-job-id="' +
                     escapeAttr(job.id) +
                     '">' +
                     escapeHtml(
@@ -282,7 +310,7 @@
                     '</button>';
                 if (job.kind === 'PREVIEW') {
                     html +=
-                        ' <button type="button" class="btn btn--cta" data-action="apply" data-job-id="' +
+                        ' <button type="button" class="btn btn-success btn-xs" data-action="apply" data-job-id="' +
                         escapeAttr(job.id) +
                         '">' +
                         escapeHtml(

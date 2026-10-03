@@ -394,7 +394,7 @@ class MissionPageControllerTest {
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
-    controller.listMissions(null, null, null, null, true, null, null, null, model, user);
+    controller.listMissions(null, null, null, null, true, null, null, null, null, model, user);
 
     String uri = uriCaptor.getValue();
     assertTrue(uri.contains("status=COMPLETED"));
@@ -402,8 +402,57 @@ class MissionPageControllerTest {
     assertTrue(uri.contains("status=PLANNED"));
     assertTrue(uri.contains("status=ACTIVE"));
     assertTrue((Boolean) model.getAttribute("showPast"));
+    assertEquals("ALL", model.getAttribute("period"));
 
     verify(backendApiClient).get(anyString(), anyTypeRef());
+  }
+
+  @Test
+  void listMissions_PeriodPast_ShouldRelayOnlyFinishedStatuses() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MissionPageController controller =
+        new MissionPageController(
+            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+    Model model = new ConcurrentModel();
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+    when(backendApiClient.get(uriCaptor.capture(), anyTypeRef()))
+        .thenReturn(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
+                Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
+
+    controller.listMissions(
+        null, null, null, null, false, "PAST", null, null, null, model, mock(OidcUser.class));
+
+    String uri = uriCaptor.getValue();
+    assertTrue(uri.contains("status=COMPLETED&status=CANCELLED"));
+    assertFalse(uri.contains("status=PLANNED"));
+    assertFalse(uri.contains("status=ACTIVE"));
+    assertEquals("PAST", model.getAttribute("period"));
+  }
+
+  @Test
+  void listMissions_UnknownPeriod_ShouldFallBackToUpcoming() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MissionPageController controller =
+        new MissionPageController(
+            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+    Model model = new ConcurrentModel();
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+    when(backendApiClient.get(uriCaptor.capture(), anyTypeRef()))
+        .thenReturn(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
+                Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
+
+    controller.listMissions(
+        null, null, null, null, false, "SOMETIME", null, null, null, model, mock(OidcUser.class));
+
+    String uri = uriCaptor.getValue();
+    assertTrue(uri.contains("status=PLANNED&status=ACTIVE"));
+    assertFalse(uri.contains("status=COMPLETED"));
+    assertEquals("UPCOMING", model.getAttribute("period"));
+    assertFalse((Boolean) model.getAttribute("showPast"));
   }
 
   @Test

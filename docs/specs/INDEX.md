@@ -177,9 +177,9 @@ keep the old ids — read them with this table.
 
 > **Next free id per area** (highest heading in use + 1, 2026-10-03 — re-grep `main` **and** open
 > PRs before claiming one): `ADMIN-004`, `API-022`, `AUDIT-008`, `BANK-057`, `DATA-023`, `FE-031`,
-> `HANGAR-005`, `INGEST-015`, `INV-055`, `MARKET-021`, `MISSION-021`, `MOD-006`, `NOTIF-022`,
-> `OBS-021`, `OPS-043`, `ORDERS-036`, `ORG-029` (`ORG-022` was skipped and stays unused),
-> `PROMO-002`, `REFINERY-023`, `ROLE-007`, `SEC-081`, `UI-027`, `XCH-040` (corrected 2026-09-26:
+> `HANGAR-005`, `INGEST-015`, `INV-055`, `MARKET-021`, `MISSION-021`, `MOD-006`, `NOTIF-023`,
+> `OBS-021`, `OPS-043`, `ORDERS-039`, `ORG-029` (`ORG-022` was skipped and stays unused),
+> `PROMO-002`, `REFINERY-023`, `ROLE-007`, `SEC-081`, `UI-028`, `XCH-040` (corrected 2026-09-26:
 > `UI-023` and `UI-024` were already taken, `UI-025` is the „Star-Citizen-Links" page; corrected
 > 2026-09-28: `API-012`, `FE-022`/`-023`, `INV-054`, `MISSION-020`, `OPS-032`…`-035` and `XCH-034`
 > had been claimed since, and `XCH-035` the same day).

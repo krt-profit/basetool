@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -125,6 +127,70 @@ class AdminBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("class=\"bp-count\"")))
         .andExpect(content().string(containsString("class=\"pager\"")))
         .andExpect(content().string(not(containsString("id=\"admin-bp-results\""))));
+  }
+
+  /**
+   * The full page renders on the list pattern (REQ-UI-027): page head with the master-data eyebrow
+   * and count, the live search outside the swapped fragment, and the table inside a flush card.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_fullPage_rendersTheListPattern() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(1));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/blueprints").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .contains("data-list-count-for=\"admin-bp-results\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("btn--cta")
+        .contains("id=\"admin-bp-results\" class=\"card card--flush\"")
+        .contains("data-list-total=\"1\"");
+    String filter = html.substring(html.indexOf("id=\"admin-bp-filter\""));
+    assertThat(filter.substring(0, filter.indexOf("</form>")))
+        .contains("data-testid=\"toolbar-search\"")
+        .contains("name=\"search\"")
+        .doesNotContain("type=\"submit\"");
+    assertThat(html.indexOf("id=\"admin-bp-filter\""))
+        .isLessThan(html.indexOf("id=\"admin-bp-results\""));
+  }
+
+  /**
+   * An empty result renders the empty state instead of a colspan row.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_emptyResult_rendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.<BlueprintDto>of(), 0, 25, 0, 0, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/blueprints").param("fragment", "results"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .doesNotContain("class=\"bp-table\"")
+        .doesNotContain("colspan")
+        .doesNotContain("data-list-total");
   }
 
   @Test

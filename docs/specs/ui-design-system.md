@@ -855,7 +855,10 @@ Covered surfaces (beyond the pre-existing REQ-ORDERS-027 orders queue, REQ-UI-01
 bank request-queue/dashboard/org-layout modules and the grouping toggles): Materialbörse (both
 boards: mode/tab, min quality, min amount, sort), Mein Lager + Globales Lager (all multi-selects,
 min quality, personal-only flags, per view), Raffinerie-Aufträge (status + only-mine),
-Profitberechnung (ship + systems), Missionen/Operationen (`showPast`), Meine Bewertungen
+Profitberechnung (ship + systems), Missionen/Operationen (the period segment „Kommend · Vergangen ·
+Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Alle" (`orders_scope_filter`,
+REQ-ORDERS-038), Benachrichtigungen „Ungelesen · Alle" (`notifications_filter`, REQ-NOTIF-022),
+Meine Bewertungen
 (only-open), Persönliche Blueprints (refinery + craftable toggles), Beförderung verwalten
 (filters/sort/collapse, migrated sessionStorage → localStorage), Bank-Freigaben (view + account /
 employee selection), Bank-Kontodetail chart range (both detail pages) and the Org-Kontodetail tab,
@@ -1491,6 +1494,8 @@ krt-profit/design-system#6), and every work page follows one of three patterns.
 | `fragments/components :: segmented` | a `role="radiogroup"` of radios inside labels; `name`, `options` (each with `value`, `labelKey`, optional `count`; a `null` value is the „all" option), `selected`, `labelKey`, `variant`, `form` |
 | `fragments/components :: overflowMenu` | the „⋯" toggle (`aria-haspopup`, `aria-expanded`, `aria-controls`) and a hidden `role="menu"` panel; `id` and the slot `items` |
 | `fragments/components :: filterChips(formId)` | the chip bar bound to a filter form |
+| `fragments/components :: filterPopover` | the „Filter" button with a `.filter-badge` and a popover panel holding the further filters (`panelId`, `panelName`, `testid`, slot `body`); a bottom sheet above the tab bar on phones. It keeps the `.filter-toggle`/`.filter-panel` contract of REQ-FE-021, so `krt-filter-panel.js` counts its active controls; a `data-filter-transient` panel always starts closed, stores no preference, focuses its first field, closes on Escape or an outside click, and flips to the left edge when it would leave the viewport |
+| `fragments/components :: listFoot(pageResponse, baseUrl)` | „1–7 von 24" and the pagination below a table; its `data-list-total` keeps the page head's count chip (`countFor`) current after every live swap (`krt-list-count.js`) |
 
 Two global scripts drive them: `krt-overflow-menu.js` opens and closes the menus (toggle, Escape,
 outside click, Tab, focus back to the toggle, arrow keys, Home/End) and closes a menu when one of its
@@ -1507,6 +1512,16 @@ the page on its primary action), `overflow-menu-toggle`, `toolbar-search`, `segm
 the scripts and the breakpoint gate; the list pages, the home page and the forms, the areas of the
 audit (hangar, blueprints, operations, Materialbörse, refinery, Leitung, bank, trade) and the removal
 of `inline-migration.css` follow as their own PRs, each moving its pages onto these patterns.
+
+**On pattern A (phase 1):** Einsätze, Operationen, Benachrichtigungen, Mitglieder, Beförderung
+verwalten, Auftragsverwaltung, Materialbedarf, Lager-Übersicht, Item- und Materialsammelübersicht,
+Material-Liste, and the admin lists Audit-Logs, Blueprints, Standard-Blueprints, Löschanträge,
+Discord-Registrierungen (tabs „Offen · Abgelehnt"), Verbundene Anwendungen, Orte, Material-Aliase,
+Materialien, Benachrichtigungsregeln, Organisationsstruktur, Qualitätsstufen, P4K-Import,
+Personensuche, Persönliche Blueprints/Inventare, Spezialkommandos, Sync-Berichte,
+Nutzungsbedingungen (segment „Noch offen · Zugestimmt · Alle"), Einsatzdaten and UEX-Daten. A list
+row's relative day („in 5 Tagen", „heute", „vor 4 Tagen") comes from the `@relativeDays` template
+bean (Europe/Berlin), its date from `.utc-time[data-format=short]`.
 
 **Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) · Stylelint
 `media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·

@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -247,6 +248,58 @@ class AdminDiscordRegistrationsNicknameRenderTest {
         .contains("data-action=\"reopen\"")
         .contains("id=\"reopen-modal\"")
         .contains("id=\"reopen-reason\"");
+  }
+
+  /**
+   * The queue renders on the list pattern (REQ-UI-027): page head with the system eyebrow and the
+   * open count, the open and rejected lists as two tab panels with stacked tables, extra-small row
+   * actions and no primary button in a row, and the empty state of the hidden rejected panel.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void queue_rendersTheListPatternWithOpenAndRejectedTabs() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new PendingRegistrationDto(
+                    UUID.randomUUID(),
+                    "AliceCallsign",
+                    null,
+                    Instant.parse("2026-06-22T00:00:00Z"),
+                    null,
+                    false,
+                    1L)));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/discord-registrations")
+                    .locale(Locale.GERMAN)
+                    .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .contains("data-testid=\"reg-tab-open\"")
+        .contains("data-testid=\"reg-tab-rejected\"")
+        .containsPattern("id=\"reg-panel-rejected\"[^>]*hidden")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("class=\"btn btn-success btn-xs\" data-action=\"approve\"")
+        .contains("class=\"btn btn-quiet-danger btn-xs\" data-action=\"reject\"")
+        .containsPattern("id=\"rejectedTable\"[^>]*hidden")
+        .containsPattern("id=\"rejectedEmpty\" class=\"reg-empty\">")
+        .containsPattern("id=\"registrationsEmpty\" class=\"reg-empty\" hidden")
+        .doesNotContain("colspan");
+    String main = html.substring(html.indexOf("<main"), html.indexOf("id=\"reject-modal\""));
+    assertThat(main).doesNotContain("btn--cta");
   }
 
   @Test

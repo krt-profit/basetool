@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.view.ItemCollectionGroup;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -74,8 +75,8 @@ public class ItemCollectionPageController {
    *
    * @param jobOrderId job order id passed through to the template
    * @param fragment when {@code results}, render only the {@code collectionResults} fragment
-   * @param model Thymeleaf model populated with {@code jobOrderId}, {@code itemStock}, {@code
-   *     locations}
+   * @param model Thymeleaf model populated with {@code jobOrderId}, {@code itemStock}, the group
+   *     rows {@code itemGroups}, the overall {@code collectionProgress} and {@code locations}
    * @return the {@code item-collection} view name, or its {@code collectionResults} fragment
    */
   @NotNull
@@ -104,7 +105,11 @@ public class ItemCollectionPageController {
     }
 
     model.addAttribute("jobOrderId", jobOrderId);
+    List<ItemCollectionGroup> itemGroups =
+        ItemCollectionGroup.of(itemStock == null ? List.of() : itemStock);
     model.addAttribute("itemStock", itemStock);
+    model.addAttribute("itemGroups", itemGroups);
+    model.addAttribute("collectionProgress", ItemCollectionGroup.total(itemGroups));
     model.addAttribute("locations", locations);
     if ("results".equals(fragment)) {
       return "item-collection :: collectionResults";

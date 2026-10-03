@@ -18,167 +18,180 @@
     <span id="xc-undo-i18n" hidden
           th:attr="data-started=#{admin.exchangeClients.undo.started},data-preview=#{admin.exchangeClients.undo.preview},data-preview-active=#{admin.exchangeClients.undo.preview.active},data-preview-empty=#{admin.exchangeClients.undo.preview.empty},data-confirm-title=#{admin.exchangeClients.undo.confirm.title},data-confirm-body=#{admin.exchangeClients.undo.confirm.body},data-installation-all=#{admin.exchangeClients.undo.installation.all},data-installation-option=#{admin.exchangeClients.undo.installation.option},data-installation-revoked=#{admin.exchangeClients.undo.installation.revoked},data-summary=#{admin.exchangeClients.undo.run.summary},data-skipped-title=#{admin.exchangeClients.undo.run.skippedTitle},data-none=#{admin.exchangeClients.undo.run.none},data-more=#{admin.exchangeClients.undo.run.more},data-unnamed=#{admin.exchangeClients.undo.unnamed},data-reason-changed-afterwards=#{admin.exchangeClients.undo.reason.CHANGED_AFTERWARDS},data-reason-gone=#{admin.exchangeClients.undo.reason.GONE},data-reason-failed=#{admin.exchangeClients.undo.reason.FAILED},data-resource-blueprint=#{admin.exchangeClients.undo.resource.BLUEPRINT},data-resource-stock=#{admin.exchangeClients.undo.resource.STOCK},data-resource-ship=#{admin.exchangeClients.undo.resource.SHIP}"></span>
 
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.exchangeClients.title}">Verbundene Anwendungen</h1>
-        <p th:text="#{admin.exchangeClients.subtitle}">Welche Anwendungen Daten austauschen d&uuml;rfen.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.exchangeClients.title},
+        count=${clients != null ? #lists.size(clients) : null}, countId='xc-count', countFor='xc-registry-host', actions=~{::xc-actions})}">
+        <th:block th:ref="xc-actions">
+            <a href="#xc-form-title" class="btn btn--cta" data-xc-new data-testid="xc-new"
+               th:text="#{admin.exchangeClients.form.create}">Anwendung registrieren</a>
+        </th:block>
+    </th:block>
 
-    <div id="xc-registry-host">
+    <div id="xc-registry-host" class="stack xc-block">
         <th:block th:fragment="registry">
-            <div class="hud-box mt-2" th:if="${error}">
-                <p class="text-danger" th:text="#{${error}}">Fehler beim Laden.</p>
-            </div>
+            <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
 
-            <div class="hud-box mt-2" id="xc-switch" th:if="${settings != null}"
-                 th:attr="data-enabled=${settings.enabled},data-version=${settings.version}">
-                <h2 th:text="#{admin.exchangeClients.switch.title}">Datenaustausch</h2>
-                <p>
-                    <span th:if="${settings.enabled}" class="chip chip--success" th:text="#{admin.exchangeClients.switch.on}">Eingeschaltet</span>
-                    <span th:unless="${settings.enabled}" class="chip chip--danger" th:text="#{admin.exchangeClients.switch.off}">Ausgeschaltet</span>
-                    <span class="xc-switch-hint" th:text="${settings.enabled} ? #{admin.exchangeClients.switch.hintOn} : #{admin.exchangeClients.switch.hintOff}">Hinweis</span>
-                </p>
-                <button type="button" data-xc-switch
-                        th:class="${settings.enabled} ? 'btn btn-quiet-danger' : 'btn btn--cta'"
-                        th:text="${settings.enabled} ? #{admin.exchangeClients.switch.turnOff} : #{admin.exchangeClients.switch.turnOn}">Ausschalten</button>
-            </div>
+            <section class="card xc-switch-card" id="xc-switch" th:if="${settings != null}"
+                     th:attr="data-enabled=${settings.enabled},data-version=${settings.version}">
+                <div class="split">
+                    <div class="stack gap-2">
+                        <h2 class="xc-heading" th:text="#{admin.exchangeClients.switch.title}">Datenaustausch</h2>
+                        <p class="cluster gap-2 xc-switch-state">
+                            <span th:if="${settings.enabled}" class="chip chip--success" th:text="#{admin.exchangeClients.switch.on}">Eingeschaltet</span>
+                            <span th:unless="${settings.enabled}" class="chip chip--danger" th:text="#{admin.exchangeClients.switch.off}">Ausgeschaltet</span>
+                            <span class="xc-switch-hint" th:text="${settings.enabled} ? #{admin.exchangeClients.switch.hintOn} : #{admin.exchangeClients.switch.hintOff}">Hinweis</span>
+                        </p>
+                    </div>
+                    <button type="button" data-xc-switch
+                            th:class="${settings.enabled} ? 'btn btn-quiet-danger' : 'btn btn-success'"
+                            th:text="${settings.enabled} ? #{admin.exchangeClients.switch.turnOff} : #{admin.exchangeClients.switch.turnOn}">Ausschalten</button>
+                </div>
+            </section>
 
-            <div class="hud-box mt-2">
-                <h2 th:text="#{admin.exchangeClients.list}">Registrierte Anwendungen</h2>
-                <div class="table-responsive">
-                    <table id="xc-table">
+            <section class="stack gap-3">
+                <h2 class="xc-heading" th:text="#{admin.exchangeClients.list}">Registrierte Anwendungen</h2>
+                <div class="card card--flush">
+                    <table id="xc-table" class="data-table data-table--stack" th:if="${!#lists.isEmpty(clients)}"
+                           th:data-list-total="${#lists.size(clients)}">
                         <thead>
                         <tr>
                             <th th:text="#{admin.exchangeClients.column.name}">Anwendung</th>
-                            <th th:text="#{admin.exchangeClients.column.clientId}">Client-ID</th>
-                            <th th:text="#{admin.exchangeClients.column.status}">Status</th>
+                            <th class="cell-status" th:text="#{admin.exchangeClients.column.status}">Status</th>
                             <th th:text="#{admin.exchangeClients.column.members}">Verbundene Mitglieder</th>
                             <th th:text="#{admin.exchangeClients.column.lastActivity}">Zuletzt aktiv</th>
                             <th th:text="#{admin.exchangeClients.column.capabilities}">Berechtigungen</th>
                             <th th:text="#{admin.exchangeClients.column.minVersion}">Mindestversion</th>
                             <th th:text="#{admin.exchangeClients.column.limits}">Limits</th>
                             <th th:text="#{admin.exchangeClients.column.contact}">Kontakt</th>
-                            <th th:text="#{admin.exchangeClients.column.actions}">Aktion</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.exchangeClients.column.actions}">Aktion</span></th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr th:each="c : ${clients}"
                             th:attr="data-client-id=${c.id},data-version=${c.version},data-status=${c.status}">
-                            <td th:text="${c.displayName}">VerseKit</td>
-                            <td><code th:text="${c.clientId}">versekit</code></td>
                             <td>
+                                <span class="cell-title" th:text="${c.displayName}">VerseKit</span>
+                                <code class="cell-sub" th:text="${c.clientId}">versekit</code>
+                            </td>
+                            <td class="cell-status">
                                 <span th:if="${c.status == 'ACTIVE'}" class="chip chip--success" th:text="#{admin.exchangeClients.status.ACTIVE}">Freigegeben</span>
                                 <span th:unless="${c.status == 'ACTIVE'}" class="chip chip--danger" th:text="#{admin.exchangeClients.status.SUSPENDED}">Gesperrt</span>
                             </td>
-                            <td class="xc-members" th:with="u=${usage[c.id]}" th:text="${u != null} ? ${u.connectedMembers} : 0">3</td>
-                            <td th:with="u=${usage[c.id]}"
+                            <td th:attr="data-label=#{admin.exchangeClients.column.members}" th:with="u=${usage[c.id]}" th:text="${u != null} ? ${u.connectedMembers} : 0" class="xc-members">3</td>
+                            <td th:attr="data-label=#{admin.exchangeClients.column.lastActivity}" th:with="u=${usage[c.id]}"
                                 th:text="${u != null and u.lastSeenAt != null} ? #{admin.exchangeClients.utc(${#temporals.format(u.lastSeenAt, 'dd.MM.yyyy HH:mm', 'UTC')})} : '–'">27.09.2026 09:30 UTC</td>
-                            <td>
+                            <td th:attr="data-label=#{admin.exchangeClients.column.capabilities}">
                                 <ul class="xc-capabilities">
                                     <li th:each="cap : ${c.capabilities}"
                                         th:text="${#messages.msgOrNull('exchange.capability.' + cap) ?: cap}">Blueprints lesen</li>
                                 </ul>
                             </td>
-                            <td th:text="${c.minClientVersion} ?: '–'">2.1.0</td>
-                            <td>
+                            <td th:attr="data-label=#{admin.exchangeClients.column.minVersion}" th:text="${c.minClientVersion} ?: '–'">2.1.0</td>
+                            <td th:attr="data-label=#{admin.exchangeClients.column.limits}">
                                 <span th:if="${c.requestsPerMinute == null and c.writesPerDay == null}" th:text="#{admin.exchangeClients.limits.default}">Standard</span>
                                 <span th:if="${c.requestsPerMinute != null}" class="xc-limit" th:text="#{admin.exchangeClients.limits.perMinute(${c.requestsPerMinute})}">120/min</span>
                                 <span th:if="${c.writesPerDay != null}" class="xc-limit" th:text="#{admin.exchangeClients.limits.perDay(${c.writesPerDay})}">500/Tag</span>
                             </td>
-                            <td>
+                            <td th:attr="data-label=#{admin.exchangeClients.column.contact}">
                                 <a th:if="${c.contactUrl != null}" th:href="${c.contactUrl}" target="_blank" rel="noopener noreferrer"
                                    th:text="#{admin.exchangeClients.contact.open}">&Ouml;ffnen</a>
                                 <span th:if="${c.contactUrl == null}">&ndash;</span>
                             </td>
-                            <td>
-                                <div class="flex-gap-xs">
-                                    <button type="button" class="btn btn-icon" data-xc-edit
+                            <td class="cell-actions">
+                                <div class="cluster gap-2 xc-actions">
+                                    <button type="button" class="btn btn-ghost btn-icon" data-xc-edit
                                             th:title="#{admin.exchangeClients.edit}" th:aria-label="#{admin.exchangeClients.edit}">
                                         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
                                     </button>
-                                    <button type="button" class="btn btn-ghost" data-xc-undo
+                                    <button type="button" class="btn btn-ghost btn-xs" data-xc-undo
                                             th:attr="data-client-name=${c.displayName}"
                                             data-testid="xc-undo-open"
                                             th:text="#{admin.exchangeClients.undo}">Zur&uuml;cknehmen</button>
-                                    <button th:if="${c.status == 'ACTIVE'}" type="button" class="btn btn-quiet-danger" data-xc-suspend
+                                    <button th:if="${c.status == 'ACTIVE'}" type="button" class="btn btn-quiet-danger btn-xs" data-xc-suspend
                                             th:text="#{admin.exchangeClients.suspend}">Sperren</button>
-                                    <button th:unless="${c.status == 'ACTIVE'}" type="button" class="btn btn-secondary" data-xc-activate
+                                    <button th:unless="${c.status == 'ACTIVE'}" type="button" class="btn btn-success btn-xs" data-xc-activate
                                             th:text="#{admin.exchangeClients.activate}">Freigeben</button>
                                 </div>
                             </td>
                         </tr>
-                        <tr th:if="${error == null and #lists.isEmpty(clients)}">
-                            <td colspan="10" th:text="#{admin.exchangeClients.empty}">Noch keine Anwendung registriert.</td>
-                        </tr>
                         </tbody>
                     </table>
+                    <th:block th:if="${error == null and #lists.isEmpty(clients)}">
+                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.exchangeClients.empty',
+                            textKey='admin.exchangeClients.empty.text', emptyId='xc-empty')}"></th:block>
+                    </th:block>
                 </div>
                 <p class="form-hint xc-grafana-hint">
                     <span th:text="#{admin.exchangeClients.errorRate.hint}">Die Fehlerrate je Anwendung steht in Grafana.</span>
                     <a th:if="${grafanaUrl != null and !#strings.isEmpty(grafanaUrl)}" th:href="${grafanaUrl}" target="_blank" rel="noopener noreferrer"
                        th:text="#{admin.exchangeClients.errorRate.link}">Zum Dashboard</a>
                 </p>
-            </div>
+            </section>
         </th:block>
     </div>
 
-    <div id="xc-undo-runs-host">
+    <div id="xc-undo-runs-host" class="xc-block">
         <th:block th:fragment="undoRuns">
-            <div class="hud-box mt-2" id="xc-undo-runs" data-testid="xc-undo-runs"
-                 th:attr="data-xc-running=${undoRunning} ? 'true' : 'false'">
-                <h2 th:text="#{admin.exchangeClients.undo.runs.title}">Zur&uuml;ckgenommene &Auml;nderungen</h2>
-                <p class="form-hint" th:text="#{admin.exchangeClients.undo.runs.hint}">L&auml;uft ein Zur&uuml;cknehmen, aktualisiert sich die Liste von selbst.</p>
-                <div class="table-responsive">
-                    <table id="xc-undo-runs-table">
+            <section class="stack gap-3" id="xc-undo-runs" data-testid="xc-undo-runs"
+                     th:attr="data-xc-running=${undoRunning} ? 'true' : 'false'">
+                <div class="stack gap-1">
+                    <h2 class="xc-heading" th:text="#{admin.exchangeClients.undo.runs.title}">Zur&uuml;ckgenommene &Auml;nderungen</h2>
+                    <p class="form-hint xc-hint" th:text="#{admin.exchangeClients.undo.runs.hint}">L&auml;uft ein Zur&uuml;cknehmen, aktualisiert sich die Liste von selbst.</p>
+                </div>
+                <div class="card card--flush">
+                    <table id="xc-undo-runs-table" class="data-table data-table--stack" th:if="${!#lists.isEmpty(undoRuns)}">
                         <thead>
                         <tr>
                             <th th:text="#{admin.exchangeClients.undo.column.client}">Anwendung</th>
-                            <th th:text="#{admin.exchangeClients.undo.column.started}">Gestartet</th>
+                            <th class="cell-status" th:text="#{admin.exchangeClients.undo.column.status}">Status</th>
                             <th th:text="#{admin.exchangeClients.undo.column.by}">Von</th>
                             <th th:text="#{admin.exchangeClients.undo.column.scope}">Umfang</th>
-                            <th th:text="#{admin.exchangeClients.undo.column.status}">Status</th>
                             <th th:text="#{admin.exchangeClients.undo.column.members}">Mitglieder</th>
-                            <th th:text="#{admin.exchangeClients.undo.column.restored}">Zur&uuml;ckgesetzt</th>
-                            <th th:text="#{admin.exchangeClients.undo.column.skipped}">&Uuml;bersprungen</th>
-                            <th th:text="#{admin.exchangeClients.undo.column.actions}">Aktion</th>
+                            <th class="num" th:text="#{admin.exchangeClients.undo.column.restored}">Zur&uuml;ckgesetzt</th>
+                            <th class="num" th:text="#{admin.exchangeClients.undo.column.skipped}">&Uuml;bersprungen</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.exchangeClients.undo.column.actions}">Aktion</span></th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr th:each="r : ${undoRuns}" th:attr="data-run-id=${r.id}">
-                            <td th:text="${r.clientName}">VerseKit</td>
-                            <td th:text="#{admin.exchangeClients.utc(${#temporals.format(r.startedAt, 'dd.MM.yyyy HH:mm', 'UTC')})}">27.09.2026 18:00 UTC</td>
-                            <td th:text="${r.requestedByName} ?: '–'">Admin</td>
                             <td>
+                                <span class="cell-title" th:text="${r.clientName}">VerseKit</span>
+                                <span class="cell-sub" th:text="#{admin.exchangeClients.utc(${#temporals.format(r.startedAt, 'dd.MM.yyyy HH:mm', 'UTC')})}">27.09.2026 18:00 UTC</span>
+                            </td>
+                            <td class="cell-status">
+                                <span th:if="${r.status == 'RUNNING'}" class="chip chip--info" th:text="#{admin.exchangeClients.undo.status.RUNNING}">L&auml;uft</span>
+                                <span th:if="${r.status == 'COMPLETED'}" class="chip chip--success" th:text="#{admin.exchangeClients.undo.status.COMPLETED}">Abgeschlossen</span>
+                                <span th:if="${r.status == 'FAILED'}" class="chip chip--danger" th:text="#{admin.exchangeClients.undo.status.FAILED}">Fehlgeschlagen</span>
+                            </td>
+                            <td th:attr="data-label=#{admin.exchangeClients.undo.column.by}" th:text="${r.requestedByName} ?: '–'">Admin</td>
+                            <td th:attr="data-label=#{admin.exchangeClients.undo.column.scope}">
                                 <span th:text="#{admin.exchangeClients.undo.scope.since(${#temporals.format(r.since, 'dd.MM.yyyy HH:mm', 'UTC')})}">seit 27.09.2026 12:00 UTC</span>
                                 <span class="chip chip--muted"
                                       th:text="${r.resource != null} ? #{'admin.exchangeClients.undo.resource.' + ${r.resource}} : #{admin.exchangeClients.undo.resource.ALL}">Alles</span>
                                 <span th:if="${r.installationId != null}" class="chip chip--muted"
                                       th:text="#{admin.exchangeClients.undo.scope.installation}">eine Installation</span>
                             </td>
-                            <td>
-                                <span th:if="${r.status == 'RUNNING'}" class="chip chip--info" th:text="#{admin.exchangeClients.undo.status.RUNNING}">L&auml;uft</span>
-                                <span th:if="${r.status == 'COMPLETED'}" class="chip chip--success" th:text="#{admin.exchangeClients.undo.status.COMPLETED}">Abgeschlossen</span>
-                                <span th:if="${r.status == 'FAILED'}" class="chip chip--danger" th:text="#{admin.exchangeClients.undo.status.FAILED}">Fehlgeschlagen</span>
-                            </td>
-                            <td th:text="#{admin.exchangeClients.undo.progress(${r.membersDone}, ${r.membersTotal}, ${r.membersFailed})}">2 von 3, 0 fehlgeschlagen</td>
-                            <td th:text="${r.restored}">4</td>
-                            <td th:text="${r.skipped}">1</td>
-                            <td>
-                                <button type="button" class="btn btn-ghost" data-xc-undo-run
+                            <td th:attr="data-label=#{admin.exchangeClients.undo.column.members}"
+                                th:text="#{admin.exchangeClients.undo.progress(${r.membersDone}, ${r.membersTotal}, ${r.membersFailed})}">2 von 3, 0 fehlgeschlagen</td>
+                            <td class="num" th:attr="data-label=#{admin.exchangeClients.undo.column.restored}" th:text="${r.restored}">4</td>
+                            <td class="num" th:attr="data-label=#{admin.exchangeClients.undo.column.skipped}" th:text="${r.skipped}">1</td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn-ghost btn-xs" data-xc-undo-run
                                         th:text="#{admin.exchangeClients.undo.details}">Details</button>
                             </td>
                         </tr>
-                        <tr th:if="${#lists.isEmpty(undoRuns)}">
-                            <td colspan="9" th:text="#{admin.exchangeClients.undo.runs.empty}">Noch nichts zur&uuml;ckgenommen.</td>
-                        </tr>
                         </tbody>
                     </table>
+                    <th:block th:if="${#lists.isEmpty(undoRuns)}">
+                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.exchangeClients.undo.runs.empty',
+                            textKey='admin.exchangeClients.undo.runs.empty.text', emptyId='xc-undo-runs-empty')}"></th:block>
+                    </th:block>
                 </div>
-            </div>
+            </section>
         </th:block>
     </div>
 
-    <div class="hud-box mt-2">
-        <h2 id="xc-form-title" th:text="#{admin.exchangeClients.form.create}">Anwendung registrieren</h2>
+    <section class="card xc-block xc-form-card">
+        <h2 id="xc-form-title" class="xc-heading" th:text="#{admin.exchangeClients.form.create}">Anwendung registrieren</h2>
         <form id="xc-form" data-client-id="" novalidate>
             <input type="hidden" id="xc-version" value="">
             <div class="form-grid">
@@ -221,12 +234,12 @@
                 </label>
                 <p class="form-hint" th:text="#{admin.exchangeClients.form.capabilities.connectHint}">Jede Anwendung braucht die Grundberechtigung.</p>
             </fieldset>
-            <div class="mt-2">
+            <div class="cluster gap-2 mt-2">
                 <button type="submit" class="btn btn--cta" th:text="#{admin.exchangeClients.form.save}">Speichern</button>
-                <button type="button" class="btn btn-secondary" id="xc-cancel" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-ghost" id="xc-cancel" th:text="#{general.cancel}">Abbrechen</button>
             </div>
         </form>
-    </div>
+    </section>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='xc-undo-modal', titleKey='admin.exchangeClients.undo.title', variant='krt-modal--wide', body=~{::xc-undo-modal-body})}">
         <th:block th:ref="xc-undo-modal-body">

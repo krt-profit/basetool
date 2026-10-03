@@ -43,26 +43,32 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtModal.close(modal);
     }
 
-    trigger.addEventListener('click', function () {
-        if (!daysInput.checkValidity()) {
-            daysInput.reportValidity();
-            return;
-        }
+    function renderMessage() {
         if (messageEl && template) {
             messageEl.textContent = template.replace('{0}', daysInput.value);
         }
+    }
+
+    trigger.addEventListener('click', function () {
+        renderMessage();
         window.krtModal.open(modal);
     });
+    daysInput.addEventListener('input', renderMessage);
 
     if (cancelBtn) {
         cancelBtn.addEventListener('click', closeModal);
     }
-    confirmBtn.addEventListener('click', function () {
-        closeModal();
-        if (!window.krtFetch) {
-            form.requestSubmit();
+
+    function purge() {
+        if (!daysInput.checkValidity()) {
+            daysInput.reportValidity();
             return;
         }
+        if (!window.krtFetch) {
+            form.submit();
+            return;
+        }
+        closeModal();
         const sourceValue = sourceInput ? sourceInput.value : '';
         const url =
             '/admin/sync-reports/delete-old?days=' +
@@ -88,15 +94,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             },
         });
-    });
-    window.addEventListener('click', function (event) {
+    }
+
+    confirmBtn.addEventListener('click', purge);
+    modal.addEventListener('click', function (event) {
         if (event.target === modal) {
             closeModal();
         }
     });
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') {
-            closeModal();
-        }
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        purge();
     });
 });

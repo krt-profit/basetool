@@ -12,64 +12,59 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.deletionRequests.title}">L&ouml;schantr&auml;ge</h1>
-        <p th:text="#{admin.deletionRequests.subtitle}">Antr&auml;ge von Mitgliedern auf L&ouml;schung ihres Kontos entscheiden.</p>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.deletionRequests.title},
+        count=${requests != null ? #lists.size(requests) : null}, countId='deletionRequestsCount', countFor='deletionRequestsHost')}"></th:block>
+
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
+
+    <div class="alert alert-warning dr-note" role="note">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+        <p th:text="#{admin.deletionRequests.deadline}">Ein Antrag ist innerhalb eines Monats zu beantworten. Die Liste ist nach Alter sortiert.</p>
     </div>
 
-    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
-        <p th:text="#{${error}}">Fehler beim Laden.</p>
-    </div>
-
-    <div class="hud-box mt-2 krtm-border-color-var-color-warning-display-flex-1b12" role="note">
-        <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-            <use href="#krt-icon-info"/></svg>
-        <p class="krtm-margin-0-2a0c" th:text="#{admin.deletionRequests.deadline}">Ein Antrag ist innerhalb eines Monats zu beantworten. Die Liste ist nach Alter sortiert.</p>
-    </div>
-
-    <div class="hud-box mt-2">
-        <div class="table-responsive" id="deletionRequestsHost">
-            <th:block th:fragment="rows">
-            <table id="deletionRequestsTable">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.deletionRequests.col.member}">Mitglied</th>
-                        <th th:text="#{admin.deletionRequests.col.requestedAt}">Beantragt</th>
-                        <th th:text="#{admin.deletionRequests.col.eraseHistory}">Protokolle</th>
-                        <th th:text="#{admin.deletionRequests.col.actions}">Aktionen</th>
-                    </tr>
-                </thead>
-                <tbody id="deletionRequestsBody">
-                    <tr th:each="req : ${requests}" th:id="'dr-row-' + ${req.id}"
-                        th:with="reqHandle=${@handles.display(req.handle)}"
-                        th:attr="data-id=${req.id},data-handle=${reqHandle},data-version=${req.version}">
-                        <td>
-                            <span th:text="${@handles.display(req.handle)}">Mitglied</span>
-                        </td>
-                        <td class="dr-when"
-                            th:text="${#temporals.format(req.requestedAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
-                        <td>
-                            <span th:if="${req.eraseHistoryRequested}" class="chip chip--warning"
-                                  th:title="#{admin.deletionRequests.eraseHistory.hint}"
-                                  th:text="#{admin.deletionRequests.eraseHistory.yes}">Auch anonymisieren</span>
-                            <span th:unless="${req.eraseHistoryRequested}" class="dr-when" aria-hidden="true">&mdash;</span>
-                        </td>
-                        <td>
-                            <div class="dr-actions">
-                                <button type="button" class="btn btn--danger" data-action="execute"
-                                        th:text="#{admin.deletionRequests.execute}">Konto l&ouml;schen</button>
-                                <button type="button" class="btn btn-outline" data-action="decline"
-                                        th:text="#{admin.deletionRequests.decline}">Ablehnen</button>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr id="deletionRequestsEmpty" th:if="${#lists.isEmpty(requests)}">
-                        <td colspan="4" th:text="#{admin.deletionRequests.empty}">Keine offenen L&ouml;schantr&auml;ge.</td>
-                    </tr>
-                </tbody>
-            </table>
-            </th:block>
-        </div>
+    <div id="deletionRequestsHost" class="card card--flush">
+        <th:block th:fragment="rows">
+        <table id="deletionRequestsTable" class="data-table data-table--stack" th:if="${!#lists.isEmpty(requests)}"
+               th:data-list-total="${#lists.size(requests)}">
+            <thead>
+                <tr>
+                    <th th:text="#{admin.deletionRequests.col.member}">Mitglied</th>
+                    <th th:text="#{admin.deletionRequests.col.requestedAt}">Beantragt</th>
+                    <th th:text="#{admin.deletionRequests.col.eraseHistory}">Protokolle</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.deletionRequests.col.actions}">Aktionen</span></th>
+                </tr>
+            </thead>
+            <tbody id="deletionRequestsBody">
+                <tr th:each="req : ${requests}" th:id="'dr-row-' + ${req.id}"
+                    th:with="reqHandle=${@handles.display(req.handle)}"
+                    th:attr="data-id=${req.id},data-handle=${reqHandle},data-version=${req.version}">
+                    <td>
+                        <span class="cell-title" th:text="${reqHandle}">Mitglied</span>
+                    </td>
+                    <td class="dr-when" th:attr="data-label=#{admin.deletionRequests.col.requestedAt}"
+                        th:text="${#temporals.format(req.requestedAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
+                    <td th:attr="data-label=#{admin.deletionRequests.col.eraseHistory}">
+                        <span th:if="${req.eraseHistoryRequested}" class="chip chip--warning"
+                              th:title="#{admin.deletionRequests.eraseHistory.hint}"
+                              th:text="#{admin.deletionRequests.eraseHistory.yes}">Auch anonymisieren</span>
+                        <span th:unless="${req.eraseHistoryRequested}" class="dr-when" aria-hidden="true">&mdash;</span>
+                    </td>
+                    <td class="cell-actions">
+                        <div class="cluster gap-2 dr-actions">
+                            <button type="button" class="btn btn-ghost btn-xs" data-action="decline"
+                                    th:text="#{admin.deletionRequests.decline}">Ablehnen</button>
+                            <button type="button" class="btn btn-quiet-danger btn-xs" data-action="execute"
+                                    th:text="#{admin.deletionRequests.execute}">Konto l&ouml;schen</button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <th:block th:if="${#lists.isEmpty(requests)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.deletionRequests.empty',
+                textKey='admin.deletionRequests.empty.text', emptyId='deletionRequestsEmpty')}"></th:block>
+        </th:block>
+        </th:block>
     </div>
 </main>
 
@@ -90,20 +85,19 @@
             <button type="button" class="btn btn-ghost"
                     data-trigger="close-modal-display" data-modal-id="decline-modal"
                     th:text="#{general.cancel}">Abbrechen</button>
-            <button type="button" class="btn btn--danger" id="decline-submit"
+            <button type="button" class="btn btn-danger" id="decline-submit"
                     data-testid="decline-submit"
                     th:text="#{admin.deletionRequests.decline.submit}">Antrag ablehnen</button>
         </div>
     </div>
 </div>
 
-<div th:replace="~{fragments/modal-wrapper :: modal(modalId='execute-modal', titleKey='admin.deletionRequests.execute.title', variant=null, body=~{::.execute-form})}">
+<div th:replace="~{fragments/modal-wrapper :: modal(modalId='execute-modal', titleKey='admin.deletionRequests.execute.title', variant='krt-modal--danger', body=~{::.execute-form})}">
     <div class="execute-form">
         <div class="krt-modal-body">
-            <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="alert">
-                <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-                    <use href="#krt-icon-warning"/></svg>
-                <p class="krtm-margin-0-2a0c" th:text="#{admin.deletionRequests.execute.warning}">Das Konto und der zugeh&ouml;rige Keycloak-Zugang werden endg&uuml;ltig entfernt. Das l&auml;sst sich nicht zur&uuml;cknehmen.</p>
+            <div class="alert alert-warning dr-note" role="alert">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+                <p th:text="#{admin.deletionRequests.execute.warning}">Das Konto und der zugeh&ouml;rige Keycloak-Zugang werden endg&uuml;ltig entfernt. Das l&auml;sst sich nicht zur&uuml;cknehmen.</p>
             </div>
             <p class="bank-field-hint" data-execute-member></p>
             <div class="check-row">
@@ -119,7 +113,7 @@
             <button type="button" class="btn btn-ghost"
                     data-trigger="close-modal-display" data-modal-id="execute-modal"
                     th:text="#{general.cancel}">Abbrechen</button>
-            <button type="button" class="btn btn--danger" id="execute-submit"
+            <button type="button" class="btn btn-danger" id="execute-submit"
                     data-testid="execute-submit"
                     th:text="#{admin.deletionRequests.execute.submit}">Endg&uuml;ltig l&ouml;schen</button>
         </div>

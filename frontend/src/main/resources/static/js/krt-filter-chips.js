@@ -42,8 +42,9 @@
     }
 
     /**
-     * Whether a control takes no part in the chips: a hidden or button input, a search field, a
-     * segmented control, or anything marked `data-filter-chip-ignore` / `data-filter-ignore`.
+     * Whether a control takes no part in the chips: a button input, a search field, a segmented
+     * control, anything marked `data-filter-chip-ignore` / `data-filter-ignore`, and a hidden input
+     * unless it names its chip with `data-chip-label`.
      *
      * @param {HTMLInputElement | HTMLSelectElement} control the control
      * @returns {boolean} true when it is skipped
@@ -52,7 +53,30 @@
         if (control.disabled || !control.name) return true;
         if (control.closest('[data-filter-chip-ignore], [data-filter-ignore]')) return true;
         const type = (control.getAttribute('type') || '').toLowerCase();
-        return ['hidden', 'submit', 'button', 'reset', 'search'].indexOf(type) >= 0;
+        if (type === 'hidden') return !control.hasAttribute('data-chip-label');
+        return ['submit', 'button', 'reset', 'search'].indexOf(type) >= 0;
+    }
+
+    /**
+     * The chip text of a free value: an ISO instant in local time when the control carries
+     * `data-chip-format="datetime"`, otherwise the trimmed value.
+     *
+     * @param {HTMLInputElement} control the control
+     * @returns {string} the value as shown on the chip
+     */
+    function valueText(control) {
+        const value = control.value.trim();
+        if (control.getAttribute('data-chip-format') !== 'datetime') return value;
+        const date = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(value) ? value : value + 'Z');
+        if (isNaN(date.getTime())) return value;
+        return new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Europe/Berlin',
+        }).format(date);
     }
 
     /**
@@ -112,7 +136,7 @@
                 active.push({
                     control,
                     option: null,
-                    text: labelOf(control) + ': ' + control.value.trim(),
+                    text: labelOf(control) + ': ' + valueText(control),
                 });
             }
         }
@@ -146,6 +170,10 @@
             if (!reset) control.checked = false;
         } else {
             control.value = '';
+            const group = control.closest('.datetime-split-group');
+            if (group && typeof window.krtSyncDatetimeSplitGroup === 'function') {
+                window.krtSyncDatetimeSplitGroup(group);
+            }
         }
         control.dispatchEvent(new Event('input', { bubbles: true }));
         control.dispatchEvent(new Event('change', { bubbles: true }));

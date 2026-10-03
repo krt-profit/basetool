@@ -1,0 +1,121 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .orders-toolbar .filter-popover__panel {
+        right: auto;
+        left: 0;
+    }
+
+    .orders-filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .orders-filter-field[hidden] {
+        display: none;
+    }
+
+    .orders-filter-label {
+        padding: 0;
+        color: var(--color-gray-1);
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .orders-filter-check {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-height: var(--touch-target);
+        margin: 0;
+        cursor: pointer;
+    }
+
+    .orders-table .orders-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1) var(--space-2);
+        margin-top: var(--space-1);
+    }
+
+    .orders-table .order-responsible-label {
+        display: inline;
+        margin-top: 0;
+        color: var(--color-gray-2-text);
+        font-weight: var(--fw-regular);
+    }
+
+    .orders-table .orders-drag-handle {
+        margin-right: var(--space-2);
+        color: var(--color-primary);
+        cursor: grab;
+    }
+
+    .orders-table .orders-materials-cell > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .orders-table .ord-materials-toggle .toggle-icon {
+        color: var(--color-primary);
+        font-size: 0.7rem;
+    }
+
+    .orders-materials-table {
+        margin: var(--space-2) 0 0;
+        background: transparent;
+        border: 0;
+    }
+
+    .orders-materials-table th {
+        background: transparent;
+    }
+
+    .orders-materials-table td {
+        border-bottom: 0;
+        white-space: nowrap;
+    }
+
+    .orders-materials-table .orders-material-name {
+        max-width: 24ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .orders-materials-empty {
+        margin: var(--space-2) 0 0;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+    }
+
+    #orders-results > .page-size-picker {
+        padding: 0 var(--space-4) var(--space-3);
+    }
+
+    @media (width <= 768px) {
+        .orders-toolbar .filter-popover__panel {
+            right: 0;
+        }
+
+        .orders-table .orders-drag-handle {
+            display: none;
+        }
+
+        .orders-table td.orders-materials-cell {
+            flex-basis: 100%;
+            margin-right: 0;
+        }
+
+        .orders-materials-table .orders-material-name {
+            max-width: none;
+        }
+    }
+}

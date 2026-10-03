@@ -15,22 +15,67 @@
     <span id="os-i18n" hidden
           th:attr="data-saved=#{admin.orgStructure.success.saved},data-error=#{admin.orgStructure.error.action},data-refresh-error=#{admin.orgStructure.refresh.error}"></span>
 
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.orgStructure.title}">Organisationsstruktur</h1>
-        <p th:text="#{admin.orgStructure.subtitle}">Bereiche und Organisationsleitung anlegen und Einheiten einordnen.</p>
-        <p class="mt-1">
-            <a th:href="@{/org-chart}" th:text="#{admin.orgStructure.toChart}">Zum Organigramm</a>
-        </p>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{admin.orgStructure.title},
+        count=${nodes != null ? nodes.size() : null}, countId='org-units-count', countFor='org-structure-units', actions=~{::org-structure-actions})}">
+        <th:block th:ref="org-structure-actions">
+            <a th:href="@{/org-chart}" class="btn btn-ghost" th:text="#{admin.orgStructure.toChart}">Zum Organigramm</a>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{fragments/components :: alert('danger', ${error}, null)}"></th:block>
+
+    <div class="alert alert-info" th:text="#{admin.orgStructure.units.hint}">Wähle die übergeordnete Einheit; Staffeln/Spezialkommandos gehören in einen Bereich, Bereiche in die Organisationsleitung.</div>
+
+    <div id="org-structure-units" class="card card--flush">
+    <th:block th:fragment="orgStructureUnits">
+        <table id="org-units-table" class="data-table data-table--stack" th:if="${!#lists.isEmpty(nodes)}"
+               th:data-list-total="${#lists.size(nodes)}">
+            <thead>
+            <tr>
+                <th th:text="#{admin.orgStructure.column.name}">Name</th>
+                <th th:text="#{admin.orgStructure.column.kind}">Art</th>
+                <th th:text="#{admin.orgStructure.column.parent}">Übergeordnete Einheit</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="n : ${nodes}" th:attr="data-org-unit-id=${n.id},data-version=${n.version}" data-testid="org-unit-row">
+                <td>
+                    <span class="cell-title" th:text="${n.name}">Name</span>
+                    <span class="cell-sub" th:text="${n.shorthand}">SH</span>
+                </td>
+                <td th:attr="data-label=#{admin.orgStructure.column.kind}" th:text="#{'admin.orgStructure.kind.' + ${n.kind}}">Art</td>
+                <td th:attr="data-label=#{admin.orgStructure.column.parent}">
+                    <span th:if="${n.kind == 'ORGANISATIONSLEITUNG'}" class="text-muted"
+                          th:text="#{admin.orgStructure.root}">Wurzel</span>
+                    <select th:unless="${n.kind == 'ORGANISATIONSLEITUNG'}" class="os-parent-select" data-trigger="os-parent-select"
+                            th:attr="aria-label=#{admin.orgStructure.setParent} + ' ' + ${n.name}">
+                        <option value="" th:text="#{admin.orgStructure.noParent}"
+                                th:selected="${n.parentOrgUnitId == null}">— keine —</option>
+                        <th:block th:if="${n.kind == 'BEREICH'}">
+                            <option th:each="ol : ${organisationsleitungen}" th:value="${ol.id}"
+                                    th:text="${ol.name}" th:selected="${ol.id == n.parentOrgUnitId}">Organisationsleitung</option>
+                        </th:block>
+                        <th:block th:unless="${n.kind == 'BEREICH'}">
+                            <option th:each="b : ${bereiche}" th:value="${b.id}"
+                                    th:text="${b.name}" th:selected="${b.id == n.parentOrgUnitId}">Bereich</option>
+                        </th:block>
+                    </select>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <th:block th:if="${#lists.isEmpty(nodes)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.orgStructure.units.empty', textKey='admin.orgStructure.units.empty.text')}"></th:block>
+        </th:block>
+    </th:block>
     </div>
 
-    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
-        <p th:text="#{${error}}">Fehler beim Laden.</p>
-    </div>
-
-    <div id="org-structure-forms">
+    <div id="org-structure-forms" class="grid-auto org-structure-forms">
     <th:block th:fragment="orgStructureForms">
-    <div class="hud-box mt-2">
-        <h2 th:text="#{admin.orgStructure.ol.create}">Organisationsleitung anlegen</h2>
+    <section class="card" aria-labelledby="ol-create-title">
+        <div class="card-head">
+            <h2 id="ol-create-title" class="card-title" th:text="#{admin.orgStructure.ol.create}">Organisationsleitung anlegen</h2>
+        </div>
         <p th:if="${hasOl}" class="text-muted" th:text="#{admin.orgStructure.ol.exists}">Die Organisationsleitung besteht bereits.</p>
         <form id="ol-form" data-trigger="os-create-ol" th:unless="${hasOl}">
             <div class="form-grid">
@@ -51,10 +96,12 @@
                 <button type="submit" class="btn btn--cta" th:text="#{admin.orgStructure.ol.createButton}">Organisationsleitung anlegen</button>
             </div>
         </form>
-    </div>
+    </section>
 
-    <div class="hud-box mt-2">
-        <h2 th:text="#{admin.orgStructure.bereich.create}">Bereich anlegen</h2>
+    <section class="card" aria-labelledby="bereich-create-title">
+        <div class="card-head">
+            <h2 id="bereich-create-title" class="card-title" th:text="#{admin.orgStructure.bereich.create}">Bereich anlegen</h2>
+        </div>
         <form id="bereich-form" data-trigger="os-create-bereich">
             <div class="form-grid">
                 <div class="form-group">
@@ -90,56 +137,7 @@
                 <button type="submit" class="btn btn--cta" th:text="#{admin.orgStructure.bereich.createButton}">Bereich anlegen</button>
             </div>
         </form>
-    </div>
-    </th:block>
-    </div>
-
-    <div id="org-structure-units">
-    <th:block th:fragment="orgStructureUnits">
-    <div class="hud-box mt-2">
-        <h2 th:text="#{admin.orgStructure.units.title}">Einheiten und Zuordnung</h2>
-        <p class="text-muted" th:text="#{admin.orgStructure.units.hint}">Wähle die übergeordnete Einheit; Staffeln/Spezialkommandos gehören in einen Bereich, Bereiche in die Organisationsleitung.</p>
-        <div class="table-responsive">
-        <table id="org-units-table">
-            <thead>
-            <tr>
-                <th th:text="#{admin.orgStructure.column.name}">Name</th>
-                <th th:text="#{admin.orgStructure.column.kind}">Art</th>
-                <th th:text="#{admin.orgStructure.column.parent}">Übergeordnete Einheit</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="n : ${nodes}" th:attr="data-org-unit-id=${n.id},data-version=${n.version}">
-                <td>
-                    <span th:text="${n.name}">Name</span>
-                    <span class="text-muted" th:text="'(' + ${n.shorthand} + ')'">(SH)</span>
-                </td>
-                <td th:text="#{'admin.orgStructure.kind.' + ${n.kind}}">Art</td>
-                <td>
-                    <span th:if="${n.kind == 'ORGANISATIONSLEITUNG'}" class="text-muted"
-                          th:text="#{admin.orgStructure.root}">Wurzel</span>
-                    <select th:unless="${n.kind == 'ORGANISATIONSLEITUNG'}" class="os-parent-select" data-trigger="os-parent-select"
-                            th:attr="aria-label=#{admin.orgStructure.setParent} + ' ' + ${n.name}">
-                        <option value="" th:text="#{admin.orgStructure.noParent}"
-                                th:selected="${n.parentOrgUnitId == null}">— keine —</option>
-                        <th:block th:if="${n.kind == 'BEREICH'}">
-                            <option th:each="ol : ${organisationsleitungen}" th:value="${ol.id}"
-                                    th:text="${ol.name}" th:selected="${ol.id == n.parentOrgUnitId}">Organisationsleitung</option>
-                        </th:block>
-                        <th:block th:unless="${n.kind == 'BEREICH'}">
-                            <option th:each="b : ${bereiche}" th:value="${b.id}"
-                                    th:text="${b.name}" th:selected="${b.id == n.parentOrgUnitId}">Bereich</option>
-                        </th:block>
-                    </select>
-                </td>
-            </tr>
-            <tr th:if="${#lists.isEmpty(nodes)}">
-                <td colspan="3" th:text="#{admin.orgStructure.units.empty}">Noch keine Einheiten.</td>
-            </tr>
-            </tbody>
-        </table>
-        </div>
-    </div>
+    </section>
     </th:block>
     </div>
 </main>

@@ -8,66 +8,51 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="hud-box mt-2">
-        <h1 th:text="#{adminTerms.title}">Zustimmung zu den Nutzungsbedingungen</h1>
-        <p th:text="#{adminTerms.lead}">Wer hat der aktuell geltenden Fassung zugestimmt und wer noch nicht.</p>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{adminTerms.title},
+        count=${termsPage != null ? termsPage.totalElements() : null}, countId='admin-terms-count', countFor='admin-terms-results')}"></th:block>
 
-        <p th:if="${termsPendingCount != null}"
-           th:text="#{adminTerms.pendingCount(${termsPendingCount})}">Es fehlen noch 0 Zustimmungen.</p>
-
-        <form id="admin-terms-filter-form" method="get" th:action="@{/admin/terms}" class="mt-2">
-            <label for="admin-terms-filter" th:text="#{adminTerms.filter.label}">Anzeigen</label>
-            <select id="admin-terms-filter" name="filter">
-                <option value="PENDING" th:selected="${termsFilter == 'PENDING'}" th:text="#{adminTerms.filter.pending}">Noch offen</option>
-                <option value="ACCEPTED" th:selected="${termsFilter == 'ACCEPTED'}" th:text="#{adminTerms.filter.accepted}">Zugestimmt</option>
-                <option value="ALL" th:selected="${termsFilter == 'ALL'}" th:text="#{adminTerms.filter.all}">Alle</option>
-            </select>
-        </form>
-
-        <div id="admin-terms-results" class="mt-2">
-            <th:block th:fragment="adminTermsResults">
-                <p th:if="${termsLoadFailed}" th:text="#{adminTerms.loadFailed}">Die Übersicht konnte nicht geladen werden.</p>
-
-                <p th:if="${!termsLoadFailed and #lists.isEmpty(termsRows)}"
-                   th:text="#{adminTerms.empty}">Keine Einträge für diese Auswahl.</p>
-
-                <div class="table-responsive" th:if="${!#lists.isEmpty(termsRows)}">
-                <table>
-                    <thead>
-                    <tr>
-                        <th th:text="#{adminTerms.column.user}">Nutzer</th>
-                        <th th:text="#{adminTerms.column.status}">Status</th>
-                        <th th:text="#{adminTerms.column.acceptedAt}">Zugestimmt am</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="row : ${termsRows}">
-                        <td>
-                            <span th:text="${row.displayName() != null ? row.displayName() : row.username()}">Rufzeichen</span>
-                        </td>
-                        <td>
-                            <span th:if="${row.accepted()}" th:text="#{adminTerms.status.accepted}">Zugestimmt</span>
-                            <span th:unless="${row.accepted()}" th:text="#{adminTerms.status.pending}">Offen</span>
-                        </td>
-                        <td th:text="${row.acceptedAt() != null ? #temporals.format(row.acceptedAt(), 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : ''}">—</td>
-                    </tr>
-                    </tbody>
-                </table>
-                </div>
-
-                <div th:if="${termsPage != null and termsPage.totalPages() > 1}" class="mt-2">
-                    <span th:text="#{adminTerms.pageOf(${termsPage.page() + 1}, ${termsPage.totalPages()})}">Seite 1 von 1</span>
-                    <a th:if="${termsPage.page() > 0}"
-                       class="btn btn-outline admin-terms-page"
-                       th:href="@{/admin/terms(filter=${termsFilter},page=${termsPage.page() - 1})}"
-                       th:text="#{adminTerms.previous}">Zurück</a>
-                    <a th:if="${termsPage.page() + 1 < termsPage.totalPages()}"
-                       class="btn btn-outline admin-terms-page"
-                       th:href="@{/admin/terms(filter=${termsFilter},page=${termsPage.page() + 1})}"
-                       th:text="#{adminTerms.next}">Weiter</a>
-                </div>
-            </th:block>
+    <form id="admin-terms-filter-form" method="get" th:action="@{/admin/terms}" class="no-track">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: segmented(name='filter', labelKey='adminTerms.filter.label', selected=${termsFilter},
+                options=${ {{value: 'PENDING', labelKey: 'adminTerms.filter.pending', count: termsPendingCount},
+                            {value: 'ACCEPTED', labelKey: 'adminTerms.filter.accepted'},
+                            {value: 'ALL', labelKey: 'adminTerms.filter.all'}} })}"></th:block>
         </div>
+    </form>
+
+    <div id="admin-terms-results" class="card card--flush">
+        <th:block th:fragment="adminTermsResults">
+            <div th:if="${termsLoadFailed}" class="alert alert-danger" role="alert" th:text="#{adminTerms.loadFailed}">Die &Uuml;bersicht konnte nicht geladen werden.</div>
+
+            <th:block th:if="${!termsLoadFailed and #lists.isEmpty(termsRows)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='adminTerms.empty', textKey='adminTerms.empty.text')}"></th:block>
+            </th:block>
+
+            <table th:if="${!#lists.isEmpty(termsRows)}" class="data-table data-table--stack">
+                <thead>
+                <tr>
+                    <th th:text="#{adminTerms.column.user}">Nutzer</th>
+                    <th class="cell-status" th:text="#{adminTerms.column.status}">Status</th>
+                    <th th:text="#{adminTerms.column.acceptedAt}">Zugestimmt am</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${termsRows}">
+                    <td>
+                        <span class="cell-title" th:text="${row.displayName() != null ? row.displayName() : row.username()}">Rufzeichen</span>
+                    </td>
+                    <td class="cell-status">
+                        <span th:if="${row.accepted()}" class="chip chip--success" th:text="#{adminTerms.status.accepted}">Zugestimmt</span>
+                        <span th:unless="${row.accepted()}" class="chip chip--warning" th:text="#{adminTerms.status.pending}">Offen</span>
+                    </td>
+                    <td th:attr="data-label=#{adminTerms.column.acceptedAt}"
+                        th:text="${row.acceptedAt() != null ? #temporals.format(row.acceptedAt(), 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '—'}">—</td>
+                </tr>
+                </tbody>
+            </table>
+
+            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${termsPage}, baseUrl=${'/admin/terms?filter=' + termsFilter})}"></th:block>
+        </th:block>
     </div>
 </main>
 <script th:src="@{/js/admin-terms.js}" defer th:attr="nonce=${cspNonce}"></script>

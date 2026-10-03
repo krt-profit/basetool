@@ -11,62 +11,61 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{promotion.manage.title}">Bewertungsverwaltung</h1>
-        <p th:text="#{promotion.manage.subtitle}">Stufen verwalten</p>
-    </div>
+<main th:with="pmShowMatrix=${!isAllSquadronsMode and members != null and !members.isEmpty()}">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.manage.title},
+        count=${pmShowMatrix ? members.size() : null}, countId='pm-count', actions=~{::pm-actions})}">
+        <th:block th:ref="pm-actions">
+            <th:block th:if="${pmShowMatrix}">
+                <th:block th:replace="~{fragments/components :: overflowMenu(id='pm-more', items=~{::pm-more-items})}">
+                    <th:block th:ref="pm-more-items">
+                        <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="pm-expand-all"
+                                data-testid="pm-expand-all" th:text="#{promotion.manage.expand.all}">Alle ausklappen</button>
+                        <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="pm-collapse-all"
+                                data-testid="pm-collapse-all" th:text="#{promotion.manage.collapse.all}">Alle einklappen</button>
+                        <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="pm-export-csv"
+                                data-testid="pm-export-csv" th:text="#{promotion.manage.export.csv}">CSV-Export</button>
+                    </th:block>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
 
-    <div th:if="${isAllSquadronsMode}" class="hud-box mt-2">
-        <p th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</p>
-    </div>
+    <div th:if="${isAllSquadronsMode}" class="alert alert-info"
+         th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</div>
     <th:block th:unless="${isAllSquadronsMode}">
 
-    <div class="hud-box mt-2">
-        <div th:if="${#lists.isEmpty(members)}">
-            <p th:text="#{promotion.manage.no.members}">Keine Mitglieder gefunden.</p>
+        <div th:if="${!pmShowMatrix}" class="card card--flush">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.manage.no.members', textKey='promotion.manage.no.members.text')}"></th:block>
         </div>
 
-        <th:block th:unless="${#lists.isEmpty(members)}">
-            <div class="pm-toolbar">
-                <input type="search"
-                       id="pm-member-search"
-                       class="pm-search"
-                       th:attr="placeholder=#{promotion.manage.filter.placeholder},aria-label=#{promotion.manage.filter.placeholder}"
-                       autocomplete="off" />
-
-                <label class="pm-filter-chip">
-                    <input type="checkbox" id="pm-filter-eligible" data-trigger="pm-filter-change" />
-                    <span th:text="#{promotion.manage.filter.eligible.only}">Nur Beförderbare</span>
-                </label>
-                <label class="pm-filter-chip">
-                    <input type="checkbox" id="pm-filter-no-eval" data-trigger="pm-filter-change" />
-                    <span th:text="#{promotion.manage.filter.no.evaluations}">Nur ohne Bewertung</span>
-                </label>
-
-                <div class="pm-spacer"></div>
-
-                <span id="pm-queue-indicator" class="pm-queue-indicator" hidden
-                      th:attr="aria-label=#{promotion.manage.queue.aria}">
-                    <span class="krt-spinner" aria-hidden="true"></span>
-                    <span>
-                        <span id="pm-queue-count">0</span>
-                        <span th:text="#{promotion.manage.queue.suffix}">Speichervorgänge offen</span>
+        <th:block th:if="${pmShowMatrix}">
+            <div id="pm-filter-form">
+                <div class="toolbar">
+                    <th:block th:replace="~{fragments/components :: toolbarSearch('pm-member-search', 'search', null, 'promotion.manage.filter.placeholder')}"></th:block>
+                    <th:block th:replace="~{fragments/components :: filterPopover(panelId='pm-filter-panel', panelName='promotion-manage',
+                        testid='pm-filter-toggle', body=~{::pm-filter-body})}">
+                        <th:block th:ref="pm-filter-body">
+                            <div class="check-row pm-filter-option">
+                                <input type="checkbox" id="pm-filter-eligible" name="eligibleOnly" data-trigger="pm-filter-change" />
+                                <label for="pm-filter-eligible" th:text="#{promotion.manage.filter.eligible.only}">Nur Beförderbare</label>
+                            </div>
+                            <div class="check-row pm-filter-option">
+                                <input type="checkbox" id="pm-filter-no-eval" name="noEvalOnly" data-trigger="pm-filter-change" />
+                                <label for="pm-filter-no-eval" th:text="#{promotion.manage.filter.no.evaluations}">Nur ohne Bewertung</label>
+                            </div>
+                        </th:block>
+                    </th:block>
+                    <span class="toolbar__spacer"></span>
+                    <span id="pm-queue-indicator" class="pm-queue-indicator" hidden
+                          th:attr="aria-label=#{promotion.manage.queue.aria}">
+                        <span class="krt-spinner" aria-hidden="true"></span>
+                        <span>
+                            <span id="pm-queue-count">0</span>
+                            <span th:text="#{promotion.manage.queue.suffix}">Speichervorgänge offen</span>
+                        </span>
                     </span>
-                </span>
-
-                <button type="button"
-                        class="btn btn-ghost btn-tiny"
-                        data-trigger="pm-expand-all"
-                        th:text="#{promotion.manage.expand.all}">Alle ausklappen</button>
-                <button type="button"
-                        class="btn btn-ghost btn-tiny"
-                        data-trigger="pm-collapse-all"
-                        th:text="#{promotion.manage.collapse.all}">Alle einklappen</button>
-                <button type="button"
-                        class="btn btn-ghost btn-tiny"
-                        data-trigger="pm-export-csv"
-                        th:text="#{promotion.manage.export.csv}">CSV-Export</button>
+                </div>
+                <th:block th:replace="~{fragments/components :: filterChips('pm-filter-form')}"></th:block>
             </div>
 
             <div class="pm-bulk-panel" id="pm-bulk-panel" hidden role="region"
@@ -104,7 +103,7 @@
                         th:text="#{promotion.manage.bulk.clear}">Auswahl aufheben</button>
             </div>
 
-            <div class="pm-matrix-wrapper">
+            <div class="card card--flush pm-matrix-wrapper">
                 <div id="pm-matrix-results">
                 <th:block th:fragment="matrixBody">
                 <th:block th:if="${matrixTruncated}">
@@ -219,13 +218,13 @@
                         </tr>
                     </tbody>
                 </table>
-                <div id="pm-empty-state" class="pm-empty" hidden
-                     th:text="#{promotion.manage.filter.empty}">Keine Treffer.</div>
+                <div id="pm-empty-state" hidden>
+                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.manage.filter.empty', textKey='promotion.manage.filter.empty.text')}"></th:block>
+                </div>
                 </th:block>
                 </div>
             </div>
         </th:block>
-    </div>
     </th:block>
 </main>
 

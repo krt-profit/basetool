@@ -49,17 +49,14 @@ function filterTable(tableId, query) {
 
 window.filterTable = filterTable;
 
-document.addEventListener('DOMContentLoaded', function () {});
-
 document.addEventListener('DOMContentLoaded', function () {
-    function patchButton(btn, flagValue, secondaryWhen) {
+    function patchButton(btn, flagValue) {
         if (!btn) {
             return;
         }
         btn.textContent = flagValue
             ? btn.getAttribute('data-label-on')
             : btn.getAttribute('data-label-off');
-        btn.classList.toggle('btn-secondary', flagValue === secondaryWhen);
     }
 
     function patchRow(row, updated) {
@@ -69,14 +66,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const visForm = row.querySelector('form[data-location-toggle="visibility"]');
         const homeForm = row.querySelector('form[data-location-toggle="home"]');
         if (visForm) {
-            patchButton(visForm.querySelector('button'), updated.hidden, false);
+            patchButton(visForm.querySelector('button'), updated.hidden);
             const visInput = visForm.querySelector('input[name="hidden"]');
             if (visInput) {
                 visInput.value = String(!updated.hidden);
             }
         }
         if (homeForm) {
-            patchButton(homeForm.querySelector('button'), updated.homeLocation, true);
+            patchButton(homeForm.querySelector('button'), updated.homeLocation);
             const homeInput = homeForm.querySelector('input[name="homeLocation"]');
             if (homeInput) {
                 homeInput.value = String(!updated.homeLocation);

@@ -12,6 +12,15 @@
         text-decoration: none;
     }
 
+    .material-flag {
+        margin-right: 0.5rem;
+        font-weight: var(--fw-bold);
+    }
+
+    .price-info__end {
+        text-align: right;
+    }
+
     .material-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(231, 126, 35, 0.2);
@@ -62,15 +71,58 @@
         box-sizing: border-box;
     }
 
-    .materials-grouping-toggle {
+    :is(
+        #materialsGrouped,
+        #materialsFlat,
+        #noResultsMsg,
+        .kind-group,
+        .materialsGrid,
+        .material-card
+    )[hidden] {
+        display: none;
+    }
+
+    .kind-head {
+        margin: 0;
+        font-size: var(--fs-sm);
+    }
+    .kind-toggle {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        margin: 0.5rem 0 1.5rem;
-    }
-    .materials-grouping-toggle label {
-        font-family: var(--font-body);
-        font-size: 0.8rem;
+        gap: var(--space-3);
+        width: 100%;
+        min-height: var(--touch-target);
+        padding: 0.6rem var(--space-4);
+        background: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+        color: var(--color-white);
+        font: inherit;
+        font-weight: var(--fw-bold);
+        letter-spacing: inherit;
+        text-align: left;
+        text-transform: inherit;
         cursor: pointer;
+    }
+    .kind-toggle:hover {
+        background: var(--color-gray-3);
+    }
+    .kind-toggle:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
+    }
+    .kind-chevron {
+        width: 16px;
+        height: 16px;
+        color: var(--color-gray-2-text);
+        transition: transform 0.2s;
+    }
+    .kind-toggle[aria-expanded='true'] .kind-chevron {
+        transform: rotate(90deg);
+    }
+    .kind-name {
+        flex: 1 1 auto;
+    }
+    .materialsGrid {
+        margin-top: var(--space-3);
     }
 }

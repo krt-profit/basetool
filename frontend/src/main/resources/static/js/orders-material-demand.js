@@ -35,7 +35,6 @@ const DEMAND_FILTERS_KEY = 'orders_demand_filters';
  * @property {boolean} hideCovered whether rows whose outstanding amount is 0 are hidden
  * @property {string|null} sortKey the sorted column, or null for the server order
  * @property {string} sortDir 'asc' or 'desc'
- * @property {boolean|undefined} panelCollapsed explicit panel choice; undefined = never chosen
  */
 
 /**
@@ -50,7 +49,6 @@ let demandState = {
     hideCovered: false,
     sortKey: null,
     sortDir: 'asc',
-    panelCollapsed: undefined,
 };
 
 /**
@@ -75,8 +73,6 @@ function readDemandState() {
             hideCovered: parsed.hideCovered === true,
             sortKey: typeof parsed.sortKey === 'string' ? parsed.sortKey : null,
             sortDir: parsed.sortDir === 'desc' ? 'desc' : 'asc',
-            panelCollapsed:
-                typeof parsed.panelCollapsed === 'boolean' ? parsed.panelCollapsed : undefined,
         };
     } catch (_e) {}
 }
@@ -103,7 +99,6 @@ function writeDemandState() {
                 hideCovered: demandState.hideCovered,
                 sortKey: demandState.sortKey,
                 sortDir: demandState.sortDir,
-                panelCollapsed: demandState.panelCollapsed,
             }),
         );
     } catch (_e) {}
@@ -395,20 +390,8 @@ function applyDemandView() {
                 excludedQualities.indexOf(quality) >= 0 ||
                 (demandState.hideCovered && !(outstanding > 0));
 
-            const bucketKey = row.getAttribute('data-bucket-key');
-            const drill = bucketKey
-                ? group.querySelector(
-                      '[data-bucket-orders="' + escapeSelectorValue(bucketKey) + '"]',
-                  )
-                : null;
-            if (hidden) {
-                row.setAttribute('hidden', '');
-                if (drill) drill.setAttribute('hidden', '');
-            } else {
-                row.removeAttribute('hidden');
-                if (drill) drill.removeAttribute('hidden');
-                visibleInGroup++;
-            }
+            row.toggleAttribute('hidden', hidden);
+            if (!hidden) visibleInGroup++;
         });
         if (visibleInGroup === 0) {
             group.setAttribute('hidden', '');
@@ -434,7 +417,7 @@ function applyDemandView() {
 }
 
 /**
- * Pushes the view state back into the filter controls; the panel's collapsed state is not touched.
+ * Pushes the view state back into the filter controls.
  *
  * @returns {void}
  */
@@ -498,8 +481,8 @@ function escapeSelectorValue(value) {
 }
 
 /**
- * Applies one bucket's expanded state to the DOM: shows or hides its drill-down row and syncs the
- * toggle's caret and `aria-expanded`.
+ * Applies one bucket's expanded state to the DOM: shows its drill-down row only while it is expanded
+ * and its bucket row is not filtered out, and syncs the toggle's caret and `aria-expanded`.
  *
  * @param {string} bucketKey the bucket to apply.
  * @param {boolean} expanded whether the drill-down should be visible.
@@ -508,11 +491,15 @@ function escapeSelectorValue(value) {
 function applyBucketState(bucketKey, expanded) {
     const escaped = escapeSelectorValue(bucketKey);
     const row = document.querySelector('[data-bucket-orders="' + escaped + '"]');
+    const bucketRow = document.querySelector(
+        'tr[data-testid="demand-row"][data-bucket-key="' + escaped + '"]',
+    );
     const btn = document.querySelector(
         '[data-trigger="demand-toggle-orders"][data-bucket-key="' + escaped + '"]',
     );
     if (row) {
-        row.classList.toggle('krtm-display-none-5790', !expanded);
+        const filteredOut = bucketRow !== null && bucketRow.hasAttribute('hidden');
+        row.toggleAttribute('hidden', !expanded || filteredOut);
     }
     if (btn) {
         btn.setAttribute('aria-expanded', String(expanded));

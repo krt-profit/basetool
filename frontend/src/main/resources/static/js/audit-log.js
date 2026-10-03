@@ -55,6 +55,7 @@
                 form.querySelectorAll('select').forEach(function (el) {
                     el.selectedIndex = 0;
                 });
+                if (window.krtFilterChips) window.krtFilterChips.refresh(form);
                 loadResults(resetLink.getAttribute('href'));
             });
         }

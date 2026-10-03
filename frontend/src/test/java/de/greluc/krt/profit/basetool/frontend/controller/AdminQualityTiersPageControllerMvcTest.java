@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -140,6 +141,59 @@ class AdminQualityTiersPageControllerMvcTest {
         .perform(get(PAGE))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("alert-danger")));
+  }
+
+  /**
+   * The page renders on the list pattern: the title from the bundle under the "Stammdaten" eyebrow,
+   * the create button as the only primary action in the page head, the tiers in a stacked data
+   * table whose total feeds the count chip, the in-use hint as an alert, no HUD box.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void thePageRendersTheListPattern() throws Exception {
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(catalogue());
+
+    String html =
+        mockMvc
+            .perform(get(PAGE).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("<h1>Qualitätsstufen</h1>")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>2<")
+        .contains("data-list-count-for=\"qt-results\"")
+        .doesNotContain("??admin.qualityTiers")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertThat(main.split("btn--cta", -1)).hasSize(2);
+    assertThat(main)
+        .containsPattern("class=\"page-actions\">\\s*<button[^>]*id=\"qt-add-btn\"")
+        .doesNotContain("colspan")
+        .contains("class=\"alert alert-info\"")
+        .contains("id=\"qt-results\" class=\"card card--flush\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("data-list-total=\"2\"")
+        .containsPattern("class=\"cell-title data-value\">GOOD<")
+        .contains("class=\"chip chip--success\">aktiv<");
+  }
+
+  /** An empty catalogue renders the empty state in the results fragment, without a table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void anEmptyCatalogueRendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(List.of());
+
+    mockMvc
+        .perform(get(PAGE).param("fragment", "results").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(containsString("Noch keine Qualitätsstufen vorhanden.")))
+        .andExpect(content().string(not(containsString("id=\"qt-table\""))));
   }
 
   @Test

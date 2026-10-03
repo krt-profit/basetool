@@ -2,7 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.p4kImport.title}">Admin: P4K-Import</title>
-    <th:block th:fragment="extraLinks"></th:block>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/admin-p4k-import.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -10,52 +12,53 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="krt-admin-banner" th:text="#{admin.personalInventory.bannerMode}">ADMIN MODE</div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.p4kImport.title},
+        count=null, actions=null)}"></th:block>
 
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.p4kImport.title}">Admin: P4K-Import</h1>
-        <p class="krt-subtitle" th:text="#{admin.p4kImport.subtitle}">Spielkatalog importieren</p>
-    </div>
-
-    <div class="hud-box mt-2">
+    <section class="card" aria-labelledby="krt-p4k-upload-title">
+        <div class="card-head">
+            <h2 id="krt-p4k-upload-title" class="card-title" th:text="#{admin.p4kImport.upload.title}">Katalog hochladen</h2>
+        </div>
         <p th:text="#{admin.p4kImport.intro}">Der Katalog wird im Hintergrund analysiert.</p>
 
-        <div class="form-group">
+        <div class="cluster">
             <input type="file" id="krt-p4k-file" accept=".json,application/json" hidden>
-            <button type="button" id="krt-p4k-pick" class="btn btn-outline"
+            <button type="button" id="krt-p4k-pick" class="btn btn-ghost"
                     th:text="#{admin.p4kImport.file.choose}">Datei wählen</button>
-            <span id="krt-p4k-filename" class="text-muted" th:text="#{admin.p4kImport.file.none}">Keine Datei ausgewählt</span>
-        </div>
-
-        <div class="mt-2-flex-gap">
+            <span id="krt-p4k-filename" class="text-muted grow" th:text="#{admin.p4kImport.file.none}">Keine Datei ausgewählt</span>
             <button type="button" id="krt-p4k-upload-btn" class="btn btn--cta" disabled
                     th:text="#{admin.p4kImport.upload.button}">Hochladen &amp; analysieren</button>
         </div>
-    </div>
+    </section>
 
-    <div class="hud-box mt-2">
-        <h2 th:text="#{admin.p4kImport.jobs.title}">Importe</h2>
-        <div class="table-responsive">
-            <table class="krt-table">
-                <thead>
-                <tr>
-                    <th th:text="#{admin.p4kImport.jobs.col.created}">Zeit</th>
-                    <th th:text="#{admin.p4kImport.jobs.col.kind}">Typ</th>
-                    <th th:text="#{admin.p4kImport.jobs.col.status}">Status</th>
-                    <th th:text="#{admin.p4kImport.jobs.col.file}">Datei</th>
-                    <th th:text="#{admin.p4kImport.jobs.col.summary}">Zusammenfassung</th>
-                    <th th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</th>
-                </tr>
-                </thead>
-                <tbody id="krt-p4k-jobs">
-                </tbody>
-            </table>
+    <section class="p4k-jobs" aria-labelledby="krt-p4k-jobs-title">
+        <h2 id="krt-p4k-jobs-title" class="p4k-section-title" th:text="#{admin.p4kImport.jobs.title}">Importe</h2>
+        <div class="card card--flush">
+            <div data-p4k-jobs-table>
+                <table class="data-table data-table--stack">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.p4kImport.jobs.col.file}">Datei</th>
+                        <th th:text="#{admin.p4kImport.jobs.col.kind}">Typ</th>
+                        <th class="cell-status" th:text="#{admin.p4kImport.jobs.col.status}">Status</th>
+                        <th th:text="#{admin.p4kImport.jobs.col.summary}">Zusammenfassung</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody id="krt-p4k-jobs">
+                    </tbody>
+                </table>
+            </div>
+            <div id="krt-p4k-jobs-empty" class="empty-state" data-testid="empty-state" hidden>
+                <th:block th:replace="~{fragments/components :: emptyStateBody('admin.p4kImport.jobs.empty.title', 'admin.p4kImport.jobs.empty', null)}"></th:block>
+            </div>
         </div>
-        <p id="krt-p4k-jobs-empty" class="text-muted" th:text="#{admin.p4kImport.jobs.empty}" hidden>Noch keine Importe.</p>
-    </div>
+    </section>
 
-    <div id="krt-p4k-apply-panel" class="hud-box mt-2" hidden>
-        <h2 th:text="#{admin.p4kImport.apply.panel.title}">Import anwenden</h2>
+    <section id="krt-p4k-apply-panel" class="card card--accent p4k-panel" hidden aria-labelledby="krt-p4k-apply-title">
+        <div class="card-head">
+            <h2 id="krt-p4k-apply-title" class="card-title" th:text="#{admin.p4kImport.apply.panel.title}">Import anwenden</h2>
+        </div>
         <p>
             <span class="text-muted" th:text="#{admin.p4kImport.jobs.col.file}">Datei</span>:
             <span id="krt-p4k-apply-filename" class="data-value"></span>
@@ -70,17 +73,17 @@
                 <span th:text="#{admin.p4kImport.seed.warning}">Achtung: Beim Anlegen werden neue Spiel-Datensätze eingefügt.</span>
             </p>
         </div>
-        <div class="mt-2-flex-gap">
+        <div class="cluster">
             <button type="button" id="krt-p4k-apply-confirm" class="btn btn--cta"
                     th:text="#{admin.p4kImport.apply.panel.confirm}">Jetzt anwenden</button>
             <button type="button" id="krt-p4k-apply-cancel" class="btn btn-ghost"
                     th:text="#{admin.p4kImport.apply.panel.cancel}">Abbrechen</button>
         </div>
-    </div>
+    </section>
 
-    <div id="krt-p4k-results" class="hud-box mt-2" hidden>
-        <div class="mt-2-flex-gap">
-            <h2 th:text="#{admin.p4kImport.results.title}">Ergebnis</h2>
+    <section id="krt-p4k-results" class="card p4k-panel" hidden aria-labelledby="krt-p4k-results-title">
+        <div class="card-head">
+            <h2 id="krt-p4k-results-title" class="card-title" th:text="#{admin.p4kImport.results.title}">Ergebnis</h2>
             <button type="button" id="krt-p4k-details-close" class="btn btn-ghost"
                     th:text="#{admin.p4kImport.apply.panel.cancel}">Schließen</button>
         </div>
@@ -93,7 +96,7 @@
         </p>
 
         <div class="table-responsive">
-            <table class="krt-table">
+            <table class="data-table data-table--compact">
                 <thead>
                 <tr>
                     <th th:text="#{admin.p4kImport.col.type}">Typ</th>
@@ -118,7 +121,7 @@
             <span th:text="#{admin.p4kImport.results.runId}">Lauf-ID</span>:
             <span id="krt-p4k-runid" class="data-value data-value--mono"></span>
         </p>
-    </div>
+    </section>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
@@ -132,6 +135,8 @@
         statusFailed:     /*[[#{admin.p4kImport.status.failed}]]*/ 'Failed',
         summaryRunning:   /*[[#{admin.p4kImport.summary.running}]]*/ 'Processing...',
         colCreated:       /*[[#{admin.p4kImport.col.created}]]*/ 'Created',
+        colKind:          /*[[#{admin.p4kImport.jobs.col.kind}]]*/ 'Type',
+        colSummary:       /*[[#{admin.p4kImport.jobs.col.summary}]]*/ 'Summary',
         actionView:       /*[[#{admin.p4kImport.action.view}]]*/ 'Details',
         actionApply:      /*[[#{admin.p4kImport.action.apply}]]*/ 'Apply',
         modeDryRun:       /*[[#{admin.p4kImport.results.mode.dryRun}]]*/ 'Preview (dry run)',

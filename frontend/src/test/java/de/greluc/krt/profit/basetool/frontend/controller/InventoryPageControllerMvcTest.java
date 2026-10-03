@@ -115,7 +115,8 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("inventory-index"))
         .andExpect(model().attributeExists("aggregated"))
-        .andExpect(content().string(containsString("colspan=\"4\"")));
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(not(containsString("data-table--stack"))));
   }
 
   @Test

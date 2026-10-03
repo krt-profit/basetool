@@ -12,62 +12,65 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.locations.title}">Orte verwalten</h1>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.locations.title},
+        count=${locations != null ? locations.size() : null}, countId='locations-count', countFor='locations-results', actions=null)}"></th:block>
+
+    <th:block th:replace="~{fragments/components :: alert('danger', ${error}, null)}"></th:block>
 
     <th:block th:if="${catalogTruncated}">
-        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mt-2')}"></div>
+        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
     </th:block>
 
-    <div class="hud-box mt-2">
-        <div class="data-section">
-            <div class="flex-between-mb">
-                <h2 th:text="#{admin.locations.locations}">Orte</h2>
-                <div class="form-group krtm-margin-bottom-0-width-300px-position-relativ-70af">
-                    <input type="text" id="filterLocations" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="locationsTable" autocomplete="off">
-                    <datalist id="locationNames-data" class="krtm-display-none-5790">
-                        <option th:each="loc : ${locations}" th:value="${loc.name}"></option>
-                    </datalist>
-                </div>
-            </div>
-
-            <div class="table-responsive">
-            <table id="locationsTable">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.location.name}">Name</th>
-                        <th th:text="#{admin.location.description}">Beschreibung</th>
-                        <th>Aktion</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="loc : ${locations}">
-                        <td th:text="${loc.name}">Name</td>
-                        <td th:text="${loc.description}">Desc</td>
-                        <td>
-                            <div class="flex-gap-xs">
-                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" class="m-0" data-location-toggle="visibility">
-                                    <input type="hidden" name="hidden" th:value="${!loc.hidden}">
-                                    <button type="submit" class="btn" th:classappend="${loc.hidden} ? '' : 'btn-secondary'"
-                                            th:data-label-on="#{admin.location.visibility.show}"
-                                            th:data-label-off="#{admin.location.visibility.hide}"
-                                            th:text="${loc.hidden} ? #{admin.location.visibility.show} : #{admin.location.visibility.hide}">Toggle</button>
-                                </form>
-                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/locations/{id}/toggle-home-location(id=${loc.id})}" class="m-0" data-location-toggle="home">
-                                    <input type="hidden" name="homeLocation" th:value="${!loc.homeLocation}">
-                                    <button type="submit" class="btn" th:classappend="${loc.homeLocation} ? 'btn-secondary' : ''"
-                                            th:data-label-on="#{admin.location.home.unmark}"
-                                            th:data-label-off="#{admin.location.home.mark}"
-                                            th:text="${loc.homeLocation} ? #{admin.location.home.unmark} : #{admin.location.home.mark}">Home</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            </div>
+    <div class="toolbar">
+        <div class="toolbar__search">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+            <input type="search" id="filterLocations" autocomplete="off" data-testid="toolbar-search"
+                   data-trigger="filter-table" data-table-id="locationsTable"
+                   th:attr="placeholder=#{general.filter.name.placeholder},aria-label=#{general.filter.name.placeholder}">
         </div>
+        <datalist id="locationNames-data" hidden>
+            <option th:each="loc : ${locations}" th:value="${loc.name}"></option>
+        </datalist>
+    </div>
+
+    <div id="locations-results" class="card card--flush">
+        <table id="locationsTable" class="data-table data-table--stack" th:if="${locations != null and !locations.isEmpty()}">
+            <thead>
+                <tr>
+                    <th th:text="#{admin.location.name}">Name</th>
+                    <th th:text="#{admin.location.description}">Beschreibung</th>
+                    <th class="cell-actions" th:text="#{general.action}">Aktion</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="loc : ${locations}" data-testid="location-row">
+                    <td><span class="cell-title" th:text="${loc.name}">Name</span></td>
+                    <td th:text="${loc.description}">Desc</td>
+                    <td class="cell-actions">
+                        <div class="cluster gap-2">
+                            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" class="m-0" data-location-toggle="visibility">
+                                <input type="hidden" name="hidden" th:value="${!loc.hidden}">
+                                <button type="submit" class="btn btn-ghost btn-xs"
+                                        th:data-label-on="#{admin.location.visibility.show}"
+                                        th:data-label-off="#{admin.location.visibility.hide}"
+                                        th:text="${loc.hidden} ? #{admin.location.visibility.show} : #{admin.location.visibility.hide}">Toggle</button>
+                            </form>
+                            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/locations/{id}/toggle-home-location(id=${loc.id})}" class="m-0" data-location-toggle="home">
+                                <input type="hidden" name="homeLocation" th:value="${!loc.homeLocation}">
+                                <button type="submit" class="btn btn-ghost btn-xs"
+                                        th:data-label-on="#{admin.location.home.unmark}"
+                                        th:data-label-off="#{admin.location.home.mark}"
+                                        th:text="${loc.homeLocation} ? #{admin.location.home.unmark} : #{admin.location.home.mark}">Home</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <th:block th:if="${locations == null or locations.isEmpty()}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.locations.empty', textKey='admin.locations.empty.text')}"></th:block>
+        </th:block>
     </div>
 </main>
 

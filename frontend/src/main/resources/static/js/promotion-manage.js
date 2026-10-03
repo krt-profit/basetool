@@ -591,6 +591,8 @@ document.addEventListener('DOMContentLoaded', function () {
     pmApplyCollapsedState(pmLoadCollapsedTopics());
     pmFormatLastEvaluated();
     pmRestoreFilters();
+    if (window.krtFilterPanel) window.krtFilterPanel.refresh('pm-filter-panel');
+    if (window.krtFilterChips) window.krtFilterChips.refresh();
     const initialSort = pmRestoreSortMode();
     pmSetSortMode(initialSort);
     pmApplySort(initialSort);

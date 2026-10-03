@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -164,6 +166,42 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"squadrons-results\"")))
         .andExpect(content().string(containsString("id=\"jobtypes-results\"")))
         .andExpect(content().string(containsString("id=\"freqtypes-results\"")));
+  }
+
+  /**
+   * The page follows the list-pattern basics (REQ-UI-027): page head with the admin eyebrow and no
+   * primary action, each box a card with a switch and a ghost create button, stacked tables and
+   * translated values.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_fullPage_rendersThePatternBasics() throws Exception {
+    stubAllThree();
+
+    String html =
+        mockMvc
+            .perform(get("/admin/mission-data").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String main = html.substring(html.indexOf("<main"), html.indexOf("id=\"squadron-modal\""));
+
+    assertThat(html)
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .contains("id=\"add-squadron-btn\" class=\"btn btn-ghost\"")
+        .contains("id=\"add-jobtype-btn\" class=\"btn btn-ghost\"")
+        .contains("id=\"add-freqtype-btn\" class=\"btn btn-ghost\"")
+        .contains("class=\"switch\" for=\"includeInactiveSquadrons\"")
+        .contains("class=\"switch\" for=\"includeInactiveJobTypes\"")
+        .contains("class=\"switch\" for=\"includeInactiveFrequencyTypes\"")
+        .contains(">Einsatz<")
+        .contains(">Nein<")
+        .doesNotContain(">MISSION<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    assertThat(main).doesNotContain("btn--cta").doesNotContain("krtm-");
+    assertThat(main.split("data-table data-table--stack", -1)).hasSize(4);
   }
 
   @Test

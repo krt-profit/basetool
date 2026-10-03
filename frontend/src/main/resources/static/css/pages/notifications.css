@@ -1,0 +1,101 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .notification-inbox .notification-item {
+        position: relative;
+        align-items: center;
+        min-height: 56px;
+        padding: 0.75rem var(--space-4);
+        border-bottom: var(--border-hairline);
+        transition: background-color 0.2s;
+    }
+
+    .notification-inbox .notification-item:hover {
+        background: var(--color-gray-3);
+    }
+
+    .notification-inbox .notification-item:last-child {
+        border-bottom: 0;
+    }
+
+    .notification-inbox .notification-item.is-read {
+        opacity: 1;
+    }
+
+    .notification-inbox .notification-item.is-read .notification-item-text {
+        color: var(--color-gray-2-text);
+        font-weight: var(--fw-regular);
+    }
+
+    .notification-inbox .notification-item-text {
+        display: block;
+        margin: 0 0 0.25rem;
+        color: var(--color-white);
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-bold);
+    }
+
+    .notification-inbox .notification-item-time {
+        font-size: var(--fs-xs);
+    }
+
+    .notification-inbox a.row-link {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .notification-inbox a.row-link::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+    }
+
+    .notification-inbox a.row-link:focus-visible {
+        outline: none;
+    }
+
+    .notification-inbox .notification-item:has(a.row-link:focus-visible) {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
+    }
+
+    .notification-inbox .notification-item-actions {
+        align-items: center;
+    }
+
+    .notification-inbox .notification-item-actions > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .notification-inbox .row-chevron {
+        width: 16px;
+        height: 16px;
+        color: var(--color-gray-2-text);
+    }
+
+    .notification-inbox[data-notif-filter='unread'] .notification-item[data-notif-read='true'] {
+        display: none;
+    }
+
+    .notification-inbox .empty-state {
+        border: 0;
+    }
+
+    .notification-inbox__unread-empty {
+        display: none;
+    }
+
+    .notification-inbox[data-notif-filter='unread']:has(.notification-item):not(
+            :has(.notification-item[data-notif-read='false'])
+        )
+        .notification-inbox__unread-empty {
+        display: block;
+    }
+
+    @media (width <= 768px) {
+        .notification-inbox .notification-item {
+            padding: 0.75rem var(--space-3);
+        }
+    }
+}

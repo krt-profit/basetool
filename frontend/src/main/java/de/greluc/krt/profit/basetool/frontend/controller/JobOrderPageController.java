@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.service.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -52,6 +53,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -97,6 +99,15 @@ public class JobOrderPageController {
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
+
+  /** The list scope listing the orders the caller's own org units requested (REQ-UI-027). */
+  static final String SCOPE_MINE = "MINE";
+
+  /** The list scope listing the caller's whole visible order queue (REQ-UI-027). */
+  static final String SCOPE_ALL = "ALL";
+
+  /** The accepted values of the list's {@code scope} parameter. */
+  static final Set<String> ORDER_SCOPES = Set.of(SCOPE_MINE, SCOPE_ALL);
 
   /**
    * Selectable page sizes for the order list, large enough that the default active queue fits on
@@ -168,20 +179,24 @@ public class JobOrderPageController {
           new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
 
   /**
-   * Renders the job-order list ({@code /orders}), filtered by status and squadron.
+   * Renders the job-order list ({@code /orders}), filtered by scope, status and squadron.
    *
    * <p>Invalid or missing statuses fall back to {@code OPEN} + {@code IN_PROGRESS}; an empty
-   * squadron selection means all squadrons (REQ-ORDERS-027).
+   * squadron selection means all squadrons (REQ-ORDERS-027). A caller who may see both the queue
+   * and their own unit's orders chooses between them with {@code scope}; the own-orders scope reads
+   * the requester-redacted list and ignores the squadron filter.
    *
    * @param status optional explicit status filter
    * @param squadronId optional repeatable squadron display filter (empty = all squadrons)
+   * @param scope {@code MINE} or {@code ALL}; anything else, or a caller without both capabilities,
+   *     falls back to the caller's only list
    * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link
    *     #DEFAULT_PAGE_SIZE}
    * @param fragment when {@code "results"}, only the results-table fragment is rendered
    *     (REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with the orders, page envelope, page sizes, pagination
-   *     base URL, selected filters and aging thresholds
+   *     base URL, scope, selected filters and aging thresholds
    * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
    */
   @NotNull
@@ -189,6 +204,7 @@ public class JobOrderPageController {
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false) List<UUID> squadronId,
+      @RequestParam(required = false) String scope,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
       @RequestParam(required = false) Integer page,
@@ -199,7 +215,14 @@ public class JobOrderPageController {
     if (!canViewJobOrders && !canViewOwnJobOrders) {
       return "redirect:/orders/create";
     }
+    boolean scopeChoice = canViewJobOrders && canViewOwnJobOrders;
+    boolean ownScope =
+        requesterView
+            || (scopeChoice && SCOPE_MINE.equals(RelayParams.oneOfOrNull(scope, ORDER_SCOPES)));
     model.addAttribute("requesterView", requesterView);
+    model.addAttribute("scopeChoice", scopeChoice);
+    model.addAttribute("ownScope", ownScope);
+    model.addAttribute("scope", ownScope ? SCOPE_MINE : SCOPE_ALL);
     List<String> requestedStatuses = (status == null) ? List.of() : status;
     List<String> validStatuses =
         requestedStatuses.stream().filter(VALID_STATUSES::contains).toList();
@@ -217,13 +240,13 @@ public class JobOrderPageController {
     try {
       String statusParam = String.join(",", status);
       StringBuilder squadronParamBuilder = new StringBuilder();
-      if (!requesterView) {
+      if (!ownScope) {
         for (UUID sid : selectedSquadronIds) {
           squadronParamBuilder.append("&squadronId=").append(sid);
         }
       }
       String squadronParam = squadronParamBuilder.toString();
-      String listBase = requesterView ? "/api/v1/orders/requested" : "/api/v1/orders";
+      String listBase = ownScope ? "/api/v1/orders/requested" : "/api/v1/orders";
       p =
           backendApiClient.get(
               listBase
@@ -278,7 +301,10 @@ public class JobOrderPageController {
     model.addAttribute("orders", orders);
     model.addAttribute("ordersPage", p);
     model.addAttribute("pageSizes", PAGE_SIZES);
-    model.addAttribute("paginationBaseUrl", buildPaginationBaseUrl(status, selectedSquadronIds));
+    model.addAttribute(
+        "paginationBaseUrl",
+        buildPaginationBaseUrl(
+            status, ownScope ? List.of() : selectedSquadronIds, scopeChoice && ownScope));
     model.addAttribute("selectedStatuses", status);
     if (!requesterView) {
       model.addAttribute("squadrons", fetchActiveSquadrons());
@@ -293,15 +319,20 @@ public class JobOrderPageController {
   }
 
   /**
-   * Builds the pagination base URL carrying the active status and squadron filters.
+   * Builds the pagination base URL carrying the active scope, status and squadron filters.
    *
    * @param status the resolved (never empty) status filter
    * @param squadronIds the selected squadron ids (empty = no squadron filter)
+   * @param mineScope whether the chosen own-orders scope is carried as {@code scope=MINE}
    * @return {@code /orders?status=...&squadronId=...} carrying the current filter
    */
   @NotNull
-  private static String buildPaginationBaseUrl(List<String> status, List<UUID> squadronIds) {
+  private static String buildPaginationBaseUrl(
+      @NotNull List<String> status, @NotNull List<UUID> squadronIds, boolean mineScope) {
     List<String> queryParts = new ArrayList<>();
+    if (mineScope) {
+      queryParts.add("scope=" + SCOPE_MINE);
+    }
     for (String s : status) {
       queryParts.add("status=" + s);
     }

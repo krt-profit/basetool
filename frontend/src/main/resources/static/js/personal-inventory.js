@@ -227,6 +227,7 @@
         if (!window.krtFetch || !document.getElementById('pi-results')) {
             return;
         }
+        window.krtFetch.bindSwap({ container: '#pi-results', history: true });
         let timer = null;
         function swapFromForm(formEl) {
             if (!formEl) {

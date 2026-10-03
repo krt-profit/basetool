@@ -11,105 +11,102 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{operations.title}">Operations</h1>
-        <p th:text="#{operations.description}">Manage and view operations.</p>
-    </div>
-
-    <th:block th:replace="~{fragments/components :: alert(type='success', msgKey=${successMessage}, extraClass='mt-2')}"></th:block>
-    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${errorMessage}, extraClass='mt-2')}"></th:block>
-    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
-
-    <div class="hud-box mt-2">
-
-        <div class="actions-bar">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{operations.title},
+        count=${operationsPage != null ? operationsPage.totalElements() : null}, countId='operations-count', countFor='operations-results', actions=~{::operations-actions})}">
+        <th:block th:ref="operations-actions">
             <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)"
-                    type="button" class="btn btn--cta" th:text="#{operation.create}"
+                    type="button" class="btn btn--cta" data-testid="page-head-primary" th:text="#{operation.create}"
                     data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
-            <div th:replace="~{fragments/components :: filterToggle('operations-filter-panel', 'operations-filter-toggle')}"></div>
-        </div>
+        </th:block>
+    </th:block>
 
-        <div class="filter-panel" id="operations-filter-panel" data-filter-panel="operations">
-        <form id="operations-filter-form" method="get" th:action="@{/operations}" class="search-form no-track">
-            <div class="search-form-flex-1">
-                <label for="operation-search" th:text="#{operation.search}">Search</label>
-                <input type="text" id="operation-search" name="search" th:value="${search}" th:placeholder="#{operation.search.placeholder}">
-            </div>
+    <th:block th:replace="~{fragments/components :: alert(type='success', msgKey=${successMessage}, extraClass=null)}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${errorMessage}, extraClass=null)}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
 
-            <div class="datetime-split-group" data-datetime-filter-role="start">
-                <label for="operation-start" th:text="#{operation.filter.start}">From</label>
-                <input type="hidden" name="start" id="operation-start" th:value="${start}">
-                <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
-                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
-                </div>
-            </div>
-
-            <div class="datetime-split-group" data-datetime-filter-role="end" th:attr="data-validate-after='operation-start', data-error-after=#{validation.datetime.after}">
-                <label for="operation-end" th:text="#{operation.filter.end}">To</label>
-                <input type="hidden" name="end" id="operation-end" th:value="${end}">
-                <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
-                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
-                </div>
-            </div>
-
-            <div class="search-form-checkbox-col" sec:authorize="isAuthenticated()">
-                <div class="search-form-checkbox-spacer"></div>
-                <label class="search-form-checkbox-label">
-                    <input type="checkbox" name="showPast" th:checked="${showPast}">
-                    <span th:text="#{operation.filter.show_past}">Show Past</span>
-                </label>
-            </div>
-
-            <div class="search-form-actions">
-                <button type="button" id="operations-filter-reset" class="btn btn-ghost" th:text="#{general.reset}">Reset</button>
-            </div>
-        </form>
-        </div>
-
-        <div id="operations-loading-indicator" class="krtm-display-none-text-align-center-padding-1rem-faea">
-            <span class="krt-loading-indicator"></span>
-        </div>
-
-        <div id="operations-results">
-            <th:block th:fragment="operationsResults">
-            <div class="table-responsive">
-                <table th:if="${operations != null and !operations.isEmpty()}" class="operations-table">
-                    <thead>
-                        <tr>
-                            <th th:text="#{operation.name}">Name</th>
-                            <th th:text="#{operation.status}">Status</th>
-                            <th class="op-desc" th:text="#{operation.description}">Description</th>
-                            <th class="op-action" th:text="#{general.action}">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="op : ${operations}">
-                            <td th:text="${op.name}">Name</td>
-                            <td>
-                                <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(op.status)}"
-                                      th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</span>
-                            </td>
-                            <td class="op-desc" th:text="${op.description}">Description</td>
-                            <td class="op-action">
-                                <a class="btn btn-ghost" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
-                                <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"
-                                        th:data-id="${op.id}"
-                                        data-trigger="operations-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div th:if="${operationsPage != null}">
-                <div th:replace="~{fragments/pagination :: pagination(pageResponse=${operationsPage}, baseUrl='/operations')}"></div>
-            </div>
-
-            <p th:if="${operations == null or operations.isEmpty()}" th:text="#{operation.empty}">No operations.</p>
+    <form id="operations-filter-form" method="get" th:action="@{/operations}" class="no-track">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: toolbarSearch('operation-search', 'search', ${search}, 'operation.search.placeholder')}"></th:block>
+            <th:block th:replace="~{fragments/components :: segmented(name='period', labelKey='mission.period.label', selected=${period},
+                options=${ {{value: 'UPCOMING', labelKey: 'mission.period.upcoming'}, {value: 'PAST', labelKey: 'mission.period.past'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
+            <th:block th:replace="~{fragments/components :: filterPopover(panelId='operations-filter-panel', panelName='operations',
+                testid='operations-filter-toggle', body=~{::operations-filter-body})}">
+                <th:block th:ref="operations-filter-body">
+                    <div class="datetime-split-group" data-datetime-filter-role="start">
+                        <label for="operation-start" th:text="#{operation.filter.start}">From</label>
+                        <input type="hidden" name="start" id="operation-start" th:value="${start}" data-chip-format="datetime" th:attr="data-chip-label=#{operation.filter.start}">
+                        <div class="datetime-split-inputs">
+                            <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                            <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                        </div>
+                    </div>
+                    <div class="datetime-split-group" data-datetime-filter-role="end" th:attr="data-validate-after='operation-start', data-error-after=#{validation.datetime.after}">
+                        <label for="operation-end" th:text="#{operation.filter.end}">To</label>
+                        <input type="hidden" name="end" id="operation-end" th:value="${end}" data-chip-format="datetime" th:attr="data-chip-label=#{operation.filter.end}">
+                        <div class="datetime-split-inputs">
+                            <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                            <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                        </div>
+                    </div>
+                    <button type="button" id="operations-filter-reset" class="btn btn-ghost" th:text="#{general.reset}">Reset</button>
+                </th:block>
             </th:block>
+            <span id="operations-loading-indicator" hidden><span class="krt-loading-indicator"></span></span>
         </div>
+        <th:block th:replace="~{fragments/components :: filterChips('operations-filter-form')}"></th:block>
+    </form>
+
+    <div id="operations-results" class="card card--flush">
+        <th:block th:fragment="operationsResults">
+        <table th:if="${operations != null and !operations.isEmpty()}" class="data-table data-table--stack operations-table">
+            <thead>
+                <tr>
+                    <th th:text="#{operation.name}">Name</th>
+                    <th class="cell-status" th:text="#{operation.status}">Status</th>
+                    <th th:if="${isAllSquadronsMode}" th:text="#{mission.owning_squadron}">Staffel</th>
+                    <th th:text="#{general.created}">Erstellt</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Action</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="op : ${operations}" data-testid="operation-row">
+                    <td>
+                        <a class="row-link" data-testid="row-link" th:href="@{/operations/{id}(id=${op.id})}">
+                            <span class="cell-title" th:text="${op.name}">Name</span>
+                            <span class="cell-sub operations-desc" th:if="${op.description != null and !#strings.isEmpty(op.description)}"
+                                  th:text="${op.description}">Description</span>
+                        </a>
+                    </td>
+                    <td class="cell-status">
+                        <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(op.status)}"
+                              th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</span>
+                    </td>
+                    <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{mission.owning_squadron}">
+                        <span th:if="${op.owningSquadron != null}" class="squadron-badge"
+                              th:title="${op.owningSquadron.name()}"
+                              th:text="${op.owningSquadron.shorthand()}">IRI</span>
+                        <span th:if="${op.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                    </td>
+                    <td th:attr="data-label=#{general.created}">
+                        <span th:if="${op.createdAt != null}" class="utc-time" data-format="short" th:text="${op.createdAt}">Created</span>
+                        <span th:if="${op.createdAt == null}">&mdash;</span>
+                    </td>
+                    <td class="cell-actions">
+                        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button"
+                                class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"
+                                th:data-id="${op.id}" data-trigger="operations-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <th:block th:if="${operations == null or operations.isEmpty()}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='operation.empty', textKey='operation.empty.text')}"></th:block>
+        </th:block>
+
+        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${operationsPage}, baseUrl='/operations')}"></th:block>
+        </th:block>
     </div>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='create-operation-modal', titleKey='operation.create', variant='krt-modal--wide', body=~{::create-operation-modal-body})}">

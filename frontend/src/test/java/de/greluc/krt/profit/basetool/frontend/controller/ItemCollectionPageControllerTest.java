@@ -28,12 +28,16 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockEntryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.view.CollectionProgress;
+import de.greluc.krt.profit.basetool.frontend.view.ItemCollectionGroup;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.ui.ConcurrentModel;
@@ -49,7 +53,18 @@ class ItemCollectionPageControllerTest {
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    List<Map<String, Object>> groups = List.of(Map.of("gameItem", Map.of("name", "Cirrus Scope")));
+    List<JobOrderItemStockGroupDto> groups =
+        List.of(
+            new JobOrderItemStockGroupDto(
+                new InventoryGameItemReferenceDto(UUID.randomUUID(), "Cirrus Scope", null, null),
+                4,
+                0,
+                4L,
+                List.of(
+                    new JobOrderItemStockEntryDto(
+                        UUID.randomUUID(), 0L, "Alice", null, null, null, 3L, 3L, true),
+                    new JobOrderItemStockEntryDto(
+                        UUID.randomUUID(), 0L, "Bob", null, null, null, 1L, 1L, false))));
     List<LocationReferenceDto> locations =
         List.of(new LocationReferenceDto(UUID.randomUUID(), "Port Olisar"));
 
@@ -62,6 +77,12 @@ class ItemCollectionPageControllerTest {
     assertEquals("item-collection", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
     assertEquals(groups, model.getAttribute("itemStock"));
+    List<?> itemGroups = (List<?>) model.getAttribute("itemGroups");
+    assertNotNull(itemGroups);
+    assertEquals(1, itemGroups.size());
+    assertEquals(
+        new CollectionProgress(3, 4), ((ItemCollectionGroup) itemGroups.getFirst()).progress());
+    assertEquals(new CollectionProgress(3, 4), model.getAttribute("collectionProgress"));
     assertEquals(locations, model.getAttribute("locations"));
   }
 

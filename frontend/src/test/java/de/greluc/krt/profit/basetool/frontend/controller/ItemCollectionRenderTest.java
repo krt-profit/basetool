@@ -129,7 +129,24 @@ class ItemCollectionRenderTest {
             .getContentAsString();
 
     assertThat(html).as("collection table").contains("id=\"item-collection-table\"");
-    assertThat(html).as("game-item name in the Item column").contains("Cirrus Optic Scope");
+    assertThat(html)
+        .as("list pattern: page head with the back link to the order, stacked table, no HUD box")
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*href=\"/orders/" + orderId + "\"")
+        .containsPattern("<h1>Itemsammelübersicht</h1>")
+        .contains("class=\"data-table data-table--stack collection-table\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("btn--cta");
+    assertThat(html)
+        .as("game-item name in the group row")
+        .containsPattern("class=\"collection-group__title\">Cirrus Optic Scope<");
+    assertThat(html)
+        .as("collection progress over all groups and per group")
+        .contains("data-collection-progress=\"total\"")
+        .contains(">0 % geliefert<")
+        .contains(">0 von 3 geliefert<")
+        .contains("data-allocated=\"3\"");
     assertThat(html).as("owner seeded into the combobox").contains("Alice");
     assertThat(html).as("total-stock context").contains("von 4 im Bestand");
     assertThat(html)
@@ -160,5 +177,10 @@ class ItemCollectionRenderTest {
             .getContentAsString();
 
     assertThat(html).as("empty state, no table").doesNotContain("id=\"item-collection-table\"");
+    assertThat(html)
+        .as("empty state with title and sentence, no progress bar")
+        .contains("data-testid=\"empty-state\"")
+        .contains("Kein Item-Bestand für diesen Auftrag vorhanden.")
+        .doesNotContain("data-collection-progress");
   }
 }

@@ -38,12 +38,14 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -102,17 +104,26 @@ public class OperationPageController {
       new ParameterizedTypeReference<>() {};
 
   /**
+   * The list's period segments (REQ-UI-027): upcoming (planned and active), past (completed and
+   * canceled) and all.
+   */
+  static final Set<String> OPERATION_PERIODS = Set.of("UPCOMING", "PAST", "ALL");
+
+  /**
    * Renders the paginated, filtered operations list. {@code search} matches name and description,
-   * {@code showPast} widens the default {@code PLANNED}/{@code ACTIVE} filter to all statuses, and
-   * {@code start}/{@code end} filter on the span of the linked missions. {@code fragment=results}
-   * returns only the results fragment for an in-place AJAX swap.
+   * {@code period} picks the status set, and {@code start}/{@code end} filter on the span of the
+   * linked missions. {@code fragment=results} returns only the results fragment for an in-place
+   * AJAX swap.
    *
    * @param search free-text query, may be {@code null}
    * @param start inclusive lower bound (ISO-8601 instant) on the earliest linked mission's planned
    *     start, may be {@code null}; a non-instant value is a {@code 400}
    * @param end inclusive upper bound (ISO-8601 instant) on the latest linked mission's planned end,
    *     may be {@code null}; a non-instant value is a {@code 400}
-   * @param showPast when {@code true}, include COMPLETED and CANCELED
+   * @param showPast whether the default status filter includes finished operations; read only when
+   *     no {@code period} is given, as {@code ALL} when set
+   * @param period the period segment, {@code UPCOMING}, {@code PAST} or {@code ALL}; other values
+   *     fall back to {@code showPast}
    * @param page zero-based page index
    * @param size page size (default 20)
    * @param fragment when equal to {@code "results"}, render only the results fragment
@@ -129,6 +140,7 @@ public class OperationPageController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
           Instant end,
       @RequestParam(required = false, defaultValue = "false") boolean showPast,
+      @RequestParam(required = false) String period,
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "20") Integer size,
       @RequestParam(required = false) String fragment,
@@ -152,11 +164,15 @@ public class OperationPageController {
     uri.append("size=").append(size).append("&");
     uri.append("sort=createdAt,desc&");
 
-    if (showPast) {
-      uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
-    } else {
-      uri.append("status=PLANNED&status=ACTIVE&");
+    String knownPeriod = RelayParams.oneOfOrNull(period, OPERATION_PERIODS);
+    String effectivePeriod = knownPeriod != null ? knownPeriod : showPast ? "ALL" : "UPCOMING";
+    switch (effectivePeriod) {
+      case "ALL" -> uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
+      case "PAST" -> uri.append("status=COMPLETED&status=CANCELED&");
+      default -> uri.append("status=PLANNED&status=ACTIVE&");
     }
+    model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));
+    model.addAttribute("period", effectivePeriod);
 
     try {
       PageResponse<OperationDto> operationsPage =
@@ -168,7 +184,6 @@ public class OperationPageController {
       model.addAttribute("search", search);
       model.addAttribute("start", start);
       model.addAttribute("end", end);
-      model.addAttribute("showPast", showPast);
     } catch (Exception e) {
       log.error("Error loading operations", e);
       model.addAttribute("error", "error.operations.load");
