@@ -7197,6 +7197,131 @@
             min-height: var(--touch-target);
         }
     }
+
+    .filter-popover {
+        position: relative;
+    }
+
+    .filter-popover .filter-toggle {
+        margin-left: 0;
+    }
+
+    .filter-popover .filter-badge[hidden] {
+        display: none;
+    }
+
+    .filter-popover__panel {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        width: max-content;
+        min-width: 280px;
+        max-width: min(440px, calc(100vw - 2rem));
+        margin: 0;
+        padding: var(--space-4);
+        background: var(--color-bg-dark-gray);
+        border: var(--border-accent);
+        box-shadow: var(--shadow-dropdown);
+    }
+
+    .filter-popover__panel[hidden] {
+        display: none;
+    }
+
+    .filter-popover__panel .form-group {
+        margin: 0;
+    }
+
+    .list-foot {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding: var(--space-3) var(--space-4);
+        border-top: var(--border-hairline);
+        font-size: var(--fs-sm);
+        color: var(--color-gray-2-text);
+    }
+
+    .list-foot .pagination {
+        margin: 0;
+    }
+
+    .list-foot:has(> :only-child) {
+        justify-content: flex-start;
+    }
+
+    .card--flush > .empty-state {
+        border: 0;
+    }
+
+    .cell-status .status-pill {
+        white-space: nowrap;
+    }
+
+    @media (width <= 768px) {
+        .filter-popover {
+            position: static;
+        }
+
+        .filter-popover .filter-toggle {
+            width: auto;
+        }
+
+        .toolbar__search {
+            flex: 1 1 0;
+        }
+
+        .toolbar .filter-popover {
+            order: 2;
+        }
+
+        .toolbar > .segmented {
+            order: 3;
+            display: flex;
+            flex: 1 1 100%;
+        }
+
+        .toolbar > .segmented > * {
+            flex: 1 1 0;
+        }
+
+        .toolbar__spacer {
+            display: none;
+        }
+
+        .toolbar__count {
+            order: 4;
+        }
+
+        .data-table--stack
+            td:not(:first-child, .cell-status, .cell-actions)
+            :is(.cell-title, .cell-sub) {
+            display: inline;
+            font: inherit;
+            color: inherit;
+        }
+
+        .data-table--stack td:not(:first-child, .cell-status, .cell-actions) .cell-sub::before {
+            content: '\00a0\00b7\00a0';
+        }
+
+        .filter-popover__panel {
+            position: fixed;
+            inset: auto 0 var(--krt-tabbar-height) 0;
+            z-index: 1100;
+            width: auto;
+            max-width: none;
+            max-height: 70vh;
+            overflow-y: auto;
+            border-width: 1px 0 0;
+        }
+    }
 }
 
 @layer page {

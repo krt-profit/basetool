@@ -154,13 +154,40 @@
         const toggle = toggleFor(panel);
         if (!toggle) return;
         updateBadge(panel);
-        const stored = readPref(panel);
+        const transient = panel.hasAttribute('data-filter-transient');
+        const stored = transient ? null : readPref(panel);
         setCollapsed(panel, typeof stored === 'boolean' ? stored : true);
         toggle.addEventListener('click', function () {
             const collapsed = !panel.hidden;
             setCollapsed(panel, collapsed);
+            if (transient) {
+                if (!collapsed) {
+                    const first = /** @type {HTMLElement | null} */ (
+                        panel.querySelector('input:not([type="hidden"]), select, textarea, button')
+                    );
+                    if (first) first.focus();
+                }
+                return;
+            }
             writePref(panel, collapsed);
         });
+        if (transient) {
+            document.addEventListener('click', function (event) {
+                if (panel.hidden || !(event.target instanceof Node)) return;
+                if (panel.contains(event.target) || toggle.contains(event.target)) return;
+                if (!event.target.isConnected) return;
+                setCollapsed(panel, true);
+            });
+            document.addEventListener('keydown', function (event) {
+                if (event.key !== 'Escape' || panel.hidden) return;
+                if (!(event.target instanceof Node)) return;
+                if (!panel.contains(event.target) && !toggle.contains(event.target)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                setCollapsed(panel, true);
+                toggle.focus();
+            });
+        }
         panel.addEventListener('input', function () {
             updateBadge(panel);
         });

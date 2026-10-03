@@ -103,6 +103,12 @@ public class MissionPageController {
    */
   static final Set<String> MISSION_STATUSES = Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
 
+  /**
+   * The list's period segments (REQ-UI-027): upcoming (planned and active), past (completed and
+   * cancelled) and all.
+   */
+  static final Set<String> MISSION_PERIODS = Set.of("UPCOMING", "PAST", "ALL");
+
   /** Response type for the single-mission {@code /api/v1/missions/{id}} read. */
   private static final ParameterizedTypeReference<MissionDto> MISSION =
       new ParameterizedTypeReference<MissionDto>() {};
@@ -250,7 +256,10 @@ public class MissionPageController {
    * @param start optional inclusive lower bound on the planned start, ISO-8601 instant
    * @param end optional inclusive upper bound on the planned start, ISO-8601 instant
    * @param status optional status filter; values outside {@link #MISSION_STATUSES} are dropped
-   * @param showPast whether the default status filter includes finished missions
+   * @param showPast whether the default status filter includes finished missions; read only when no
+   *     {@code period} is given, as {@code ALL} when set
+   * @param period the period segment, {@code UPCOMING}, {@code PAST} or {@code ALL}; other values
+   *     fall back to {@code showPast}
    * @param page optional zero-based page index
    * @param size optional page size
    * @param fragment {@code "results"} to render only the results fragment for a live-filter swap
@@ -268,6 +277,7 @@ public class MissionPageController {
           Instant end,
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false, defaultValue = "false") boolean showPast,
+      @RequestParam(required = false) String period,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
@@ -302,11 +312,13 @@ public class MissionPageController {
                 .map(s -> RelayParams.oneOfOrNull(s, MISSION_STATUSES))
                 .filter(Objects::nonNull)
                 .toList();
+    String knownPeriod = RelayParams.oneOfOrNull(period, MISSION_PERIODS);
+    String effectivePeriod = knownPeriod != null ? knownPeriod : showPast ? "ALL" : "UPCOMING";
     if (knownStatuses.isEmpty()) {
-      if (showPast) {
-        uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELLED&");
-      } else {
-        uri.append("status=PLANNED&status=ACTIVE&");
+      switch (effectivePeriod) {
+        case "ALL" -> uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELLED&");
+        case "PAST" -> uri.append("status=COMPLETED&status=CANCELLED&");
+        default -> uri.append("status=PLANNED&status=ACTIVE&");
       }
     } else {
       for (String s : knownStatuses) {
@@ -324,7 +336,8 @@ public class MissionPageController {
       model.addAttribute("search", search);
       model.addAttribute("start", start);
       model.addAttribute("end", end);
-      model.addAttribute("showPast", showPast);
+      model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));
+      model.addAttribute("period", effectivePeriod);
     } catch (Exception e) {
       log.error("Error loading missions", e);
       model.addAttribute("error", "error.missions.load");

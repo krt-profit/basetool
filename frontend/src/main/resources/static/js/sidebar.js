@@ -499,14 +499,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!dateStr.endsWith('Z')) dateStr += 'Z';
                 const date = new Date(dateStr);
                 if (!isNaN(date.getTime())) {
-                    el.textContent = new Intl.DateTimeFormat(undefined, {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZone: 'Europe/Berlin',
-                    }).format(date);
+                    el.textContent =
+                        el.getAttribute('data-format') === 'short'
+                            ? new Intl.DateTimeFormat(undefined, {
+                                  weekday: 'short',
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  timeZone: 'Europe/Berlin',
+                              }).format(date)
+                            : new Intl.DateTimeFormat(undefined, {
+                                  year: 'numeric',
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  timeZone: 'Europe/Berlin',
+                              }).format(date);
                 }
             }
         });

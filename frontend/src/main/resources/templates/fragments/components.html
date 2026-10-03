@@ -59,6 +59,30 @@
   </div>
 </div>
 
+<div th:fragment="filterPopover" class="filter-popover">
+  <button type="button" class="btn btn-ghost filter-toggle"
+          th:attr="aria-controls=${panelId},data-testid=${testid}" aria-expanded="true">
+    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
+    <span th:text="#{filter.add}">Filter</span>
+    <span class="filter-badge filter-count" data-filter-count hidden th:data-label="#{filter.activeCount}">
+      <span data-filter-count-value aria-hidden="true">0</span>
+      <span data-filter-count-label class="visually-hidden"></span>
+    </span>
+  </button>
+  <div class="filter-panel filter-popover__panel" role="group" data-filter-transient
+       th:id="${panelId}" th:data-filter-panel="${panelName}" th:attr="aria-label=#{filter.add}">
+    <th:block th:replace="${body}"></th:block>
+  </div>
+</div>
+
+<div th:fragment="listFoot(pageResponse, baseUrl)" class="list-foot"
+     th:if="${pageResponse != null and pageResponse.totalElements() > 0}"
+     th:data-list-total="${pageResponse.totalElements()}">
+  <span data-testid="list-count"
+        th:text="#{list.countOf(${pageResponse.page() * pageResponse.size() + 1}, ${pageResponse.page() * pageResponse.size() + #lists.size(pageResponse.content())}, ${pageResponse.totalElements()})}">1–7 von 24</span>
+  <div th:replace="~{fragments/pagination :: pagination(pageResponse=${pageResponse}, baseUrl=${baseUrl})}"></div>
+</div>
+
 <div th:fragment="filterChips(formId)" class="filter-chips" hidden
      data-filter-chips th:data-filter-form="${formId}" data-testid="filter-chips"
      th:data-remove-label="#{filter.remove}">
