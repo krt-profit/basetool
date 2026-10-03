@@ -75345,6 +75345,11 @@
             "items" : {
               "$ref" : "#/components/schemas/AllocationReductionDto"
             }
+          },
+          "qualityRequirement" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
           }
         },
         "required" : [ "amount", "inventoryItemId" ]

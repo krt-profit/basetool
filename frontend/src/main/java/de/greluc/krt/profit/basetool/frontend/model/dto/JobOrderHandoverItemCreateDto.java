@@ -34,8 +34,11 @@ import org.jetbrains.annotations.Nullable;
  * @param inventoryItemId the inventory entry handed over from
  * @param amount the SCU amount handed over
  * @param missionReductions the per-mission "deduct from" plan, or {@code null} to auto-clamp
+ * @param qualityRequirement the code of the quality tier the amount is booked against, or {@code
+ *     null} for the highest tier the entry meets (REQ-ORDERS-038)
  */
 public record JobOrderHandoverItemCreateDto(
     @NotNull UUID inventoryItemId,
     @NotNull @Positive Double amount,
-    @Nullable List<@Valid AllocationReductionDto> missionReductions) {}
+    @Nullable List<@Valid AllocationReductionDto> missionReductions,
+    @Nullable String qualityRequirement) {}
