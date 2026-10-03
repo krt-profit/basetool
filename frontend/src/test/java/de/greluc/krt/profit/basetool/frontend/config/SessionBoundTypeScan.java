@@ -702,7 +702,8 @@ final class SessionBoundTypeScan {
     }
 
     /**
-     * Records a generic signature from a local variable type table.
+     * Records a generic signature from a local variable type table; a primitive signature records
+     * nothing.
      *
      * @param signature the parsed signature
      * @param loader the loader
@@ -710,7 +711,6 @@ final class SessionBoundTypeScan {
     void addSignature(@NotNull Signature signature, @NotNull ClassLoader loader) {
       switch (signature) {
         case Signature.ArrayTypeSig array -> addSignature(array.componentSignature(), loader);
-        case Signature.BaseTypeSig _ -> {}
         case Signature.TypeVarSig variable ->
             problems.add("type variable " + variable.identifier());
         case Signature.ClassTypeSig type -> {
@@ -726,12 +726,14 @@ final class SessionBoundTypeScan {
             }
           }
           for (Signature.TypeArg argument : type.typeArgs()) {
-            switch (argument) {
-              case Signature.TypeArg.Bounded bounded -> addSignature(bounded.boundType(), loader);
-              case Signature.TypeArg.Unbounded _ -> problems.add("unbounded wildcard in " + name);
+            if (argument instanceof Signature.TypeArg.Bounded bounded) {
+              addSignature(bounded.boundType(), loader);
+            } else {
+              problems.add("unbounded wildcard in " + name);
             }
           }
         }
+        default -> {}
       }
     }
 
