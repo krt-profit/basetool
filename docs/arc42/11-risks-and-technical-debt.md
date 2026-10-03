@@ -22,7 +22,8 @@ twice, and the second one can be forgotten.
 
 **Mitigated, not solved.** `FrontendDtoContractTest` diffs the mirrors against `openapi.json`, and
 `GeneratedDtoAgreementTest` compares them field by field against the models generated from the same
-document. Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
+document, and `DtoMirrorConsistencyTest` pairs every mirror with its backend record wherever it
+lives in the backend source tree (REQ-OPS-038). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
 and until it happens the duplication is real.
 
 ## 11.3 The knowledge base cannot be gated by this repository's CI

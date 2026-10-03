@@ -124,7 +124,8 @@ that has to cross that boundary â€” the active-OrgUnit pin, the correlation id â
   `krt-freemarker` login forms provider that hands a device login's user code to the consent page
   (ADR-0228, REQ-XCH-005); every Discord call
   goes through one shared HTTP client, and a first login reads the guild-member object once. Analysed by SpotBugs +
-  FindSecBugs and held to a JaCoCo floor like the applications (since 2026-09-22). Shipped as its
+  FindSecBugs and held to its own JaCoCo floor like the applications (since 2026-09-22;
+  `build-settings.properties`, REQ-OPS-037). Shipped as its
   own signed artifact (ADR-0055). Three sub-packages by concern: `discord` (the identity provider,
   its two mappers, the shared Discord client and the nickname reader), `gate` (the first-login
   authenticator, the membership checker and the backend account precheck with its truststore) and
@@ -141,7 +142,8 @@ that has to cross that boundary â€” the active-OrgUnit pin, the correlation id â
 - **`test-support`** â€” a test-only library, never shipped: endpoint enumeration and the frontend
   page-route inventory behind the backend and frontend anonymous-surface sweeps, and behind ingest's
   `IngestEndpointSurfaceTest`, which pins the gateway's routed surface to the exchange route table
-  and fails on any mapping under `/v1`.
+  and fails on any mapping under `/v1`; and `ContextShape`, the bean count each application's
+  `ContextShapeTest` ratchets (REQ-OPS-038).
 
 ### Inside `ingest`
 

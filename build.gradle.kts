@@ -119,6 +119,99 @@ val ossLicenseCoordinateOverrides =
     "org.springframework.session:spring-session-data-redis" to ("4.1.1" to "Apache-2.0"),
   )
 
+/**
+ * The quality settings one module declares in its own `build-settings.properties` (REQ-OPS-037).
+ *
+ * Every getter fails configuration when its key is absent or malformed; there is no default.
+ */
+class ModuleBuildSettings(
+  private val projectPath: String,
+  private val source: String,
+  private val values: Map<String, String>,
+) {
+  private fun required(key: String): String =
+    values[key]?.trim()?.takeIf { it.isNotEmpty() }
+      ?: throw GradleException(
+        "$projectPath: $source does not set '$key'. Every module declares its own quality " +
+          "settings for each plugin it applies; nothing falls back to a default (REQ-OPS-037)."
+      )
+
+  private fun floor(key: String): java.math.BigDecimal {
+    val value = required(key).toBigDecimalOrNull()
+    if (value == null || value.signum() <= 0 || value > java.math.BigDecimal.ONE) {
+      throw GradleException("$projectPath: $source sets '$key' to a value outside (0, 1].")
+    }
+    return value
+  }
+
+  private fun patterns(key: String): List<String> {
+    val list = required(key).split(',').map { it.trim() }.filter { it.isNotEmpty() }
+    if (list.isEmpty() || list.any { !Regex("[A-Za-z0-9_.\$*]+").matches(it) }) {
+      throw GradleException("$projectPath: $source sets '$key' to $list, not class patterns.")
+    }
+    return list
+  }
+
+  /** The maximum heap of every `Test` JVM of the module, e.g. `3072m`. */
+  val testMaxHeap: String
+    get() =
+      required("test.maxHeap").also {
+        if (!Regex("[1-9][0-9]*[mg]").matches(it)) {
+          throw GradleException("$projectPath: $source sets 'test.maxHeap' to '$it', not <n>m|g.")
+        }
+      }
+
+  /** The JaCoCo instruction coverage floor of the module. */
+  val instructionFloor: java.math.BigDecimal
+    get() = floor("coverage.instruction")
+
+  /** The JaCoCo branch coverage floor of the module. */
+  val branchFloor: java.math.BigDecimal
+    get() = floor("coverage.branch")
+
+  /** The PIT target class patterns of the module. */
+  val mutationTargetClasses: List<String>
+    get() = patterns("mutation.targetClasses")
+
+  /** The PIT target test patterns of the module. */
+  val mutationTargetTests: List<String>
+    get() = patterns("mutation.targetTests")
+
+  companion object {
+    /** Every key a `build-settings.properties` may hold. */
+    val KEYS =
+      setOf(
+        "test.maxHeap",
+        "coverage.instruction",
+        "coverage.branch",
+        "mutation.targetClasses",
+        "mutation.targetTests",
+      )
+  }
+}
+
+/**
+ * Reads this module's `build-settings.properties`, failing configuration when it is missing or
+ * holds a key no convention reads.
+ */
+fun Project.moduleBuildSettings(): ModuleBuildSettings {
+  val file = layout.projectDirectory.file("build-settings.properties")
+  val source = file.asFile.relativeTo(rootDir).invariantSeparatorsPath
+  val text =
+    providers.fileContents(file).asText.orNull
+      ?: throw GradleException(
+        "$path: $source is missing. Every Java module declares its test heap, and its coverage " +
+          "floors and mutation targets when it applies JaCoCo or PIT (REQ-OPS-037)."
+      )
+  val properties = java.util.Properties().apply { load(java.io.StringReader(text)) }
+  val values = properties.stringPropertyNames().associateWith { properties.getProperty(it) }
+  val unknown = values.keys - ModuleBuildSettings.KEYS
+  if (unknown.isNotEmpty()) {
+    throw GradleException("$path: $source holds unknown keys ${unknown.sorted()}.")
+  }
+  return ModuleBuildSettings(path, source, values)
+}
+
 extra["ossLicenseUrlAliases"] = ossLicenseUrlAliases
 
 extra["ossLicenseCoordinateOverrides"] =
@@ -184,12 +277,11 @@ subprojects {
         }
       }
 
+    val testMaxHeap = moduleBuildSettings().testMaxHeap
     tasks.withType<Test>().configureEach {
       useJUnitPlatform()
       jvmArgs("--enable-native-access=ALL-UNNAMED")
-      maxHeapSize =
-        mapOf("backend" to "3072m", "frontend" to "2048m", "ingest" to "1024m")[project.name]
-          ?: "1024m"
+      maxHeapSize = testMaxHeap
       systemProperty("spring.profiles.active", "test")
     }
 
@@ -234,20 +326,9 @@ subprojects {
       classDirectories.setFrom(filterGenerated(classDirectories))
     }
 
-    val instructionFloor =
-      mapOf(
-        "backend" to "0.82",
-        "frontend" to "0.60",
-        "ingest" to "0.93",
-        "keycloak-spi" to "0.66",
-      )[project.name] ?: "0.50"
-    val branchFloor =
-      mapOf(
-        "backend" to "0.65",
-        "frontend" to "0.46",
-        "ingest" to "0.85",
-        "keycloak-spi" to "0.60",
-      )[project.name] ?: "0.40"
+    val coverageSettings = moduleBuildSettings()
+    val instructionFloor = coverageSettings.instructionFloor
+    val branchFloor = coverageSettings.branchFloor
     tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
       dependsOn(tasks.named("test"))
       classDirectories.setFrom(filterGenerated(classDirectories))
@@ -257,12 +338,12 @@ subprojects {
           limit {
             counter = "INSTRUCTION"
             value = "COVEREDRATIO"
-            minimum = instructionFloor.toBigDecimal()
+            minimum = instructionFloor
           }
           limit {
             counter = "BRANCH"
             value = "COVEREDRATIO"
-            minimum = branchFloor.toBigDecimal()
+            minimum = branchFloor
           }
         }
       }
@@ -271,10 +352,11 @@ subprojects {
   }
 
   plugins.withId("info.solidsoft.pitest") {
+    val mutationSettings = moduleBuildSettings()
     extensions.configure<info.solidsoft.gradle.pitest.PitestPluginExtension>("pitest") {
       junit5PluginVersion.set(libs.versions.pitestJunit5.get())
-      targetClasses.set(listOf("de.greluc.krt.profit.basetool.${project.name}.service.*"))
-      targetTests.set(listOf("de.greluc.krt.profit.basetool.${project.name}.service.*Test"))
+      targetClasses.set(mutationSettings.mutationTargetClasses)
+      targetTests.set(mutationSettings.mutationTargetTests)
       threads.set(4)
       outputFormats.set(listOf("HTML", "XML"))
       timestampedReports.set(false)

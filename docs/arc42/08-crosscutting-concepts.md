@@ -317,6 +317,13 @@ test scope only, with explicitly annotated module detection. **Only coupling is 
 security or structural rule stays a hard rule
 ([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-003…005).
 
+**A quality gate never falls back to a default, and a guard never narrows in silence.** Each module
+declares its test heap, coverage floors and PIT targets in its own `build-settings.properties`, and
+configuration fails without them (REQ-OPS-037). Guards that find their subject by a path or a
+listing fail when they stop seeing it — build-script input paths, recursive content scans, the DTO
+mirror pairing, and a counted context shape per application (REQ-OPS-038) — so moving files or
+packages cannot switch a gate off.
+
 ## 8.13 The external client exchange
 
 Three rules hold for every exchange route, and each new resource or capability inherits them:

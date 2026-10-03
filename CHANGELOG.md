@@ -73,6 +73,15 @@
   Backend-Fehlers. Dasselbe gilt für `goods` und `sourceImages` jedes Auftrags, die ebenfalls mindestens
   einen Eintrag verlangen. Keine Vertragsänderung im Sinne von v2 (REQ-XCH-026).
 
+- **Build: Qualitätsschwellen pro Modul ausdrücklich.** Testheap, JaCoCo-Schwellen und PIT-Ziele
+  stehen in `<modul>/build-settings.properties`; fehlt ein Wert, bricht die Konfiguration ab, statt
+  still auf 0.50/0.40 zu fallen (REQ-OPS-037). Die Werte sind unverändert.
+
+- **Build: Prüfungen, die an Pfaden hängen, schlagen fehl statt still zu schrumpfen.** Neue Prüfung,
+  dass jeder Eingabepfad der Build-Skripte existiert; i18n- und Seiten-CSS-Scans lesen Unterordner;
+  ein Frontend-DTO ohne Backend-Gegenstück fällt durch; ein `ContextShapeTest` je Anwendung zählt
+  geplante Jobs, Transaktions-Listener, Controller und Filterketten (REQ-OPS-038).
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
