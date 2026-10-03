@@ -177,6 +177,11 @@ Two binding rules shape every UI change:
   declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
   layer: page CSS beats the design system without specificity bumps, a migrated inline class beats
   both, and the two state classes win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`).
+- **One navigation chrome, rendered once** (2026-10-03). Every app page includes
+  `fragments/header.html` and `fragments/sidebar.html`; the drawer is also the phone menu sheet, and
+  the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it, so `sec:authorize`
+  in that one template stays the only place that decides which pages a member is offered
+  (REQ-UI-026, ADR-0240, `NavigationRenderMvcTest`, `NavigationE2eTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

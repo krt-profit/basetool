@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<body>
+<nav th:fragment="tabbar" class="mobile-tabbar" th:aria-label="#{mobile.tab.aria}">
+    <a th:href="@{/missions}" class="mobile-tab" data-tab-path="/missions" data-testid="mobile-tab-missions">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"></use></svg>
+        <span th:text="#{mobile.tab.missions}">Einsätze</span>
+    </a>
+    <a th:href="@{/inventory}" class="mobile-tab" data-tab-path="/inventory" data-testid="mobile-tab-inventory">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"></use></svg>
+        <span th:text="#{mobile.tab.inventory}">Lager</span>
+    </a>
+    <a th:href="${canViewJobOrders or canViewOwnJobOrders} ? @{/orders} : @{/orders/create}"
+       class="mobile-tab" data-tab-path="/orders" data-testid="mobile-tab-orders">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"></use></svg>
+        <span th:text="#{mobile.tab.orders}">Aufträge</span>
+    </a>
+    <a th:href="@{/notifications}" class="mobile-tab" data-tab-path="/notifications" data-testid="mobile-tab-notifications">
+        <span class="mobile-tab-icon">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
+            <span class="mobile-tab-badge" data-notif-badge
+                  th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
+                  th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span>
+        </span>
+        <span th:text="#{mobile.tab.notifications}">Meldungen</span>
+    </a>
+    <button type="button" class="mobile-tab mobile-tab-menu" id="mobile-menu-toggle" data-testid="mobile-tab-menu"
+            aria-controls="sidebar" aria-expanded="false">
+        <span class="mobile-tab-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span th:text="#{mobile.tab.menu}">Menü</span>
+    </button>
+</nav>
+</body>
+</html>
