@@ -45,14 +45,16 @@
         font-size: 0.85rem;
     }
 
+    @media (width <= 1024px) {
+        .audit-event-filter select {
+            min-height: var(--touch-target);
+        }
+    }
+
     @media (width <= 768px) {
         .audit-event-filter {
             flex: 1 1 100%;
             order: 3;
-        }
-
-        .audit-event-filter select {
-            min-height: var(--touch-target);
         }
 
         .audit-details {
