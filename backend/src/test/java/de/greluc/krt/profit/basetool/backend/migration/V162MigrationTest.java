@@ -36,7 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V162__manufacturer_uex_company_alias_and_dedup.sql}: the alias table's
@@ -47,7 +46,6 @@ import org.springframework.test.context.ActiveProfiles;
  * dedup statements directly; {@link #cleanup()} removes the fixture.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V162MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

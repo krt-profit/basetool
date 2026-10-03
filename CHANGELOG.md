@@ -82,6 +82,10 @@
   ein Frontend-DTO ohne Backend-Gegenstück fällt durch; ein `ContextShapeTest` je Anwendung zählt
   geplante Jobs, Transaktions-Listener, Controller und Filterketten (REQ-OPS-038).
 
+- **Tests: das Test-Profil setzt nur noch der Build.** 237 überflüssige `@ActiveProfiles("test")`
+  sind entfernt; sie teilten Springs Test-Context-Cache, ohne etwas zu ändern. Ein Test je Anwendung
+  verhindert, dass sie wiederkommen (REQ-OPS-039).
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die

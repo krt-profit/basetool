@@ -324,6 +324,11 @@ listing fail when they stop seeing it — build-script input paths, recursive co
 mirror pairing, and a counted context shape per application (REQ-OPS-038) — so moving files or
 packages cannot switch a gate off.
 
+**The build sets the `test` profile, once.** Every Gradle `Test` task activates it, and no test class
+repeats it with `@ActiveProfiles("test")`: the annotation is part of Spring's test-context cache key,
+so it only splits contexts that are otherwise identical (REQ-OPS-039, guarded by a
+`TestProfileConventionTest` per application).
+
 ## 8.13 The external client exchange
 
 Three rules hold for every exchange route, and each new resource or capability inherits them:

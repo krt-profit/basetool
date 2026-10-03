@@ -33,7 +33,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -44,7 +43,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * test, since the update flags every user not in it.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class OrphanedAccountRepositoryIntegrationTest {
 
   @Autowired private UserRepository userRepository;

@@ -61,7 +61,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,7 +73,6 @@ import org.springframework.transaction.annotation.Transactional;
  * modes surface.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class UserDeletionForeignKeyIntegrityTest {
 

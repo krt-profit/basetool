@@ -2533,6 +2533,49 @@ what it guards:
 `frontend/…/DtoMirrorConsistencyTest` · `*/…/architecture/ContextShapeTest` ·
 `test-support/…/context/ContextShape` · **Related:** REQ-OPS-037
 
+### REQ-OPS-039 — The build sets the test profile once; no test repeats it
+
+Every Gradle `Test` task sets `spring.profiles.active=test` (root `build.gradle.kts`). An
+`@ActiveProfiles("test")` on a test class therefore changes nothing about the profile — but it is
+part of the key under which Spring's test-context cache stores an application context, so two test
+classes that differ only by that annotation boot two identical contexts, and with the cache's limit of
+32 contexts the backend evicted and rebooted contexts it still needed (BLD-PERF-03).
+
+- **No test class carries `@ActiveProfiles("test")`** in any spelling — `"test"`, `{"test"}`,
+  `value =` / `profiles =`, or the fully qualified annotation.
+- **A test that needs another profile keeps its annotation**, including one that names `test` beside
+  another profile; it is not redundant and the guard does not report it.
+- **`TestProfileConventionTest`** in `backend`, `frontend` (unit and E2E sources) and `ingest` scans
+  the module's test sources with `test-support`'s `TestProfileScan` and fails on a redundant
+  annotation; a selection floor fails it when it stops seeing the sources.
+
+Measured on the full suites with the context-cache statistics
+(`logging.level.org.springframework.test.context.cache=DEBUG`), before and after removing the 237
+redundant annotations (195 backend, 42 frontend), on a warm workstation, one run each. "Distinct" is
+the number of contexts with the cache limit raised to 400; "loads" counts the boots under the default
+limit of 32, evictions included:
+
+| Module | Distinct before → after | Loads before → after | `test` wall time before → after |
+| --- | --- | --- | --- |
+| backend | 48 → 46 | 49 → 47 | 409 s → 330 s |
+| frontend | 25 → 21 | 25 → 21 | 126 s → 99 s |
+| ingest | 13 → 13 (had none) | 13 → 13 | — |
+
+The backend gain is small because its remaining contexts differ by their `@MockitoBean` sets and
+properties, not by the profile; sharing one mock set is the next step (BLD-PERF-03, plan §7.2).
+
+**Acceptance**
+
+- [x] No `@ActiveProfiles("test")` remains in any test or E2E source.
+- [x] `TestProfileScanTest` reports every redundant spelling and none that names another profile.
+- [x] A planted `@org.springframework.test.context.ActiveProfiles("test")` in an ingest test failed
+  `TestProfileConventionTest` with its file and line.
+- [x] The full backend, frontend and ingest suites are green after the removal.
+
+**Enforced by:** `*/…/architecture/TestProfileConventionTest` ·
+`test-support/…/profile/TestProfileScan` · root `build.gradle.kts` (`systemProperty
+("spring.profiles.active", "test")`)
+
 ### REQ-OPS-040 — The provider JAR is checked against the Keycloak that loads it
 
 `keycloak-spi` compiles against Keycloak's private SPIs at the catalog's `keycloak` version

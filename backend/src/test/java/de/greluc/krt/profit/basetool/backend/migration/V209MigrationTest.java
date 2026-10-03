@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V209__restore_mission_status_covering_index.sql}: the three-column
@@ -35,7 +34,6 @@ import org.springframework.test.context.ActiveProfiles;
  * index is dropped.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V209MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

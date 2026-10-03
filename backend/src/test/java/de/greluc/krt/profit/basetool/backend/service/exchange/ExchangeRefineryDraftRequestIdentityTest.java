@@ -51,7 +51,6 @@ import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -67,7 +66,6 @@ import tools.jackson.databind.node.ObjectNode;
  * same schema in the committed OpenAPI document.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeRefineryDraftRequestIdentityTest {
 

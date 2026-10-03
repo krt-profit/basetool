@@ -41,7 +41,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -51,7 +50,6 @@ import org.springframework.web.context.WebApplicationContext;
 
 /** Verifies that the {@code /api/v1/org-hierarchy/**} endpoints admit ADMIN and forbid OFFICER. */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class OrgHierarchyControllerSecurityTest {
 

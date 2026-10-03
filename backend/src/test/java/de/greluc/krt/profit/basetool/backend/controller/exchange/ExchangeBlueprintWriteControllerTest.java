@@ -61,7 +61,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -77,7 +76,6 @@ import org.springframework.web.context.WebApplicationContext;
  * transactions.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeBlueprintWriteControllerTest {
 

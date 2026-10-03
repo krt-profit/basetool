@@ -64,7 +64,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -84,7 +83,6 @@ import tools.jackson.databind.json.JsonMapper;
  * name of the type they prove; the guard checks that one exists per listed type.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class DualUseRequestBodyProofTest {
 

@@ -31,7 +31,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -42,7 +41,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>Writes are committed, so {@link #cleanUp()} removes the fixture.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class UexRefineryFlagCommitTest {
 
   private static final String STATION_NAME = "Commit-Probe Refinery Station";

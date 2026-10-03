@@ -87,7 +87,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -108,7 +107,6 @@ import org.springframework.web.context.WebApplicationContext;
  * all seeded data.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class LazyToOneReadPathsTest {
 
   @Autowired private WebApplicationContext context;

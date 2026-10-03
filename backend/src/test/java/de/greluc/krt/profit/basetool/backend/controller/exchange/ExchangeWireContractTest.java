@@ -84,7 +84,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -104,7 +103,6 @@ import tools.jackson.databind.node.ObjectNode;
  * SCHEMA_INVALID} for a body the contract allows.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeWireContractTest {
 

@@ -35,7 +35,6 @@ import org.springframework.http.converter.cbor.JacksonCborHttpMessageConverter;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.mock.http.MockHttpOutputMessage;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter;
 import tools.jackson.databind.JsonNode;
@@ -50,7 +49,6 @@ import tools.jackson.dataformat.cbor.CBORMapper;
  * Spring actually registered, without going through an endpoint.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class CborJsonFidelityTest {
 
   @Autowired private RequestMappingHandlerAdapter handlerAdapter;

@@ -50,14 +50,12 @@ import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Integration tests for the bank PDF exports against real Postgres: the account statement
  * (REQ-BANK-014) and the three-month report (REQ-BANK-015).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class BankReportServiceTest {
 
   @Autowired private BankStatementReportService statementService;
