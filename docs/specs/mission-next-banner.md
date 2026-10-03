@@ -1,15 +1,14 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** MISSION · **Related ADRs:** ADR-0159
 
 # Home-page upcoming-missions overview
 
 ## Context & goal
 
-The home page (`/`) shows the **upcoming missions of the next seven days** as a tile grid, nearest
-planned start first (REQ-MISSION-012). Each tile carries the same fields as the legacy single "next
-mission" card — name, status, schedule, optional calendar link, the **owning org unit**
-(Staffel/SK/Bereich/OL, or "ownerless", read from the `owningSquadron` field) and a Markdown
-description preview clamped to three lines. It is populated from `GET /api/v1/missions/search` and
+The home page (`/`) shows the **upcoming missions of the next seven days** as the list „Nächste 7
+Tage", nearest planned start first (REQ-MISSION-012). Each row is a link to the mission and carries
+its date, name, TS time, server join, Treffpunkt, the **owning org unit** (Staffel/SK/Bereich/OL,
+or "ownerless", read from the `owningSquadron` field) and the translated status. It is populated from `GET /api/v1/missions/search` and
 uses the **broad mission-list scope** (the viewer's own org units plus every unit's
 organisation-wide missions), deliberately wider than the own-unit `/next` lookup described below.
 
@@ -113,9 +112,9 @@ the viewer has any:
 ### REQ-MISSION-012 — Home-page upcoming-missions tile grid (next 7 days)
 
 The home page (`/`) renders the missions whose `plannedStartTime` falls within the next seven days
-(from "now" to "now + 7 days") as a **tile grid**, ordered by `plannedStartTime` ascending — the
-nearest planned start first. This replaces the former single next-mission banner; the first tile is
-the soonest upcoming mission.
+(from "now" to "now + 7 days") as a **list of row links** („Nächste 7 Tage"), ordered by
+`plannedStartTime` ascending — the nearest planned start first. This replaces the former single
+next-mission banner; the first row is the soonest upcoming mission.
 
 - **Source & scope.** The grid is populated from `GET /api/v1/missions/search` with `start = now`,
   `end = now + 7d`, `status = PLANNED, ACTIVE`, `sort = plannedStartTime,asc`, `size = 50` — one
@@ -135,34 +134,37 @@ the soonest upcoming mission.
   the `/me` `UserDto` as a fallback; the mission's `owningSquadron.id` is matched against that set.
   The **leadership cascade** of the `/next` lookup (REQ-MISSION-008) is intentionally **not** applied
   (a Bereichs-/OL-leader's subordinate units are not "their unit" here), and a member with no
-  memberships never sees the chip. The chip is pinned to the **bottom-right** of the tile (right of the "Einsatz
-  öffnen" CTA), **not** the top — so it never inserts a row above the tile body and every tile's body
-  text starts at the same height whether or not it carries the chip.
+  memberships never sees the chip. The chip stands in the row's status column, under the status, so
+  it never shifts the row's title.
 - **Eligibility & redaction.** Only `PLANNED` / `ACTIVE` missions appear (terminal ones are excluded
   by the status filter). The outsider tier that hid the description from anonymous and role-less
   callers is gone with its audience (ADR-0159); what remains is REQ-SEC-007's peer redaction, which
   strips participant PII and never touched the tile fields
   ([`security-and-access.md`](security-and-access.md)).
-- **Tile content.** Each tile carries the same fields as the legacy next-mission card — name, owning
-  org unit (or "Keine"), status pill, meeting time, planned start, optional calendar link, and — for
-  a Markdown description **preview clamped to three lines**; the full description is on the mission
-  detail page. The "Einsatz öffnen" link opens the mission.
+- **Row content.** A date block (weekday, day, month of the planned start, Europe/Berlin), the name,
+  a sub-line „TS hh:mm · Join hh:mm · Treffpunkt · Einheit" (the Treffpunkt only when set, the unit
+  „Keine" when ownerless), the translated status and a chevron. **The whole row is the link**;
+  there is no call to action per mission, no description preview and no calendar link — the
+  mission detail page carries them. „Alle Einsätze →" in the card head opens the list.
 - **Empty state.** When no `PLANNED` / `ACTIVE` mission starts within the next seven days, the
   section renders its localized empty state (`home.upcoming.empty`); a mission whose planned start is
   more than seven days out is **not** shown, even if it is the soonest upcoming one.
-- **Layout.** The announcement / information panel above the grid spans the full width and is only as
-  tall as its content (minimal when collapsed); the grid is responsive (auto-fit tiles, single column
-  on touch classes) per the design system ([`ui-design-system.md`](ui-design-system.md), REQ-UI-009).
+- **Layout.** Pattern B of REQ-UI-027: a 2 : 1 grid, the list on the left, the information card
+  and the three newest notifications on the right, one column from 1024 px down
+  ([`ui-design-system.md`](ui-design-system.md), REQ-UI-009, REQ-UI-027).
+
+Amended 2026-10-03 (website overhaul phase 2, recorded in phase 3): the tile grid with its
+„Einsatz öffnen" button and three-line description preview became the row list above, and the
+information panel moved beside it.
 
 **Acceptance**
 
-- [ ] The home page lists every `PLANNED`/`ACTIVE` mission with a planned start in `[now, now+7d]` as a tile, nearest planned start first.
+- [ ] The home page lists every `PLANNED`/`ACTIVE` mission with a planned start in `[now, now+7d]` as a row link, nearest planned start first.
 - [ ] A mission starting more than seven days out is not shown; when none qualify, the localized empty state renders.
-- [ ] A member sees own-unit internal missions alongside the organisation-wide ones, each with the three-line description preview.
-- [ ] An unauthenticated visitor gets the landing page and no tile at all (REQ-SEC-052).
-- [ ] Each tile's description preview is truncated to three lines; the full text is visible on the mission detail page.
-- [ ] The information panel spans the full width and collapses to its header height.
-- [ ] An own-unit mission's tile shows the "Meine Einheit" chip; a foreign mission's tile does not.
+- [ ] A member sees own-unit internal missions alongside the organisation-wide ones.
+- [ ] An unauthenticated visitor gets the landing page and no mission row at all (REQ-SEC-052).
+- [ ] A row carries no call to action of its own; the whole row opens the mission.
+- [ ] An own-unit mission's row shows the "Meine Einheit" chip; a foreign mission's row does not.
 - [ ] The own-unit match covers every direct membership kind — a Spezialkommando, a directly-assigned Bereich and a directly-assigned Organisationsleitung mission are flagged, not only Staffel missions — while a subordinate unit reached only via the leadership cascade is **not**.
 
 **Enforced by:** `HomeControllerMvcTest`
@@ -176,8 +178,7 @@ the soonest upcoming mission.
 `UserControllerTest` (`getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService`).
 **Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions/search` call + the
 `/api/v1/users/me/org-unit-ids` own-unit lookup), `templates/index.html` (the `upcomingMissions`
-tile grid + `.mission-tile__desc` clamp + the `myOrgUnitIds` chip gate), `static/css/styles.css`
-(`.mission-tile*`); backend `UserController#getMyOrgUnitIds` +
+row list `.home-missions` + the `myOrgUnitIds` chip gate), `static/css/pages/index.css`; backend `UserController#getMyOrgUnitIds` +
 `OrgUnitMembershipService#findDirectMembershipOrgUnitIds`. The mission grid reuses the existing
 `MissionController` `/api/v1/missions/search` endpoint; the only new backend surface is the
 kind-agnostic own-membership id lookup.

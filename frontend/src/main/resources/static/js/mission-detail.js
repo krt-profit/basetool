@@ -142,15 +142,15 @@ document.addEventListener('krt:swapped', function (ev) {
         return;
     }
     const title = meta.getAttribute('data-title');
-    const h1 = document.querySelector('.mission-head-title h1');
+    const h1 = document.getElementById('mission-title');
     if (h1 && title != null) {
         h1.textContent = title;
     }
     const status = (meta.getAttribute('data-status') || '').trim();
     const statusLabel = meta.getAttribute('data-status-label');
-    const pill = document.querySelector('.mission-head-title .status-pill');
+    const pill = document.getElementById('mission-status-badge');
     if (pill && status) {
-        pill.className = 'status-pill status-' + status;
+        pill.className = 'status-badge status-' + status;
         if (statusLabel != null) {
             pill.textContent = statusLabel;
         }
@@ -936,11 +936,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     );
                     const eOrgUnitsReadonly = document.getElementById('edit-org-units-readonly');
                     if (eOrgUnitsGroup && eOrgUnitsReadonlyGroup) {
-                        eOrgUnitsGroup.style.display = isExternal ? '' : 'none';
-                        eOrgUnitsReadonlyGroup.classList.toggle(
-                            'krtm-display-none-5790',
-                            isExternal,
-                        );
+                        eOrgUnitsGroup.hidden = !isExternal;
+                        eOrgUnitsReadonlyGroup.hidden = isExternal;
                         if (!isExternal && eOrgUnitsReadonly) {
                             eOrgUnitsReadonly.textContent = '';
                             const unitNames = (this.getAttribute('data-org-unit-names') || '')
@@ -1108,7 +1105,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 )
                                 .forEach(function (display) {
                                     display.textContent = formatted;
-                                    display.classList.remove('krtm-hidden');
+                                    display.hidden = false;
                                 });
                             document
                                 .querySelectorAll('.set-freq-btn[data-type-id="' + typeId + '"]')
@@ -2559,11 +2556,17 @@ if (document.readyState === 'loading') {
     if (!tabs.length) {
         return;
     }
-    const validKeys = tabs.map((t) => t.getAttribute('data-tab'));
+    const EDIT_KEY = 'verw';
+    const viewKeys = tabs.map((t) => t.getAttribute('data-tab'));
+    const verwPane = document.getElementById('pane-verw');
+    const editBtn = document.getElementById('mission-edit-btn');
+    const editDone = document.getElementById('mission-edit-done');
+    const validKeys = verwPane && editBtn ? viewKeys.concat(EDIT_KEY) : viewKeys.slice();
     const storeKey = 'krt.einsatz.' + (window.missionId || 'new') + '.tab';
     let dirty = false;
+    let current = null;
+    let lastView = 'ueb';
 
-    const verwPane = document.getElementById('pane-verw');
     if (verwPane) {
         verwPane.addEventListener('input', function () {
             dirty = true;
@@ -2574,20 +2577,28 @@ if (document.readyState === 'loading') {
     }
 
     function currentKey() {
-        const active = tabs.find((t) => t.classList.contains('active'));
-        return active ? active.getAttribute('data-tab') : null;
+        return current;
     }
 
     function apply(key) {
+        current = key;
+        if (key !== EDIT_KEY) {
+            lastView = key;
+        }
+        const editing = key === EDIT_KEY;
         tabs.forEach((t) => {
-            const on = t.getAttribute('data-tab') === key;
+            const tabKey = t.getAttribute('data-tab');
+            const on = tabKey === key;
             t.classList.toggle('active', on);
             t.setAttribute('aria-selected', String(on));
-            t.tabIndex = on ? 0 : -1;
+            t.tabIndex = on || (editing && tabKey === lastView) ? 0 : -1;
         });
         document.querySelectorAll('.tab-pane').forEach((p) => {
             p.classList.toggle('on', p.id === 'pane-' + key);
         });
+        if (editBtn) {
+            editBtn.setAttribute('aria-pressed', String(editing));
+        }
         try {
             localStorage.setItem(storeKey, key);
         } catch {}
@@ -2595,7 +2606,7 @@ if (document.readyState === 'loading') {
 
     async function show(key, push) {
         if (!validKeys.includes(key) || key === currentKey()) {
-            return;
+            return false;
         }
         if (dirty && typeof window.showKrtConfirm === 'function') {
             const i18n = window.MISSION_TAB_I18N || {};
@@ -2605,7 +2616,7 @@ if (document.readyState === 'loading') {
                 window.krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
                 window.krtI18nText(i18n['unsaved.cancel'], 'MISSION_TAB_I18N[unsaved.cancel]'),
             );
-            if (!go) return;
+            if (!go) return false;
             dirty = false;
         }
         apply(key);
@@ -2614,6 +2625,22 @@ if (document.readyState === 'loading') {
             url.searchParams.set('tab', key);
             url.hash = '';
             history.pushState({ tab: key }, '', url);
+        }
+        return true;
+    }
+
+    async function enterEditMode() {
+        if (await show(EDIT_KEY, true)) {
+            const title = document.getElementById('mission-edit-title');
+            if (title) {
+                title.focus();
+            }
+        }
+    }
+
+    async function leaveEditMode() {
+        if ((await show(lastView, true)) && editBtn) {
+            editBtn.focus();
         }
     }
 
@@ -2624,9 +2651,9 @@ if (document.readyState === 'loading') {
         if (h && validKeys.includes(h)) return h;
         if (
             document.querySelector('#pane-verw #mission-form .field-error:not(:empty)') &&
-            validKeys.includes('verw')
+            validKeys.includes(EDIT_KEY)
         )
-            return 'verw';
+            return EDIT_KEY;
         if (useStore) {
             try {
                 const s = localStorage.getItem(storeKey);
@@ -2641,6 +2668,21 @@ if (document.readyState === 'loading') {
             show(t.getAttribute('data-tab'), true);
         }),
     );
+
+    if (editBtn) {
+        editBtn.addEventListener('click', function () {
+            if (currentKey() === EDIT_KEY) {
+                leaveEditMode();
+            } else {
+                enterEditMode();
+            }
+        });
+    }
+    if (editDone) {
+        editDone.addEventListener('click', function () {
+            leaveEditMode();
+        });
+    }
 
     document.querySelector('.tab-nav').addEventListener('keydown', function (e) {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
