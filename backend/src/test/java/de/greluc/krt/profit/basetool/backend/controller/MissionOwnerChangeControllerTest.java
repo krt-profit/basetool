@@ -44,7 +44,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -64,7 +63,6 @@ class MissionOwnerChangeControllerTest {
 
   @MockitoBean private MissionService missionService;
   @MockitoBean private MissionSecurityService missionSecurityService;
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private final UUID missionId = UUID.randomUUID();
   private final UUID newOwnerId = UUID.randomUUID();

@@ -37,7 +37,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -50,7 +49,6 @@ import org.springframework.web.reactive.function.client.WebClient;
  * controllers still receive the model is covered by the render tests.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class LayoutModelScopeMvcTest {
 
   /**

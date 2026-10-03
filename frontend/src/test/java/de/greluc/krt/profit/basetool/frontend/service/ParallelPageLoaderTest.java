@@ -21,27 +21,54 @@ package de.greluc.krt.profit.basetool.frontend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.frontend.config.ReactorContextPropagationConfig;
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContext;
+import de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.CorrelationContext;
+import de.greluc.krt.profit.basetool.frontend.logging.UserLocaleRelayFilter;
+import de.greluc.krt.profit.basetool.frontend.logging.WebClientLoggingFilter;
+import io.micrometer.context.ContextRegistry;
+import java.time.Duration;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Unit tests for {@link ParallelPageLoader}'s propagation of request-scoped context onto its
- * virtual-thread workers, chiefly {@link ClientIpContext} for the {@code X-Forwarded-For} relay,
- * plus {@link ActiveSquadronContext} and {@link CorrelationContext}.
+ * virtual-thread workers (REQ-FE-030): every accessor of its {@link ContextRegistry} — the four
+ * relays and any other — plus the security context, and the headers a backend call made from a
+ * worker therefore carries.
  */
 class ParallelPageLoaderTest {
 
-  private final ParallelPageLoader loader = new ParallelPageLoader();
+  /**
+   * A holder no relay knows, standing in for any accessor a library or a later change registers.
+   */
+  private static final ThreadLocal<String> EXTRA = new ThreadLocal<>();
+
+  private final ParallelPageLoader loader = new ParallelPageLoader(registry());
 
   @AfterEach
   void clearThreadLocals() {
     ClientIpContext.clear();
     ActiveSquadronContext.clear();
     CorrelationContext.clear();
+    LocaleContextHolder.resetLocaleContext();
+    SecurityContextHolder.clearContext();
+    EXTRA.remove();
   }
 
   @Test
@@ -59,6 +86,7 @@ class ParallelPageLoaderTest {
     ActiveSquadronContext.set(squadron);
     CorrelationContext.set("corr-123");
     ClientIpContext.set("198.51.100.9");
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
 
     String[] seen =
         loader
@@ -67,13 +95,50 @@ class ParallelPageLoaderTest {
                     new String[] {
                       String.valueOf(ActiveSquadronContext.get()),
                       CorrelationContext.get(),
-                      ClientIpContext.get()
+                      ClientIpContext.get(),
+                      LocaleContextHolder.getLocale().toLanguageTag()
                     })
             .join();
 
-    assertThat(seen[0]).isEqualTo(squadron.toString());
-    assertThat(seen[1]).isEqualTo("corr-123");
-    assertThat(seen[2]).isEqualTo("198.51.100.9");
+    assertThat(seen)
+        .containsExactly(
+            squadron.toString(), "corr-123", "198.51.100.9", Locale.ENGLISH.toLanguageTag());
+  }
+
+  @Test
+  void loadAsyncPropagatesTheUserLocale() {
+    LocaleContextHolder.setLocale(Locale.GERMANY);
+
+    Locale seenOnWorker =
+        loader
+            .loadAsync(
+                () ->
+                    LocaleContextHolder.getLocaleContext() == null
+                        ? null
+                        : LocaleContextHolder.getLocaleContext().getLocale())
+            .join();
+
+    assertThat(seenOnWorker).isEqualTo(Locale.GERMANY);
+  }
+
+  @Test
+  void loadAsyncPropagatesEveryRegisteredAccessorNotOnlyTheKnownOnes() {
+    EXTRA.set("registered-later");
+
+    assertThat(loader.loadAsync(EXTRA::get).join()).isEqualTo("registered-later");
+  }
+
+  @Test
+  void loadAsyncPropagatesTheSecurityContext() {
+    SecurityContextHolder.setContext(
+        new SecurityContextImpl(new TestingAuthenticationToken("member", "n/a", "ROLE_MEMBER")));
+
+    String seenOnWorker =
+        loader
+            .loadAsync(() -> SecurityContextHolder.getContext().getAuthentication().getName())
+            .join();
+
+    assertThat(seenOnWorker).isEqualTo("member");
   }
 
   @Test
@@ -92,5 +157,67 @@ class ParallelPageLoaderTest {
     loader.loadAsync(ClientIpContext::get).join();
 
     assertThat(ClientIpContext.get()).isEqualTo("192.0.2.42");
+  }
+
+  @Test
+  void aBackendCallFromAParallelSectionCarriesTheLocaleCorrelationAndOrgUnit() throws Exception {
+    try (MockWebServer backend = new MockWebServer()) {
+      backend.enqueue(new MockResponse().setBody("{}"));
+      backend.start();
+      WebClient client = relayingClient(backend.url("/").toString());
+      UUID orgUnit = UUID.randomUUID();
+      LocaleContextHolder.setLocale(Locale.GERMANY);
+      CorrelationContext.set("corr-parallel");
+      ActiveSquadronContext.set(orgUnit);
+
+      loader
+          .loadAsync(
+              () ->
+                  client
+                      .get()
+                      .uri("/api/v1/section")
+                      .retrieve()
+                      .toBodilessEntity()
+                      .block(Duration.ofSeconds(10)))
+          .join();
+
+      RecordedRequest request = backend.takeRequest(5, TimeUnit.SECONDS);
+      assertThat(request).isNotNull();
+      assertThat(request.getHeader("Accept-Language")).isEqualTo("de-DE");
+      assertThat(request.getHeader("X-Correlation-Id")).isEqualTo("corr-parallel");
+      assertThat(request.getHeader("X-Active-Org-Unit-Id")).isEqualTo(orgUnit.toString());
+    }
+  }
+
+  /**
+   * A registry like the production one: the library accessors, the four relays and one extra.
+   *
+   * @return the registry
+   */
+  private static ContextRegistry registry() {
+    ContextRegistry registry = new ContextRegistry().loadThreadLocalAccessors();
+    ReactorContextPropagationConfig.registerRelayAccessors(registry);
+    registry.registerThreadLocalAccessor("test.extra", EXTRA::get, EXTRA::set, EXTRA::remove);
+    return registry;
+  }
+
+  /**
+   * A client with the frontend's real relay filters, which read the holders on the calling thread.
+   *
+   * @param baseUrl the stand-in backend
+   * @return the client
+   */
+  private static WebClient relayingClient(String baseUrl) {
+    WebClientLoggingFilter logging =
+        new WebClientLoggingFilter(
+            new LoggingProperties(
+                "X-Correlation-Id", "correlationId", "userId", 2000, 1500, false));
+    return WebClient.builder()
+        .baseUrl(baseUrl)
+        .filter(logging.correlationIdPropagation())
+        .filter(new ActiveSquadronRelayFilter().relayActiveSquadron())
+        .filter(new UserLocaleRelayFilter().relayUserLocale())
+        .filter(new ClientIpRelayFilter().relayClientIp())
+        .build();
   }
 }

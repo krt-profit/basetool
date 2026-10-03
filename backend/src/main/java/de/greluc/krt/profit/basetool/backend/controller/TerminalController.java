@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.service.TerminalService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;
 import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
@@ -74,7 +75,7 @@ public class TerminalController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("name", "id", "starSystemName"), "name");
+            page, size, sort, Set.of("name", "id", "starSystemName"), "name", PageCeiling.LOAD_ALL);
     Page<Terminal> p = terminalService.getAllTerminals(pageable);
     return PageResponse.of(p.map(terminalMapper::toDto));
   }

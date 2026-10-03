@@ -32,7 +32,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -42,7 +41,6 @@ import org.springframework.transaction.annotation.Transactional;
  * product for the same owner while allowing the same product for a different owner.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class V126MigrationTest {
 

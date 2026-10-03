@@ -11,7 +11,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Keycloak /admin must not be reachable from the internet
         run: |
@@ -66,7 +66,7 @@ jobs:
           done
           exit $fail
 
-      - name: API vhost allow-list must answer the statuses REQ-SEC-037 records
+      - name: API vhost admission must answer the statuses REQ-API-021 generates
         run: |
           base=https://api.profit-base.online
           fail=0
@@ -74,224 +74,504 @@ jobs:
           probe() {
             key="$1 $2"
             if [ -n "${seen[$key]:-}" ] && [ "${seen[$key]}" != "$3" ]; then
-              echo "::error::probe table conflict: '$key' is expected to answer both ${seen[$key]} and $3. A path admitted by a phase must have its old refusal row DELETED, not just a new row added."
+              echo "::error::probe table conflict: '$key' is expected to answer both ${seen[$key]} and $3. The table is generated; regenerate it with ./gradlew :backend:generateEdgeAdmission."
               fail=1
             fi
             seen[$key]="$3"
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X "$1" "$base$2" || true)
+            if [ "$1" = HEAD ]; then
+              code=$(curl -s -o /dev/null -I -w '%{http_code}' --max-time 20 "$base$2" || true)
+            else
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X "$1" "$base$2" || true)
+            fi
             echo "$1 $2 -> HTTP ${code:-000} (expected $3)"
             if [ "$code" != "$3" ]; then
-              echo "::error::$1 $2 answered ${code:-000}, expected $3 — the vhost allow-list drifted from REQ-SEC-037 / runbook § D.3a, or the backend's rule for that path moved."
+              echo "::error::$1 $2 answered ${code:-000}, expected $3 - the deployed admission map drifted from the frozen contract set (REQ-API-021), or the backend's rule for that operation moved."
               fail=1
             fi
           }
 
-          probe GET /api/v1/terms/document 200
-          probe GET /api/v1/app/version-policy 200
-          probe HEAD /api/v1/terms/document 401
-          probe HEAD /api/v1/app/version-policy 401
-          probe GET /api/v1/missions/search 401
-
-          for p in /api/v1/terms/status /api/v1/me/active-org-unit /api/v1/me/capabilities                    /api/v1/users/me/registration-status /api/v1/users/me/memberships; do
-            probe GET "$p" 401
-          done
-
-          for p in /api/v1/operations/search /api/v1/orders /api/v1/inventory/aggregated \
-                   /api/v1/inventory/all/grouped /api/v1/org-units/bank/balances \
-                   /api/v1/hangar/my-ships /api/v1/hangar/squadron-overview \
-                   /api/v1/notifications /api/v1/notifications/unread-count \
-                   /api/v1/notifications/stream /api/v1/announcement /api/v1/users/me; do
-            probe GET "$p" 401
-          done
-
-          probe POST /api/v1/orders 401
-          probe POST /api/v1/operations 401
-
-          probe GET "/api/v1/inventory/material/00000000-0000-4000-8000-00000000cafe" 401
-          probe GET /api/v1/orders/item-catalog 401
-          probe GET "/api/v1/orders/item-catalog/00000000-0000-4000-8000-00000000cafe/blueprints" 401
-          probe POST /api/v1/orders/items 401
-
-          nil=00000000-0000-4000-8000-00000000cafe
-          for p in /api/v1/personal-inventory /api/v1/personal-blueprints \
-                   /api/v1/personal-blueprints/craftability /api/v1/blueprints/products/search \
-                   /api/v1/uex/locations/search /api/v1/hangar/ships /api/v1/inventory \
-                   /api/v1/users/search /api/v1/inventory/all/stack/entries \
-                   /api/v1/finance-entries "/api/v1/org-units/bank/accounts/$nil/settings"; do
-            probe GET "$p" 401
-          done
-
-          probe GET /api/v1/inventory/my-inventory/grouped 401
-          probe GET /api/v1/inventory/my-inventory/stack/entries 401
-          probe GET /api/v1/inventory/my-inventory/entry-ids 401
-
-          probe GET /api/v1/ship-types 401
-          probe GET /api/v1/materials/search 401
-          probe GET /api/v1/locations/search 401
-          probe POST /api/v1/refinery-orders 401
-          probe GET /api/v1/locations/refineries 401
-          probe GET /api/v1/refining-methods 401
-          probe GET /api/v1/refinery-orders/all 401
-          probe POST /api/v1/refinery-orders/import-extract 404
-          probe GET "/api/v1/materials/$nil/terminals" 401
-
-          probe GET /api/v1/locations/home-locations 401
-
-          probe POST "/api/v1/inventory/$nil/book-out" 401
-          probe POST "/api/v1/orders/$nil/assignees/$nil" 401
-          probe PUT "/api/v1/orders/$nil/status" 401
-          probe POST "/api/v1/missions/$nil/join" 401
-          probe PUT "/api/v1/operations/$nil/payouts/paid-out" 401
-          probe PUT "/api/v1/org-units/bank/accounts/$nil/balance-target" 401
-
-          for leaf in all-members area-members role/LOGISTICIAN "user/$nil"; do
-            probe PUT "/api/v1/org-units/bank/accounts/$nil/approval-limit/$leaf" 401
-            probe DELETE "/api/v1/org-units/bank/accounts/$nil/approval-limit/$leaf" 401
-          done
-
-          for p in /api/v1/org-units/bank/requests /api/v1/org-units/bank/requests/foreign                    /api/v1/org-units/bank/transfer-targets "/api/v1/users/$nil/memberships"; do
-            probe GET "$p" 401
-          done
-          probe POST /api/v1/org-units/bank/requests 401
-          probe PUT "/api/v1/org-units/bank/requests/$nil" 401
-          probe POST "/api/v1/org-units/bank/requests/$nil/cancel" 401
-          probe POST "/api/v1/org-units/bank/requests/$nil/owner-approval" 401
-          probe DELETE "/api/v1/org-units/bank/requests/$nil/owner-approval" 401
-
-          probe PATCH "/api/v1/users/$nil/memberships" 405
-
-          for p in /api/v1/users/me/payout-preference /api/v1/users/me/blueprint-sharing \
-            /api/v1/users/me/rsi-handle; do
-            probe GET "$p" 401
-            probe PUT "$p" 401
-          done
-          probe PUT "/api/v1/users/me/read-announcement/$nil" 401
-
-          probe PUT "/api/v1/orders/$nil" 401
-          probe PUT "/api/v1/operations/$nil" 401
-          probe DELETE "/api/v1/orders/$nil" 405
-          probe DELETE "/api/v1/operations/$nil" 405
-
-          probe GET /api/v1/orders/lookup 401
-          probe GET /api/v1/operations/lookup 401
-          probe GET /api/v1/missions/lookup 401
-          probe GET /api/v1/job-types 401
-
-          probe GET /api/v1/orders/material-demand 401
-          probe GET "/api/v1/orders/$nil/item-stock" 401
-          probe GET "/api/v1/orders/$nil/claims" 401
-          probe GET "/api/v1/orders/$nil/materials/$nil/inventory" 401
-          probe POST "/api/v1/orders/$nil/claims" 401
-          probe DELETE "/api/v1/orders/$nil/claims/$nil" 401
-          probe POST "/api/v1/orders/$nil/handovers" 401
-          probe POST "/api/v1/orders/$nil/item-handovers" 401
-          probe PUT "/api/v1/orders/$nil/items" 401
-          probe POST "/api/v1/orders/$nil/items/$nil/production" 401
-          probe PUT "/api/v1/orders/$nil/priority?priority=1" 401
-
-          probe POST /api/v1/inventory/bulk-checkout 401
-          probe POST /api/v1/inventory/bulk-rebook 401
-          probe POST /api/v1/inventory/bulk-org-unit 401
-          probe POST "/api/v1/inventory/$nil/org-unit" 401
-          probe POST /api/v1/inventory/bulk-stolen 401
-          probe POST "/api/v1/inventory/$nil/stolen" 401
-          probe POST "/api/v1/inventory/$nil/allocation" 401
-          probe PATCH "/api/v1/inventory/$nil/allocation" 401
-          probe DELETE "/api/v1/inventory/$nil/allocation" 401
-
-          probe GET "/api/v1/missions/$nil/unit-ship-options" 401
-          for leaf in core schedule flags; do
-            probe PATCH "/api/v1/missions/$nil/$leaf" 401
-          done
-          probe PUT "/api/v1/missions/$nil/party-lead" 401
-          probe POST "/api/v1/missions/$nil/participants" 404
-          probe POST "/api/v1/missions/$nil/participants/by-id/slim" 401
-          probe POST "/api/v1/missions/$nil/participants/slim" 404
-          probe POST "/api/v1/missions/$nil/units/slim" 401
-          probe PUT "/api/v1/missions/$nil/units/$nil/slim" 401
-          probe DELETE "/api/v1/missions/$nil/units/$nil/slim" 401
-          probe POST "/api/v1/missions/$nil/units/$nil/crew/slim" 401
-          probe PUT "/api/v1/missions/$nil/units/$nil/crew/$nil/slim" 401
-          probe POST "/api/v1/missions/$nil/frequencies/custom/slim" 401
-          probe DELETE "/api/v1/missions/$nil/frequencies/$nil/slim" 401
-          probe POST "/api/v1/missions/$nil/managers/$nil/slim" 401
-          probe DELETE "/api/v1/missions/$nil/managers/$nil/slim" 401
-          for section in steps objectives; do
-            probe POST "/api/v1/missions/$nil/$section/slim" 401
-            probe PUT "/api/v1/missions/$nil/$section/$nil/slim" 401
-            probe DELETE "/api/v1/missions/$nil/$section/$nil/slim" 401
-            probe PUT "/api/v1/missions/$nil/$section/reorder/slim" 401
-          done
-          probe PATCH "/api/v1/missions/$nil/steps/$nil/done/slim" 401
-          probe DELETE "/api/v1/missions/$nil" 405
-
-          probe GET /api/v1/materials/prices-overview 401
-          probe GET /api/v1/materials/profit-calculation 401
-          probe GET "/api/v1/materials/$nil/prices" 401
-          probe GET /api/v1/materials/matrix 401
-          probe GET "/api/v1/materials/$nil" 401
-          probe GET /api/v1/terminals 401
-          probe GET /api/v1/material-exchange/released-item-ids 401
-          probe POST /api/v1/material-exchange/item-offers 401
-          probe POST /api/v1/material-requests/item 401
-          probe PUT "/api/v1/material-exchange/offers/$nil/remark" 401
-          probe PUT "/api/v1/material-requests/$nil" 401
-
-          probe GET /api/v1/settings/job_order.age_yellow_days 401
-          probe GET /api/v1/settings/job_order.age_red_days 401
-          probe PUT /api/v1/settings/job_order.age_red_days 405
-          probe GET /api/v1/personal-blueprints/overview 401
-          probe GET /api/v1/personal-blueprints/overview/owners 401
-          probe POST /api/v1/personal-blueprints/batch 401
-          probe POST /api/v1/personal-blueprints/import/preview 401
-          probe POST /api/v1/personal-blueprints/import/apply 401
-          probe POST /api/v1/hangar/import/fleetview 401
-          probe POST /api/v1/hangar/ships/home-location 401
-          probe GET "/api/v1/hangar/users/$nil/ships" 404
-
-          for p in /api/v1/bank/dashboard /api/v1/bank/accounts /api/v1/bank/requests \
-                   /api/v1/bank/grants /api/v1/bank/holders \
-                   /api/v1/users/search-bank \
-                   "/api/v1/bank/accounts/$nil" "/api/v1/bank/accounts/$nil/transactions" \
-                   "/api/v1/bank/accounts/$nil/statement" \
-                   "/api/v1/bank/holders/$nil" "/api/v1/bank/holders/$nil/transactions" \
-                   /api/v1/bank/export/three-month-report; do
-            probe GET "$p" 401
-          done
-          probe POST /api/v1/bank/accounts 401
-          probe PATCH "/api/v1/bank/accounts/$nil" 401
-          probe POST "/api/v1/bank/accounts/$nil/close" 401
-          probe POST "/api/v1/bank/accounts/$nil/reopen" 401
-          probe POST "/api/v1/bank/requests/$nil/confirm" 401
-          probe POST "/api/v1/bank/requests/$nil/reject" 401
-          probe POST /api/v1/bank/grants 401
-
-          probe GET "/api/v1/bank/accounts/$nil/balance-series" 404
-          probe PATCH "/api/v1/bank/grants/$nil/$nil" 401
-          probe DELETE "/api/v1/bank/grants/$nil/$nil" 401
-          probe POST /api/v1/bank/holders 401
-          probe PATCH "/api/v1/bank/holders/$nil" 401
-          probe POST /api/v1/bank/holders/transfer 401
-          probe POST "/api/v1/bank/transactions/$nil/reversal" 401
-
-          probe POST /api/v1/bank/deposits 401
-          probe POST /api/v1/bank/withdrawals 401
-          probe POST /api/v1/bank/transfers 401
-          probe GET /api/v1/bank/transfer-fee-rate 401
-
-          probe GET /api/v1/bank/admin/audit 404
-          probe POST /api/v1/bank/admin/wipe-reset 404
-          probe PATCH "/api/v1/bank/accounts/$nil/approval-tiers" 404
-
-          probe POST "/api/v1/missions/$nil/participants/$nil/check-in/slim" 401
-
-          probe POST /api/v1/inventory/all 404
-
-          probe GET /api/v1/definitely-not-allow-listed 404
-
-          probe GET "/api/v1/missions/$nil" 401
-          probe GET "/api/v1/missions/$nil/finance-entries" 401
-          probe GET "/api/v1/missions/$nil/finance-entries/summary" 401
-          probe PUT "/api/v1/missions/$nil" 405
-          probe DELETE "/api/v1/missions/$nil" 405
+          while read -r verb path code; do
+            probe "$verb" "$path" "$code"
+          done <<'PROBES'
+          GET /api/v1/announcement 401
+          GET /api/v1/app/version-policy 200
+          GET /api/v1/bank/accounts 401
+          POST /api/v1/bank/accounts 401
+          GET /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe 401
+          PATCH /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/close 401
+          POST /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/reopen 401
+          GET /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/statement 401
+          GET /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/transactions 401
+          GET /api/v1/bank/dashboard 401
+          POST /api/v1/bank/deposits 401
+          GET /api/v1/bank/export/three-month-report 401
+          GET /api/v1/bank/grants 401
+          POST /api/v1/bank/grants 401
+          PATCH /api/v1/bank/grants/00000000-0000-4000-8000-00000000cafe/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/bank/grants/00000000-0000-4000-8000-00000000cafe/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/bank/holders 401
+          POST /api/v1/bank/holders 401
+          POST /api/v1/bank/holders/transfer 401
+          GET /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe 401
+          PATCH /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe/transactions 401
+          GET /api/v1/bank/requests 401
+          POST /api/v1/bank/requests/00000000-0000-4000-8000-00000000cafe/confirm 401
+          POST /api/v1/bank/requests/00000000-0000-4000-8000-00000000cafe/reject 401
+          POST /api/v1/bank/transactions/00000000-0000-4000-8000-00000000cafe/reversal 401
+          GET /api/v1/bank/transfer-fee-rate 401
+          POST /api/v1/bank/transfers 401
+          POST /api/v1/bank/withdrawals 401
+          GET /api/v1/blueprints/products/search 401
+          POST /api/v1/finance-entries 401
+          PUT /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/hangar/import/fleetview 401
+          GET /api/v1/hangar/my-ships 401
+          POST /api/v1/hangar/ships 401
+          DELETE /api/v1/hangar/ships 401
+          POST /api/v1/hangar/ships/home-location 401
+          PUT /api/v1/hangar/ships/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/hangar/ships/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/hangar/squadron-overview 401
+          POST /api/v1/inventory 401
+          GET /api/v1/inventory/aggregated 401
+          GET /api/v1/inventory/all/grouped 401
+          GET /api/v1/inventory/all/stack/entries 401
+          POST /api/v1/inventory/bulk-checkout 401
+          POST /api/v1/inventory/bulk-org-unit 401
+          POST /api/v1/inventory/bulk-rebook 401
+          POST /api/v1/inventory/bulk-stolen 401
+          GET /api/v1/inventory/material/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/inventory/my-inventory/entry-ids 401
+          GET /api/v1/inventory/my-inventory/grouped 401
+          GET /api/v1/inventory/my-inventory/stack/entries 401
+          POST /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/allocation 401
+          PATCH /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/allocation 401
+          DELETE /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/allocation 401
+          POST /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/book-out 401
+          PATCH /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/delivered 401
+          PUT /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/note 401
+          POST /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/org-unit 401
+          POST /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/personal-rebook 401
+          POST /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/stolen 401
+          GET /api/v1/job-types 401
+          POST /api/v1/live-sync/changed 401
+          GET /api/v1/live-sync/stream 401
+          GET /api/v1/locations/home-locations 401
+          GET /api/v1/locations/refineries 401
+          GET /api/v1/locations/search 401
+          POST /api/v1/material-exchange/item-offers 401
+          GET /api/v1/material-exchange/offers 401
+          POST /api/v1/material-exchange/offers 401
+          POST /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/deactivate 401
+          POST /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/interest 401
+          DELETE /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/interest 401
+          PUT /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/remark 401
+          GET /api/v1/material-exchange/releasable-items 401
+          GET /api/v1/material-exchange/released-item-ids 401
+          GET /api/v1/material-requests 401
+          POST /api/v1/material-requests 401
+          POST /api/v1/material-requests/item 401
+          PUT /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/deactivate 401
+          POST /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/interest 401
+          DELETE /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/interest 401
+          GET /api/v1/materials/matrix 401
+          GET /api/v1/materials/prices-overview 401
+          GET /api/v1/materials/profit-calculation 401
+          GET /api/v1/materials/search 401
+          GET /api/v1/materials/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/materials/00000000-0000-4000-8000-00000000cafe/prices 401
+          GET /api/v1/materials/00000000-0000-4000-8000-00000000cafe/terminals 401
+          GET /api/v1/me/active-org-unit 401
+          GET /api/v1/me/capabilities 401
+          GET /api/v1/me/org-units 401
+          GET /api/v1/missions/lookup 401
+          GET /api/v1/missions/search 401
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe 401
+          PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/core 401
+          PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/flags 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/custom/slim 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/00000000-0000-4000-8000-00000000cafe/slim 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/join 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe/slim 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe/slim 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/reorder/slim 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/slim 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe/slim 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe/slim 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/by-id/slim 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-in/slim 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-out/slim 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/payout-preference/slim 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/slim 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/slim 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/party-lead 401
+          PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/schedule 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/reorder/slim 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/slim 401
+          PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/done/slim 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/slim 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/slim 401
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/unit-ship-options 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/slim 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/slim 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe/slim 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe/slim 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/slim 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/slim 401
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries 401
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/summary 401
+          GET /api/v1/notifications 401
+          DELETE /api/v1/notifications/read 401
+          POST /api/v1/notifications/read-all 401
+          GET /api/v1/notifications/stream 401
+          GET /api/v1/notifications/unread-count 401
+          DELETE /api/v1/notifications/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/notifications/00000000-0000-4000-8000-00000000cafe/read 401
+          POST /api/v1/operations 401
+          GET /api/v1/operations/lookup 401
+          GET /api/v1/operations/search 401
+          GET /api/v1/operations/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/operations/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/operations/00000000-0000-4000-8000-00000000cafe/finance-summary 401
+          GET /api/v1/operations/00000000-0000-4000-8000-00000000cafe/payouts 401
+          PUT /api/v1/operations/00000000-0000-4000-8000-00000000cafe/payouts/paid-out 401
+          GET /api/v1/orders 401
+          POST /api/v1/orders 401
+          GET /api/v1/orders/item-catalog 401
+          GET /api/v1/orders/item-catalog/00000000-0000-4000-8000-00000000cafe/blueprints 401
+          POST /api/v1/orders/items 401
+          GET /api/v1/orders/lookup 401
+          GET /api/v1/orders/material-demand 401
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe/note 401
+          DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe/note 401
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/handovers 401
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/item-handovers 401
+          PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe/items 401
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/items/00000000-0000-4000-8000-00000000cafe/production 401
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/materials/00000000-0000-4000-8000-00000000cafe/inventory 401
+          PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe/priority 401
+          PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe/requested 401
+          PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe/status 401
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/claims 401
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/claims 401
+          DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/claims/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/inventory/00000000-0000-4000-8000-00000000cafe/unlink 401
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/item-stock 401
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/material-collection 401
+          DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/materials/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/org-units/active-all-kinds 401
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/all-members 401
+          DELETE /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/all-members 401
+          PUT /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/area-members 401
+          DELETE /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/area-members 401
+          PUT /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/role/LOGISTICIAN 401
+          DELETE /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/role/LOGISTICIAN 401
+          PUT /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/user/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/user/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/balance-target 401
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/settings 401
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/transactions 401
+          PUT /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/visibility/all-members/true 401
+          POST /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/visibility/role/LOGISTICIAN 401
+          DELETE /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/visibility/role/LOGISTICIAN 401
+          GET /api/v1/org-units/bank/balances 401
+          GET /api/v1/org-units/bank/requests 401
+          POST /api/v1/org-units/bank/requests 401
+          GET /api/v1/org-units/bank/requests/foreign 401
+          PUT /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/cancel 401
+          POST /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/owner-approval 401
+          DELETE /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/owner-approval 401
+          GET /api/v1/org-units/bank/transfer-targets 401
+          GET /api/v1/personal-blueprints 401
+          POST /api/v1/personal-blueprints 401
+          DELETE /api/v1/personal-blueprints 401
+          POST /api/v1/personal-blueprints/batch 401
+          GET /api/v1/personal-blueprints/craftability 401
+          POST /api/v1/personal-blueprints/import/apply 401
+          POST /api/v1/personal-blueprints/import/preview 401
+          GET /api/v1/personal-blueprints/overview 401
+          GET /api/v1/personal-blueprints/overview/owners 401
+          PUT /api/v1/personal-blueprints/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/personal-blueprints/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/personal-blueprints/00000000-0000-4000-8000-00000000cafe/recipe 401
+          GET /api/v1/personal-inventory 401
+          POST /api/v1/personal-inventory 401
+          GET /api/v1/personal-inventory/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/personal-inventory/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/personal-inventory/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/promotion/eligibility/my 401
+          GET /api/v1/promotion/evaluations/my 401
+          POST /api/v1/refinery-orders 401
+          GET /api/v1/refinery-orders/all 401
+          GET /api/v1/refinery-orders/my-orders 401
+          GET /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe/store 401
+          GET /api/v1/refining-methods 401
+          GET /api/v1/settings/job_order.age_yellow_days 401
+          GET /api/v1/ship-types 401
+          GET /api/v1/terminals 401
+          POST /api/v1/terms/acceptance 401
+          GET /api/v1/terms/document 200
+          GET /api/v1/terms/status 401
+          GET /api/v1/uex/locations/search 401
+          GET /api/v1/users/me 401
+          GET /api/v1/users/me/blueprint-sharing 401
+          PUT /api/v1/users/me/blueprint-sharing 401
+          GET /api/v1/users/me/memberships 401
+          GET /api/v1/users/me/payout-preference 401
+          PUT /api/v1/users/me/payout-preference 401
+          PUT /api/v1/users/me/read-announcement/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/users/me/registration-status 401
+          GET /api/v1/users/me/rsi-handle 401
+          PUT /api/v1/users/me/rsi-handle 401
+          GET /api/v1/users/search 401
+          GET /api/v1/users/search-bank 401
+          GET /api/v1/users/00000000-0000-4000-8000-00000000cafe/memberships 401
+          POST /api/v1/announcement 404
+          POST /api/v1/app/version-policy 404
+          PUT /api/v1/bank/accounts 404
+          POST /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/close 404
+          GET /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/reopen 404
+          POST /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/statement 404
+          POST /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/transactions 404
+          POST /api/v1/bank/dashboard 404
+          GET /api/v1/bank/deposits 404
+          POST /api/v1/bank/export/three-month-report 404
+          PUT /api/v1/bank/grants 404
+          GET /api/v1/bank/grants/00000000-0000-4000-8000-00000000cafe/00000000-0000-4000-8000-00000000cafe 404
+          PUT /api/v1/bank/holders 404
+          GET /api/v1/bank/holders/transfer 404
+          POST /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe/transactions 404
+          POST /api/v1/bank/requests 404
+          GET /api/v1/bank/requests/00000000-0000-4000-8000-00000000cafe/confirm 404
+          GET /api/v1/bank/requests/00000000-0000-4000-8000-00000000cafe/reject 404
+          GET /api/v1/bank/transactions/00000000-0000-4000-8000-00000000cafe/reversal 404
+          POST /api/v1/bank/transfer-fee-rate 404
+          GET /api/v1/bank/transfers 404
+          GET /api/v1/bank/withdrawals 404
+          POST /api/v1/blueprints/products/search 404
+          GET /api/v1/finance-entries 404
+          GET /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/hangar/import/fleetview 404
+          POST /api/v1/hangar/my-ships 404
+          GET /api/v1/hangar/ships 404
+          GET /api/v1/hangar/ships/home-location 404
+          GET /api/v1/hangar/ships/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/hangar/squadron-overview 404
+          GET /api/v1/inventory 404
+          POST /api/v1/inventory/aggregated 404
+          POST /api/v1/inventory/all/grouped 404
+          POST /api/v1/inventory/all/stack/entries 404
+          GET /api/v1/inventory/bulk-checkout 404
+          GET /api/v1/inventory/bulk-org-unit 404
+          GET /api/v1/inventory/bulk-rebook 404
+          GET /api/v1/inventory/bulk-stolen 404
+          POST /api/v1/inventory/material/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/inventory/my-inventory/entry-ids 404
+          POST /api/v1/inventory/my-inventory/grouped 404
+          POST /api/v1/inventory/my-inventory/stack/entries 404
+          GET /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/allocation 404
+          GET /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/book-out 404
+          GET /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/delivered 404
+          GET /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/note 404
+          GET /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/org-unit 404
+          GET /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/personal-rebook 404
+          GET /api/v1/inventory/00000000-0000-4000-8000-00000000cafe/stolen 404
+          POST /api/v1/job-types 404
+          GET /api/v1/live-sync/changed 404
+          POST /api/v1/live-sync/stream 404
+          POST /api/v1/locations/home-locations 404
+          POST /api/v1/locations/refineries 404
+          POST /api/v1/locations/search 404
+          GET /api/v1/material-exchange/item-offers 404
+          PUT /api/v1/material-exchange/offers 404
+          GET /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/deactivate 404
+          GET /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/interest 404
+          GET /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/remark 404
+          POST /api/v1/material-exchange/releasable-items 404
+          POST /api/v1/material-exchange/released-item-ids 404
+          PUT /api/v1/material-requests 404
+          GET /api/v1/material-requests/item 404
+          GET /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/deactivate 404
+          GET /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/interest 404
+          POST /api/v1/materials/matrix 404
+          POST /api/v1/materials/prices-overview 404
+          POST /api/v1/materials/profit-calculation 404
+          POST /api/v1/materials/search 404
+          POST /api/v1/materials/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/materials/00000000-0000-4000-8000-00000000cafe/prices 404
+          POST /api/v1/materials/00000000-0000-4000-8000-00000000cafe/terminals 404
+          POST /api/v1/me/active-org-unit 404
+          POST /api/v1/me/capabilities 404
+          POST /api/v1/me/org-units 404
+          POST /api/v1/missions/lookup 404
+          POST /api/v1/missions/search 404
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/core 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/flags 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/custom/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/00000000-0000-4000-8000-00000000cafe/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/join 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/reorder/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/by-id/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-in/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-out/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/payout-preference/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/party-lead 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/schedule 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/reorder/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/done/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/slim 404
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/unit-ship-options 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/slim 404
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries 404
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/summary 404
+          POST /api/v1/notifications 404
+          GET /api/v1/notifications/read 404
+          GET /api/v1/notifications/read-all 404
+          POST /api/v1/notifications/stream 404
+          POST /api/v1/notifications/unread-count 404
+          GET /api/v1/notifications/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/notifications/00000000-0000-4000-8000-00000000cafe/read 404
+          GET /api/v1/operations 404
+          POST /api/v1/operations/lookup 404
+          POST /api/v1/operations/search 404
+          POST /api/v1/operations/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/operations/00000000-0000-4000-8000-00000000cafe/finance-summary 404
+          POST /api/v1/operations/00000000-0000-4000-8000-00000000cafe/payouts 404
+          GET /api/v1/operations/00000000-0000-4000-8000-00000000cafe/payouts/paid-out 404
+          PUT /api/v1/orders 404
+          POST /api/v1/orders/item-catalog 404
+          POST /api/v1/orders/item-catalog/00000000-0000-4000-8000-00000000cafe/blueprints 404
+          GET /api/v1/orders/items 404
+          POST /api/v1/orders/lookup 404
+          POST /api/v1/orders/material-demand 404
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe/note 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/handovers 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/item-handovers 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/items 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/items/00000000-0000-4000-8000-00000000cafe/production 404
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/materials/00000000-0000-4000-8000-00000000cafe/inventory 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/priority 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/requested 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/status 404
+          PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe/claims 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/claims/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/inventory/00000000-0000-4000-8000-00000000cafe/unlink 404
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/item-stock 404
+          POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/material-collection 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/materials/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/org-units/active-all-kinds 404
+          POST /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/all-members 404
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/area-members 404
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/role/LOGISTICIAN 404
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-limit/user/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/balance-target 404
+          POST /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/settings 404
+          POST /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/transactions 404
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/visibility/all-members/true 404
+          GET /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/visibility/role/LOGISTICIAN 404
+          POST /api/v1/org-units/bank/balances 404
+          PUT /api/v1/org-units/bank/requests 404
+          POST /api/v1/org-units/bank/requests/foreign 404
+          GET /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/cancel 404
+          GET /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/owner-approval 404
+          POST /api/v1/org-units/bank/transfer-targets 404
+          PUT /api/v1/personal-blueprints 404
+          GET /api/v1/personal-blueprints/batch 404
+          POST /api/v1/personal-blueprints/craftability 404
+          GET /api/v1/personal-blueprints/import/apply 404
+          GET /api/v1/personal-blueprints/import/preview 404
+          POST /api/v1/personal-blueprints/overview 404
+          POST /api/v1/personal-blueprints/overview/owners 404
+          GET /api/v1/personal-blueprints/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/personal-blueprints/00000000-0000-4000-8000-00000000cafe/recipe 404
+          PUT /api/v1/personal-inventory 404
+          POST /api/v1/personal-inventory/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/promotion/eligibility/my 404
+          POST /api/v1/promotion/evaluations/my 404
+          GET /api/v1/refinery-orders 404
+          POST /api/v1/refinery-orders/all 404
+          POST /api/v1/refinery-orders/my-orders 404
+          POST /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe/store 404
+          POST /api/v1/refining-methods 404
+          POST /api/v1/settings/job_order.age_yellow_days 404
+          POST /api/v1/ship-types 404
+          POST /api/v1/terminals 404
+          GET /api/v1/terms/acceptance 404
+          POST /api/v1/terms/document 404
+          POST /api/v1/terms/status 404
+          POST /api/v1/uex/locations/search 404
+          POST /api/v1/users/me 404
+          POST /api/v1/users/me/blueprint-sharing 404
+          POST /api/v1/users/me/memberships 404
+          POST /api/v1/users/me/payout-preference 404
+          GET /api/v1/users/me/read-announcement/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/users/me/registration-status 404
+          POST /api/v1/users/me/rsi-handle 404
+          POST /api/v1/users/search 404
+          POST /api/v1/users/search-bank 404
+          POST /api/v1/users/00000000-0000-4000-8000-00000000cafe/memberships 404
+          GET /api/v1/me/layout 404
+          GET /api/v1/me/a-path-not-built-yet 404
+          GET /api/v1/terms/admin 404
+          GET /api/v1/terms/admin/pending-count 404
+          GET /api/v1/terms/a-path-not-built-yet 404
+          GET /api/v1/admin/terms 404
+          HEAD /api/v1/terms/document 404
+          HEAD /api/v1/app/version-policy 404
+          GET /api/v1/exchange/me/blueprints 404
+          GET /api/v1/connected-apps 404
+          GET /api/v1/definitely-not-allow-listed 404
+          GET /api/v1/missions 404
+          POST /api/v1/missions 404
+          POST /api/v1/users 404
+          POST /api/v1/operations/ 404
+          POST /api/v1/Operations 404
+          POST /api/v1/operation 404
+          POST /api/v1/operations%2F 404
+          PUT /api/v1/orders/not-a-uuid/requested 404
+          PUT /api/v1/orders/requested 404
+          POST /api/v1/refinery-orders/import-extract 404
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants 404
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/slim 404
+          GET /api/v1/hangar/users/00000000-0000-4000-8000-00000000cafe/ships 404
+          GET /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/balance-series 404
+          GET /api/v1/bank/admin/audit 404
+          POST /api/v1/bank/admin/wipe-reset 404
+          PATCH /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-tiers 404
+          POST /api/v1/inventory/all 404
+          GET /api/v1/settings/job_order.age_green_days 404
+          PUT /api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/visibility/all-members/maybe 404
+          GET /api/v2/ping 404
+          GET /actuator/health 404
+          PROBES
           exit $fail

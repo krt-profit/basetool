@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-25.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -20,14 +20,16 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-072** (corrected 2026-09-25: this note still said
-> REQ-SEC-070 after REQ-SEC-070 had been allocated below) — re-check `origin/main` and open PRs before
-> claiming it. Requirements are grouped by subject, not strictly by number.
+> allocated. The next free id is **REQ-SEC-077** (corrected 2026-10-02: this note still said
+> REQ-SEC-072 after REQ-SEC-072 had been allocated, and REQ-SEC-073…076 went to the Phase 0 guard
+> packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
 
 The backend is a **resource server** (validates the JWT); the frontend is an **OAuth2
-client** (browser SSO + bearer-token relay to the backend).
+client** (browser SSO + bearer-token relay to the backend). The relay sends the bearer to the
+backend's own origin only: every backend client refuses any other host before the OAuth2 filter
+runs (REQ-FE-029).
 
 ### REQ-SEC-002 — Centralised authorization
 
@@ -67,7 +69,7 @@ Roles.ADMIN + "')`. This is safe by construction: `"literal" + Roles.X + "litera
 compile-time constant (JLS 4.12.4 / 15.28 — a `public static final String` field initialized from a
 literal, referenced from another compilation unit, is a constant expression), so javac folds it to
 the byte-identical original string before the annotation is even written to the class file — the
-wire behavior, and everything ArchUnit's `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` /
+wire behavior, and everything the write-gate rule of `TenancyGuardTest` /
 `writeEndpointsMustDeclareAnAuthorisationAnnotation` inspect via the resolved annotation value, is
 unchanged. Bean-method-only expressions (`@ownerScopeService.canEdit*`, `isAuthenticated()`,
 `permitAll()`) are untouched — only the literal-role/permission subset was in scope, matching the
@@ -119,6 +121,46 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
   now reference one pre-built compile-time-constant expression, `Roles.ADMIN_OR_OFFICER` /
   `frontend.support.Roles.ADMIN_OR_OFFICER`, instead of repeating the splice per call site.
 
+### REQ-SEC-074 — Who may call an operation is pinned in one reviewed file
+
+The gate of a backend operation can live in a `SecurityConfig` URL rule, a controller
+`@PreAuthorize` and a service `@PreAuthorize`; a move or re-cut can drop any of them while every
+other test stays green. The **authorization matrix**
+[`backend/src/test/resources/api/authorization-matrix.txt`](../../backend/src/test/resources/api/authorization-matrix.txt)
+pins all three, and a change to it is a reviewed change.
+
+- **`[operations]`** — one line per handler mapping, verb and path pattern:
+  `VERB PATH | Handler#method | pre=<expr> | url=<matcher> -> <rule>`. `pre` is the effective
+  `@PreAuthorize` (the method's, else the class's, else `none`; a `@PostAuthorize` is appended as
+  `post=`). `url` is the `authorizeHttpRequests` entry that decides the request, **read from the
+  running filter chain**: the `AuthorizationFilter`'s `RequestMatcherDelegatingAuthorizationManager`
+  is evaluated against a mock request for the verb and the path (variables filled with `x`), first
+  match winning exactly as Spring Security decides; `unmatched -> denyAll` when nothing matches. A
+  mapping that declares no verb is listed once per `GET POST PUT PATCH DELETE`.
+- **`[service-gates]`** — one line per `@PreAuthorize` / `@PostAuthorize` method of a
+  non-controller application bean, `Class#method(arity) | pre=<expr>`, or `Class#*` for a
+  class-level gate.
+- **Stable across a move.** Handlers and beans are named by their simple class name, lines sort by
+  path, verb and handler, the file is UTF-8 with LF line endings (pinned in `.gitattributes`). A
+  package move therefore leaves the file byte-identical; any diff is a gate that changed.
+- **Regenerating.** After reviewing a diff, `./gradlew :backend:test --tests '*AuthorizationMatrixTest'
+  -Dauthz.matrix.update=true` rewrites the file (the build forwards the property to the test JVM);
+  the new file is committed with the change that caused it.
+
+**Acceptance**
+
+- [x] Every handler mapping (581 lines on 2026-10-02) and every service-level gate (18) appears;
+  fewer fails the test as an emptied selection.
+- [x] A changed annotation, a reordered or removed URL rule or a dropped service gate changes a line,
+  and the test names the removed and the added line.
+- [x] A URL-rule form the renderer does not know fails instead of printing an object identity.
+
+**Enforced by:** `AuthorizationMatrixTest` (against the golden file) ·
+`AuthorizationMatrixRenderingTest` (proves the matrix can fail: fixture annotations, reordered
+fixture rules, an unknown manager) · **Code:** test-only, `AuthorizationMatrix` ·
+**Related:** REQ-SEC-002, REQ-SEC-003, REQ-SEC-052, plan guard G-02
+([`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §6.1)
+
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 
 The following must always hold and are enforced as ArchUnit rules in
@@ -143,10 +185,20 @@ equivalents — a new violation fails `./gradlew test`:
   `everyPostMappingShouldBeAuthorisationAnnotated`).
 - `permitAll()` appears on exactly four backend handlers — the two anonymous reads, the Keycloak SPI
   precheck and `/error` (`permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`, REQ-SEC-052).
-- Staffel-scoped write endpoints gate on `OwnerScopeService`
-  (`staffelScopedWriteEndpointsMustGateOnOwnerScopeService`,
-  `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
-  the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007).
+- Staffel-scoped services wire `OwnerScopeService` or `AuthHelperService`
+  (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
+  the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007). Write endpoints of
+  every controller that writes tenant data gate on a scope service, selected by the `@TenantScoped`
+  marker (`TenancyGuardTest`, REQ-ORG-028); it replaced the list-keyed
+  `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` and still selects all seven controllers
+  that rule named.
+- No type is both returned and bound as a request body beyond a reviewed list, no request type
+  carries a server-managed component, and every body is `@Valid` (`MassAssignmentGuardTest`,
+  REQ-SEC-077, REQ-API-015); the first rule replaced the single-DTO
+  `responseOnlyDtosMustNotBeAcceptedAsRequestBodyOnWriteEndpoints`. The Mission write requests keep
+  their own name list (`missionWriteRequestDtosMustNotCarryServerManagedFields`), which forbids
+  components such as `version`, `parent` and `participants` that the generic rule does not treat as
+  server-managed.
 - Controllers never return JPA entities (DTOs only — see [`api-conventions.md`](api-conventions.md)).
 - No controller depends on `OrgUnitMembershipMapper` — the membership entity→DTO projection runs
   inside `OrgUnitMembershipService`'s own transactions, never controller-side after commit
@@ -160,6 +212,150 @@ equivalents — a new violation fails `./gradlew test`:
   at build time rather than in production (security review, INFO regression guard).
 - The frontend does not depend on Spring Data JPA or JDBC (`frontendShouldNotDependOnSpringDataJpa`,
   `frontendShouldNotUseJdbcDirectly`); ingest depends on no persistence at all.
+
+How the backend rules select what they check, so that a refactor cannot disarm them silently, is
+REQ-SEC-073.
+
+### REQ-SEC-073 — The architecture gates select by role and class literal, carry selection floors, and every FQCN they hold resolves
+
+A rule that selects by a package or a class-name string checks less, without failing, as soon as a
+class moves or is renamed: ArchUnit fails a rule whose selection is empty, but not one whose
+selection shrank or whose target string no longer names a class. Every rule of the backend
+[`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
+therefore:
+
+- **Selects by role.** A layer is the classes of its role — web controllers (`@RestController`, or
+  meta-annotated `@Controller`), `@Service` beans, Spring Data `Repository` subtypes, MapStruct
+  `@Mapper` types and their generated implementations, JPA `@Entity`/`@Embeddable`/`@MappedSuperclass`
+  types, Bean Validation constraints and validators — plus the classes nested in them, plus the
+  package tree of one class of the layer named by class literal (so today's selection is kept
+  whole, and a role class stays selected wherever it moves). Layers without a role (`support`,
+  `integration`, `event`) are the package tree of a class literal. The exchange is selected by its
+  domain package segment (`exchange`), which survives both today's layer layout and a module
+  package.
+- **Names its keys by class literal**, never by a fully qualified name string: targets, allow-lists
+  (`permitAll()` handlers resolved as `java.lang.reflect.Method`), the staffel-scoped services,
+  the PII-carrying DTOs, the bank ledger repositories. A method name a rule keys on is
+  checked against its class when the rule is built, and a SpEL bean name is derived from the bean
+  class. A meta-test (`ArchitectureFqcnLiteralsTest`) fails on any string literal in the
+  architecture tests that looks like a fully qualified class name and does not resolve.
+- **Asserts a selection floor before it runs**: the number of classes (top-level) or members it
+  selects is at least the count measured when the floor was set; `allowEmptyShould(true)` is not
+  used. A rule that had nothing to select today is reshaped so that it selects the population it
+  guards (every repository method for the no-arg `findAll()` rule; every top-level class beside
+  `ScWikiClient`, the client included). A deliberate shrink lowers the floor in the same change.
+- **Is proven able to fail.** `ArchitectureRuleFailureTest` evaluates every rule family against
+  planted violations in `de.greluc.krt.profit.basetool.architecture.fixtures` — test sources, so
+  outside the production import (`ImportOption.DO_NOT_INCLUDE_TESTS`), and outside the backend
+  package, so outside the component scan — and asserts each one is reported. The fixtures place
+  role-annotated classes outside every layer package, which is what proves role selection.
+
+Two structural rules go with it (ADR-0047, amended):
+
+- **`support` is an allow-list leaf**: it may depend only on itself, the model and the
+  repositories, and on classes outside the backend. Logic that a mapper and a service share
+  belongs to the domain that owns it, inverted through an SPI there — not into `support`.
+- **Layers inside each module are acyclic** (`layersInsideEachModuleShouldBeFreeOfDependencyCycles`):
+  a top-level package named like one of today's layers is a layer of the root module; any other
+  top-level package is a domain module whose sub-packages are its layers, and each module's layers
+  must form no cycle. With no domain package yet, it selects exactly the slices of
+  `backendPackagesShouldBeFreeOfDependencyCycles`.
+
+The bank's two seam rules (ADR-0020, ADR-0028, re-keyed with the owner's approval on 2026-10-02)
+select the **bank domain**: the classes listed by class literal in `BANK_CLASSES`, the classes
+nested in them, MapStruct's implementations of the bank mappers, and every class of a `bank` module
+package. `everyBankNamedClassIsClassified` puts every class named after the bank into either that
+list or the reviewed org-unit side (`ORG_UNIT_BANK_SIDE`). The containment rule treats any class
+depending on `OwnerScopeService` and on any bank-domain class as a bridge, and the bridge set is
+exactly `OrgUnitBankAccessService`.
+
+**Acceptance criteria**
+
+- [x] No rule selects by a layer package string or names a class by a fully qualified string; no
+  rule uses `allowEmptyShould(true)`.
+- [x] Every rule asserts a selection floor equal to its count when the floor was set.
+- [x] Every rule family reports a planted violation; a shrunk selection fails its floor; a renamed
+  method key fails when the rule is built.
+- [x] An unresolvable fully qualified name in a string literal of the architecture tests fails the
+  meta-test.
+- [x] On today's code every rule finds no violation and selects at least the classes it selected
+  before.
+
+**Enforced by:** `ArchitectureTest`, `ArchitectureRuleFailureTest`, `ArchitectureFqcnLiteralsTest`
+· **Code:** the fixtures under `backend/src/test/java/de/greluc/krt/profit/basetool/architecture/fixtures/`
+· **Related:** REQ-SEC-003, REQ-SEC-052, REQ-SEC-007, REQ-BANK-008, REQ-BANK-019, ADR-0020,
+ADR-0028, ADR-0047
+
+### REQ-SEC-075 — Every security expression names a bean that exists, by an explicit name, in constant SpEL
+
+A `@PreAuthorize` that names a bean or method the context does not have fails only when it is
+evaluated — as `400 ILLEGAL_ARGUMENT` on every call of the operation (REQ-OBS-020 counts it). A
+class rename, a moved bean or a changed signature therefore has to fail the build instead.
+
+- **Resolved against the real context.** Every `@PreAuthorize` and `@PostAuthorize` of the
+  backend's main classes, class- and method-level, is parsed with Spring's SpEL parser; each
+  `@bean.method(args)` is resolved in the running application context by bean name, then by a
+  public method of that name whose parameter count equals the argument count (a varargs method
+  accepts one less or more). 166 references to 8 beans on 2026-10-02.
+- **Explicit bean names.** Every bean a security expression names declares that name in its
+  stereotype (`@Service("ownerScopeService")`, `@Component("exchangeGate")`, …), so renaming the
+  class cannot rename the bean: `ownerScopeService`, `missionSecurityService`, `authHelperService`,
+  `orgRoleManagementSecurityService`, `bankSecurityService`, `specialCommandSecurityService`,
+  `exchangeGate`, `connectedAppsGate`.
+- **A ratchet per bean.** The number of references to each bean may not fall below its recorded
+  floor; a drop means a gate lost its bean check and is a reviewed change that lowers the floor in
+  the same pull request. A rise raises it.
+- **Constant SpEL only.** An expression may consist of literals; `and`, `or`, `not`, `==`, `!=`;
+  root functions such as `hasRole('X')` and `isAuthenticated()` whose arguments are values;
+  `#parameter`, `authentication` and `principal`, each followed only by property reads and
+  zero-argument calls (`#dto.missionId()`); and `@bean.method(values)` in a boolean position.
+  A bean reference never appears as an argument, never as a bare value and is never followed by a
+  further call. Everything else is refused: `T(…)` (allow-list empty), `+` and the other
+  arithmetic operators, `new`, assignment, `#function()`, indexers, projections, selections,
+  inline lists and maps, `matches`, Elvis and safe navigation.
+
+**Acceptance**
+
+- [x] Every bean reference resolves in the context (`SecurityExpressionBeanResolutionTest`).
+- [x] All 441 declared expressions follow the constant-SpEL rules, the per-bean floors hold and
+  every referenced bean is named explicitly (`SecurityExpressionRulesTest`).
+- [x] A missing bean, a wrong arity, a missing method and each refused construct are reported
+  (`SecurityExpressionAnalyzerTest`).
+
+**Enforced by:** `SecurityExpressionBeanResolutionTest`, `SecurityExpressionRulesTest`,
+`SecurityExpressionAnalyzerTest` · **Code:** the explicit names on `OwnerScopeService`,
+`MissionSecurityService`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
+`BankSecurityService`, `SpecialCommandSecurityService`, `ExchangeGate`, `ConnectedAppsGate` ·
+**Related:** REQ-SEC-002, REQ-OBS-020, plan guard G-04
+([`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) §6.1)
+
+### REQ-SEC-076 — No class calls its own gated method
+
+A call through `this` never reaches the Spring proxy, so the callee's `@PreAuthorize` /
+`@PostAuthorize` does not run. No backend class may call a method of its own class (or a superclass
+it inherits) that carries such an annotation, or that is a public instance method of a class
+carrying one; a call from a lambda inside the class counts.
+
+- The 18 service-level gates (`MemberEvaluationService` ×3, `MissionFinanceEntryService#updateEntry`
+  / `#deleteEntry`, `PromotionCategoryService` ×3, `PromotionEligibilityService#evaluateAllForUserAsAdmin`,
+  `PromotionLevelContentService` ×3, `PromotionTopicService` ×3, `RankRequirementService` ×3) are
+  each called only from their controller (checked 2026-10-02).
+- The finance-entry edit and delete and the promotion-category writes have no role gate beyond
+  `isAuthenticated()` on their controllers, so their service annotations are the real gate; the
+  rule's test also pins those five annotations to their expressions.
+- `MeController#getLayout` composed its answer by calling the class-gated `getActiveOrgUnit`,
+  `getCapabilities` and `getPinnableOrgUnits` through `this`; it now calls the private helpers those
+  endpoints share. Behaviour is unchanged — the layout read carries the same class-level gate.
+
+**Acceptance**
+
+- [x] No main class calls its own gated method; at least 593 gated methods and 18 service gates are
+  in the rule's selection (`GatedSelfInvocationTest`).
+- [x] A planted direct, lambda and class-gated self-invocation each fail the rule; a gated method
+  calling an ungated helper does not.
+
+**Enforced by:** `GatedSelfInvocationTest` · **Related:** REQ-SEC-002, REQ-SEC-065, REQ-SEC-074,
+plan guard G-25
 
 ### REQ-SEC-004 — Roles & hierarchy
 
@@ -892,11 +1088,11 @@ here:
   closed to it.
 - **Strict silo:** a Bereichsleitung sees/edits only its own Bereich's descendants; only the OL crosses
   Bereiche. No peer-Bereich access, even read-only.
-- **ArchUnit-whitelist obligation:** the name-keyed rules `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`,
-  `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` and `orgUnitAwareBankSeamIsContainedToOneClass`
-  silently skip classes not in their set; **every** new scoped controller/service added by the
-  restructure MUST be added to the relevant whitelist in the same PR (or covered by an
-  annotation/package-based rule), so no new write endpoint ships ungated.
+- **ArchUnit-whitelist obligation:** the list-keyed rule `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
+  (class literals since REQ-SEC-073) checks only the classes in its list; **every** new scoped
+  service added by the restructure MUST be added to it in the same PR. Write endpoints are covered
+  by the `@TenantScoped` marker rule (`TenancyGuardTest`, REQ-ORG-028), so no new write endpoint of
+  a controller writing tenant data ships ungated.
 
 **Acceptance**
 
@@ -909,7 +1105,7 @@ here:
 strict-silo foreign-unit denial, OL concrete-union) and `OrgUnitCascadeServiceTest`;
 `ArchitectureTest` — `cascadeServiceMustNotConsultTheSecurityContext` (the cascade can never branch on
 admin status, so it can never grant admin), the `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
-whitelist (incl. the new `OrgUnitBankAccessService`) and `staffelScopedWriteEndpointsMustGateOnOwnerScopeService`
+whitelist (incl. the new `OrgUnitBankAccessService`); `TenancyGuardTest`'s write-gate rule
 (a new ungated scoped endpoint fails the build); and the `OrgHierarchyVisibilityMatrixE2eTest` cross-Bereich
 matrix on the ephemeral stack (Phase 7, `e2e`-label-gated) · **ADR:**
 [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:** #692, #696, #700.
@@ -1824,13 +2020,49 @@ for the client, profile and policy (`REQ-OPS-033`) · **Decision:**
 
 ### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
 
-API GET responses of every sensitive family MUST carry `Cache-Control: private, no-store`. Every
-other `/api/**` GET keeps `no-cache, must-revalidate`. The families are the bank surfaces
-(`/api/v1/bank/**` **and** `/api/v1/org-units/bank/**`), `/api/v1/users/**`, `/api/v1/me/**`,
-`/api/v1/notifications/**`, the ledgers (`/api/v1/finance-entries/**`,
-`/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**`), the holdings
-(`/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`,
-`/api/v1/hangar/**`, `/api/v1/refinery-orders/**`) and `/api/v1/promotion/**`.
+> [!note] Amended 2026-10-03 (plan D-18, guard G-07) — every family is classified
+> Every API family is now classified **explicitly**, in one place (`NoStoreApiScopes`), as
+> `no-store` or revalidatable, and a test over the real handler mappings fails on a mapping no family
+> classifies. Twelve families that had been storable by omission were reviewed and moved to
+> `no-store` (listed below); the Materialbörse exclusion this requirement used to state is
+> withdrawn. An `/api` path no family classifies answers `no-store` at runtime, so an omission now
+> fails safe.
+
+API GET responses of every sensitive family MUST carry `Cache-Control: private, no-store`; every
+other family MUST be listed as revalidatable and keeps `no-cache, must-revalidate`. The rule for
+deciding: a family that serves **personal data or data specific to the calling member** (their
+holdings, their status, viewer-specific flags such as `mine` or `canEdit`, named position holders)
+is `no-store`; **shared reference or catalogue data** is revalidatable. The most specific matching
+family decides, so a sub-family can differ from its parent.
+
+| `no-store` | What makes it sensitive |
+| --- | --- |
+| `/api/v1/bank/**`, `/api/v1/org-units/bank/**` | bank ledgers, balances and holder handles |
+| `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
+| `/api/v1/notifications/**` | one member's feed, including the SSE stream |
+| `/api/v1/finance-entries/**`, `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
+| `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
+| `/api/v1/promotion/**` | evaluations of named members |
+| `/api/v1/admin/**` | **new** — person search, registrations, exports, deletion requests, a member's holdings |
+| `/api/v1/audit/**` | **new** — who did what, by actor |
+| `/api/v1/connected-apps/**` | **new** — the member's installations and their activity |
+| `/api/v1/exchange/**` | **new** — the acting member's stock, ships, blueprints and installation |
+| `/api/v1/leitung/**` | **new** — the units the caller leads, their rosters and the caller's permissions |
+| `/api/v1/live-sync/**` | **new** — the stream names the topics accepted for this caller |
+| `/api/v1/material-exchange/**`, `/api/v1/material-requests/**` | **new** — viewer-specific `mine` / `viewerInterested`, interested handles, and the member's own releasable stock |
+| `/api/v1/notification-rules/**` | **new** — a selector can name an individual member |
+| `/api/v1/orders/**` | **new** — assignee and requester handles, claims, handovers, blueprint owners, viewer `canEdit` |
+| `/api/v1/org-chart/**` | **new** — named position holders and viewer-specific `canAdd…` flags |
+| `/api/v1/special-commands/*/members/**`, `/api/v1/squadrons/*/members/**` | **new** — member rosters |
+| `/api/v1/terms/**` | **new** — `/terms/status` is the caller's own acceptance |
+
+Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`, `job-types`,
+`kommando-groups`, `locations`, `manufacturers`, `material-categories`,
+`material-external-aliases`, `materials`, `missions`, `org-hierarchy`, `org-units`, `outposts`,
+`pois`, `refining-methods`, `settings`, `ship-types`, `space-stations`, `special-commands`,
+`squadrons`, `star-systems`, `sync-reports`, `system` (v1 and v2), `terminals`, `uex`, and three
+catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**`,
+`/api/v1/orders/item-catalog/**` and `/api/v1/terms/document`.
 
 **Both bank spellings, because they are different surfaces.** `/api/v1/bank/**` is the
 bank-employee one; the member-facing account a shipped client actually reads lives under
@@ -1846,10 +2078,11 @@ sensitive family absent from the list loses the framework's own default `no-stor
 sensitive GET family means adding it to `NoStoreApiScopes` in the same change — which since
 2026-09-10 also takes it out of the ETag buffer, because both filters read that one list.
 
-The Materialbörse (`/api/v1/material-exchange/**`, `/api/v1/material-requests/**`) is deliberately
-excluded: it is an org-wide shared board whose handles are the same public callsign tuple the public
-mission roster already serves, so it belongs in the revalidate bucket with the other shared
-listings.
+The Materialbörse (`/api/v1/material-exchange/**`, `/api/v1/material-requests/**`) used to be
+excluded as an org-wide shared board. That was wrong for what it serves: each board row carries the
+viewer-specific `mine` and `viewerInterested` flags, and `/material-exchange/releasable-items` is
+the member's own inventory — holdings, which are `no-store` everywhere else. It is `no-store` since
+2026-10-03.
 
 The distinction is not cosmetic. `no-cache, must-revalidate` permits an intermediary to **store** the
 body and reuse it after a successful revalidation; only `no-store` forbids the copy existing at all.
@@ -1897,9 +2130,20 @@ answer from it identically for seventeen paths.
 - [x] The ETag filter skips exactly the same families, and no response header changes when it does
   (`StreamAwareShallowEtagHeaderFilterTest`, which asserts the premise against Spring's own filter
   rather than against a reading of its source).
+- [x] The committed `openapi.json` documents it the same way: a `GET` of a `no-store` family carries
+  `Cache-Control` (`private, no-store`) and neither an `ETag` nor a `304` response, every other
+  `GET` the `ETag`, `Cache-Control` (`no-cache, must-revalidate`) and `304`
+  (`OpenApiCachingConfig`, classified by `NoStoreApiScopes`; `OpenApiCachingConfigTest`).
+- [x] Every `/api` mapping of the real dispatcher belongs to a classified family, and every family
+  names at least one mapping (`ApiCacheFamilyCoverageTest`, selection floor 572 mappings).
+- [x] Every `GET` mapping, with its path variables filled, answers its family's directive through
+  the real filter chain (floor 244), and one authenticated read per `no-store` family keeps
+  `no-store` past its handler (floor 26).
+- [x] A planted unclassified family is reported (`PathControlInventoryTest`) and an unclassified
+  `/api` path answers `no-store` (`NoStoreApiScopesTest`).
 
 **Enforced by:** `ApiCacheControlFilterTest`, `NoStoreApiScopesTest`,
-`StreamAwareShallowEtagHeaderFilterTest` ·
+`StreamAwareShallowEtagHeaderFilterTest`, `ApiCacheFamilyCoverageTest`, `PathControlInventoryTest` ·
 **Code:** `ApiCacheControlFilter`, `NoStoreApiScopes`, `StreamAwareShallowEtagHeaderFilter`
 
 ### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
@@ -1990,8 +2234,8 @@ unaffected either way, since it asks for pages until they run out. The ceiling i
 exactly what the existing anonymous callers request — the guest order form's pickers and the catalogue
 page-walks — so it costs the legitimate flows nothing.
 
-Authenticated callers keep the 100 000 clamp. The scope is matched on the **decoded** path
-(REQ-SEC-029).
+Authenticated callers are clamped by the kernel page policy of REQ-API-005: 1 000 by default,
+100 000 only on the reviewed opt-outs. The scope is matched on the **decoded** path (REQ-SEC-029).
 
 **Acceptance**
 
@@ -2007,8 +2251,8 @@ Authenticated callers keep the 100 000 clamp. The scope is matched on the **deco
   `PAGE_SIZE_TOO_LARGE`.~~ Retired with `AnonymousPageSizeFilter` (ADR-0159): no paginated endpoint
   answers an unauthenticated caller, so there is no anonymous page to bound.
 - [x] ~~An anonymous request with `size=1000` still succeeds.~~ Same.
-- [x] An authenticated caller with `size=50000` is unaffected — the 100 000 `PaginationUtil` clamp
-  is unchanged.
+- [x] An authenticated caller with `size=50000` gets the page REQ-API-005 allows: 100 000 on a
+  reviewed opt-out, 1 000 elsewhere (`PageCeilingTest`).
 
 **Enforced by:** `SecurityTest`, `AnonymousSurfaceSweepTest` (the `HEAD`-per-`GET` pass that carries
 the verb-agnostic lesson forward) · **Code:** `SecurityConfig`
@@ -2036,8 +2280,15 @@ their bound (the anonymous page-size ceiling of REQ-SEC-032 went with the anonym
 anonymous paths REQ-SEC-052 leaves are unpaginated). The budget MUST be enforced after
 the pending-approval and terms gates, so a caller refused there does not spend a token first. The
 scope MUST be decided on the **decoded** path (REQ-SEC-029). The rejection MUST reuse the per-IP
-limiter's contract: `429`, the stable code `RATE_LIMIT_EXCEEDED`, and the
-`X-Rate-Limit-*` headers including a retry hint.
+limiter's contract: `429`, the stable code `RATE_LIMIT_EXCEEDED`, the
+`X-Rate-Limit-*` headers including a retry hint, a `Retry-After` header carrying the same whole
+seconds until the bucket refills, and a `correlationId` that the body and the `X-Correlation-Id`
+header share. The filter runs inside the security chain, before `CorrelationIdFilter`, so it reuses an
+id already in the MDC and otherwise mints one, as the other filter-level producers do.
+
+> [!note] Corrected 2026-10-03
+> Until then this 429 sent no `Retry-After`, and its `correlationId` was `null`: the filter read the
+> `X-Correlation-Id` response header, which `CorrelationIdFilter` only sets after the security chain.
 
 The subject MUST NOT appear in a metric label or a log message — it is unbounded and it is PII. The
 bucket map MUST be bounded so a flood of distinct subjects cannot grow it without limit.
@@ -2060,6 +2311,9 @@ bucket map MUST be bounded so a flood of distinct subjects cannot grow it withou
 **Acceptance**
 
 - [x] A second write beyond the budget from the same subject is refused with `429` and a retry hint.
+- [x] The `429` carries `Retry-After` equal to `X-Rate-Limit-Retry-After-Seconds` and a non-null
+  `correlationId` equal to its `X-Correlation-Id` header, also through the real filter chain
+  (`SubjectRateLimitingFilterTest`, `ProblemCodeRuntimeProbeTest`).
 - [x] Two different subjects do not share a bucket.
 - [x] Ordinary reads spend no tokens; the SSE connect does.
 - [x] An encoded spelling of an API write cannot shed the budget.
@@ -2071,7 +2325,7 @@ bucket map MUST be bounded so a flood of distinct subjects cannot grow it withou
   endpoint sweep in `SecurityFilterChainOrderTest`).
 
 **Enforced by:** `SubjectRateLimitingFilterTest`, `SecurityFilterChainOrderTest` (the export sweep),
-`BackendPropertiesValidationTest` · **Code:** `SubjectRateLimitingFilter`,
+`BackendPropertiesValidationTest`, `ProblemCodeRuntimeProbeTest` · **Code:** `SubjectRateLimitingFilter`,
 `RateLimitProperties.Subject`, `RateLimitProperties.Export`, `SecurityConfig`
 
 ### REQ-SEC-034 — A rejected registration MUST be recoverable through a supported admin action
@@ -2217,14 +2471,16 @@ sites and the nine `hasRole(Roles.ADMIN)` URL matchers in the backend `SecurityC
 not a client — the remaining boundary is the **default-deny vhost allow-list** of
 [REQ-SEC-037](#req-sec-037--the-public-api-vhosts-anonymous-surface-is-enumerated-not-incidental).
 When this was written that list lived in the edge proxy's database, out of reach of any test; since
-2026-09-12 it is `docker/edge/include/api-allowlist.conf` in this repository, read by
-`ExternalContractTest`, checked against the nightly probe by the `probe-vs-allowlist` check and
-validated by `scripts/check-edge-nginx.sh` in `repo-lint.yml`. Two consequences, both load-bearing:
+2026-09-12 it is in this repository, and since 2026-10-03 it is a map generated from the frozen
+set (`docker/edge/include/api-admission.conf`, REQ-API-021), checked by `EdgeAdmissionTest` and
+`EdgeAdmissionNginxTest` and validated by `scripts/check-edge-nginx.sh` in `repo-lint.yml`. Two
+consequences, both load-bearing:
 
 - `POST /api/v1/refining-methods` was the one allow-listed path carrying a bare `hasRole('ADMIN')`
-  write. `refining-methods` is therefore in the read-only family of `api-allowlist.conf` (it was
-  first added to the runbook block, now archived at
-  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)). Nothing loses a
+  write. `refining-methods` was therefore put in the read-only family of the include (first in
+  the runbook block, now archived at
+  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)); since 2026-10-03 the
+  map admits only its frozen `GET` and the `POST` answers `404` (REQ-API-021). Nothing loses a
   capability: the app only reads it (the refinery form's method picker) and the web admin does not
   traverse this vhost at all.
 - The allow-list is now load-bearing for what this requirement itself used to guarantee. Anyone
@@ -2521,7 +2777,8 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 > Proxy Manager, where no PR and no test could read it — several statements below were written in
 > that world. It is now [`docker/edge/include/api-allowlist.conf`](../../docker/edge/include/api-allowlist.conf),
 > included by `conf.d/50-api.conf.template` and applied by the deploy reconcile. Three things read
-> it in CI: `ExternalContractTest`, the `probe-vs-allowlist` check in `repo-lint.yml` (the nightly
+> it in CI (since 2026-10-03 the generated map and the tests of REQ-API-021 replace the first two):
+> `ExternalContractTest`, the `probe-vs-allowlist` check in `repo-lint.yml` (the nightly
 > probe's rows against the list) and `scripts/check-edge-nginx.sh` (renders and starts the edge).
 > The runbook is archived at [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)
 > and still explains *why* each family was admitted in which phase; it no longer carries the list.
@@ -2581,6 +2838,14 @@ pinned in `ApiVhostAnonymousSurfaceTest` like every other allow-listed path. Fam
 controller behind them are admitted **by name rather than by stem** (the refinery family path by
 path, for example), which is why the rest of those surfaces stays unreachable.
 
+**A retired Android operation answers without a token, and serves nothing** (REQ-API-020). An
+operation a hard-cut wave retired and listed in `api/retired-operations.txt` answers
+`410 APP_UPDATE_REQUIRED` ahead of authentication, so an app too old to log in still meets its
+update wall. It is not an anonymous *operation*: no handler is behind it, the answer is constant for
+every value of a placeholder, and another verb or a longer path continues to authentication as
+before. The list is empty today. When the generated edge include (plan guard G-08) admits such a
+path, its row states `410`.
+
 Everything else on the list is refused without a token — the Finanzen endpoints among them
 (`isAuthenticated() and isMemberOrAbove() and canSeeMission`), and since ADR-0159 the mission itself
 as well.
@@ -2621,45 +2886,35 @@ refuses gets the entry point's `401`. Before ADR-0159 the Finanzen paths sat und
 stem `GET /api/v1/missions/**` and answered an anonymous caller `403`; with the stem gone they answer
 `401` like the me-scoped paths, and `ApiVhostAnonymousSurfaceTest` pins that.
 
-**The missions and operations families are additionally read-only on this vhost.**
-`/api/v1/missions/<uuid>` and `/api/v1/operations/<uuid>` answer `PUT` and `DELETE` as well as
-`GET`, and an allow-list that matches on the path cannot tell them apart, so the vhost refuses
-every non-`GET`/`HEAD` under a read-only family (`$krt_readonly_family` in `api-allowlist.conf`,
-which covers more prefixes than these two) with `405` before the request reaches the backend —
-except where a write is named explicitly. `@PreAuthorize` would refuse them too; the point is that it
-does not have to be the only thing that does. Under operations the write that matters is `PUT
-/api/v1/operations/<uuid>/payouts/paid-out`, which marks a member as paid — phase 3 opened it by
-naming that one path rather than widening the family, because the guard is verb-blind by design.
-Later phases opened more writes the same way (the participation writes, the Einsatz planning set,
-and a **method-scoped** `PUT` on `/operations/<uuid>` and `/orders/<uuid>` that keeps `DELETE` on
-both shut). `POST /api/v1/operations` (the Android app raises an Operation with it) is the first
-**collection** write: the path is admitted for every verb by the allow-list, but `$krt_collection_post`
-answers `404` for any verb but `POST` on exactly `/api/v1/operations` — so `GET` on the collection,
-`PUT`/`DELETE` and `/api/v1/operations/`, `/api/v1/operationsX` stay refused as before — and only the
-`POST` clears the read-only family. `scripts/check-edge-allowlist-behaviour.sh` runs the real nginx
-against that matrix in CI.
+> [!note] Amended 2026-10-03 (REQ-API-021, guard G-08) — admission by operation, every refusal `404`
+> Until 2026-10-03 the include admitted by **path**: 172 `if ($uri …)` rules, two of them prefix
+> rules without an end anchor (`^/api/v1/terms/`, `^/api/v1/me/`), a read-only family of 16 prefixes
+> that answered `405` to every non-`GET`/`HEAD` it did not explicitly clear, per-path resets of that
+> family, and two method-scoping variables (`$krt_collection_post` for `POST /api/v1/operations`,
+> `$krt_requester_edit` for `PUT /api/v1/orders/<uuid>/requested`) that answered `404` to every other
+> verb. A refusal was therefore `404` or `405` depending on the order of the rules, and the two
+> episodes this paragraph used to record — REQ-OBS-012's run asserting `405` on a path the vhost
+> answered `404` for, and phase X leaving an old refusal row next to its new admission (2026-09-06)
+> — both came from that. The prefix rules also admitted `GET /api/v1/me/layout`, which REQ-API-012
+> said was not on the vhost, and would have admitted `/terms/admin` the day it moved there.
+>
+> The admission is now **one generated map keyed on verb and path**, one anchored expression per
+> admitted operation, rendered from the frozen set (REQ-API-021). There is no family, no prefix and
+> no method-scoping variable left, and every refusal — an unknown path or another verb on an
+> admitted one, `HEAD` and `OPTIONS` included — is `404`. The probe table is generated from the
+> same model, so an admission can no longer leave its old refusal row standing.
 
-**A refusal by this vhost is `404` or `405`, and which one is decided by order, not by family.** The
-allow-list's default deny runs first; the read-only guard runs after it. A path that is on no
-allow-list line is therefore `404` for **every** verb — its family membership in the read-only guard
-is never consulted, because the request is already refused. Only an *admitted* path can answer
-`405`, and that is what `PUT` and `DELETE /api/v1/missions/<uuid>` do: the detail is on the list as a
-read, so the verb is the only thing left to refuse (`POST /api/v1/orders`, the example that stood
-here, has since been admitted and answers `401`). `POST /api/v1/hangar/import/fleetview` used to read the
-other way round: `404`, not `405`, because it was on no allow-list line and the `/hangar` prefix
-sitting in the read-only family only decided what would happen on the day it was admitted. **Phase X
-was that day** — it added both the allow-list line and the `$krt_readonly_family` clearing, so the
-path answers `401` now, and the sentence that once ended „phase 4 has not admitted it" is corrected
-here rather than deleted, because the reasoning it carried is still the reasoning that decides every
-other row.
-
-Stating this is worth the paragraph because the two are trivially confused when reading the block
-top-down, and the confusion is silent in the direction that matters least and loud in a nightly
-probe. It has now cost two episodes. REQ-OBS-012's run asserted `405` on that path for three nights
-against a vhost that had always answered `404`; then phase X admitted the path, added its `401` row
-to the probe and left the old `404` row standing, so the probe demanded both answers of one path and
-went red on the first scheduled run after the merge (2026-09-06). **An admission has to delete the
-refusal row, not only add an admitted one.**
+**Writes are admitted one operation at a time.** `/api/v1/missions/<uuid>` and
+`/api/v1/operations/<uuid>` answer `PUT` and `DELETE` as well as `GET` in the backend; the vhost
+admits exactly the verbs the frozen set lists for each path (`GET` on the mission, `GET` and `PUT` on
+the Operation) and refuses the others with `404` before the request reaches the backend.
+`@PreAuthorize` would refuse them too; the point is that it does not have to be the only thing that
+does. `PUT /api/v1/operations/<uuid>/payouts/paid-out`, which marks a member as paid,
+`POST /api/v1/operations` (the app raises an Operation with it) and
+`PUT /api/v1/orders/<uuid>/requested` (the requester's order edit, refused until REQ-API-016 found it
+on 2026-10-03) are each one entry of the map like every other operation. `EdgeAdmissionNginxTest`
+drives the committed map through the edge's own image in CI: every admitted operation passes, and
+every other verb on every admitted path, near-miss spellings and non-uuid ids answer `404`.
 
 **Phase 4's Beförderung reads are the least remarkable entries on the list, and that is the point
 of naming them.** `GET /api/v1/promotion/evaluations/my` and `…/eligibility/my` are
@@ -2714,9 +2969,10 @@ REQ-SEC-052 requires a method gate on every controller as well.
 
 **Acceptance**
 
-- [x] Every allow-listed path has a recorded expected status without a token — today in the nightly
-  `edge-deny-probe.yml`, checked against `api-allowlist.conf` by `probe-vs-allowlist` (the archived
-  runbook's § D.3a was its first form). The previous single-number check raised a false alarm the
+- [x] Every admitted operation has a recorded expected status without a token — today in the
+  nightly `edge-deny-probe.yml`, whose table is generated with the admission map since 2026-10-03
+  (REQ-API-021) and pinned at the backend by `EdgeProbeBackendStatusTest` (the archived runbook's
+  § D.3a was its first form, the `probe-vs-allowlist` check its second). The previous single-number check raised a false alarm the
   first time it was run against a `permitAll` path.
 - [x] Both anonymous operations are named, each with the already-public surface it mirrors.
 - [x] The two live-sync paths were checked specifically: `isAuthenticated()` at the controller, so
@@ -2751,7 +3007,7 @@ REQ-SEC-052 requires a method gate on every controller as well.
 
 The probe's refusals are the *expected output of a passing assertion*. Every row it asserts `401`
 is refused by the entry point, which logs at **DEBUG** (the REQ-OBS-001 `401` carve-out), and the
-edge-level `404`/`405` rows never reach the backend — so a passing run leaves **no** backend WARN
+edge-level `404` rows never reach the backend — so a passing run leaves **no** backend WARN
 line. The schedule is `17 5 * * *` UTC, but match on paths, not the clock: a burst at another hour
 is equally a `workflow_dispatch`, a delayed schedule or an unrelated anonymous caller.
 
@@ -2761,9 +3017,11 @@ back. Keep that line at WARN and out of the `401`→DEBUG carve-out; `AccessDeni
 10m`) is a spike detector, not a drift detector.
 
 **Enforced by:** review at the moment a path is added, backed by the probe and the pin below ·
-**Code:** `SecurityConfig` (filter chain), `docker/edge/include/api-allowlist.conf`,
+**Code:** `SecurityConfig` (filter chain), `docker/edge/include/api-admission.conf` (generated by
+`EdgeAdmission`), `docker/edge/include/api-allowlist.conf`,
 `docker/edge/conf.d/50-api.conf.template` · **Tests:** `ApiVhostAnonymousSurfaceTest` (the
-anonymous status of every admitted path), `edge-deny-probe.yml`, `probe-vs-allowlist` ·
+anonymous status of every admitted path), `EdgeProbeBackendStatusTest`, `EdgeAdmissionTest`,
+`EdgeAdmissionNginxTest`, `edge-deny-probe.yml` ·
 **Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
 [ADR-0138](../adr/0138-terms-wording-is-a-backend-resource.md)
 
@@ -3420,6 +3678,9 @@ Redis, which three services reach (APPSEC-05, improvement audit 2026-09-22).
 | `CONTAINER_WRITTEN_FINAL_SESSION_TYPES` | Tomcat's WebSocket binding listener (REQ-SEC-049) |
 
 A new session attribute of a type outside the list is a change to this table, in the same PR.
+`SessionBoundTypeClosureTest` derives every session-bound type from the compiled code and fails the
+build when one falls outside the list, and `SessionTypeAllowListBreadthTest` refuses an entry
+broader than a model or session package (REQ-FE-027).
 
 > [!warning] Corrected 2026-09-23 — the first list refused every signed-in member under `enforce`
 > The list as merged (PR #2018) had no `java.lang`, `java.math` or `java.net` entry and not the
@@ -3478,6 +3739,7 @@ touches no stored session and needs no migration.
 
 **Enforced by:** `SessionTypeAllowListTest` (parity over a realistic session, gadget refusal before
 construction, report/off reading, package boundaries, metrics, mode parsing) ·
+`SessionBoundTypeClosureTest`, `SessionTypeAllowListBreadthTest` (REQ-FE-027) ·
 `SessionSerializerRoundTripTest`, `RedisSessionImportFlashRoundTripTest`,
 `FaultTolerantSessionSerializerTest`, `HalfWrittenSessionHashIntegrationTest`,
 `SessionAttributeRepairIntegrationTest` (all built on the enforcing mapper) · the E2E suite
@@ -3730,6 +3992,8 @@ a defect there would turn both guards green at once, so it is tested on its own 
 through them) ·
 `ArchitectureTest#permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`,
 `#readEndpointsMustDeclareAnAuthorisationAnnotation` · `OpenApiAnonymousOperationsTest` ·
+`RouteGateSnapshotTest` (the frontend: every handler carries a gate except the nine public ones,
+REQ-FE-025) ·
 `HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
 `SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
 `ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
@@ -4123,6 +4387,27 @@ run, client, resource, reason and when the run started, kept 90 days) and the sh
 (`exchangeShipLinks`: client, the installation's id for the ship, the ship and when it was linked)
 — REQ-XCH-007, -008, -013, -017, -022, -034.
 
+**Rows that name the member in a role somebody else gave them** have a section each, so every
+column that references a member is either exported or listed with a reason in
+`GdprParticipantCoverageTest` (REQ-DATA-021). All are `ART_15`, being assigned by the organisation,
+except the market interest, which the member registered:
+
+|            Section            |                          Column                         |                                                           Selected                                                           |
+|-------------------------------|---------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `realmRoles`                  | `user_roles.user_id`                                    | role code and name                                                                                                           |
+| `orgUnitsAsGrandAdmiral`      | `org_unit.grand_admiral_user_id`                        | unit name, shorthand, kind                                                                                                   |
+| `missionsAsPartyLead`         | `mission.party_lead_user_id`                            | mission name (scrubbed), status, planned start and end                                                                       |
+| `missionUnitResponsibilities` | `mission_unit.responsible_user_id`                      | mission and unit name (both scrubbed), ship type, high-value flag; not the unit's note or ship                               |
+| `marketRequestInterests`      | `material_exchange_request_interest.interested_user_id` | request kind, item or material, when; not the requester (`ART_15_20`)                                                        |
+| `bankAccountBookingGrants`    | `bank_account_grant.user_id`                            | account number and name (scrubbed), deposit / withdraw / transfer rights; not who granted them                               |
+| `bankApprovalLimits`          | `bank_account_approval_limit.grantee_user_id`           | account number and name (scrubbed), the limit                                                                                |
+| `bankRequestsAsCounterparty`  | `bank_booking_request.counterparty_user_id`             | type, amount, status, note and justification (scrubbed); not the requester, the decider, the staff note or the reject reason |
+
+The counterparty requests mirror `bankRequestsRaised` and `bankBookingsAsCounterparty`: the
+member's side of the request, with the third party's prose scrubbed and their identity unselected.
+The staff note and the reject reason are the bank's internal text about another member's request,
+and stay out as they do for `bankRequestsRaised`.
+
 **Every section is marked with its legal basis**, so the portable subset is identifiable without
 re-deriving it:
 
@@ -4161,12 +4446,15 @@ places where that is the whole point:
 
 **Free text is the one place scrubbing is unavoidable**, and it is handled separately. A note the
 member wrote is *their* data and belongs in the export, and it may name somebody else mid-sentence
-where no `SELECT` list can reach. Six columns in five sections are scrubbed for the mirror-image
-reason — they
+where no `SELECT` list can reach. Eleven columns in nine sections are scrubbed for the
+mirror-image reason — they
 carry a **name somebody gave a thing**, which can be a person's: `hangar.name` (`ship.name`),
-`missionsManaged.mission` (`mission.name`, already scrubbed in the two sibling sections that select
-it), `notificationRuleTargets.rule` (`notification_rule.description`), `bankAccountGrants.account`
-(`bank_account.name`) and the two `orgChartPositions` name columns. Each is a person-name surface in
+`missionsManaged.mission`, `missionsAsPartyLead.mission` and `missionUnitResponsibilities.mission`
+(`mission.name`, already scrubbed in the two sibling sections that select it),
+`missionUnitResponsibilities.unit` (`mission_unit.name`), `notificationRuleTargets.rule`
+(`notification_rule.description`), `bankAccountGrants.account`, `bankAccountBookingGrants.account`
+and `bankApprovalLimits.account` (`bank_account.name`) and the two `orgChartPositions` name
+columns. Each is a person-name surface in
 `PersonSearchTargets` (REQ-SEC-060), which is the registry that settles the question rather than a
 per-section judgement call.
 
@@ -4297,8 +4585,23 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 - [x] The export reports whether third-party names were removed.
 - [x] The admin variant is ADMIN-only; a member, an officer and bank management are refused.
 - [x] Both paths write `PERSONAL_DATA_EXPORTED`, with `bySelf` telling them apart.
+- [x] Every column that references a member is exported by a section or listed as not exported
+  with a reason, and a column holding data about the member is exported (REQ-DATA-021); each of
+  the eight sections above returns the member's row only, with the third party's prose scrubbed
+  and their identity unselected.
+- [x] Every section has a `pdf.export.section.*` label in all three backend bundles, so the PDF
+  inventory never prints a raw key.
 
-**Enforced by:** `DataExportIntegrationTest`, `HandleScrubberTest`,
+> [!warning] Corrected 2026-10-03 — four inventory rows printed their key
+> `exchangeChanges`, `exchangeJournal`, `exchangeBulkUndoSkips` and `exchangeShipLinks` shipped
+> without a `pdf.export.section.*` label, so the PDF inventory named them by the raw key — the
+> defect the field labels had for the verbatim sections. `DataExportPdfSectionLabelCoverageTest`
+> fails the build on a section without a label in any of the three bundles, and on a label for a
+> section that no longer exists.
+
+**Enforced by:** `DataExportIntegrationTest`, `DataExportParticipantSectionsIntegrationTest`,
+`DataExportScrubCoverageTest`, `DataExportPdfFieldLabelCoverageTest`,
+`DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`, `HandleScrubberTest`,
 `DataExportControllerSecurityTest` · **Code:** `support/DataExportSections`,
 `support/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
@@ -5127,6 +5430,141 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 `MemberManagementController`, `profile.html`, `profile.js`, `member-edit.html` · **Record:**
 [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md) (A1) · **Related:**
 REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
+
+### REQ-SEC-077 — A request body never carries what the server manages
+
+Mass assignment is closed by structure, not by the care of each mapper:
+
+1. **No type is both returned and bound.** A type a handler returns — directly or inside
+   `ResponseEntity`, `PageResponse`, `List` or another generic — is never a `@RequestBody` type. A
+   dual-use type turns every read field added later into a writable one.
+2. **A request type carries no server-managed component.** Neither a body type nor any project type
+   nested in one declares the owner (`owner`, `ownerId`, …), an `owning…` component, a component
+   naming an org unit, a creation or modification timestamp or a `…SyncedAt`, or a `status` unless
+   every path binding the type ends in `/status` (a transition endpoint). The body type itself
+   declares no `id`: the identity of the written row comes from the path or the server. A nested
+   `id` names a referenced row and is allowed.
+3. **Every body is validated** (REQ-API-015).
+
+Two reviewed lists hold today's deliberate exceptions, and a stale entry fails the build:
+
+- **Thirteen dual-use types** whose split would rename a frozen OpenAPI schema the app consumes, which
+  the modularisation's Phase 0 forbids: `BereichDto`, `FrequencyTypeDto`, `JobTypeDto`,
+  `LocationDto`, `MaterialCategoryDto`, `MaterialDto`, `OrganisationsleitungDto`,
+  `RefineryOrderDto`, `RefiningMethodDto`, `SpecialCommandDto`, `SquadronDto`, `StarSystemDto`,
+  `TerminalDto`. Each entry names which of its server-managed components a MockMvc test proves
+  unwritable — a forged `id` naming another existing row neither overwrites that row on create nor
+  retargets an update; the refinery order's forged owner (outside the caller's units), owning
+  Staffel and create status are not persisted; a terminal update writes only `hidden` — and which
+  are deliberate client input, with the check that validates each. The guard refuses an entry whose
+  components and proof do not match, so the exception is proven safe rather than frozen. The split
+  follows each domain's API cut (ADR-0060).
+- **Reviewed client inputs:** components that look server-managed but are a validated choice — the
+  create-time owning unit resolved by `OwnerScopeService.resolveOrgUnitForPickerOutput`
+  (REQ-ORG-004), a move or rebook target, the job order's processing and customer unit, a bank
+  counterparty, an ADMIN's org-chart or hierarchy choice, and the lifecycle `status` of the mission
+  and operation sections, each with its reason.
+
+A new request type complies with no exception.
+
+**Acceptance**
+
+- [x] No type beyond the thirteen is returned and bound (573 handlers, 161 body types today,
+  floors).
+- [x] No request type declares a server-managed component beyond the reviewed inputs.
+- [x] Every dual-use entry accounts for each server-managed component, and
+  `DualUseRequestBodyProofTest` holds a proof per type.
+- [x] Each rule fails on planted fixtures: a returned-and-bound DTO, `id` / `ownerId` /
+  `createdAt` / `status` on a body, a `status` outside `/status`, a nested `owningOrgUnitId`, and a
+  stale list entry; a `status` on a `/status`-only type and a nested `id` pass.
+
+**Enforced by:** `MassAssignmentGuardTest`, `MassAssignmentGuardRules`,
+`DualUseRequestBodyProofTest`, `RefineryOrderServiceLifecycleTest`
+(`clientSuppliedServerManagedFields_areIgnoredOnCreate`) · **Related:** REQ-API-002, REQ-API-015,
+REQ-ORG-028, REQ-SEC-005, ADR-0060
+
+### REQ-SEC-078 — Every write lies inside the CSRF exemption, and nothing is mapped outside the served surface
+
+Cookie CSRF is armed on the backend chain in every profile but `test`, and exempts only the
+bearer-only surface (`SecurityConfig.CSRF_EXEMPT_PATHS`: `/api/v1/**`, `/internal/**`,
+`/actuator/loggers/**`, ADR-0144). A write mapped anywhere else is refused with `403` in production
+while every test passes, because the `test` profile disables CSRF. So:
+
+- Every mapping that answers `POST`, `PUT`, `PATCH` or `DELETE` — in every request-mapping
+  registry, the actuator's included — MUST pass the **real, armed** CSRF filter without a token. The
+  check selects the security chain the way `FilterChainProxy` does: `/actuator/prometheus` has a
+  chain of its own (`MonitoringScrapeSecurityConfig`), everything else the main chain.
+- No mapping exists outside `/api/**`, `/internal/**` and `/actuator/**`, except `/error` and
+  springdoc's `/v3/api-docs` and `/v3/api-docs.yaml` (`ADMIN`-only, disabled under `prod`).
+- The one reviewed write outside the exemption is `/error`: it answers every verb but is reached
+  only by the container's error dispatch, after the original request passed the chain.
+
+**Acceptance**
+
+- [x] All 331 write mappings pass the armed filter without a token (selection floor 331).
+- [x] A planted write at `/legacy/…` and at `/api/v2/…` is refused by the same filter, and
+  `/api/v1/missions` passes — the check can fail.
+- [x] The 583 mappings of every registry lie inside the surface; a planted `/legacy/write` is
+  reported (`PathControlInventoryTest`).
+
+**Enforced by:** `CsrfExemptionCoverageTest`, `PathControlInventoryTest`,
+`SecurityConfigCsrfExemptionTest`, `ActuatorLoggersCsrfArmedTest` · **Code:** `SecurityConfig`,
+`MonitoringScrapeSecurityConfig` · **Decision:** ADR-0144
+
+### REQ-SEC-079 — Every rate-limit rule names a real operation
+
+The per-IP rules (`app.rate-limit.rules` in `application.yml`), the two stream connects the
+per-subject budget counts (`SubjectRateLimitingFilter.SSE_CONNECT`, `LIVE_SYNC_CONNECT`) and the
+export segments (`SubjectRateLimitingFilter.EXPORT_SEGMENTS`) are keyed on paths. A path that moves
+without its rule keeps the rule configured and applying to nothing. So every path of every rule
+MUST match at least one operation of the real dispatcher that answers one of the rule's verbs, both
+stream connects MUST be `GET` operations, and every export segment MUST occur in at least one
+operation's path.
+
+The rule `participant-mutations` listed `/api/v1/missions/*/participants` beside
+`/api/v1/missions/*/participants/**`; no operation answers the bare path with a write, and the
+second pattern already matches it, so the first was removed without a change in behaviour.
+
+**Acceptance**
+
+- [x] Every path of the four rules matches an operation with one of its verbs (floor: 4 rules).
+- [x] Both stream connects and all six export segments name real operations.
+- [x] A planted rule path, a rule whose verbs no matching operation answers, and a planted export
+  segment are each reported (`PathControlInventoryTest`).
+
+**Enforced by:** `RateLimitRuleCoverageTest`, `PathControlInventoryTest` · **Code:**
+`application.yml` (`app.rate-limit`), `RateLimitingFilter`, `SubjectRateLimitingFilter` ·
+**Related:** REQ-SEC-023, REQ-SEC-033
+
+### REQ-SEC-080 — Gate exemptions are exact sets of real paths
+
+Three filters decide by path which requests they leave alone, and each list MUST be an exact set of
+literal paths, each naming a real mapping:
+
+- **Pending approval and role-less** (`PendingApprovalAccessFilter`):
+  `/api/v1/users/me/registration-status`, `/api/v1/app/version-policy`, `/api/v1/terms/document`.
+- **Terms acceptance** (`TermsAcceptanceAccessFilter`): `/api/v1/terms/document`,
+  `/api/v1/terms/status`, `/api/v1/terms/acceptance`, `/api/v1/users/me/registration-status`,
+  `/api/v1/app/version-policy`. This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`,
+  under which a future `/api/v1/terms/admin` would have escaped the gate; for the three mappings
+  under `/api/v1/terms` the behaviour is identical.
+- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the thirteen exchange paths the ingest
+  gateway may act on; every mapping under `/api/v1/exchange` is one of them.
+
+A new mapping under `/api/v1/terms` fails the test until it is listed as exempt or as gated by
+consent.
+
+**Acceptance**
+
+- [x] Each of the three sets equals its pinned list exactly, every entry is a literal and names a
+  mapping.
+- [x] Every mapping under `/api/v1/terms` is decided; a planted `/api/v1/terms/admin` is reported
+  (`PathControlInventoryTest`) and refused by the terms gate (`TermsAcceptanceAccessFilterTest`).
+
+**Enforced by:** `FilterExemptionSetsTest`, `TermsAcceptanceAccessFilterTest`,
+`PathControlInventoryTest`, `AnonymousSurfaceSweepTest` · **Code:** `PendingApprovalAccessFilter`,
+`TermsAcceptanceAccessFilter`, `ActingMemberFilter` · **Related:** REQ-SEC-017, REQ-SEC-028,
+REQ-SEC-053, REQ-XCH-009
 
 ## Out of scope
 

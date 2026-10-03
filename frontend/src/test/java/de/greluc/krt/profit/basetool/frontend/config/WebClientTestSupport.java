@@ -53,6 +53,23 @@ final class WebClientTestSupport {
    */
   static WebClientConfig config(
       AppHttpProperties.BackendProtocol protocol, AppHttpProperties.BackendCodec codec) {
+    return config(protocol, codec, "https://backend:11261");
+  }
+
+  /**
+   * Builds the real {@link WebClientConfig} like {@link #config(AppHttpProperties.BackendProtocol,
+   * AppHttpProperties.BackendCodec)}, addressed to a given backend, the only origin its clients
+   * send to.
+   *
+   * @param protocol the wire protocol under test
+   * @param codec the encoding under test
+   * @param backendUrl the backend base URL, typically the test server's origin
+   * @return a configuration whose beans can be built directly, with no Spring context
+   */
+  static WebClientConfig config(
+      AppHttpProperties.BackendProtocol protocol,
+      AppHttpProperties.BackendCodec codec,
+      String backendUrl) {
     ExchangeFilterFunction passthrough = (request, next) -> next.exchange(request);
 
     WebClientLoggingFilter logging = mock(WebClientLoggingFilter.class);
@@ -67,7 +84,7 @@ final class WebClientTestSupport {
     when(environment.getActiveProfiles()).thenReturn(new String[] {"test"});
 
     return new WebClientConfig(
-        new AppBackendProperties("https://backend:11261"),
+        new AppBackendProperties(backendUrl),
         new AppHttpProperties(
             Duration.ofSeconds(3),
             Duration.ofSeconds(10),

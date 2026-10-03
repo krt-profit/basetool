@@ -58,8 +58,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -71,8 +69,6 @@ import org.springframework.web.context.WebApplicationContext;
  * with {@code NOT_PERMITTED} from a member who fails the web's job-order gate (REQ-XCH-018).
  */
 @SpringBootTest
-@ActiveProfiles("test")
-@TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeDemandControllerTest {
 
   private static final String PATH = "/api/v1/exchange/me/org-demand";

@@ -21,210 +21,104 @@ package de.greluc.krt.profit.basetool.frontend.contract;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Fails the build when the web frontend calls a backend operation marked {@code deprecated} in the
- * committed {@code openapi.json}.
+ * committed {@code openapi.json}, except for the reviewed relays in {@link #DEPRECATED_RELAYS}.
  *
- * <p>Each {@code backendApiClient.<verb>(…)} call is reduced to a path template and matched, verb
- * included, against the deprecated operations. Calls whose path is a variable are skipped, so a
- * floor on resolved calls is asserted.
+ * <p>The call sites come from {@link BackendCallScanner}, which also backs the existence guard
+ * (REQ-FE-028), so both see the same calls.
  */
 class DeprecatedBackendEndpointCallGuardTest {
 
-  /** The verbs {@code BackendApiClient} exposes, which are also the HTTP methods they send. */
-  private static final Set<String> VERBS = Set.of("get", "post", "put", "patch", "delete");
+  /** Fewer resolved calls than this means the scanner broke, not that the frontend got smaller. */
+  private static final int MIN_RESOLVED_CALL_SITES = 600;
 
   /**
-   * Fewer resolved calls than this means the parser broke, not that the frontend got smaller: there
-   * are well over two hundred literal backend calls in the main sources.
+   * Deprecated operations the frontend still relays on purpose, keyed {@code VERB template}, each
+   * with the reason; an entry no call uses any more fails the test.
    */
-  private static final int MIN_RESOLVED_CALLS = 150;
-
-  /** One call site: the HTTP verb, the normalised path template, and where it is. */
-  private record Call(String verb, String template, String location) {}
+  private static final Map<String, String> DEPRECATED_RELAYS =
+      Map.of(
+          "POST /api/v1/hangar/import/fleetview",
+          "HangarImportProxyController#importFleetview relays the deprecated alias until its"
+              + " sunset; the frontend route goes with the backend operation");
 
   @Test
-  void theFrontendCallsNoDeprecatedBackendOperation() throws IOException {
-    Set<String> deprecated = deprecatedOperations(readOpenApi());
-    List<Call> calls = new ArrayList<>();
-    try (Stream<Path> files = Files.walk(frontendMainSources())) {
-      for (Path file : files.filter(f -> f.toString().endsWith(".java")).toList()) {
-        calls.addAll(backendCalls(Files.readString(file), file.getFileName().toString()));
-      }
-    }
+  void theFrontendCallsNoDeprecatedBackendOperation() {
+    BackendCallScanner.Result scan = BackendCallScanner.scanDirectory(frontendMainSources());
+    BackendOperations deprecated =
+        BackendOperations.of(
+            BackendOperations.committedDocument(), op -> op.path("deprecated").asBoolean(false));
 
-    assertThat(calls)
-        .as("the scan resolved too few backendApiClient calls; the parser is broken")
-        .hasSizeGreaterThanOrEqualTo(MIN_RESOLVED_CALLS);
+    assertThat(scan.callSites())
+        .as("the scan resolved too few backend calls; the scanner is broken")
+        .isGreaterThanOrEqualTo(MIN_RESOLVED_CALL_SITES);
 
+    List<BackendCallScanner.Call> calls =
+        scan.calls().stream().filter(c -> deprecated.exists(c.verb(), c.template())).toList();
     List<String> offenders =
         calls.stream()
-            .filter(c -> deprecated.contains(c.verb() + " " + c.template()))
-            .map(c -> c.verb() + " " + c.template() + " at " + c.location())
+            .filter(c -> !DEPRECATED_RELAYS.containsKey(signature(c)))
+            .map(BackendCallScanner.Call::describe)
             .toList();
     assertThat(offenders)
         .as(
             "the frontend calls backend operations marked deprecated in openapi.json; move each to"
                 + " the replacement its @ApiDeprecation names before the sunset removes it")
         .isEmpty();
+    assertThat(calls.stream().map(DeprecatedBackendEndpointCallGuardTest::signature).toList())
+        .as("every reviewed deprecated relay is still in use; remove the stale entries")
+        .containsAll(DEPRECATED_RELAYS.keySet());
   }
 
   @Test
-  void theParserRecognisesAConcatenatedPathAndMatchesItAgainstATemplate() {
+  void aCallToADeprecatedOperationIsFound() {
     String source =
         """
-        backendApiClient.put(
-            "/api/v1/missions/" + missionUuid + "/owner/" + userUuid, null, Void.class);
-        backendApiClient.get("/api/v1/missions/" + id + "/units?size=1000", TYPE);
-        """;
-
-    List<Call> calls = backendCalls(source, "Sample.java");
-
-    assertThat(calls)
-        .extracting(c -> c.verb() + " " + c.template())
-        .containsExactly("PUT /api/v1/missions/{}/owner/{}", "GET /api/v1/missions/{}/units");
-    assertThat(
-            deprecatedOperations(
-                JsonMapper.builder()
-                    .build()
-                    .readTree(
-                        "{\"paths\":{\"/api/v1/missions/{id}/owner/{userId}\":{\"put\":"
-                            + "{\"deprecated\":true},\"get\":{}}}}")))
-        .containsExactly("PUT /api/v1/missions/{}/owner/{}");
-  }
-
-  /**
-   * Collects every operation the document marks {@code deprecated}, as {@code VERB template} with
-   * each path variable written {@code {}}.
-   *
-   * @param openApi the parsed API document
-   * @return the deprecated operations
-   */
-  private static Set<String> deprecatedOperations(JsonNode openApi) {
-    Set<String> found = new TreeSet<>();
-    for (Map.Entry<String, JsonNode> path : openApi.path("paths").properties()) {
-      for (Map.Entry<String, JsonNode> operation : path.getValue().properties()) {
-        if (operation.getValue().path("deprecated").asBoolean(false)) {
-          found.add(
-              operation.getKey().toUpperCase(Locale.ROOT)
-                  + " "
-                  + path.getKey().replaceAll("\\{[^}]*}", "{}"));
-        }
-      }
-    }
-    return found;
-  }
-
-  /**
-   * Finds every {@code backendApiClient.<verb>(} call in a source file and reduces its first
-   * argument to a path template.
-   *
-   * @param source the Java source
-   * @param fileName the file name, for the failure message
-   * @return the calls whose first argument starts with an {@code /api/} string literal
-   */
-  private static List<Call> backendCalls(String source, String fileName) {
-    List<Call> calls = new ArrayList<>();
-    int from = 0;
-    while (true) {
-      int at = source.indexOf("backendApiClient.", from);
-      if (at < 0) {
-        return calls;
-      }
-      int nameStart = at + "backendApiClient.".length();
-      int paren = source.indexOf('(', nameStart);
-      from = nameStart;
-      if (paren < 0) {
-        return calls;
-      }
-      String verb = source.substring(nameStart, paren).trim();
-      if (!VERBS.contains(verb)) {
-        continue;
-      }
-      String template = firstArgumentTemplate(source, paren + 1);
-      if (template != null && template.startsWith("/api/")) {
-        int line = (int) source.substring(0, at).chars().filter(c -> c == '\n').count() + 1;
-        calls.add(new Call(verb.toUpperCase(Locale.ROOT), template, fileName + ":" + line));
-      }
-    }
-  }
-
-  /**
-   * Renders a call's first argument as a template: string literals verbatim, each other {@code +}
-   * operand as {@code {}}, anything after a {@code ?} dropped.
-   *
-   * @param source the Java source
-   * @param start the index just after the call's opening parenthesis
-   * @return the template, or {@code null} when the argument contains no string literal
-   */
-  private static String firstArgumentTemplate(String source, int start) {
-    StringBuilder template = new StringBuilder();
-    StringBuilder operand = new StringBuilder();
-    boolean sawLiteral = false;
-    int depth = 0;
-    int i = start;
-    while (i < source.length()) {
-      char c = source.charAt(i);
-      if (c == '"') {
-        int end = i + 1;
-        StringBuilder literal = new StringBuilder();
-        while (end < source.length() && source.charAt(end) != '"') {
-          if (source.charAt(end) == '\\') {
-            end++;
+        class Sample {
+          void call(UUID missionUuid, UUID userUuid, UUID id) {
+            backendApiClient.put(
+                "/api/v1/missions/" + missionUuid + "/owner/" + userUuid, null, Void.class);
+            backendApiClient.get("/api/v1/missions/" + id + "/units?size=1000", TYPE);
           }
-          literal.append(source.charAt(end));
-          end++;
         }
-        template.append(literal);
-        sawLiteral = true;
-        operand.setLength(0);
-        i = end + 1;
-        continue;
-      }
-      if (c == '(' || c == '[' || c == '{') {
-        depth++;
-      } else if (c == ')' || c == ']' || c == '}') {
-        if (depth == 0) {
-          break;
-        }
-        depth--;
-      } else if (c == ',' && depth == 0) {
-        break;
-      } else if (c == '+' && depth == 0) {
-        if (!operand.toString().isBlank()) {
-          template.append("{}");
-        }
-        operand.setLength(0);
-        i++;
-        continue;
-      }
-      operand.append(c);
-      i++;
-    }
-    if (!operand.toString().isBlank()) {
-      template.append("{}");
-    }
-    if (!sawLiteral) {
-      return null;
-    }
-    int query = template.indexOf("?");
-    return query < 0 ? template.toString() : template.substring(0, query);
+        """;
+    JsonNode document =
+        JsonMapper.builder()
+            .build()
+            .readTree(
+                "{\"paths\":{\"/api/v1/missions/{id}/owner/{userId}\":{\"put\":"
+                    + "{\"deprecated\":true},\"get\":{}},"
+                    + "\"/api/v1/missions/{id}/units\":{\"get\":{}}}}");
+    BackendOperations deprecated =
+        BackendOperations.of(document, op -> op.path("deprecated").asBoolean(false));
+
+    List<String> found =
+        BackendCallScanner.scanSources(Map.of("Sample.java", source)).calls().stream()
+            .filter(c -> deprecated.exists(c.verb(), c.template()))
+            .map(DeprecatedBackendEndpointCallGuardTest::signature)
+            .toList();
+
+    assertThat(found).containsExactly("PUT /api/v1/missions/{}/owner/{}");
+  }
+
+  /**
+   * Renders a call as {@code VERB template} with every runtime part written {@code {}}.
+   *
+   * @param call the call
+   * @return the signature
+   */
+  private static String signature(BackendCallScanner.Call call) {
+    return call.verb() + " " + BackendCallScanner.display(call.template());
   }
 
   /**
@@ -234,28 +128,10 @@ class DeprecatedBackendEndpointCallGuardTest {
    */
   private static Path frontendMainSources() {
     Path relative = Paths.get("src", "main", "java");
-    Path direct = relative;
-    if (Files.isDirectory(direct.resolve("de"))
+    if (Files.isDirectory(relative.resolve("de"))
         && Files.exists(Paths.get("src", "main", "resources", "templates"))) {
-      return direct;
+      return relative;
     }
     return Paths.get("frontend").resolve(relative);
-  }
-
-  /**
-   * Reads the committed backend API document by walking up from the working directory.
-   *
-   * @return the parsed document
-   */
-  private static JsonNode readOpenApi() throws IOException {
-    Path relative = Paths.get("backend", "src", "main", "resources", "api", "openapi.json");
-    for (Path dir = Paths.get("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
-      Path candidate = dir.resolve(relative);
-      if (Files.isRegularFile(candidate)) {
-        return JsonMapper.builder().build().readTree(Files.readString(candidate));
-      }
-    }
-    throw new UncheckedIOException(
-        new IOException("backend/src/main/resources/api/openapi.json not found"));
   }
 }

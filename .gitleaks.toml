@@ -1,7 +1,7 @@
 [extend]
 useDefault = true
 
-[allowlist]
+[[allowlists]]
 description = "Committed test/sample fixtures with throwaway placeholder credentials"
 paths = [
   '''\.env\.example$''',
@@ -13,4 +13,13 @@ paths = [
 regexes = [
   '''123456789012345678''',
   '''eyJhbGciOiJIUzI1NiIsInR5cCI\.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZ\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c''',
+]
+
+[[allowlists]]
+description = "Log-masking tests: the fake secrets they feed the masker must stay in the source to prove it masks them"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^(backend|frontend|ingest)/src/test/java/de/greluc/krt/profit/basetool/(backend|frontend|ingest)/logging/ProdLogMaskingTest\.java$''',
+  '''^logging-support/src/test/java/de/greluc/krt/profit/basetool/logging/PiiMaskerTest\.java$''',
+  '''^backend/src/test/java/de/greluc/krt/(iri|profit)/basetool/backend/logging/PiiMaskerTest\.java$''',
 ]

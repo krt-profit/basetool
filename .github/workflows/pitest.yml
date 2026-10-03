@@ -16,11 +16,17 @@ jobs:
   pitest:
     name: PIT (${{ matrix.module }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
-        module: [backend, frontend]
+        include:
+          - module: backend
+            timeout: 120
+          - module: frontend
+            timeout: 120
+          - module: ingest
+            timeout: 30
 
     steps:
       - name: Checkout

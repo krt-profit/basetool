@@ -624,7 +624,7 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The two edit paths are refused without a token.
+   * The three edit paths, the requester's order edit among them, are refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
@@ -634,6 +634,13 @@ class ApiVhostAnonymousSurfaceTest {
     mockMvc
         .perform(
             put("/api/v1/orders/" + ABSENT_OPERATION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"materials\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/orders/" + ABSENT_OPERATION + "/requested")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"materials\":[]}"))

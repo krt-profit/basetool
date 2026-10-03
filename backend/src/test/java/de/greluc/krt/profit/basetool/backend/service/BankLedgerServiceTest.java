@@ -71,7 +71,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Integration tests for {@link BankLedgerService} against real Postgres on the two-ledger model
@@ -79,7 +78,6 @@ import org.springframework.test.context.ActiveProfiles;
  * wipe reset, append-only behaviour and one audit row per booking.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class BankLedgerServiceTest {
 
   private static final int THREADS = 4;

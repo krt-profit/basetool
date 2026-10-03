@@ -41,89 +41,100 @@ import org.springframework.http.HttpStatus;
 public final class BankConflictException extends AppException {
 
   /** Overdraft attempt: the booking would take the account balance below zero (REQ-BANK-006). */
-  public static final String CODE_BANK_OVERDRAFT = "BANK_OVERDRAFT";
+  public static final String CODE_BANK_OVERDRAFT = CoreProblemCode.BANK_OVERDRAFT.code();
 
   /**
    * Holder overdraft; never thrown, because holder balances may go negative (REQ-BANK-006,
    * ADR-0039).
    */
-  public static final String CODE_BANK_HOLDER_OVERDRAFT = "BANK_HOLDER_OVERDRAFT";
+  public static final String CODE_BANK_HOLDER_OVERDRAFT =
+      CoreProblemCode.BANK_HOLDER_OVERDRAFT.code();
 
   /** Close attempt on an account whose balance is not zero (REQ-BANK-002). */
-  public static final String CODE_BANK_ACCOUNT_NOT_EMPTY = "BANK_ACCOUNT_NOT_EMPTY";
+  public static final String CODE_BANK_ACCOUNT_NOT_EMPTY =
+      CoreProblemCode.BANK_ACCOUNT_NOT_EMPTY.code();
 
   /** Booking attempt on a {@code CLOSED} account (REQ-BANK-002). */
-  public static final String CODE_BANK_ACCOUNT_CLOSED = "BANK_ACCOUNT_CLOSED";
+  public static final String CODE_BANK_ACCOUNT_CLOSED = CoreProblemCode.BANK_ACCOUNT_CLOSED.code();
 
   /** Grant creation for a user who does not hold the Bank Employee role (REQ-BANK-009). */
-  public static final String CODE_BANK_GRANTEE_MISSING_ROLE = "BANK_GRANTEE_MISSING_ROLE";
+  public static final String CODE_BANK_GRANTEE_MISSING_ROLE =
+      CoreProblemCode.BANK_GRANTEE_MISSING_ROLE.code();
 
   /**
    * Transfer with identical source and destination: same source/destination account on an
    * account-to-account transfer, or same source/destination holder on a holder Umbuchung
    * (REQ-BANK-011/-031).
    */
-  public static final String CODE_BANK_SELF_TRANSFER = "BANK_SELF_TRANSFER";
+  public static final String CODE_BANK_SELF_TRANSFER = CoreProblemCode.BANK_SELF_TRANSFER.code();
 
   /** Reversal attempt on a transaction that has already been reversed (REQ-BANK-004). */
-  public static final String CODE_BANK_ALREADY_REVERSED = "BANK_ALREADY_REVERSED";
+  public static final String CODE_BANK_ALREADY_REVERSED =
+      CoreProblemCode.BANK_ALREADY_REVERSED.code();
 
   /** Booking attempt naming a deactivated holder (REQ-BANK-003). */
-  public static final String CODE_BANK_HOLDER_INACTIVE = "BANK_HOLDER_INACTIVE";
+  public static final String CODE_BANK_HOLDER_INACTIVE =
+      CoreProblemCode.BANK_HOLDER_INACTIVE.code();
 
   /**
    * Reversal attempt on a transaction that is not itself reversible — a {@code WIPE_RESET} (a
    * deliberate end-state) or a {@code REVERSAL} (a mistake is corrected by reversing the original,
    * never the correction). REQ-BANK-004.
    */
-  public static final String CODE_BANK_NOT_REVERSIBLE = "BANK_NOT_REVERSIBLE";
+  public static final String CODE_BANK_NOT_REVERSIBLE = CoreProblemCode.BANK_NOT_REVERSIBLE.code();
 
   /**
    * Decision (confirm/reject/cancel) attempt on a booking request that is no longer {@code PENDING}
    * — it was already confirmed, rejected or cancelled. Blocks double-decisions (REQ-BANK-023).
    */
-  public static final String CODE_BANK_REQUEST_NOT_PENDING = "BANK_REQUEST_NOT_PENDING";
+  public static final String CODE_BANK_REQUEST_NOT_PENDING =
+      CoreProblemCode.BANK_REQUEST_NOT_PENDING.code();
 
   /**
    * Edit attempt by the requester on a booking request whose over-limit approval was already
    * granted (REQ-BANK-056); the requester must cancel and re-raise instead.
    */
-  public static final String CODE_BANK_REQUEST_ALREADY_APPROVED = "BANK_REQUEST_ALREADY_APPROVED";
+  public static final String CODE_BANK_REQUEST_ALREADY_APPROVED =
+      CoreProblemCode.BANK_REQUEST_ALREADY_APPROVED.code();
 
   /**
    * Close attempt on an account that still has at least one open {@code PENDING} booking request —
    * the request must be confirmed, rejected or cancelled first (REQ-BANK-025).
    */
   public static final String CODE_BANK_ACCOUNT_HAS_PENDING_REQUESTS =
-      "BANK_ACCOUNT_HAS_PENDING_REQUESTS";
+      CoreProblemCode.BANK_ACCOUNT_HAS_PENDING_REQUESTS.code();
 
   /**
    * Confirmation attempt on a booking request that exceeds the requester's approval limit without
    * the bank employee attesting that the responsible holder's approval was obtained — the mandatory
    * over-limit checkbox is missing (REQ-BANK-041).
    */
-  public static final String CODE_BANK_OWNER_APPROVAL_REQUIRED = "BANK_OWNER_APPROVAL_REQUIRED";
+  public static final String CODE_BANK_OWNER_APPROVAL_REQUIRED =
+      CoreProblemCode.BANK_OWNER_APPROVAL_REQUIRED.code();
 
   /**
    * Direct booking out of the KRT ({@code CARTEL}) account by a plain bank employee above the
    * ceiling T1 (REQ-BANK-047). Not thrown: the direct-booking controller files such an attempt as a
    * {@code PENDING} approval request and answers {@code 202} (ADR-0109).
    */
-  public static final String CODE_BANK_CARTEL_APPROVAL_REQUIRED = "BANK_CARTEL_APPROVAL_REQUIRED";
+  public static final String CODE_BANK_CARTEL_APPROVAL_REQUIRED =
+      CoreProblemCode.BANK_CARTEL_APPROVAL_REQUIRED.code();
 
   /**
    * Split deposit (REQ-BANK-043) attempted while there is no active squadron account to distribute
    * to — none exists, or the only one is the deposit's own named account (which is excluded from
    * the split). The split cannot be honoured.
    */
-  public static final String CODE_BANK_SPLIT_NO_TARGETS = "BANK_SPLIT_NO_TARGETS";
+  public static final String CODE_BANK_SPLIT_NO_TARGETS =
+      CoreProblemCode.BANK_SPLIT_NO_TARGETS.code();
 
   /**
    * Split deposit (REQ-BANK-043) whose percentage of the gross rounds to less than 1 aUEC, so there
    * is nothing to distribute. The requested split cannot be honoured — raise the amount or the
    * percentage.
    */
-  public static final String CODE_BANK_SPLIT_TOO_SMALL = "BANK_SPLIT_TOO_SMALL";
+  public static final String CODE_BANK_SPLIT_TOO_SMALL =
+      CoreProblemCode.BANK_SPLIT_TOO_SMALL.code();
 
   /**
    * Withdrawal/transfer (request or direct booking) leaving a {@link
@@ -131,14 +142,16 @@ public final class BankConflictException extends AppException {
    * justification-mandating} account ({@code CARTEL}, {@code CARTEL_BANK}, {@code SPECIAL}) without
    * a non-blank justification (Begr&uuml;ndung). REQ-BANK-045.
    */
-  public static final String CODE_BANK_JUSTIFICATION_REQUIRED = "BANK_JUSTIFICATION_REQUIRED";
+  public static final String CODE_BANK_JUSTIFICATION_REQUIRED =
+      CoreProblemCode.BANK_JUSTIFICATION_REQUIRED.code();
 
   /**
    * Fee-inclusive withdrawal/transfer (REQ-BANK-033) whose amount does not exceed the in-game fee,
    * so nothing would arrive ({@code amount - fee <= 0}). Never thrown in the default on-top fee
    * mode.
    */
-  public static final String CODE_BANK_FEE_EXCEEDS_AMOUNT = "BANK_FEE_EXCEEDS_AMOUNT";
+  public static final String CODE_BANK_FEE_EXCEEDS_AMOUNT =
+      CoreProblemCode.BANK_FEE_EXCEEDS_AMOUNT.code();
 
   /** The stable machine-readable problem code, one of the {@code CODE_BANK_*} constants. */
   private final String code;

@@ -111,9 +111,13 @@ assignment. Releasing a drag **outside every `.drop-zone`** (over no unit and no
 also removes the unit assignment — the participant falls back into "Ohne Einheit", so a row deep in
 a long board can be unassigned by dragging into empty space without scrolling to the pool; a pool
 row dragged into empty space is a no-op. While a crew row is being dragged, holding the pointer
-near the **top or bottom viewport edge auto-scrolls the page** (speed eases with depth into the
-edge band) so units scrolled out of view stay reachable as drop targets; the scroll stops on drop /
-drag-end.
+near the **top or bottom edge of the visible page auto-scrolls the page** (speed eases with depth
+into the edge band) so units scrolled out of view stay reachable as drop targets; the scroll stops
+on drop / drag-end. The bottom edge is the **top of the pinned bottom bar** — the phone tab bar
+(REQ-UI-026) or the fixed footer — when one is shown, not the viewport's bottom, so the whole
+72 px band lies over page content and a zone the bar covers scrolls out from under it. A touch drag
+**released over that bar is cancelled**: it neither assigns nor unassigns, because the bar hides
+whatever lies beneath it.
 
 **The board's labels name the click path first, because the drag path does not exist on touch**
 (#1936). Mobile browsers do not synthesise HTML5 drag events from touch input — a long press on a
@@ -638,10 +642,10 @@ app's "Teilnehmer hinzufügen" on the public API vhost.
   themselves — gets 403; a body without `userId` is a 400; anonymous is refused (401).
 
 **Enforced by:** `MissionControllerSlimEndpointsTest` (`addParticipantByIdSlim_*`),
-`ApiVhostAnonymousSurfaceTest`, `ExternalContractTest` (frozen + reachable through the edge),
-`check_probe_against_allowlist.py` / `edge-deny-probe.yml`. **Code:**
+`ApiVhostAnonymousSurfaceTest`, `ExternalContractTest` (frozen),
+`EdgeAdmissionTest` / `edge-deny-probe.yml` (generated, REQ-API-021). **Code:**
 `MissionController#addParticipantByIdSlim`, `AddParticipantByIdRequest`,
-`docker/edge/include/api-allowlist.conf`.
+`docker/edge/include/api-admission.conf`.
 
 ### REQ-MISSION-018 — Registration count on the mission list row
 

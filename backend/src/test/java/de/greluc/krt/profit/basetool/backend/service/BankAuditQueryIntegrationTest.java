@@ -44,14 +44,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Integration tests for the bank audit-log query against real Postgres: {@code findFiltered} runs
  * with all filters absent.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class BankAuditQueryIntegrationTest {
 
   @Autowired private BankAuditService bankAuditService;

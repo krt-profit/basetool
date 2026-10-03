@@ -47,7 +47,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -75,7 +74,6 @@ class MissionFinanceEntryControllerSecurityTest {
   @MockitoBean private MissionFinanceEntryService financeEntryService;
   @MockitoBean private OwnerScopeService ownerScopeService;
   @MockitoBean private MissionSecurityService missionSecurityService;
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   @BeforeEach
   void setUp() {

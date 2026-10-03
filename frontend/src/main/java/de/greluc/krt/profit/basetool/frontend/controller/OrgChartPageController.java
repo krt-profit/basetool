@@ -70,6 +70,7 @@ public class OrgChartPageController {
    */
   @NotNull
   @GetMapping
+  @PreAuthorize("isAuthenticated()")
   public String orgChart(@RequestParam(required = false) String fragment, Model model) {
     try {
       model.addAttribute("orgChart", backendApiClient.get("/api/v1/org-chart", OrgChartDto.class));
