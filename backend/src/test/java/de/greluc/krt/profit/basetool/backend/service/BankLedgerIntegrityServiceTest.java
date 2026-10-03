@@ -44,7 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Integration tests for {@link BankLedgerIntegrityService} against the real Testcontainers
@@ -52,7 +51,6 @@ import org.springframework.test.context.ActiveProfiles;
  * corrupted ledger — a raw posting inserted past the service guards — is flagged.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class BankLedgerIntegrityServiceTest {
 
   @Autowired private BankLedgerIntegrityService integrityService;

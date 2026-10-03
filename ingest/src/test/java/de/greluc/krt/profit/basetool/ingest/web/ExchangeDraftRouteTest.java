@@ -35,17 +35,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nimbusds.jose.jwk.ECKey;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeBudget;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeIdempotency;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeQuotas;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRegistryReader;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRelay;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRevocationReader;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeTestSupport;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeUnavailableException;
-import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.ingest.service.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.handoff.HandoffKind;
+import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.observability.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistryReader;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRevocationReader;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
+import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeBudget;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeIdempotency;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
+import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -261,7 +261,7 @@ class ExchangeDraftRouteTest {
             eq("versekit"), eq(member), eq(HandoffKind.REFINERY), anyString(), eq(10)))
         .thenReturn(new HandoffStagingService.Staged("hid-r", "ingest:handoff:x:hid-r", 20L));
 
-    post("/exchange/v1/me/drafts/refinery-orders", example("refinery-draft/valid/minimal.json"))
+    post("/exchange/v1/me/drafts/refinery-orders", example("refinery-draft/valid/one-order.json"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.kind").value("REFINERY"))
         .andExpect(
@@ -276,6 +276,16 @@ class ExchangeDraftRouteTest {
             example("blueprint-draft/invalid/item-without-ref.json"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void aRefineryDraftWithoutOrdersIsRefusedBeforeTheRelay() throws Exception {
+    post("/exchange/v1/me/drafts/refinery-orders", example("refinery-draft/invalid/no-orders.json"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"))
+        .andExpect(jsonPath("$.errors[0].pointer").value("/orders"));
 
     verify(relay, never()).forward(any(), anyString(), any(), any(), any());
   }
@@ -327,7 +337,7 @@ class ExchangeDraftRouteTest {
     when(relay.forward(any(), anyString(), any(), any(), any()))
         .thenReturn(new ExchangeRelay.Result(400, null, "SCHEMA_INVALID", "Unsupported panel."));
 
-    post("/exchange/v1/me/drafts/refinery-orders", example("refinery-draft/valid/minimal.json"))
+    post("/exchange/v1/me/drafts/refinery-orders", example("refinery-draft/valid/one-order.json"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
 
@@ -371,7 +381,7 @@ class ExchangeDraftRouteTest {
   void eachDraftRouteNeedsItsCapability() throws Exception {
     grant(Set.of("exchange.connect", "exchange.drafts.blueprints"));
 
-    post("/exchange/v1/me/drafts/refinery-orders", example("refinery-draft/valid/minimal.json"))
+    post("/exchange/v1/me/drafts/refinery-orders", example("refinery-draft/valid/one-order.json"))
         .andExpect(status().isForbidden());
 
     verify(relay, never()).forward(any(), anyString(), any(), any(), any());

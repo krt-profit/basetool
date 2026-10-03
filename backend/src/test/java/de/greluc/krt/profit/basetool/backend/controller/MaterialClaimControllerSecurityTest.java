@@ -38,7 +38,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -57,7 +56,6 @@ class MaterialClaimControllerSecurityTest {
 
   @MockitoBean private MaterialClaimService materialClaimService;
   @MockitoBean private OwnerScopeService ownerScopeService;
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
   private static final UUID CLAIM_ID = UUID.randomUUID();

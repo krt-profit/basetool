@@ -33,14 +33,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Structural test for {@link CacheConfig}: every cache-name constant declared on the class must be
  * registered in its {@code setCacheNames(...)} whitelist, or {@code @Cacheable} fails at runtime.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class CacheConfigTest {
 
   @Autowired private CacheManager cacheManager;

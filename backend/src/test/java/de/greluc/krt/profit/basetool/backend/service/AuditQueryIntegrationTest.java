@@ -38,7 +38,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.IllegalTransactionStateException;
 
 /**
@@ -46,7 +45,6 @@ import org.springframework.transaction.IllegalTransactionStateException;
  * findFiltered} runs with and without filters, and {@code record()} outside a transaction throws.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class AuditQueryIntegrationTest {
 
   @Autowired private AuditService auditService;

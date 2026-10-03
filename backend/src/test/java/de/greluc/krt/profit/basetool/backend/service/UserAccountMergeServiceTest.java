@@ -36,8 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -45,10 +43,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * column-type errors in its set-based native SQL that a mocked repository would hide.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class UserAccountMergeServiceTest {
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   @MockitoBean private RoleRepository roleRepository;
 

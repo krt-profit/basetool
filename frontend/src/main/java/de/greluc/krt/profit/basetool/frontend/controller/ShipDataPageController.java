@@ -85,6 +85,7 @@ public class ShipDataPageController {
    */
   @NotNull
   @GetMapping
+  @PreAuthorize("isAuthenticated()")
   @SuppressWarnings("unchecked")
   public String listData(Model model) {
     if (!model.containsAttribute("manufacturerForm")) {

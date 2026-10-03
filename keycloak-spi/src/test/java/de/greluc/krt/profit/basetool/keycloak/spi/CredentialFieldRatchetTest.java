@@ -35,7 +35,7 @@ class CredentialFieldRatchetTest {
 
   private static final Set<String> REVIEWED_REDACTING_TYPES =
       Set.of(
-          "de.greluc.krt.profit.basetool.keycloak.spi.DiscordGuildRoleGateAuthenticator$Brokered");
+          "de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordGuildRoleGateAuthenticator$Brokered");
 
   @Test
   void everyCredentialBearingTypeIsReviewedAndRedacts() {

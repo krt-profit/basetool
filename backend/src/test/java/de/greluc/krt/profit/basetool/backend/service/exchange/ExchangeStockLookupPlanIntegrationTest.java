@@ -48,7 +48,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -61,7 +60,6 @@ import org.springframework.transaction.support.TransactionTemplate;
         "spring.jpa.properties.hibernate.session_factory.statement_inspector="
             + "de.greluc.krt.profit.basetool.backend.service.exchange"
             + ".ExchangeStockLookupPlanIntegrationTest$RecordingInspector")
-@ActiveProfiles("test")
 class ExchangeStockLookupPlanIntegrationTest {
 
   @Autowired private JdbcTemplate jdbc;

@@ -42,7 +42,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -51,7 +50,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * leaves read-only transactions alone (ADR-0224).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class ChangeSourceTransactionManagerIntegrationTest {
 
   @Autowired private PlatformTransactionManager transactionManager;

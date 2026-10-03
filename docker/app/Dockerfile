@@ -10,12 +10,12 @@ COPY gradle/ gradle/
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY gradle.properties .
-COPY backend/build.gradle.kts backend/
-COPY frontend/build.gradle.kts frontend/
-COPY ingest/build.gradle.kts ingest/
-COPY keycloak-spi/build.gradle.kts keycloak-spi/
-COPY test-support/build.gradle.kts test-support/
-COPY logging-support/build.gradle.kts logging-support/
+COPY backend/build.gradle.kts backend/build-settings.properties backend/
+COPY frontend/build.gradle.kts frontend/build-settings.properties frontend/
+COPY ingest/build.gradle.kts ingest/build-settings.properties ingest/
+COPY keycloak-spi/build.gradle.kts keycloak-spi/build-settings.properties keycloak-spi/
+COPY test-support/build.gradle.kts test-support/build-settings.properties test-support/
+COPY logging-support/build.gradle.kts logging-support/build-settings.properties logging-support/
 
 RUN case "$MODULE" in \
         backend|frontend|ingest) ;; \

@@ -23,23 +23,23 @@ import de.greluc.krt.profit.basetool.ingest.config.ExchangeGatewayProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeBudget;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeQuotas;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRefusals;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRelay;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRequestContext;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeSchemas;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeUnavailableException;
-import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.ingest.service.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.contract.ExchangeSchemas;
+import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
+import de.greluc.krt.profit.basetool.ingest.handoff.HandoffKind;
+import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
+import de.greluc.krt.profit.basetool.ingest.observability.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.problem.Problems;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
+import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeBudget;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -1026,10 +1026,7 @@ public class ExchangeController {
     problem.setProperty(
         "errors",
         violations.stream()
-            .map(
-                v ->
-                    Map.of(
-                        "pointer", ExchangeSchemas.reportable(v.pointer()), "message", v.message()))
+            .map(v -> new Problems.FieldError(ExchangeSchemas.reportable(v.pointer()), v.message()))
             .toList());
     return ResponseEntity.badRequest()
         .contentType(MediaType.APPLICATION_PROBLEM_JSON)

@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -43,7 +42,6 @@ import org.springframework.transaction.annotation.Transactional;
  * PersonSearchTargets#EXEMPT_TABLES}, and every registered target to exist (REQ-SEC-060).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class PersonSearchCoverageTest {
 
   /**
