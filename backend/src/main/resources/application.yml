@@ -220,7 +220,6 @@ app:
       - name: participant-mutations
         methods: [POST, PUT, DELETE]
         paths:
-          - /api/v1/missions/*/participants
           - /api/v1/missions/*/participants/**
         capacity: 500
         refillTokens: 500

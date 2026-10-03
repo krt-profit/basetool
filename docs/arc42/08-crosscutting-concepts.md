@@ -51,6 +51,12 @@ Beyond roles there are three mechanisms that are easy to miss:
   explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past
   the proxy (REQ-SEC-076), and one that still fails at runtime stays a fail-closed 400 that is
   counted and alerted (REQ-OBS-020).
+- **Path-keyed controls check themselves against the real mappings** (guard G-07) — the CSRF
+  exemption, the `no-store` classification of every API family, the rate-limit rules and the
+  pending, terms and acting-member exemptions are all keyed on paths, so a moved path would lose
+  them silently. Tests over the real handler mappings fail on a write outside the CSRF exemption, a
+  mapping outside `/api`, `/internal` and the actuator, an unclassified family, a rule that names no
+  operation, and an exemption that is not an exact list of real paths (REQ-SEC-031, REQ-SEC-078…080).
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.
@@ -111,7 +117,8 @@ carries it — is in [`frontend/CLAUDE.md`](../../frontend/CLAUDE.md).
 
 Versioned `/api/v1` paths with `@ApiDeprecation`, DTO-only boundaries (records + MapStruct +
 Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every error,
-`Pageable`/`PageResponse` with whitelisted sort fields, UTC everywhere, and a committed
+`Pageable`/`PageResponse` with whitelisted sort fields and a kernel page ceiling of 1 000 (eight
+reviewed catalogue lists opt out to 100 000), UTC everywhere, and a committed
 `openapi.json` per REST-serving module — generated with sorted keys by each module's
 `OpenApiGeneratorTest`, and CI fails a pull request whose committed document differs from the one
 its build generated.

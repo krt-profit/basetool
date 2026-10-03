@@ -191,10 +191,27 @@ All list endpoints take Spring's `Pageable` and return a `PageResponse` wrapper 
 elements, pages, current page). **Whitelist allowed sort fields in the service** — never
 pass user input directly to `Sort` (unstable sorting + information-disclosure risk). Build the
 `Pageable` through `PaginationUtil`, which whitelists the sort field, appends `id` as a stable
-tiebreaker, and clamps `size` to `MAX_PAGE_SIZE` (100 000 — high on purpose so the "load all in one
-request" surfaces are not truncated). The clamp bounds the result-set size; the global
-query-execution timeout (REQ-DATA-009, finding SEC-03) bounds how long a heavy fetch may hold a
-database connection.
+tiebreaker, and clamps `size` to a **page ceiling**. The clamp bounds the result-set size; the
+global query-execution timeout (REQ-DATA-009, finding SEC-03) bounds how long a heavy fetch may hold
+a database connection.
+
+**The kernel page policy** (plan D-18, amended 2026-10-03). The default ceiling is
+`MAX_PAGE_SIZE` = **1 000**. A list opts out only explicitly, by passing `PageCeiling.LOAD_ALL`
+(`LOAD_ALL_MAX_PAGE_SIZE` = 100 000), and only for a caller that requests a larger page. The value
+was set from the callers in the code, not guessed: every frontend, Android-app and ingest call
+requests at most 1 000 except eight, which are the reviewed opt-outs —
+
+| Opt-out | Caller | Requested `size` |
+| --- | --- | ---: |
+| `GET /api/v1/materials/matrix` | frontend price matrix (`CachedCatalog.MATERIALS_MATRIX`) | 100 000 |
+| `GET /api/v1/materials/prices-overview` | frontend materials page, one page | 10 000 |
+| `GET /api/v1/materials/{id}/prices` | frontend materials page | 10 000 |
+| `GET /api/v1/terminals` | frontend terminal catalogue, admin UEX page | 10 000 |
+| `GET /api/v1/cities`, `/space-stations`, `/outposts`, `/pois` | frontend admin UEX page | 10 000 |
+
+A caller that asks a non-opted-out list for more than 1 000 gets a page of 1 000 and the true
+`totalPages`, so a page walk still reaches every row. `PageCeilingTest` pins the opt-outs to exactly
+these eight handlers and fails on a new one; adding one is a reviewed decision that names its caller.
 
 ### REQ-API-006 — All times in UTC
 

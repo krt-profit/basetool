@@ -1995,13 +1995,49 @@ for the client, profile and policy (`REQ-OPS-033`) · **Decision:**
 
 ### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
 
-API GET responses of every sensitive family MUST carry `Cache-Control: private, no-store`. Every
-other `/api/**` GET keeps `no-cache, must-revalidate`. The families are the bank surfaces
-(`/api/v1/bank/**` **and** `/api/v1/org-units/bank/**`), `/api/v1/users/**`, `/api/v1/me/**`,
-`/api/v1/notifications/**`, the ledgers (`/api/v1/finance-entries/**`,
-`/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**`), the holdings
-(`/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`,
-`/api/v1/hangar/**`, `/api/v1/refinery-orders/**`) and `/api/v1/promotion/**`.
+> [!note] Amended 2026-10-03 (plan D-18, guard G-07) — every family is classified
+> Every API family is now classified **explicitly**, in one place (`NoStoreApiScopes`), as
+> `no-store` or revalidatable, and a test over the real handler mappings fails on a mapping no family
+> classifies. Twelve families that had been storable by omission were reviewed and moved to
+> `no-store` (listed below); the Materialbörse exclusion this requirement used to state is
+> withdrawn. An `/api` path no family classifies answers `no-store` at runtime, so an omission now
+> fails safe.
+
+API GET responses of every sensitive family MUST carry `Cache-Control: private, no-store`; every
+other family MUST be listed as revalidatable and keeps `no-cache, must-revalidate`. The rule for
+deciding: a family that serves **personal data or data specific to the calling member** (their
+holdings, their status, viewer-specific flags such as `mine` or `canEdit`, named position holders)
+is `no-store`; **shared reference or catalogue data** is revalidatable. The most specific matching
+family decides, so a sub-family can differ from its parent.
+
+| `no-store` | What makes it sensitive |
+| --- | --- |
+| `/api/v1/bank/**`, `/api/v1/org-units/bank/**` | bank ledgers, balances and holder handles |
+| `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
+| `/api/v1/notifications/**` | one member's feed, including the SSE stream |
+| `/api/v1/finance-entries/**`, `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
+| `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
+| `/api/v1/promotion/**` | evaluations of named members |
+| `/api/v1/admin/**` | **new** — person search, registrations, exports, deletion requests, a member's holdings |
+| `/api/v1/audit/**` | **new** — who did what, by actor |
+| `/api/v1/connected-apps/**` | **new** — the member's installations and their activity |
+| `/api/v1/exchange/**` | **new** — the acting member's stock, ships, blueprints and installation |
+| `/api/v1/leitung/**` | **new** — the units the caller leads, their rosters and the caller's permissions |
+| `/api/v1/live-sync/**` | **new** — the stream names the topics accepted for this caller |
+| `/api/v1/material-exchange/**`, `/api/v1/material-requests/**` | **new** — viewer-specific `mine` / `viewerInterested`, interested handles, and the member's own releasable stock |
+| `/api/v1/notification-rules/**` | **new** — a selector can name an individual member |
+| `/api/v1/orders/**` | **new** — assignee and requester handles, claims, handovers, blueprint owners, viewer `canEdit` |
+| `/api/v1/org-chart/**` | **new** — named position holders and viewer-specific `canAdd…` flags |
+| `/api/v1/special-commands/*/members/**`, `/api/v1/squadrons/*/members/**` | **new** — member rosters |
+| `/api/v1/terms/**` | **new** — `/terms/status` is the caller's own acceptance |
+
+Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`, `job-types`,
+`kommando-groups`, `locations`, `manufacturers`, `material-categories`,
+`material-external-aliases`, `materials`, `missions`, `org-hierarchy`, `org-units`, `outposts`,
+`pois`, `refining-methods`, `settings`, `ship-types`, `space-stations`, `special-commands`,
+`squadrons`, `star-systems`, `sync-reports`, `system` (v1 and v2), `terminals`, `uex`, and three
+catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**`,
+`/api/v1/orders/item-catalog/**` and `/api/v1/terms/document`.
 
 **Both bank spellings, because they are different surfaces.** `/api/v1/bank/**` is the
 bank-employee one; the member-facing account a shipped client actually reads lives under
@@ -2017,10 +2053,11 @@ sensitive family absent from the list loses the framework's own default `no-stor
 sensitive GET family means adding it to `NoStoreApiScopes` in the same change — which since
 2026-09-10 also takes it out of the ETag buffer, because both filters read that one list.
 
-The Materialbörse (`/api/v1/material-exchange/**`, `/api/v1/material-requests/**`) is deliberately
-excluded: it is an org-wide shared board whose handles are the same public callsign tuple the public
-mission roster already serves, so it belongs in the revalidate bucket with the other shared
-listings.
+The Materialbörse (`/api/v1/material-exchange/**`, `/api/v1/material-requests/**`) used to be
+excluded as an org-wide shared board. That was wrong for what it serves: each board row carries the
+viewer-specific `mine` and `viewerInterested` flags, and `/material-exchange/releasable-items` is
+the member's own inventory — holdings, which are `no-store` everywhere else. It is `no-store` since
+2026-10-03.
 
 The distinction is not cosmetic. `no-cache, must-revalidate` permits an intermediary to **store** the
 body and reuse it after a successful revalidation; only `no-store` forbids the copy existing at all.
@@ -2068,9 +2105,16 @@ answer from it identically for seventeen paths.
 - [x] The ETag filter skips exactly the same families, and no response header changes when it does
   (`StreamAwareShallowEtagHeaderFilterTest`, which asserts the premise against Spring's own filter
   rather than against a reading of its source).
+- [x] Every `/api` mapping of the real dispatcher belongs to a classified family, and every family
+  names at least one mapping (`ApiCacheFamilyCoverageTest`, selection floor 572 mappings).
+- [x] Every `GET` mapping, with its path variables filled, answers its family's directive through
+  the real filter chain (floor 244), and one authenticated read per `no-store` family keeps
+  `no-store` past its handler (floor 26).
+- [x] A planted unclassified family is reported (`PathControlInventoryTest`) and an unclassified
+  `/api` path answers `no-store` (`NoStoreApiScopesTest`).
 
 **Enforced by:** `ApiCacheControlFilterTest`, `NoStoreApiScopesTest`,
-`StreamAwareShallowEtagHeaderFilterTest` ·
+`StreamAwareShallowEtagHeaderFilterTest`, `ApiCacheFamilyCoverageTest`, `PathControlInventoryTest` ·
 **Code:** `ApiCacheControlFilter`, `NoStoreApiScopes`, `StreamAwareShallowEtagHeaderFilter`
 
 ### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
@@ -2161,8 +2205,8 @@ unaffected either way, since it asks for pages until they run out. The ceiling i
 exactly what the existing anonymous callers request — the guest order form's pickers and the catalogue
 page-walks — so it costs the legitimate flows nothing.
 
-Authenticated callers keep the 100 000 clamp. The scope is matched on the **decoded** path
-(REQ-SEC-029).
+Authenticated callers are clamped by the kernel page policy of REQ-API-005: 1 000 by default,
+100 000 only on the reviewed opt-outs. The scope is matched on the **decoded** path (REQ-SEC-029).
 
 **Acceptance**
 
@@ -2178,8 +2222,8 @@ Authenticated callers keep the 100 000 clamp. The scope is matched on the **deco
   `PAGE_SIZE_TOO_LARGE`.~~ Retired with `AnonymousPageSizeFilter` (ADR-0159): no paginated endpoint
   answers an unauthenticated caller, so there is no anonymous page to bound.
 - [x] ~~An anonymous request with `size=1000` still succeeds.~~ Same.
-- [x] An authenticated caller with `size=50000` is unaffected — the 100 000 `PaginationUtil` clamp
-  is unchanged.
+- [x] An authenticated caller with `size=50000` gets the page REQ-API-005 allows: 100 000 on a
+  reviewed opt-out, 1 000 elsewhere (`PageCeilingTest`).
 
 **Enforced by:** `SecurityTest`, `AnonymousSurfaceSweepTest` (the `HEAD`-per-`GET` pass that carries
 the verb-agnostic lesson forward) · **Code:** `SecurityConfig`
@@ -5350,6 +5394,89 @@ A new request type complies with no exception.
 `DualUseRequestBodyProofTest`, `RefineryOrderServiceLifecycleTest`
 (`clientSuppliedServerManagedFields_areIgnoredOnCreate`) · **Related:** REQ-API-002, REQ-API-015,
 REQ-ORG-028, REQ-SEC-005, ADR-0060
+
+### REQ-SEC-078 — Every write lies inside the CSRF exemption, and nothing is mapped outside the served surface
+
+Cookie CSRF is armed on the backend chain in every profile but `test`, and exempts only the
+bearer-only surface (`SecurityConfig.CSRF_EXEMPT_PATHS`: `/api/v1/**`, `/internal/**`,
+`/actuator/loggers/**`, ADR-0144). A write mapped anywhere else is refused with `403` in production
+while every test passes, because the `test` profile disables CSRF. So:
+
+- Every mapping that answers `POST`, `PUT`, `PATCH` or `DELETE` — in every request-mapping
+  registry, the actuator's included — MUST pass the **real, armed** CSRF filter without a token. The
+  check selects the security chain the way `FilterChainProxy` does: `/actuator/prometheus` has a
+  chain of its own (`MonitoringScrapeSecurityConfig`), everything else the main chain.
+- No mapping exists outside `/api/**`, `/internal/**` and `/actuator/**`, except `/error` and
+  springdoc's `/v3/api-docs` and `/v3/api-docs.yaml` (`ADMIN`-only, disabled under `prod`).
+- The one reviewed write outside the exemption is `/error`: it answers every verb but is reached
+  only by the container's error dispatch, after the original request passed the chain.
+
+**Acceptance**
+
+- [x] All 331 write mappings pass the armed filter without a token (selection floor 331).
+- [x] A planted write at `/legacy/…` and at `/api/v2/…` is refused by the same filter, and
+  `/api/v1/missions` passes — the check can fail.
+- [x] The 583 mappings of every registry lie inside the surface; a planted `/legacy/write` is
+  reported (`PathControlInventoryTest`).
+
+**Enforced by:** `CsrfExemptionCoverageTest`, `PathControlInventoryTest`,
+`SecurityConfigCsrfExemptionTest`, `ActuatorLoggersCsrfArmedTest` · **Code:** `SecurityConfig`,
+`MonitoringScrapeSecurityConfig` · **Decision:** ADR-0144
+
+### REQ-SEC-079 — Every rate-limit rule names a real operation
+
+The per-IP rules (`app.rate-limit.rules` in `application.yml`), the two stream connects the
+per-subject budget counts (`SubjectRateLimitingFilter.SSE_CONNECT`, `LIVE_SYNC_CONNECT`) and the
+export segments (`SubjectRateLimitingFilter.EXPORT_SEGMENTS`) are keyed on paths. A path that moves
+without its rule keeps the rule configured and applying to nothing. So every path of every rule
+MUST match at least one operation of the real dispatcher that answers one of the rule's verbs, both
+stream connects MUST be `GET` operations, and every export segment MUST occur in at least one
+operation's path.
+
+The rule `participant-mutations` listed `/api/v1/missions/*/participants` beside
+`/api/v1/missions/*/participants/**`; no operation answers the bare path with a write, and the
+second pattern already matches it, so the first was removed without a change in behaviour.
+
+**Acceptance**
+
+- [x] Every path of the four rules matches an operation with one of its verbs (floor: 4 rules).
+- [x] Both stream connects and all six export segments name real operations.
+- [x] A planted rule path, a rule whose verbs no matching operation answers, and a planted export
+  segment are each reported (`PathControlInventoryTest`).
+
+**Enforced by:** `RateLimitRuleCoverageTest`, `PathControlInventoryTest` · **Code:**
+`application.yml` (`app.rate-limit`), `RateLimitingFilter`, `SubjectRateLimitingFilter` ·
+**Related:** REQ-SEC-023, REQ-SEC-033
+
+### REQ-SEC-080 — Gate exemptions are exact sets of real paths
+
+Three filters decide by path which requests they leave alone, and each list MUST be an exact set of
+literal paths, each naming a real mapping:
+
+- **Pending approval and role-less** (`PendingApprovalAccessFilter`):
+  `/api/v1/users/me/registration-status`, `/api/v1/app/version-policy`, `/api/v1/terms/document`.
+- **Terms acceptance** (`TermsAcceptanceAccessFilter`): `/api/v1/terms/document`,
+  `/api/v1/terms/status`, `/api/v1/terms/acceptance`, `/api/v1/users/me/registration-status`,
+  `/api/v1/app/version-policy`. This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`,
+  under which a future `/api/v1/terms/admin` would have escaped the gate; for the three mappings
+  under `/api/v1/terms` the behaviour is identical.
+- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the thirteen exchange paths the ingest
+  gateway may act on; every mapping under `/api/v1/exchange` is one of them.
+
+A new mapping under `/api/v1/terms` fails the test until it is listed as exempt or as gated by
+consent.
+
+**Acceptance**
+
+- [x] Each of the three sets equals its pinned list exactly, every entry is a literal and names a
+  mapping.
+- [x] Every mapping under `/api/v1/terms` is decided; a planted `/api/v1/terms/admin` is reported
+  (`PathControlInventoryTest`) and refused by the terms gate (`TermsAcceptanceAccessFilterTest`).
+
+**Enforced by:** `FilterExemptionSetsTest`, `TermsAcceptanceAccessFilterTest`,
+`PathControlInventoryTest`, `AnonymousSurfaceSweepTest` · **Code:** `PendingApprovalAccessFilter`,
+`TermsAcceptanceAccessFilter`, `ActingMemberFilter` · **Related:** REQ-SEC-017, REQ-SEC-028,
+REQ-SEC-053, REQ-XCH-009
 
 ## Out of scope
 

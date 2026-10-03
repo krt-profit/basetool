@@ -609,11 +609,10 @@ Every Hibernate-issued query — JPQL, Spring-Data derived, `@Query` (including 
 `APP_DB_QUERY_TIMEOUT_MS`). Without it a single heavy request can hold one of the Hikari pool's
 connections for the query's full duration — the Hikari timeouts only bound pool *acquisition*, not
 query *execution* — so a handful of concurrent heavy reads can exhaust the pool and stall the API
-(SEC-03). This is the complement to the deliberately high `PaginationUtil` page ceiling
-(`MAX_PAGE_SIZE = 100_000`): the ceiling stays high because several surfaces legitimately "load all"
-in one request (the material × terminal price matrix `/api/v1/materials/matrix?size=100000`, the
-admin material / member / UEX lists, the org-unit pickers), so the *time* a fetch may run — not the
-*number of rows* it may ask for — is the enforceable bound.
+(SEC-03). This is the complement to the `PaginationUtil` page ceiling (REQ-API-005: 1 000 by
+default, 100 000 on the reviewed opt-outs such as the material × terminal price matrix
+`/api/v1/materials/matrix?size=100000`): the opt-outs legitimately "load all" in one request, so the
+*time* a fetch may run — not only the *number of rows* it may ask for — is the enforceable bound.
 
 The timeout is a **Hibernate** property, so it applies only to application queries: **Flyway
 migrations use raw JDBC and are unaffected**, and a long migration is never killed. The value is

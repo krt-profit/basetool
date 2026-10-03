@@ -131,8 +131,8 @@ appendability), `BackendApiClientHappyPathTest` (merge order, single-request com
   was chosen over a pagination UI.
 - Non-admin list surfaces with real pagination (hangar, refinery orders, audit log, sync
   reports, blueprints) — those are governed by their own specs.
-- The backend's `size` clamp itself (`PaginationUtil.MAX_PAGE_SIZE`, SEC-03 rationale in its
-  Javadoc).
+- The backend's `size` clamp itself (`PaginationUtil`, the kernel page policy of
+  [`api-conventions.md`](api-conventions.md) REQ-API-005).
 
 ## Open questions
 
