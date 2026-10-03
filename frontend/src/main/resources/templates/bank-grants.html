@@ -4,6 +4,7 @@
     <title th:text="#{bank.grants.title} + ' - ' + ${appTitle}">Bank-Berechtigungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/bank-grants.css}">
     </th:block>
 </head>
 <body>
@@ -12,121 +13,105 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
-    <div class="greeting hud-box flex-between">
-        <div>
-            <h1 th:text="#{bank.grants.title}">Berechtigungen</h1>
-            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
-               th:text="#{bank.grants.subtitle}">Pro Mitarbeiter und Konto: Einzahlen, Auszahlen, Transfer.</p>
-        </div>
-        <div class="bank-head-actions">
-            <a th:href="@{/bank}" class="btn btn-ghost" data-testid="bank-back-link"
-               th:text="#{bank.manage.back}">Zur Bank</a>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', eyebrowHref=@{/bank}, titleText=#{bank.grants.title}, actions=~{::bank-grants-actions})}">
+        <th:block th:ref="bank-grants-actions">
             <button type="button" class="btn btn--cta"
                     data-trigger="open-modal-display" data-modal-id="bank-grant-create-modal"
                     data-testid="bank-grant-create-open" th:text="#{bank.grants.create}">+ Berechtigung erteilen</button>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
-    <div class="bank-filterbar bank-filterbar--tabs mt-2">
-        <div class="tab-nav" role="tablist">
-            <a th:href="@{/bank/grants(view='account')}" class="tab" role="tab"
-               th:classappend="${!byEmployee} ? ' active' : ''" th:aria-selected="${!byEmployee}"
-               data-testid="bank-grants-view-account" th:text="#{bank.grants.view.account}">Nach Konto</a>
-            <a th:href="@{/bank/grants(view='employee')}" class="tab" role="tab"
-               th:classappend="${byEmployee} ? ' active' : ''" th:aria-selected="${byEmployee}"
-               data-testid="bank-grants-view-employee" th:text="#{bank.grants.view.employee}">Nach Mitarbeiter</a>
-        </div>
-        <div class="bank-form-row" th:if="${!byEmployee}">
-            <label for="bank-grants-account-filter" class="visually-hidden" th:text="#{bank.grants.filter.account}">Konto</label>
-            <select id="bank-grants-account-filter" data-role="bank-grants-filter"
-                    data-view="account" data-param="accountId"
-                    data-krt-combobox="remote-bank-accounts"
-                    th:attr="data-combobox-placeholder=#{bank.account.search.placeholder},data-combobox-no-results=#{bank.account.search.noResults}"
-                    data-testid="bank-grants-filter">
-                <option value="" th:text="#{bank.grants.filter.allAccounts}">Alle Konten</option>
-                <option th:if="${selectedAccount != null}" th:value="${selectedAccount.id()}" selected
-                        th:text="${selectedAccount.accountNo()} + ' &#8212; ' + ${selectedAccount.name()}">KB-0001 &#8212; Staffel IRIDIUM</option>
-            </select>
-        </div>
-        <div class="bank-form-row" th:if="${byEmployee}">
-            <label for="bank-grants-user-filter" class="visually-hidden" th:text="#{bank.grants.filter.employee}">Mitarbeiter</label>
-            <select id="bank-grants-user-filter" data-role="bank-grants-filter"
-                    data-view="employee" data-param="userId" data-testid="bank-grants-filter">
-                <option value="" th:text="#{bank.grants.filter.allEmployees}">Alle Mitarbeiter</option>
-                <option th:each="g : ${grantees}" th:value="${g.key}"
-                        th:selected="${selectedUserId != null and selectedUserId == g.key}"
-                        th:text="${g.value}">greluc</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="bank-panel mt-2" data-testid="bank-grants-panel">
-        <div class="bank-panel-body">
-            <div id="bank-grants-results">
-            <th:block th:fragment="grantsMatrix">
-            <div class="table-responsive" th:if="${!#lists.isEmpty(grants)}">
-                <table class="data-table">
-                    <thead>
-                    <tr>
-                        <th th:text="#{bank.grants.col.employee}">Mitarbeiter</th>
-                        <th th:text="#{bank.grants.col.account}">Konto</th>
-                        <th class="text-center" th:text="#{bank.grants.col.deposit}">Einzahlen</th>
-                        <th class="text-center" th:text="#{bank.grants.col.withdraw}">Auszahlen</th>
-                        <th class="text-center" th:text="#{bank.grants.col.transfer}">Transfer</th>
-                        <th class="text-right" th:text="#{general.actions}">Aktionen</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="g : ${grants}" data-testid="bank-grant-row"
-                        th:with="grantHandle=${@handles.display(g.userHandle())}"
-                        th:classappend="${!g.granteeHasBankRole()} ? ' is-inert' : ''"
-                        th:attr="data-user-id=${g.userId()},data-account-id=${g.accountId()},data-version=${g.version()},data-can-deposit=${g.canDeposit()},data-can-withdraw=${g.canWithdraw()},data-can-transfer=${g.canTransfer()},data-user-handle=${grantHandle}">
-                        <td>
-                            <span th:text="${@handles.display(g.userHandle())}">greluc</span>
-                            <span class="chip chip--muted krtm-font-size-0-55rem-eff3"
-                                  th:if="${!g.granteeHasBankRole()}"
-                                  th:title="#{bank.grants.missingRole.hint}"
-                                  th:text="#{bank.grants.missingRole}">Rolle fehlt</span>
-                        </td>
-                        <td th:text="${g.accountNo()} + ' &#8212; ' + ${g.accountName()}">KB-0001 &#8212; Staffel IRIDIUM</td>
-                        <td class="text-center">
-                            <button type="button" class="matrix-flag" data-flag="canDeposit"
-                                    th:classappend="${g.canDeposit()} ? ' on' : ''"
-                                    th:aria-pressed="${g.canDeposit()}"
-                                    th:aria-label="#{bank.grants.col.deposit}"
-                                    data-testid="bank-grant-flag-deposit"></button>
-                        </td>
-                        <td class="text-center">
-                            <button type="button" class="matrix-flag" data-flag="canWithdraw"
-                                    th:classappend="${g.canWithdraw()} ? ' on' : ''"
-                                    th:aria-pressed="${g.canWithdraw()}"
-                                    th:aria-label="#{bank.grants.col.withdraw}"
-                                    data-testid="bank-grant-flag-withdraw"></button>
-                        </td>
-                        <td class="text-center">
-                            <button type="button" class="matrix-flag" data-flag="canTransfer"
-                                    th:classappend="${g.canTransfer()} ? ' on' : ''"
-                                    th:aria-pressed="${g.canTransfer()}"
-                                    th:aria-label="#{bank.grants.col.transfer}"
-                                    data-testid="bank-grant-flag-transfer"></button>
-                        </td>
-                        <td class="text-right">
-                            <button type="button" class="btn btn-ghost btn-sm"
-                                    data-trigger="open-modal-display" data-modal-id="bank-grant-revoke-modal"
-                                    th:with="grantLabel=${@handles.display(g.userHandle())} + ' / ' + ${g.accountNo()}"
-                                    th:attr="data-field-_userId=${g.userId()},data-field-_accountId=${g.accountId()},data-field-_label=${grantLabel}"
-                                    data-testid="bank-grant-revoke-open"
-                                    th:text="#{bank.grants.revoke}">Entziehen</button>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
+    <form id="bank-grants-filter-form" class="no-track" method="get" th:action="@{/bank/grants}">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: segmented(name='view', labelKey='bank.grants.view.aria', selected=${byEmployee ? 'employee' : 'account'},
+                options=${ {{value: 'account', labelKey: 'bank.grants.view.account'}, {value: 'employee', labelKey: 'bank.grants.view.employee'}} })}"></th:block>
+            <div class="bank-grants-filter" th:if="${!byEmployee}">
+                <label for="bank-grants-account-filter" class="visually-hidden" th:text="#{bank.grants.filter.account}">Konto</label>
+                <select id="bank-grants-account-filter" data-role="bank-grants-filter"
+                        data-view="account" data-param="accountId"
+                        data-krt-combobox="remote-bank-accounts"
+                        th:attr="data-combobox-placeholder=#{bank.account.search.placeholder},data-combobox-no-results=#{bank.account.search.noResults}"
+                        data-testid="bank-grants-filter">
+                    <option value="" th:text="#{bank.grants.filter.allAccounts}">Alle Konten</option>
+                    <option th:if="${selectedAccount != null}" th:value="${selectedAccount.id()}" selected
+                            th:text="${selectedAccount.accountNo()} + ' &#8212; ' + ${selectedAccount.name()}">KB-0001 &#8212; Staffel IRIDIUM</option>
+                </select>
             </div>
-            <p class="text-center text-muted" th:if="${#lists.isEmpty(grants)}"
-               data-testid="bank-grants-empty" th:text="#{bank.grants.empty}">Keine Berechtigungen vergeben.</p>
-            </th:block>
+            <div class="bank-grants-filter" th:if="${byEmployee}">
+                <label for="bank-grants-user-filter" class="visually-hidden" th:text="#{bank.grants.filter.employee}">Mitarbeiter</label>
+                <select id="bank-grants-user-filter" data-role="bank-grants-filter"
+                        data-view="employee" data-param="userId" data-testid="bank-grants-filter">
+                    <option value="" th:text="#{bank.grants.filter.allEmployees}">Alle Mitarbeiter</option>
+                    <option th:each="g : ${grantees}" th:value="${g.key}"
+                            th:selected="${selectedUserId != null and selectedUserId == g.key}"
+                            th:text="${g.value}">greluc</option>
+                </select>
             </div>
         </div>
+    </form>
+
+    <div id="bank-grants-results" class="card card--flush" data-testid="bank-grants-panel">
+        <th:block th:fragment="grantsMatrix">
+        <table class="data-table data-table--stack" th:if="${!#lists.isEmpty(grants)}">
+            <thead>
+            <tr>
+                <th th:text="#{bank.grants.col.employee}">Mitarbeiter</th>
+                <th th:text="#{bank.grants.col.account}">Konto</th>
+                <th class="bank-grants-flag-col" th:text="#{bank.grants.col.deposit}">Einzahlen</th>
+                <th class="bank-grants-flag-col" th:text="#{bank.grants.col.withdraw}">Auszahlen</th>
+                <th class="bank-grants-flag-col" th:text="#{bank.grants.col.transfer}">Transfer</th>
+                <th class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="g : ${grants}" data-testid="bank-grant-row"
+                th:with="grantHandle=${@handles.display(g.userHandle())}"
+                th:classappend="${!g.granteeHasBankRole()} ? ' is-inert' : ''"
+                th:attr="data-user-id=${g.userId()},data-account-id=${g.accountId()},data-version=${g.version()},data-can-deposit=${g.canDeposit()},data-can-withdraw=${g.canWithdraw()},data-can-transfer=${g.canTransfer()},data-user-handle=${grantHandle}">
+                <td>
+                    <span class="cell-title" th:text="${grantHandle}">greluc</span>
+                    <span class="chip chip--muted"
+                          th:if="${!g.granteeHasBankRole()}"
+                          th:title="#{bank.grants.missingRole.hint}"
+                          th:text="#{bank.grants.missingRole}">Rolle fehlt</span>
+                </td>
+                <td th:attr="data-label=#{bank.grants.col.account}" th:text="${g.accountNo()} + ' &#8212; ' + ${g.accountName()}">KB-0001 &#8212; Staffel IRIDIUM</td>
+                <td class="bank-grants-flag-col" th:attr="data-label=#{bank.grants.col.deposit}">
+                    <button type="button" class="matrix-flag" data-flag="canDeposit"
+                            th:classappend="${g.canDeposit()} ? ' on' : ''"
+                            th:aria-pressed="${g.canDeposit()}"
+                            th:aria-label="#{bank.grants.col.deposit}"
+                            data-testid="bank-grant-flag-deposit"></button>
+                </td>
+                <td class="bank-grants-flag-col" th:attr="data-label=#{bank.grants.col.withdraw}">
+                    <button type="button" class="matrix-flag" data-flag="canWithdraw"
+                            th:classappend="${g.canWithdraw()} ? ' on' : ''"
+                            th:aria-pressed="${g.canWithdraw()}"
+                            th:aria-label="#{bank.grants.col.withdraw}"
+                            data-testid="bank-grant-flag-withdraw"></button>
+                </td>
+                <td class="bank-grants-flag-col" th:attr="data-label=#{bank.grants.col.transfer}">
+                    <button type="button" class="matrix-flag" data-flag="canTransfer"
+                            th:classappend="${g.canTransfer()} ? ' on' : ''"
+                            th:aria-pressed="${g.canTransfer()}"
+                            th:aria-label="#{bank.grants.col.transfer}"
+                            data-testid="bank-grant-flag-transfer"></button>
+                </td>
+                <td class="cell-actions">
+                    <button type="button" class="btn btn-quiet-danger btn-xs"
+                            data-trigger="open-modal-display" data-modal-id="bank-grant-revoke-modal"
+                            th:with="grantLabel=${grantHandle} + ' / ' + ${g.accountNo()}"
+                            th:attr="data-field-_userId=${g.userId()},data-field-_accountId=${g.accountId()},data-field-_label=${grantLabel}"
+                            data-testid="bank-grant-revoke-open"
+                            th:text="#{bank.grants.revoke}">Entziehen</button>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <th:block th:if="${#lists.isEmpty(grants)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.grants.empty.title', textKey='bank.grants.empty', emptyId='bank-grants-empty')}"></th:block>
+        </th:block>
+        </th:block>
     </div>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-grant-create-modal', titleKey='bank.modal.grant.title', body=~{::bank-grant-create-modal-body})}">
@@ -208,5 +193,6 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/bank-grants.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

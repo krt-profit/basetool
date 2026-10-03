@@ -865,7 +865,10 @@ REQ-ORDERS-040), Benachrichtigungen „Ungelesen · Alle" (`notifications_filter
 Meine Bewertungen
 (only-open), Persönliche Blueprints (refinery + craftable toggles), Beförderung verwalten
 (filters/sort/collapse, migrated sessionStorage → localStorage), Bank-Freigaben (view + account /
-employee selection), Bank-Kontodetail chart range (both detail pages) and the Org-Kontodetail tab,
+employee selection), Bank-Kontodetail chart range (both detail pages) and the Kontodetail tab (both
+detail pages: `bank_account_tab_<user>`, `org_unit_bank_account_tab_<user>`), the bank request
+queue's status segment (one stored segment since 2026-10-03; a stored checkbox list migrates onto
+it, REQ-BANK-023),
 Admin: Audit-Log event-type (per domain), Missionsdaten + SK include-inactive toggles, and the
 member selection of the personal-inventory/blueprints admin pages.
 
