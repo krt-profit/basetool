@@ -955,23 +955,78 @@ scenario_signature_verified_on_apply() {
   rm -rf "${tmp}"
 }
 
-scenario_mixed_release_is_refused() {
-  echo "Scenario: a target set whose images are built from different commits is refused"
+scenario_mixed_release_is_waited_out() {
+  echo "Scenario: a target set built from different commits is waited out as a promotion in progress"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_REV_FRONTEND=rev-two" || rc=$?
-  assert_exit 1 "$rc" "a mixed release fails the deploy"
-  assert_contains "is not one release" "the refusal names the mixed set"
-  assert_contains "frontend is built from rev-two but backend from rev-one" "the refusal names the diverging image"
+  assert_exit 0 "$rc" "a mixed release inside the grace does not fail the tick"
+  assert_contains "is not one release yet" "the wait names the mixed set"
+  assert_contains "frontend is built from rev-two but backend from rev-one" "the wait names the diverging image"
   assert_no_docker "podman pull" "nothing is pulled for a mixed release"
   assert_no_apply "the stack is not recreated for a mixed release"
+  if grep -q 'basetool_deploy_last_failure_timestamp [1-9]' "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 0 "a promotion in progress does not stamp a deploy failure"
+  else
+    record 1 "a promotion in progress does not stamp a deploy failure"
+  fi
+  if [[ -s "${T_STATE_DIR}/mixed-release.since" ]]; then
+    record 1 "the first sighting of the mixed set is recorded"
+  else
+    record 0 "the first sighting of the mixed set is recorded"
+  fi
   if [[ -e "${T_STATE_DIR}/failed.digests" ]]; then
     record 0 "a mixed release is not recorded as a bad target, so the next tick retries without backoff"
   else
     record 1 "a mixed release is not recorded as a bad target, so the next tick retries without backoff"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_mixed_release_past_grace_is_refused() {
+  echo "Scenario: a mixed target set that outlasts the grace fails the deploy"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  printf '%d\n' "$(( $(date +%s) - 1000 ))" > "${T_STATE_DIR}/mixed-release.since"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_REV_FRONTEND=rev-two" || rc=$?
+  assert_exit 1 "$rc" "a mixed release past the grace fails the deploy"
+  assert_contains "has not been one release for" "the refusal names how long the set has been mixed"
+  assert_contains "frontend is built from rev-two but backend from rev-one" "the refusal names the diverging image"
+  assert_no_apply "the stack is not recreated for a mixed release"
+  if grep -q 'basetool_deploy_last_failure_timestamp [1-9]' "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "an interrupted promotion stamps a deploy failure"
+  else
+    record 0 "an interrupted promotion stamps a deploy failure"
+  fi
+  if [[ -e "${T_STATE_DIR}/failed.digests" ]]; then
+    record 0 "a mixed release is not recorded as a bad target, so the next tick retries without backoff"
+  else
+    record 1 "a mixed release is not recorded as a bad target, so the next tick retries without backoff"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_one_release_clears_the_mixed_sighting() {
+  echo "Scenario: a target set that became one release forgets the earlier mixed sighting"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  printf '%d\n' "$(( $(date +%s) - 120 ))" > "${T_STATE_DIR}/mixed-release.since"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "one release deploys"
+  assert_docker "${APPLIED}" "the stack is applied"
+  if [[ -e "${T_STATE_DIR}/mixed-release.since" ]]; then
+    record 0 "the mixed sighting is removed once the set is one release"
+  else
+    record 1 "the mixed sighting is removed once the set is one release"
   fi
   rm -rf "${tmp}"
 }
@@ -1281,7 +1336,9 @@ scenario_monitoring_reconcile_disabled_when_running
 scenario_monitoring_flag_read_from_env_file
 scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
-scenario_mixed_release_is_refused
+scenario_mixed_release_is_waited_out
+scenario_mixed_release_past_grace_is_refused
+scenario_one_release_clears_the_mixed_sighting
 scenario_missing_revision_label_is_refused
 scenario_one_release_deploys
 scenario_mixed_release_break_glass

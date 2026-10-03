@@ -21,7 +21,7 @@ groups:
           severity: critical
         annotations:
           summary: "Deploy failed (newer than last success)"
-          description: "The last deploy attempt failed and is newer than the last successful deploy (or failed with no successful deploy on record — a failing first install). deploy.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-deploy\"} |~ \"FATAL\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-deploy\"}` for the run around it. Not visible via `journalctl -u iri-deploy.service` (stdout/stderr are appended to /var/log/iri-deploy.log, not journald)."
+          description: "The last deploy attempt failed and is newer than the last successful deploy (or failed with no successful deploy on record — a failing first install). A tick that lands inside a running promotion does not fire this; a stable set that stays a mix of releases for over 15 minutes (an interrupted promotion) does. deploy.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-deploy\"} |~ \"FATAL\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-deploy\"}` for the run around it. Not visible via `journalctl -u iri-deploy.service` (stdout/stderr are appended to /var/log/iri-deploy.log, not journald)."
 
       - alert: DeployHealthRestartFailing
         expr: >-
