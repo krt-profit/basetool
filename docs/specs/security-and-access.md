@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -2861,8 +2861,11 @@ both shut). `POST /api/v1/operations` (the Android app raises an Operation with 
 **collection** write: the path is admitted for every verb by the allow-list, but `$krt_collection_post`
 answers `404` for any verb but `POST` on exactly `/api/v1/operations` — so `GET` on the collection,
 `PUT`/`DELETE` and `/api/v1/operations/`, `/api/v1/operationsX` stay refused as before — and only the
-`POST` clears the read-only family. `scripts/check-edge-allowlist-behaviour.sh` runs the real nginx
-against that matrix in CI.
+`POST` clears the read-only family. `PUT /api/v1/orders/<uuid>/requested`, the requester's order
+edit the app has called since v0.2.0, is admitted the same way since 2026-10-03 (REQ-API-016 found it
+refused): `$krt_requester_edit` answers `404` for any verb but `PUT` on exactly that path, and only
+the `PUT` clears the read-only family. `scripts/check-edge-allowlist-behaviour.sh` runs the real
+nginx against both matrices in CI.
 
 **A refusal by this vhost is `404` or `405`, and which one is decided by order, not by family.** The
 allow-list's default deny runs first; the read-only guard runs after it. A path that is on no

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** API · **Related:** [`security-and-access.md`](security-and-access.md), [`observability.md`](observability.md)
 
 # API conventions
@@ -461,6 +461,13 @@ constraint for nothing and record a guess about which fields matter.
 | `PUT /api/v1/orders/{id}`                                                                                  | as the detail read, through the **same** mapper — **request** requires `materials`. Its carve-out is method-scoped: the backend serves `DELETE` on this path too, the app sends none, and the edge keeps that at `405`                                                                                                                                                                                                                                                                                                                                                                |
 | `PUT /api/v1/operations/{id}`                                                                              | *(response unread)* — **request** requires `name`, `status`, `version`; `status` is `PLANNED` / `ACTIVE` / `COMPLETED` / `CANCELED`. Same method-scoped carve-out, same reason                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `POST /api/v1/operations` | `id` (the app opens the new Operation by it) — **request** requires `name`, `status`; `description` and `owningOrgUnitId` are optional, and the operation needs `MISSION_MANAGER`. Method-scoped carve-out: the edge admits exactly this verb on exactly this path (since 2026-10-01); `GET`, `PUT`, `DELETE` and any near-miss path stay `404` |
+| `PUT /api/v1/orders/{id}/requested` | *(response unread)* — **request** requires `materials`; the requester's edit of a material order before its first delivery. Frozen 2026-10-03 from the app's call list (REQ-API-016), and admitted by the edge the same day: method-scoped like `POST /api/v1/operations`, so every other verb and any near-miss path stays `404` |
+| `POST /api/v1/orders` | as the detail read, through the same mapper — **request** requires `materials`. Frozen 2026-10-03 from the app's call list |
+| `GET /api/v1/materials/matrix` | envelope; row `materialId`, `materialName`, `terminalId`, `terminalName`, `starSystemName`, `priceBuy`, `priceSell` — addressed by `page`, `size`, `sort`. Frozen 2026-10-03 from the app's call list |
+| `POST /api/v1/bank/accounts` · `POST /api/v1/bank/holders` · `PATCH /api/v1/bank/holders/{id}` | the account (`id`, `accountNo`, `name`, `type`, `status`, `balance`, `version`) and the holder (`id`, `userId`, `handle`, `active`, `totalHeld`, `version`) — **requests** require `name`, `type` (`type` a frozen required enum); `userId`; `active`, `version`. Frozen 2026-10-03 from the app's call list |
+| `PUT` · `DELETE /api/v1/refinery-orders/{id}` | *(response unread)* — the `PUT` **request** requires `goods`, `location`. Frozen 2026-10-03 from the app's call list |
+| `DELETE /api/v1/hangar/ships` · `DELETE /api/v1/personal-blueprints` | clear-all of the caller's own rows; the blueprint one answers `deleted`. Frozen 2026-10-03 from the app's call list |
+| `PUT /api/v1/missions/{id}/participants/{participantId}/slim` | `id`, `user`, `guestName`, `startTime`, `endTime`, `payoutPreference` — **request** requires `version`. Frozen 2026-10-03 from the app's call list |
 | `POST /api/v1/missions/{id}/join`                                                                          | `id`, `participants`, `user`, `registeredParticipants` — self-enrolment; answers with the whole Einsatz because it creates the row. Its **request** body is optional and so is every field in it (`desiredJobTypeId`, `payoutPreference`, added 2026-09-02, ADR-0170) — a bodyless POST is what every build before that sends, and nothing here is frozen as required                                                                                                                                                                                                                 |
 | `DELETE /api/v1/missions/{id}/participants/{pid}/slim`                                                     | *(204, no body)* — the **slim** pair; the legacy full-DTO one was deleted on 2026-09-22 after its deprecation                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `DELETE …/missions/{id}/units/{unitId}/crew/{crewId}/slim`                                                 | *(204, no body)* — same pair, same reason: the legacy sibling is gone (deleted 2026-09-22), so the app re-reads the Einsatz rather than folding an answer that does not come                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -745,9 +752,9 @@ parallel `/api/v2` path and no sunset window. It ships together with:
 
 > [!note] Amended 2026-10-02 — retirement by hard cut (owner decisions D-03, D-04, D-11; ADR-0234)
 > This used to read: retirement goes through `/api/v2` + `@ApiDeprecation` with a sunset rather
-> than a deletion. **Decided; partly implemented:** the `APP_UPDATE_REQUIRED` answer exists since
-> 2026-10-03 (REQ-API-020); the ledger and the committed app call list do not exist yet (plan guard
-> G-23, Phase 0 step 0.7), and no frozen operation may be retired before they do.
+> than a deletion. **Implemented 2026-10-03:** the declared-break ledger (REQ-API-017), the committed
+> app call list (REQ-API-016) and the `APP_UPDATE_REQUIRED` answer (REQ-API-020) exist (plan guard
+> G-23, Phase 0 step 0.7); a frozen operation is retired only through them.
 
 > [!warning] Amended 2026-09-02 (owner-approved) — this sentence used to say every field it had
 > The wording was stricter than the rest of its own requirement and stricter than the gate that
@@ -778,7 +785,9 @@ move together.
 
 - [x] Every listed operation exists in the committed `openapi.json` with its recorded verb, and no
   recorded response field has disappeared (`ExternalContractTest`).
-- [x] The set cannot be emptied to make the guard pass — its floor is asserted.
+- [x] The set cannot be emptied to make the guard pass — its floor is asserted, since 2026-10-03 at
+  the exact count (246 operations, each named once) instead of 5, and the app's own call list must
+  be covered by it (REQ-API-016).
 - [x] **Every frozen operation is reachable through the edge** — the guard parses the allow-list
   include (`docker/edge/include/api-allowlist.conf`; until 2026-09-22 its copy inside the now
   archived API vhost rollout runbook) and asserts the rule above, rather than leaving it to a reader
@@ -790,7 +799,9 @@ move together.
 - [x] **The edge's method gating is tested against a live nginx** — `scripts/check-edge-allowlist-behaviour.sh`
   (repo-lint) drives the allow-list include and asserts, among other rows, that `POST /api/v1/operations`
   is admitted while `GET`/`PUT`/`DELETE` on it and the near-miss paths `/api/v1/operations/` and
-  `/api/v1/operationsX` answer `404` (2026-10-01).
+  `/api/v1/operationsX` answer `404` (2026-10-01), and that `PUT /api/v1/orders/<uuid>/requested` is
+  admitted while every other verb, `/requested/`, `/requestedX`, a non-uuid id and
+  `/orders/<uuid>/items/requested` answer `404` (2026-10-03).
 - [x] An entry freezes every level a client parses: the guard descends **one level** into every
   referenced schema — an array's items and a plain nested object alike. That covers a page's
   `content` rows, an embedded list such as an operation's `payouts`, and a nested object such as a
@@ -818,19 +829,21 @@ move together.
   (`backend/src/test/resources/api/frozen-contract-types.txt`) and runs everywhere, including
   locally; a pull request could in principle edit the record and the document together.
   `theContractTypesMatchThePreviousRelease` compares against the previous release tag's own
-  `openapi.json`, which no pull request can edit — ADR-0136's wording taken literally — and skips
-  when CI has not fetched a baseline. Verified by flipping one property from optional to required
-  (the first fails, naming the field) and by running the second against `v1.7.7`.
+  `openapi.json`, which no pull request can edit — ADR-0136's wording taken literally. Verified by
+  flipping one property from optional to required (the first fails, naming the field) and by
+  running the second against `v1.7.7`. **Since 2026-10-03 the second no longer skips in CI**: a
+  missing baseline fails there, it compares operation by operation, and it accepts a break only
+  when the declared-break ledger names it (REQ-API-017).
 - [x] A sunset can actually retire old builds — **closed by REQ-API-010** (2026-08-24). The gate
   the first `/api/v2` was waiting on now exists: the server names a floor and the app refuses to run
   below it. What that unblocks is narrower than "old builds are gone", and the difference matters
   when planning a sunset — the floor stops a build from *running*, it does not remove it from
   anyone's phone, and a member who never opens the app never learns of it.
-- [ ] **A break is declared before it ships** — the declared-break ledger, accepted exactly by the
-  previous-release comparison. **Open** (decided 2026-10-02, ADR-0234; plan guard G-23).
-- [ ] **The frozen set covers what the app calls** — the app's call list committed per release and
-  asserted against the set. **Open** (same decision; the app calls operations the set does not list
-  yet).
+- [x] **A break is declared before it ships** — the declared-break ledger, accepted exactly by the
+  previous-release comparison. **Closed by REQ-API-017** (2026-10-03).
+- [x] **The frozen set covers what the app calls** — the app's call list committed per release and
+  asserted against the set. **Closed by REQ-API-016** (2026-10-03) for the app's next build; the
+  list per released build follows with the app release.
 - [x] **A retired path answers `APP_UPDATE_REQUIRED`.** **Closed by REQ-API-020** (2026-10-03):
   `RetiredOperationFilter` answers every operation of `retired-operations.txt` with `410
   APP_UPDATE_REQUIRED` ahead of authentication; on the public API vhost once the edge admits the
@@ -1095,6 +1108,126 @@ to leave the annotation off.
 
 ---
 
+### REQ-API-016 — The frozen set covers every call the app publishes
+
+The frozen set of REQ-API-009 was assembled by hand and missed operations the app calls: eleven, one
+of them refused by the edge (2026-10-03, below). The Android app therefore publishes, with every
+release, the calls it makes — `core/contract/app-calls.txt` in `krt-profit/basetool-android`
+(REQ-APP-API-011 there, generated and kept exact by its `AppCallListTest`) — and this repository
+commits that list and holds the frozen set to it.
+
+**Where the lists live.** `backend/src/test/resources/api/app-calls/`, one file per app build the
+server still serves, named `<versionCode>.txt`, plus `unreleased.txt` for the build under
+development. One line per operation, in the app's format: `<VERB> <path> q=<names>|- f=<names>|-
+s=<sites>`, the path template exactly as `openapi.json` writes it, `q=` the query parameters the app
+sends, `f=` the response fields it may read (flat, two levels deep, over-stated rather than
+under-stated), `s=` the app's own call sites, which the server ignores. No comment lines.
+
+**What the guard asserts** (`ExternalContractTest`):
+
+- **every call is in the frozen set** — verb and path — and **every query parameter it sends is
+  frozen** on that entry (`theFrozenSetCoversEveryCallOfEveryServedAppBuild`);
+- **every response field it may read is still served** by the document at the depth
+  `theContractResponsesKeepTheirFields` reads (`theFieldsEveryServedAppBuildReadsAreStillServed`).
+  The list itself is the field freeze for the app: the hand-recorded `responseFields` of an entry
+  stay as the reviewed minimum, and the list adds what the app's code may touch, so nobody copies
+  2,231 over-stated names into a Java literal. Each field's type and `required`-ness is frozen as
+  before through `frozen-contract-types.txt`, which records every property reachable from a frozen
+  operation;
+- **the newest list is not emptied** — a floor on its call count (243 when it was committed).
+
+**Refreshing it, at each app release** (the owner, or whoever cuts the app release):
+
+1. Copy the released tag's `core/contract/app-calls.txt` to `app-calls/<versionCode>.txt`, LF line
+   endings, unchanged.
+2. Replace `unreleased.txt` with the list on the app's `main` once it differs from the release (or
+   delete it while nothing is in development).
+3. Delete the list of every build the minimum version (REQ-API-010) no longer serves.
+4. Run `ExternalContractTest`; a new call fails until it is frozen — added to `CONTRACT`, its entry
+   in `frozen-contract-types.txt`, and its edge admission (REQ-SEC-037) in the same change.
+
+> [!note] Recorded 2026-10-03 — what the first list found
+> Against the list of the app's next build (243 operations, `unreleased.txt`), the frozen set lacked
+> eleven operations: `GET /materials/matrix`, `POST /orders`, `PUT /orders/{id}/requested`,
+> `POST /bank/accounts`, `POST /bank/holders`, `PATCH /bank/holders/{id}`, `PUT` and
+> `DELETE /refinery-orders/{id}`, `DELETE /hangar/ships`, `DELETE /personal-blueprints` and
+> `PUT /missions/{id}/participants/{participantId}/slim`; and seven query parameters on frozen
+> entries. All are frozen now. `PUT /orders/{id}/requested` — the requester's order edit — was also
+> refused by the edge, so the app's edit answered `404` since app v0.2.0; the vhost now admits that
+> `PUT` and nothing else on the path. Three frozen operations are no longer called by the app
+> (`GET /personal-inventory/{id}`, `GET /refinery-orders/my-orders`, `GET /users/me/memberships`);
+> they stay frozen, because removing one is a declared break (REQ-API-017).
+
+**Acceptance**
+
+- [x] The list of the app's next build is committed and the frozen set covers it — 246 operations,
+  each named once, floor asserted at that count (2026-10-03).
+- [x] A planted list fails the coverage, the parse and the ledger agreement (`AppCallListTest`).
+- [ ] A list per released app build — **open**: the first released list arrives with the app release
+  that ships `app-calls.txt` (versionCode 18).
+
+**Enforced by:** `ExternalContractTest`, `AppCallListTest` (backend) · `AppCallListTest` (app) ·
+**Related:** REQ-API-009, REQ-API-010, REQ-API-017, REQ-SEC-037, ADR-0136
+
+---
+
+### REQ-API-017 — A frozen operation breaks only by a declared line, against a mandatory baseline
+
+A break of a frozen operation or field is either declared or a defect. The declaration is a line in
+**the declared-break ledger**, `backend/src/test/resources/api/declared-breaks.txt`, one line per
+break:
+
+```text
+<VERB> <path> <field> <versionCode>
+```
+
+- `field` is `-` when the operation itself is gone (path or verb), `Schema.property` for a property
+  of a schema the operation reaches, `query:<name>` for a query parameter, or the body key the
+  comparison prints (`request[application/json]`, `response[200][*/*]`, …);
+- `versionCode` is the Android build that absorbs the break — the one the minimum version is raised
+  to (REQ-API-010);
+- no wildcard, no comment line, no repeated break; a malformed line fails the build.
+
+It is empty until the first hard-cut wave.
+
+**The comparison.** `theContractTypesMatchThePreviousRelease` compares the committed `openapi.json`
+with the previous release tag's, operation by operation, over the frozen set, every committed app
+call list and every ledger line: an operation the release served and the document no longer does,
+and every property, body or query parameter of a served operation that is gone or changed its type,
+format or `required`-ness, is a break. It **fails on every break no ledger line names exactly**
+(operation and field, verb included). A line that matches no break is spent and stays as the record.
+
+**The ledger and the call lists agree** (`theLedgerAgreesWithTheCommittedCallLists`): a list of a
+build older than a line's `versionCode` must be deleted with the break, because the raised floor walls
+that build off; a list of the absorbing or a newer build must not call an operation the ledger
+declares gone.
+
+**The baseline is mandatory in CI.** The *Fetch the previous release's API contract* step of
+`ci.yml` fails when it cannot fetch the newest `vX.Y.Z` tag's `openapi.json`, and the build step sets
+`CONTRACT_BASELINE_REQUIRED=true`, which `backend/build.gradle.kts` passes on as
+`-Dcontract.baseline.required=true`; the test then fails instead of skipping on a missing baseline.
+This holds on pull requests as well as on `main`: the tag is read anonymously from the public base
+repository, which works for a fork's pull request too, so a failed fetch is a transient error to
+re-run, never a reason to skip. Locally nothing is required and the comparison skips; the committed
+type record (`theContractTypesAndNullabilityAreFrozen`) still runs.
+
+**Acceptance**
+
+- [x] The ledger exists and is empty; a planted wildcard, malformed or repeated line fails the parse
+  (`DeclaredBreaksTest`).
+- [x] A planted previous document with a retired operation, a retyped field and a dropped query
+  parameter yields exactly those breaks; each is accepted only by its own line (`DeclaredBreaksTest`).
+- [x] A required but missing baseline fails (`aMissingBaselineFailsWhereOneIsRequired`), and CI
+  requires it (2026-10-03).
+- [ ] T0 operations refuse every ledger line — **open**, with the contract tiers (plan Phase 0
+  step 0.7).
+
+**Enforced by:** `ExternalContractTest`, `DeclaredBreaksTest`, `AppCallListTest` (backend) · the
+*Fetch the previous release's API contract* step of `ci.yml` ·
+**Related:** REQ-API-009, REQ-API-010, REQ-API-016, ADR-0136
+
+---
+
 ### REQ-API-020 — The app floor rides the release, and a retired path tells the app to update
 
 Owner decision D-11 (ADR-0234): the minimum app version deploys and rolls back together with the API
@@ -1156,9 +1289,10 @@ skipped for every request.
 - **No oracle.** The answer is the same for every value of a placeholder, reads nothing and names no
   resource; all it says is that the operation was once part of the published API, which the public
   repository's ledger already says.
-- **Only previously admitted paths.** Every entry is a declared break of the ledger
-  `backend/src/test/resources/api/declared-breaks.txt` (REQ-API-009, plan guard G-23); the build
-  fails on an entry the ledger does not declare, and on a non-empty list without a ledger.
+- **Only previously admitted paths.** Every entry is a whole-operation break
+  (`<VERB> <path> - <versionCode>`) of the ledger `backend/src/test/resources/api/declared-breaks.txt`
+  (REQ-API-017, plan guard G-23); the build fails on an entry the ledger does not declare that way —
+  a field-level line does not retire its operation — and when the ledger is missing.
 - **The edge comes first.** On the public API vhost the edge allow-list refuses a path it does not
   admit with a bare `404` before the backend sees it. Until the generated edge include (plan guard
   G-08) also admits the ledger's retired paths, an app on the API vhost meets that `404` — which the

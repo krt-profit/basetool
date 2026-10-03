@@ -188,6 +188,7 @@ jobs:
           probe PUT "/api/v1/orders/$nil/items" 401
           probe POST "/api/v1/orders/$nil/items/$nil/production" 401
           probe PUT "/api/v1/orders/$nil/priority?priority=1" 401
+          probe PUT "/api/v1/orders/$nil/requested" 401
 
           probe POST /api/v1/inventory/bulk-checkout 401
           probe POST /api/v1/inventory/bulk-rebook 401

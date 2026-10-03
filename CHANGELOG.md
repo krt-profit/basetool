@@ -113,6 +113,11 @@
   gültiges Token, damit die App ihre Update-Sperre zeigt (REQ-API-020). Die Liste
   `api/retired-operations.txt` ist noch leer; bis dahin ändert sich nichts.
 
+- **API-Vertrag: Die Liste der App-Aufrufe ist jetzt Teil des Vertrags.** Die eingefrorene Menge deckt
+  jeden Aufruf der App ab (elf fehlende Operationen und sieben Query-Parameter ergänzt); ein Bruch gegenüber
+  dem letzten Release muss in `declared-breaks.txt` stehen, und dieser Vergleich läuft in CI verpflichtend
+  statt still übersprungen zu werden (REQ-API-016, REQ-API-017).
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
@@ -144,6 +149,10 @@
 - **Parallel geladene Seitenabschnitte senden die Sprache des Nutzers ans Backend.** Einsätze, Operationen,
   Aufträge, Lager, Hangar, Raffinerie, Org-Bank und Einsatzdaten luden Abschnitte ohne `Accept-Language`; der
   `ParallelPageLoader` übernimmt jetzt den ganzen Anfragekontext aus dem `ContextRegistry` (REQ-FE-030).
+
+- **App: Auftraggeber können ihren Auftrag wieder bearbeiten.** Die öffentliche API-Edge ließ
+  `PUT /api/v1/orders/{id}/requested` nicht durch, die Bearbeitung in der App endete seit v0.2.0 mit 404.
+  Nach dem Deploy ist genau dieser `PUT` freigegeben (andere Methoden bleiben 404).
 
 ### Security
 

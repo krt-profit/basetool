@@ -968,6 +968,14 @@ edge admits but the set does not list: `GET /materials/matrix`, `POST /orders`,
 repositories). Ten of the fourteen reachable extras above are therefore app calls, not
 over-admissions. → G-23 before G-08.
 
+> [!note] Corrected 2026-10-03 — the app's own call list found one more
+> The app's published call list (243 operations, REQ-API-016) names an eleventh unfrozen call,
+> `PUT /orders/{id}/requested` (the requester's order edit, since app v0.2.0), which no edge rule
+> admitted either — a `404` at the edge like `POST /operations` was. All eleven are frozen now and the
+> edit is admitted, method-scoped; the frozen set holds 246 operations — 235 pairs before (with
+> `POST /operations`) plus the eleven, and its duplicate entry is removed. Three frozen operations are no longer called by the
+> app: `GET /personal-inventory/{id}`, `GET /refinery-orders/my-orders`, `GET /users/me/memberships`.
+
 **Versioning and deprecation.** All documented operations but one are `/api/v1`; the `/api/v2` one
 is a demonstration ping whose v1 twin is deprecated. Two operations are deprecated (that ping and
 `POST /hangar/import/fleetview`); `DeprecationInterceptor` sends `Deprecation: true` and a

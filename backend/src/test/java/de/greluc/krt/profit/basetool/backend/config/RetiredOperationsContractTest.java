@@ -46,7 +46,7 @@ class RetiredOperationsContractTest {
   /** The committed OpenAPI document. */
   private static final String OPENAPI_RESOURCE = "/api/openapi.json";
 
-  /** The declared-break ledger on the test classpath, once it exists. */
+  /** The declared-break ledger on the test classpath (REQ-API-017). */
   private static final String LEDGER_RESOURCE = "api/declared-breaks.txt";
 
   /** The verbs an OpenAPI path item may carry that an entry can name. */
@@ -103,7 +103,7 @@ class RetiredOperationsContractTest {
 
   /**
    * Lists the retired entries the ledger does not declare; an entry is declared when a ledger line
-   * names its verb and path template.
+   * names its verb and path template and the whole operation ({@code -}) as the broken field.
    *
    * @param retired the retired operations
    * @param ledger the ledger's lines
@@ -114,9 +114,7 @@ class RetiredOperationsContractTest {
     for (RetiredOperations.Entry entry : retired.entries()) {
       String needle = entry.method() + " " + entry.path();
       boolean declared =
-          ledger.stream()
-              .map(String::strip)
-              .anyMatch(line -> line.equals(needle) || line.startsWith(needle + " "));
+          ledger.stream().map(String::strip).anyMatch(line -> line.startsWith(needle + " - "));
       if (!declared) {
         undeclared.add(needle);
       }
@@ -162,11 +160,8 @@ class RetiredOperationsContractTest {
   void everyEntryIsDeclaredInTheLedger() throws IOException {
     RetiredOperations retired = committed();
     ClassPathResource ledger = new ClassPathResource(LEDGER_RESOURCE);
-    if (retired.isEmpty() && !ledger.exists()) {
-      return;
-    }
     assertThat(ledger.exists())
-        .as("a retired operation needs the declared-break ledger %s", LEDGER_RESOURCE)
+        .as("the declared-break ledger %s is committed", LEDGER_RESOURCE)
         .isTrue();
     List<String> lines =
         new String(ledger.getContentAsByteArray(), StandardCharsets.UTF_8).lines().toList();
@@ -178,7 +173,11 @@ class RetiredOperationsContractTest {
   void theLedgerCheckFindsAPlantedEntry() {
     RetiredOperations planted =
         RetiredOperations.parse(List.of("GET /api/v1/old/{id}", "DELETE /api/v1/older"));
-    assertThat(undeclared(planted, List.of("GET /api/v1/old/{id} 18", "GET /api/v1/older 18")))
+    assertThat(
+            undeclared(
+                planted,
+                List.of("GET /api/v1/old/{id} - 18", "DELETE /api/v1/older Older.name 18")))
+        .as("a field-level break does not retire its operation")
         .containsExactly("DELETE /api/v1/older");
   }
 

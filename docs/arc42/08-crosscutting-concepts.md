@@ -144,6 +144,12 @@ update, T2 is web-only), and the minimum app version is to be bound to the relea
 ([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), REQ-API-001,
 -009, -010; decided 2026-10-02, implementation pending).
 
+What the Android app calls is a contract of its own: the frozen set of `ExternalContractTest` must
+cover the call list each app release publishes (committed under
+`backend/src/test/resources/api/app-calls/`), and a frozen operation or field breaks only by a line
+of the declared-break ledger, checked against the previous release's document, which CI must fetch
+(REQ-API-016, REQ-API-017).
+
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 
 ## 8.6 Frontend behaviour
