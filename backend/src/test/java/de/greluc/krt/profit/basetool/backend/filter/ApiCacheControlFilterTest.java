@@ -129,7 +129,20 @@ class ApiCacheControlFilterTest {
         "no-cache, must-revalidate", run("GET", "/api/v1/ship-types").getHeader(CACHE_CONTROL));
     assertEquals(
         "no-cache, must-revalidate",
+        run("GET", "/api/v1/materials/matrix").getHeader(CACHE_CONTROL));
+  }
+
+  /**
+   * The Materialbörse boards carry viewer-specific fields and the member's own releasable stock, so
+   * they are {@code no-store} like the other member-scoped families (REQ-SEC-031).
+   */
+  @Test
+  void materialExchangeBoards_areNoStore() throws Exception {
+    assertEquals(
+        "private, no-store",
         run("GET", "/api/v1/material-exchange/offers").getHeader(CACHE_CONTROL));
+    assertEquals(
+        "private, no-store", run("GET", "/api/v1/material-requests").getHeader(CACHE_CONTROL));
   }
 
   @Test

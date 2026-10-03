@@ -106,6 +106,11 @@ Consequences worth stating:
   podman 5.8, remain `PodmanArgs=`.
 - **The edge publishes on loopback only** and is pinned with `ip=` on every network it joins, so
   the set of addresses haproxy's PROXY header can arrive from is finite (§11.5c).
+- **The API vhost admits operations, not paths.** Its admission is one generated nginx `map` on
+  verb and path (`docker/edge/include/api-admission.conf`), rendered from the frozen contract set
+  with the nightly probe's table, and it ships in the config bundle like the rest of `docker/edge`;
+  `reconcile_edge` applies it in the promotion that carries the matching backend (REQ-API-021,
+  REQ-OPS-042).
 
 ## 7.3 What moved out of containers, and what was deleted
 
@@ -314,8 +319,19 @@ ancestor that has images (ADR-0137/ADR-0210 amendments, 2026-09-23).
 `deploy.sh` and the host's own `iri-*` units are **not** part of the config bundle: a bundle cannot
 rewrite the thing that applies bundles, so they arrive with the Ansible role. The Quadlet units do
 ride the bundle. Provider JARs are barred from the config bundle and get their own promotable,
-signed artifact (ADR-0055). Requirements:
+signed artifact (ADR-0055). The SPI's compile version and the Keycloak image it is loaded by are
+pinned in different files — the catalog's `keycloak`, and the compose file, the Quadlet unit and the
+sandbox Dockerfile — and `repo-lint.yml` (`keycloak-version`) fails when they name different
+Keycloak lines (REQ-OPS-040). Requirements:
 [`deployment-delivery.md`](../specs/deployment-delivery.md).
+
+**A value that must roll back with the release lives in the image, not in `.env`.** `env.d` is
+rendered from the host `.env`, which no rollback touches, so a value the API depends on would
+survive a rollback of the API it was set for. The Android app floor is the case in point: it is a
+literal in the backend's `application.yml` (REQ-API-020), and the host keeps only an emergency
+override under its own `_OVERRIDE` names, alerted while it is in force. A variable the templates
+stop passing simply stops reaching the container; its stale `.env` line stays for the older
+releases a rollback may still render.
 
 **The Keycloak realm is the one piece of the deployment no artifact carries.** It lives in
 `db-keycloak` on each host, so delivery keeps images, units and provider JAR in lock-step across

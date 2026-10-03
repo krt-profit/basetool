@@ -33,7 +33,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.interceptor.SimpleKey;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -43,7 +42,6 @@ import org.springframework.transaction.annotation.Transactional;
  * findAll} cannot silently shift the cache key without breaking the test.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class MaterialCategoryServiceCachingTest {
 

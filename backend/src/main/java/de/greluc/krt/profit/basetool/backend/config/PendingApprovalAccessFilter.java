@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
@@ -105,10 +106,10 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
       ANONYMOUS_READ_PATHS.stream().map(PATH_PARSER::parse).toList();
 
   /** Stable machine-readable code the frontend maps to the waiting-page routing. */
-  static final String CODE_PENDING_APPROVAL = "PENDING_APPROVAL";
+  static final String CODE_PENDING_APPROVAL = CoreProblemCode.PENDING_APPROVAL.code();
 
   /** Stable machine-readable code for the role-less refusal (REQ-SEC-053). */
-  static final String CODE_NO_ROLE = "NO_ROLE";
+  static final String CODE_NO_ROLE = CoreProblemCode.NO_ROLE.code();
 
   /** App-wide correlation-id response header, mirroring {@code LoggingProperties} default. */
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";

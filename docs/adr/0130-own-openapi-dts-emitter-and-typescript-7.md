@@ -1,6 +1,6 @@
 # ADR-0130 — Emit the DTO declarations ourselves, and take TypeScript 7
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (a correction about the lint globs, see below)
 - **Date:** 2026-08-09
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-FE-018 ([`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) · supersedes the DTO-generation and TypeScript-version parts of ADR-0125 · ADR-0069 (inline-JS page-module extraction)
@@ -129,3 +129,18 @@ TypeScript 7 problem, and is out of scope here.
   90-line script.
 - **Turn on `noImplicitAny` to clear the 179 errors.** Rejected: 514 pre-existing errors, unrelated
   to this decision, and a change to the opt-in model ADR-0125 chose deliberately.
+
+## Amendment — 2026-10-02: the `scripts/` files are not linted
+
+**Correction** (domain modularisation plan §15). The decision bullet "`scripts/**/*.mjs` joins the
+ESLint and Prettier globs" holds only for the configuration: `frontend/eslint.config.mjs` carries a
+Node-ESM block for `scripts/**/*.mjs`. No gate reads those files. `:frontend:lintJs` passes only
+`src/main/resources/static/js/**/*.js`, `:frontend:prettierCheck` only the static CSS and JS and
+`types/**/*.d.ts`, and no workflow lints `frontend/scripts/`. The five `.mjs` files there — the
+emitter, its test, the probe extractor and two script tests — are therefore neither linted nor
+format-checked. Adding `scripts/**/*.mjs` to the arguments and inputs of both tasks was the open
+follow-up that makes the bullet true.
+
+**Closed** (2026-10-03, #2327): `:frontend:lintJs`, `:frontend:prettierCheck` and
+`:frontend:prettierApply` now pass `scripts/**/*.mjs` and declare the files as task inputs, so the
+decision bullet holds as written.

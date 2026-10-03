@@ -7,6 +7,10 @@ fields, enum values and error codes; it never removes, renames or narrows anythi
 allows, and a published schema `$id` never changes. CI compares every schema with the previous
 release's and fails a change that removes or narrows.
 
+One narrowing is not a breaking change: correcting a schema to refuse what the Basetool has always
+refused, so that no request the schema newly refuses ever succeeded. Each such correction is listed
+in the [changelog](changelog.md).
+
 A breaking change becomes `/exchange/v2`, served beside `v1` for at least **12 months**. Answers of
 the old version then carry `Deprecation` and `Sunset` headers, and the service document lists the
 deprecation.

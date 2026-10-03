@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 /**
  * Resolves a user's {@code SQUADRON}-kind {@link OrgUnitMembership} rows to their {@link
@@ -48,7 +48,7 @@ import org.springframework.stereotype.Service;
  * UserMapper} and {@code OwnerScopeService}; lives in the dependency-leaf {@code support} package
  * (ADR-0047). Dangling memberships are skipped, and it joins the caller's transaction, if any.
  */
-@Service
+@Component
 @RequiredArgsConstructor
 public class StaffelMembershipResolver {
 

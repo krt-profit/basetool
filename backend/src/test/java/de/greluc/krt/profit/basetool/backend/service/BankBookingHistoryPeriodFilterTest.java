@@ -38,14 +38,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Integration test for the period-filtered booking-history query against real Postgres
  * (REQ-BANK-051), verifying the cast temporal bounds plan with non-null values.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class BankBookingHistoryPeriodFilterTest {
 
   @Autowired private BankAccountService bankAccountService;

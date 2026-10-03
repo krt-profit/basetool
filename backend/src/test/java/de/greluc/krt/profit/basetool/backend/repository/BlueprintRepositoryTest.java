@@ -27,7 +27,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Runs {@link BlueprintRepository}'s admin list queries against PostgreSQL to ensure the no-filter
@@ -36,7 +35,6 @@ import org.springframework.test.context.ActiveProfiles;
  * error.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class BlueprintRepositoryTest {
 
   @Autowired private BlueprintRepository blueprintRepository;

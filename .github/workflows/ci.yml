@@ -33,25 +33,25 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Fetch the previous release's API contract
-        continue-on-error: true
         run: |
           set -u
           mkdir -p backend/build/contract-baseline
           tag=$(git -c versionsort.suffix=- ls-remote --tags --refs --sort=-v:refname origin 'v*' \
                 | sed 's#.*refs/tags/##' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
           if [ -z "$tag" ]; then
-            echo "no release tag on origin yet; the schema diff will skip"
-            exit 0
+            echo "::error::no release tag found on origin; the previous-release contract comparison is required (REQ-API-017)"
+            exit 1
           fi
           echo "baseline tag: $tag"
           if ! git fetch --depth=1 origin "refs/tags/$tag:refs/tags/$tag"; then
-            echo "could not fetch $tag; the schema diff will skip"
-            exit 0
+            echo "::error::could not fetch $tag; the previous-release contract comparison is required (REQ-API-017) -- re-run the job"
+            exit 1
           fi
-          git show "$tag:backend/src/main/resources/api/openapi.json" \
-            > backend/build/contract-baseline/openapi.json \
-            || { echo "$tag carries no openapi.json; the schema diff will skip"; \
-                 rm -f backend/build/contract-baseline/openapi.json; }
+          if ! git show "$tag:backend/src/main/resources/api/openapi.json" \
+            > backend/build/contract-baseline/openapi.json; then
+            echo "::error::$tag carries no backend openapi.json; the previous-release contract comparison is required (REQ-API-017)"
+            exit 1
+          fi
           schemas=ingest/src/main/resources/exchange/v1/schemas
           mkdir -p ingest/build/exchange-baseline
           git ls-tree --name-only "$tag" "$schemas/" | while IFS= read -r file; do
@@ -61,6 +61,8 @@ jobs:
           exit 0
 
       - name: Build, run tests and lint
+        env:
+          CONTRACT_BASELINE_REQUIRED: 'true'
         run: ./gradlew build --continue --stacktrace --configuration-cache
 
       - name: Fail if a committed openapi.json is stale

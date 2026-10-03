@@ -42,7 +42,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -51,7 +50,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Each test rolls back.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class MaterialExchangeRequestRepositoryDataTest {
 

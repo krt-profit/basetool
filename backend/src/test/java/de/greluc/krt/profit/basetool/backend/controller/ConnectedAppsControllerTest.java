@@ -69,8 +69,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -78,9 +76,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
-@TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ConnectedAppsControllerTest {
 
   private static final String PATH = "/api/v1/connected-apps";

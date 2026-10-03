@@ -8,6 +8,8 @@
   [ADR-0135](0135-public-api-vhost-not-a-gateway.md) (exchange paths never join its allowlist).
 - **Date:** 2026-09-26
 - **Deciders:** @greluc
+- **Amended:** 2026-09-28 (twice, see below); 2026-10-02 — the relay surface is the exchange's
+  internal published API, with its own internal OpenAPI document (see the last Amendment section)
 - **Related:** spec [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-001`…) ·
   [`desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-001`, `-010`, `-011`, `-012`) ·
   [ADR-0217](0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md) ·
@@ -109,3 +111,23 @@ consequences is gone too: `IngestPathScope` names `/exchange/**` alone. An extra
 2.10.0 now shows its generic send error instead of the update hint; that was accepted as the price
 of carrying no dead route. Going back to `/v1` needs a rollback to 1.13.0, the last release with
 the routes (REQ-XCH-033).
+
+## Amendment — 2026-10-02: the relay surface is the exchange's internal published API
+
+Owner decision D-05 of the domain modularisation plan (§5.11, §7.9, guard G-18);
+[ADR-0234](0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md). The backend exchange layer
+of decision 3 — the 14 operations on 13 paths under `/api/v1/exchange/**` that the gateway relays
+to — is treated as a published API of its own, contract tier T0, and keeps its behaviour
+byte-identical while the rest of `/api/v1` is re-cut:
+
+- It moves out of the backend's `openapi.json` into **its own internal OpenAPI document** with its
+  own staleness check, so per-domain diffs, the frontend's generated test types and
+  `DtoOpenApiContractTest` stop seeing it. It is never served to a client.
+- Frozen are the method and path pairs, the `cursor` and `limit` parameters, the JSON fields with
+  their types, optionality and enum values (read tolerantly), the RFC 7807 body and every relayed
+  code with its status, the relay headers and their `azp` allow-list, `ActingMemberFilter`'s exact
+  path patterns, and the Redis registry, revocation and handoff formats. The package, module and
+  class that serve it, and DTO class names, may change as long as the JSON stays identical.
+- A backend wire-contract test against the published schemas and fixtures and a parity test for
+  every identifier the gateway and the backend share guard it; the refinery draft route gets its own
+  request DTO instead of reusing the web import's.

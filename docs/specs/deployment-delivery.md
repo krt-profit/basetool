@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
 
 # Deployment delivery & promotion
@@ -2391,6 +2391,10 @@ the result onto the Dependabot branch.
 - **A digest that cannot be resolved is kept and warned about**, never dropped; the workflow never
   adds or removes a file.
 - **No `pull_request_target` or `workflow_run` trigger** is used for it.
+- **A Keycloak image bump to another minor is not completed automatically.** The follow-up does not
+  touch the version catalog, so `keycloak-version` (REQ-OPS-040) stays red until a human moves the
+  catalog's `keycloak` with it and the SPI is rebuilt and re-tested; a digest bump within the pinned
+  minor completes as above.
 
 **Acceptance**
 
@@ -2451,6 +2455,285 @@ record.
 (`assert_one_release_or_die`, `release_revision_problem`) · `scripts/lib/container-runtime.sh`
 (`rt_image_revision`) · `scripts/deploy.test.sh` (`scenario_mixed_release_*`) · **Runbook:**
 `docs/deployment.md` → *Promoting to production* · **Related:** REQ-OPS-002, REQ-OPS-015
+
+### REQ-OPS-037 — Every module declares its own quality settings; none is defaulted
+
+The root `build.gradle.kts` applies the shared conventions to every module, but the values that
+differ per module are **declared by the module itself** in `<module>/build-settings.properties`,
+never derived from the module's name with a fallback. A module carved out of `backend` must not
+quietly be held to weaker floors than the code it came from (plan G-20).
+
+| Key | Required when the module applies | Read by |
+| --- | --- | --- |
+| `test.maxHeap` | `java` | every `Test` task's `maxHeapSize` |
+| `coverage.instruction`, `coverage.branch` | `jacoco` | `jacocoTestCoverageVerification`, a ratio in (0, 1] |
+| `mutation.targetClasses`, `mutation.targetTests` | `info.solidsoft.pitest` | PIT's target patterns, comma-separated |
+
+- **Absence fails configuration.** A missing file, a missing key for an applied plugin, an unknown
+  key or a malformed value stops the build with the module, the file and the key named.
+- **The file is a configuration-cache input** (`providers.fileContents`): an edit invalidates the
+  cache entry, and the build stays configuration-cache clean.
+- **The image builds copy it** next to each module's `build.gradle.kts` (`docker/app/Dockerfile`,
+  `docker/sandbox/keycloak/Dockerfile`), so it is a shared image input for the release reuse plan.
+- **PIT is judged by its completion**, not its exit code: `scripts/check-pit-result.sh` fails the
+  weekly mutation run on a cut-off or empty `mutations.xml` (plan C-02).
+
+Values at introduction, identical to the name-keyed maps they replace:
+
+| Module | Test heap | Instruction / branch floor | PIT targets |
+| --- | --- | --- | --- |
+| `backend` | 3072m | 0.82 / 0.65 | `…backend.service.*` |
+| `frontend` | 2048m | 0.60 / 0.46 | `…frontend.service.*` |
+| `ingest` | 1024m | 0.93 / 0.85 | the three former `…ingest.service` classes, by name in their concern packages (`contract`, `handoff`, `relay`); since the ingest PIT leg every concern package but `assembly`, `config`, `problem` and `web`, tests `…ingest.*Test` |
+| `keycloak-spi` | 1024m | 0.66 / 0.60 | — |
+| `logging-support` | 1024m | 0.50 / 0.40 | — |
+| `test-support` | 1024m | — | — |
+
+**Acceptance**
+
+- [x] The effective test heap, JaCoCo limits and PIT targets of every module are unchanged
+  (dumped before and after with an init script).
+- [x] Removing `coverage.branch` from `logging-support`, `mutation.targetTests` from `ingest`, or
+  `test-support`'s whole file, adding an unknown key or setting a floor above 1 each fails
+  `./gradlew help` with a message naming the module and key.
+- [x] `./gradlew help --configuration-cache` reuses its entry on the second run.
+
+**Enforced by:** root `build.gradle.kts` (`ModuleBuildSettings`, `moduleBuildSettings()`) ·
+`*/build-settings.properties` · `scripts/check-pit-result.sh` (`pitest.yml`) · **Related:**
+REQ-OPS-038
+
+### REQ-OPS-038 — Guards keyed on today's layout fail instead of going quiet
+
+Several gates find their subject by a path, a directory listing or a package prefix. A file or
+package move — the domain modularisation consists of little else — would narrow them one file at a
+time while the build stays green (plan G-20, G-24). Each of them therefore fails when it stops seeing
+what it guards:
+
+- **Every input path a build script declares exists.** `scripts/check-gradle-input-paths.py`
+  resolves each `inputs.file`, `inputs.files` and `inputs.dir` of every tracked `*.gradle.kts`
+  (literals, `file`/`fileTree`, `layout.projectDirectory`, `rootProject.file`, and a `val` holding
+  one) and fails on a missing one; Gradle drops a missing `inputs.files` entry silently, leaving the
+  task up to date when the real file changes. A selection floor fails it when the parser stops
+  finding today's references (`repo-lint.yml`, `gradle-input-paths`).
+- **Content scans walk recursively.** `I18nDictionaryCoverageTest` reads every script below
+  `static/js` and `TemplateCommentHygieneTest` every page stylesheet below `static/css/pages`, so a
+  per-domain subfolder stays covered; each is proven on a subfolder fixture.
+- **A frontend DTO mirror without a backend twin fails.** `DtoMirrorConsistencyTest` finds the twin
+  by record name anywhere under `backend/src/main/java`, nested records included, or under the name
+  `RENAMED_TWINS` gives it; a frontend record with neither fails unless `UNPAIRED_BY_DESIGN` lists it
+  with its reason, and a stale entry in either list fails. The frontend `test` task takes the whole
+  backend source tree as its input for this.
+- **The application contexts keep their shape.** A `ContextShapeTest` in `backend`, `frontend` and
+  `ingest` counts, in the running test context, the `@Scheduled` methods, `@TransactionalEventListener`
+  methods and controllers of beans under `de.greluc.krt.profit.basetool`, and the
+  `SecurityFilterChain` beans, and asserts today's exact numbers (`test-support`'s `ContextShape`).
+  A module that leaves the component scan changes a count.
+
+**Acceptance**
+
+- [x] The input-path checker's self-test reports a deleted input file and directory, and finds each
+  reference shape without taking an `include` pattern or a `buildDirectory` output for a path.
+- [x] Each recursive scan finds a fixture placed in a subfolder.
+- [x] The mirror pairing reports an unpaired fixture record, pairs a nested backend twin and a
+  renamed one, and reports a stale list entry; the real pairing holds at least 267 mirrors.
+- [x] `ContextShape` counts a fixture context exactly (a repeated schedule once) and only inside its
+  package prefix.
+
+**Enforced by:** `scripts/check-gradle-input-paths.py` (`repo-lint.yml`) ·
+`frontend/…/i18n/I18nDictionaryCoverageTest` · `frontend/…/template/TemplateCommentHygieneTest` ·
+`frontend/…/DtoMirrorConsistencyTest` · `*/…/architecture/ContextShapeTest` ·
+`test-support/…/context/ContextShape` · **Related:** REQ-OPS-037
+
+### REQ-OPS-039 — The build sets the test profile once; no test repeats it
+
+Every Gradle `Test` task sets `spring.profiles.active=test` (root `build.gradle.kts`). An
+`@ActiveProfiles("test")` on a test class therefore changes nothing about the profile — but it is
+part of the key under which Spring's test-context cache stores an application context, so two test
+classes that differ only by that annotation boot two identical contexts, and with the cache's limit of
+32 contexts the backend evicted and rebooted contexts it still needed (BLD-PERF-03).
+
+- **No test class carries `@ActiveProfiles("test")`** in any spelling — `"test"`, `{"test"}`,
+  `value =` / `profiles =`, or the fully qualified annotation.
+- **A test that needs another profile keeps its annotation**, including one that names `test` beside
+  another profile; it is not redundant and the guard does not report it.
+- **`TestProfileConventionTest`** in `backend`, `frontend` (unit and E2E sources) and `ingest` scans
+  the module's test sources with `test-support`'s `TestProfileScan` and fails on a redundant
+  annotation; a selection floor fails it when it stops seeing the sources.
+
+Measured on the full suites with the context-cache statistics
+(`logging.level.org.springframework.test.context.cache=DEBUG`), before and after removing the 237
+redundant annotations (195 backend, 42 frontend), on a warm workstation, one run each. "Distinct" is
+the number of contexts with the cache limit raised to 400; "loads" counts the boots under the default
+limit of 32, evictions included:
+
+| Module | Distinct before → after | Loads before → after | `test` wall time before → after |
+| --- | --- | --- | --- |
+| backend | 48 → 46 | 49 → 47 | 409 s → 330 s |
+| frontend | 25 → 21 | 25 → 21 | 126 s → 99 s |
+| ingest | 13 → 13 (had none) | 13 → 13 | — |
+
+The backend gain is small because its remaining contexts differ by their `@MockitoBean` sets and
+properties, not by the profile; sharing them is REQ-OPS-041.
+
+**Acceptance**
+
+- [x] No `@ActiveProfiles("test")` remains in any test or E2E source.
+- [x] `TestProfileScanTest` reports every redundant spelling and none that names another profile.
+- [x] A planted `@org.springframework.test.context.ActiveProfiles("test")` in an ingest test failed
+  `TestProfileConventionTest` with its file and line.
+- [x] The full backend, frontend and ingest suites are green after the removal.
+
+**Enforced by:** `*/…/architecture/TestProfileConventionTest` ·
+`test-support/…/profile/TestProfileScan` · root `build.gradle.kts` (`systemProperty
+("spring.profiles.active", "test")`)
+
+### REQ-OPS-040 — The provider JAR is checked against the Keycloak that loads it
+
+`keycloak-spi` compiles against Keycloak's private SPIs at the catalog's `keycloak` version
+(`gradle/libs.versions.toml`) and is loaded by the image the stack pins as
+`quay.io/keycloak/keycloak:<tag>@sha256:…` in `docker-compose.yml`, `quadlet/systemd/keycloak.container`
+and `docker/sandbox/keycloak/Dockerfile`. Nothing else ties the two, and a provider that compiles
+but is not registered fails only at login, so both are checked at build time.
+
+- **One Keycloak line.** `scripts/check-keycloak-version.py` fails when an image tag differs from the
+  catalog version in major and minor (the repository pins a minor tag, `26.8`) or, for a tag pinned to
+  a patch, in any part; when a tag is neither form; when one of the three runtime pins disappears; and
+  when the pins disagree with each other in tag or digest. Documentation, CHANGELOGs and shell
+  self-tests are not pins. A Dependabot bump of the image to another minor therefore stays red until
+  the catalog moves with it and the SPI is rebuilt and re-tested against it; a digest bump within the
+  minor passes.
+- **Every registration loads.** `ServiceRegistrationsTest` reads the six files under
+  `keycloak-spi/src/main/resources/META-INF/services/` and fails when a file is missing or
+  unexpected, an entry does not resolve, does not implement the SPI interface it is registered for,
+  cannot be instantiated through its public no-arg constructor as the service loader does, or reports
+  another provider id than the realm and the backend use (`discord`, `discord-user-attribute-mapper`,
+  `discord-federated-identity-mapper`, `discord-guild-role-gate`, `krt-freemarker`,
+  `basetool-exchange`); it also asserts the `ServiceLoader` discovers each one.
+
+**Acceptance**
+
+- [x] `check-keycloak-version.py --selftest` breaks every rule once and passes on a clean fixture;
+  the check passes on the repository and fails when the catalog moves to `26.9.0` alone.
+- [x] `ServiceRegistrationsTest` passes on the module and its planted fixtures (missing class, wrong
+  type, no public no-arg constructor, changed provider id, missing and unexpected registration) each
+  yield exactly the expected problem; a services entry left on a moved class's old name fails it.
+
+**Enforced by:** `scripts/check-keycloak-version.py` · `repo-lint.yml` (`keycloak-version`) ·
+`keycloak-spi` `ServiceRegistrationsTest` · **Reference:** `docs/dependency-pins.md` (`keycloak`) ·
+**Related:** REQ-OPS-035 (the Dependabot compose follow-up), REQ-SEC-016 (the membership gate the
+authenticator registration carries), REQ-XCH-005, REQ-XCH-008
+
+### REQ-OPS-041 — Test classes share their application contexts, and a budget keeps it so
+
+Spring's test-context cache keys a context by its merged configuration: the configuration classes,
+the inlined properties, the profiles and the context customizers — among them every `@MockitoBean`
+and `@MockitoSpyBean`. A mock declared on a field is keyed by its bean type **and its field name**,
+so the same mock under two field names, a redundant mock, or a property one class sets and another
+does not each boot a further full context (BLD-PERF-03, plan §7.2 step 0.6).
+
+- **A test reuses an existing context configuration** instead of opening a new one: a plain
+  `@SpringBootTest`, or `@LeafServiceMockTest` in the backend, which boots the application with one
+  agreed set of mocked leaf services that a test obtains with `@Autowired`. A mock that the test
+  never stubs, verifies or needs is not declared; the same bean is mocked under the same field name
+  everywhere.
+- **Security beans stay real in a shared context.** A bean joins `@LeafServiceMockTest`'s set only if
+  no security bean reaches it — no `SecurityFilterChain`, servlet filter, `JwtDecoder`, converter,
+  argument resolver, interceptor, MVC configurer, `PermissionEvaluator`, and no bean a
+  `@PreAuthorize` / `@PostAuthorize` / `@PreFilter` / `@PostFilter` expression names, directly or
+  through the beans it depends on. A test that must mock a security bean keeps its own context.
+- **The backend test profile names the ingest gateway client** (`app.security.ingest-gateway.
+  client-ids: test-ingest-gateway` in `application-test.yml`) instead of repeating it on each test
+  class. Only a token whose `azp` is that value is affected, and only the tests that act as the
+  gateway use it.
+- **Each application holds a budget of distinct contexts**, computed without starting any of them:
+  `TestContextBudgetTest` builds the `MergedContextConfiguration` Spring's own bootstrapper builds for
+  every Spring test class (`test-support`'s `TestContextKeys`), groups them, and fails above the
+  budget with the full grouping. Budgets: backend 36, frontend 21, ingest 15 (raised from 34, 19 and 13
+  when the Phase 0 merge chain brought in `CachedCatalogueEntityInvariantTest` and
+  `RetiredOperationChainTest`, whose planted configuration classes are contexts of their own, the exchange freeze's ingest golden and route tests, and
+  the frontend's backend-origin tests, which point the clients at a local server they start
+  (`WebClientBackendSeamTest`, `WebClientHttp2NegotiationTest`); two other new backend tests share
+  the default context). A selection floor fails
+  the test when it stops seeing the test classes. A budget is raised only with a reason in the PR.
+- **`LeafServiceMockSecurityTest`** runs inside the `@LeafServiceMockTest` context and fails when a
+  security root reaches one of its mocks, naming the dependency chain.
+
+Measured on the full backend suite, same workstation, two runs each, with the context-cache
+statistics (`LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TEST_CONTEXT_CACHE=DEBUG`); "loads" is the cache's
+miss count under the default limit of 32:
+
+| Backend | Distinct contexts | Loads | `:backend:test` wall time |
+| --- | --- | --- | --- |
+| before (REQ-OPS-039) | 46 | 47 | 287 s, 281 s |
+| after | 34 | 34 | 253 s, 250 s |
+
+Each context now boots exactly once; in the suite's class order no evicted context is needed again.
+
+The backend reached 34 by dropping 80 unused `JwtDecoder` mocks (the auto-configured decoder is lazy
+and `jwt()` never calls it) and one unused `OrgUnitMembershipService` mock, moving the ingest
+gateway client id into the test profile, and moving eight classes onto `@LeafServiceMockTest`. The
+frontend reached 19 by giving two mocks the field name the other classes use. Of the 32 other
+backend contexts, 16 pin a property or configuration under test (rate limiting, CSRF, management
+port, scrape credentials, tracing, query timeout, the exchange mirror, stolen-stock marking, change
+retention, a statement inspector, a test-only controller), 14 mock a bean that a security bean
+reaches (`OwnerScopeService`, `MissionSecurityService`, `UserService`, `KeycloakService`, the role
+and squadron repositories, …) and 2 spy on exchange beans for their own scenario. Sharing the
+security-mock ones would put a mock under security, so the backend stays two above the cache limit
+of 32.
+
+**Acceptance**
+
+- [x] `TestContextKeysTest` shows that the same mock fields share a key, while another mock set,
+  another field name for the same mock, or an inlined property each split it.
+- [x] A planted `@SpringBootTest` class with a `@MockitoBean JwtDecoder` failed the backend
+  `TestContextBudgetTest` (35 > 34) with the grouping.
+- [x] `UserService` planted into `@LeafServiceMockTest`'s set failed `LeafServiceMockSecurityTest`
+  with `userService <- missionSecurityService`; `BeanReachTest` covers the walk.
+- [x] The full backend, frontend and ingest suites are green.
+
+**Enforced by:** `*/…/architecture/TestContextBudgetTest` ·
+`test-support/…/context/TestContextKeys` · `backend/…/testcontext/LeafServiceMockTest` ·
+`backend/…/testcontext/LeafServiceMockSecurityTest` · **Related:** REQ-OPS-039
+
+### REQ-OPS-042 — The edge's API admission ships as generated config, and the nightly probe checks the same table
+
+The API vhost's admission (REQ-API-021) is configuration in `docker/edge/`, and it is delivered the
+way every edge change is: it rides the config bundle of the release that carries the matching
+backend, and `deploy.sh`'s `reconcile_edge` recreates the edge once the on-disk `docker/edge`
+differs from the last applied snapshot. A change to the frozen set, the declared-break ledger or the
+retired list therefore reaches the public vhost in the same promotion as the API it describes, after
+the apps are recreated (the brief all-vhost outage of an edge recreate included).
+
+- **One writer.** `docker/edge/include/api-admission.conf`, `docker/edge/include/api-allowlist.conf`
+  and the API vhost table of `.github/workflows/edge-deny-probe.yml` (the rows between
+  `done <<'PROBES'` and `PROBES`) are written only by `./gradlew :backend:generateEdgeAdmission`, and
+  `EdgeAdmissionTest` fails a pull request whose committed copies differ. A hand edit is a red build,
+  not a review question.
+- **The nightly probe asserts the generated table from outside.** One row per admitted operation —
+  `200` for the two anonymous reads, `401` for every frozen operation, `410` for a retired one — one
+  refused verb per admitted path, and a reviewed list of near-misses (`/me/layout`, `/terms/admin`,
+  the exchange, `HEAD` on the anonymous reads, the web-only admin trees), each `404`. About 480 rows;
+  the job allows 15 minutes. `HEAD` rows are sent with `curl -I`, which does not wait for a body.
+- **The table runs from `main` against production.** Between the merge of an admission change and
+  its promotion, the probe expects what `main` admits while the edge still serves the previous
+  release, so the rows that differ fail for those nights. That is the probe reporting a pending
+  deploy, not drift; it clears with the promotion.
+- **The whole edge is validated with it.** `scripts/check-edge-nginx.sh` renders every vhost through
+  `render-and-run.sh` — the map included at `http` level — and starts nginx without a warning, and
+  `EdgeAdmissionNginxTest` drives the committed files through the edge's pinned image.
+
+**Acceptance**
+
+- [x] The generated files and the probe table are committed and equal the generator's output
+  (`EdgeAdmissionTest`).
+- [x] The edge renders and starts with the map in all four shapes (`check-edge-nginx.sh`).
+- [x] The probe table's admitted rows answer as stated at the backend (`EdgeProbeBackendStatusTest`)
+  and pass or stop at the edge as stated (`EdgeAdmissionNginxTest.theProbeRowsAgreeWithTheEdge`).
+
+**Enforced by:** `EdgeAdmissionTest`, `EdgeAdmissionNginxTest`, `EdgeProbeBackendStatusTest` ·
+`scripts/check-edge-nginx.sh` (`repo-lint.yml`) · `edge-deny-probe.yml` · `scripts/deploy.sh`
+(`reconcile_edge`) · **Runbook:** `docs/deployment.md` → *The edge* · **Related:** REQ-API-021,
+REQ-SEC-037, ADR-0135, ADR-0162
 
 ## Open questions
 

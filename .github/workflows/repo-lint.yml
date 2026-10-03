@@ -117,6 +117,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: scripts/check-logging-facade.sh
 
+      - name: gradle-input-paths / Self-test the input-path checker
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-gradle-input-paths.py --selftest
+
+      - name: gradle-input-paths / Check every build-script input path exists
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-gradle-input-paths.py
+
       - name: pid1-reaping / Self-test the detector
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_pid1_reaping.py --selftest
@@ -145,10 +153,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/dependabot_compose_followup.py --selftest
 
-      - name: probe-vs-allowlist / Check the edge probe against the vhost allow-list
-        if: ${{ !cancelled() }}
-        run: python3 .github/scripts/check_probe_against_allowlist.py
-
       - name: ingest-audience / Self-test the ingest audience checker
         if: ${{ !cancelled() }}
         run: python3 scripts/check-ingest-audience.py --selftest
@@ -156,6 +160,14 @@ jobs:
       - name: ingest-audience / Check no ingest config pairs expected-audiences with basetool-backend
         if: ${{ !cancelled() }}
         run: python3 scripts/check-ingest-audience.py
+
+      - name: keycloak-version / Self-test the Keycloak version checker
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-keycloak-version.py --selftest
+
+      - name: keycloak-version / Check the SPI compile version against the Keycloak image pins
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-keycloak-version.py
 
       - name: sandbox-realm / Self-test the sandbox realm builder
         if: ${{ !cancelled() }}
@@ -184,6 +196,10 @@ jobs:
       - name: object-layout-parity / Check the image layout against every JAVA_TOOL_OPTIONS
         if: ${{ !cancelled() }}
         run: python3 scripts/check-object-layout-parity.py
+
+      - name: exchange-label / Self-test the exchange e2e-label check
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_exchange_e2e_label.py --selftest
 
       - name: e2e-device-matrix / Self-test the comparison
         if: ${{ !cancelled() }}
@@ -454,10 +470,6 @@ jobs:
       - name: edge-nginx / Check edge nginx configuration
         if: ${{ !cancelled() }}
         run: scripts/check-edge-nginx.sh
-
-      - name: edge-allowlist / Check the API allow-list's method gating against a live nginx
-        if: ${{ !cancelled() }}
-        run: scripts/check-edge-allowlist-behaviour.sh
 
       - name: acme-publish / Check acme certificate publishing
         if: ${{ !cancelled() }}

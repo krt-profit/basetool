@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.service.RefiningMethodService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -97,7 +98,7 @@ public class RefiningMethodController {
   @PostMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public RefiningMethodDto createRefiningMethod(
-      @RequestBody @NotNull RefiningMethodDto refiningMethod) {
+      @RequestBody @Valid @NotNull RefiningMethodDto refiningMethod) {
     var toCreate = refiningMethodMapper.toEntity(refiningMethod);
     toCreate.setId(null);
     toCreate.setVersion(null);
@@ -115,7 +116,8 @@ public class RefiningMethodController {
   @PutMapping("/{id}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public RefiningMethodDto updateRefiningMethod(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull RefiningMethodDto refiningMethod) {
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid @NotNull RefiningMethodDto refiningMethod) {
     return refiningMethodMapper.toDto(
         refiningMethodService.updateRefiningMethod(
             id, refiningMethodMapper.toEntity(refiningMethod)));

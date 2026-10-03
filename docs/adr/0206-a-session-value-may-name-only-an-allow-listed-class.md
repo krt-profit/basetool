@@ -4,7 +4,8 @@
 - **Date:** 2026-09-23
 - **Deciders:** @greluc
 - **Requirement:** [REQ-SEC-067](../specs/security-and-access.md)
-- **Amended:** 2026-09-23 (final types in containers), 2026-09-26 (the flash-map list)
+- **Amended:** 2026-09-23 (final types in containers), 2026-09-26 (the flash-map list), 2026-10-02
+  (an exact list of the application's own session types, decided; implementation pending)
 - **Related:** [ADR-0154](0154-a-container-written-final-session-value-gets-a-forced-type-id.md)
   (the one container class that needed a forced type id, now an allow-list entry too),
   [ADR-0157](0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md) (what happens
@@ -114,6 +115,21 @@ members. The parity test held its flash maps in an `ArrayList`, so it proved a s
 writes. Production, on `enforce` since 2026-09-25, refused the list and dropped the flash attributes
 of every redirect. `CopyOnWriteArrayList` joins the list by exact name — never `java.util.concurrent`
 as a package — and the parity sample now lets `SessionFlashMapManager` write its flash maps itself.
+
+## Amendment 3 — 2026-10-02: an exact list of the application's own types
+
+Owner decision D-10 of the domain modularisation plan (§5.9, track step F2, guard G-16); decided,
+implementation pending. The entry `de.greluc.krt.profit.basetool.frontend.model.*` admits every
+class of that package — 325 source files on 2026-10-02 — while about eleven forms and DTOs are ever bound to a session.
+It is also keyed on a package the frontend's move to per-domain packages dissolves: a moved form
+would be refused under `enforce` and its flash value dropped.
+
+The prefix is replaced by an **exact, test-derived list** of the session-bound application types:
+a closure test derives the types the controllers put into the session or the flash map and fails
+when the list and the derivation differ, and a second test fails on any entry broader than one class
+of a model or session package. The change ships in its own release, before the frontend move, so a
+missed type shows on `basetool_session_type_refused_total` before any class moves. The list is never widened back to a prefix
+(plan §6, red lines). Decision points 2 to 5 and the other entries are unchanged.
 
 ## Alternatives rejected
 

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -135,46 +136,55 @@ public class BasetoolErrorController implements ErrorController {
               "problem.bad_request.title",
               "problem.bad_request.detail",
               "bad-request",
-              "BAD_REQUEST");
+              CoreProblemCode.BAD_REQUEST.code());
       case UNAUTHORIZED ->
           new ProblemMapping(
               "problem.unauthenticated.title",
               "problem.unauthenticated.detail",
               "unauthenticated",
-              "UNAUTHENTICATED");
+              CoreProblemCode.UNAUTHENTICATED.code());
       case FORBIDDEN ->
           new ProblemMapping(
               "problem.access_denied.title",
               "problem.access_denied.detail",
               "access-denied",
-              "ACCESS_DENIED");
+              CoreProblemCode.ACCESS_DENIED.code());
       case NOT_FOUND ->
           new ProblemMapping(
-              "problem.not_found.title", "problem.not_found.detail", "not-found", "NOT_FOUND");
+              "problem.not_found.title",
+              "problem.not_found.detail",
+              "not-found",
+              CoreProblemCode.NOT_FOUND.code());
       case METHOD_NOT_ALLOWED ->
           new ProblemMapping(
               "problem.method_not_allowed.title",
               "problem.method_not_allowed.detail",
               "method-not-allowed",
-              "METHOD_NOT_ALLOWED");
+              CoreProblemCode.METHOD_NOT_ALLOWED.code());
+      case TOO_MANY_REQUESTS ->
+          new ProblemMapping(
+              "problem.rate_limit_exceeded.title",
+              "problem.rate_limit_exceeded.detail",
+              "rate-limit-exceeded",
+              CoreProblemCode.RATE_LIMIT_EXCEEDED.code());
       case SERVICE_UNAVAILABLE ->
           new ProblemMapping(
               "problem.service_unavailable.title",
               "problem.service_unavailable.detail",
               "service-unavailable",
-              "SERVICE_UNAVAILABLE");
+              CoreProblemCode.SERVICE_UNAVAILABLE.code());
       default ->
           status.is5xxServerError()
               ? new ProblemMapping(
                   "problem.internal_error.title",
                   "problem.internal_error.detail",
                   "internal-error",
-                  "INTERNAL_ERROR")
+                  CoreProblemCode.INTERNAL_ERROR.code())
               : new ProblemMapping(
                   "problem.bad_request.title",
                   "problem.bad_request.detail",
                   "bad-request",
-                  "BAD_REQUEST");
+                  CoreProblemCode.BAD_REQUEST.code());
     };
   }
 

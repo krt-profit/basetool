@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -45,6 +46,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 /** Refinery Order JPA entity. */
+@TenantScoped("owningOrgUnit")
 @Entity
 @Getter
 @Setter

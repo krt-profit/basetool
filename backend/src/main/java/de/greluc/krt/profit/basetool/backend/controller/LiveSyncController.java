@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.dto.LiveSyncChangedRequest;
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.RateLimitExceededException;
 import de.greluc.krt.profit.basetool.backend.service.LiveSyncRelayService;
 import de.greluc.krt.profit.basetool.backend.service.LiveSyncStreamService;
 import de.greluc.krt.profit.basetool.backend.service.LiveSyncSubscriptionAuthorizer;
@@ -77,6 +79,18 @@ public class LiveSyncController {
    * connection can trigger.
    */
   static final int MAX_TOPICS_PER_STREAM = 16;
+
+  /** Detail key of the {@code 400} for a frame naming no room this backend serves. */
+  static final String UNKNOWN_TOPIC_KEY = "problem.live_sync.unknown_topic";
+
+  /** Detail key of the {@code 400} for a frame naming no section its room knows. */
+  static final String NO_KNOWN_SECTIONS_KEY = "problem.live_sync.no_known_sections";
+
+  /** Detail key of the {@code 429} for a frame a full bucket dropped. */
+  static final String SIGNAL_DROPPED_KEY = "problem.live_sync.signal_dropped";
+
+  /** The relay's buckets refill every second, so a refused frame's next one may follow after it. */
+  static final long SIGNAL_RETRY_AFTER_SECONDS = 1L;
 
   private final LiveSyncStreamService streamService;
   private final LiveSyncSubscriptionAuthorizer authorizer;
@@ -141,8 +155,9 @@ public class LiveSyncController {
    *
    * @param sub the caller's id, from the JWT subject claim
    * @param request the room and the regions that changed
-   * @return {@code 202} when relayed, {@code 400} when it named no real room or region, {@code 429}
-   *     when rate-limited
+   * @return {@code 202} when relayed
+   * @throws BadRequestException when the frame names no real room or no known region
+   * @throws RateLimitExceededException when the subject's or the room's bucket is empty
    */
   @PostMapping("/changed")
   @Operation(summary = "Announce a change so other viewers of the same room re-fetch.")
@@ -157,15 +172,15 @@ public class LiveSyncController {
     LiveSyncTopic topic = LiveSyncTopic.parse(request.topic());
     if (topic == null) {
       authorizer.recordInvalidTopic();
-      return ResponseEntity.badRequest().build();
+      throw new BadRequestException(UNKNOWN_TOPIC_KEY);
     }
     LiveSyncRelayService.Outcome outcome =
         relayService.publishFromClient(sub, topic, request.sections());
     return switch (outcome) {
       case ACCEPTED -> ResponseEntity.accepted().build();
-      case NO_KNOWN_SECTIONS -> ResponseEntity.badRequest().build();
+      case NO_KNOWN_SECTIONS -> throw new BadRequestException(NO_KNOWN_SECTIONS_KEY);
       case SUBJECT_RATE_LIMITED, TOPIC_RATE_LIMITED ->
-          ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+          throw new RateLimitExceededException(SIGNAL_DROPPED_KEY, SIGNAL_RETRY_AFTER_SECONDS);
     };
   }
 

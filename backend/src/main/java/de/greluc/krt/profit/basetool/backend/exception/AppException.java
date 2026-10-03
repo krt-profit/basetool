@@ -47,6 +47,7 @@ public abstract sealed class AppException extends RuntimeException
         OverAllocationException,
         OwnerOrgUnitRequiredException,
         ProductionAllocationException,
+        RateLimitExceededException,
         ReportGenerationException {
 
   /**
@@ -205,6 +206,18 @@ public abstract sealed class AppException extends RuntimeException
   @NotNull
   @Unmodifiable
   public Map<String, Object> extraProperties() {
+    return Map.of();
+  }
+
+  /**
+   * Response headers the dispatch handler sets beside the problem body, such as {@code
+   * RateLimitExceededException}'s {@code Retry-After}; empty for every other subtype.
+   *
+   * @return header name to value; never {@code null}
+   */
+  @NotNull
+  @Unmodifiable
+  public Map<String, String> responseHeaders() {
     return Map.of();
   }
 

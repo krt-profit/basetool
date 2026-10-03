@@ -70,6 +70,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
@@ -291,6 +292,8 @@ public class SecurityConfig {
    * @param meterRegistry counts the identity-provider-unavailable 503
    * @param noRoleRefusedSubjectWindow the window the {@code NO_ROLE} refusals are recorded into
    * @param clientAttribution bounds the {@code client_id} label of the API client request counter
+   * @param retiredOperations the retired Android operations answered ahead of CSRF and
+   *     authentication with {@code 410 APP_UPDATE_REQUIRED} (REQ-API-020)
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -310,7 +313,8 @@ public class SecurityConfig {
       IngestGatewayProperties ingestGatewayProperties,
       ActingMemberAuthorities actingMemberAuthorities,
       RateLimitProperties rateLimitProperties,
-      ClientAttribution clientAttribution)
+      ClientAttribution clientAttribution,
+      RetiredOperations retiredOperations)
       throws Exception {
 
     boolean isTest = env.matchesProfiles("test");
@@ -495,6 +499,14 @@ public class SecurityConfig {
                 objectMapper,
                 meterRegistry),
             TermsAcceptanceAccessFilter.class)
+        .addFilterBefore(
+            new RetiredOperationFilter(
+                retiredOperations,
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry),
+            CsrfFilter.class)
         .addFilterBefore(
             new IdentityProviderUnavailableFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),

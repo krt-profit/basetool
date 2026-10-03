@@ -1,7 +1,12 @@
 > **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29, every
-> open decision on 2026-10-01; nothing is implemented yet. Last reviewed: 2026-10-01.
-> **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0032, ADR-0047, ADR-0060,
-> ADR-0065, ADR-0136, ADR-0205, ADR-0206, ADR-0214, ADR-0216, ADR-0219, ADR-0223 · **Specs:**
+> open decision on 2026-10-01. **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312);
+> Phase 0 done (2026-10-03, merged as one chain of pull requests, #2350 … #2353): the decision
+> records (ADR-0231 … ADR-0239 and the amendments of §14) and every guard of §6.1 that Phase 0 owns;
+> the app's re-read of the version policy waits for the app release (basetool-android#209). No
+> class has moved yet. Last reviewed: 2026-10-03.
+> **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
+> ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
+> ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
 > REQ-API-\*, REQ-SEC-\*, REQ-AUDIT-001, REQ-DATA-\*, REQ-FE-\*, REQ-XCH-\*
 > **Appendices:** [the REST API cut](modularisation/rest-api-cut.md) ·
 > [previous audits re-evaluated](modularisation/previous-audits.md) ·
@@ -21,7 +26,8 @@ refuses code that reaches past that API. It is the report of a whole-repository 
   APIs — and two secondary ones: use modern, final language features where they pay off, and
   re-evaluate the findings of the previous audits under today's rules. It names every change with
   its implementation, pros, cons, risks and regressions, and the guard that catches a regression.
-- **What it is not.** Nothing is implemented. Section 2 lists every decision; section 13 maps the
+- **What it is not.** A record of finished work: Phase −1 (§7.1) and Phase 0 (§7.2) are merged,
+  and no class has moved yet. Section 2 lists every decision; section 13 maps the
   former open decisions onto them.
 - **Scope.** All modules of `basetool`: `backend`, `frontend`, `ingest`, `keycloak-spi`,
   `keycloak-theme`, `logging-support`, `test-support`, the build and the delivery path. Sibling
@@ -474,7 +480,9 @@ The owner therefore decided (2026-10-01, D-11) on a **release-bound floor** — 
 a reviewed default in the release's own configuration, so it deploys and rolls back together with
 the API it protects, with the host value kept only as an emergency override — together with the
 app's re-read on resume and after an unexpected 404 and the `APP_UPDATE_REQUIRED` answer of retired
-paths. The S8 sequence above holds only until the release-bound floor is in place.
+paths. The S8 sequence above holds only until the release-bound floor is in place. *Implemented
+2026-10-03 (REQ-API-020): the floor is a literal in the backend's `application.yml`, the host keeps
+only `APP_ANDROID_*_OVERRIDE`, and retired paths answer `410 APP_UPDATE_REQUIRED`.*
 
 **Machinery the cut needs first** (Phase 0): ADR-0136, REQ-API-001, REQ-API-009 and REQ-API-010
 amended for the hard cut; a declared-break ledger that lists every removed or changed frozen
@@ -588,6 +596,9 @@ step is its own pull request or a short series, independently shippable and reve
 
 ### 7.1 Phase −1 — the defects of §9, fixed separately
 
+**Done** — merged 2026-10-01 in PRs #2299–#2312 (released with v1.13.5). C-03 is a
+repository-settings change for the owner and is not part of those pull requests.
+
 Small, independent pull requests before anything else (D-07). They remove traps the refactor would
 otherwise trigger (the URL-rule-only gates, the dual-use refinery DTO) and close the defects the
 audit found.
@@ -596,13 +607,13 @@ audit found.
 
 | Step | Content | Why first |
 | --- | --- | --- |
-| 0.1 ADRs | New: target architecture C and module rules; module interaction styles (§5.3); enforcement tooling (ArchUnit + Modulith in test scope, frozen module baseline); hard cut with forced update and the release-bound minimum version (D-11); error model (D-09). Amended: ADR-0047 (module cycles frozen, layer cycles per module), ADR-0065 (access policies per domain), ADR-0020/0028 (seam rules re-keyed — owner approval), ADR-0032 (single filter chain, typed clients), ADR-0136 (retirement by hard cut), ADR-0206 (exact session list, D-10), ADR-0223 (corrections, §8.1) | CLAUDE.md: a requirement is amended before code diverges from it |
-| 0.2 Backend guards | G-01 … G-07, G-10, G-12, G-19, G-22 | The refactor must not be able to weaken a gate unnoticed |
-| 0.3 Module map | Domain map as a checked-in artefact; ArchUnit `modules()` rule plus `FreezingArchRule` baseline (150 violations); Spring Modulith spike (`verify()` under ArchUnit 1.5.1, `explicitly-annotated` detection, `Documenter` output) and then `ModularityTest` | Stops new coupling from day one; measures progress |
-| 0.4 Frontend guards | G-13 … G-17; `ParallelPageLoader` on `ContextSnapshotFactory` (fixes the missing locale relay); the three kernel shapes (byte download with headers and per-call timeout, multipart upload, `Flux`) so the eleven bypassing controllers return to the kernel | Typed clients and the package move inherit whatever the kernel does |
-| 0.5 Exchange guards | G-18; ingest re-package by concern (§5.11); keycloak-spi registrations test | The only contract that must not move |
-| 0.6 Build and CI guards | G-20, G-21; `@SpringBootTest` profile unification (BLD-PERF-03, 191 of 231 classes carry `@ActiveProfiles("test")` although Gradle forces it) | Test-context count and coverage floors decide how painful every later step is |
-| 0.7 API machinery | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
+| 0.1 ADRs — **done 2026-10-02** | New (ADR-0231 … ADR-0239): target architecture C and module rules; module interaction styles (§5.3); enforcement tooling (ArchUnit + Modulith in test scope, frozen module baseline); hard cut with forced update and the release-bound minimum version (D-11); error model (D-09). Amended: ADR-0047 (module cycles frozen, layer cycles per module), ADR-0065 (access policies per domain), ADR-0020/0028 (seam rules re-keyed — owner approval), ADR-0032 (single filter chain, typed clients), ADR-0136 (retirement by hard cut), ADR-0206 (exact session list, D-10), ADR-0223 (corrections, §8.1), and the further amendments of §14 | CLAUDE.md: a requirement is amended before code diverges from it |
+| 0.2 Backend guards — **done 2026-10-03** | G-01 … G-07, G-10, G-12, G-19, G-22 | The refactor must not be able to weaken a gate unnoticed |
+| 0.3 Module map — **done 2026-10-03** | Domain map as a checked-in artefact; ArchUnit `modules()` rule plus `FreezingArchRule` baseline (150 violations as jdeps counted them; ArchUnit's baseline holds 138 edges in 42 module pairs, corrected 2026-10-03); Spring Modulith spike (`verify()` under ArchUnit 1.5.1, `explicitly-annotated` detection, `Documenter` output) and then `ModularityTest` | Stops new coupling from day one; measures progress |
+| 0.4 Frontend guards — **done 2026-10-03** | G-13 … G-17; `ParallelPageLoader` on `ContextSnapshotFactory` (fixes the missing locale relay); the three kernel shapes (byte download with headers and per-call timeout, multipart upload, `Flux`) so the eleven bypassing controllers return to the kernel | Typed clients and the package move inherit whatever the kernel does |
+| 0.5 Exchange guards — **done 2026-10-03** | G-18; ingest re-package by concern (§5.11); keycloak-spi registrations test | The only contract that must not move |
+| 0.6 Build and CI guards — **done 2026-10-03** | G-20, G-21; `@SpringBootTest` profile unification (BLD-PERF-03, 191 of 231 classes carry `@ActiveProfiles("test")` although Gradle forces it) | Test-context count and coverage floors decide how painful every later step is |
+| 0.7 API machinery — **done 2026-10-03** except the app's re-read, which ships with basetool-android#209 | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
 
 ### 7.3 Phase 1 — behaviour-free inversions and re-homings
 
@@ -763,6 +774,8 @@ configuration-cache entries (it never does today, because `setup-gradle` gets no
 
 ## 9 Defects found along the way — fixed first, in separate pull requests
 
+**Status:** fixed by PRs #2299–#2312, merged 2026-10-01 (§7.1); C-03 is left to the owner.
+
 Every item below survived the adversarial round; the severity is the verified one, often lower
 than the first finding claimed. None allows another member's data to be read or changed; several
 are availability, privacy or integrity defects, and some are traps the refactor would trigger.
@@ -917,29 +930,31 @@ Full tables, per finding with status, evidence and verdict:
 
 ## 14 Documents to write or amend
 
-- **New ADRs:** target architecture and module rules (D-01); module interaction styles; enforcement
-  tooling and the frozen module baseline (D-02); hard cut with forced update and the release-bound
-  minimum version (D-04, D-11); error model (D-09); per-domain access policies over the scope
-  kernel; Error Prone and NullAway (D-13); the switch policy (D-15); the browser baseline and
-  Trusted Types (D-16).
-- **Amended ADRs:** ADR-0020/0028 (seam rules re-keyed; owner approval), ADR-0032 (single filter
+- **New ADRs — done 2026-10-02:** target architecture and module rules (D-01, ADR-0231); module
+  interaction styles (ADR-0232); enforcement tooling and the frozen module baseline (D-02,
+  ADR-0233); hard cut with forced update and the release-bound minimum version (D-04, D-11,
+  ADR-0234); error model (D-09, ADR-0235); per-domain access policies over the scope kernel
+  (ADR-0236); Error Prone and NullAway (D-13, ADR-0237); the switch policy (D-15, ADR-0238); the
+  browser baseline and Trusted Types (D-16, ADR-0239).
+- **Amended ADRs — done 2026-10-02:** ADR-0020/0028 (seam rules re-keyed; owner approval), ADR-0032 (single filter
   chain, typed clients), ADR-0047 (module cycles frozen, layer cycles per module), ADR-0060 (separate
   request and response types mandatory at each domain's cut), ADR-0065 (policies per domain),
   ADR-0069 (IIFE namespaces), ADR-0135 (edge include generated from the contract set), ADR-0136
   (retirement by hard cut), ADR-0206 (D-10), ADR-0212 (its instruction to add a comment contradicts
   ADR-0214), ADR-0214 (D-14: `_` in empty catch blocks), ADR-0216 (the relay surface as the
   exchange's internal published API), ADR-0223 (§8.1), ADR-0229 (the lot-lock protocol moves into inventory).
-- **Requirements:** REQ-API-001/009/010 (hard cut), REQ-API-002/003/004/005/007 (the conventions as
+- **Requirements:** REQ-API-001/009/010 (hard cut — done 2026-10-02, implementation pending), REQ-API-002/003/004/005/007 (the conventions as
   they are enforced), REQ-SEC-031 (every family classified), REQ-SEC (bean-reference integrity,
   authorization placement), REQ-DATA (table ownership, one Flyway location), REQ-DATA-007 (cached
   read models), REQ-DATA-010 (one scope fragment per aggregate), REQ-AUDIT-001 (the audit contract
   per command), REQ-XCH-009/011/026 (domain APIs; build-time contract test), REQ-FE-018 (baseline and
-  counts), REQ-OBS (event-publication metrics, only if an outbox is ever adopted).
+  counts — done 2026-10-02), REQ-OBS (event-publication metrics, only if an outbox is ever adopted).
 - **arc42:** §4.1, §4.2, §5.3 and §5.5 (corrected with this plan), §5.2 and §5.3 rewritten per
-  module as the moves land, §8 (module rules, interaction styles), §11.9 (the domain coupling as
-  debt, opened with this plan).
+  module as the moves land, §8 (module rules, interaction styles — §8.14, done 2026-10-02), §11.9
+  (the domain coupling as debt, opened with this plan; its decisions linked 2026-10-02).
 - **CLAUDE.md files:** the Architecture and Java-conventions sections of the root file, and the
-  backend and frontend files, as each phase changes the rules they state.
+  backend and frontend files, as each phase changes the rules they state (2026-10-02: the root
+  file's Java conventions and code-comment rule gained `_`, D-14, and the switch policy, D-15).
 - **Knowledge base:** the plan note in `80 Plans`, and every system and domain note as its module
   moves.
 
@@ -957,9 +972,9 @@ same session as this plan, and in the repository where this plan touches the doc
 | `docs/specs/api-conventions.md` REQ-API-007 | every endpoint carries `@Operation`/`@ApiResponses`; the generator test asserts the document | 400 and 231 of 574; the backend generator test asserts only `200` |
 | `docs/specs/api-conventions.md` REQ-API-012 | `/me/layout` is not on the API vhost | the `^/api/v1/me/` prefix rule admits it |
 | `docs/specs/security-and-access.md` REQ-SEC-031 | a member record is the only personal data the API serves | admin export, person search and registrations serve personal data and are not in the `no-store` families |
-| `docs/specs/frontend-ajax-mutations.md` REQ-FE-018, `docs/TYPESCRIPT_MIGRATION_PLAN.md` | 40 of 96 files type-checked; `type=module` would change the execution order | 44 of 100; 120 of 121 scripts are already `defer` |
-| ADR-0223 | see §8.1 | |
-| ADR-0069, ADR-0130, ADR-0212 | "no IIFE wrapping"; `scripts/**/*.mjs` in the lint globs; "with a comment naming what it beats" | half the scripts are IIFE-wrapped; the Gradle lint tasks do not read `scripts/`; ADR-0214 forbids the comment |
+| `docs/specs/frontend-ajax-mutations.md` REQ-FE-018, `docs/TYPESCRIPT_MIGRATION_PLAN.md` | 40 of 96 files type-checked; `type=module` would change the execution order | 44 of 100; 120 of 121 scripts are already `defer` — **corrected 2026-10-02** in both |
+| ADR-0223 | see §8.1 | **corrected 2026-10-02** (amendment) |
+| ADR-0069, ADR-0130, ADR-0212 | "no IIFE wrapping"; `scripts/**/*.mjs` in the lint globs; "with a comment naming what it beats" | half the scripts are IIFE-wrapped; the Gradle lint tasks do not read `scripts/`; ADR-0214 forbids the comment — **corrected 2026-10-02** (an amendment each; the `scripts/` lint gate itself is still open) |
 | backend `ArchitectureTest` messages | ask for "a code comment" in three places | ADR-0214 |
 | `config/owasp/dependency-check-suppressions.xml` | its header described how a suppression is renewed | the header went with the ADR-0214 sweep; no document describes the renewal now, and all nine suppressions expire on the same day |
 

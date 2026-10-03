@@ -44,14 +44,12 @@ import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Integration tests against real Postgres verifying that bank surfaces show a holder's current
  * effective name, falling back to the stored handle once the user is deleted (REQ-BANK-003).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class BankHolderLiveDisplayNameTest {
 
   @Autowired private BankHolderService bankHolderService;
