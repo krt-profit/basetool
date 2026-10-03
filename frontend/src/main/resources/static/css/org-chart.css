@@ -51,7 +51,7 @@
     @media (width <= 768px) {
         .oc-scrollbar {
             position: sticky;
-            bottom: 0;
+            bottom: var(--krt-tabbar-height);
         }
     }
 

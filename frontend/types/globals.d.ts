@@ -596,6 +596,29 @@ interface KrtFilterPanelApi {
     refresh(panelId?: string): void;
 }
 
+/** The navigation drawer and mobile menu sheet (`sidebar.js`, REQ-UI-026). */
+interface KrtNavApi {
+    /**
+     * Opens the drawer.
+     *
+     * @param focus the element to focus once it is open; the menu filter when omitted
+     */
+    open(focus?: HTMLElement | null): void;
+
+    /** Closes the drawer without moving focus. */
+    close(): void;
+}
+
+/** The quick-access command palette (`krt-palette.js`, REQ-UI-026). */
+interface KrtPaletteApi {
+    /**
+     * Opens the palette.
+     *
+     * @param query text to pre-fill the search with
+     */
+    open(query?: string): void;
+}
+
 interface Window {
     /**
      * Returns `value` when it is a non-empty string; otherwise reports `key` once per page view as
@@ -630,6 +653,8 @@ interface Window {
     ) => Promise<boolean>;
 
     krtModal: KrtModalApi;
+    krtNav?: KrtNavApi;
+    krtPalette?: KrtPaletteApi;
     /** Alias of `krtModal.open` for the mission page. */
     krtModalOpen?: (overlay: HTMLElement | null) => void;
     krtModalClose?: (overlay: HTMLElement | null) => void;
