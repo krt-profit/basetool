@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
+
 ### Added
 
 - **Schnellzugriff (Strg K / ⌘ K).** Ein Suchfeld in der Kopfzeile findet jede Seite, die man sehen darf,
