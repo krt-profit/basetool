@@ -2,7 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Schnellzugriff (Strg K / ⌘ K).** Ein Suchfeld in der Kopfzeile findet jede Seite, die man sehen darf,
+  dazu „Zuletzt besucht" und Aktionen wie „Neuen Auftrag anlegen" oder „Abmelden"; bedienbar per Tastatur.
+
+- **Tab-Leiste auf dem Smartphone.** Einsätze, Lager, Aufträge, Meldungen und „Menü" sitzen unten fest; das
+  Menü öffnet als Sheet, die Suche als Vollbild. Die Fußzeilen-Links stehen dort am Ende des Menüs.
+
 ### Changed
+
+- **Neues Navigationsmenü.** Das Menü hat einen Menüfilter, Gruppen mit Icons und unten eine Nutzerzeile mit
+  „Persönlich", Sprache und Abmelden. „Administration" ist ein eigener Modus (auf Admin-Seiten automatisch),
+  „Rechtliches" steht nur noch in der Fußzeile, die Glocke sitzt in der Kopfzeile.
 
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
   Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <body>
 <header th:fragment="header">
     <nav>
-        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}"
+                aria-controls="sidebar" aria-expanded="false">
             <span></span>
             <span></span>
             <span></span>
@@ -12,6 +13,47 @@
             <img th:src="@{/logos/basetool-logo.svg}" alt="" height="50">
             <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
         </a>
+        <span class="header-spacer"></span>
+        <span class="admin-mode-chip" th:aria-label="#{nav.administration}" th:text="#{nav.adminMode.chip}">ADMIN</span>
+        <th:block sec:authorize="isAuthenticated()">
+            <button type="button" class="palette-trigger" data-testid="palette-open" data-palette-open
+                    th:aria-label="#{palette.trigger.aria}" aria-haspopup="dialog" aria-controls="nav-palette">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
+                <span class="palette-trigger-text" th:text="#{palette.placeholder}">Seite oder Aktion suchen …</span>
+                <span class="nav-kbd" data-palette-kbd th:text="#{palette.kbd}">STRG K</span>
+            </button>
+            <button type="button" class="header-search-btn" data-testid="mobile-search-open" data-palette-open
+                    th:aria-label="#{mobile.search.open}" th:title="#{mobile.search.open}"
+                    aria-haspopup="dialog" aria-controls="nav-palette">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
+            </button>
+            <div id="notification-bell" class="notification-bell">
+                <span id="notification-i18n" hidden
+                      th:attr="data-loading=#{notifications.loading},data-empty=#{notifications.empty},data-mark-read=#{notifications.markRead},data-delete=#{notifications.delete},data-deleted=#{notifications.success.deleted},data-all-read=#{notifications.success.allRead},data-cleared=#{notifications.success.cleared},data-confirm-clear-title=#{notifications.confirm.clear.title},data-confirm-clear-body=#{notifications.confirm.clear.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-error=#{notification.error.title}"></span>
+                <button type="button" id="notification-toggle" class="notification-bell-btn"
+                        th:title="#{notifications.bell.title}" th:aria-label="#{notifications.bell.aria}"
+                        aria-haspopup="true" aria-expanded="false">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
+                    <span id="notification-badge" class="notification-badge"
+                          th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
+                          th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span>
+                </button>
+                <div id="notification-dropdown" class="notification-dropdown notification-dropdown-hidden"
+                     role="region" th:aria-label="#{notifications.bell.title}">
+                    <div class="notification-dropdown-header">
+                        <span th:text="#{notifications.title}">Notifications</span>
+                        <button type="button" class="notification-link-btn" data-notif-mark-all
+                                th:text="#{notifications.markAllRead}">Mark all read</button>
+                    </div>
+                    <ul id="notification-dropdown-list" class="notification-dropdown-list"></ul>
+                    <p id="notification-dropdown-empty" class="notification-dropdown-empty notification-badge-hidden"
+                       data-notif-empty th:text="#{notifications.empty}">No notifications</p>
+                    <div class="notification-dropdown-footer">
+                        <a th:href="@{/notifications}" th:text="#{notifications.viewAll}">View all</a>
+                    </div>
+                </div>
+            </div>
+        </th:block>
     </nav>
 </header>
 </body>

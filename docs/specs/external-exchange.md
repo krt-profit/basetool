@@ -1809,7 +1809,8 @@ installation raises a notification and stays highlighted until seen. The page li
 list of approved clients (REQ-XCH-002, REQ-SEC-027). `ADMIN` manages the registry on an admin page
 with a suspend switch. The page is web-only; the app links to it.
 
-The page is `/connected-apps` (sidebar *Persönlich*, every member), over `/api/v1/connected-apps`.
+The page is `/connected-apps` (the drawer's personal menu *Persönlich*, REQ-UI-026, every member),
+over `/api/v1/connected-apps`.
 Its header links `docs/legal/approved-clients.md` on GitHub
 (`https://github.com/krt-profit/basetool/blob/main/docs/legal/approved-clients.md`) in a new tab,
 the address the developer site's onboarding page links as well.
