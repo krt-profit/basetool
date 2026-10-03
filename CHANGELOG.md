@@ -130,6 +130,10 @@
   Frontend rief `/api/v1/admin/personal-inventory/{id}` statt `…/items/{id}` auf, das Backend lehnte ab.
   Ein neuer Test prüft jetzt jeden Backend-Aufruf des Frontends gegen die `openapi.json` (REQ-FE-028).
 
+- **Parallel geladene Seitenabschnitte senden die Sprache des Nutzers ans Backend.** Einsätze, Operationen,
+  Aufträge, Lager, Hangar, Raffinerie, Org-Bank und Einsatzdaten luden Abschnitte ohne `Accept-Language`; der
+  `ParallelPageLoader` übernimmt jetzt den ganzen Anfragekontext aus dem `ContextRegistry` (REQ-FE-030).
+
 ### Security
 
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
