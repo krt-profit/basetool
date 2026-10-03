@@ -11,28 +11,43 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<div class="page-wrapper">
+<div class="page-wrapper mission-page">
 
-    <main th:if="${isNew}" class="krtm-padding-bottom-0-a32f">
-        <div class="greeting hud-box flex-between">
-            <h1 class="m-0" th:text="#{mission.create}">New Mission</h1>
-            <a th:href="@{/missions}" class="btn btn-ghost" th:text="#{general.back}">Zur&uuml;ck</a>
-        </div>
-    </main>
+    <div th:if="${isNew}" class="mission-new-head">
+        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.missions', eyebrowHref=@{/missions}, titleText=#{mission.create})}"></th:block>
+    </div>
 
     <div th:unless="${isNew}" class="mission-head-sticky" id="mission-head-sticky">
-        <div class="mission-head">
-            <div class="mission-head-title">
-                <h1 th:text="#{mission.prefix} + ' ' + ${mission.name}">Mission Name</h1>
-                <span id="mission-head-org-badge-slot" class="krtm-display-contents-ddf5"><span th:if="${mission?.owningSquadron != null}" class="squadron-badge"
-                      th:title="${mission.owningSquadron.name()}"
-                      th:text="${mission.owningSquadron.shorthand()}">IRI</span></span>
-                <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
-                      th:text="${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status}">PLANNED</span>
+        <div class="page-head mission-head" data-testid="page-head">
+            <div class="page-head__main">
+                <a class="page-eyebrow" th:href="@{/missions}" data-testid="page-eyebrow"
+                  ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
+                  ><span th:text="#{nav.missions}">Eins&auml;tze</span></a>
+                <div class="page-title">
+                    <h1 id="mission-title" th:text="${mission.name}">Mission Name</h1>
+                    <span id="mission-head-org-badge-slot" class="head-org-slot"><span th:if="${mission?.owningSquadron != null}" class="squadron-badge"
+                          th:title="${mission.owningSquadron.name()}"
+                          th:text="${mission.owningSquadron.shorthand()}">IRI</span></span>
+                    <span id="mission-status-badge" class="status-badge" data-testid="mission-status"
+                          th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
+                          th:text="${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status}">GEPLANT</span>
+                </div>
             </div>
-            <div class="mission-head-actions">
-                <button id="add-participant-btn" type="button" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{mission.participant.add}">Anmelden</span></button>
-                <a th:href="@{/missions}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg> <span th:text="#{general.back}">Zur&uuml;ck</span></a>
+            <div class="page-actions">
+                <button th:if="${mission.canEdit or mission.canManageManagers}" id="mission-edit-btn" type="button" class="btn btn-ghost"
+                        data-testid="mission-edit-toggle" aria-controls="pane-verw" aria-pressed="false"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{mission.edit.toggle}">Bearbeiten</span></button>
+                <button id="add-participant-btn" type="button" class="btn btn--cta" data-testid="page-head-primary"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{mission.participant.add}">Anmelden</span></button>
+                <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                    <th:block th:replace="~{fragments/components :: overflowMenu(id='mission-more-menu', items=~{::mission-more-items})}">
+                        <th:block th:ref="mission-more-items">
+                            <button type="button" role="menuitem" class="overflow-menu__item overflow-menu__item--danger delete-mission-btn"
+                                    data-testid="mission-delete"
+                                    th:data-action="@{/missions/{id}/delete(id=${mission.id})}"
+                                    th:data-name="${mission.name}"
+                                    data-sub-section="mission"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{mission.delete.menu}">Einsatz l&ouml;schen &hellip;</span></button>
+                        </th:block>
+                    </th:block>
+                </th:block>
             </div>
         </div>
         <div class="facts-bar">
@@ -47,7 +62,6 @@
             <button class="tab" id="tab-ueb" type="button" role="tab" aria-selected="false" aria-controls="pane-ueb" data-tab="ueb" th:text="#{mission.tab.overview}">&Uuml;bersicht</button>
             <button class="tab" id="tab-crew" type="button" role="tab" aria-selected="false" aria-controls="pane-crew" data-tab="crew"><span th:text="#{mission.tab.crew}">Teilnehmer &amp; Einheiten</span> <span class="tab-count" th:text="|${mission.checkedInParticipants}/${mission.registeredParticipants}|" th:title="#{mission.participants.count.tooltip}">0/0</span></button>
             <button class="tab" id="tab-fin" type="button" role="tab" aria-selected="false" aria-controls="pane-fin" data-tab="fin"><span th:text="#{mission.tab.finance}">Finanzen &amp; Auszahlung</span> <span id="finance-tab-count" class="tab-count" th:if="${financeSum != null}" th:text="${financeIncomeCount + financeExpenseCount}">0</span></button>
-            <button class="tab" id="tab-verw" type="button" role="tab" aria-selected="false" aria-controls="pane-verw" data-tab="verw" th:if="${mission.canEdit or mission.canManageManagers}" th:text="#{mission.tab.admin}">Verwaltung</button>
         </div>
     </div>
 
@@ -55,7 +69,7 @@
         <section th:unless="${isNew}" id="pane-ueb" class="tab-pane" role="tabpanel" aria-labelledby="tab-ueb">
             <div id="overview-results"><th:block th:fragment="overviewSection">
             <span id="overview-head-meta" hidden
-                  th:attr="data-title=${#messages.msg('mission.prefix') + ' ' + mission.name},
+                  th:attr="data-title=${mission.name},
                            data-status=${#strings.toLowerCase(mission.status)},
                            data-status-label=${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status},
                            data-planned-start-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'},
@@ -173,7 +187,7 @@
                                     <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                                 </dd>
                             </dl>
-                            <div class="chiprow krtm-margin-top-10px-e5a6" th:if="${myParticipant != null}">
+                            <div class="chiprow chiprow--after" th:if="${myParticipant != null}">
                                 <span class="chip chip--success" th:text="#{mission.overview.signed_up} + (${myParticipant.desiredMissionJobType != null} ? ' &middot; ' + ${myParticipant.desiredMissionJobType.name} : '')">Du bist angemeldet</span>
                                 <span class="chip" th:if="${assignedUnitByParticipantId[myParticipant.id] != null}" th:text="#{mission.overview.aboard} + ' ' + ${assignedUnitByParticipantId[myParticipant.id]}">an Bord</span>
                             </div>
@@ -325,220 +339,219 @@
             <div id="finance-results"><th:block th:fragment="financeSection">
             <span id="finance-count-meta" hidden th:text="${(financeIncomeCount ?: 0) + (financeExpenseCount ?: 0)}"></span>
 
-            <div class="sumstrip" th:if="${financeSum != null}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
-                <div class="sum is-total"><div class="sk" th:text="#{mission.finance.total}">Gesamtsumme</div><div class="sv" th:classappend="${financeSum >= 0 ? 'pos' : 'neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</div><div class="sd" th:text="|aUEC &middot; ${financeIncomeCount + financeExpenseCount} ${#messages.msg('mission.finance.entries')}|">aUEC</div></div>
-                <div class="sum"><div class="sk" th:text="#{mission.finance.income_sum}">Einnahmen</div><div class="sv pos" th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(financeIncomeSum), 1, 'POINT')}">0</div><div class="sd" th:text="|${financeIncomeCount} ${#messages.msg('mission.finance.entries')}|">0</div></div>
-                <div class="sum"><div class="sk" th:text="#{mission.finance.expense_sum}">Ausgaben</div><div class="sv neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.round(financeExpenseSum), 1, 'POINT')}">0</div><div class="sd" th:text="|${financeExpenseCount} ${#messages.msg('mission.finance.entries')} &middot; ${#messages.msg('mission.finance.incl_refinery')}|">0</div></div>
-                <div class="sum"><div class="sk" th:text="#{mission.finance.per_share} + ' (' + ${mission.registeredParticipants} + ' TN)'">Je Anteil</div><div class="sv" th:text="${financePerShare != null ? #numbers.formatInteger(financePerShare, 1, 'POINT') : '&mdash;'}">0</div><div class="sd" th:text="#{mission.finance.per_share.hint}">aUEC bei Gleichverteilung</div></div>
+            <div class="kpi-grid fin-kpis" data-testid="mission-finance-kpis" th:if="${financeSum != null}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
+                <div class="kpi-total">
+                    <div class="kpi-label" th:text="#{mission.finance.kpi.total}">Gesamtergebnis</div>
+                    <div class="kpi-value"><span th:classappend="${financeSum >= 0 ? 'is-pos' : 'is-neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</span> <span class="kpi-unit">aUEC</span></div>
+                    <div class="kpi-sub" th:text="|${financeIncomeCount + financeExpenseCount} ${#messages.msg('mission.finance.entries')}|">0 Eintr&auml;ge</div>
+                </div>
+                <div class="kpi-total">
+                    <div class="kpi-label" th:text="#{mission.finance.income_sum}">Einnahmen</div>
+                    <div class="kpi-value"><span class="is-pos" th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(financeIncomeSum), 1, 'POINT')}">0</span> <span class="kpi-unit">aUEC</span></div>
+                    <div class="kpi-sub" th:text="|${financeIncomeCount} ${#messages.msg('mission.finance.entries')}|">0 Eintr&auml;ge</div>
+                </div>
+                <div class="kpi-total">
+                    <div class="kpi-label" th:text="#{mission.finance.expense_sum}">Ausgaben</div>
+                    <div class="kpi-value"><span class="is-neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.round(financeExpenseSum), 1, 'POINT')}">0</span> <span class="kpi-unit">aUEC</span></div>
+                    <div class="kpi-sub" th:text="|${financeExpenseCount} ${#messages.msg('mission.finance.entries')} &middot; ${#messages.msg('mission.finance.incl_refinery')}|">0 Eintr&auml;ge</div>
+                </div>
+                <div class="kpi-total">
+                    <div class="kpi-label" th:text="#{mission.finance.per_share}">Je Anteil</div>
+                    <div class="kpi-value"><span th:text="${financePerShare != null ? #numbers.formatInteger(financePerShare, 1, 'POINT') : '&mdash;'}">0</span> <span class="kpi-unit" th:if="${financePerShare != null}">aUEC</span></div>
+                    <div class="kpi-sub" th:text="#{mission.finance.per_share.participants(${mission.registeredParticipants ?: 0})}">0 Teilnehmer</div>
+                </div>
             </div>
 
             <div class="pane-grid-fin">
-                <div class="kpanel" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
-                    <div class="kpanel-head">
-                        <span th:text="#{mission.finances}">Finanzen</span>
-                        <button type="button" class="btn btn--cta btn-xs2" data-trigger="open-modal-display" data-modal-id="finance-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.finance.add}">Neuer Eintrag</span></button>
+                <section class="card card--flush fin-card" data-testid="mission-finance-list" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
+                    <div class="card-head fin-card-head">
+                        <h2 class="card-title" th:text="#{mission.finances}">Finanzen</h2>
+                        <button type="button" class="btn btn--cta" data-trigger="open-modal-display" data-modal-id="finance-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</span></button>
                     </div>
-                    <div class="kpanel-body">
-                    <div class="table-responsive">
-                        <table th:if="${(financeEntries != null and !financeEntries.isEmpty()) or (refineryOrders != null and !refineryOrders.isEmpty())}">
-                            <thead>
-                                <tr>
-                                    <th th:text="#{mission.finance.user}">Nutzer</th>
-                                    <th th:text="#{mission.finance.type}">Typ</th>
-                                    <th class="num" th:text="#{mission.finance.amount}">Betrag</th>
-                                    <th th:text="#{mission.finance.note}">Notiz</th>
-                                    <th th:text="#{general.actions}" sec:authorize="isAuthenticated()">Aktionen</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="entry : ${financeEntries}">
-                                    <td th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">Nutzer</td>
-                                    <td>
-                                        <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
-                                        <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
-                                    </td>
-                                    <td class="num" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
-                                    <td th:text="${entry.note}" th:title="${entry.note}">Notiz</td>
-                                    <td sec:authorize="isAuthenticated()">
-                                        <div class="flex-gap-xs krtm-justify-content-flex-end-177c">
-                                            <button type="button" class="btn btn-ghost btn-icon edit-finance-btn"
-                                                    th:with="financeEditAmount=${@moneyFormat.round(entry.amount)}"
-                                                    th:data-id="${entry.id}"
-                                                    th:data-note="${entry.note}"
-                                                    th:data-type="${entry.type}"
-                                                    th:data-amount="${financeEditAmount}"
-                                                    th:data-version="${entry.version}"
-                                                    data-trigger="mission-open-edit-finance"
-                                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                    <table class="data-table data-table--stack" th:if="${(financeEntries != null and !financeEntries.isEmpty()) or (refineryOrders != null and !refineryOrders.isEmpty())}">
+                        <thead>
+                            <tr>
+                                <th th:text="#{mission.finance.user}">Nutzer</th>
+                                <th class="cell-status" th:text="#{mission.finance.type}">Typ</th>
+                                <th class="num" th:text="#{mission.finance.amount}">Betrag</th>
+                                <th class="cell-actions" sec:authorize="isAuthenticated()"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="entry : ${financeEntries}">
+                                <td>
+                                    <span class="cell-title" th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">Nutzer</span>
+                                    <span class="cell-sub fin-note" th:if="${!#strings.isEmpty(entry.note)}" th:text="${entry.note}" th:title="${entry.note}">Notiz</span>
+                                </td>
+                                <td class="cell-status">
+                                    <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
+                                    <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
+                                </td>
+                                <td class="num" th:classappend="${entry.type.name() == 'INCOME'} ? 'is-pos' : 'is-neg'" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
+                                <td class="cell-actions" sec:authorize="isAuthenticated()">
+                                    <button type="button" class="btn btn-ghost btn-icon edit-finance-btn"
+                                            th:with="financeEditAmount=${@moneyFormat.round(entry.amount)}"
+                                            th:data-id="${entry.id}"
+                                            th:data-note="${entry.note}"
+                                            th:data-type="${entry.type}"
+                                            th:data-amount="${financeEditAmount}"
+                                            th:data-version="${entry.version}"
+                                            data-trigger="mission-open-edit-finance"
+                                            th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                    <button type="button" class="btn btn-quiet-danger btn-icon delete-finance-btn" th:attr="data-action=@{/missions/{id}/finance-entries/{entryId}/delete(id=${mission.id}, entryId=${entry.id})}" data-sub-section="finance" th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </td>
+                            </tr>
+                            <tr th:if="${refineryOrders != null}" th:each="order : ${refineryOrders}" th:unless="${order.expenses == null or order.expenses <= 0}">
+                                <td>
+                                    <span class="cell-title" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</span>
+                                    <a class="cell-sub reflink" th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}">Raffinerieauftrag</a>
+                                </td>
+                                <td class="cell-status">
+                                    <span class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
+                                </td>
+                                <td class="num is-neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
+                                <td class="cell-actions" sec:authorize="isAuthenticated()">
+                                    <span class="auto-marker" th:title="#{mission.finance.auto.tooltip}" th:text="#{mission.finance.auto}">auto</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <th:block th:if="${(financeEntries == null or financeEntries.isEmpty()) and (refineryOrders == null or refineryOrders.isEmpty())}">
+                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.finance.empty.title', textKey='mission.finance.empty')}"></th:block>
+                    </th:block>
+                </section>
 
-                                            <button type="button" class="btn btn-quiet-danger btn-icon delete-finance-btn" th:attr="data-action=@{/missions/{id}/finance-entries/{entryId}/delete(id=${mission.id}, entryId=${entry.id})}" data-sub-section="finance" th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr th:if="${refineryOrders != null}" th:each="order : ${refineryOrders}" th:unless="${order.expenses == null or order.expenses <= 0}">
-                                    <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
-                                    <td>
-                                        <span class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
-                                    </td>
-                                    <td class="num" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
-                                    <td>
-                                        <a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" class="reflink">Raffinerieauftrag</a>
-                                    </td>
-                                    <td sec:authorize="isAuthenticated()">
-                                        <div class="flex-gap-xs krtm-justify-content-flex-end-177c">
-                                            <span class="auto-marker" th:title="#{mission.finance.auto.tooltip}" th:text="#{mission.finance.auto}">auto</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <p th:if="${(financeEntries == null or financeEntries.isEmpty()) and (refineryOrders == null or refineryOrders.isEmpty())}" th:text="#{mission.finance.empty}">Keine Finanzdaten vorhanden.</p>
+                <section class="card card--flush fin-card" data-testid="mission-payout-list">
+                    <div class="card-head fin-card-head">
+                        <h2 class="card-title" th:text="#{mission.payout}">Auszahlung</h2>
                     </div>
-                    </div>
-                </div>
-
-                <div class="kpanel">
-                    <div class="kpanel-head" th:text="#{mission.payout}">Auszahlung</div>
-                    <div class="kpanel-body">
-                    <div class="table-responsive">
-                        <table class="payout-table" th:if="${participants != null and !participants.isEmpty()}">
-                            <thead>
-                                <tr>
-                                    <th th:text="#{mission.participant.user}">Benutzer</th>
-                                    <th class="num" th:text="#{mission.participant.participation_percentage}" sec:authorize="isAuthenticated()">Teilnahme (%)</th>
-                                    <th th:text="#{mission.participant.payout_preference}">Auszahlungsart</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="p : ${participants}" th:attr="data-participant-id=${p?.id}, data-version=${p?.version}">
-                                    <td th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Username</td>
-                                    <td class="num" th:text="${#numbers.formatDecimal(participationPercentages[p.id] ?: 0.0, 1, 'NONE', 2, 'DEFAULT')} + ' %'" sec:authorize="isAuthenticated()">0.00 %</td>
-                                    <td>
-                                        <select class="form-control"
-                                                th:data-payout-url="@{/missions/{id}/participants/{pId}/payout-preference(id=${mission.id}, pId=${p?.id})}"
-                                                th:data-participant-id="${p?.id}"
-                                                th:data-original-value="${p?.payoutPreference?.name()}"
-                                                data-trigger="mission-update-payout"
-                                                th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and !#authorization.expression('hasRole(''MISSION_MANAGER'')') and (authUserId == null or p.user.id.toString() != authUserId) and !mission.canEdit)}">
-                                            <option value="PAYOUT" th:selected="${p?.payoutPreference?.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
-                                            <option value="DONATE" th:selected="${p?.payoutPreference?.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</option>
-                                        </select>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <p th:if="${participants == null or participants.isEmpty()}" th:text="#{mission.participants.empty}">Keine Teilnehmer.</p>
-                    </div>
-                </div>
+                    <table class="data-table data-table--stack payout-table" th:if="${participants != null and !participants.isEmpty()}">
+                        <thead>
+                            <tr>
+                                <th th:text="#{mission.participant.user}">Benutzer</th>
+                                <th class="num" th:text="#{mission.participant.participation_percentage}" sec:authorize="isAuthenticated()">Teilnahme (%)</th>
+                                <th class="cell-actions" th:text="#{mission.participant.payout_preference}">Auszahlungsart</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="p : ${participants}" th:attr="data-participant-id=${p?.id}, data-version=${p?.version}">
+                                <td><span class="cell-title" th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Username</span></td>
+                                <td class="num" th:attr="data-label=#{mission.participant.participation_percentage}" th:text="${#numbers.formatDecimal(participationPercentages[p.id] ?: 0.0, 1, 'NONE', 2, 'DEFAULT')} + ' %'" sec:authorize="isAuthenticated()">0.00 %</td>
+                                <td class="cell-actions">
+                                    <select class="form-control payout-select"
+                                            th:aria-label="#{mission.participant.payout_preference}"
+                                            th:data-payout-url="@{/missions/{id}/participants/{pId}/payout-preference(id=${mission.id}, pId=${p?.id})}"
+                                            th:data-participant-id="${p?.id}"
+                                            th:data-original-value="${p?.payoutPreference?.name()}"
+                                            data-trigger="mission-update-payout"
+                                            th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and !#authorization.expression('hasRole(''MISSION_MANAGER'')') and (authUserId == null or p.user.id.toString() != authUserId) and !mission.canEdit)}">
+                                        <option value="PAYOUT" th:selected="${p?.payoutPreference?.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
+                                        <option value="DONATE" th:selected="${p?.payoutPreference?.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <th:block th:if="${participants == null or participants.isEmpty()}">
+                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.payout.empty.title', textKey='mission.participants.empty')}"></th:block>
+                    </th:block>
+                </section>
             </div>
 
             <th:block sec:authorize="isAuthenticated()" th:if="${(refineryOrders != null and !#lists.isEmpty(refineryOrders)) or (inventoryEntries != null and !#lists.isEmpty(inventoryEntries))}">
-                <details class="hud-details" open th:if="${refineryOrders != null and !#lists.isEmpty(refineryOrders)}">
-                    <summary><span th:text="#{mission.refinery_orders}">Raffinerieauftr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(refineryOrders)}">2</span></summary>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th th:text="#{refinery.user}">Nutzer</th>
-                                    <th th:text="#{refinery.location}">Standort</th>
-                                    <th th:text="#{refinery.ends_at}">Ende</th>
-                                    <th th:text="#{refinery.status}">Status</th>
-                                    <th th:text="#{nav.materials}">Materialien</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="order : ${refineryOrders}">
-                                    <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
-                                    <td th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
-                                    <td>
-                                        <span class="refinery-endsat-local"
-                                              th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}"
-                                              th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '-'}">Ende</span>
-                                    </td>
-                                    <td th:text="${order.status != null ? #messages.msgOrNull('refinery.status.' + order.status) ?: order.status : '-'}">Status</td>
-                                    <td class="krtm-padding-0-5rem-2fc7">
-                                        <table th:if="${order.goods != null and !#lists.isEmpty(order.goods)}" class="krtm-margin-0-background-transparent-0b9a">
-                                            <thead>
-                                                <tr>
-                                                    <th th:text="#{refinery.material}" class="krtm-background-transparent-padding-0-25rem-0-5re-b99e">Material</th>
-                                                    <th th:text="#{refinery.amount}" class="krtm-background-transparent-padding-0-25rem-0-5re-b99e">Menge</th>
-                                                    <th th:text="#{refinery.quality}" class="krtm-background-transparent-padding-0-25rem-0-5re-b99e">Qualit&auml;t</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr th:each="good : ${order.goods}" class="krtm-background-transparent-529a">
-                                                    <td th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}" class="krtm-padding-0-25rem-0-5rem-border-bottom-none-5890">Material</td>
-                                                    <td th:switch="${good.outputMaterial?.quantityType}" class="krtm-padding-0-25rem-0-5rem-border-bottom-none-5890">
-                                                        <span th:case="'PIECE'" th:text="${good.outputQuantity != null} ? |${#numbers.formatInteger(good.outputQuantity, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
-                                                        <span th:case="*" th:text="${good.outputQuantity != null} ? |${#numbers.formatDecimal(good.outputQuantity / 100.0, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
-                                                    </td>
-                                                    <td th:text="${good.quality != null ? good.quality : '-'}" class="krtm-padding-0-25rem-0-5rem-border-bottom-none-5890">Qualit&auml;t</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                        <span th:if="${order.goods == null or #lists.isEmpty(order.goods)}" class="krtm-padding-0-5rem-display-block-2e6a">-</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <details class="card card--flush fin-details" open th:if="${refineryOrders != null and !#lists.isEmpty(refineryOrders)}">
+                    <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.refinery_orders}">Raffinerieauftr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(refineryOrders)}">2</span></summary>
+                    <table class="data-table data-table--stack">
+                        <thead>
+                            <tr>
+                                <th th:text="#{refinery.user}">Nutzer</th>
+                                <th th:text="#{refinery.location}">Standort</th>
+                                <th th:text="#{refinery.ends_at}">Ende</th>
+                                <th class="cell-status" th:text="#{refinery.status}">Status</th>
+                                <th th:text="#{nav.materials}">Materialien</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="order : ${refineryOrders}">
+                                <td><a class="row-link" th:href="@{/refinery-orders/{id}(id=${order.id})}"><span class="cell-title" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</span></a></td>
+                                <td th:attr="data-label=#{refinery.location}" th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
+                                <td th:attr="data-label=#{refinery.ends_at}">
+                                    <span class="refinery-endsat-local"
+                                          th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}"
+                                          th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '-'}">Ende</span>
+                                </td>
+                                <td class="cell-status" th:text="${order.status != null ? #messages.msgOrNull('refinery.status.' + order.status) ?: order.status : '-'}">Status</td>
+                                <td th:attr="data-label=#{nav.materials}">
+                                    <ul class="goods-list" th:if="${order.goods != null and !#lists.isEmpty(order.goods)}">
+                                        <li th:each="good : ${order.goods}">
+                                            <span th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}">Material</span>
+                                            <span class="goods-amount" th:switch="${good.outputMaterial?.quantityType}">
+                                                <span th:case="'PIECE'" th:text="${good.outputQuantity != null} ? |${#numbers.formatInteger(good.outputQuantity, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
+                                                <span th:case="*" th:text="${good.outputQuantity != null} ? |${#numbers.formatDecimal(good.outputQuantity / 100.0, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
+                                            </span>
+                                            <span class="goods-quality" th:if="${good.quality != null}" th:text="|#{refinery.quality} ${good.quality}|">Qualit&auml;t 500</span>
+                                        </li>
+                                    </ul>
+                                    <span th:if="${order.goods == null or #lists.isEmpty(order.goods)}">-</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </details>
 
-                <details class="hud-details" open th:if="${inventoryEntries != null and !#lists.isEmpty(inventoryEntries)}">
-                    <summary><span th:text="#{mission.inventory_entries}">Lagereintr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(inventoryEntries)}">3</span></summary>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th th:text="#{inventory.user}">Nutzer</th>
-                                    <th th:text="#{inventory.location}">Standort</th>
-                                    <th th:text="#{inventory.material}">Material</th>
-                                    <th th:text="#{inventory.amount}">Menge</th>
-                                    <th th:text="#{inventory.quality}">Qualit&auml;t</th>
-                                    <th th:text="#{inventory.order}">Auftrag</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="item : ${inventoryEntries}">
-                                    <td th:text="${item.user != null ? item.user.effectiveName : '-'}">Nutzer</td>
-                                    <td th:text="${item.location != null ? item.location.name : '-'}">Standort</td>
-                                    <td>
-                                        <span th:text="${item.material != null ? item.material.name : '-'}">Material</span>
-                                        <span th:if="${item.stolen}" class="chip chip--danger chip-xs" data-testid="stolen-chip"
-                                              th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
-                                    </td>
-                                    <td th:switch="${item.material?.quantityType}">
-                                        <span th:case="'PIECE'" th:text="${item.amount != null} ? |${#numbers.formatInteger(item.amount, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
-                                        <span th:case="*" th:text="${item.amount != null} ? |${#numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
-                                    </td>
-                                    <td th:text="${item.quality != null ? item.quality : '-'}">Qualit&auml;t</td>
-                                    <td>
-                                        <span th:each="a : ${item.jobOrderAllocations}"
-                                              class="assoc-chip assoc-chip--order">
-                                            <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
-                                            <span class="assoc-chip__amt"
-                                                  th:text="${item.material?.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
-                                        </span>
-                                        <span th:if="${#lists.isEmpty(item.jobOrderAllocations)}">-</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <details class="card card--flush fin-details" open th:if="${inventoryEntries != null and !#lists.isEmpty(inventoryEntries)}">
+                    <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.inventory_entries}">Lagereintr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(inventoryEntries)}">3</span></summary>
+                    <table class="data-table data-table--stack">
+                        <thead>
+                            <tr>
+                                <th th:text="#{inventory.material}">Material</th>
+                                <th th:text="#{inventory.user}">Nutzer</th>
+                                <th th:text="#{inventory.location}">Standort</th>
+                                <th class="num" th:text="#{inventory.amount}">Menge</th>
+                                <th class="num" th:text="#{inventory.quality}">Qualit&auml;t</th>
+                                <th th:text="#{inventory.order}">Auftrag</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="item : ${inventoryEntries}">
+                                <td>
+                                    <span class="cell-title" th:text="${item.material != null ? item.material.name : '-'}">Material</span>
+                                    <span th:if="${item.stolen}" class="chip chip--danger chip-xs" data-testid="stolen-chip"
+                                          th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
+                                </td>
+                                <td th:attr="data-label=#{inventory.user}" th:text="${item.user != null ? item.user.effectiveName : '-'}">Nutzer</td>
+                                <td th:attr="data-label=#{inventory.location}" th:text="${item.location != null ? item.location.name : '-'}">Standort</td>
+                                <td class="num" th:switch="${item.material?.quantityType}">
+                                    <span th:case="'PIECE'" th:text="${item.amount != null} ? |${#numbers.formatInteger(item.amount, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
+                                    <span th:case="*" th:text="${item.amount != null} ? |${#numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
+                                </td>
+                                <td class="num" th:attr="data-label=#{inventory.quality}" th:text="${item.quality != null ? item.quality : '-'}">Qualit&auml;t</td>
+                                <td th:attr="data-label=#{inventory.order}">
+                                    <span th:each="a : ${item.jobOrderAllocations}"
+                                          class="assoc-chip assoc-chip--order">
+                                        <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
+                                        <span class="assoc-chip__amt"
+                                              th:text="${item.material?.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                    </span>
+                                    <span th:if="${#lists.isEmpty(item.jobOrderAllocations)}">-</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </details>
             </th:block>
             </th:block></div>
         </section>
-        <section id="pane-verw" class="tab-pane" role="tabpanel" aria-labelledby="tab-verw"
+        <section id="pane-verw" class="tab-pane edit-pane" role="region"
+                 th:aria-label="${isNew} ? #{mission.create} : #{mission.edit.title}"
                  th:classappend="${isNew} ? 'on'"
                  th:if="${isNew or mission.canEdit or mission.canManageManagers}">
-            <div class="pane-grid-2" th:classappend="${isNew} ? 'pane-grid--single'">
-                <div class="kpanel">
-                    <div class="kpanel-head" th:text="#{mission.details}">Details</div>
-                    <div class="kpanel-body">
-
-                    <form id="mission-form" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}"
+            <div th:unless="${isNew}" class="split edit-bar">
+                <h2 id="mission-edit-title" class="edit-bar__title" tabindex="-1" th:text="#{mission.edit.title}">Einsatz bearbeiten</h2>
+                <button type="button" id="mission-edit-done" class="btn btn-ghost" data-testid="mission-edit-done"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-check"/></svg> <span th:text="#{mission.edit.done}">Fertig</span></button>
+            </div>
+            <div class="pane-grid-2" th:classappend="${isNew} ? 'pane-grid--single' : 'pane-grid--edit'">
+                    <form id="mission-form" class="form-layout card" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}"
                           th:attr="data-mission-edit=${isNew} ? null : 'true'">
                         <input type="hidden" id="mission-version" name="version" th:field="*{version}">
                         <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
@@ -548,206 +561,205 @@
                         <input type="hidden" id="mission-dirty-schedule" name="dirtySchedule" value="true">
                         <input type="hidden" id="mission-dirty-flags" name="dirtyFlags" value="true">
 
-            <div class="form-group">
-                <label th:text="#{mission.name}">Name</label>
-                <input type="text" name="name" data-testid="mission-name-input" th:value="*{name}" required
-                       th:disabled="${!isNew and !mission.canEdit}">
-                <div class="field-error" data-error-for="name" th:text="${#fields.hasErrors('name') ? #fields.errors('name')[0] : ''}"></div>
-            </div>
+                        <fieldset class="form-section" th:disabled="${!isNew and !mission.canEdit}">
+                            <legend class="form-section__head" th:text="|1 · #{mission.form.section.core}|">1 · Einsatz</legend>
+                            <div class="form-grid">
+                                <div class="form-group span-all">
+                                    <label for="mission-name" th:text="#{mission.name}">Name</label>
+                                    <input type="text" id="mission-name" name="name" data-testid="mission-name-input" th:value="*{name}" required>
+                                    <div class="field-error" data-error-for="name" th:text="${#fields.hasErrors('name') ? #fields.errors('name')[0] : ''}"></div>
+                                </div>
 
-            <div class="form-group" th:if="${isNew}">
-                <label th:text="#{mission.objective.section}">Ziele</label>
-                <div class="kpanel">
-                    <div class="kpanel-body">
-                        <div class="ae-list" id="mission-create-objective-list"></div>
-                        <button type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-create-objective-add"
-                                data-trigger="create-objective-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
-                        <p class="form-hint krtm-margin-top-10px-e5a6" th:text="#{mission.objective.editor.hint}">Titel + Klassifizierung frei editierbar.</p>
-                    </div>
-                </div>
-                <input type="hidden" name="objectivesJson" id="mission-objectives-json" th:value="*{objectivesJson}">
-                <template id="mission-create-objective-row">
-                    <div class="ae-row">
-                        <span class="ae-num">1</span>
-                        <span class="ae-fields">
-                            <input class="ae-title" type="text" maxlength="500"
-                                   th:placeholder="#{mission.objective.title.placeholder}" th:aria-label="#{mission.objective.title.placeholder}">
-                            <select class="ae-kind" th:aria-label="#{mission.objective.kind.label}">
-                                <option value="PRIMARY" th:text="#{mission.objective.kind.primary}">Hauptziel</option>
-                                <option value="SECONDARY" th:text="#{mission.objective.kind.secondary}">Nebenziel</option>
-                                <option value="NON_GOAL" th:text="#{mission.objective.kind.non_goal}">Nicht-Ziel</option>
-                            </select>
-                        </span>
-                        <span class="ae-move">
-                            <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-objective-up"
-                                    th:title="#{mission.objective.move_up}" th:aria-label="#{mission.objective.move_up}">&#x25B2;</button>
-                            <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-objective-down"
-                                    th:title="#{mission.objective.move_down}" th:aria-label="#{mission.objective.move_down}">&#x25BC;</button>
-                        </span>
-                        <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="create-objective-delete"
-                                th:title="#{mission.objective.remove}" th:aria-label="#{mission.objective.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                    </div>
-                </template>
-            </div>
+                                <div class="form-group span-all">
+                                    <span class="form-label" id="mission-status-label" th:text="#{mission.status}">Status</span>
+                                    <th:block th:replace="~{fragments/components :: segmented(name='status', labelKey='mission.status', variant='segmented--block segmented--lg', selected=*{status},
+                                        options=${ {{value: 'PLANNED', labelKey: 'mission.status.planned'}, {value: 'ACTIVE', labelKey: 'mission.status.active'}, {value: 'COMPLETED', labelKey: 'mission.status.completed'}, {value: 'CANCELLED', labelKey: 'mission.status.cancelled'}} })}"></th:block>
+                                    <div class="field-error" data-error-for="status" th:text="${#fields.hasErrors('status') ? #fields.errors('status')[0] : ''}"></div>
+                                </div>
 
-            <div class="form-group" th:if="${isNew}">
-                <label th:text="#{mission.step.section}">Ablauf</label>
-                <div class="kpanel">
-                    <div class="kpanel-body">
-                        <div class="ae-list" id="mission-create-step-list"></div>
-                        <button type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-create-step-add"
-                                data-trigger="create-step-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
-                        <p class="form-hint krtm-margin-top-10px-e5a6" th:text="#{mission.step.editor.hint}">Titel + optionale Zeit/Ort frei editierbar.</p>
-                    </div>
-                </div>
-                <input type="hidden" name="stepsJson" id="mission-steps-json" th:value="*{stepsJson}">
-                <template id="mission-create-step-row">
-                    <div class="ae-row">
-                        <span class="ae-num">1</span>
-                        <span class="ae-fields">
-                            <input class="ae-title" type="text" maxlength="500"
-                                   th:placeholder="#{mission.step.title.placeholder}" th:aria-label="#{mission.step.title.placeholder}">
-                            <input class="ae-meta" type="text" maxlength="200"
-                                   th:placeholder="#{mission.step.meta.placeholder}" th:aria-label="#{mission.step.meta.placeholder}">
-                        </span>
-                        <span class="ae-move">
-                            <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-step-up"
-                                    th:title="#{mission.step.move_up}" th:aria-label="#{mission.step.move_up}">&#x25B2;</button>
-                            <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-step-down"
-                                    th:title="#{mission.step.move_down}" th:aria-label="#{mission.step.move_down}">&#x25BC;</button>
-                        </span>
-                        <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="create-step-delete"
-                                th:title="#{mission.step.remove}" th:aria-label="#{mission.step.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                    </div>
-                </template>
-            </div>
+                                <div class="form-group">
+                                    <label for="mission-operation" th:text="#{mission.operation}">Operation</label>
+                                    <select id="mission-operation" name="operationId">
+                                        <option value="" th:text="#{general.none}">-- Keine --</option>
+                                        <option th:each="op : ${operationsList}" th:value="${op.id}" th:text="${op.name}" th:selected="${missionForm.operationId != null and missionForm.operationId == op.id.toString()}"></option>
+                                    </select>
+                                    <div th:if="${#fields.hasErrors('operationId')}" th:errors="*{operationId}" class="field-error"></div>
+                                </div>
 
-            <div class="form-group" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
-                <label th:text="#{mission.description}">Description</label>
-                <textarea name="description" rows="5" maxlength="20000" th:text="*{description}"
-                          th:disabled="${!isNew and !mission.canEdit}"></textarea>
-                <small class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterst&uuml;tzt.</small>
-                <div class="field-error" data-error-for="description" th:text="${#fields.hasErrors('description') ? #fields.errors('description')[0] : ''}"></div>
-            </div>
+                                <div class="form-group">
+                                    <label for="mission-meeting-point" th:text="#{mission.meeting_point}">Treffpunkt</label>
+                                    <input type="text" id="mission-meeting-point" name="meetingPoint" maxlength="200" th:value="*{meetingPoint}">
+                                    <div class="field-error" data-error-for="meetingPoint" th:text="${#fields.hasErrors('meetingPoint') ? #fields.errors('meetingPoint')[0] : ''}"></div>
+                                </div>
 
-            <div class="form-group">
-                <label th:text="#{mission.meeting_point}">Treffpunkt</label>
-                <input type="text" name="meetingPoint" maxlength="200" th:value="*{meetingPoint}"
-                       th:disabled="${!isNew and !mission.canEdit}">
-                <div class="field-error" data-error-for="meetingPoint" th:text="${#fields.hasErrors('meetingPoint') ? #fields.errors('meetingPoint')[0] : ''}"></div>
-            </div>
+                                <div class="form-group span-all" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
+                                    <label for="mission-description" th:text="#{mission.description}">Description</label>
+                                    <textarea id="mission-description" name="description" rows="5" maxlength="20000" th:text="*{description}"></textarea>
+                                    <small class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterst&uuml;tzt.</small>
+                                    <div class="field-error" data-error-for="description" th:text="${#fields.hasErrors('description') ? #fields.errors('description')[0] : ''}"></div>
+                                </div>
 
-            <div class="form-row">
-            <div class="form-group">
-                <label th:text="#{mission.status}">Status</label>
-                <select name="status" data-testid="mission-status-select" th:disabled="${!isNew and !mission.canEdit}" required>
-                    <option value="PLANNED" th:selected="*{status == 'PLANNED'}">PLANNED</option>
-                    <option value="ACTIVE" th:selected="*{status == 'ACTIVE'}">ACTIVE</option>
-                    <option value="COMPLETED" th:selected="*{status == 'COMPLETED'}">COMPLETED</option>
-                    <option value="CANCELLED" th:selected="*{status == 'CANCELLED'}">CANCELLED</option>
-                </select>
-                <div class="field-error" data-error-for="status" th:text="${#fields.hasErrors('status') ? #fields.errors('status')[0] : ''}"></div>
-            </div>
+                                <div class="form-group span-all">
+                                    <label for="mission-calendar-link" th:text="#{mission.calendar_link}">Link zum Kalendereintrag</label>
+                                    <div class="cluster gap-2">
+                                        <input type="url" id="mission-calendar-link" name="calendarLink" th:value="*{calendarLink}" class="grow calendar-link-input">
+                                        <a th:if="${!isNew and !#strings.isEmpty(missionForm.calendarLink)}"
+                                           th:href="*{calendarLink}" target="_blank" rel="noopener noreferrer"
+                                           class="btn btn-ghost nowrap"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{mission.calendar_link_open}">&Ouml;ffnen</span></a>
+                                    </div>
+                                    <div class="field-error" data-error-for="calendarLink" th:text="${#fields.hasErrors('calendarLink') ? #fields.errors('calendarLink')[0] : ''}"></div>
+                                </div>
+                            </div>
+                        </fieldset>
 
-            <div class="form-group">
-                <label th:text="#{mission.operation}">Operation</label>
-                <select name="operationId" th:disabled="${!isNew and !mission.canEdit}">
-                    <option value="" th:text="#{general.none}">-- Keine --</option>
-                    <option th:each="op : ${operationsList}" th:value="${op.id}" th:text="${op.name}" th:selected="${missionForm.operationId != null and missionForm.operationId == op.id.toString()}"></option>
-                </select>
-                <div th:if="${#fields.hasErrors('operationId')}" th:errors="*{operationId}" class="field-error"></div>
-            </div>
-            </div>
+                        <fieldset class="form-section" th:disabled="${!isNew and !mission.canEdit}">
+                            <legend class="form-section__head" th:text="|2 · #{mission.form.section.schedule}|">2 · Zeitplan</legend>
+                            <div class="mission-time-grid">
+                                <div class="form-group datetime-split-group" th:attr="data-validate-not-past=${isNew ? 'true' : 'false'}, data-error-past=#{validation.datetime.past}">
+                                    <label th:text="#{mission.meeting_time}">Treffen Teamspeak</label>
+                                    <input type="hidden" name="meetingTime" id="meetingTime" th:value="*{meetingTime}">
+                                    <div class="datetime-split-inputs">
+                                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                    </div>
+                                    <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" class="field-error"></div>
+                                </div>
 
-            <div class="form-row">
-                <div class="form-group krtm-flex-direction-row-align-items-center-gap-0-7454" th:if="${isNew or mission.canEdit}">
-                    <input type="checkbox" id="isInternal" th:field="*{isInternal}" class="krtm-margin-0-flex-0-0-auto-fa3b" th:disabled="${!isNew and !mission.canEdit}">
-                    <label for="isInternal" th:text="#{mission.is_internal}" class="krtm-margin-0-flex-0-0-auto-display-inline-block-418c">Intern</label>
-                </div>
-            </div>
+                                <div class="form-group datetime-split-group" th:attr="data-validate-not-past=${isNew ? 'true' : 'false'}, data-error-past=#{validation.datetime.past}">
+                                    <label th:text="#{mission.planned_start}">Planned Start</label>
+                                    <input type="hidden" name="plannedStartTime" id="plannedStartTime" th:value="*{plannedStartTime}">
+                                    <div class="datetime-split-inputs">
+                                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" data-testid="mission-start-date" required>
+                                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" data-testid="mission-start-time" required>
+                                    </div>
+                                    <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" class="field-error"></div>
+                                </div>
 
-            <div class="form-row" th:if="${isNew}">
-                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
-            </div>
+                                <div class="form-group datetime-split-group" th:attr="data-validate-after='plannedStartTime', data-error-after=#{validation.datetime.after}">
+                                    <label th:text="#{mission.planned_end}">Planned End</label>
+                                    <input type="hidden" name="plannedEndTime" id="plannedEndTime" th:value="*{plannedEndTime}">
+                                    <div class="datetime-split-inputs">
+                                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                    </div>
+                                    <div th:if="${#fields.hasErrors('plannedEndTime')}" th:errors="*{plannedEndTime}" class="field-error"></div>
+                                </div>
 
-            <div class="form-row">
-            <div class="form-group datetime-split-group" th:attr="data-validate-not-past=${isNew ? 'true' : 'false'}, data-error-past=#{validation.datetime.past}">
-                <label th:text="#{mission.meeting_time}">Treffen Teamspeak</label>
-                <input type="hidden" name="meetingTime" id="meetingTime" th:value="*{meetingTime}">
-                <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
-                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
-                </div>
-                <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" class="field-error"></div>
-            </div>
-            </div>
+                                <th:block th:if="${!isNew}">
+                                <div class="form-group datetime-split-group">
+                                    <label th:text="#{mission.actual_start}">Actual Start</label>
+                                    <input type="hidden" name="actualStartTime" id="actualStartTime" th:value="*{actualStartTime}">
+                                    <div class="datetime-with-now">
+                                        <div class="datetime-split-inputs">
+                                            <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                            <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                        </div>
+                                        <button type="button" class="btn btn-ghost" data-trigger="mission-set-now" data-input-id="actualStartTime"
+                                                th:if="${mission.canEdit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg> <span th:text="#{general.now}">Jetzt</span></button>
+                                    </div>
+                                    <div th:if="${#fields.hasErrors('actualStartTime')}" th:errors="*{actualStartTime}" class="field-error"></div>
+                                </div>
 
-            <div class="form-row">
-            <div class="form-group datetime-split-group" th:attr="data-validate-not-past=${isNew ? 'true' : 'false'}, data-error-past=#{validation.datetime.past}">
-                <label th:text="#{mission.planned_start}">Planned Start</label>
-                <input type="hidden" name="plannedStartTime" id="plannedStartTime" th:value="*{plannedStartTime}">
-                <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" data-testid="mission-start-date" required th:disabled="${!isNew and !mission.canEdit}">
-                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" data-testid="mission-start-time" required th:disabled="${!isNew and !mission.canEdit}">
-                </div>
-                <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" class="field-error"></div>
-            </div>
+                                <div class="form-group datetime-split-group" th:attr="data-validate-after='actualStartTime', data-error-after=#{validation.datetime.after}">
+                                    <label th:text="#{mission.actual_end}">Actual End</label>
+                                    <input type="hidden" name="actualEndTime" id="actualEndTime" th:value="*{actualEndTime}">
+                                    <div class="datetime-with-now">
+                                        <div class="datetime-split-inputs">
+                                            <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                            <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                        </div>
+                                        <button type="button" class="btn btn-ghost" data-trigger="mission-set-now" data-input-id="actualEndTime"
+                                                th:if="${mission.canEdit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg> <span th:text="#{general.now}">Jetzt</span></button>
+                                    </div>
+                                    <div th:if="${#fields.hasErrors('actualEndTime')}" th:errors="*{actualEndTime}" class="field-error"></div>
+                                </div>
+                                </th:block>
+                            </div>
+                        </fieldset>
 
-            <div class="form-group datetime-split-group" th:attr="data-validate-after='plannedStartTime', data-error-after=#{validation.datetime.after}">
-                <label th:text="#{mission.planned_end}">Planned End</label>
-                <input type="hidden" name="plannedEndTime" id="plannedEndTime" th:value="*{plannedEndTime}">
-                <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
-                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
-                </div>
-                <div th:if="${#fields.hasErrors('plannedEndTime')}" th:errors="*{plannedEndTime}" class="field-error"></div>
-            </div>
-            </div>
+                        <fieldset class="form-section" th:if="${isNew or mission.canEdit}">
+                            <legend class="form-section__head" th:text="|3 · #{mission.form.section.visibility}|">3 · Sichtbarkeit</legend>
+                            <div class="form-group">
+                                <label class="switch" for="isInternal">
+                                    <input type="checkbox" id="isInternal" th:field="*{isInternal}">
+                                    <span class="switch__track" aria-hidden="true"></span>
+                                    <span th:text="#{mission.is_internal}">Intern</span>
+                                </label>
+                            </div>
+                            <th:block th:if="${isNew}">
+                                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+                            </th:block>
+                        </fieldset>
 
-            <div th:if="${!isNew}" class="form-row">
-            <div class="form-group datetime-split-group">
-                <label th:text="#{mission.actual_start}">Actual Start</label>
-                <input type="hidden" name="actualStartTime" id="actualStartTime" th:value="*{actualStartTime}">
-                <div class="datetime-with-now">
-                    <div class="datetime-split-inputs">
-                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
-                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
-                    </div>
-                    <button type="button" class="btn btn-ghost btn-sm" data-trigger="mission-set-now" data-input-id="actualStartTime"
-                            th:if="${!isNew and mission.canEdit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg> <span th:text="#{general.now}">Jetzt</span></button>
-                </div>
-                <div th:if="${#fields.hasErrors('actualStartTime')}" th:errors="*{actualStartTime}" class="field-error"></div>
-            </div>
+                        <fieldset class="form-section" th:if="${isNew}">
+                            <legend class="form-section__head"><span th:text="|4 · #{mission.objective.section}|">4 · Ziele</span> <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
+                            <div class="stack gap-3">
+                                <div class="ae-list" id="mission-create-objective-list"></div>
+                                <button type="button" class="btn btn-ghost editor-add" id="mission-create-objective-add"
+                                        data-trigger="create-objective-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
+                                <p class="form-hint m-0" th:text="#{mission.objective.editor.hint}">Titel + Klassifizierung frei editierbar.</p>
+                            </div>
+                            <input type="hidden" name="objectivesJson" id="mission-objectives-json" th:value="*{objectivesJson}">
+                            <template id="mission-create-objective-row">
+                                <div class="ae-row">
+                                    <span class="ae-num">1</span>
+                                    <span class="ae-fields">
+                                        <input class="ae-title" type="text" maxlength="500"
+                                               th:placeholder="#{mission.objective.title.placeholder}" th:aria-label="#{mission.objective.title.placeholder}">
+                                        <select class="ae-kind" th:aria-label="#{mission.objective.kind.label}">
+                                            <option value="PRIMARY" th:text="#{mission.objective.kind.primary}">Hauptziel</option>
+                                            <option value="SECONDARY" th:text="#{mission.objective.kind.secondary}">Nebenziel</option>
+                                            <option value="NON_GOAL" th:text="#{mission.objective.kind.non_goal}">Nicht-Ziel</option>
+                                        </select>
+                                    </span>
+                                    <span class="ae-move">
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-objective-up"
+                                                th:title="#{mission.objective.move_up}" th:aria-label="#{mission.objective.move_up}">&#x25B2;</button>
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-objective-down"
+                                                th:title="#{mission.objective.move_down}" th:aria-label="#{mission.objective.move_down}">&#x25BC;</button>
+                                    </span>
+                                    <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="create-objective-delete"
+                                            th:title="#{mission.objective.remove}" th:aria-label="#{mission.objective.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </div>
+                            </template>
+                        </fieldset>
 
-            <div class="form-group datetime-split-group" th:attr="data-validate-after='actualStartTime', data-error-after=#{validation.datetime.after}">
-                <label th:text="#{mission.actual_end}">Actual End</label>
-                <input type="hidden" name="actualEndTime" id="actualEndTime" th:value="*{actualEndTime}">
-                <div class="datetime-with-now">
-                    <div class="datetime-split-inputs">
-                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
-                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
-                    </div>
-                    <button type="button" class="btn btn-ghost btn-sm" data-trigger="mission-set-now" data-input-id="actualEndTime"
-                            th:if="${!isNew and mission.canEdit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg> <span th:text="#{general.now}">Jetzt</span></button>
-                </div>
-                <div th:if="${#fields.hasErrors('actualEndTime')}" th:errors="*{actualEndTime}" class="field-error"></div>
-            </div>
-            </div>
+                        <fieldset class="form-section" th:if="${isNew}">
+                            <legend class="form-section__head"><span th:text="|5 · #{mission.step.section}|">5 · Ablauf</span> <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
+                            <div class="stack gap-3">
+                                <div class="ae-list" id="mission-create-step-list"></div>
+                                <button type="button" class="btn btn-ghost editor-add" id="mission-create-step-add"
+                                        data-trigger="create-step-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
+                                <p class="form-hint m-0" th:text="#{mission.step.editor.hint}">Titel + optionale Zeit/Ort frei editierbar.</p>
+                            </div>
+                            <input type="hidden" name="stepsJson" id="mission-steps-json" th:value="*{stepsJson}">
+                            <template id="mission-create-step-row">
+                                <div class="ae-row">
+                                    <span class="ae-num">1</span>
+                                    <span class="ae-fields">
+                                        <input class="ae-title" type="text" maxlength="500"
+                                               th:placeholder="#{mission.step.title.placeholder}" th:aria-label="#{mission.step.title.placeholder}">
+                                        <input class="ae-meta" type="text" maxlength="200"
+                                               th:placeholder="#{mission.step.meta.placeholder}" th:aria-label="#{mission.step.meta.placeholder}">
+                                    </span>
+                                    <span class="ae-move">
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-step-up"
+                                                th:title="#{mission.step.move_up}" th:aria-label="#{mission.step.move_up}">&#x25B2;</button>
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-step-down"
+                                                th:title="#{mission.step.move_down}" th:aria-label="#{mission.step.move_down}">&#x25BC;</button>
+                                    </span>
+                                    <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="create-step-delete"
+                                            th:title="#{mission.step.remove}" th:aria-label="#{mission.step.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </div>
+                            </template>
+                        </fieldset>
 
-            <div class="form-group">
-                <label th:text="#{mission.calendar_link}">Link zum Kalendereintrag</label>
-                <div class="flex-gap-sm">
-                    <input type="url" name="calendarLink" th:value="*{calendarLink}" class="flex-1"
-                           th:disabled="${!isNew and !mission.canEdit}">
-                    <a th:if="${!isNew and !#strings.isEmpty(missionForm.calendarLink)}"
-                       th:href="*{calendarLink}" target="_blank" rel="noopener noreferrer"
-                       class="btn btn-ghost nowrap"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{mission.calendar_link_open}">&Ouml;ffnen</span></a>
-                </div>
-                <div class="field-error" data-error-for="calendarLink" th:text="${#fields.hasErrors('calendarLink') ? #fields.errors('calendarLink')[0] : ''}"></div>
-            </div>
+                        <div class="form-actions--sticky" th:if="${isNew or mission.canEdit}">
+                            <span class="form-actions__summary"></span>
+                            <a th:if="${isNew}" th:href="@{/missions}" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</a>
+                            <button type="submit" form="mission-form" class="btn btn--cta" data-testid="mission-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="${isNew} ? #{mission.create.submit} : #{mission.edit.save}">&Auml;nderungen speichern</span></button>
+                        </div>
                     </form>
-                    </div>
-                </div>
 
                 <div class="pane-col" th:if="${!isNew}">
                     <div id="mission-objectives-results"><th:block th:fragment="objectivesEditor">
@@ -758,7 +770,7 @@
                             <span th:text="#{mission.objective.editor.title}">Ziele &mdash; Ziele setzen</span>
                             <span class="ph-extra" th:text="${nGoals == 1 ? #messages.msg('mission.objective.count.one', nGoals) : #messages.msg('mission.objective.count.other', nGoals)}">0 Ziele</span>
                         </div>
-                        <div class="kpanel-body">
+                        <div class="kpanel-body stack gap-3">
                             <div class="ae-list" id="mission-objective-list">
                                 <div th:each="o, st : ${mission.objectives}" class="ae-row" draggable="true"
                                      th:attr="data-objective-id=${o.id}">
@@ -783,8 +795,8 @@
                                             th:title="#{mission.objective.remove}" th:aria-label="#{mission.objective.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-objective-add" data-trigger="mission-objective-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
-                            <p class="form-hint krtm-margin-top-10px-e5a6" th:text="#{mission.objective.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + Klassifizierung frei editierbar.</p>
+                            <button type="button" class="btn btn-ghost btn-xs2 editor-add" id="mission-objective-add" data-trigger="mission-objective-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
+                            <p class="form-hint m-0" th:text="#{mission.objective.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + Klassifizierung frei editierbar.</p>
                         </div>
                     </div>
                     </th:block></div>
@@ -797,7 +809,7 @@
                             <span th:text="#{mission.step.editor.title}">Ablauf &mdash; Schritte setzen</span>
                             <span class="ph-extra" th:text="${nSteps == 1 ? #messages.msg('mission.step.count.one', nSteps) : #messages.msg('mission.step.count.other', nSteps)}">0 Schritte</span>
                         </div>
-                        <div class="kpanel-body">
+                        <div class="kpanel-body stack gap-3">
                             <div class="ae-list" id="mission-step-list">
                                 <div th:each="s, st : ${mission.steps}" class="ae-row" draggable="true"
                                      th:attr="data-step-id=${s.id}">
@@ -819,8 +831,8 @@
                                             th:title="#{mission.step.remove}" th:aria-label="#{mission.step.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-step-add" data-trigger="mission-step-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
-                            <p class="form-hint krtm-margin-top-10px-e5a6" th:text="#{mission.step.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + optionale Zeit/Ort frei editierbar.</p>
+                            <button type="button" class="btn btn-ghost btn-xs2 editor-add" id="mission-step-add" data-trigger="mission-step-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
+                            <p class="form-hint m-0" th:text="#{mission.step.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + optionale Zeit/Ort frei editierbar.</p>
                         </div>
                     </div>
                     </th:block></div>
@@ -830,19 +842,19 @@
                         <div class="kpanel-body">
                             <div id="mission-organisation-results"><th:block th:fragment="organisationPanel">
                             <div class="form-group">
-                                <label th:text="#{mission.party_lead}">Partyleiter</label>
-                                <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
-                                    <div id="party-lead-display" class="data-value krtm-background-var-color-surface-input-padding-0-fd20" th:data-none-label="#{general.none}">
+                                <label for="party-lead-search-input" th:text="#{mission.party_lead}">Partyleiter</label>
+                                <div class="stack gap-2">
+                                    <div id="party-lead-display" class="data-value value-box" th:data-none-label="#{general.none}">
                                         <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead Name</span>
                                         <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Externer Lead</span>
                                         <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                                     </div>
                                     <form th:if="${mission.canEdit}" id="party-lead-form" autocomplete="off"
                                           th:action="@{/missions/{id}/party-lead(id=${mission.id})}" method="post"
-                                          class="krtm-display-flex-gap-0-5rem-flex-wrap-wrap-align-ce5b">
+                                          class="cluster gap-2">
                                         <input type="hidden" id="party-lead-version" name="version" th:value="${mission.partyLeadVersion}">
                                         <input type="hidden" id="party-lead-user-id" name="userId" th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.id : ''}">
-                                        <div class="krtm-position-relative-flex-1-min-width-12rem-4175">
+                                        <div class="grow ac-host">
                                             <input type="text" id="party-lead-search-input" name="guestName" autocomplete="off"
                                                    th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : mission.partyLeadGuestName}"
                                                    th:placeholder="#{mission.party_lead.placeholder}">
@@ -855,21 +867,19 @@
                             </div>
 
                             <div class="form-group">
-                                <label th:text="#{admin.mission_data.frequency_types}">Frequenz&uuml;bersicht</label>
+                                <span class="form-label" th:text="#{admin.mission_data.frequency_types}">Frequenz&uuml;bersicht</span>
                                 <div class="flex-col-gap">
-                                    <div th:each="freqType : ${frequencyTypes}" class="krtm-display-flex-justify-content-space-between-a-09ca">
-                                        <div>
-                                            <strong th:text="${freqType.name}" class="krtm-color-var-color-gray-1-font-family-var-font-bcf9">Freq</strong>
-                                        </div>
+                                    <div th:each="freqType : ${frequencyTypes}" class="split gap-2 freq-row">
+                                        <strong class="freq-name" th:text="${freqType.name}">Freq</strong>
                                         <div class="flex-gap-sm"
                                              th:with="f=${frequencyByTypeId[freqType.id]}"
                                              th:attr="data-freq-type-id=${freqType.id}, data-version=${f != null ? f.version : ''}">
                                             <span class="freq-value-display data-value data-value--mono"
                                                   th:attr="data-freq-type-id=${freqType.id}"
                                                   th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
-                                                  th:classappend="${f == null} ? 'krtm-hidden' : ''">123.45</span>
+                                                  th:hidden="${f == null}">123.45</span>
 
-                                            <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-sm btn-ghost btn-icon set-freq-btn"
+                                            <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-ghost btn-icon set-freq-btn"
                                                     th:data-action="@{/missions/{id}/frequencies/ajax(id=${mission.id})}"
                                                     th:data-type-id="${freqType.id}"
                                                     th:data-current-value="${f != null ? f.value : ''}"
@@ -881,25 +891,23 @@
                             </th:block></div>
 
                             <div id="mission-frequencies-results"><th:block th:fragment="frequenciesEditor">
-                            <div class="form-group krtm-margin-bottom-0-5043" th:if="${!isNew}">
-                                <label th:text="#{mission.frequency.custom.section}">Weitere Frequenzen</label>
+                            <div class="form-group stack gap-3 m-0" th:if="${!isNew}">
+                                <span class="form-label" th:text="#{mission.frequency.custom.section}">Weitere Frequenzen</span>
                                 <div class="flex-col-gap" id="mission-custom-freq-list">
-                                    <div th:each="cf : ${customFrequencies}" class="custom-freq-row krtm-display-flex-justify-content-space-between-a-09ca"
+                                    <div th:each="cf : ${customFrequencies}" class="custom-freq-row split gap-2 freq-row"
                                          th:attr="data-custom-freq-id=${cf.id}, data-version=${cf.version}, data-name=${cf.name}, data-value=${cf.value}">
-                                        <div>
-                                            <strong th:text="${cf.name}" class="krtm-color-var-color-gray-1-font-family-var-font-bcf9">Name</strong>
-                                        </div>
+                                        <strong class="freq-name" th:text="${cf.name}">Name</strong>
                                         <div class="flex-gap-sm">
                                             <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
-                                            <button th:if="${mission.canEdit}" type="button" class="btn btn-sm btn-ghost btn-icon" data-trigger="custom-freq-edit"
+                                            <button th:if="${mission.canEdit}" type="button" class="btn btn-ghost btn-icon" data-trigger="custom-freq-edit"
                                                     th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                            <button th:if="${mission.canEdit}" type="button" class="btn btn-sm btn-quiet-danger btn-icon" data-trigger="custom-freq-delete"
+                                            <button th:if="${mission.canEdit}" type="button" class="btn btn-quiet-danger btn-icon" data-trigger="custom-freq-delete"
                                                     th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                         </div>
                                     </div>
-                                    <p th:if="${customFrequencies == null or customFrequencies.isEmpty()}" class="form-hint krtm-margin-0-2a0c" th:text="#{mission.frequency.custom.empty}">Noch keine weiteren Frequenzen.</p>
+                                    <p th:if="${customFrequencies == null or customFrequencies.isEmpty()}" class="form-hint m-0" th:text="#{mission.frequency.custom.empty}">Noch keine weiteren Frequenzen.</p>
                                 </div>
-                                <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-custom-freq-add" data-trigger="custom-freq-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</span></button>
+                                <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-ghost btn-xs2 editor-add" id="mission-custom-freq-add" data-trigger="custom-freq-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</span></button>
                             </div>
                             </th:block></div>
                         </div>
@@ -910,13 +918,13 @@
                         <div class="kpanel-head" th:text="#{mission.management_rights}">Verwaltungsrechte</div>
                         <div class="kpanel-body">
                             <div class="form-group">
-                                <label th:text="#{mission.owner}">Besitzer</label>
-                                <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
-                                    <div class="data-value krtm-background-var-color-surface-input-padding-0-fd20">
+                                <span class="form-label" th:text="#{mission.owner}">Besitzer</span>
+                                <div class="stack gap-2">
+                                    <div class="data-value value-box">
                                         <span th:text="${mission.owner != null ? mission.owner.effectiveName : '-'}">Besitzer Name</span>
                                     </div>
                                     <div th:if="${mission.canEdit}" class="flex-gap-xs" id="owner-row" th:attr="data-ownership-version=${mission.ownershipVersion}">
-                                        <select id="new-owner-id" class="flex-1" data-krt-combobox="remote-users" data-testid="mission-owner-picker">
+                                        <select id="new-owner-id" class="flex-1" data-krt-combobox="remote-users" data-testid="mission-owner-picker" th:aria-label="#{mission.owner.select}">
                                             <option value="" th:text="#{mission.owner.select}">-- Neuen Besitzer w&auml;hlen --</option>
                                         </select>
                                         <button type="button" class="btn btn-outline" data-trigger="mission-change-owner"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
@@ -925,14 +933,14 @@
                             </div>
 
                             <div class="form-group">
-                                <label th:text="#{mission.owningOrgUnit}">Verantwortliche Einheit</label>
-                                <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
-                                    <div class="data-value krtm-background-var-color-surface-input-padding-0-fd20">
+                                <span class="form-label" th:text="#{mission.owningOrgUnit}">Verantwortliche Einheit</span>
+                                <div class="stack gap-2">
+                                    <div class="data-value value-box">
                                         <span th:if="${mission.owningSquadron != null}" th:text="${mission.owningSquadron.name()}">Einheit</span>
                                         <span th:if="${mission.owningSquadron == null}" th:text="#{mission.owningOrgUnit.none}">Keine</span>
                                     </div>
                                     <div th:if="${mission.canEdit}" class="flex-gap-xs" id="owning-org-unit-row" th:attr="data-owning-org-unit-version=${mission.owningOrgUnitVersion}">
-                                        <select id="new-owning-org-unit-id" class="flex-1">
+                                        <select id="new-owning-org-unit-id" class="flex-1" th:aria-label="#{mission.owningOrgUnit}">
                                             <option th:if="${mission.owningSquadron != null}" th:value="${mission.owningSquadron.id()}" th:text="${mission.owningSquadron.name()}" selected></option>
                                             <option value="" th:text="#{mission.owningOrgUnit.none}" th:selected="${mission.owningSquadron == null}">-- Keine --</option>
                                             <option th:each="o : ${ownerOptions}" th:if="${mission.owningSquadron == null or mission.owningSquadron.id() != o.orgUnitId()}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}"></option>
@@ -942,21 +950,21 @@
                                 </div>
                             </div>
 
-                            <div class="form-group krtm-margin-bottom-0-5043">
-                                <label th:text="#{mission.managers}">Co-Manager</label>
-                                <div class="chiprow krtm-margin-bottom-1rem-c2c0">
+                            <div class="form-group stack gap-3 m-0">
+                                <span class="form-label" th:text="#{mission.managers}">Co-Manager</span>
+                                <div class="chiprow">
                                     <span th:each="manager : ${mission.managers}" class="manager-chip">
-                                        <span th:text="${manager.effectiveName}" class="krtm-color-var-color-gray-1-23b4">Manager Name</span>
-                                        <button th:if="${mission.canEdit}" type="button" class="btn btn-sm btn-quiet-danger krtm-padding-0-0-3rem-line-height-1-0101"
+                                        <span class="manager-chip__name" th:text="${manager.effectiveName}">Manager Name</span>
+                                        <button th:if="${mission.canEdit}" type="button" class="btn btn-quiet-danger manager-chip__remove"
                                                 th:data-manager-id="${manager.id}"
                                                 data-trigger="mission-remove-manager"
                                                 th:title="#{mission.managers}" th:aria-label="#{mission.managers}">&times;</button>
                                     </span>
-                                    <span th:if="${mission.managers == null or mission.managers.isEmpty()}" th:text="#{general.none}" class="krtm-color-var-color-gray-3-f5bd">Keine</span>
+                                    <span th:if="${mission.managers == null or mission.managers.isEmpty()}" th:text="#{general.none}" class="text-muted">Keine</span>
                                 </div>
 
                                 <div th:if="${mission.canEdit}" class="flex-gap-xs">
-                                    <select id="new-manager-id" class="flex-1" data-krt-combobox="remote-users">
+                                    <select id="new-manager-id" class="flex-1" data-krt-combobox="remote-users" th:aria-label="#{mission.manager.select}">
                                         <option value="" th:text="#{mission.manager.select}">-- Manager w&auml;hlen --</option>
                                     </select>
                                     <button type="button" class="btn btn-ghost" data-trigger="mission-add-manager"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{general.add}">Hinzuf&uuml;gen</span></button>
@@ -966,15 +974,6 @@
                     </div>
                     </th:block></div>
                 </div>
-            </div>
-
-            <div class="footacts">
-                <button th:if="${!isNew}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" class="btn btn-quiet-danger delete-mission-btn krtm-margin-right-auto-1424"
-                        th:data-action="@{/missions/{id}/delete(id=${mission.id})}"
-                        th:data-name="${mission.name}"
-                        data-sub-section="mission"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{info.delete}">Delete</span></button>
-                <button th:if="${isNew or mission.canEdit}" type="submit" form="mission-form" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{mission.save}">Save</span></button>
-                <a th:href="@{/missions}" class="btn btn-ghost" th:text="#{profile.back}">Back</a>
             </div>
         </section>
 
@@ -1037,10 +1036,10 @@
                   class="crew-jobs-static" th:text="${#strings.listJoin(crew.jobTypes.![name], ', ')}"
                   th:title="${#strings.listJoin(crew.jobTypes.![name], ', ')}">Pilot</span>
             <div class="row-actions" th:if="${mission.canEdit or own}">
-                <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form krtm-display-inline-2f87" data-participant-action="check-in" th:data-participant-id="${p?.id}">
+                <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form" data-participant-action="check-in" th:data-participant-id="${p?.id}">
                     <button type="submit" class="btn btn-success btn-icon" th:title="#{mission.participant.checkin.tooltip}" th:aria-label="#{mission.participant.checkin}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-login"/></svg></button>
                 </form>
-                <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime != null and p?.endTime == null}" class="participant-action-form krtm-display-inline-2f87" data-participant-action="check-out" th:data-participant-id="${p?.id}">
+                <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime != null and p?.endTime == null}" class="participant-action-form" data-participant-action="check-out" th:data-participant-id="${p?.id}">
                     <button type="submit" class="btn btn-ghost btn-icon" th:title="#{mission.participant.checkout}" th:aria-label="#{mission.participant.checkout}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-logout"/></svg></button>
                 </form>
                 <button type="button" class="btn btn-ghost btn-icon edit-participant-btn"
@@ -1076,7 +1075,7 @@
         <th:block th:ref="participant-modal-body">
             <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
                 <div class="krt-modal-body">
-                <div class="form-group krtm-position-relative-a8a9">
+                <div class="form-group ac-host">
                     <label th:text="#{mission.participant.name}">Name</label>
                     <input type="text" id="participant-search-input" name="guestName" autocomplete="off" th:value="*{guestName}" th:placeholder="#{mission.participant.external_name_placeholder}">
                     <input type="hidden" id="participant-user-id" name="userId" th:value="*{userId}">
@@ -1092,7 +1091,7 @@
                     <small class="form-hint" th:text="#{mission.participant.org_units.external_hint}">Nur fuer externe Teilnehmer relevant.</small>
                 </div>
 
-                <div class="form-row">
+                <div class="form-grid">
                 <div class="form-group">
                     <label th:text="#{mission.participant.desired_job}">Job</label>
                     <select name="desiredJobTypeId">
@@ -1111,7 +1110,7 @@
                 </div>
                 </div>
 
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label th:text="#{mission.participant.comment}">Kommentar</label>
                     <textarea name="comment" rows="3" th:text="*{comment}"></textarea>
                     <div th:if="${#fields.hasErrors('comment')}" th:errors="*{comment}" class="field-error"></div>
@@ -1132,7 +1131,7 @@
             <form id="edit-participant-form" method="post" th:action="${modalAction != null && openModal == 'edit-participant-modal'} ? ${modalAction} : @{/missions}">
                 <div class="krt-modal-body">
                 <input type="hidden" name="version" id="edit-participant-version">
-                <div class="form-row">
+                <div class="form-grid">
                 <div class="form-group">
                     <label th:text="#{mission.participant.desired_job}">Job</label>
                     <select name="desiredJobTypeId" id="edit-job">
@@ -1157,7 +1156,7 @@
                     </select>
                     <small class="form-hint" th:text="#{mission.participant.org_units.external_hint}">Nur fuer externe Teilnehmer relevant.</small>
                 </div>
-                <div class="form-group krtm-display-none-5790" id="edit-org-units-readonly-group">
+                <div class="form-group" id="edit-org-units-readonly-group" hidden>
                     <label th:text="#{mission.participant.org_units}">Org-Einheiten</label>
                     <div id="edit-org-units-readonly" class="chiprow"></div>
                     <small class="form-hint" th:text="#{mission.participant.org_units.member_hint}">Aus dem Account abgeleitet.</small>
@@ -1179,7 +1178,7 @@
                 <input type="hidden" name="startTime" id="edit-participant-start-time-hidden">
                 <input type="hidden" name="endTime" id="edit-participant-end-time-hidden">
 
-                <div class="form-row">
+                <div class="mission-time-grid">
                 <div class="form-group datetime-split-group" th:if="${mission.canEdit}">
                     <label th:text="#{mission.participant.start_time}">Startzeit</label>
                     <input type="hidden" id="edit-participant-start-time-ui">
@@ -1200,7 +1199,7 @@
                 </div>
                 </div>
                 <div class="krt-modal-foot">
-                    <button type="button" class="btn btn-quiet-danger delete-participant-btn krtm-margin-right-auto-1424" id="edit-participant-unregister-btn" data-sub-section="participant"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{mission.participant.unregister}">Abmelden</span></button>
+                    <button type="button" class="btn btn-quiet-danger delete-participant-btn foot-start" id="edit-participant-unregister-btn" data-sub-section="participant"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{mission.participant.unregister}">Abmelden</span></button>
                     <button type="button" class="btn btn-ghost" data-modal-dismiss th:text="#{general.cancel}">Abbrechen</button>
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
                 </div>
@@ -1234,7 +1233,7 @@
                     </select>
                     <small class="form-hint" th:text="#{mission.unit.ship.none_hint}">Ohne passendes Schiff wird die Einheit nur &uuml;ber den Typ angelegt.</small>
                 </div>
-                <div class="form-row">
+                <div class="form-grid">
                 <div class="form-group">
                     <label><span th:text="#{mission.unit.display_name}">Anzeigename</span><span class="req" aria-hidden="true">*</span></label>
                     <input type="text" name="name" th:value="*{name}" required>
@@ -1257,7 +1256,7 @@
                     <input type="checkbox" name="highValueUnit" id="hvu-check" value="true" th:checked="*{highValueUnit}">
                     <label for="hvu-check" class="m-0"><span th:text="#{mission.unit.hvu}">HVU</span> <span class="chip chip--warning chip-xs" th:title="#{mission.unit.hvu.tooltip}" th:text="#{mission.unit.hvu.short}">HVU</span></label>
                 </div>
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label th:text="#{mission.unit.note}">Notiz</label>
                     <input type="text" name="note" th:value="*{note}" th:placeholder="#{mission.unit.note.placeholder}">
                     <div th:if="${#fields.hasErrors('note')}" th:errors="*{note}" class="field-error"></div>
@@ -1278,7 +1277,7 @@
             <form id="frequency-form" method="post" th:action="@{/missions}">
                 <div class="krt-modal-body">
                 <input type="hidden" name="frequencyTypeId" id="freq-type-id" value="">
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz (z.B. 123.45)</label>
                     <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="value" id="freq-value" required>
                 </div>
@@ -1304,7 +1303,7 @@
                     <input type="text" id="custom-freq-name" maxlength="100" required th:placeholder="#{mission.frequency.custom.name.placeholder}">
                     <div class="field-error" id="custom-freq-name-error"></div>
                 </div>
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label th:text="#{mission.frequency.custom.value}">Frequenz (z.B. 123.45)</label>
                     <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" id="custom-freq-value" required>
                 </div>
@@ -1343,7 +1342,7 @@
                     </select>
                     <small class="form-hint" th:text="#{mission.unit.ship.none_hint}">Ohne passendes Schiff wird die Einheit nur &uuml;ber den Typ angelegt.</small>
                 </div>
-                <div class="form-row">
+                <div class="form-grid">
                 <div class="form-group">
                     <label><span th:text="#{mission.unit.display_name}">Anzeigename</span><span class="req" aria-hidden="true">*</span></label>
                     <input type="text" name="name" id="edit-unit-name" th:value="*{name}" required>
@@ -1366,7 +1365,7 @@
                     <input type="checkbox" name="highValueUnit" id="edit-unit-hvu" value="true" th:checked="*{highValueUnit}">
                     <label for="edit-unit-hvu" class="m-0"><span th:text="#{mission.unit.hvu}">HVU</span> <span class="chip chip--warning chip-xs" th:title="#{mission.unit.hvu.tooltip}" th:text="#{mission.unit.hvu.short}">HVU</span></label>
                 </div>
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label th:text="#{mission.unit.note}">Notiz</label>
                     <input type="text" name="note" id="edit-unit-note" th:value="*{note}" th:placeholder="#{mission.unit.note.placeholder}">
                     <div th:if="${#fields.hasErrors('note')}" th:errors="*{note}" class="field-error"></div>
@@ -1386,9 +1385,9 @@
         <th:block th:ref="edit-crew-modal-body">
             <form id="edit-crew-form" method="post" th:action="${modalAction != null && openModal == 'edit-crew-modal'} ? ${modalAction} : @{/missions}" th:object="${crewForm}">
                 <div class="krt-modal-body">
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label th:text="#{admin.mission_data.job_types}">Aufgaben</label>
-                    <select name="jobTypeIds" id="edit-crew-jobs" multiple class="krtm-height-100px-eebc">
+                    <select name="jobTypeIds" id="edit-crew-jobs" multiple class="crew-jobs-select">
                         <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
                     </select>
                     <small class="text-muted" th:text="#{general.multiselect}">Strg+Klick f&uuml;r Mehrfachauswahl</small>
@@ -1437,7 +1436,7 @@
                     <div th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" class="field-error"></div>
                 </div>
 
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label th:text="#{mission.finance.note}">Notiz</label>
                     <textarea name="note" rows="2" th:text="*{note}"></textarea>
                 </div>
@@ -1472,7 +1471,7 @@
                     <input type="number" step="1" min="0" inputmode="numeric" name="amount" id="edit-finance-amount" required>
                 </div>
 
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group">
                     <label th:text="#{mission.finance.note}">Notiz</label>
                     <textarea name="note" id="edit-finance-note" rows="2"></textarea>
                 </div>
@@ -1489,7 +1488,7 @@
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
         <th:block th:ref="delete-confirm-modal-body">
             <div class="krt-modal-body">
-                <p id="delete-confirm-message" class="krtm-margin-0-font-size-0-85rem-font-weight-300-771b" th:text="#{info.delete.confirm.message}">Wirklich l&ouml;schen?</p>
+                <p id="delete-confirm-message" class="confirm-text" th:text="#{info.delete.confirm.message}">Wirklich l&ouml;schen?</p>
             </div>
             <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost close-delete-modal" data-modal-dismiss th:text="#{general.cancel}">Abbrechen</button>

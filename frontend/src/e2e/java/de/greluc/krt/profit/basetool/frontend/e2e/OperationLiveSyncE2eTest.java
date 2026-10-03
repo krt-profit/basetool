@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies that a core-data save on an operation's Verwaltung tab reaches another viewer's header
+ * Verifies that a core-data save in an operation's edit dialog reaches another viewer's header
  * without a reload, via the {@code overview} section of the {@code operation:{id}} room
  * (REQ-FE-015, ADR-0094).
  *
@@ -81,9 +81,9 @@ class OperationLiveSyncE2eTest {
   }
 
   /**
-   * Context A (on the Verwaltung tab) renames the operation and saves; context B — a passive viewer
-   * that never reloads — must reflect the new name in its sticky header IN PLACE, driven purely by
-   * the change signal over {@code /ws/sync}.
+   * Context A renames the operation in the edit dialog and saves; context B, a passive viewer that
+   * never reloads, must reflect the new name in its page head in place, driven purely by the change
+   * signal over {@code /ws/sync}.
    */
   @Test
   void coreSaveByOneViewerPropagatesToAnotherViewerLive() {
@@ -118,7 +118,7 @@ class OperationLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        pageA.locator("#optab-verw").click();
+        pageA.locator("[data-testid='operation-edit']").click();
         pageA.locator("#op-name").fill(RENAMED);
         pageA.locator("button[type='submit'][form='operation-form']").click();
         assertThat(pageA.locator("#operation-title"))

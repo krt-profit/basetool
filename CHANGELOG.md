@@ -10,6 +10,12 @@
   Benachrichtigungsregeln haben nummerierte Abschnitte und eine fixierte Aktionsleiste (REQ-UI-027).
 - **Profil als eine Einstellungsseite.** Abschnitts-Navigation links, eine Speichern-Leiste, die nur
   bei Änderungen erscheint und alle geänderten Abschnitte speichert.
+- **Einsatz- und Operationsdetail im neuen Muster.** Der Einsatz hat drei Reiter (Übersicht ·
+  Teilnehmer & Einheiten · Finanzen & Auszahlung); statt des Reiters „Verwaltung" öffnet
+  „Bearbeiten" einen Bearbeitungsmodus, „Anmelden" ist die Hauptaktion, Löschen liegt im „⋯"-Menü.
+  Die Operation zeigt eine Kennzahlenleiste und vier Reiter (Übersicht · Einsätze · Auszahlung ·
+  Finanzen) und wird in einem Dialog bearbeitet (REQ-MISSION-004/011).
+
 - **Hangar: Versicherung als „Keine · Monate · LTI".** Statt einer Liste mit 122 Einträgen; Monate
   als Zahl von 1 bis 120.
 
