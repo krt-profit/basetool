@@ -3,6 +3,16 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-10-03
+
+- **Corrected: a refinery draft carries at least one order.** `refinery-draft.schema.json` now
+  requires one to five `orders`, as the [drafts](resources/drafts.md) page always said; the
+  fixture with an empty list moves to `refinery-draft/invalid/no-orders.json`. An empty list never
+  succeeded: it was answered `400 SCHEMA_INVALID` before and still is, so this is a correction, not
+  a breaking change ([versioning](versioning.md)). The gateway now refuses it itself, with
+  `errors[]` naming `/orders` and the detail of its other schema refusals, instead of relaying it
+  to the Basetool.
+
 ## 2026-09-28
 
 - **`LEGACY_ENDPOINT_GONE` is retired.** It answered the SC Extractor's old `/v1/*` routes, which

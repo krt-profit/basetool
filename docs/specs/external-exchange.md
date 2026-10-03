@@ -1600,6 +1600,19 @@ most 200 characters.
   `ExchangeContractTest.theSchemasOnlyGrewSinceThePreviousRelease` compares them with
   `SchemaCompatibility`, whose rules `SchemaCompatibilityTest` pins. Until a release carries the
   v1 schemas the comparison has nothing to compare and is skipped.
+- [x] A narrowing the owner accepts as a correction is listed by its exact comparison message, with
+  its reason, in `ExchangeContractTest.ACCEPTED_NARROWINGS`; any other narrowing still fails, and the
+  entry is proven to match exactly what the comparison reports for it.
+
+> [!note] 2026-10-03 — `refinery-draft` requires at least one order
+> `refinery-draft.schema.json` gains `"minItems": 1` on `orders`, and the fixture
+> `refinery-draft/valid/minimal.json` (`"orders": []`) moves to `invalid/no-orders.json`. This
+> narrowing aligns the published schema with behaviour the backend has always had: its extract
+> carries `@NotEmpty` on `orders`, so no request with an empty `orders` ever succeeded — it was
+> answered `400`, relayed to the client as `SCHEMA_INVALID`. It is therefore not treated as a
+> breaking change and does not open `v2`. Decided by the owner on 2026-10-03. The client still gets
+> `400 SCHEMA_INVALID`; the refusal now comes from the gateway before the relay, with `errors[]`
+> naming `/orders`, instead of the backend's relayed refusal without `errors[]`.
 
 **Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest` · **Status:** implemented —
 WP 0.2 (#2080)
@@ -2056,15 +2069,14 @@ contract allows.
   answer, and the answers of every read on seeded data (one blueprint, one stock lot at a UEX city,
   one ship, and the tombstones after their removal), must validate against the published schema
   the gateway checks it with. Every published answer fixture survives a round trip through the
-  backend's answer type. Two named exceptions are pinned, not hidden: the published
-  `refinery-draft/valid/minimal.json` (`"orders": []`) is answered `400` — the schema allows an
-  empty list, the backend's extract demands one order, so the client gets `400 SCHEMA_INVALID` —
-  and the gateway's own `warnings` and the reserved `cursor` of a change result are members the
-  backend never writes. Of `GET /api/v1/exchange/me/installation` the gateway takes only
+  backend's answer type. One named exception is pinned, not hidden: the gateway's own `warnings`
+  and the reserved `cursor` of a change result are members the backend never writes. The published
+  `refinery-draft/invalid/no-orders.json` (`"orders": []`), which the schema refuses, is refused
+  by the backend too, with `400 VALIDATION_FAILED`. Of `GET /api/v1/exchange/me/installation` the gateway takes only
   `installationId` into the service document, so only that member is checked.
 - **Golden answers.** `ExchangeGoldenAnswerTest` records, for every `/exchange/v1` route and for a
-  relayed refusal, a translated code, a relay failure, an answer that breaks its schema and a
-  staged mass change, the client's request, the backend request the relay sent with every header,
+  relayed refusal, a translated code, a relay failure, an answer that breaks its schema, a draft
+  its schema refuses before the relay and a staged mass change, the client's request, the backend request the relay sent with every header,
   and the status, every header and the body the client got — under a fixed backend stub answering
   with the published fixtures — and compares it byte for byte with the committed goldens under
   `ingest/src/test/resources/exchange/golden/`. Only named volatile values are normalised (DPoP
@@ -2090,8 +2102,8 @@ Every guard is proven able to fail by a planted violation in its own test.
 
 **Acceptance**
 
-- [x] Every published request fixture of a relayed route is accepted by the backend, with the one
-  named exception; every backend answer validates against its published schema.
+- [x] Every published request fixture of a relayed route is accepted by the backend; every backend
+  answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
   seam's 14 operations. *`ExchangeGoldenAnswerTest`.*

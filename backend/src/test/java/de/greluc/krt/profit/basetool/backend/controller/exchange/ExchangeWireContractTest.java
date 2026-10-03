@@ -119,18 +119,6 @@ class ExchangeWireContractTest {
   private static final String KEY = "Kx9_" + "c".repeat(39);
 
   /**
-   * Published request fixtures the backend answers with another status than {@code 200}, each with
-   * that status and the reason; the frozen behaviour is pinned, never silently changed.
-   */
-  private static final Map<String, Expected> REQUEST_EXCEPTIONS =
-      Map.of(
-          "refinery-draft/valid/minimal.json",
-          new Expected(
-              400,
-              "the schema allows an empty orders list, the backend's extract demands one order;"
-                  + " the gateway answers 400 SCHEMA_INVALID"));
-
-  /**
    * Members of a published answer fixture the backend never writes, per schema folder, each with
    * the reason.
    */
@@ -231,7 +219,6 @@ class ExchangeWireContractTest {
   @Test
   void everyPublishedRequestFixtureIsAcceptedAndEveryAnswerMatchesItsSchema() throws Exception {
     int sent = 0;
-    Set<String> unused = new HashSet<>(REQUEST_EXCEPTIONS.keySet());
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
       if (operation.requestSchema() == null) {
         continue;
@@ -241,25 +228,36 @@ class ExchangeWireContractTest {
       assertThat(fixtures).as("valid fixtures of " + folder).isNotEmpty();
       for (Path fixture : fixtures) {
         String name = folder + "/valid/" + fixture.getFileName();
-        Expected expected = REQUEST_EXCEPTIONS.get(name);
-        unused.remove(name);
         MockHttpServletResponse answer =
             relay(
                 post(ExchangeSeam.RELAY_PREFIX + operation.relayPath())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(Files.readString(fixture, StandardCharsets.UTF_8)));
-        int status = expected == null ? 200 : expected.status();
         assertThat(answer.getStatus())
             .as("%s %s answered %s", operation.relayed(), name, answer.getContentAsString())
-            .isEqualTo(status);
-        if (answer.getStatus() == 200 && operation.responseSchema() != null) {
+            .isEqualTo(200);
+        if (operation.responseSchema() != null) {
           assertMatches(operation.responseSchema(), answer.getContentAsString(), name);
         }
         sent++;
       }
     }
-    assertThat(unused).as("request exceptions without a fixture").isEmpty();
     assertThat(sent).as("request fixtures sent").isGreaterThanOrEqualTo(15);
+  }
+
+  @Test
+  void aRefineryDraftWithoutOrdersIsRefusedByTheBackendAsByItsSchema() throws Exception {
+    MockHttpServletResponse answer =
+        relay(
+            post(ExchangeSeam.RELAY_PREFIX + "/me/drafts/refinery-orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    Files.readString(
+                        FIXTURES.resolve("refinery-draft/invalid/no-orders.json"),
+                        StandardCharsets.UTF_8)));
+    assertThat(answer.getStatus()).as(answer.getContentAsString()).isEqualTo(400);
+    assertThat(mapper.readTree(answer.getContentAsString()).path("code").asString())
+        .isEqualTo("VALIDATION_FAILED");
   }
 
   @Test
@@ -595,12 +593,4 @@ class ExchangeWireContractTest {
       return files.filter(p -> p.toString().endsWith(".json")).sorted().toList();
     }
   }
-
-  /**
-   * The status a published request fixture is answered with, and why.
-   *
-   * @param status the HTTP status
-   * @param reason why it is not {@code 200}
-   */
-  private record Expected(int status, @NotNull String reason) {}
 }

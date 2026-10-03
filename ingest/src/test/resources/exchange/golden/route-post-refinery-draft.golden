@@ -2,14 +2,30 @@
 POST /exchange/v1/me/drafts/refinery-orders
 {
   "schemaVersion": 1,
-  "orders": []
+  "orders": [
+    {
+      "panelType": "SETUP",
+      "sourceImages": [
+        {
+          "name": "refinery-setup.png"
+        }
+      ],
+      "goods": [
+        {
+          "rawMaterialName": "QUANTANIUM (RAW)",
+          "inputQuantity": 120,
+          "refine": true
+        }
+      ]
+    }
+  ]
 }
 === relayed
 POST /api/v1/exchange/me/drafts/refinery-orders
 accept: application/json, application/problem+json
 accept-encoding: gzip, deflate
 authorization: Bearer gateway-service-token
-content-length: 31
+content-length: 182
 content-type: application/json
 traceparent: <trace>
 x-correlation-id: <correlation-id>
@@ -18,7 +34,7 @@ x-exchange-client: versekit
 x-exchange-connected-at: <connected-at>
 x-exchange-installation: <thumbprint>
 x-ingest-on-behalf-of: 6f1c2e7a-3b4d-4c5e-8f60-718293a4b5c6
-{"schemaVersion":1,"orders":[]}
+{"schemaVersion":1,"orders":[{"panelType":"SETUP","sourceImages":[{"name":"refinery-setup.png"}],"goods":[{"rawMaterialName":"QUANTANIUM (RAW)","inputQuantity":120,"refine":true}]}]}
 === response
 200
 cache-control: no-cache, no-store, max-age=0, must-revalidate
