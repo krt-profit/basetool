@@ -91,6 +91,10 @@
   den gemeinsamen Mock-Satz `@LeafServiceMockTest`, Sicherheits-Beans bleiben echt. Ein Budget-Test
   je Anwendung verhindert, dass der Cache wieder zerfällt (REQ-OPS-041).
 
+- **CI: Mutationstests auch für den Ingest-Gateway.** Der wöchentliche PIT-Lauf (`pitest.yml`) prüft
+  jetzt auch `ingest`, mit eigenem Timeout und demselben Abschluss-Gate; mutiert werden alle
+  Zuständigkeitspakete mit Gates und ihrem Zustand statt nur der früheren `service`-Klassen (MB-07).
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die

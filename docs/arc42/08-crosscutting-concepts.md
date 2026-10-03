@@ -302,6 +302,13 @@ credential in a test or a local stack** — dedicated test artifacts exist for e
 a stripped realm export). Deliberately publishing a worthless artefact and leaking a real one are
 opposite acts; one is not licence for the other.
 
+**Mutation testing runs weekly for all three applications** (`pitest.yml`: backend, frontend and
+ingest, each with its own job timeout). A job passes only when PIT finished and left a non-empty
+report (`scripts/check-pit-result.sh`). The backend and frontend mutate their `service` package; the
+ingest mutates every concern package that holds a gate or its state — `auth`, `contract`, `edge`,
+`gate`, `handoff`, `idempotency`, `limits`, `observability`, `registry`, `relay`, `store` — all but
+the wiring (`assembly`, `config`), `problem` and `web` (`ingest/build-settings.properties`, REQ-OPS-037). No module declares a mutation threshold yet.
+
 The reverse direction holds too: **nothing test-only ships.** The `test` profile lives in each
 module's `src/test/resources` and the `jar`/`bootJar` tasks fail on a jar that carries one; the
 shared test helpers in `test-support` reach no runtime classpath. And a test runs against what
