@@ -92,12 +92,13 @@
             return;
         }
         const n = typeof count === 'number' ? count : 0;
-        badge.textContent = n > 99 ? '99+' : String(n);
-        if (n > 0) {
-            badge.classList.remove('notification-badge-hidden');
-        } else {
-            badge.classList.add('notification-badge-hidden');
-        }
+        const text = n > 99 ? '99+' : String(n);
+        [badge, ...Array.from(document.querySelectorAll('[data-notif-badge]'))].forEach(
+            function (el) {
+                el.textContent = text;
+                el.classList.toggle('notification-badge-hidden', n <= 0);
+            },
+        );
     }
 
     function refreshUnreadCount() {

@@ -294,11 +294,11 @@ val generateOssLicenses =
 
 sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
 
-val backendDtoMirrorDir = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto"
+val backendDtoMirrorDir = "backend/src/main/java"
 
 tasks.named<Test>("test") {
   inputs
-    .files(rootProject.fileTree(backendDtoMirrorDir) { include("*.java") })
+    .files(rootProject.fileTree(backendDtoMirrorDir) { include("**/*.java") })
     .withPropertyName("backendDtoMirrorSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
@@ -325,6 +325,11 @@ tasks.named<Test>("test") {
       rootProject.file("frontend/src/e2e/resources/realm-export.e2e.json"),
     )
     .withPropertyName("e2eAudienceParitySources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  inputs
+    .files(fileTree("src/e2e/java") { include("**/*.java") })
+    .withPropertyName("e2eSourcesForTestProfileScan")
     .withPathSensitivity(PathSensitivity.RELATIVE)
   inputs
     .files(
@@ -572,12 +577,13 @@ val lintJs =
   tasks.register<NpxTask>("lintJs") {
     group = "verification"
     description =
-      "Lints hand-written browser scripts with ESLint (strict; fails the build on findings)."
+      "Lints the browser scripts and the Node scripts with ESLint (strict; fails on findings)."
     dependsOn(tasks.named("npmInstall"))
     command.set("eslint")
-    args.set(listOf("src/main/resources/static/js/**/*.js"))
+    args.set(listOf("src/main/resources/static/js/**/*.js", "scripts/**/*.mjs"))
     ignoreExitValue.set(false)
     inputs.files(fileTree("src/main/resources/static/js") { include("**/*.js") })
+    inputs.files(fileTree("scripts") { include("**/*.mjs") })
     inputs.file("package.json")
     inputs.file("eslint.config.mjs")
   }
@@ -594,6 +600,7 @@ val prettierCheck =
         "src/main/resources/static/css/**/*.css",
         "src/main/resources/static/js/**/*.js",
         "types/**/*.d.ts",
+        "scripts/**/*.mjs",
       )
     )
     ignoreExitValue.set(false)
@@ -605,6 +612,7 @@ val prettierCheck =
       }
     )
     inputs.files(fileTree("types") { include("**/*.d.ts") })
+    inputs.files(fileTree("scripts") { include("**/*.mjs") })
     inputs.file("package.json")
     inputs.file(".prettierrc.json")
     inputs.file(".prettierignore")
@@ -621,6 +629,7 @@ tasks.register<NpxTask>("prettierApply") {
       "src/main/resources/static/css/**/*.css",
       "src/main/resources/static/js/**/*.js",
       "types/**/*.d.ts",
+      "scripts/**/*.mjs",
     )
   )
   ignoreExitValue.set(false)

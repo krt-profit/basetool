@@ -58,7 +58,6 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -76,13 +75,8 @@ import org.springframework.web.context.WebApplicationContext;
  * assertions target the {@code callerId} passed down.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
-@TestPropertySource(
-    properties = {
-      "app.security.ingest-gateway.client-ids=test-ingest-gateway",
-      "app.security.terms.armed-in-test=true"
-    })
+@TestPropertySource(properties = "app.security.terms.armed-in-test=true")
 class ActingMemberIdentityChainTest {
 
   private static final UUID MEMBER = UUID.fromString("44444444-4444-4444-4444-444444444444");

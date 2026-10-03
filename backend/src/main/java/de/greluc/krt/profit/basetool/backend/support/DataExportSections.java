@@ -115,6 +115,24 @@ public final class DataExportSections {
               WHERE p.user_id = :userId ORDER BY p.created_at
               """),
           new Section(
+              "realmRoles",
+              ART_15,
+              "The roles the organisation assigned to the member, which decide what they may do.",
+              """
+              SELECT r.code, r.name AS role
+              FROM user_roles ur JOIN role r ON r.id = ur.role_id
+              WHERE ur.user_id = :userId ORDER BY r.name
+              """),
+          new Section(
+              "orgUnitsAsGrandAdmiral",
+              ART_15,
+              "An appointment as the grand admiral of an organisational unit, made by the"
+                  + " organisation.",
+              """
+              SELECT name AS org_unit, shorthand, kind
+              FROM org_unit WHERE grand_admiral_user_id = :userId ORDER BY name
+              """),
+          new Section(
               "evaluations",
               ART_15,
               "A grading of the member by the organisation.",
@@ -273,6 +291,28 @@ public final class DataExportSections {
               WHERE mm.user_id = :userId ORDER BY m.name
               """),
           new Section(
+              "missionsAsPartyLead",
+              ART_15,
+              "A designation as a mission's party lead, made by the mission's organisers.",
+              """
+              SELECT name AS mission, status, planned_start_time, planned_end_time
+              FROM mission WHERE party_lead_user_id = :userId ORDER BY planned_start_time
+              """),
+          new Section(
+              "missionUnitResponsibilities",
+              ART_15,
+              "A responsibility for a unit of a mission, assigned by the mission's organisers. The"
+                  + " unit's note and ship are not included: they are the organisers' text and"
+                  + " possibly another member's ship.",
+              """
+              SELECT m.name AS mission, u.name AS unit, t.name AS ship_type, u.high_value_unit,
+                     u.created_at
+              FROM mission_unit u
+                JOIN mission m ON m.id = u.mission_id
+                LEFT JOIN ship_type t ON t.id = u.ship_type_id
+              WHERE u.responsible_user_id = :userId ORDER BY u.created_at
+              """),
+          new Section(
               "refineryOrdersOwned",
               ART_15_20,
               "Created by the member.",
@@ -331,6 +371,18 @@ public final class DataExportSections {
               WHERE i.interested_user_id = :userId ORDER BY i.created_at
               """),
           new Section(
+              "marketRequestInterests",
+              ART_15_20,
+              "Interest the member registered in a request. The requesting member is not named,"
+                  + " being the counterparty.",
+              """
+              SELECT r.request_kind, r.item_name, m.name AS material, i.created_at
+              FROM material_exchange_request_interest i
+                JOIN material_exchange_request r ON r.id = i.request_id
+                LEFT JOIN material m ON m.id = r.requested_material_id
+              WHERE i.interested_user_id = :userId ORDER BY i.created_at
+              """),
+          new Section(
               "bankHolderRegistration",
               ART_15,
               "The bank's record of the member as a custodian of org money.",
@@ -346,6 +398,27 @@ public final class DataExportSections {
               SELECT a.account_no, a.name AS account, g.created_at
               FROM bank_account_view_grant g JOIN bank_account a ON a.id = g.account_id
               WHERE g.grantee_user_id = :userId ORDER BY g.created_at
+              """),
+          new Section(
+              "bankAccountBookingGrants",
+              ART_15,
+              "Per-account booking rights granted to the member as a bank employee. The granting"
+                  + " manager is not named, being a third party.",
+              """
+              SELECT a.account_no, a.name AS account, g.can_deposit, g.can_withdraw,
+                     g.can_transfer, g.created_at
+              FROM bank_account_grant g JOIN bank_account a ON a.id = g.account_id
+              WHERE g.user_id = :userId ORDER BY g.created_at
+              """),
+          new Section(
+              "bankApprovalLimits",
+              ART_15,
+              "Personal approval ceilings the bank set for the member's booking requests on an"
+                  + " account.",
+              """
+              SELECT a.account_no, a.name AS account, l.limit_amount, l.created_at
+              FROM bank_account_approval_limit l JOIN bank_account a ON a.id = l.account_id
+              WHERE l.grantee_user_id = :userId ORDER BY l.created_at
               """),
           new Section(
               "bankBookingsAsCounterparty",
@@ -364,6 +437,16 @@ public final class DataExportSections {
               """
               SELECT type, amount, note, justification, status, created_at, decided_at
               FROM bank_booking_request WHERE requested_by = :userId ORDER BY created_at
+              """),
+          new Section(
+              "bankRequestsAsCounterparty",
+              ART_15,
+              "Booking requests naming the member as the counterparty. Neither the requesting"
+                  + " member nor the deciding bank employee is named, being third parties; the"
+                  + " requester's note and justification are scrubbed.",
+              """
+              SELECT type, amount, note, justification, status, created_at, decided_at
+              FROM bank_booking_request WHERE counterparty_user_id = :userId ORDER BY created_at
               """),
           new Section(
               "auditActionsByMember",
@@ -425,12 +508,17 @@ public final class DataExportSections {
           Map.entry("missionsOwned", Set.of("name", "description", "meeting_point")),
           Map.entry("missionParticipations", Set.of("mission", "comment")),
           Map.entry("missionsManaged", Set.of("mission")),
+          Map.entry("missionsAsPartyLead", Set.of("mission")),
+          Map.entry("missionUnitResponsibilities", Set.of("mission", "unit")),
           Map.entry("jobOrderAssignments", Set.of("note")),
           Map.entry("marketOffers", Set.of("remark")),
           Map.entry("marketRequests", Set.of("remark")),
           Map.entry("bankAccountGrants", Set.of("account")),
+          Map.entry("bankAccountBookingGrants", Set.of("account")),
+          Map.entry("bankApprovalLimits", Set.of("account")),
           Map.entry("bankBookingsAsCounterparty", Set.of("note", "justification")),
           Map.entry("bankRequestsRaised", Set.of("note", "justification")),
+          Map.entry("bankRequestsAsCounterparty", Set.of("note", "justification")),
           Map.entry("orgChartPositions", Set.of("name", "display_name")));
 
   /**
@@ -468,6 +556,17 @@ public final class DataExportSections {
           Map.entry(
               "orgChartPositions.org_unit",
               "org_unit.name, the unit the position sits in; see orgUnitMemberships.org_unit."),
+          Map.entry(
+              "orgUnitsAsGrandAdmiral.org_unit",
+              "org_unit.name, the unit the member is grand admiral of; see"
+                  + " orgUnitMemberships.org_unit."),
+          Map.entry(
+              "orgUnitsAsGrandAdmiral.shorthand",
+              "org_unit.shorthand of that unit; see orgUnitMemberships.org_unit."),
+          Map.entry(
+              "missionUnitResponsibilities.ship_type",
+              "ship_type.name: a hull from the synced catalogue. Flagged because the statement also"
+                  + " reads mission and mission_unit, whose name columns are scrubbed."),
           Map.entry(
               "evaluations.category",
               "promotion_category.name: a catalogue entry maintained by the organisation, rendered"

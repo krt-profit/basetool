@@ -1,6 +1,6 @@
 # ADR-0212 — Every stylesheet sits in a cascade layer
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (no comment beside a page-layer winner, see below)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc (owner decisions 2026-09-23)
 - **Requirement:** [REQ-UI-024](../specs/ui-design-system.md)
@@ -90,3 +90,12 @@ page stylesheet.**
 - **Preserve every group-2 result with a compensating rule.** Rejected by the owner: each of those
   results was a page rule overruling a style its author had written inline on purpose.
 - **Keep load order.** Rejected: the traps above.
+
+## Amendment — 2026-10-02: no comment beside a page-layer winner
+
+Domain modularisation plan §15. The consequence "goes into the page-layer block at the end of
+`styles.css`, with a comment naming what it beats" contradicts
+[ADR-0214](0214-code-carries-no-comments-besides-javadoc.md), which keeps no comments in CSS. The
+instruction to add a comment is withdrawn: a design-system declaration that must keep beating page
+CSS still goes into the page-layer block at the end of `styles.css`, and what it beats is stated in
+the commit message and the pull request that put it there.

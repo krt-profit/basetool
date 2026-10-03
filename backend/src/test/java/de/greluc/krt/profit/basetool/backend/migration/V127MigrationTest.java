@@ -32,7 +32,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V127__create_blueprint_external_alias.sql}: table shape, the {@code
@@ -40,7 +39,6 @@ import org.springframework.test.context.ActiveProfiles;
  * (REQ-INV-020).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V127MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

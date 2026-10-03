@@ -65,8 +65,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -79,8 +77,6 @@ import org.springframework.web.context.WebApplicationContext;
  * run is audited and instrumented (REQ-XCH-034). Writes commit.
  */
 @SpringBootTest
-@ActiveProfiles("test")
-@TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeBulkUndoControllerTest {
 
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";

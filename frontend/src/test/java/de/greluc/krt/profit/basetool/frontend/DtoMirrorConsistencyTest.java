@@ -19,51 +19,114 @@
 
 package de.greluc.krt.profit.basetool.frontend;
 
+import static java.util.Map.entry;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Verifies that every frontend {@code *Dto} record mirrors all record components of the same-named
- * backend record, by parsing both sources.
+ * Verifies that every frontend {@code model.dto} record mirrors all record components of its
+ * backend twin, by parsing both source trees (REQ-OPS-038).
  *
- * <p>A backend-only component fails the test; a frontend-only one is only reported. Non-record
- * files and frontend DTOs without a backend counterpart are skipped. Deliberate omissions go in
- * {@link #ALLOWED_BACKEND_ONLY_FIELDS}.
+ * <p>A twin is the backend record of the same simple name anywhere under {@code
+ * backend/src/main/java}, nested records included, or the one {@link #RENAMED_TWINS} names. A
+ * frontend record with no twin fails unless {@link #UNPAIRED_BY_DESIGN} lists it; a backend-only
+ * component fails unless {@link #ALLOWED_BACKEND_ONLY_FIELDS} lists it; a frontend-only component
+ * is only reported. Both trees are walked recursively.
  */
 class DtoMirrorConsistencyTest {
 
   private static final Path FRONTEND_DTO_DIR =
       resolveModuleRelative("src/main/java/de/greluc/krt/profit/basetool/frontend/model/dto");
-  private static final Path BACKEND_DTO_DIR =
-      resolveModuleRelative(
-          "../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto");
+  private static final Path BACKEND_SOURCE_ROOT = resolveModuleRelative("../backend/src/main/java");
+
+  /** The number of mirrors paired today; fewer means the scan lost its sources. */
+  private static final int PAIRED_FLOOR = 267;
+
+  /** Frontend mirrors whose backend twin carries another name: frontend name to backend name. */
+  private static final Map<String, String> RENAMED_TWINS =
+      Map.ofEntries(
+          entry("AdminDeletionRequestDto", "DeletionRequestDto"),
+          entry("DefaultBlueprintDto", "DefaultBlueprintResponse"),
+          entry("MaterialCreateAjaxRequest", "MaterialCreateDto"),
+          entry("MemberEvaluationDto", "MemberEvaluationResponse"),
+          entry("NotificationCountResponse", "NotificationUnreadCountDto"),
+          entry("PersonSearchResultDto", "PersonSearchResult"),
+          entry("PersonalBlueprintBatchResultDto", "PersonalBlueprintBatchResult"),
+          entry("PersonalBlueprintBulkDeleteResultDto", "PersonalBlueprintBulkDeleteResult"),
+          entry("PersonalBlueprintDto", "PersonalBlueprintResponse"),
+          entry("PersonalBlueprintRecipeDto", "PersonalBlueprintRecipeResponse"),
+          entry("PersonalInventoryItemDto", "PersonalInventoryItemResponse"),
+          entry("PromotionCategoryDto", "PromotionCategoryResponse"),
+          entry("PromotionEligibilityDto", "PromotionEligibilityResponse"),
+          entry("PromotionLevelContentDto", "PromotionLevelContentResponse"),
+          entry("PromotionRequirementCheckDto", "PromotionRequirementCheckResponse"),
+          entry("PromotionTopicDto", "PromotionTopicResponse"),
+          entry("RankRequirementDto", "RankRequirementResponse"));
+
+  /** Frontend records that deliberately have no backend record twin, each with its reason. */
+  private static final Map<String, String> UNPAIRED_BY_DESIGN =
+      Map.ofEntries(
+          entry("AuditRowView", "page view model merged from BankAuditEventDto and AuditEventDto"),
+          entry("BereichCreateRequest", "write subset of BereichDto; the backend assigns the rest"),
+          entry("DefaultBlueprintAddResultDto", "toast outcome the frontend counts itself"),
+          entry(
+              "DefaultBlueprintAddSelectionRequest",
+              "browser body expanded into one DefaultBlueprintCreateRequest per key"),
+          entry("MaterialUpdateAjaxRequest", "browser body; updateType selects the backend call"),
+          entry("MatrixGridDto", "render projection the frontend builds for the matrix grid"),
+          entry(
+              "MissionActualTimeUpdateRequest",
+              "browser body turned into a PatchMissionScheduleRequest"),
+          entry("NotificationPageSliceDto", "localized inbox page the frontend assembles"),
+          entry("NotificationViewDto", "localized notification view model"),
+          entry(
+              "OrganisationsleitungCreateRequest",
+              "write subset of OrganisationsleitungDto; the backend assigns the rest"),
+          entry("StagedHandoff", "mirror of the ingest gateway's Redis value, not of the backend"),
+          entry(
+              "UserAttributesUpdateDto",
+              "body of UserController.UserAttributesRequest, a class rather than a record"));
 
   /**
    * Per-DTO whitelist of backend-only record components the frontend deliberately does not mirror.
    * Each field is listed explicitly so a new backend-only field still fails.
    */
-  private static final Map<String, Set<String>> ALLOWED_BACKEND_ONLY_FIELDS = Map.of();
+  private static final Map<String, Set<String>> ALLOWED_BACKEND_ONLY_FIELDS =
+      Map.of("MaterialCreateAjaxRequest", Set.of("isManualEntry"));
+
+  /** A record declaration at the start of a line, nested ones included. */
+  private static final Pattern RECORD_DECLARATION =
+      Pattern.compile(
+          "^\\s*(?:(?:public|protected|private|static|final)\\s+)*record\\s+(\\w+)"
+              + "\\s*(?:<[^>]+>)?\\s*\\(",
+          Pattern.MULTILINE);
 
   /**
-   * Resolves a path that is given relative to the frontend module root. When Gradle runs the test
-   * the working directory is the frontend module root; when a developer accidentally runs the test
-   * from the repository root (e.g. via the IDE), the {@code frontend/} prefix branch keeps the
-   * lookup working.
+   * Resolves a path that is given relative to the frontend module root, also when the working
+   * directory is the repository root.
+   *
+   * @param relative the path below the frontend module root
+   * @return the resolved path
    */
   private static Path resolveModuleRelative(String relative) {
     Path direct = Paths.get(relative);
@@ -83,53 +146,48 @@ class DtoMirrorConsistencyTest {
         Files.isDirectory(FRONTEND_DTO_DIR),
         "Frontend DTO directory not found at " + FRONTEND_DTO_DIR.toAbsolutePath());
     assertTrue(
-        Files.isDirectory(BACKEND_DTO_DIR),
-        "Backend DTO directory not found at " + BACKEND_DTO_DIR.toAbsolutePath());
+        Files.isDirectory(BACKEND_SOURCE_ROOT),
+        "Backend source root not found at " + BACKEND_SOURCE_ROOT.toAbsolutePath());
+
+    Pairing pairing =
+        pair(FRONTEND_DTO_DIR, BACKEND_SOURCE_ROOT, RENAMED_TWINS, UNPAIRED_BY_DESIGN);
+
+    assertThat(pairing.paired())
+        .as("paired mirrors; fewer means the scan lost its sources or its layout")
+        .isGreaterThanOrEqualTo(PAIRED_FLOOR);
+    assertThat(pairing.listErrors())
+        .as("RENAMED_TWINS / UNPAIRED_BY_DESIGN entries that no longer hold")
+        .isEmpty();
+    assertThat(pairing.unpaired())
+        .as(
+            "frontend DTO records without a backend twin: add the twin, name it in RENAMED_TWINS,"
+                + " or list the record in UNPAIRED_BY_DESIGN with its reason")
+        .isEmpty();
 
     List<String> drifts = new ArrayList<>();
     List<String> softWarnings = new ArrayList<>();
-    int paired = 0;
-
-    try (Stream<Path> stream = Files.list(FRONTEND_DTO_DIR)) {
-      List<Path> frontendDtos =
-          stream.filter(p -> p.toString().endsWith(".java")).sorted().toList();
-      for (Path frontendFile : frontendDtos) {
-        String filename = frontendFile.getFileName().toString();
-        Path backendFile = BACKEND_DTO_DIR.resolve(filename);
-        if (!Files.exists(backendFile)) {
-          continue;
-        }
-        List<String> frontendComponents =
-            extractRecordComponentNames(Files.readString(frontendFile));
-        List<String> backendComponents = extractRecordComponentNames(Files.readString(backendFile));
-        if (frontendComponents == null || backendComponents == null) {
-          continue;
-        }
-        paired++;
-
-        Set<String> missingOnFrontend = new LinkedHashSet<>(backendComponents);
-        missingOnFrontend.removeAll(frontendComponents);
-        Set<String> allowed = ALLOWED_BACKEND_ONLY_FIELDS.getOrDefault(filename, Set.of());
-        missingOnFrontend.removeAll(allowed);
-        if (!missingOnFrontend.isEmpty()) {
-          drifts.add(
-              filename
-                  + " — backend record has components the frontend mirror is missing: "
-                  + missingOnFrontend
-                  + ". A Thymeleaf template that references any of these will 500 at render time."
-                  + " Add them to the frontend record (preferred) or, if intentional, list them in"
-                  + " ALLOWED_BACKEND_ONLY_FIELDS with a rationale.");
-        }
-
-        Set<String> extraOnFrontend = new LinkedHashSet<>(frontendComponents);
-        extraOnFrontend.removeAll(backendComponents);
-        if (!extraOnFrontend.isEmpty()) {
-          softWarnings.add(filename + " — frontend-only record components: " + extraOnFrontend);
-        }
-      }
-    }
-
-    assertTrue(paired > 0, "No paired DTOs found - directory layout or detection logic broke.");
+    pairing
+        .pairs()
+        .forEach(
+            (name, pair) -> {
+              Set<String> missingOnFrontend = new LinkedHashSet<>(pair.backend());
+              missingOnFrontend.removeAll(pair.frontend());
+              missingOnFrontend.removeAll(ALLOWED_BACKEND_ONLY_FIELDS.getOrDefault(name, Set.of()));
+              if (!missingOnFrontend.isEmpty()) {
+                drifts.add(
+                    name
+                        + " — backend record has components the frontend mirror is missing: "
+                        + missingOnFrontend
+                        + ". A Thymeleaf template that references any of these will 500 at render"
+                        + " time. Add them to the frontend record (preferred) or, if intentional,"
+                        + " list them in ALLOWED_BACKEND_ONLY_FIELDS with a rationale.");
+              }
+              Set<String> extraOnFrontend = new LinkedHashSet<>(pair.frontend());
+              extraOnFrontend.removeAll(pair.backend());
+              if (!extraOnFrontend.isEmpty()) {
+                softWarnings.add(name + " — frontend-only record components: " + extraOnFrontend);
+              }
+            });
 
     if (!softWarnings.isEmpty()) {
       System.out.println("DTO mirror soft warnings (frontend-only fields):");
@@ -138,26 +196,199 @@ class DtoMirrorConsistencyTest {
 
     if (!drifts.isEmpty()) {
       fail(
-          "DTO mirror drift detected (this is the recurring 'Property or field cannot be found'"
-              + " Thymeleaf bug class — see CHANGELOG.md and the"
-              + " feedback_backend_frontend_dto_mirror memory entry):\n"
-              + "  "
+          "DTO mirror drift detected (the recurring 'Property or field cannot be found' Thymeleaf"
+              + " bug class):\n  "
               + String.join("\n  ", drifts));
     }
   }
 
+  @Test
+  void aMirrorWithoutATwinFailsAndATwinIsFoundInAnyFolder(@TempDir Path root) throws IOException {
+    Path frontend = root.resolve("frontend");
+    Path backend = root.resolve("backend");
+    write(frontend.resolve("mission/MissionDto.java"), "public record MissionDto(String a) {}");
+    write(frontend.resolve("OrphanDto.java"), "public record OrphanDto(String a) {}");
+    write(frontend.resolve("ViewDto.java"), "public record ViewDto(String a) {}");
+    write(frontend.resolve("RenamedDto.java"), "public record RenamedDto(String a) {}");
+    write(frontend.resolve("TwinnedDto.java"), "public record TwinnedDto(String a) {}");
+    write(frontend.resolve("Kind.java"), "public enum Kind { A }");
+    write(
+        backend.resolve("de/x/mission/api/MissionController.java"),
+        "class MissionController {\n  public record MissionDto(String a, int b) {}\n}");
+    write(
+        backend.resolve("de/x/RenamedResponse.java"), "public record RenamedResponse(String a) {}");
+    write(backend.resolve("de/x/TwinnedDto.java"), "public record TwinnedDto(String a) {}");
+
+    Pairing pairing =
+        pair(
+            frontend,
+            backend,
+            Map.of("RenamedDto", "RenamedResponse", "GoneDto", "X"),
+            Map.of("ViewDto", "view model", "TwinnedDto", "excused although it has a twin"));
+
+    assertThat(pairing.unpaired()).containsExactly("OrphanDto");
+    assertThat(pairing.pairs()).containsOnlyKeys("MissionDto", "RenamedDto");
+    assertThat(pairing.pairs().get("MissionDto").backend()).containsExactly("a", "b");
+    assertThat(pairing.paired()).isEqualTo(2);
+    assertThat(pairing.listErrors())
+        .containsExactlyInAnyOrder(
+            "RENAMED_TWINS names GoneDto, which is no frontend DTO record",
+            "UNPAIRED_BY_DESIGN lists TwinnedDto, which has a backend twin");
+  }
+
   /**
-   * Returns the record-component names of the first top-level {@code public record Foo(...)} in the
-   * source, or {@code null} if there is none. Annotations, generics and nested parentheses are
-   * skipped by depth-tracked scanning.
+   * One frontend record and its backend twin's components.
+   *
+   * @param frontend the frontend record's component names
+   * @param backend the backend twin's component names
    */
-  private static List<String> extractRecordComponentNames(String source) {
-    Pattern anchor = Pattern.compile("public\\s+record\\s+(\\w+)\\s*(?:<[^>]+>)?\\s*\\(");
-    Matcher matcher = anchor.matcher(source);
-    if (!matcher.find()) {
-      return null;
+  record Pair(@NotNull List<String> frontend, @NotNull List<String> backend) {}
+
+  /**
+   * The outcome of pairing the frontend records with their backend twins.
+   *
+   * @param pairs paired frontend record name to its components and its twin's
+   * @param unpaired frontend records with no twin and no listed reason, sorted
+   * @param listErrors list entries that name no record, or excuse a record that has a twin
+   */
+  record Pairing(
+      @NotNull Map<String, Pair> pairs,
+      @NotNull List<String> unpaired,
+      @NotNull List<String> listErrors) {
+
+    /**
+     * Counts the paired records.
+     *
+     * @return the number of frontend records compared against a twin
+     */
+    int paired() {
+      return pairs.size();
     }
-    int cursor = matcher.end();
+  }
+
+  /**
+   * Pairs every frontend record below one root with its backend twin below another.
+   *
+   * @param frontendRoot the frontend DTO directory, walked recursively
+   * @param backendRoot the backend source root, walked recursively
+   * @param renamed frontend name to backend name for twins under another name
+   * @param unpairedByDesign frontend records that have no twin, with reasons
+   * @return the pairs, the unexcused unpaired records and the stale list entries
+   * @throws IOException if a source cannot be read
+   */
+  static Pairing pair(
+      Path frontendRoot,
+      Path backendRoot,
+      Map<String, String> renamed,
+      Map<String, String> unpairedByDesign)
+      throws IOException {
+    Map<String, List<List<String>>> backendRecords = new TreeMap<>();
+    for (Path file : javaSources(backendRoot)) {
+      String source = Files.readString(file, StandardCharsets.UTF_8);
+      Matcher declaration = RECORD_DECLARATION.matcher(source);
+      while (declaration.find()) {
+        List<String> components = componentsAfter(source, declaration.end());
+        if (components != null) {
+          backendRecords
+              .computeIfAbsent(declaration.group(1), k -> new ArrayList<>())
+              .add(components);
+        }
+      }
+    }
+
+    Map<String, Pair> pairs = new TreeMap<>();
+    List<String> unpaired = new ArrayList<>();
+    List<String> listErrors = new ArrayList<>();
+    Set<String> frontendRecords = new LinkedHashSet<>();
+    for (Path file : javaSources(frontendRoot)) {
+      String name = file.getFileName().toString().replaceFirst("\\.java$", "");
+      List<String> frontend = recordComponents(Files.readString(file, StandardCharsets.UTF_8));
+      if (frontend == null) {
+        continue;
+      }
+      frontendRecords.add(name);
+      List<List<String>> twins = backendRecords.get(renamed.getOrDefault(name, name));
+      if (unpairedByDesign.containsKey(name)) {
+        if (twins != null) {
+          listErrors.add("UNPAIRED_BY_DESIGN lists " + name + ", which has a backend twin");
+        }
+        continue;
+      }
+      if (twins == null) {
+        unpaired.add(name);
+      } else if (twins.size() > 1) {
+        listErrors.add(name + " has " + twins.size() + " backend records of that name");
+      } else {
+        pairs.put(name, new Pair(frontend, twins.getFirst()));
+      }
+    }
+    renamed.keySet().stream()
+        .filter(name -> !frontendRecords.contains(name))
+        .sorted()
+        .forEach(
+            name ->
+                listErrors.add(
+                    "RENAMED_TWINS names " + name + ", which is no frontend DTO record"));
+    unpairedByDesign.keySet().stream()
+        .filter(name -> !frontendRecords.contains(name))
+        .sorted()
+        .forEach(
+            name ->
+                listErrors.add(
+                    "UNPAIRED_BY_DESIGN lists " + name + ", which is no frontend DTO record"));
+    unpaired.sort(String::compareTo);
+    return new Pairing(pairs, unpaired, listErrors);
+  }
+
+  /**
+   * Lists every Java source below a root, sorted.
+   *
+   * @param root the directory to walk
+   * @return the {@code .java} files
+   * @throws IOException if the tree cannot be walked
+   */
+  private static List<Path> javaSources(Path root) throws IOException {
+    try (Stream<Path> tree = Files.walk(root)) {
+      return tree.filter(Files::isRegularFile)
+          .filter(p -> p.toString().endsWith(".java"))
+          .sorted()
+          .toList();
+    }
+  }
+
+  /**
+   * Writes a fixture source, creating its folders.
+   *
+   * @param file the file to write
+   * @param text its content
+   * @throws IOException if it cannot be written
+   */
+  private static void write(Path file, String text) throws IOException {
+    Files.createDirectories(file.getParent());
+    Files.writeString(file, text, StandardCharsets.UTF_8);
+  }
+
+  /**
+   * Returns the component names of the first top-level {@code public record} in a source.
+   *
+   * @param source a Java source
+   * @return the component names, or {@code null} when the source declares no public record
+   */
+  private static @Nullable List<String> recordComponents(String source) {
+    Matcher matcher =
+        Pattern.compile("public\\s+record\\s+(\\w+)\\s*(?:<[^>]+>)?\\s*\\(").matcher(source);
+    return matcher.find() ? componentsAfter(source, matcher.end()) : null;
+  }
+
+  /**
+   * Returns the component names of a record header whose opening parenthesis ends just before
+   * {@code cursor}; annotations, generics and nested parentheses are skipped by depth tracking.
+   *
+   * @param source a Java source
+   * @param cursor the index just after the header's opening parenthesis
+   * @return the component names, or {@code null} when the header does not close
+   */
+  private static @Nullable List<String> componentsAfter(String source, int cursor) {
     int depth = 1;
     int headerEnd = cursor;
     while (headerEnd < source.length() && depth > 0) {
@@ -180,9 +411,11 @@ class DtoMirrorConsistencyTest {
   }
 
   /**
-   * Splits the record header body on commas that sit at depth 0 - parens, angle brackets and square
-   * brackets all count as nesting depth so generic types ({@code List<Map<String, Integer>>}) and
-   * annotation arguments ({@code @JsonProperty(value = "x")}) do not produce false splits.
+   * Splits the record header body on commas that sit at depth 0; parentheses, angle brackets and
+   * square brackets count as nesting.
+   *
+   * @param body the text between a record header's parentheses
+   * @return the component declarations
    */
   private static List<String> splitTopLevelByComma(String body) {
     List<String> result = new ArrayList<>();
@@ -208,27 +441,25 @@ class DtoMirrorConsistencyTest {
   }
 
   /**
-   * Reduces a single component declaration ({@code "@NotNull String name"}, {@code "List<UUID>
-   * ids"}, ...) to its parameter name. Strips leading annotations (with or without arguments) and
-   * then takes the last whitespace-separated token of what remains as the parameter name.
+   * Reduces one component declaration to its name, after its leading annotations.
+   *
+   * @param component a declaration such as {@code @NotNull String name}
+   * @return the name, or {@code null} when nothing is left
    */
-  private static String extractParameterName(String component) {
+  private static @Nullable String extractParameterName(String component) {
     String stripped = stripLeadingAnnotations(component.trim());
     if (stripped.isEmpty()) {
       return null;
     }
     String[] tokens = stripped.split("\\s+");
-    if (tokens.length == 0) {
-      return null;
-    }
     return tokens[tokens.length - 1].trim();
   }
 
   /**
-   * Drops zero or more leading {@code @Annotation} or {@code @Annotation(args)} tokens from the
-   * front of {@code s} so the subsequent split-on-whitespace yields {@code Type name} without
-   * annotation noise interfering. Cursor walks character by character to respect parenthesised
-   * argument lists.
+   * Drops the leading {@code @Annotation} and {@code @Annotation(args)} tokens of a declaration.
+   *
+   * @param s a component declaration
+   * @return the declaration without its leading annotations
    */
   private static String stripLeadingAnnotations(String s) {
     int i = 0;
@@ -256,22 +487,5 @@ class DtoMirrorConsistencyTest {
       }
     }
     return s.substring(i);
-  }
-
-  /**
-   * Exposes the parsed record components of one source file for debug-time inspection. Not used by
-   * the production assertion above; kept as a public-test artefact so a future Claude session that
-   * needs to debug a false positive can break here and inspect the intermediate representation
-   * without having to re-derive the parser.
-   */
-  @SuppressWarnings("unused")
-  static Map<String, List<String>> debugDumpParsedComponents() throws IOException {
-    Map<String, List<String>> out = new LinkedHashMap<>();
-    try (Stream<Path> stream = Files.list(FRONTEND_DTO_DIR)) {
-      for (Path p : stream.filter(x -> x.toString().endsWith(".java")).sorted().toList()) {
-        out.put(p.getFileName().toString(), extractRecordComponentNames(Files.readString(p)));
-      }
-    }
-    return out;
   }
 }

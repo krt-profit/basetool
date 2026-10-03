@@ -3968,6 +3968,55 @@
           }
         }
       ]
+    },
+    {
+      "id": 82,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 280
+      },
+      "type": "timeseries",
+      "title": "Security-expression failures/hour by kind",
+      "description": "Method-security expressions Spring Security could not evaluate (REQ-OBS-020). Every failure refused a call with 400 ILLEGAL_ARGUMENT. Normally flat zero: evaluation is a bean or method the expression names but the running context lacks (a renamed security bean, a changed arity), other an expression that yields no decision. Any point above zero fires SecurityExpressionEvaluationFailed; the WARN line of the 400 names the expression.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (kind) (rate(basetool_security_expression_failures_total{application=\"basetool-backend\"}[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{kind}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

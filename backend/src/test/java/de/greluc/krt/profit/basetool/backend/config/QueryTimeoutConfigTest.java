@@ -28,7 +28,6 @@ import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
  * test also proves the production binding reaches Hibernate.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @TestPropertySource(properties = "spring.jpa.properties.jakarta.persistence.query.timeout=1000")
 @Transactional
 class QueryTimeoutConfigTest {

@@ -8,7 +8,12 @@ findable from one place, not to restate them.
 Keycloak is the only identity provider; the applications never handle a credential. The backend is
 an OAuth2 **resource server**, the frontend an OAuth2 **client**. Authorisation is centralised on
 `@PreAuthorize` so the permission model can be read off the code, and ArchUnit tests enforce the
-invariants that keep it that way.
+invariants that keep it that way. Those tests select by role and class literal rather than by
+package or name, assert a selection floor and are each proven able to fail on a planted fixture,
+so moving or renaming a class fails the build instead of quietly leaving a gate (REQ-SEC-073).
+Where a gate can still live in more than one place — a `SecurityConfig` URL rule, a controller
+annotation, a service annotation — the backend's authorization matrix pins all three for every
+operation in one reviewed file, so a move that drops one shows up as a diff (REQ-SEC-074).
 
 Beyond roles there are three mechanisms that are easy to miss:
 
@@ -41,6 +46,17 @@ Beyond roles there are three mechanisms that are easy to miss:
   behind the relay (`ActingMemberFilter`, an explicit list of exchange routes, gated by
   `@exchangeGate`) the member holds a reduced exchange authentication, never their stored roles,
   and every write is journaled, undoable and bounded by a mass-change guard (§8.13).
+- **A security expression is code the compiler cannot check** — every `@bean.method(…)` in a
+  `@PreAuthorize` is resolved against the running context in a test, the security beans carry
+  explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past
+  the proxy (REQ-SEC-076), and one that still fails at runtime stays a fail-closed 400 that is
+  counted and alerted (REQ-OBS-020).
+- **Path-keyed controls check themselves against the real mappings** (guard G-07) — the CSRF
+  exemption, the `no-store` classification of every API family, the rate-limit rules and the
+  pending, terms and acting-member exemptions are all keyed on paths, so a moved path would lose
+  them silently. Tests over the real handler mappings fail on a write outside the CSRF exemption, a
+  mapping outside `/api`, `/internal` and the actuator, an unclassified family, a rule that names no
+  operation, and an exemption that is not an exact list of real paths (REQ-SEC-031, REQ-SEC-078…080).
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.
@@ -53,6 +69,12 @@ non-internal Missions, and a separate responsible/requesting pair for Job Orders
 ownership according to a documented matrix, the admin area and promotion are explicit carve-outs,
 and `orgUnitId` travels in the MDC and in a relay header so the active context is visible in logs
 and across the module boundary.
+
+A scoped aggregate says so in its own code: it carries `@TenantScoped`, naming its owning or
+responsible unit, and the tenancy guards select by that marker and by what a controller writes,
+never by class names, so a split or moved controller stays under the scope-gate rule (REQ-ORG-028).
+Request bodies are kept apart from what the server manages by the same kind of structural rule
+(REQ-SEC-077).
 
 Authority: [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (`REQ-ORG-*`).
 
@@ -81,6 +103,15 @@ a relayed exchange client, otherwise `system` — and the exchange change feed's
 a change reaches the feed with its writer whatever path made it, a bulk path included (ADR-0224,
 `REQ-XCH-013`).
 
+Every table has exactly one owning module of the target cut, recorded in a table-ownership map that
+a test holds against the migrated schema; a trigger or native statement reaches another module's
+table only through a listed crossing, and every column a trigger function names must resolve,
+because PostgreSQL would otherwise only notice a renamed column on the next insert
+(`REQ-DATA-020`). Every column that references a member has a disposition in the erasure, the
+Art. 15 export and the account merge (`REQ-DATA-021`). A master-data cache shares one instance
+between every reader, so no mutator may edit an instance a cache handed out; caches move to read
+models, and the entity-returning ones are a list that may only shrink (`REQ-DATA-022`).
+
 ## 8.4 Concurrency — the landmine field
 
 Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest granularity the data
@@ -95,10 +126,17 @@ carries it — is in [`frontend/CLAUDE.md`](../../frontend/CLAUDE.md).
 
 Versioned `/api/v1` paths with `@ApiDeprecation`, DTO-only boundaries (records + MapStruct +
 Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every error,
-`Pageable`/`PageResponse` with whitelisted sort fields, UTC everywhere, and a committed
+`Pageable`/`PageResponse` with whitelisted sort fields and a kernel page ceiling of 1 000 (eight
+reviewed catalogue lists opt out to 100 000), UTC everywhere, and a committed
 `openapi.json` per REST-serving module — generated with sorted keys by each module's
 `OpenApiGeneratorTest`, and CI fails a pull request whose committed document differs from the one
 its build generated.
+
+A breaking change is a **hard cut**, not a second version: every operation carries a contract tier
+(T0 never breaks, T1 is what a released app calls and breaks only in a declared wave with a forced
+update, T2 is web-only), and the minimum app version is to be bound to the release
+([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), REQ-API-001,
+-009, -010; decided 2026-10-02, implementation pending).
 
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 
@@ -155,6 +193,11 @@ Two binding rules shape every UI change:
   declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
   layer: page CSS beats the design system without specificity bumps, a migrated inline class beats
   both, and the two state classes win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`).
+- **One navigation chrome, rendered once** (2026-10-03). Every app page includes
+  `fragments/header.html` and `fragments/sidebar.html`; the drawer is also the phone menu sheet, and
+  the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it, so `sec:authorize`
+  in that one template stays the only place that decides which pages a member is offered
+  (REQ-UI-026, ADR-0240, `NavigationRenderMvcTest`, `NavigationE2eTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),
@@ -164,7 +207,9 @@ ADR-0012/0013/0031/0094.
 
 One centrally-configured WebClient, wrapped by Resilience4j (Timeout, Retry, CircuitBreaker,
 Bulkhead), with state transitions logged so a `SERVICE_UNAVAILABLE` or `BACKEND_TIMEOUT` always has
-a matching log line.
+a matching log line. The per-domain typed clients the frontend gets are built over that same
+`webClient` bean, never beside it, so the one filter chain stays the single pass
+([ADR-0032](../adr/0032-frontend-single-resilience-pass-at-webclient-filter.md) amendment).
 
 **Reactor context propagation is mandatory** for anything that must be visible inside an exchange
 filter: `WebClient.exchange()` runs on a Reactor-Netty worker thread and a plain `ThreadLocal` is
@@ -173,11 +218,12 @@ Forgetting one is silent — the holder is simply empty on the worker thread.
 
 **This is a frontend rule only.** The backend and the ingest call HTTP through blocking
 `RestClient`s on the JDK HTTP client (ADR-0204): no WebFlux, no Reactor Netty, and the call runs on
-the thread that holds the MDC. Each module builds its clients in one `config.RestClientConfig`,
-wires the observation registry by hand (neither ships Boot's `spring-boot-restclient`), pins
-HTTP/1.1 and caps the response body with a `ResponseSizeLimitInterceptor`; a new outbound call in
-either module goes through those clients rather than a fresh `RestClient.builder()`, or it is
-neither observed nor bounded.
+the thread that holds the MDC. Each module builds its clients in one `RestClientConfig` (backend
+`config`, ingest `relay`), wires the observation registry by hand (neither ships Boot's
+`spring-boot-restclient`), pins HTTP/1.1 and caps the response body with a
+`ResponseSizeLimitInterceptor`; a new outbound call in either module goes through those clients
+rather than a fresh `RestClient.builder()`, or it is neither observed nor bounded. In the ingest,
+`ConcernPackageRulesTest` fails on an outbound HTTP client outside `relay` (REQ-INGEST-014).
 
 In the ingest the exchange relay runs on `exchangeRestClient` (30 s) under its own breaker
 `exchange` and, for change sets of more than 100 ops, a four-slot bulkhead (ADR-0204 amendment 2,
@@ -192,7 +238,12 @@ mutation to an audited area without its audit event is an incomplete change — 
 type, the recording call, the viewer's per-area filter, the DE/EN labels and the coverage list. No
 user free text and no personal data in the details payload.
 
-Authority: [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001`).
+Audit is a direct, synchronous call inside the business transaction, never an event: no
+after-commit or asynchronous method records an audit row, no listener reads the request-bound scope
+or security context, and an observer SPI implementation (`@ObserverSpi`) joins the caller's
+transaction as `MANDATORY` (`REQ-AUDIT-007`).
+
+Authority: [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001`, `REQ-AUDIT-007`).
 
 ## 8.9 Observability
 
@@ -264,6 +315,32 @@ production runs where that is cheap to arrange: the Redis integration tests star
 image by digest (`TestImages.REDIS`, guarded against the compose file and the Quadlet unit), and
 the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`).
 
+Backend module coupling is measured in tests too. An ArchUnit `modules()` rule over the domain map
+lets a module depend only on lower-ranked modules and its same-rank `allow` rows; today's violations
+are frozen in `backend/src/test/resources/architecture/module-baseline/` and may only shrink — a new
+edge fails, a fixed one must be removed from the committed file. Spring Modulith runs beside it in
+test scope only, with explicitly annotated module detection. **Only coupling is ever frozen;** a
+security or structural rule stays a hard rule
+([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-003…005).
+
+**A quality gate never falls back to a default, and a guard never narrows in silence.** Each module
+declares its test heap, coverage floors and PIT targets in its own `build-settings.properties`, and
+configuration fails without them (REQ-OPS-037). Guards that find their subject by a path or a
+listing fail when they stop seeing it — build-script input paths, recursive content scans, the DTO
+mirror pairing, and a counted context shape per application (REQ-OPS-038) — so moving files or
+packages cannot switch a gate off.
+
+**The build sets the `test` profile, once.** Every Gradle `Test` task activates it, and no test class
+repeats it with `@ActiveProfiles("test")`: the annotation is part of Spring's test-context cache key,
+so it only splits contexts that are otherwise identical (REQ-OPS-039, guarded by a
+`TestProfileConventionTest` per application).
+
+**Test classes share their application contexts.** A test reuses a plain `@SpringBootTest` or, in
+the backend, `@LeafServiceMockTest` with its one agreed set of leaf-service mocks, rather than
+declaring a mock set or property of its own; security beans stay real in a shared context
+(`LeafServiceMockSecurityTest`). `TestContextBudgetTest` computes every class's context-cache key
+without starting a context and holds each application to a budget (REQ-OPS-041).
+
 ## 8.13 The external client exchange
 
 Three rules hold for every exchange route, and each new resource or capability inherits them:
@@ -285,6 +362,45 @@ Three rules hold for every exchange route, and each new resource or capability i
   stay open, a published `$id` never changes, and identifiers and cursors are opaque. A breaking
   change is `v2`, served beside `v1` for at least twelve months. The contract test fails a schema
   that shrank since the last release (REQ-XCH-026, ADR-0219).
+- **Frozen across the relay, pinned at build time.** The backend surface the gateway relays to
+  keeps its behaviour byte-identical (D-05). Every identifier the modules share — relay paths,
+  headers, capability scopes, gate codes, the registry mirror document, the revocation and handoff
+  keys — is declared once in `test-support`'s `ExchangeSeam` and each module asserts its side
+  against it; the backend's answers are validated against the published schemas, every gateway
+  route has a committed golden answer, the gateway's security filter order is pinned, and a pull
+  request touching the exchange path needs the `e2e` label (REQ-XCH-036…-038).
 
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
 ADR-0221, ADR-0224 … ADR-0228; the third-party view is published from `docs/exchange/`.
+
+## 8.14 Domain modules — decided, being built
+
+The backend is being cut into domain modules inside its one Gradle module (plan
+[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md); nothing has moved yet). Five
+rules hold for every module as it lands:
+
+- **One package per domain, with a rank.** A module depends only on lower ranks or on what its
+  declaration allows; `kernel` and `platform` carry no domain meaning; inside a module, `api` is the
+  only thing another module may use, `internal` holds the rest, and `web` holds controllers and REST
+  DTOs without transactions, repositories or entities
+  ([ADR-0231](../adr/0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md)).
+- **Three ways to interact.** A command or query API whose writes are `MANDATORY`; an observer SPI
+  owned by the lower module and called in the same transaction; an after-commit event only where the
+  reaction may happen later or fail on its own. Only the owner writes its aggregate, and audit is
+  always a direct synchronous call, never an event
+  ([ADR-0232](../adr/0232-modules-interact-through-commands-observers-and-after-commit-events.md)).
+- **Enforced by tests, not review.** ArchUnit keeps the security rules, re-keyed so a move cannot
+  disarm them, and a frozen module baseline that may only shrink; security rules are never frozen;
+  Spring Modulith verifies the modules in test scope only
+  ([ADR-0233](../adr/0233-module-boundaries-are-enforced-by-archunit-and-spring-modulith-in-test-scope.md)).
+- **Access is a policy per domain** that owns both the per-row gate and the JPQL scope fragment
+  ([ADR-0236](../adr/0236-each-domain-owns-an-access-policy-over-the-scope-kernel.md)); errors are a
+  sealed kernel of kinds plus per-module problem codes
+  ([ADR-0235](../adr/0235-errors-are-a-sealed-kernel-of-kinds-and-per-module-problem-codes.md)).
+- **Guards before moves.** No class, controller, template, script or path moves before the Phase 0
+  guards are green and each is proven able to fail once; a move pull request is mechanical and
+  keeps the authorization matrix byte-identical (plan §6).
+
+The REST API follows the modules by hard cut with a forced app update
+([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), §8.5). Only the
+exchange and the bank later become Gradle modules of their own. The debt this closes is §11.9.

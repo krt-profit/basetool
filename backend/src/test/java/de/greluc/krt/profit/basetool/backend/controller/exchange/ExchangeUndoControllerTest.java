@@ -59,7 +59,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -73,12 +72,7 @@ import org.springframework.web.context.WebApplicationContext;
  * days here, so the undo's reach follows it. Writes commit.
  */
 @SpringBootTest
-@ActiveProfiles("test")
-@TestPropertySource(
-    properties = {
-      "app.security.ingest-gateway.client-ids=test-ingest-gateway",
-      "app.exchange.change-retention.max-age=P30D"
-    })
+@TestPropertySource(properties = "app.exchange.change-retention.max-age=P30D")
 class ExchangeUndoControllerTest {
 
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";

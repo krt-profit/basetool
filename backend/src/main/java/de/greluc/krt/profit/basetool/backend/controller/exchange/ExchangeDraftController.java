@@ -20,9 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.controller.exchange;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeBlueprintDraftDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeRefineryDraftRequest;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeDraftService;
 import de.greluc.krt.profit.basetool.backend.support.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
@@ -92,7 +92,7 @@ public class ExchangeDraftController {
   @ApiResponse(responseCode = "200", description = "The draft")
   @ApiResponse(responseCode = "400", description = "Unsupported schema version or panel type")
   public ResponseEntity<RefineryImportDraftDto> refineryOrders(
-      @NotNull @Valid @RequestBody RefineryExtractDto extract,
+      @NotNull @Valid @RequestBody ExchangeRefineryDraftRequest extract,
       @NotNull Authentication authentication) {
     return ResponseEntity.ok(draftService.refinery(member(authentication), extract));
   }

@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * TestContainers-backed migration test for {@code V110__create_game_item.sql}. Asserts the table
@@ -37,7 +36,6 @@ import org.springframework.test.context.ActiveProfiles;
  * CHECK on {@code source_systems} and {@code kind}.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V110MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;
