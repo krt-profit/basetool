@@ -417,7 +417,12 @@ the owner's decision of 2026-09-25). When the promoted `keycloak-spi` digest mov
    keycloak, the re-pinned app services, the units the config replaced — and, through `Requires=`,
    what requires them; then every stack unit is **started** in dependency order and waited for
    (`Notify=healthy`). Keycloak's start re-runs the provider build on the new JAR before backend
-   starts. **One health gate** covers the app images, the units and the JAR, and the run records
+   starts. **The edge starts right after keycloak, before backend, ingest and frontend**
+   (`db-backend db-keycloak redis keycloak edge backend ingest frontend acme`): the applications
+   fetch the issuer's discovery document through the public name, which the host alias routes
+   through haproxy to the edge, so an edge that the same window stopped and starts last fails every
+   application start with `Remote host terminated the handshake`. *(Corrected 2026-10-03: the edge
+   started last, which broke the testing host's jump from 1.10.0 to 1.13.6 twice.)* **One health gate** covers the app images, the units and the JAR, and the run records
    success only when every stack unit is healthy.
 
 If the gate fails, **everything the release changed is rolled back together** — the digest pin

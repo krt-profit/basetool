@@ -21,10 +21,14 @@ package de.greluc.krt.profit.basetool.backend.service.exchange;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractGoodDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractImageDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeBlueprintDraftDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeItemRef;
+import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeRefineryDraftRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintExportParser;
@@ -98,12 +102,98 @@ public class ExchangeDraftService {
    * Builds the refinery draft for the member, as the extractor's upload does.
    *
    * @param member the member, the draft's owner
-   * @param extract the refinery extract
+   * @param draft the refinery extract the client sent
    * @return the draft with its issues
    */
   public @NotNull RefineryImportDraftDto refinery(
-      @NotNull UUID member, @NotNull RefineryExtractDto extract) {
-    return refineryImportService.buildDraft(extract, member);
+      @NotNull UUID member, @NotNull ExchangeRefineryDraftRequest draft) {
+    return refineryImportService.buildDraft(extract(draft), member);
+  }
+
+  /**
+   * Copies the exchange's refinery draft into the web import's extract, field by field.
+   *
+   * @param draft the refinery extract the client sent
+   * @return the same extract as the web import reads it
+   */
+  static @NotNull RefineryExtractDto extract(@NotNull ExchangeRefineryDraftRequest draft) {
+    return new RefineryExtractDto(
+        draft.schemaVersion(),
+        draft.tool(),
+        draft.toolVersion(),
+        draft.model(),
+        draft.generatedAt(),
+        draft.clientLanguage(),
+        draft.orders() == null
+            ? null
+            : draft.orders().stream().map(ExchangeDraftService::order).toList());
+  }
+
+  /**
+   * Copies one order of a refinery draft.
+   *
+   * @param order the order the client sent
+   * @return the same order as the web import reads it
+   */
+  private static @Nullable RefineryExtractOrderDto order(
+      @Nullable ExchangeRefineryDraftRequest.ExchangeRefineryDraftOrder order) {
+    if (order == null) {
+      return null;
+    }
+    return new RefineryExtractOrderDto(
+        order.panelType(),
+        order.quoted(),
+        order.layoutConfidence(),
+        order.rawLocationName(),
+        order.rawMethodName(),
+        order.rawInManifestTotal(),
+        order.rawToRefineTotal(),
+        order.expenses(),
+        order.durationMinutes(),
+        order.totalYieldScu(),
+        order.sourceImages() == null
+            ? null
+            : order.sourceImages().stream().map(ExchangeDraftService::image).toList(),
+        order.goods() == null
+            ? null
+            : order.goods().stream().map(ExchangeDraftService::good).toList());
+  }
+
+  /**
+   * Copies one source screenshot of a refinery draft.
+   *
+   * @param image the screenshot the client named
+   * @return the same screenshot as the web import reads it
+   */
+  private static @Nullable RefineryExtractImageDto image(
+      @Nullable ExchangeRefineryDraftRequest.ExchangeRefineryDraftImage image) {
+    if (image == null) {
+      return null;
+    }
+    return new RefineryExtractImageDto(
+        image.name(), image.width(), image.height(), image.cropMode(), image.capturedAt());
+  }
+
+  /**
+   * Copies one material row of a refinery draft.
+   *
+   * @param good the row the client sent
+   * @return the same row as the web import reads it
+   */
+  private static @Nullable RefineryExtractGoodDto good(
+      @Nullable ExchangeRefineryDraftRequest.ExchangeRefineryDraftGood good) {
+    if (good == null) {
+      return null;
+    }
+    return new RefineryExtractGoodDto(
+        good.rowIndex(),
+        good.rawMaterialName(),
+        good.quality(),
+        good.inputQuantity(),
+        good.outputQuantity(),
+        good.refine(),
+        good.confidence(),
+        good.sourceImage());
   }
 
   /**

@@ -29,7 +29,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * The per-IP rate-limit budget of the exchange routes (prefix {@code app.rate-limit},
  * REQ-INGEST-005), enforced by {@link
- * de.greluc.krt.profit.basetool.ingest.filter.RateLimitingFilter}.
+ * de.greluc.krt.profit.basetool.ingest.edge.RateLimitingFilter}.
  *
  * @param enabled master switch; {@code false} disables throttling entirely
  * @param refillPeriod refill cadence of the per-IP bucket

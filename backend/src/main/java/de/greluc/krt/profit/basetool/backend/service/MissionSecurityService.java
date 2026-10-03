@@ -46,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
  * linked participant by its user or an elevated role. Missing resources raise {@code
  * NotFoundException} instead of returning {@code false}.
  */
-@Service
+@Service("missionSecurityService")
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)

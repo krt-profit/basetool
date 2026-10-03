@@ -1,6 +1,6 @@
 # ADR-0214 — Code carries no comments besides Javadoc
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (`_` for an empty catch, see below)
 - **Date:** 2026-09-25
 - **Deciders:** @greluc (owner)
 - **Related:** REQ-OPS-020 (amended) · ADR-0125 (JSDoc types) · `CLAUDE.md` → *Documentation*
@@ -62,3 +62,13 @@ test fixtures whose comments are the data under test, and Markdown documentation
 - **Move the comments into Javadoc** — rejected: it would keep the history, only in another place.
 - **A lint rule banning comments now** — deferred: Checkstyle cannot tell a directive from prose in
   every language the repository uses, and a partial gate reads as full coverage.
+
+## Amendment — 2026-10-02: `_` for an unused variable, empty catch blocks included
+
+Owner decision D-14 of the domain modularisation plan (§8.1). The unnamed variable `_` (final since
+Java 22) is accepted for every variable whose value is deliberately unused — a lambda parameter, a
+catch parameter, a pattern component — and that includes the parameter of an empty `catch`, beside
+the names `ignored` and `expected` of the consequence above. Checkstyle's `EmptyCatchBlock`
+accepts `^(ignored|expected|_)$` as its `exceptionVariableName`. A descriptive name stays where the
+name states intent. Not in `keycloak-spi`: it emits Java-21 bytecode, where `_` is not a valid
+identifier, so javac refuses it there.

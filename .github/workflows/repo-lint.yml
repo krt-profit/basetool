@@ -193,6 +193,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/check-object-layout-parity.py
 
+      - name: exchange-label / Self-test the exchange e2e-label check
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_exchange_e2e_label.py --selftest
+
       - name: e2e-device-matrix / Self-test the comparison
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_e2e_device_matrix.py --selftest

@@ -1,8 +1,9 @@
 # ADR-0047 — Backend packages form an acyclic dependency graph
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (see below)
 - **Date:** 2026-06-27
 - **Deciders:** @greluc
+- **Amended:** 2026-10-02 — `support` is an allow-list leaf, the layer rules select by role, the layers inside each module are acyclic, and module cycles sit in a frozen baseline (REQ-SEC-073, see the Amendment section below)
 - **Related:** [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java) (`backendPackagesShouldBeFreeOfDependencyCycles`, `supportPackageMustStayADependencyLeaf`, `mapperLayerShouldNotReachIntoSecurityContext`) · ADR-0012 (layering)
 
 ## Context
@@ -112,3 +113,34 @@ removals are routine relocations.
   breaks it.
 - **Backend-wide `beFreeOfCycles` left unenforced (a one-off cleanup)** — rejected: without
   the gate the graph would re-acquire cycles within a few PRs.
+
+## Amendment — 2026-10-02: role selection, an allow-list leaf, layer cycles per module, module cycles frozen
+
+Domain modularisation plan §5.7, guards G-01 and G-09 (REQ-SEC-073; ADR-0231, ADR-0233), so that
+moving classes into domain packages cannot disarm these rules silently, and so that the domain
+modules — a second level of slices whose graph is not acyclic today (21 of 23 domains in one
+strongly connected component) — get a cycle gate of their own:
+
+- **The layer rules select by role** (`@Service`, MapStruct `@Mapper`, Spring Data repositories,
+  JPA entities, Bean Validation constraints and validators) plus the package tree of one class of
+  the layer named by class literal, and each asserts a selection floor. Selecting by role found one
+  `@Service` bean in `support`, `StaffelMembershipResolver`, which `UserMapper` uses; it is a
+  `@Component` now, which is what a `support` collaborator is.
+- **`support` is an allow-list leaf**: `supportPackageMustStayADependencyLeaf` allows only `support`
+  itself, the model, the repositories and classes outside the backend, instead of denying eleven
+  layer packages that a domain package would not match. `support` holds domain-free helpers; logic
+  that a mapper and a service share belongs to the domain that owns it, inverted through an SPI
+  there. The "obvious home" for shared helpers named above is narrowed accordingly.
+- **The layers inside each module are acyclic** (`layersInsideEachModuleShouldBeFreeOfDependencyCycles`,
+  never frozen): a top-level package named like one of today's 21 layers is a layer of the root
+  module, any other top-level package is a domain module whose sub-packages are its layers. Cycles
+  between modules are not this rule's subject. Today only the root module exists, so it checks
+  exactly the slices of `backendPackagesShouldBeFreeOfDependencyCycles`, which stays and keeps
+  guarding the layer packages while they exist.
+- **Module cycles are frozen in a baseline.** The ArchUnit `modules()` rule over the domain map,
+  wrapped in `FreezingArchRule`, records today's violating edges, cycles included, in a committed
+  store that may only shrink. This is the alternative the decision above rejected for the layers;
+  it is accepted for the modules because their cycles cannot be removed before the gate is needed,
+  and the store makes every removal visible.
+
+The leaf-SPI inversion of the decision above is also how an upward module edge is broken (ADR-0232).
