@@ -1,6 +1,6 @@
 # ADR-0060 — Write-DTO convention: `…Request` in `model/dto`, collapse Create/Update into one `…WriteRequest`
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`a45adf77e`: `validation.DtoConstraints`, `validation.OnUpdate` and the collapsed `…WriteRequest` records such as `PromotionTopicWriteRequest`).
+- **Status:** Accepted — implemented; amended 2026-10-02 (separate request and response types at each domain's cut, see below). *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`a45adf77e`: `validation.DtoConstraints`, `validation.OnUpdate` and the collapsed `…WriteRequest` records such as `PromotionTopicWriteRequest`).
 - **Date:** 2026-07-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec [`api-conventions.md`](../specs/api-conventions.md) REQ-API-002 · issue #919 (S13, epic #905)
@@ -71,3 +71,17 @@ constants in this slice; the broad `@Size` rollout is incremental.
 - Frontend request mirrors that mirror a collapsed pair (only `MaterialExternalAlias`) collapse to
   one record too, kept in lockstep by the cross-module DTO contract test (S9, #915).
 - Future write DTOs and the remaining naming outliers migrate onto this convention per feature slice.
+
+## Amendment — 2026-10-02: separate request and response types at each domain's cut
+
+Domain modularisation plan §5.2 and §5.10, guard G-06; ADR-0231. The convention above is
+incremental per feature slice; from a domain's REST cut on, two parts of it become mandatory for
+that domain:
+
+- **A request body and a response are never the same type.** The audit of 2026-09-29 found 13 DTOs
+  that are both; each is split when its domain is cut. G-06 enforces it: a type any mapping returns
+  is never a `@RequestBody`, server-managed fields (`id`, `owner*`, `*OrgUnit*`, `status` outside
+  transition endpoints) never appear in a request record, and every write body is `@Valid`.
+- **REST DTOs are separate from the module-API records.** The `web` package of a module owns its
+  request and response types and maps them onto the module's `api` records, so an internal
+  refactor never changes the wire contract (the exchange layer already works this way).

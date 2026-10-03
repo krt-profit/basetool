@@ -29,20 +29,20 @@
  * Usage: node scripts/gen-api-types.mjs <openapi.json> <out.d.ts>
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 const [, , specPath, outPath] = process.argv;
 if (!specPath || !outPath) {
-  console.error("usage: gen-api-types.mjs <openapi.json> <out.d.ts>");
-  process.exit(2);
+    console.error('usage: gen-api-types.mjs <openapi.json> <out.d.ts>');
+    process.exit(2);
 }
 
-const spec = JSON.parse(readFileSync(specPath, "utf8"));
+const spec = JSON.parse(readFileSync(specPath, 'utf8'));
 const schemas = spec.components?.schemas ?? {};
 if (Object.keys(schemas).length === 0) {
-  console.error(`no components.schemas found in ${specPath}`);
-  process.exit(1);
+    console.error(`no components.schemas found in ${specPath}`);
+    process.exit(1);
 }
 
 /**
@@ -50,80 +50,80 @@ if (Object.keys(schemas).length === 0) {
  * (`allOf`, `oneOf`, `anyOf`, `not`, `discriminator`).
  */
 function assertNoPolymorphism(node, path) {
-  if (!node || typeof node !== "object") return;
-  if (Array.isArray(node)) {
-    node.forEach((v, i) => assertNoPolymorphism(v, `${path}[${i}]`));
-    return;
-  }
-  for (const kw of ["allOf", "oneOf", "anyOf", "not", "discriminator"]) {
-    if (kw in node) {
-      console.error(
-        `${specPath}: unsupported OpenAPI construct '${kw}' at ${path}.\n` +
-          "scripts/gen-api-types.mjs emits only the flat-object subset springdoc used to produce.\n" +
-          "Extend the generator (see its header comment) — do not silently drop the type.",
-      );
-      process.exit(1);
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+        node.forEach((v, i) => assertNoPolymorphism(v, `${path}[${i}]`));
+        return;
     }
-  }
-  for (const [k, v] of Object.entries(node)) assertNoPolymorphism(v, `${path}.${k}`);
+    for (const kw of ['allOf', 'oneOf', 'anyOf', 'not', 'discriminator']) {
+        if (kw in node) {
+            console.error(
+                `${specPath}: unsupported OpenAPI construct '${kw}' at ${path}.\n` +
+                    'scripts/gen-api-types.mjs emits only the flat-object subset springdoc used to produce.\n' +
+                    'Extend the generator (see its header comment) — do not silently drop the type.',
+            );
+            process.exit(1);
+        }
+    }
+    for (const [k, v] of Object.entries(node)) assertNoPolymorphism(v, `${path}.${k}`);
 }
-assertNoPolymorphism(schemas, "components.schemas");
+assertNoPolymorphism(schemas, 'components.schemas');
 
 /** Renders a property name: bare when it is a valid TS identifier, quoted otherwise. */
 const key = (k) => (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k) ? k : JSON.stringify(k));
 
 /** Resolves a local `$ref` into an indexed access, which keeps self-referential DTOs legal. */
 function fromRef(ref) {
-  const name = ref.replace("#/components/schemas/", "");
-  if (!(name in schemas)) {
-    console.error(`${specPath}: dangling $ref '${ref}' — no such schema.`);
-    process.exit(1);
-  }
-  return `components['schemas'][${JSON.stringify(name)}]`;
+    const name = ref.replace('#/components/schemas/', '');
+    if (!(name in schemas)) {
+        console.error(`${specPath}: dangling $ref '${ref}' — no such schema.`);
+        process.exit(1);
+    }
+    return `components['schemas'][${JSON.stringify(name)}]`;
 }
 
 /** Maps one OpenAPI schema node to a TypeScript type expression. */
 function toType(schema, indent) {
-  if (!schema || typeof schema !== "object") return "unknown";
-  if (schema.$ref) return fromRef(schema.$ref);
-  if (Array.isArray(schema.enum)) {
-    return schema.enum.map((v) => JSON.stringify(v)).join(" | ") || "never";
-  }
-  switch (schema.type) {
-    case "string":
-      return "string";
-    case "integer":
-    case "number":
-      return "number";
-    case "boolean":
-      return "boolean";
-    case "array":
-      return `(${toType(schema.items, indent)})[]`;
-    default: {
-      if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
-        return `Record<string, ${toType(schema.additionalProperties, indent)}>`;
-      }
-      if (!schema.properties) {
-        return schema.type === "object" ? "Record<string, unknown>" : "unknown";
-      }
-      const required = new Set(schema.required ?? []);
-      const pad = "  ".repeat(indent + 1);
-      const body = Object.entries(schema.properties)
-        .map(([name, prop]) => {
-          const optional = required.has(name) ? "" : "?";
-          const nullable = prop.nullable ? " | null" : "";
-          return `${pad}${key(name)}${optional}: ${toType(prop, indent + 1)}${nullable};`;
-        })
-        .join("\n");
-      return `{\n${body}\n${"  ".repeat(indent)}}`;
+    if (!schema || typeof schema !== 'object') return 'unknown';
+    if (schema.$ref) return fromRef(schema.$ref);
+    if (Array.isArray(schema.enum)) {
+        return schema.enum.map((v) => JSON.stringify(v)).join(' | ') || 'never';
     }
-  }
+    switch (schema.type) {
+        case 'string':
+            return 'string';
+        case 'integer':
+        case 'number':
+            return 'number';
+        case 'boolean':
+            return 'boolean';
+        case 'array':
+            return `(${toType(schema.items, indent)})[]`;
+        default: {
+            if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
+                return `Record<string, ${toType(schema.additionalProperties, indent)}>`;
+            }
+            if (!schema.properties) {
+                return schema.type === 'object' ? 'Record<string, unknown>' : 'unknown';
+            }
+            const required = new Set(schema.required ?? []);
+            const pad = '  '.repeat(indent + 1);
+            const body = Object.entries(schema.properties)
+                .map(([name, prop]) => {
+                    const optional = required.has(name) ? '' : '?';
+                    const nullable = prop.nullable ? ' | null' : '';
+                    return `${pad}${key(name)}${optional}: ${toType(prop, indent + 1)}${nullable};`;
+                })
+                .join('\n');
+            return `{\n${body}\n${'  '.repeat(indent)}}`;
+        }
+    }
 }
 
 const entries = Object.entries(schemas)
-  .sort(([a], [b]) => a.localeCompare(b))
-  .map(([name, schema]) => `    ${key(name)}: ${toType(schema, 2)};`)
-  .join("\n");
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, schema]) => `    ${key(name)}: ${toType(schema, 2)};`)
+    .join('\n');
 
 const out = `/*
  * AUTO-GENERATED from openapi.json by scripts/gen-api-types.mjs — do not edit, do not commit.
@@ -147,7 +147,7 @@ export interface operations {}
 `;
 
 mkdirSync(dirname(outPath), { recursive: true });
-writeFileSync(outPath, out, "utf8");
+writeFileSync(outPath, out, 'utf8');
 console.log(
-  `gen-api-types: ${Object.keys(schemas).length} schemas -> ${outPath} (${out.split("\n").length} lines)`,
+    `gen-api-types: ${Object.keys(schemas).length} schemas -> ${outPath} (${out.split('\n').length} lines)`,
 );

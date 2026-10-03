@@ -8,7 +8,12 @@ findable from one place, not to restate them.
 Keycloak is the only identity provider; the applications never handle a credential. The backend is
 an OAuth2 **resource server**, the frontend an OAuth2 **client**. Authorisation is centralised on
 `@PreAuthorize` so the permission model can be read off the code, and ArchUnit tests enforce the
-invariants that keep it that way.
+invariants that keep it that way. Those tests select by role and class literal rather than by
+package or name, assert a selection floor and are each proven able to fail on a planted fixture,
+so moving or renaming a class fails the build instead of quietly leaving a gate (REQ-SEC-073).
+Where a gate can still live in more than one place — a `SecurityConfig` URL rule, a controller
+annotation, a service annotation — the backend's authorization matrix pins all three for every
+operation in one reviewed file, so a move that drops one shows up as a diff (REQ-SEC-074).
 
 Beyond roles there are three mechanisms that are easy to miss:
 
@@ -105,6 +110,12 @@ Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every 
 `OpenApiGeneratorTest`, and CI fails a pull request whose committed document differs from the one
 its build generated.
 
+A breaking change is a **hard cut**, not a second version: every operation carries a contract tier
+(T0 never breaks, T1 is what a released app calls and breaks only in a declared wave with a forced
+update, T2 is web-only), and the minimum app version is to be bound to the release
+([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), REQ-API-001,
+-009, -010; decided 2026-10-02, implementation pending).
+
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 
 ## 8.6 Frontend behaviour
@@ -169,7 +180,9 @@ ADR-0012/0013/0031/0094.
 
 One centrally-configured WebClient, wrapped by Resilience4j (Timeout, Retry, CircuitBreaker,
 Bulkhead), with state transitions logged so a `SERVICE_UNAVAILABLE` or `BACKEND_TIMEOUT` always has
-a matching log line.
+a matching log line. The per-domain typed clients the frontend gets are built over that same
+`webClient` bean, never beside it, so the one filter chain stays the single pass
+([ADR-0032](../adr/0032-frontend-single-resilience-pass-at-webclient-filter.md) amendment).
 
 **Reactor context propagation is mandatory** for anything that must be visible inside an exchange
 filter: `WebClient.exchange()` runs on a Reactor-Netty worker thread and a plain `ThreadLocal` is
@@ -263,6 +276,14 @@ production runs where that is cheap to arrange: the Redis integration tests star
 image by digest (`TestImages.REDIS`, guarded against the compose file and the Quadlet unit), and
 the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`).
 
+Backend module coupling is measured in tests too. An ArchUnit `modules()` rule over the domain map
+lets a module depend only on lower-ranked modules and its same-rank `allow` rows; today's violations
+are frozen in `backend/src/test/resources/architecture/module-baseline/` and may only shrink — a new
+edge fails, a fixed one must be removed from the committed file. Spring Modulith runs beside it in
+test scope only, with explicitly annotated module detection. **Only coupling is ever frozen;** a
+security or structural rule stays a hard rule
+([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-003…005).
+
 ## 8.13 The external client exchange
 
 Three rules hold for every exchange route, and each new resource or capability inherits them:
@@ -287,3 +308,35 @@ Three rules hold for every exchange route, and each new resource or capability i
 
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
 ADR-0221, ADR-0224 … ADR-0228; the third-party view is published from `docs/exchange/`.
+
+## 8.14 Domain modules — decided, being built
+
+The backend is being cut into domain modules inside its one Gradle module (plan
+[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md); nothing has moved yet). Five
+rules hold for every module as it lands:
+
+- **One package per domain, with a rank.** A module depends only on lower ranks or on what its
+  declaration allows; `kernel` and `platform` carry no domain meaning; inside a module, `api` is the
+  only thing another module may use, `internal` holds the rest, and `web` holds controllers and REST
+  DTOs without transactions, repositories or entities
+  ([ADR-0231](../adr/0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md)).
+- **Three ways to interact.** A command or query API whose writes are `MANDATORY`; an observer SPI
+  owned by the lower module and called in the same transaction; an after-commit event only where the
+  reaction may happen later or fail on its own. Only the owner writes its aggregate, and audit is
+  always a direct synchronous call, never an event
+  ([ADR-0232](../adr/0232-modules-interact-through-commands-observers-and-after-commit-events.md)).
+- **Enforced by tests, not review.** ArchUnit keeps the security rules, re-keyed so a move cannot
+  disarm them, and a frozen module baseline that may only shrink; security rules are never frozen;
+  Spring Modulith verifies the modules in test scope only
+  ([ADR-0233](../adr/0233-module-boundaries-are-enforced-by-archunit-and-spring-modulith-in-test-scope.md)).
+- **Access is a policy per domain** that owns both the per-row gate and the JPQL scope fragment
+  ([ADR-0236](../adr/0236-each-domain-owns-an-access-policy-over-the-scope-kernel.md)); errors are a
+  sealed kernel of kinds plus per-module problem codes
+  ([ADR-0235](../adr/0235-errors-are-a-sealed-kernel-of-kinds-and-per-module-problem-codes.md)).
+- **Guards before moves.** No class, controller, template, script or path moves before the Phase 0
+  guards are green and each is proven able to fail once; a move pull request is mechanical and
+  keeps the authorization matrix byte-identical (plan §6).
+
+The REST API follows the modules by hard cut with a forced app update
+([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), §8.5). Only the
+exchange and the bank later become Gradle modules of their own. The debt this closes is §11.9.
