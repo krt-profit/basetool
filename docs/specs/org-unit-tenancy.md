@@ -228,9 +228,9 @@ entity no longer maps the column at all (V104 dropped `app_user`'s legacy squadr
 `MissionParticipant`'s affiliation moved to the `mission_participant_org_unit` join table.
 
 > **Amended by REQ-ORG-028 (2026-10-03):** the scope rules now also select by the `@TenantScoped`
-> marker on the aggregate rather than only by class names. The simple-name write-gate rule
-> `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` still runs beside the marker-based rule
-> and can be retired, because the marker-based rule selects every controller it names and more.
+> marker on the aggregate rather than only by class names. The list-keyed write-gate rule
+> `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` is retired (2026-10-03): the marker-based
+> rule in `TenancyGuardTest` selects every controller it named (asserted) and more.
 
 ### REQ-ORG-007 — Audit MDC field
 

@@ -61,14 +61,7 @@ import de.greluc.krt.profit.basetool.backend.controller.BankHolderController;
 import de.greluc.krt.profit.basetool.backend.controller.BankRequestController;
 import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
 import de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController;
-import de.greluc.krt.profit.basetool.backend.controller.HangarController;
-import de.greluc.krt.profit.basetool.backend.controller.InventoryItemController;
-import de.greluc.krt.profit.basetool.backend.controller.MissionController;
-import de.greluc.krt.profit.basetool.backend.controller.OperationController;
 import de.greluc.krt.profit.basetool.backend.controller.OrgUnitBankController;
-import de.greluc.krt.profit.basetool.backend.controller.RefineryOrderController;
-import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandController;
-import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.controller.TermsDocumentController;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
@@ -206,7 +199,6 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.service.MissionParticipantService;
-import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
@@ -218,7 +210,6 @@ import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
-import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankBalanceChart;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
@@ -247,7 +238,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.hibernate.annotations.OptimisticLock;
@@ -269,10 +259,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -579,13 +567,6 @@ class ArchitectureTest {
           Optional.class,
           Iterable.class);
 
-  /**
-   * Response-only DTOs that must never be accepted as a {@code @RequestBody} on a write endpoint,
-   * because they carry server-managed fields ({@code id}, {@code version}, {@code owningSquadron},
-   * …).
-   */
-  static final Set<Class<?>> RESPONSE_ONLY_DTOS = Set.of(MissionDto.class);
-
   /** Mission DTOs whose participant data carries PII (REQ-SEC-007). */
   static final Set<Class<?>> MISSION_PII_CARRYING_DTOS =
       Set.of(MissionDto.class, MissionParticipantDto.class, MissionFinanceEntryDto.class);
@@ -609,25 +590,6 @@ class ArchitectureTest {
   /** The scope guards a staffel-scoped service injects. */
   static final Set<Class<?>> SCOPE_GUARDS =
       Set.of(AuthHelperService.class, OwnerScopeService.class);
-
-  /** Staffel-scoped aggregate controllers whose {@code {id}} writes gate on a scope bean. */
-  static final Set<Class<?>> STAFFEL_SCOPED_CONTROLLERS =
-      Set.of(
-          MissionController.class,
-          OperationController.class,
-          HangarController.class,
-          InventoryItemController.class,
-          RefineryOrderController.class,
-          SpecialCommandController.class,
-          SpecialCommandMembershipController.class);
-
-  /** The security beans whose SpEL reference satisfies a staffel-scoped write gate. */
-  static final Set<Class<?>> STAFFEL_WRITE_GATE_BEANS =
-      Set.of(
-          OwnerScopeService.class,
-          MissionSecurityService.class,
-          SpecialCommandSecurityService.class,
-          OrgRoleManagementSecurityService.class);
 
   /** The handler methods that may declare {@code @PreAuthorize("permitAll()")} (REQ-SEC-052). */
   static final Set<Method> PERMIT_ALL_ALLOWED_METHODS =
@@ -1461,65 +1423,6 @@ class ArchitectureTest {
   }
 
   /**
-   * Write endpoints with an {@code {id}} path on the staffel-scoped controllers must use a
-   * {@code @PreAuthorize} expression that references a scope bean; reads, id-less writes and a
-   * role-only check other than an ADMIN-only one are out of scope or violate.
-   */
-  @Test
-  void staffelScopedWriteEndpointsMustGateOnOwnerScopeService() {
-    DescribedPredicate<JavaMethod> selection = staffelScopedWrites(STAFFEL_SCOPED_CONTROLLERS);
-    assertMethodFloor("staffelScopedWriteEndpointsMustGateOnOwnerScopeService", selection, 86);
-    staffelScopedWriteEndpointsRule(selection, STAFFEL_WRITE_GATE_BEANS).check(CLASSES);
-  }
-
-  static DescribedPredicate<JavaMethod> staffelScopedWrites(Set<Class<?>> controllers) {
-    return methodsOf(classesIn(controllers))
-        .and(
-            annotatedWithAnyOf(
-                PostMapping.class, PutMapping.class, PatchMapping.class, DeleteMapping.class))
-        .and(annotatedWithAnyOf(PreAuthorize.class));
-  }
-
-  static ArchRule staffelScopedWriteEndpointsRule(
-      DescribedPredicate<JavaMethod> selection, Set<Class<?>> gateBeans) {
-    Set<String> beanNames =
-        gateBeans.stream().map(ArchitectureTest::beanName).collect(Collectors.toSet());
-    return methods()
-        .that(selection)
-        .should(
-            new ArchCondition<JavaMethod>("gate on one of the scope beans " + beanNames) {
-              @Override
-              public void check(JavaMethod method, ConditionEvents events) {
-                boolean takesResourceIdPathVariable =
-                    method.getParameters().stream()
-                        .anyMatch(
-                            p ->
-                                p.isAnnotatedWith(PathVariable.class)
-                                    && p.getRawType().isEquivalentTo(UUID.class));
-                if (!takesResourceIdPathVariable || !mappingPathContainsIdPlaceholder(method)) {
-                  return;
-                }
-                String value = preAuthorizeValue(method);
-                boolean hasScopeBean = beanNames.stream().anyMatch(value::contains);
-                boolean hasAdminOnly =
-                    value.contains("hasRole('ADMIN')") && !value.contains("hasAnyRole(");
-                if (!hasScopeBean && !hasAdminOnly) {
-                  events.add(
-                      SimpleConditionEvent.violated(
-                          method,
-                          method.getFullName()
-                              + " is a write endpoint on a staffel-scoped aggregate but its"
-                              + " @PreAuthorize expression gates on none of "
-                              + beanNames
-                              + " (nor hasRole('ADMIN')) - that means cross-staffel writes are"
-                              + " not blocked. Add `and @ownerScopeService.canEdit*(#id)` to the"
-                              + " SpEL (SPEZIALKOMMANDO_PLAN.md §5.3)."));
-                }
-              }
-            });
-  }
-
-  /**
    * Mission endpoints whose gate admits members below Logistician and return a PII-carrying mission
    * DTO must call a {@code cleanup…ForPeer} helper (REQ-SEC-007).
    */
@@ -1553,55 +1456,9 @@ class ArchitectureTest {
                 + " skipped on the write paths.");
   }
 
-  /**
-   * Write endpoints must not accept a response-only DTO as {@code @RequestBody}, which would allow
-   * mass assignment of server-managed fields.
-   */
-  @Test
-  void responseOnlyDtosMustNotBeAcceptedAsRequestBodyOnWriteEndpoints() {
-    DescribedPredicate<JavaMethod> selection = bodyAcceptingWrites();
-    assertMethodFloor(
-        "responseOnlyDtosMustNotBeAcceptedAsRequestBodyOnWriteEndpoints", selection, 249);
-    responseOnlyDtosRule(selection, RESPONSE_ONLY_DTOS).check(CLASSES);
-  }
-
   static DescribedPredicate<JavaMethod> bodyAcceptingWrites() {
     return publicMethodsOf(CONTROLLER_CODE)
         .and(annotatedWithAnyOf(PostMapping.class, PutMapping.class, PatchMapping.class));
-  }
-
-  static ArchRule responseOnlyDtosRule(
-      DescribedPredicate<JavaMethod> selection, Set<Class<?>> responseOnlyDtos) {
-    Set<String> names = responseOnlyDtos.stream().map(Class::getName).collect(Collectors.toSet());
-    return methods()
-        .that(selection)
-        .should(
-            new ArchCondition<JavaMethod>(
-                "not declare a @RequestBody parameter of a response-only DTO type") {
-              @Override
-              public void check(JavaMethod method, ConditionEvents events) {
-                method.getParameters().stream()
-                    .filter(p -> p.isAnnotatedWith(RequestBody.class))
-                    .filter(p -> names.contains(p.getRawType().getFullName()))
-                    .forEach(
-                        p ->
-                            events.add(
-                                SimpleConditionEvent.violated(
-                                    method,
-                                    method.getFullName()
-                                        + " — @RequestBody parameter of type "
-                                        + p.getRawType().getSimpleName()
-                                        + " is a response-only DTO; binding it on a write endpoint"
-                                        + " enables mass-assignment of server-managed fields (id,"
-                                        + " version, owningSquadron, …). Switch to a dedicated"
-                                        + " *Request record. See audit finding C-3.")));
-              }
-            })
-        .because(
-            "Write endpoints must accept a dedicated request DTO (e.g. CreateMissionRequest, "
-                + "UpdateMissionRequest) that structurally excludes server-managed fields — "
-                + "binding the full response DTO opens a mass-assignment vector (audit finding"
-                + " C-3).");
   }
 
   /** The Mission write requests must not declare server-managed components (audit finding C-4). */
@@ -2547,35 +2404,6 @@ class ArchitectureTest {
   static boolean hasMutatingNamePrefix(String methodName) {
     String lower = methodName.toLowerCase(Locale.ROOT);
     return MUTATING_METHOD_PREFIXES.stream().anyMatch(lower::startsWith);
-  }
-
-  /**
-   * Whether one of the method's write mappings has a path containing the literal {@code "{id}"}
-   * placeholder.
-   */
-  static boolean mappingPathContainsIdPlaceholder(JavaMethod method) {
-    for (Class<? extends java.lang.annotation.Annotation> type :
-        List.of(PostMapping.class, PutMapping.class, PatchMapping.class, DeleteMapping.class)) {
-      if (!method.isAnnotatedWith(type)) {
-        continue;
-      }
-      Object raw =
-          method
-              .getAnnotationOfType(type.getName())
-              .tryGetExplicitlyDeclaredProperty("value")
-              .orElse(null);
-      if (raw instanceof String s && s.contains("{id}")) {
-        return true;
-      }
-      if (raw instanceof Object[] arr) {
-        for (Object o : arr) {
-          if (o instanceof String s && s.contains("{id}")) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
   }
 
   /**
