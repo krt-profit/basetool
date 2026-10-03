@@ -284,6 +284,13 @@ configuration time (use `providers.exec`). Check a build-script change with
 Repositories are declared only in `settings.gradle.kts`; a module script that
 declares one fails the build (`FAIL_ON_PROJECT_REPOS`).
 
+**Each module declares its own quality settings** in `<module>/build-settings.properties`:
+`test.maxHeap`, the JaCoCo floors `coverage.instruction` / `coverage.branch` and the PIT
+patterns `mutation.targetClasses` / `mutation.targetTests`, each required as soon as the
+module applies the plugin that reads it. Nothing has a default — a new module without the
+file fails configuration (REQ-OPS-037), and the Dockerfiles copy the file beside each
+module's `build.gradle.kts`.
+
 **Dependency updates** are surfaced by the weekly
 [refresh-versions workflow](.github/workflows/refresh-versions.yml), which runs
 `./gradlew refreshVersions -PrefreshVersions`. The flag is what applies the

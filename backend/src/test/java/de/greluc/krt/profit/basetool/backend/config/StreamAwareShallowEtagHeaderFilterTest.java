@@ -55,10 +55,10 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "/api/v1/live-sync/changed",
         "/api/v1/missions/search",
         "/api/v1/materials/matrix",
-        "/api/v1/material-exchange/offers",
+        "/api/v1/orders/item-catalog",
+        "/api/v1/terms/document",
         "/api/v1/job-types",
         "/"
       })
@@ -81,7 +81,10 @@ class StreamAwareShallowEtagHeaderFilterTest {
         "/api/v1/missions/00000000-0000-4000-8000-000000000000/finance-entries",
         "/api/v1/personal-inventory",
         "/api/v1/refinery-orders/all",
-        "/api/v1/promotion/eligibility"
+        "/api/v1/promotion/eligibility",
+        "/api/v1/live-sync/changed",
+        "/api/v1/material-exchange/offers",
+        "/api/v1/orders"
       })
   @DisplayName("a no-store family is not filtered either — its buffer could never pay for itself")
   void noStoreFamiliesBypassTheFilter(String path) {
@@ -159,7 +162,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
   }
 
   @Test
-  @DisplayName("a non-API path never pays the fourteen-pattern scan")
+  @DisplayName("a non-API path never pays the family scan")
   void nonApiPathsAreNotScanned() {
     assertThat(filter.shouldNotFilter(get("/actuator/health"))).isFalse();
     assertThat(filter.shouldNotFilter(get("/v3/api-docs"))).isFalse();
@@ -170,19 +173,20 @@ class StreamAwareShallowEtagHeaderFilterTest {
   void theExemptListIsTheSharedOne() {
     assertThat(NoStoreApiScopes.size())
         .as("the shared list must not be empty, or the agreement above is vacuous")
-        .isGreaterThanOrEqualTo(14);
+        .isGreaterThanOrEqualTo(28);
   }
 
   @Test
-  @DisplayName("an unnormalised stream spelling is still NOT recognised, and that is bounded")
+  @DisplayName("an unnormalised spelling outside the no-store families is still NOT recognised")
   void unnormalisedPathsAreNotRecognised() {
-    assertThat(filter.shouldNotFilter(get("/api/v1/live-sync/./stream"))).isFalse();
+    assertThat(filter.shouldNotFilter(get("/api/v1/missions/./search"))).isFalse();
   }
 
   @Test
-  @DisplayName("the notification stream's unnormalised spelling is now covered, by the other list")
+  @DisplayName("both streams' unnormalised spellings are covered, by the no-store list")
   void theNoStoreListNarrowsTheUnnormalisedHole() {
     assertThat(filter.shouldNotFilter(get("/api/v1/notifications/./stream"))).isTrue();
+    assertThat(filter.shouldNotFilter(get("/api/v1/live-sync/./stream"))).isTrue();
   }
 
   @Test

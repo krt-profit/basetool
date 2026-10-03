@@ -22,7 +22,8 @@ twice, and the second one can be forgotten.
 
 **Mitigated, not solved.** `FrontendDtoContractTest` diffs the mirrors against `openapi.json`, and
 `GeneratedDtoAgreementTest` compares them field by field against the models generated from the same
-document. Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
+document, and `DtoMirrorConsistencyTest` pairs every mirror with its backend record wherever it
+lives in the backend source tree (REQ-OPS-038). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
 and until it happens the duplication is real.
 
 ## 11.3 The knowledge base cannot be gated by this repository's CI
@@ -45,6 +46,11 @@ parameter rule was caught being wrong — but that is a backstop, not coverage.
 The same shape applies to the accessor sweep (ADR-0192 Amendment 1): it is true on the day it runs,
 and three files added after the first sweep had already put six accessors back before anyone
 noticed.
+
+**Closing it** is decided: Error Prone with NullAway checks the annotations at compile time,
+starting with the module `api` packages and widening package by package
+([ADR-0237](../adr/0237-error-prone-and-nullaway-check-the-nullness-annotations-at-compile-time.md),
+2026-10-01). Until a package is covered, this entry holds for it.
 
 ## 11.5 One host, no failover
 
@@ -318,7 +324,20 @@ since the go-live of 2026-09-28, so these risks hold now.
   compiles against the pinned version only, so every Keycloak bump rebuilds it against the new
   version, re-checks those classes and renders one device consent page (the sandbox smoke test
   asserts the warning and the code). A silently changed default-provider rule would leave the
-  consent page without the code but still working.
+  consent page without the code but still working. Two build-time checks narrow the gap
+  (REQ-OPS-040): `scripts/check-keycloak-version.py` fails when the catalog's `keycloak` version and
+  the image pins name different Keycloak lines, and `ServiceRegistrationsTest` fails when one of the
+  six service registrations no longer resolves, implements its SPI, instantiates or keeps its
+  provider id. Neither runs the SPI inside Keycloak; that stays the sandbox smoke test's job.
+- **Thirty-two master-data caches hold the catalogue entities themselves** (opened 2026-10-03).
+  Every reader shares the cached instance, and the mutators are safe only because they load
+  through self-invocation; a test runs every mutator against a cached read and a rule lets the
+  list only shrink until the caches hold read models (`REQ-DATA-022`, plan Phase 4).
+- **Eight member-referencing columns were not in the Art. 15 export** (opened and closed
+  2026-10-03): approval limits, account booking grants, booking requests as counterparty,
+  market-request interest, party lead, unit responsibility, grand admiral appointment and realm
+  roles. Each has its own export section now, and `GdprParticipantCoverageTest` requires it
+  (`REQ-DATA-021`, `REQ-SEC-058`).
 
 ## 11.9 The domains are coupled inside correct layers — opened 2026-09-29
 
@@ -333,9 +352,15 @@ domain's rules through its repository, and a second write path into an aggregate
 stock book-in; the job-order production book-in that APPSEC-01 of the September audit caught
 writing into foreign stock) is found by review or not at all. Many security gates are
 keyed on package names, class names or paths, so a refactor could disarm them without failing a
-build.
+build. The backend ArchUnit rules no longer are (re-keyed by role and class literal with selection
+floors, 2026-10-02, REQ-SEC-073); SpEL bean names, path lists and the other name-keyed controls are
+the plan's remaining guards.
 
 **Closing it** is the [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md): package per
 domain with a published API, Spring Modulith and a frozen ArchUnit baseline in test scope, guards
 that make every name-keyed gate fail loudly before anything moves, and later Gradle modules for the
-exchange and the bank.
+exchange and the bank. Its decisions are recorded as ADR-0231 (the module cut), ADR-0232 (how modules
+interact), ADR-0233 (enforcement), ADR-0234 (the API's hard cut), ADR-0235 (the error model) and
+ADR-0236 (access policies per domain); the rules are §8.14. Status on 2026-10-02: the defects found
+along the way are fixed (Phase −1, merged 2026-10-01), the guards of Phase 0 are being built, and no
+class has moved.

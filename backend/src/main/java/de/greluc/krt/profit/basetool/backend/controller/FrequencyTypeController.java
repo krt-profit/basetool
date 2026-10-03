@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.FrequencyTypeService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -100,7 +101,7 @@ public class FrequencyTypeController {
   @PostMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public FrequencyTypeDto createFrequencyType(
-      @RequestBody @NotNull FrequencyTypeDto frequencyType) {
+      @RequestBody @Valid @NotNull FrequencyTypeDto frequencyType) {
     var toCreate = frequencyTypeMapper.toEntity(frequencyType);
     toCreate.setId(null);
     toCreate.setVersion(null);
@@ -118,7 +119,7 @@ public class FrequencyTypeController {
   @PutMapping("/{id}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public FrequencyTypeDto updateFrequencyType(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull FrequencyTypeDto frequencyType) {
+      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull FrequencyTypeDto frequencyType) {
     return frequencyTypeMapper.toDto(
         frequencyTypeService.updateFrequencyType(id, frequencyTypeMapper.toEntity(frequencyType)));
   }
@@ -153,7 +154,7 @@ public class FrequencyTypeController {
    */
   @PostMapping("/reorder")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public void reorderFrequencyTypes(@RequestBody @NotNull List<UUID> ids) {
+  public void reorderFrequencyTypes(@RequestBody @Valid @NotNull List<UUID> ids) {
     frequencyTypeService.reorderFrequencyTypes(ids);
   }
 }
