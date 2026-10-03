@@ -1,6 +1,6 @@
 # ADR-0234 — The API is re-cut by hard cut, with a forced app update and a release-bound floor
 
-- **Status:** Accepted — implementation pending (plan Phase 0 step 0.7, REST API track). Supersedes
+- **Status:** Accepted — machinery in place (Phase 0: contract tiers, frozen set from the app's call list, declared-break ledger, generated edge admission, release-bound floor, `APP_UPDATE_REQUIRED`, the app's policy re-read in app v0.5.0); the cuts follow wave by wave (REST API track). Supersedes
   the retirement clause of [ADR-0136](0136-external-contract-set-for-shipped-clients.md) (decision
   bullet 4).
 - **Date:** 2026-09-29 (hard cut, D-03, D-04, D-05); 2026-10-01 (release-bound floor, D-11)

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.filter;
 
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RequestBodyLimitProperties;
@@ -204,7 +205,9 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
             + problemProperties.baseUri()
             + "request-body-too-large\",\"title\":\"Payload Too Large\",\"status\":413,"
             + "\"detail\":\"The request body exceeds the allowed size for this endpoint.\","
-            + "\"code\":\"REQUEST_BODY_TOO_LARGE\",\"instance\":\""
+            + "\"code\":\""
+            + CoreProblemCode.REQUEST_BODY_TOO_LARGE.code()
+            + "\",\"instance\":\""
             + jsonEscape(request.getRequestURI())
             + "\",\"correlationId\":\""
             + correlationId

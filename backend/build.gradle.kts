@@ -75,6 +75,9 @@ dependencies {
   testImplementation(libs.spring.modulith.core)
   testImplementation(libs.spring.modulith.docs)
   testImplementation(libs.okhttp3.mockwebserver)
+  testImplementation(libs.json.schema.validator) {
+    exclude(group = "tools.jackson.dataformat", module = "jackson-dataformat-yaml")
+  }
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -96,26 +99,36 @@ tasks.javadoc {
 }
 
 val contractBaseline = layout.buildDirectory.file("contract-baseline/openapi.json")
+val contractBaselineRequired =
+  providers
+    .environmentVariable("CONTRACT_BASELINE_REQUIRED")
+    .map { it.trim() == "true" }
+    .orElse(false)
 
 tasks.named<Test>("test") {
   inputs
     .files(contractBaseline)
     .withPropertyName("contractBaseline")
     .withPathSensitivity(PathSensitivity.NONE)
+  inputs.property("contractBaselineRequired", contractBaselineRequired)
   val baseline = contractBaseline
+  val baselineRequired = contractBaselineRequired
   jvmArgumentProviders.add(
     CommandLineArgumentProvider {
-      listOf("-Dcontract.baseline=" + baseline.get().asFile.absolutePath)
+      listOf(
+        "-Dcontract.baseline=" + baseline.get().asFile.absolutePath,
+        "-Dcontract.baseline.required=" + baselineRequired.get(),
+      )
     }
   )
 
   inputs
     .files(
       rootProject.file(
-        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/exchange/ExchangeRelay.java"
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/ExchangeRelay.java"
       ),
       rootProject.file(
-        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/config/ObservationPrivacyFilter.java"
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/ObservationPrivacyFilter.java"
       ),
       rootProject.file(
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ObservationPrivacyFilter.java"
@@ -125,8 +138,22 @@ tasks.named<Test>("test") {
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
-    .file(rootProject.file("docker/edge/include/api-allowlist.conf"))
-    .withPropertyName("apiVhostAllowList")
+    .dir(rootProject.file("ingest/src/main/resources/exchange/v1/schemas"))
+    .withPropertyName("exchangeContractSchemas")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  inputs
+    .dir(rootProject.file("docs/exchange/examples"))
+    .withPropertyName("exchangeContractFixtures")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  inputs
+    .files(
+      rootProject.file("docker/edge/include/api-admission.conf"),
+      rootProject.file("docker/edge/include/api-allowlist.conf"),
+      rootProject.file(".github/workflows/edge-deny-probe.yml"),
+      rootProject.file("docker-compose.yml"),
+    )
+    .withPropertyName("apiVhostAdmission")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
@@ -148,4 +175,13 @@ tasks.named<Test>("test") {
   jvmArgumentProviders.add(
     CommandLineArgumentProvider { listOf("-Dauthz.matrix.update=" + authzMatrixUpdate.get()) }
   )
+}
+
+tasks.register<JavaExec>("generateEdgeAdmission") {
+  description =
+    "Writes the API vhost's admission map, its include and the nightly probe table from the" +
+      " frozen contract set (REQ-API-021)."
+  classpath = sourceSets["test"].runtimeClasspath
+  mainClass.set("de.greluc.krt.profit.basetool.backend.api.EdgeAdmission")
+  args(rootDir.absolutePath)
 }

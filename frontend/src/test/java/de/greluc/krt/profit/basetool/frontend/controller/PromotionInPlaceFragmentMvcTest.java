@@ -79,7 +79,8 @@ class PromotionInPlaceFragmentMvcTest {
   void adminTopics_topicsResultsFragment_rendersCardsWithoutPageChromeOrModals() throws Exception {
     UUID topicId = UUID.randomUUID();
     UUID catId = UUID.randomUUID();
-    PromotionTopicDto topic = new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null);
+    PromotionTopicDto topic =
+        new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null, null);
     PromotionCategoryDto cat =
         new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", null, 0, null, null);
     PromotionLevelContentDto lc =
@@ -139,7 +140,8 @@ class PromotionInPlaceFragmentMvcTest {
     UUID topicId = UUID.randomUUID();
     UUID catId = UUID.randomUUID();
     UUID memberId = UUID.randomUUID();
-    PromotionTopicDto topic = new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null);
+    PromotionTopicDto topic =
+        new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null, null);
     PromotionCategoryDto cat =
         new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", null, 0, null, null);
     UserDto member =

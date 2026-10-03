@@ -22,7 +22,8 @@ twice, and the second one can be forgotten.
 
 **Mitigated, not solved.** `FrontendDtoContractTest` diffs the mirrors against `openapi.json`, and
 `GeneratedDtoAgreementTest` compares them field by field against the models generated from the same
-document. Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
+document, and `DtoMirrorConsistencyTest` pairs every mirror with its backend record wherever it
+lives in the backend source tree (REQ-OPS-038). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
 and until it happens the duplication is real.
 
 ## 11.3 The knowledge base cannot be gated by this repository's CI
@@ -323,7 +324,20 @@ since the go-live of 2026-09-28, so these risks hold now.
   compiles against the pinned version only, so every Keycloak bump rebuilds it against the new
   version, re-checks those classes and renders one device consent page (the sandbox smoke test
   asserts the warning and the code). A silently changed default-provider rule would leave the
-  consent page without the code but still working.
+  consent page without the code but still working. Two build-time checks narrow the gap
+  (REQ-OPS-040): `scripts/check-keycloak-version.py` fails when the catalog's `keycloak` version and
+  the image pins name different Keycloak lines, and `ServiceRegistrationsTest` fails when one of the
+  six service registrations no longer resolves, implements its SPI, instantiates or keeps its
+  provider id. Neither runs the SPI inside Keycloak; that stays the sandbox smoke test's job.
+- **Thirty-two master-data caches hold the catalogue entities themselves** (opened 2026-10-03).
+  Every reader shares the cached instance, and the mutators are safe only because they load
+  through self-invocation; a test runs every mutator against a cached read and a rule lets the
+  list only shrink until the caches hold read models (`REQ-DATA-022`, plan Phase 4).
+- **Eight member-referencing columns were not in the Art. 15 export** (opened and closed
+  2026-10-03): approval limits, account booking grants, booking requests as counterparty,
+  market-request interest, party lead, unit responsibility, grand admiral appointment and realm
+  roles. Each has its own export section now, and `GdprParticipantCoverageTest` requires it
+  (`REQ-DATA-021`, `REQ-SEC-058`).
 
 ## 11.9 The domains are coupled inside correct layers — opened 2026-09-29
 

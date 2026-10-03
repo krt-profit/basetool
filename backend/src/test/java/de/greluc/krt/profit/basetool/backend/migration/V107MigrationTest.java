@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * TestContainers-backed migration test for {@code V107__add_cross_ref_columns_to_manufacturer.sql}.
@@ -37,7 +36,6 @@ import org.springframework.test.context.ActiveProfiles;
  * scwiki_uuid}) exist so the R2 / R6 sync services can rely on them.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V107MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

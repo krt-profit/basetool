@@ -28,15 +28,24 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import de.greluc.krt.profit.basetool.backend.dto.LiveSyncChangedRequest;
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
+import de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.backend.service.LiveSyncRelayService;
 import de.greluc.krt.profit.basetool.backend.service.LiveSyncStreamService;
 import de.greluc.krt.profit.basetool.backend.service.LiveSyncSubscriptionAuthorizer;
+import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserArgumentResolver;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,11 +54,20 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** The bridge's two endpoints: what they accept, what they refuse, and how loudly (ADR-0143). */
 @ExtendWith(MockitoExtension.class)
@@ -176,41 +194,98 @@ class LiveSyncControllerTest {
   }
 
   @Test
-  @DisplayName("an unknown topic is a 400 and never reaches the relay")
-  void anUnknownTopicIsRejected() {
-    assertThat(
-            controller
-                .changed(ALICE, new LiveSyncChangedRequest("not-a-room", List.of("stock")))
-                .getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+  @DisplayName("an unknown topic is a 400 problem and never reaches the relay")
+  void anUnknownTopicIsRejected() throws Exception {
+    MockHttpServletResponse response = signal("not-a-room", "stock");
+
+    assertProblem(response, HttpStatus.BAD_REQUEST, CoreProblemCode.BAD_REQUEST);
     verify(relayService, never()).publishFromClient(any(), any(), anyList());
   }
 
   @Test
-  @DisplayName("a frame with no known section is a 400, so a client bug is visible")
-  void noKnownSectionIsRejected() {
+  @DisplayName("a frame with no known section is a 400 problem, so a client bug is visible")
+  void noKnownSectionIsRejected() throws Exception {
     when(relayService.publishFromClient(eq(ALICE), any(), anyList()))
         .thenReturn(LiveSyncRelayService.Outcome.NO_KNOWN_SECTIONS);
 
-    assertThat(
-            controller
-                .changed(ALICE, new LiveSyncChangedRequest("inventory", List.of("nonsense")))
-                .getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+    assertProblem(
+        signal("inventory", "nonsense"), HttpStatus.BAD_REQUEST, CoreProblemCode.BAD_REQUEST);
   }
 
   @Test
-  @DisplayName("both buckets answer 429, so the client drops the frame instead of retrying")
-  void rateLimitedSignalsAreTooManyRequests() {
+  @DisplayName("both buckets answer a 429 problem, so the client drops the frame")
+  void rateLimitedSignalsAreTooManyRequests() throws Exception {
     when(relayService.publishFromClient(eq(ALICE), any(), anyList()))
         .thenReturn(LiveSyncRelayService.Outcome.SUBJECT_RATE_LIMITED)
         .thenReturn(LiveSyncRelayService.Outcome.TOPIC_RATE_LIMITED);
 
-    LiveSyncChangedRequest request = new LiveSyncChangedRequest("inventory", List.of("stock"));
-    assertThat(controller.changed(ALICE, request).getStatusCode())
-        .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-    assertThat(controller.changed(ALICE, request).getStatusCode())
-        .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    for (int i = 0; i < 2; i++) {
+      MockHttpServletResponse response = signal("inventory", "stock");
+      assertProblem(response, HttpStatus.TOO_MANY_REQUESTS, CoreProblemCode.RATE_LIMIT_EXCEEDED);
+      assertThat(response.getHeader(HttpHeaders.RETRY_AFTER)).isEqualTo("1");
+    }
+  }
+
+  /**
+   * Posts one {@code changed} frame as {@link #ALICE} through MockMvc, with the real exception
+   * handler and the real bundles.
+   *
+   * @param topic the frame's topic
+   * @param section the frame's one section
+   * @return the response
+   * @throws Exception if the request cannot be performed
+   */
+  private MockHttpServletResponse signal(String topic, String section) throws Exception {
+    AppProblemProperties problemProperties =
+        new AppProblemProperties("https://profit-base.online/problems/");
+    ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+    messageSource.setBasename("messages");
+    messageSource.setDefaultEncoding("UTF-8");
+    messageSource.setFallbackToSystemLocale(false);
+    MockMvc mockMvc =
+        MockMvcBuilders.standaloneSetup(controller)
+            .setControllerAdvice(
+                new GlobalExceptionHandler(
+                    problemProperties,
+                    new ProblemResponseFactory(problemProperties),
+                    messageSource,
+                    new SimpleMeterRegistry()))
+            .setCustomArgumentResolvers(new CurrentUserArgumentResolver())
+            .build();
+    Jwt jwt =
+        new Jwt(
+            "token",
+            Instant.now(),
+            Instant.now().plusSeconds(300),
+            Map.of("alg", "none"),
+            Map.of("sub", ALICE.toString()));
+    return mockMvc
+        .perform(
+            post("/api/v1/live-sync/changed")
+                .principal(new JwtAuthenticationToken(jwt, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"topic\":\"" + topic + "\",\"sections\":[\"" + section + "\"]}"))
+        .andReturn()
+        .getResponse();
+  }
+
+  /**
+   * Asserts the response is a localized problem with the given status and code.
+   *
+   * @param response the response
+   * @param status the expected status
+   * @param code the expected code
+   * @throws Exception if the body cannot be read
+   */
+  private static void assertProblem(
+      MockHttpServletResponse response, HttpStatus status, CoreProblemCode code) throws Exception {
+    assertThat(response.getStatus()).isEqualTo(status.value());
+    assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    JsonNode body = new ObjectMapper().readTree(response.getContentAsString());
+    assertThat(body.path("code").asString(null)).isEqualTo(code.code());
+    assertThat(body.path("correlationId").asString("")).isNotBlank();
+    assertThat(body.path("title").asString("")).isNotBlank().doesNotStartWith("problem.");
+    assertThat(body.path("detail").asString("")).isNotBlank().doesNotStartWith("problem.");
   }
 
   private static MockHttpServletResponse response() {

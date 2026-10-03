@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
 
 import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -53,6 +54,7 @@ public record ExchangeStockChangeSet(
    * @param expectedQuantity the quantity the client last saw, 0 for a new lot
    * @param override whether the op may refill a lot emptied elsewhere, after asking the member
    */
+  @Schema(name = "Op")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
       @NotNull @Pattern(regexp = "^set-quantity$") String op,

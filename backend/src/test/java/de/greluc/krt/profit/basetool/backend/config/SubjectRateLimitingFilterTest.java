@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
@@ -36,13 +38,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.context.support.StaticMessageSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -139,6 +144,57 @@ class SubjectRateLimitingFilterTest {
     assertTrue(
         Integer.parseInt(rejected.getHeader("X-Rate-Limit-Retry-After-Seconds")) >= 1,
         "a caller must be told when to come back");
+  }
+
+  @Test
+  @DisplayName("the 429 carries a correlation id in body and header, and a Retry-After")
+  void theRejectionCarriesACorrelationIdAndARetryAfter() throws Exception {
+    authenticateAs("member-a");
+    send("POST", "/api/v1/missions");
+
+    MockHttpServletResponse rejected = send("POST", "/api/v1/missions");
+
+    String header = rejected.getHeader("X-Correlation-Id");
+    assertNotNull(header, "the refusal must echo X-Correlation-Id");
+    assertFalse(header.isBlank());
+    assertEquals(header, correlationIdOf(rejected));
+    assertEquals(
+        rejected.getHeader("X-Rate-Limit-Retry-After-Seconds"),
+        rejected.getHeader(HttpHeaders.RETRY_AFTER),
+        "Retry-After must state the same wait as the rate-limit header");
+    assertTrue(Integer.parseInt(rejected.getHeader(HttpHeaders.RETRY_AFTER)) >= 1);
+  }
+
+  @Test
+  @DisplayName("the 429 reuses a correlation id already bound to the request")
+  void theRejectionReusesABoundCorrelationId() throws Exception {
+    authenticateAs("member-a");
+    send("POST", "/api/v1/missions");
+    MDC.put("correlationId", "cid-bound-before");
+    try {
+      MockHttpServletResponse rejected = send("POST", "/api/v1/missions");
+
+      assertEquals("cid-bound-before", rejected.getHeader("X-Correlation-Id"));
+      assertEquals("cid-bound-before", correlationIdOf(rejected));
+    } finally {
+      MDC.remove("correlationId");
+    }
+  }
+
+  /**
+   * Reads the body's {@code correlationId}; the plain mapper this test hands the filter nests the
+   * problem's extension members under {@code properties}, where Spring's mapper flattens them.
+   *
+   * @param response the refusal
+   * @return the correlation id, or {@code null} when the body carries none
+   * @throws Exception if the body cannot be read
+   */
+  private static String correlationIdOf(MockHttpServletResponse response) throws Exception {
+    JsonNode body = new ObjectMapper().readTree(response.getContentAsString());
+    JsonNode flat = body.path("correlationId");
+    return flat.isMissingNode()
+        ? body.path("properties").path("correlationId").asString(null)
+        : flat.asString(null);
   }
 
   @Test

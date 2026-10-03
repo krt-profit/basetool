@@ -22,21 +22,26 @@ package de.greluc.krt.profit.basetool.backend.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.config.ContractTiers;
+import de.greluc.krt.profit.basetool.backend.config.OpenApiDomainConfig;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -46,8 +51,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Reads the committed {@code openapi.json} and fails when a contract operation disappears,
  * changes its verb, loses a recorded response field, gains a required request field, changes a
- * frozen enum, or changes a recorded query parameter. Removing an entry means retiring a contract
- * via {@code /api/v2}.
+ * frozen enum, or changes a recorded query parameter; when a committed app call list names a call
+ * the set does not cover (REQ-API-016); and when anything frozen broke since the previous release
+ * without a line in the declared-break ledger (REQ-API-017, ADR-0234).
  */
 class ExternalContractTest {
 
@@ -116,52 +122,6 @@ class ExternalContractTest {
       return new ContractOperation(path, method, responseFields, requiredRequestFields, frozen);
     }
   }
-
-  /**
-   * The nginx include that decides what the internet can reach through the API vhost (ADR-0162).
-   */
-  private static final String ALLOW_LIST = "docker/edge/include/api-allowlist.conf";
-
-  /**
-   * One admission rule: {@code if ($uri = "…")}, {@code if ($uri ~ "…")} or {@code if ($uri ~*
-   * "…")}, followed by {@code { set $krt_api_allowed 1; }}; group 1 is the operator, group 2 the
-   * operand.
-   */
-  private static final Pattern ADMISSION_RULE =
-      Pattern.compile(
-          "^\\s*if\\s*\\(\\s*\\$uri\\s*(=|~\\*?)\\s*\"([^\"]+)\"\\s*\\)"
-              + "\\s*\\{\\s*set\\s+\\$krt_api_allowed\\s+1\\s*;\\s*}\\s*$");
-
-  /** {@code set $krt_api_allowed 0;}, the default every request starts from. */
-  private static final Pattern DEFAULT_DENY =
-      Pattern.compile("^\\s*set\\s+\\$krt_api_allowed\\s+0\\s*;\\s*$");
-
-  /** {@code if ($krt_api_allowed = 0) { return 404; }}, the refusal of every unadmitted URI. */
-  private static final Pattern UNADMITTED_REFUSAL =
-      Pattern.compile(
-          "^\\s*if\\s*\\(\\s*\\$krt_api_allowed\\s*=\\s*0\\s*\\)\\s*\\{\\s*return\\s+404\\s*;\\s*}\\s*$");
-
-  /** A {@code {name}} segment in a contract path. */
-  private static final Pattern PLACEHOLDER = Pattern.compile("\\{[a-zA-Z]+}");
-
-  /** Any uuid; the rules match the shape, not the value. */
-  private static final String SAMPLE_UUID = "00000000-0000-4000-8000-000000000000";
-
-  /**
-   * Placeholders that are not uuids, and what they stand for.
-   *
-   * <p>Only one exists today: the bank account's all-members visibility toggle, whose rule matches
-   * {@code (true|false)} rather than a uuid class. A new entry here is cheaper than a test that
-   * quietly substitutes the wrong shape and reports a gap that is not there.
-   */
-  private static final java.util.Map<String, String> PLACEHOLDERS =
-      java.util.Map.of(
-          "{enabled}",
-          "true",
-          "{roleCode}",
-          "KOMMANDOLEITER",
-          "{key}",
-          "job_order.age_yellow_days");
 
   /**
    * Response fields promised by all seven operations that answer with an org-unit bank account's
@@ -298,8 +258,8 @@ class ExternalContractTest {
           "frequencies");
 
   /**
-   * The contract set: every operation the Android app consumes, matching the paths the API vhost
-   * allow-lists, recorded from the generated document.
+   * The contract set: every operation the Android app consumes, recorded from the generated
+   * document; the API vhost admits it through the map {@link EdgeAdmission} renders from it.
    */
   private static final List<ContractOperation> CONTRACT =
       List.of(
@@ -437,7 +397,12 @@ class ExternalContractTest {
                       "personal",
                       "entryCount"))
               .addressedBy(
-                  Set.of("materialIds:array", "stolenOnly:boolean", "nonStolenOnly:boolean")),
+                  Set.of(
+                      "materialIds:array",
+                      "stolenOnly:boolean",
+                      "nonStolenOnly:boolean",
+                      "catalog:string",
+                      "locationIds:array")),
           new ContractOperation(
                   "/api/v1/orders",
                   "get",
@@ -454,7 +419,8 @@ class ExternalContractTest {
                       "createdAt",
                       "materials",
                       "redacted"))
-              .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
+              .addressedBy(
+                  Set.of("status:array", "page:integer", "size:integer", "squadronId:array")),
           new ContractOperation("/api/v1/orders/{id}", "get", JOB_ORDER_DETAIL),
           new ContractOperation(
               "/api/v1/orders/{id}/assignees/{userId}",
@@ -647,7 +613,7 @@ class ExternalContractTest {
                       "entityId",
                       "read",
                       "createdAt"))
-              .addressedBy(Set.of("page:integer", "size:integer")),
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
           new ContractOperation("/api/v1/notifications/unread-count", "get", Set.of("count")),
           new ContractOperation("/api/v1/notifications/stream", "get", Set.of()),
           new ContractOperation("/api/v1/notifications/{id}/read", "post", Set.of("id", "read")),
@@ -938,6 +904,8 @@ class ExternalContractTest {
                       "quality:integer",
                       "stolen:boolean",
                       "owningOrgUnitId:string",
+                      "catalog:string",
+                      "gameItemId:string",
                       "page:integer",
                       "size:integer")),
           new ContractOperation(
@@ -1034,7 +1002,13 @@ class ExternalContractTest {
                       "id",
                       "name",
                       "quantityType"))
-              .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
+              .addressedBy(
+                  Set.of(
+                      "search:string",
+                      "page:integer",
+                      "size:integer",
+                      "jobOrderOnly:boolean",
+                      "rawOnly:boolean")),
           new ContractOperation(
                   "/api/v1/locations/search",
                   "get",
@@ -1114,7 +1088,7 @@ class ExternalContractTest {
                       "oreSales",
                       "profit",
                       "version"))
-              .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
+              .addressedBy(Set.of("status:array", "page:integer", "size:integer", "sort:string")),
           new ContractOperation(
               "/api/v1/refinery-orders/{id}",
               "get",
@@ -1355,7 +1329,7 @@ class ExternalContractTest {
                       "requiredApprover",
                       "createdAt",
                       "version"))
-              .addressedBy(Set.of("page:integer", "size:integer")),
+              .addressedBy(Set.of("page:integer", "size:integer", "status:array")),
           new ContractOperation(
               "/api/v1/bank/requests/{id}/confirm",
               "post",
@@ -1681,8 +1655,6 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "put", Set.of()),
           new ContractOperation(
-              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "delete", Set.of()),
-          new ContractOperation(
               "/api/v1/missions/{id}/frequencies/custom/slim",
               "post",
               Set.of("id", "frequencyType", "name", "value"),
@@ -1831,7 +1803,51 @@ class ExternalContractTest {
               Set.of("file")),
           new ContractOperation(
               "/api/v1/hangar/ships/home-location", "post", Set.of(), Set.of("locationId")),
-          new ContractOperation("/api/v1/settings/{key}", "get", Set.of("value")));
+          new ContractOperation("/api/v1/settings/{key}", "get", Set.of("value")),
+          new ContractOperation(
+                  "/api/v1/materials/matrix",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "materialId",
+                      "materialName",
+                      "terminalId",
+                      "terminalName",
+                      "starSystemName",
+                      "priceBuy",
+                      "priceSell"))
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
+          new ContractOperation("/api/v1/orders", "post", JOB_ORDER_DETAIL, Set.of("materials")),
+          new ContractOperation(
+              "/api/v1/orders/{id}/requested", "put", Set.of(), Set.of("materials")),
+          new ContractOperation(
+              "/api/v1/bank/accounts",
+              "post",
+              Set.of("id", "accountNo", "name", "type", "status", "balance", "version"),
+              Set.of("name", "type")),
+          new ContractOperation(
+              "/api/v1/bank/holders",
+              "post",
+              Set.of("id", "userId", "handle", "active", "totalHeld", "version"),
+              Set.of("userId")),
+          new ContractOperation(
+              "/api/v1/bank/holders/{id}",
+              "patch",
+              Set.of("id", "userId", "handle", "active", "totalHeld", "version"),
+              Set.of("active", "version")),
+          new ContractOperation(
+              "/api/v1/refinery-orders/{id}", "put", Set.of(), Set.of("goods", "location")),
+          new ContractOperation("/api/v1/refinery-orders/{id}", "delete", Set.of()),
+          new ContractOperation("/api/v1/hangar/ships", "delete", Set.of()),
+          new ContractOperation("/api/v1/personal-blueprints", "delete", Set.of("deleted")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/participants/{participantId}/slim",
+              "put",
+              Set.of("id", "user", "guestName", "startTime", "endTime", "payoutPreference"),
+              Set.of("version")));
 
   /**
    * Contract operations the app deliberately addresses with no query parameter although the
@@ -1959,6 +1975,9 @@ class ExternalContractTest {
           Map.entry("MissionFinanceEntryCreateDto.type", Set.of("INCOME", "EXPENSE")),
           Map.entry("MissionFinanceEntryUpdateDto.type", Set.of("INCOME", "EXPENSE")),
           Map.entry("CreateBankBookingRequest.type", Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER")),
+          Map.entry(
+              "CreateBankAccountRequest.type",
+              Set.of("ORG_UNIT", "AREA", "CARTEL", "CARTEL_BANK", "SPECIAL")),
           Map.entry("AddMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
           Map.entry(
               "UpdateMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
@@ -1997,68 +2016,17 @@ class ExternalContractTest {
     Map<String, Set<String>> found = new TreeMap<>();
     Set<String> visited = new TreeSet<>();
     for (ContractOperation operation : CONTRACT) {
-      for (String root : responseSchemaNames(document, operation)) {
+      for (String root :
+          OpenApiWalk.responseSchemaNames(document, operation.path(), operation.method())) {
         walkSchema(schemas, root, visited, found);
       }
-      String request = requestSchemaName(document, operation);
+      String request =
+          OpenApiWalk.requestSchemaName(document, operation.path(), operation.method());
       if (request != null) {
         walkSchema(schemas, request, visited, found);
       }
     }
     return found;
-  }
-
-  /**
-   * Names the schema an operation's JSON request body resolves to.
-   *
-   * @param document the parsed API document
-   * @param operation the contract operation
-   * @return the schema name, or {@code null} for an operation that carries no JSON body
-   */
-  private static String requestSchemaName(JsonNode document, ContractOperation operation) {
-    JsonNode body =
-        document
-            .get("paths")
-            .get(operation.path())
-            .get(operation.method())
-            .path("requestBody")
-            .path("content")
-            .path("application/json")
-            .path("schema");
-    return schemaName(body);
-  }
-
-  /**
-   * Names the schemas an operation's 2xx responses resolve to.
-   *
-   * @param document the parsed API document
-   * @param operation the contract operation
-   * @return the schema names, following an array response through its {@code items}
-   */
-  private static Set<String> responseSchemaNames(JsonNode document, ContractOperation operation) {
-    JsonNode responses =
-        document.get("paths").get(operation.path()).get(operation.method()).get("responses");
-    Set<String> names = new TreeSet<>();
-    for (Map.Entry<String, JsonNode> response : responses.properties()) {
-      if (!response.getKey().startsWith("2")) {
-        continue;
-      }
-      JsonNode content = response.getValue().get("content");
-      if (content == null) {
-        continue;
-      }
-      for (Map.Entry<String, JsonNode> mediaType : content.properties()) {
-        JsonNode schema = mediaType.getValue().path("schema");
-        String name = schemaName(schema);
-        if (name == null) {
-          name = schemaName(schema.path("items"));
-        }
-        if (name != null) {
-          names.add(name);
-        }
-      }
-    }
-    return names;
   }
 
   /**
@@ -2071,12 +2039,12 @@ class ExternalContractTest {
    */
   private static void walkSchema(
       JsonNode schemas, String name, Set<String> visited, Map<String, Set<String>> found) {
-    walkProperties(
+    OpenApiWalk.walkProperties(
         schemas,
         name,
         visited,
         (owner, property, value, required) -> {
-          String target = schemaName(value);
+          String target = OpenApiWalk.schemaName(value);
           JsonNode enumNode = target != null ? schemas.path(target).get("enum") : value.get("enum");
           if (enumNode != null && required) {
             Set<String> constants = new TreeSet<>();
@@ -2084,75 +2052,6 @@ class ExternalContractTest {
             found.put(owner + "." + property, constants);
           }
         });
-  }
-
-  /** What a traversal does with one property of one schema. */
-  @FunctionalInterface
-  private interface PropertyVisitor {
-
-    /**
-     * Called once per property of every schema the walk reaches.
-     *
-     * @param owner the schema the property belongs to
-     * @param property the property name
-     * @param value the property's schema node
-     * @param required whether the owning schema lists it as required
-     */
-    void visit(String owner, String property, JsonNode value, boolean required);
-  }
-
-  /**
-   * Walks a schema and everything it references transitively, via {@code $ref}, array {@code items}
-   * and map {@code additionalProperties}, calling the visitor for each property. Shared by the enum
-   * guard and the type record.
-   *
-   * @param schemas the document's {@code components.schemas} node
-   * @param name the schema to walk; {@code null} and already-visited names are no-ops
-   * @param visited the shared cycle guard
-   * @param visitor what to do with each property
-   */
-  private static void walkProperties(
-      JsonNode schemas, String name, Set<String> visited, PropertyVisitor visitor) {
-    if (name == null || !visited.add(name)) {
-      return;
-    }
-    JsonNode schema = schemas.get(name);
-    if (schema == null) {
-      return;
-    }
-    Set<String> required = new TreeSet<>();
-    JsonNode requiredNode = schema.get("required");
-    if (requiredNode != null) {
-      requiredNode.forEach(entry -> required.add(entry.asString()));
-    }
-    JsonNode properties = schema.get("properties");
-    if (properties == null) {
-      return;
-    }
-    for (Map.Entry<String, JsonNode> property : properties.properties()) {
-      JsonNode value = property.getValue();
-      visitor.visit(name, property.getKey(), value, required.contains(property.getKey()));
-      if ("array".equals(value.path("type").asString(""))) {
-        walkProperties(schemas, schemaName(value.path("items")), visited, visitor);
-        continue;
-      }
-      if (value.path("additionalProperties").isObject()) {
-        walkProperties(schemas, schemaName(value.path("additionalProperties")), visited, visitor);
-        continue;
-      }
-      walkProperties(schemas, schemaName(value), visited, visitor);
-    }
-  }
-
-  /**
-   * Reads a schema node's {@code $ref} target name.
-   *
-   * @param node the schema node
-   * @return the referenced schema's name, or {@code null} when the node is not a reference
-   */
-  private static String schemaName(JsonNode node) {
-    JsonNode ref = node == null ? null : node.get("$ref");
-    return ref == null ? null : ref.asString().substring(ref.asString().lastIndexOf('/') + 1);
   }
 
   /**
@@ -2165,10 +2064,54 @@ class ExternalContractTest {
   private static final String FROZEN_TYPES_RESOURCE = "/api/frozen-contract-types.txt";
 
   /**
-   * System property naming a previous release's {@code openapi.json} to diff against; set by CI,
-   * absent locally.
+   * System property naming a previous release's {@code openapi.json} to diff against; set by the
+   * build, pointing at a file only CI fetches.
    */
   private static final String BASELINE_PROPERTY = "contract.baseline";
+
+  /**
+   * System property that turns a missing baseline into a failure; the build sets it from {@code
+   * CONTRACT_BASELINE_REQUIRED}, which CI sets.
+   */
+  private static final String BASELINE_REQUIRED_PROPERTY = "contract.baseline.required";
+
+  /** The declared-break ledger on the test classpath (REQ-API-017). */
+  private static final String LEDGER_RESOURCE = "/api/declared-breaks.txt";
+
+  /** The committed app call lists, relative to the repository root (REQ-API-016). */
+  private static final String APP_CALLS = "backend/src/test/resources/api/app-calls";
+
+  /** How many calls the newest committed app call list names at least. */
+  private static final int NEWEST_CALL_LIST_FLOOR = 243;
+
+  /** How many operations the frozen set holds at least. */
+  private static final int FROZEN_OPERATIONS_FLOOR = 246;
+
+  /**
+   * The record of tier {@code T0}, which never changes (ADR-0234): the version gate, the 14
+   * exchange relay operations, the two streams and the live-sync signal. The SPI endpoint {@code
+   * POST /internal/discord/account-existence} is T0 too but is not in the document.
+   */
+  private static final Set<String> TIER_ZERO =
+      Set.of(
+          "GET /api/v1/app/version-policy",
+          "GET /api/v1/notifications/stream",
+          "GET /api/v1/live-sync/stream",
+          "POST /api/v1/live-sync/changed",
+          "GET /api/v1/exchange/catalog/locations",
+          "POST /api/v1/exchange/catalog/resolve",
+          "POST /api/v1/exchange/me/account-check",
+          "GET /api/v1/exchange/me/blueprints",
+          "POST /api/v1/exchange/me/blueprints/changes",
+          "POST /api/v1/exchange/me/drafts/blueprints",
+          "POST /api/v1/exchange/me/drafts/refinery-orders",
+          "GET /api/v1/exchange/me/installation",
+          "POST /api/v1/exchange/me/installation",
+          "GET /api/v1/exchange/me/org-demand",
+          "GET /api/v1/exchange/me/ships",
+          "POST /api/v1/exchange/me/ships/changes",
+          "GET /api/v1/exchange/me/stock",
+          "POST /api/v1/exchange/me/stock/changes");
 
   /**
    * Verifies that no field reachable from the contract changed its type, format or {@code required}
@@ -2228,172 +2171,310 @@ class ExternalContractTest {
   }
 
   /**
-   * Verifies that no contract field changed shape since the previous release, comparing only
-   * properties present in both documents (ADR-0136). Skipped when no baseline is configured.
+   * Verifies that no frozen operation or field broke since the previous release unless the
+   * declared-break ledger names exactly that break (REQ-API-017, ADR-0234).
    *
-   * @throws IOException if either document cannot be read
+   * <p>Compares the operations of the frozen set, of every committed app call list and of the
+   * ledger. Skipped only where no baseline is required; CI requires one.
+   *
+   * @throws IOException if either document or the ledger cannot be read
    */
   @Test
-  @DisplayName("no field a released build reads changed shape since that release")
+  @DisplayName("nothing a released build calls broke since that release unless the ledger says so")
   void theContractTypesMatchThePreviousRelease() throws IOException {
-    String baseline = System.getProperty(BASELINE_PROPERTY);
+    Path baseline =
+        requiredBaseline(
+            System.getProperty(BASELINE_PROPERTY), Boolean.getBoolean(BASELINE_REQUIRED_PROPERTY));
     Assumptions.assumeTrue(
-        baseline != null && Files.isReadable(Path.of(baseline)),
-        "no -Dcontract.baseline pointing at a readable previous-release openapi.json; the frozen"
-            + " record in theContractTypesAndNullabilityAreFrozen covers this run");
+        baseline != null,
+        "no -Dcontract.baseline pointing at a readable previous-release openapi.json, and none is"
+            + " required here; the frozen record in theContractTypesAndNullabilityAreFrozen covers"
+            + " this run");
 
-    JsonNode previous = new ObjectMapper().readTree(Files.readString(Path.of(baseline)));
-    Map<String, String> was = contractSignatures(previous);
-    Map<String, String> now = contractSignatures(openapi());
-
-    assertThat(was)
+    JsonNode previous = new ObjectMapper().readTree(Files.readString(baseline));
+    assertThat(contractSignatures(previous))
         .as("the baseline document yielded no contract signatures, so this case proves nothing")
         .isNotEmpty();
 
-    Map<String, String> changed = new TreeMap<>();
-    for (Map.Entry<String, String> entry : now.entrySet()) {
-      String before = was.get(entry.getKey());
-      if (before != null && !before.equals(entry.getValue())) {
-        changed.put(entry.getKey(), before + " -> " + entry.getValue());
-      }
-    }
+    Map<DeclaredBreaks.Break, String> found =
+        DeclaredBreaks.between(previous, openapi(), comparedOperations(previous));
 
-    Set<String> gone = new TreeSet<>(was.keySet());
-    gone.removeAll(now.keySet());
-
-    assertThat(changed)
+    assertThat(DeclaredBreaks.undeclared(found, ledger()))
         .as(
-            "a field changed shape since the last release, and there are builds in the field that"
-                + " read it. This is the diff ADR-0136 asks for, against an artefact this pull"
-                + " request cannot edit")
-        .isEmpty();
-
-    assertThat(gone)
-        .as(
-            "a field the last release served is gone from the document. An installed build reads it"
-                + " unconditionally and will now get null \u2014 the break the freeze exists for."
-                + " If the operation was retired deliberately, the app build that stops reading it"
-                + " ships FIRST")
+            "a frozen operation or field broke since the last release, and builds in the field call"
+                + " it. This is the diff against an artefact this pull request cannot edit. A"
+                + " deliberate break of a hard-cut wave adds exactly these lines, each followed by"
+                + " the versionCode of the app build that absorbs it, to %s (ADR-0234); anything"
+                + " else is the break the freeze exists for",
+            LEDGER_RESOURCE)
         .isEmpty();
   }
 
   /**
-   * Records the type, format and required-ness of every property reachable from the contract set.
+   * Verifies the baseline gate: where a baseline is required, a missing one fails instead of
+   * skipping, and where it is not, a missing one skips.
+   *
+   * @param tempDir an empty directory for the fixture
+   * @throws IOException if the fixture cannot be written
+   */
+  @Test
+  @DisplayName("a missing previous-release baseline fails where one is required")
+  void aMissingBaselineFailsWhereOneIsRequired(@TempDir Path tempDir) throws IOException {
+    String missing = tempDir.resolve("openapi.json").toString();
+
+    assertThatThrownBy(() -> requiredBaseline(missing, true))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("required");
+    assertThatThrownBy(() -> requiredBaseline(null, true)).isInstanceOf(AssertionError.class);
+    assertThat(requiredBaseline(missing, false)).isNull();
+    assertThat(requiredBaseline(null, false)).isNull();
+
+    Path present = Files.writeString(tempDir.resolve("present.json"), "{}");
+    assertThat(requiredBaseline(present.toString(), true)).isEqualTo(present);
+  }
+
+  /**
+   * Resolves the previous-release baseline.
+   *
+   * @param baseline the configured path, or {@code null} when none is configured
+   * @param required whether a missing baseline is a failure rather than a skip
+   * @return the readable baseline, or {@code null} when it is missing and not required
+   * @throws AssertionError if it is missing and required
+   */
+  private static @Nullable Path requiredBaseline(@Nullable String baseline, boolean required) {
+    Path path = baseline == null ? null : Path.of(baseline);
+    if (path != null && Files.isReadable(path)) {
+      return path;
+    }
+    if (required) {
+      throw new AssertionError(
+          "-D"
+              + BASELINE_REQUIRED_PROPERTY
+              + "=true, but no readable previous-release openapi.json at "
+              + baseline
+              + ". The comparison with the last release is required here: a skipped one is a green"
+              + " check that checked nothing. The CI step 'Fetch the previous release's API"
+              + " contract' writes it to backend/build/contract-baseline/openapi.json");
+    }
+    return null;
+  }
+
+  /**
+   * Collects the operations the previous-release comparison looks at: the frozen set, every call of
+   * every committed app call list, every operation the ledger names, and every operation the
+   * previous document marks {@code T0} or {@code T1}.
+   *
+   * @param previous the previous release's document
+   * @return the operations, verb upper case
+   * @throws IOException if a call list or the ledger cannot be read
+   */
+  private static Set<DeclaredBreaks.OperationKey> comparedOperations(JsonNode previous)
+      throws IOException {
+    Set<DeclaredBreaks.OperationKey> operations =
+        new LinkedHashSet<>(DeclaredBreaks.frozenIn(previous));
+    for (ContractOperation operation : CONTRACT) {
+      operations.add(
+          new DeclaredBreaks.OperationKey(
+              operation.method().toUpperCase(Locale.ROOT), operation.path()));
+    }
+    for (AppCallList.Release release : appCallLists()) {
+      for (AppCallList.Call call : release.calls()) {
+        operations.add(new DeclaredBreaks.OperationKey(call.method(), call.path()));
+      }
+    }
+    for (DeclaredBreaks.Entry entry : ledger()) {
+      operations.add(
+          new DeclaredBreaks.OperationKey(entry.declared().method(), entry.declared().path()));
+    }
+    return operations;
+  }
+
+  /**
+   * Verifies the contract tiers (REQ-API-018, ADR-0234): the {@code T0} list equals the record that
+   * never changes, the {@code T1} list is the frozen set minus {@code T0}, the document carries
+   * each operation's tier, and no ledger line declares a {@code T0} break.
+   *
+   * @throws IOException if the document or the ledger cannot be read
+   */
+  @Test
+  @DisplayName(
+      "the contract tiers are T0 as recorded, T1 as frozen, and T0 is never declared broken")
+  void theContractTiersMatchTheFrozenSet() throws IOException {
+    ContractTiers tiers = ContractTiers.load();
+    assertThat(tiers.operations(ContractTiers.T0))
+        .as("the T0 list in %s changed; T0 never changes (ADR-0234)", ContractTiers.RESOURCE)
+        .containsExactlyInAnyOrderElementsOf(TIER_ZERO);
+
+    Set<String> frozenMinusTierZero = new TreeSet<>();
+    for (ContractOperation operation : CONTRACT) {
+      frozenMinusTierZero.add(operation.method().toUpperCase(Locale.ROOT) + " " + operation.path());
+    }
+    frozenMinusTierZero.removeAll(TIER_ZERO);
+    assertThat(new TreeSet<>(tiers.operations(ContractTiers.T1)))
+        .as(
+            "the T1 list in %s is not the frozen set minus T0. Freezing and tiering are one"
+                + " decision: change CONTRACT and the list together",
+            ContractTiers.RESOURCE)
+        .isEqualTo(frozenMinusTierZero);
+
+    JsonNode document = openapi();
+    List<String> wrongTier = new ArrayList<>();
+    for (Map.Entry<String, JsonNode> path : document.path("paths").properties()) {
+      for (Map.Entry<String, JsonNode> verb : path.getValue().properties()) {
+        if (!verb.getValue().has("responses")) {
+          continue;
+        }
+        String tier = verb.getValue().path(OpenApiDomainConfig.TIER_EXTENSION).asString("");
+        String expected = tiers.tierOf(verb.getKey(), path.getKey());
+        if (!expected.equals(tier)) {
+          wrongTier.add(verb.getKey() + " " + path.getKey() + ": " + tier + " != " + expected);
+        }
+      }
+    }
+    assertThat(wrongTier).as("the committed document carries a stale x-contract-tier").isEmpty();
+
+    assertThat(DeclaredBreaks.onTierZero(ledger(), TIER_ZERO))
+        .as("%s declares a break of a T0 operation, which never breaks", LEDGER_RESOURCE)
+        .isEmpty();
+  }
+
+  /**
+   * Verifies that the declared-break ledger parses and agrees with the committed app call lists: no
+   * list of a build the ledger walls off is still committed, and no list of an absorbing build
+   * calls an operation the ledger declares gone (REQ-API-017).
+   *
+   * @throws IOException if the ledger or a call list cannot be read
+   */
+  @Test
+  @DisplayName("the declared-break ledger parses and agrees with the committed app call lists")
+  void theLedgerAgreesWithTheCommittedCallLists() throws IOException {
+    assertThat(AppCallList.conflictsWithLedger(appCallLists(), ledger()))
+        .as(
+            "%s and the committed app call lists contradict each other. A break is absorbed by a"
+                + " build that no longer makes the call, and every older build is walled off by the"
+                + " floor the break raises (REQ-API-010)",
+            LEDGER_RESOURCE)
+        .isEmpty();
+  }
+
+  /**
+   * Verifies that the frozen set covers every call of every committed app call list: the verb and
+   * path are frozen, and so is every query parameter the app sends (REQ-API-016).
+   *
+   * @throws IOException if a call list cannot be read
+   */
+  @Test
+  @DisplayName("the frozen set covers every call of every app build the server still serves")
+  void theFrozenSetCoversEveryCallOfEveryServedAppBuild() throws IOException {
+    List<AppCallList.Release> releases = appCallLists();
+    assertThat(releases)
+        .as("no app call list is committed under %s, so coverage would be vacuous", APP_CALLS)
+        .isNotEmpty();
+    assertThat(releases.getLast().calls())
+        .as(
+            "the newest app call list names fewer calls than it did when it was last reviewed; if"
+                + " the app really dropped calls, lower this floor in the same change")
+        .hasSizeGreaterThanOrEqualTo(NEWEST_CALL_LIST_FLOOR);
+
+    Map<String, Set<String>> frozenQuery = new TreeMap<>();
+    for (ContractOperation operation : CONTRACT) {
+      Set<String> names = new TreeSet<>();
+      operation.queryParams().forEach(parameter -> names.add(parameter.split(":", 2)[0]));
+      frozenQuery.put(operation.method().toUpperCase(Locale.ROOT) + " " + operation.path(), names);
+    }
+
+    assertThat(AppCallList.uncovered(releases, frozenQuery))
+        .as(
+            "an app build the server still serves calls something the frozen set does not hold."
+                + " Its edge admission, its query parameters and its required request fields are"
+                + " then unguarded, and the next re-cut breaks a build nobody can redeploy. Add the"
+                + " operation to CONTRACT with the parameters the list names (REQ-API-016)")
+        .isEmpty();
+  }
+
+  /**
+   * Verifies that the document still serves every response field a committed app call list says the
+   * app may read, at the depth {@link #responseProperties} looks (REQ-API-016).
+   *
+   * @throws IOException if the document or a call list cannot be read
+   */
+  @Test
+  @DisplayName("every response field a served app build may read is still in the document")
+  void theFieldsEveryServedAppBuildReadsAreStillServed() throws IOException {
+    JsonNode document = openapi();
+    List<String> missing = new ArrayList<>();
+    for (AppCallList.Release release : appCallLists()) {
+      for (AppCallList.Call call : release.calls()) {
+        if (OpenApiWalk.operation(document, call.path(), call.method()).isMissingNode()) {
+          missing.add(release.name() + ": " + call.key() + " is not served at all");
+          continue;
+        }
+        Set<String> absent = new TreeSet<>(call.fields());
+        absent.removeAll(
+            responseProperties(document, call.path(), call.method().toLowerCase(Locale.ROOT)));
+        if (!absent.isEmpty()) {
+          missing.add(release.name() + ": " + call.key() + " no longer answers " + absent);
+        }
+      }
+    }
+
+    assertThat(missing)
+        .as(
+            "a response field an app build in the field may read is gone. The call list over-states"
+                + " rather than under-states what the app reads, so a name here may be unread"
+                + " \u2014 but that is for the app's maintainers to say, in a new list, not for"
+                + " this build to assume. A deliberate removal is a declared break (%s)",
+            LEDGER_RESOURCE)
+        .isEmpty();
+  }
+
+  /**
+   * Loads every committed app call list.
+   *
+   * @return the lists sorted by {@code versionCode}, the unreleased build last
+   * @throws IOException if the directory or a list cannot be read
+   */
+  private static List<AppCallList.Release> appCallLists() throws IOException {
+    return AppCallList.load(findRepoRoot().resolve(APP_CALLS));
+  }
+
+  /**
+   * Reads and parses the declared-break ledger off the test classpath.
+   *
+   * @return the ledger's entries, in file order
+   * @throws IOException if the resource is missing or unreadable
+   */
+  private static List<DeclaredBreaks.Entry> ledger() throws IOException {
+    try (InputStream in = ExternalContractTest.class.getResourceAsStream(LEDGER_RESOURCE)) {
+      if (in == null) {
+        throw new IOException("missing test resource " + LEDGER_RESOURCE);
+      }
+      return DeclaredBreaks.parse(
+          List.of(new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\\R", -1)));
+    }
+  }
+
+  /**
+   * Records the type, format and required-ness of every property reachable from the contract set,
+   * plus every inline or multipart body keyed by its operation.
    *
    * @param document the parsed API document
-   * @return {@code Schema.property} to its signature, sorted
+   * @return {@code Schema.property} or {@code VERB path body-key} to its signature, sorted
    */
   private static Map<String, String> contractSignatures(JsonNode document) {
-    JsonNode schemas = document.path("components").path("schemas");
     Map<String, String> found = new TreeMap<>();
-    Set<String> visited = new TreeSet<>();
     for (ContractOperation operation : CONTRACT) {
-      if (document.path("paths").path(operation.path()).path(operation.method()).isMissingNode()) {
-        continue;
-      }
-      for (String root : responseSchemaNames(document, operation)) {
-        walkSignatures(schemas, root, visited, found);
-      }
-      walkSignatures(schemas, requestSchemaName(document, operation), visited, found);
-      recordInlineBodies(document, operation, found);
+      String key = operation.method().toUpperCase(Locale.ROOT) + " " + operation.path();
+      OpenApiWalk.operationSignatures(document, operation.path(), operation.method())
+          .forEach(
+              (field, signature) ->
+                  found.put(
+                      field.startsWith("request[") || field.startsWith("response[")
+                          ? key + " " + field
+                          : field,
+                      signature));
     }
     return found;
-  }
-
-  /**
-   * Freezes body shapes that resolve to no named schema: multipart request bodies and inline 2xx
-   * response schemas, keyed by operation and media type.
-   *
-   * @param document the parsed API document
-   * @param operation the contract operation
-   * @param found the accumulator
-   */
-  private static void recordInlineBodies(
-      JsonNode document, ContractOperation operation, Map<String, String> found) {
-    JsonNode node = document.path("paths").path(operation.path()).path(operation.method());
-    String key = operation.method().toUpperCase(java.util.Locale.ROOT) + " " + operation.path();
-
-    for (Map.Entry<String, JsonNode> media :
-        node.path("requestBody").path("content").properties()) {
-      JsonNode schema = media.getValue().path("schema");
-      found.put(key + " request[" + media.getKey() + "]", signature(schema));
-      for (String required : requiredNames(schema)) {
-        found.put(key + " request[" + media.getKey() + "].required." + required, "required");
-      }
-    }
-
-    for (Map.Entry<String, JsonNode> response : node.path("responses").properties()) {
-      if (!response.getKey().startsWith("2")) {
-        continue;
-      }
-      for (Map.Entry<String, JsonNode> media : response.getValue().path("content").properties()) {
-        found.put(
-            key + " response[" + response.getKey() + "][" + media.getKey() + "]",
-            signature(media.getValue().path("schema")));
-      }
-    }
-  }
-
-  /**
-   * The {@code required} entries an inline schema declares.
-   *
-   * @param schema the schema node
-   * @return the required property names, sorted; empty when the node declares none
-   */
-  private static Set<String> requiredNames(JsonNode schema) {
-    Set<String> names = new TreeSet<>();
-    JsonNode required = schema.path("required");
-    if (required.isArray()) {
-      required.forEach(entry -> names.add(entry.asString()));
-    }
-    return names;
-  }
-
-  /**
-   * Adds one signature per property of {@code name}, then follows every reference it makes.
-   *
-   * @param schemas the document's {@code components.schemas} node
-   * @param name the schema to record; {@code null} and already-visited names are no-ops
-   * @param visited the shared cycle guard
-   * @param found the accumulator
-   */
-  private static void walkSignatures(
-      JsonNode schemas, String name, Set<String> visited, Map<String, String> found) {
-    walkProperties(
-        schemas,
-        name,
-        visited,
-        (owner, property, value, required) ->
-            found.put(owner + "." + property, signature(value) + (required ? "!" : "")));
-  }
-
-  /**
-   * The one-line shape of a property node.
-   *
-   * @param node the property's schema node
-   * @return {@code $Ref}, {@code array<...>}, {@code type/format} or {@code type}
-   */
-  private static String signature(JsonNode node) {
-    String ref = schemaName(node);
-    if (ref != null) {
-      return "$" + ref;
-    }
-    String type = node.path("type").asString("");
-    if ("array".equals(type)) {
-      JsonNode items = node.path("items");
-      String itemRef = schemaName(items);
-      return "array<" + (itemRef != null ? "$" + itemRef : signature(items)) + ">";
-    }
-    JsonNode additional = node.path("additionalProperties");
-    if (additional.isObject()) {
-      String value = schemaName(additional);
-      return "map<" + (value != null ? "$" + value : signature(additional)) + ">";
-    }
-    if (type.isEmpty()) {
-      return node.has("properties") ? "object" : "any";
-    }
-    String format = node.path("format").asString("");
-    return format.isEmpty() ? type : type + "/" + format;
   }
 
   /**
@@ -2434,8 +2515,8 @@ class ExternalContractTest {
       assertThat(paths.has(operation.path()))
           .as(
               "%s is in the external contract set (REQ-API-009): a shipped app calls it and cannot"
-                  + " be redeployed. Retiring it needs /api/v2 + @ApiDeprecation and a sunset, not"
-                  + " a deletion",
+                  + " be redeployed. Retiring it is a declared break of a hard-cut wave (ADR-0234,"
+                  + " REQ-API-017), not a silent deletion",
               operation.path())
           .isTrue();
       assertThat(paths.get(operation.path()).has(operation.method()))
@@ -2452,7 +2533,7 @@ class ExternalContractTest {
     JsonNode document = openapi();
 
     for (ContractOperation operation : CONTRACT) {
-      Set<String> present = responseProperties(document, operation);
+      Set<String> present = responseProperties(document, operation.path(), operation.method());
       assertThat(present)
           .as(
               "%s %s dropped a response field. Additive change is fine and this assertion allows "
@@ -2498,7 +2579,7 @@ class ExternalContractTest {
       return Set.of();
     }
     JsonNode schema = content.properties().iterator().next().getValue().get("schema");
-    String name = schemaName(schema);
+    String name = OpenApiWalk.schemaName(schema);
     JsonNode resolved = name == null ? schema : document.get("components").get("schemas").get(name);
     JsonNode required = resolved == null ? null : resolved.get("required");
     Set<String> fields = new TreeSet<>();
@@ -2508,9 +2589,21 @@ class ExternalContractTest {
     return fields;
   }
 
+  /**
+   * Verifies that the frozen set holds at least the operations it held when the floor was last
+   * raised, and names each operation once.
+   */
   @Test
+  @DisplayName("the frozen set is not silently emptied and names each operation once")
   void theContractSetIsNotSilentlyEmptied() {
-    assertThat(CONTRACT).hasSizeGreaterThanOrEqualTo(5);
+    assertThat(CONTRACT)
+        .as(
+            "the frozen set shrank below its floor. Shrinking it is a declared break (REQ-API-017);"
+                + " raise the floor whenever the set grows")
+        .hasSizeGreaterThanOrEqualTo(FROZEN_OPERATIONS_FLOOR);
+    assertThat(CONTRACT.stream().map(operation -> operation.method() + " " + operation.path()))
+        .as("an operation is listed twice in CONTRACT")
+        .doesNotHaveDuplicates();
   }
 
   /**
@@ -2519,12 +2612,12 @@ class ExternalContractTest {
    * properties.
    *
    * @param document the parsed API document
-   * @param operation the contract operation to resolve
+   * @param path the operation's path template
+   * @param method the HTTP verb, lower case
    * @return the property names, or an empty set when the response has no body schema
    */
-  private static Set<String> responseProperties(JsonNode document, ContractOperation operation) {
-    JsonNode responses =
-        document.get("paths").get(operation.path()).get(operation.method()).get("responses");
+  private static Set<String> responseProperties(JsonNode document, String path, String method) {
+    JsonNode responses = document.get("paths").get(path).get(method).get("responses");
     Set<String> properties = new TreeSet<>();
     for (Map.Entry<String, JsonNode> response : responses.properties()) {
       if (!response.getKey().startsWith("2")) {
@@ -2601,214 +2694,14 @@ class ExternalContractTest {
   }
 
   /**
-   * Verifies that no exchange or connected-apps path is admitted by the API vhost allow-list: the
-   * exchange layer answers only the gateway and the member controls only the browser (REQ-XCH-001,
-   * ADR-0216). Probes every such path the committed {@code openapi.json} documents, plus paths no
-   * controller serves yet, so a broad rule is caught before the endpoint it would expose exists.
+   * Lists the frozen operations for the edge admission generator (REQ-API-021).
    *
-   * @throws IOException if the allow-list or the document cannot be read
+   * @return every frozen operation as {@code VERB path}, verb upper case, in declaration order
    */
-  @Test
-  @DisplayName("no exchange or connected-apps path is admitted by the API vhost allow-list")
-  void theExchangeStaysOffTheApiVhost() throws IOException {
-    List<Predicate<String>> rules = allowListRules();
-    List<String> documented =
-        openapi().get("paths").propertyNames().stream()
-            .filter(ExternalContractTest::isExchangeOrConnectionPath)
-            .map(ExternalContractTest::probePath)
-            .toList();
-    assertThat(documented)
-        .as("openapi.json documents no exchange path — has the document or its prefixes moved?")
-        .contains("/api/v1/exchange/me/blueprints", "/api/v1/connected-apps");
-
-    Set<String> probes = new TreeSet<>(documented);
-    probes.addAll(
-        List.of(
-            "/api/v1/exchange",
-            "/api/v1/exchange/",
-            "/api/v1/exchange/me/a-resource-not-built-yet",
-            "/api/v1/exchange/v2/me/blueprints",
-            "/api/v1/connected-apps/",
-            "/api/v1/connected-apps/versekit/undo",
-            "/api/v1/connected-apps/a-control-not-built-yet",
-            "/api/v1/admin/exchange-a-page-not-built-yet"));
-    List<String> admitted =
-        probes.stream().filter(path -> rules.stream().anyMatch(rule -> rule.test(path))).toList();
-
-    assertThat(admitted)
-        .as(
-            "%s must never admit the exchange layer or the member's connection controls",
-            ALLOW_LIST)
-        .isEmpty();
-  }
-
-  /**
-   * Tells whether a path belongs to the exchange layer, the member's connection controls or the
-   * admin registry of connected applications.
-   *
-   * @param path a documented path
-   * @return {@code true} for {@code /api/v1/exchange/**}, {@code /api/v1/connected-apps/**} and
-   *     {@code /api/v1/admin/exchange-*}
-   */
-  private static boolean isExchangeOrConnectionPath(String path) {
-    return path.equals("/api/v1/exchange")
-        || path.startsWith("/api/v1/exchange/")
-        || path.equals("/api/v1/connected-apps")
-        || path.startsWith("/api/v1/connected-apps/")
-        || path.startsWith("/api/v1/admin/exchange-");
-  }
-
-  /**
-   * Verifies that every frozen operation is admitted by the API vhost allow-list, parsed from the
-   * nginx include.
-   *
-   * @throws IOException if the allow-list cannot be read
-   */
-  @Test
-  @DisplayName("every frozen operation is admitted by the API vhost allow-list")
-  void theFrozenSetIsReachableThroughTheEdge() throws IOException {
-    List<Predicate<String>> rules = allowListRules();
-    assertThat(rules)
-        .as("no allow-list rules were parsed from %s — has its format changed?", ALLOW_LIST)
-        .hasSizeGreaterThan(50);
-
-    List<String> unreachable =
-        CONTRACT.stream()
-            .map(ContractOperation::path)
-            .distinct()
-            .filter(path -> rules.stream().noneMatch(rule -> rule.test(probePath(path))))
-            .sorted()
-            .toList();
-
-    assertThat(unreachable)
-        .as(
-            "these operations are frozen as a promise to a shipped client but no rule in %s admits "
-                + "them, so the edge answers 404 and the promise cannot be called. Add the rule in "
-                + "the same change that freezes the operation — and if one of these merely uses a "
-                + "path placeholder this test does not know how to fill, extend PLACEHOLDERS",
-            ALLOW_LIST)
-        .isEmpty();
-  }
-
-  /**
-   * Verifies that a line touching the admission flag in a form the parser does not know fails the
-   * parse instead of being skipped, so no rule can admit a URI the exchange guard never probes.
-   */
-  @Test
-  @DisplayName("an allow-list line the parser cannot read fails instead of being skipped")
-  void anAllowListLineTheParserCannotReadFails() {
-    List<String> unreadable =
-        List.of(
-            "if ($request_uri ~ \"^/api/v1/exchange/\") { set $krt_api_allowed 1; }",
-            "if ($uri !~ \"^/api/v1/users/\") { set $krt_api_allowed 1; }",
-            "if ($uri ~ ^/api/v1/exchange/) { set $krt_api_allowed 1; }",
-            "if ($uri ~ \"^/api/v1/exchange/\") { set $krt_api_allowed \"1\"; }",
-            "set $krt_api_allowed 1;",
-            "    set $krt_api_allowed 1;");
-
-    for (String line : unreadable) {
-      assertThatThrownBy(() -> parseAllowList(List.of("set $krt_api_allowed 0;", line)))
-          .as(line)
-          .isInstanceOf(AssertionError.class)
-          .hasMessageContaining("line 2");
-    }
-  }
-
-  /**
-   * Verifies that a {@code ~*} rule is parsed as the case-insensitive regular expression nginx
-   * evaluates, so a rule written in upper case still counts as admitting the lower-case path.
-   */
-  @Test
-  @DisplayName("a ~* allow-list rule is parsed as a case-insensitive regular expression")
-  void aCaseInsensitiveRuleIsParsedCaseInsensitively() {
-    List<Predicate<String>> rules =
-        parseAllowList(
-            List.of(
-                "set $krt_api_allowed 0;",
-                "if ($uri ~* \"^/API/V1/EXCHANGE/\") { set $krt_api_allowed 1; }",
-                "if ($uri ~ \"^/API/V1/CONNECTED-APPS\") { set $krt_api_allowed 1; }",
-                "if ($krt_api_allowed = 0) { return 404; }"));
-
-    assertThat(rules).hasSize(2);
-    assertThat(rules.get(0).test("/api/v1/exchange/me/blueprints")).isTrue();
-    assertThat(rules.get(1).test("/api/v1/connected-apps")).isFalse();
-  }
-
-  /**
-   * Reads the committed allow-list and parses it with {@link #parseAllowList(List)}.
-   *
-   * @return one predicate per admission rule
-   * @throws IOException if the allow-list cannot be read
-   */
-  private static List<Predicate<String>> allowListRules() throws IOException {
-    Path allowList = findRepoRoot().resolve(ALLOW_LIST);
-    assertThat(Files.exists(allowList)).as("%s must exist", allowList).isTrue();
-    return parseAllowList(Files.readAllLines(allowList));
-  }
-
-  /**
-   * Parses allow-list lines into predicates over a concrete URI: {@code $uri = "…"} as an exact
-   * match, {@code $uri ~ "…"} as a regular expression and {@code $uri ~* "…"} as a case-insensitive
-   * one. Lines that do not mention {@code krt_api_allowed} are ignored.
-   *
-   * @param lines the lines of the nginx include
-   * @return one predicate per admission rule, in file order
-   * @throws AssertionError if a line mentioning {@code krt_api_allowed} is neither an admission
-   *     rule, the default nor the refusal
-   */
-  private static List<Predicate<String>> parseAllowList(List<String> lines) {
-    List<Predicate<String>> rules = new java.util.ArrayList<>();
-    for (int index = 0; index < lines.size(); index++) {
-      String line = lines.get(index);
-      if (!line.contains("krt_api_allowed")) {
-        continue;
-      }
-      Matcher rule = ADMISSION_RULE.matcher(line);
-      if (rule.matches()) {
-        String operand = rule.group(2);
-        switch (rule.group(1)) {
-          case "=" -> rules.add(operand::equals);
-          case "~" -> rules.add(regexRule(Pattern.compile(operand)));
-          default -> rules.add(regexRule(Pattern.compile(operand, Pattern.CASE_INSENSITIVE)));
-        }
-        continue;
-      }
-      if (!DEFAULT_DENY.matcher(line).matches() && !UNADMITTED_REFUSAL.matcher(line).matches()) {
-        throw new AssertionError(
-            String.format(
-                "%s line %d touches krt_api_allowed in a form this test cannot evaluate, so it "
-                    + "cannot prove the rule keeps the exchange off the API vhost: %s — write it "
-                    + "as a one-line if ($uri = \"…\"), if ($uri ~ \"…\") or if ($uri ~* \"…\") "
-                    + "rule, or teach parseAllowList the new form",
-                ALLOW_LIST, index + 1, line.strip()));
-      }
-    }
-    return rules;
-  }
-
-  /**
-   * Wraps a compiled nginx regular expression as a predicate with nginx's unanchored semantics.
-   *
-   * @param compiled the rule's regular expression
-   * @return a predicate that is true when the expression is found anywhere in the URI
-   */
-  private static Predicate<String> regexRule(Pattern compiled) {
-    return uri -> compiled.matcher(uri).find();
-  }
-
-  /**
-   * Replaces each placeholder in a contract path with a representative value: a UUID by default, or
-   * the value named in {@link #PLACEHOLDERS}.
-   *
-   * @param path the contract path, possibly containing {@code {name}} segments
-   * @return the path with every placeholder replaced
-   */
-  private static String probePath(String path) {
-    String probe = path;
-    for (var entry : PLACEHOLDERS.entrySet()) {
-      probe = probe.replace(entry.getKey(), entry.getValue());
-    }
-    return PLACEHOLDER.matcher(probe).replaceAll(SAMPLE_UUID);
+  static List<String> frozenOperations() {
+    return CONTRACT.stream()
+        .map(operation -> operation.method().toUpperCase(Locale.ROOT) + " " + operation.path())
+        .toList();
   }
 
   /**

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -66,6 +67,7 @@ public record ExchangeShipChangeSet(
    * @param override whether an {@code upsert} may bring back a ship removed elsewhere, after asking
    *     the member
    */
+  @Schema(name = "ExchangeShipOp")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
       @NotNull @Pattern(regexp = "^(link|upsert|remove)$") String op,

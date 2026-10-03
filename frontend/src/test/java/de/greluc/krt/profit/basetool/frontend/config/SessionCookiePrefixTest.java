@@ -21,13 +21,15 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Duration;
 import java.util.Properties;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
+import org.springframework.boot.web.server.Cookie;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -68,19 +70,21 @@ class SessionCookiePrefixTest {
     Properties profile = yaml(file);
 
     assertThat(profile.stringPropertyNames())
-        .as("%s must not override the session cookie's name, Secure flag, Domain or Path", file)
-        .doesNotContain(PREFIX + "name", PREFIX + "secure", PREFIX + "domain", PREFIX + "path");
+        .as("%s must not override any attribute of the session cookie", file)
+        .doesNotContain(
+            PREFIX + "name",
+            PREFIX + "secure",
+            PREFIX + "domain",
+            PREFIX + "path",
+            PREFIX + "http-only",
+            PREFIX + "same-site",
+            PREFIX + "max-age");
   }
 
   @Test
   void theRenderedCookieSatisfiesTheBrowsersHostPrefixRules() {
-    Properties base = yaml("application.yml");
-    DefaultCookieSerializer serializer = new DefaultCookieSerializer();
-    serializer.setCookieName(base.getProperty(PREFIX + "name"));
-    serializer.setUseSecureCookie(Boolean.parseBoolean(base.getProperty(PREFIX + "secure")));
-    serializer.setUseHttpOnlyCookie(Boolean.parseBoolean(base.getProperty(PREFIX + "http-only")));
-    serializer.setSameSite("Strict");
-    serializer.setCookieMaxAge((int) Duration.ofDays(30).toSeconds());
+    DefaultCookieSerializer serializer =
+        SessionCookieSerializerConfig.sessionCookieSerializer(configuredCookie());
 
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setContextPath("");
@@ -91,6 +95,14 @@ class SessionCookiePrefixTest {
     assertThat(header).startsWith(COOKIE_NAME + "=");
     assertThat(header).contains("; Path=/;").contains("; Secure").contains("; HttpOnly");
     assertThat(header).doesNotContainIgnoringCase("Domain=");
+  }
+
+  private static Cookie configuredCookie() {
+    MapConfigurationPropertySource source =
+        new MapConfigurationPropertySource(yaml("application.yml"));
+    return new Binder(source)
+        .bind(PREFIX.substring(0, PREFIX.length() - 1), Cookie.class)
+        .orElseThrow(() -> new AssertionError("server.servlet.session.cookie must be configured"));
   }
 
   private static Properties yaml(String file) {

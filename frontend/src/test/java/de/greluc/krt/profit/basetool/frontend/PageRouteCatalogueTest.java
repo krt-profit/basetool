@@ -60,7 +60,8 @@ class PageRouteCatalogueTest {
    * the same reason the anonymous sweep stubs it: a real client would try to connect while the
    * context came up.
    */
-  @MockitoBean private de.greluc.krt.profit.basetool.frontend.service.BackendApiClient client;
+  @MockitoBean
+  private de.greluc.krt.profit.basetool.frontend.service.BackendApiClient backendApiClient;
 
   /** The frontend is an OAuth2 client; the registry is what the security chain wires through. */
   @MockitoBean

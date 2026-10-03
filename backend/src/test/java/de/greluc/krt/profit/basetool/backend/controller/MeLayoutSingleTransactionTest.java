@@ -40,7 +40,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -49,7 +48,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * Runs without a surrounding test transaction so the count is meaningful.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class MeLayoutSingleTransactionTest {
 
   @Autowired private MeController meController;

@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0239
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0206, ADR-0239
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -1819,7 +1819,11 @@ does, and the backend relays locally and then onto the shared channel. `202`, be
 signal and not a transaction: the mutation it follows has already committed, and a client that
 treated a failure here as a failed write would show an error for a change that is in the database. A
 `429` is to be **dropped, not retried** — the buckets exist to bound the re-fetch herd, and a retry
-defeats the bound it just hit.
+defeats the bound it just hit. Both refusals are standard problems (REQ-API-004): an unknown topic or a
+frame naming no known section is `400 BAD_REQUEST`, a full bucket is `429 RATE_LIMIT_EXCEEDED` with
+`Retry-After: 1`, the buckets' refill granularity. The status is the contract; the app classifies by it
+and also tolerates the body (`ApiErrorMapper`). *Corrected 2026-10-03: both answered with an empty
+body until then, although the document promised a problem.*
 
 **The bounds are REQ-FE-015's, unchanged**: per-subject burst 40 / refill 20 per second, per-topic
 burst 200 / refill 100 per second, and receiver-side coalescing of 400 ms for a per-resource room
@@ -1855,6 +1859,8 @@ registry: the admin area is web-only permanently, so a room there would have no 
 - [x] A refused topic is dropped and the stream still opens; nothing accepted is `403`
   (`LiveSyncControllerTest`).
 - [x] Too many topics is refused rather than truncated (`LiveSyncControllerTest`).
+- [x] A refused `changed` frame answers a localized problem: `400 BAD_REQUEST`, or
+  `429 RATE_LIMIT_EXCEEDED` with `Retry-After` (`LiveSyncControllerTest`).
 - [x] Local delivery precedes the fan-out, so a Redis outage costs peers only
   (`LiveSyncRelayServiceTest`).
 - [x] Both buckets bound what they are meant to, and one member's flood does not cost another theirs
@@ -2093,6 +2099,224 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
 **Enforced by:** `UnsavedChangesGuardE2eTest` · **Code:** `unsaved-changes.js`,
 `fragments/unsaved-modal.html`, `admin-terms.js`, `admin/terms.html` · **Related:** REQ-FE-005,
 REQ-FE-021
+
+### REQ-FE-025 — The route table and its gates are pinned, and every handler carries a gate
+
+Many of the frontend's checks name their subject by a package or a class, and a moved class would
+leave them green without checking anything. The route table is therefore pinned by what the
+dispatcher actually serves:
+
+- **A committed route/gate snapshot.** `frontend/src/test/resources/security/route-gate-snapshot.txt`
+  holds one sorted line per mapping of `requestMappingHandlerMapping`: path patterns, verbs, the
+  `params` / `headers` / `consumes` / `produces` conditions, the handler as `SimpleName#method`, the
+  effective `@PreAuthorize` (the method's, else the class's, with its source) and the
+  `UsesLayoutModel` opt-in. The handler is named without its package, so a pure move leaves the file
+  byte-identical; any diff is an intended route or gate change and is reviewed as such. The file is
+  rewritten with `./gradlew :frontend:test --tests '*RouteGateSnapshotTest' -PupdateSnapshots`.
+- **A gate on every handler.** Every application handler has an effective `@PreAuthorize` — its own
+  or its class's — except an exact list of nine handlers named `SimpleName#method`: the anonymous
+  surface of REQ-SEC-052 (landing page, Impressum, privacy, terms, licences, the App Link callback and
+  help page, `assetlinks.json`, the web app manifest). A handler moved out of a class-gated
+  controller fails the build instead of being served to any signed-in member. The class-level rule
+  of `ArchitectureTest` (REQ-SEC-052) stays as it is.
+
+**Acceptance**
+
+- [x] The snapshot holds all 538 mappings (536 application handlers, 2 of Spring Boot's error
+  controller) and matches the committed file (2026-10-02).
+- [x] The four member handlers that relied on the URL rule alone — `/org-chart`, `/ship-data` and
+  both `/announcement/read` variants — declare `isAuthenticated()`, so the allow-list holds only the
+  nine public handlers (2026-10-02).
+- [x] A stale allow-list entry fails; a handler moved into an ungated class fails and changes its
+  snapshot line (planted fixtures).
+
+**Enforced by:** `RouteGateSnapshotTest` (snapshot, per-handler rule, selection floors),
+`RouteGateSnapshotRuleTest` (planted fixtures), `GoldenFileTest` · **Related:** REQ-SEC-052,
+REQ-FE-020
+
+### REQ-FE-026 — Template type references and view names resolve before render time
+
+A template names Java by string — `T(de.greluc….support.Roles).ADMIN` inside `sec:authorize` — and a
+controller names templates by string. Neither is seen by the compiler; a broken one fails only when
+the page is rendered (an SpEL error, a 500). Both are resolved statically:
+
+- every `T(fqcn)` in a template loads and its member is a public static field or method; every
+  `T(` opener must parse, so an unparseable reference cannot hide (172 references in 22 templates on
+  2026-10-02);
+- every view a `Controller` or `ControllerAdvice` returns as a literal (returned, a ternary branch of
+  a return, a switch arm, a `ModelAndView` name), every `"view :: fragment"` literal in any Java
+  source and every literal `path :: fragment` reference between templates names an existing template
+  that declares the fragment (`th:fragment` or `th:ref`);
+- every template is named by such a reference or is one of Spring Boot's status-code error views,
+  so a view returned in a shape the scan does not recognise fails instead of passing unchecked.
+
+**Acceptance**
+
+- [x] All 172 `T(…)` references resolve; all 182 Java view references and all 486 template fragment
+  references resolve; every one of the 120 templates is named (2026-10-02).
+- [x] A moved class, a missing constant, a moved template and a renamed fragment are each reported
+  (planted fixtures).
+
+**Enforced by:** `TemplateTypeReferenceTest`, `ViewNameResolutionTest` (both with selection floors
+and planted fixtures) · **Code:** `support/Roles`
+
+### REQ-FE-027 — Every session-bound type is derived from the code and admitted by the allow-list
+
+The session type allow-list of REQ-SEC-067 admits the application's classes by the prefix
+`de.greluc.krt.profit.basetool.frontend.model.`. A flashed form moved out of that package would be
+refused under `enforce` and its flash attribute dropped after the redirect, silently in the UI. The
+set of types the frontend can store in the session is therefore derived from the compiled code:
+
+- Every call of `RedirectAttributes.addFlashAttribute` / `addAllFlashAttributes`, a `FlashMap`
+  write, `HttpSession.setAttribute` and `WebUtils.setSessionAttribute` is resolved to the static type
+  of its value from the bytecode — a constant, a local variable's generic type, a method's generic
+  return type, a field, a cast or a constructor. A value whose type does not determine the stored
+  classes (a merge of two branches, `Object`, a type variable, a raw container, an abstract
+  application type) fails the build unless a reviewed entry resolves it; there is one, the role sync
+  filter's copied `ArrayList` of authority names.
+- The closure over those types — record components, instance fields and getters of every
+  application type, transitively — must be admitted by the enforcing validator as production builds
+  it. `@SessionAttributes` and session-scoped beans are absent; one appearing fails the build until
+  the scan learns about it.
+- The application part of the closure is the **exact list** the allow-list narrows to in its own
+  release (D-10): `frontend/src/test/resources/session/session-bound-types.txt`, 21 types on
+  2026-10-02 (10 flashed forms and DTOs plus their nested types and enums), rewritten with
+  `-PupdateSnapshots`.
+- **No allow-list entry is broader than a model or session package**: an application prefix must
+  name a `model` or `session` package of the frontend, the non-application prefixes stay
+  `org.springframework.security.`, the three name patterns stay the reviewed ones, and an exact name
+  is a plain class name.
+
+**Acceptance**
+
+- [x] 317 session writes are resolved, every type of the closure is admitted, and the exact list
+  matches the committed file (2026-10-02).
+- [x] A planted flash of a form outside `frontend.model`, a nested row type and a
+  `java.util.concurrent` map are each refused; a raw list and an `Object` value are reported as
+  unresolved; a planted `@SessionAttributes` is reported.
+- [x] A prefix such as `…frontend.`, `…frontend.mission.`, `de.greluc.` or `java.` is reported as too
+  broad.
+
+**Enforced by:** `SessionBoundTypeClosureTest`, `SessionTypeAllowListBreadthTest` · **Code:**
+`config/SessionTypeAllowList`, `config/RedisSessionConfig` · **Related:** REQ-SEC-067 · **ADR:**
+ADR-0206
+
+### REQ-FE-028 — Every frontend call to the backend names an operation the backend has
+
+Every request the frontend sends to the backend names an operation of the committed
+`backend/src/main/resources/api/openapi.json`, verb and path template both, and every live-sync
+subscribe probe (`LiveSyncTopicClass#authProbePath`, `#fallbackProbePath`) is a `GET` the document
+has. A unit test that mocks `BackendApiClient` stays green when the backend path it mocks is gone;
+this rule is what notices.
+
+- **Every call site is checked, not a sample.** The guard parses the frontend's main sources with
+  the JDK's compiler front end and folds each URI expression of a `backendApiClient` verb, of
+  `backendApiClient.execute(…)` and of the two bare clients (the SSE relay, the live-sync probe)
+  into a template: literals, `+`, constants of any class, locals, `String` parameters through the
+  call sites of their method, `String`-returning helpers, `String.format`/`formatted`, conditionals
+  (both branches), `StringBuilder` and `UriComponentsBuilder` chains. The query string is dropped;
+  every runtime value is one path variable.
+- **What cannot be folded is listed, exactly.** A call site the scanner cannot fold must be named in
+  the test's exception list with the check that covers it instead; a new one, or a stale entry,
+  fails. Two remain: the probe's resource and capability reads, whose URIs are the topic-class
+  templates the probe rule checks.
+- **The values that are not call sites are read from their declarations:** every `CachedCatalog`
+  URI and the anonymous terms read are existing `GET`s.
+- **An `execute(…)` site declares what it sends.** Its verb and URI arguments, which feed the log
+  line and the error metric, must equal the request its lambda builds.
+- **The selection cannot shrink unnoticed:** at least 611 resolved call sites and seven probe
+  templates.
+- `DeprecatedBackendEndpointCallGuardTest` reads the same scan, so it sees `execute(…)` sites too.
+  The one deprecated operation still relayed, `POST /api/v1/hangar/import/fleetview` (sunset
+  2027-05-14), is named in its list of reviewed relays.
+
+**Acceptance**
+
+- [x] A fixture calling a retired path and one calling an existing path with the wrong verb are
+  both reported; an `execute(…)` fixture declaring `GET` while sending `POST` is reported.
+- [x] A probe template that is no `GET` of the document is reported.
+- [x] The guard found the admin update and delete of a member's personal-inventory item calling
+  `PUT`/`DELETE /api/v1/admin/personal-inventory/{id}`, which the backend never served (it serves
+  `…/items/{id}`); both now call the backend's paths.
+
+**Enforced by:** `BackendCallExistenceTest`, `DeprecatedBackendEndpointCallGuardTest`,
+`AdminPersonalInventoryPageControllerMvcTest` · **Code:** `contract/BackendCallScanner`,
+`contract/BackendOperations` (tests) · **Related:** REQ-FE-015, REQ-API-001, ADR-0032
+
+### REQ-FE-029 — The backend clients stay in the kernel and send only to the backend
+
+The frontend reaches the backend through four `WebClient` beans, all built in `WebClientConfig`:
+`webClient` (OAuth2 bearer relay, correlation, org-unit, locale and client-IP relays, Resilience4j),
+the anonymous `termsDocumentClient`, the SSE relay's `sseWebClient` and the live-sync probe's
+`liveSyncAuthWebClient` (the last two without Resilience4j and without the OAuth2 filter, by
+design). Whatever a client does not carry, a call through it loses: the bearer, the tenancy header,
+the breaker, the error mapping.
+
+- **Only `WebClientConfig` builds a client** — calls `WebClient.builder()`, `create` or `mutate`,
+  or uses `WebClient.Builder`.
+- **Only the kernel and two named exceptions hold one**: a `WebClient` field, constructor parameter
+  or `@Bean` exists only in `WebClientConfig`, `BackendApiClient`, the SSE relay
+  `NotificationPageController` and the live-sync probe `LiveSyncSubscriptionAuthorizer`. Everything
+  else calls `BackendApiClient`.
+- **HTTP-interface clients** (Spring `@HttpExchange`, none yet) are created only by the kernel,
+  over the `webClient` bean (`HttpServiceProxyFactory`/`WebClientAdapter` used nowhere else), and
+  never take a `java.net.URI` or `UriBuilderFactory` parameter (it replaces the whole request URL),
+  never take a `@CookieValue`, never name an absolute URL in an exchange annotation, and never carry
+  `@Cacheable`, `@CachePut` or `@CacheEvict` (a response depends on the implicit bearer and org
+  unit).
+- **Every backend client refuses any origin but the backend's.** Its first filter compares scheme,
+  host and port of the request URL with `app.backend-url` (a missing port is the scheme's default)
+  and fails a mismatch with `BackendOriginViolationException` before any other filter runs. The
+  OAuth2 filter attaches the member's bearer without looking at the host, so without this an
+  absolute URL handed to `webClient` — a value from a request, a redirect target, a typed client's
+  `URI` argument — would carry the token to that host. A refused call through `BackendApiClient`
+  surfaces as a `BackendServiceException` (500) and counts as `reason="unknown"` in
+  `basetool_backend_client_errors_total`; the exception message names the method and the refused
+  origin, never the path or query.
+
+**Acceptance**
+
+- [x] Through the real `webClient` bean a backend call carries `Authorization`,
+  `X-Correlation-Id`, `X-Active-Org-Unit-Id`, `Accept-Language` and `X-Forwarded-For` and is
+  counted by the `backendApi` breaker; a forced-open breaker stops it before the backend.
+- [x] An absolute URL to another server, as a string or a `URI`, fails on all four clients; the
+  other server sees no request and the authorized-client manager is never asked for a token. With
+  the guard placed last instead of first the token is resolved, and the test fails.
+- [x] A planted class that holds, builds and wraps its own `WebClient` and a planted HTTP interface
+  breaking each client rule are reported.
+
+**Enforced by:** `WebClientConfinementTest`, `WebClientBackendSeamTest`, `BackendOriginGuardTest` ·
+**Code:** `config/WebClientConfig`, `config/BackendOriginGuard` · **Related:** REQ-SEC-012,
+REQ-FE-028, ADR-0032
+
+### REQ-FE-030 — A parallel page section relays the same request context as the page
+
+`ParallelPageLoader` runs independent backend reads of one page on virtual threads (the mission,
+operation, job-order, inventory, hangar, refinery, org-unit bank and mission-data pages). A backend
+call from such a section carries exactly what a call from the request thread carries: the bearer,
+`X-Correlation-Id`, `X-Active-Org-Unit-Id`, `Accept-Language` and `X-Forwarded-For`.
+
+- **One source of truth.** The loader captures every `ThreadLocalAccessor` of Micrometer's
+  `ContextRegistry` on the calling thread (`ContextSnapshotFactory#captureAll`) and restores the
+  snapshot on the worker — the same accessors Reactor's automatic propagation uses: the four relays
+  `ReactorContextPropagationConfig#registerRelayAccessors` registers (org unit, correlation id,
+  user locale, client IP) and those libraries register (Spring Security's security context,
+  Micrometer's current observation). A holder registered later reaches the sections without a
+  change to the loader.
+- The security context, the request attributes and the MDC are copied explicitly as well.
+- A holder the caller has not set is cleared on the worker (`clearMissing`), and the worker's
+  holders are restored when the section ends.
+
+**Acceptance**
+
+- [x] A backend call made from a parallel section sends the caller's `Accept-Language`,
+  `X-Correlation-Id` and `X-Active-Org-Unit-Id` (before, the locale was not copied and the call went
+  out in the backend's default language).
+- [x] A thread-local accessor registered by a test, unknown to the loader, reaches the worker.
+- [x] With an empty registry the propagation tests fail.
+
+**Enforced by:** `ParallelPageLoaderTest` · **Code:** `service/ParallelPageLoader`,
+`config/ReactorContextPropagationConfig` · **Related:** REQ-OBS-002, REQ-OBS-009
 
 ## Out of scope
 

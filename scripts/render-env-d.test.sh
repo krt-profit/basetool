@@ -273,6 +273,59 @@ else
 fi
 
 say ""
+say "== the Android floor rides the release, not a stale host value (REQ-API-020) =="
+REAL_BACKEND_TMPL="${SCRIPT_DIR}/../quadlet/env.d/backend.env.tmpl"
+retired_android_lines() {
+  grep -E '^APP_ANDROID_(MINIMUM_VERSION_CODE|LATEST_VERSION_CODE|RELEASES_URL)=' "$1"
+}
+android_env() {
+  grep -v '^[[:space:]]*#' "$REAL_BACKEND_TMPL" \
+    | grep -oE '\$\{[A-Za-z_][A-Za-z0-9_]*:\?' \
+    | sed -E 's/^\$\{//; s/:\?$//' \
+    | sort -u \
+    | while read -r name; do printf '%s=ci-%s\n' "$name" "$name"; done
+  printf '%s\n' "$@"
+}
+SC_DIR="${WORK}/android_floor"
+mkdir -p "${SC_DIR}/tmpl" "${SC_DIR}/out"
+cp "$REAL_BACKEND_TMPL" "${SC_DIR}/tmpl/backend.env.tmpl"
+android_env \
+  'APP_ANDROID_MINIMUM_VERSION_CODE=16' \
+  'APP_ANDROID_LATEST_VERSION_CODE=16' \
+  'APP_ANDROID_RELEASES_URL=https://stale.example/releases' > "${SC_DIR}/env"
+if render >/dev/null 2>&1; then
+  if retired_android_lines "${SC_DIR}/out/backend.env" >/dev/null; then
+    bad "android_floor: a stale .env value reached the backend under a retired name"
+  else
+    ok "android_floor: the stale .env values under the retired names reach no container"
+  fi
+  if grep -qx 'APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=' "${SC_DIR}/out/backend.env" \
+     && grep -qx 'APP_ANDROID_LATEST_VERSION_CODE_OVERRIDE=' "${SC_DIR}/out/backend.env" \
+     && grep -qx 'APP_ANDROID_RELEASES_URL_OVERRIDE=' "${SC_DIR}/out/backend.env"; then
+    ok "android_floor: the three overrides render empty by default"
+  else
+    bad "android_floor: an override did not render empty"
+  fi
+else
+  bad "android_floor: the real backend template did not render"
+fi
+android_env 'APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=18' > "${SC_DIR}/env"
+if render >/dev/null 2>&1 \
+   && grep -qx 'APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=18' "${SC_DIR}/out/backend.env"; then
+  ok "android_floor: a set override reaches the backend"
+else
+  bad "android_floor: a set override did not reach the backend"
+fi
+printf 'APP_ANDROID_MINIMUM_VERSION_CODE=${APP_ANDROID_MINIMUM_VERSION_CODE:-0}\n' \
+  >> "${SC_DIR}/tmpl/backend.env.tmpl"
+android_env 'APP_ANDROID_MINIMUM_VERSION_CODE=16' > "${SC_DIR}/env"
+if render >/dev/null 2>&1 && retired_android_lines "${SC_DIR}/out/backend.env" >/dev/null; then
+  ok "android_floor: control - a planted retired line is detected"
+else
+  bad "android_floor: control - the check missed a planted retired line"
+fi
+
+say ""
 say "=========================================="
 say "  passed: ${PASSED}   failed: ${FAILED}"
 say "=========================================="

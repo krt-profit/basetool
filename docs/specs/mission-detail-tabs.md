@@ -642,10 +642,10 @@ app's "Teilnehmer hinzufügen" on the public API vhost.
   themselves — gets 403; a body without `userId` is a 400; anonymous is refused (401).
 
 **Enforced by:** `MissionControllerSlimEndpointsTest` (`addParticipantByIdSlim_*`),
-`ApiVhostAnonymousSurfaceTest`, `ExternalContractTest` (frozen + reachable through the edge),
-`check_probe_against_allowlist.py` / `edge-deny-probe.yml`. **Code:**
+`ApiVhostAnonymousSurfaceTest`, `ExternalContractTest` (frozen),
+`EdgeAdmissionTest` / `edge-deny-probe.yml` (generated, REQ-API-021). **Code:**
 `MissionController#addParticipantByIdSlim`, `AddParticipantByIdRequest`,
-`docker/edge/include/api-allowlist.conf`.
+`docker/edge/include/api-admission.conf`.
 
 ### REQ-MISSION-018 — Registration count on the mission list row
 

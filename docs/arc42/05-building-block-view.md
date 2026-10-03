@@ -113,9 +113,9 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   (§5.5). Its contract is the committed `exchange-v1.openapi.json`; it has no springdoc and no
   generated document since the extractor's `/v1` routes were removed on 2026-09-28. Its two
   outbound calls — the relay and its own token grant — are blocking `RestClient`s on the JDK HTTP
-  client (`config.RestClientConfig`, ADR-0204); the module has no WebFlux and no Reactor Netty, so
-  the worker-thread trap of §5.3 does not exist there. Specification:
-  [`desktop-ingest.md`](../specs/desktop-ingest.md).
+  client (`relay.RestClientConfig`, ADR-0204); the module has no WebFlux and no Reactor Netty, so
+  the worker-thread trap of §5.3 does not exist there. It is packaged by concern (table below).
+  Specification: [`desktop-ingest.md`](../specs/desktop-ingest.md).
 - **`keycloak-spi`** — a provider JAR, deliberately free of the application stack: no Spring Boot,
   Java-21 bytecode for the Keycloak JVM, its own Lombok pin, `@JBossLog` rather than `@Slf4j`. It
   holds the Discord identity provider and its mappers, the guild/role gate authenticator, the
@@ -124,8 +124,15 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   `krt-freemarker` login forms provider that hands a device login's user code to the consent page
   (ADR-0228, REQ-XCH-005); every Discord call
   goes through one shared HTTP client, and a first login reads the guild-member object once. Analysed by SpotBugs +
-  FindSecBugs and held to a JaCoCo floor like the applications (since 2026-09-22). Shipped as its
-  own signed artifact (ADR-0055).
+  FindSecBugs and held to its own JaCoCo floor like the applications (since 2026-09-22;
+  `build-settings.properties`, REQ-OPS-037). Shipped as its
+  own signed artifact (ADR-0055). Three sub-packages by concern: `discord` (the identity provider,
+  its two mappers, the shared Discord client and the nickname reader), `gate` (the first-login
+  authenticator, the membership checker and the backend account precheck with its truststore) and
+  `exchange` (the `basetool-exchange` admin extension and the `krt-freemarker` login forms); `gate`
+  uses `discord`, nothing else crosses. `ServiceRegistrationsTest` pins the six
+  `META-INF/services` registrations, and `repo-lint.yml` ties the compile version to the image
+  (REQ-OPS-040).
 - **`keycloak-theme/krt-theme`** — not a Gradle module: the `login` and `account` themes in the
   organisation's design, shipped inside the config bundle.
 - **`logging-support`** — a plain library, **shipped** inside the three application JARs: the
@@ -135,7 +142,34 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
 - **`test-support`** — a test-only library, never shipped: endpoint enumeration and the frontend
   page-route inventory behind the backend and frontend anonymous-surface sweeps, and behind ingest's
   `IngestEndpointSurfaceTest`, which pins the gateway's routed surface to the exchange route table
-  and fails on any mapping under `/v1`.
+  and fails on any mapping under `/v1`; and `ContextShape`, the bean count each application's
+  `ContextShapeTest` ratchets (REQ-OPS-038).
+
+### Inside `ingest`
+
+The gateway is packaged by concern, not by kind (REQ-INGEST-013). The table is in dependency
+order: each package uses only packages listed before it. `ConcernPackageRulesTest` fails on a
+package cycle and on a class outside these packages, on an outbound HTTP client outside `relay` and
+on Redis outside `registry`, `store` and `handoff` (REQ-INGEST-014); the order itself is not
+pinned beyond being cycle-free.
+
+| Package | What lives there |
+| --- | --- |
+| `config` | The `@ConfigurationProperties` records (`app.ingest`, `app.exchange.*`, `app.logging`, `app.rate-limit`, the service account, the scrape credentials); they use nothing else |
+| `contract` | The committed contract: the route table (`ExchangeRoutes`), the v1 schemas and the served documents |
+| `registry` | Reading the registry mirror and the revocations the backend writes to Redis; fails closed |
+| `observability` | Metric names, the refusal counter and its codes, the exchange MDC fields, the mirror-age gauge, the `userId` MDC filter, the observation privacy filter, the tracing and Resilience4j meters |
+| `problem` | The one RFC 7807 builder, the filter-level writer and the two exceptions mapped to problems |
+| `edge` | The servlet filters ahead of Spring Security (bot protection, correlation id, access log, payload cap, per-IP buckets) and the exchange path scope |
+| `auth` | The token gate, DPoP nonces, proof validation and replay stores, the `htu` converter, the IdP-unavailable filter and the 401/403 problem handler |
+| `gate` | The registry gate filter, the client-version check and the admitted request's context |
+| `store` | The gateway's own Redis state under `ingest:xch:*`: the byte budget, the daily write quotas and the idempotency cache (ADR-0221) |
+| `limits` | The limit filter (per-minute buckets, the daily quota check) |
+| `idempotency` | The idempotency filter |
+| `relay` | Every outbound HTTP call: the relay to the backend, the service-account token grant, the two `RestClient`s, the Keycloak trust, the size cap and the call log |
+| `handoff` | The single-use browser handoffs in Redis |
+| `web` | The exchange and document controllers and the global exception handler |
+| `assembly` | The three security filter chains, the startup guards, the gate-posture gauge and the startup banner |
 
 ## 5.5 Level 2 — the external client exchange
 

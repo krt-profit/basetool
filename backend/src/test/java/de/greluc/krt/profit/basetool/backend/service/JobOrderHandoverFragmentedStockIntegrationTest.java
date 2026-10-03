@@ -48,7 +48,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -58,7 +57,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * JobOrderHandoverCreateDto)} visits the same {@link JobOrderMaterial} several times.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class JobOrderHandoverFragmentedStockIntegrationTest {
 
   private static final int STACKS_PER_MATERIAL = 12;

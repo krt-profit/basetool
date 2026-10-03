@@ -17,6 +17,44 @@
   Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
   Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
 
+- **Sicherheitsausdrücke werden beim Build geprüft.** Jede Bean-Referenz in `@PreAuthorize` muss im
+  Kontext mit Namen und Parameterzahl auflösbar sein, die Sicherheits-Beans tragen feste Namen, und
+  kein Gate darf über `this` umgangen werden (REQ-SEC-075, REQ-SEC-076).
+
+- **Metrik und Alarm für nicht auswertbare Sicherheitsausdrücke.** Ein solcher Fehler bleibt ein
+  `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
+  löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
+
+- **Backend-Wächter für Daten und Transaktionen (Modularisierung, Phase 0).** Tests prüfen jetzt, dass
+  jede Tabelle genau einem Modul gehört, Trigger und natives SQL fremde Tabellen nur über gelistete
+  Ausnahmen erreichen, jede Mitgliedsreferenz in Löschung, Datenauskunft und Kontozusammenführung
+  geregelt ist, Audit nie nach dem Commit geschrieben wird und Mutatoren keine gecachte Instanz
+  verändern (REQ-DATA-020…022, REQ-AUDIT-007). Keine Verhaltensänderung.
+
+- **Datenaustausch: der eingefrorene Vertrag wird beim Bauen geprüft.** Backend-Antworten werden gegen die
+  veröffentlichten Schemas und Fixtures geprüft, jede Gateway-Route hat eine festgeschriebene Antwort, die
+  gemeinsamen Bezeichner von Backend, Gateway und Frontend stehen an einer Stelle, und ein PR am Austauschpfad
+  braucht das Label `e2e` (REQ-XCH-036…-038). Die Refinery-Entwurfsroute hat einen eigenen Request-Typ mit
+  identischem JSON; das Verhalten bleibt unverändert.
+
+- **Ingest-Gateway: nach Zuständigkeit paketiert, mit Strukturregeln.** Die Klassen liegen jetzt in 15
+  Paketen nach Aufgabe (`edge`, `auth`, `gate`, `relay`, …) statt nach Art; ein ArchUnit-Test verbietet
+  Paketzyklen, ausgehende HTTP-Aufrufe außerhalb von `relay` und Redis außerhalb von `registry`, `store`
+  und `handoff` (REQ-INGEST-013/-014). Reine Verschiebung, das Verhalten bleibt unverändert.
+
+- **Keycloak-Provider: Registrierungen und Keycloak-Version werden beim Bauen geprüft.** Ein Test lädt
+  alle sechs Service-Registrierungen samt Provider-ID, und `repo-lint` schlägt fehl, wenn die
+  Keycloak-Version im Katalog und das Keycloak-Image in Compose, Quadlet und Sandbox verschiedene
+  Minor-Versionen nennen (REQ-OPS-040). Die Klassen liegen jetzt in `discord`, `gate` und `exchange`;
+  das Verhalten bleibt unverändert.
+
+- **Frontend: Routen, Rechte und Sitzungstypen sind gegen Verschiebungen gesichert.** Eine
+  committete Routen-/Rechte-Tabelle, eine Pflicht-`@PreAuthorize` pro Handler, die statische Prüfung
+  aller `T(…)`-Verweise und View-Namen in Templates und eine aus dem Code abgeleitete Liste der
+  Sitzungstypen lassen den Build scheitern, statt dass ein verschobener Controller oder ein Formular
+  still ein Recht oder Flash-Werte verliert (REQ-FE-025…027). Organigramm, Schiffsdaten und
+  „Ankündigung gelesen" tragen ihr `isAuthenticated()` jetzt selbst; das Verhalten ist unverändert.
+
 ### Changed
 
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
@@ -30,7 +68,89 @@
   jeder verbliebene Klassenname auflösbar ist (REQ-SEC-073). Eine Verschiebung lässt den Build scheitern,
   statt eine Regel still leerlaufen zu lassen.
 
+- **API: mehr Bereiche werden nie zwischengespeichert.** Admin, Audit, Verbundene Anwendungen,
+  Datenaustausch, Leitung, Live-Sync, Materialbörse, Benachrichtigungsregeln, Aufträge, Organigramm,
+  SK-/Staffel-Mitglieder und der eigene Nutzungsbedingungs-Status antworten jetzt mit
+  `private, no-store` statt `no-cache, must-revalidate` (REQ-SEC-031); ein Test schlägt fehl, wenn
+  eine neue API-Familie nicht eingeordnet ist.
+
+- **API: höchstens 1 000 Einträge pro Seite.** Nur Preismatrix, Preisübersicht, Materialpreise,
+  Terminals und die UEX-Ortskataloge erlauben weiter 100 000 (REQ-API-005); Frontend und App fordern
+  sonst nirgends größere Seiten an.
+
+- **Datenaustausch: ein Refinery-Entwurf verlangt laut Schema mindestens einen Auftrag.**
+  `refinery-draft.schema.json` setzt `minItems: 1` auf `orders`, wie das Backend es schon immer verlangt; eine
+  leere Liste lehnt jetzt das Gateway selbst mit `400 SCHEMA_INVALID` und `errors[]` ab statt des weitergereichten
+  Backend-Fehlers. Dasselbe gilt für `goods` und `sourceImages` jedes Auftrags, die ebenfalls mindestens
+  einen Eintrag verlangen. Keine Vertragsänderung im Sinne von v2 (REQ-XCH-026).
+
+- **Build: Qualitätsschwellen pro Modul ausdrücklich.** Testheap, JaCoCo-Schwellen und PIT-Ziele
+  stehen in `<modul>/build-settings.properties`; fehlt ein Wert, bricht die Konfiguration ab, statt
+  still auf 0.50/0.40 zu fallen (REQ-OPS-037). Die Werte sind unverändert.
+
+- **Build: Prüfungen, die an Pfaden hängen, schlagen fehl statt still zu schrumpfen.** Neue Prüfung,
+  dass jeder Eingabepfad der Build-Skripte existiert; i18n- und Seiten-CSS-Scans lesen Unterordner;
+  ein Frontend-DTO ohne Backend-Gegenstück fällt durch; ein `ContextShapeTest` je Anwendung zählt
+  geplante Jobs, Transaktions-Listener, Controller und Filterketten (REQ-OPS-038).
+
+- **Tests: das Test-Profil setzt nur noch der Build.** 237 überflüssige `@ActiveProfiles("test")`
+  sind entfernt; sie teilten Springs Test-Context-Cache, ohne etwas zu ändern. Ein Test je Anwendung
+  verhindert, dass sie wiederkommen (REQ-OPS-039).
+
+- **Tests: Testklassen teilen sich ihre Spring-Kontexte.** Das Backend startet 34 statt 46
+  Anwendungskontexte, das Frontend 19 statt 21: ungenutzte Mocks sind entfernt, acht Klassen nutzen
+  den gemeinsamen Mock-Satz `@LeafServiceMockTest`, Sicherheits-Beans bleiben echt. Ein Budget-Test
+  je Anwendung verhindert, dass der Cache wieder zerfällt (REQ-OPS-041).
+
+- **CI: Mutationstests auch für den Ingest-Gateway.** Der wöchentliche PIT-Lauf (`pitest.yml`) prüft
+  jetzt auch `ingest`, mit eigenem Timeout und demselben Abschluss-Gate; mutiert werden alle
+  Zuständigkeitspakete mit Gates und ihrem Zustand statt nur der früheren `service`-Klassen (MB-07).
+
+- **Die Mindestversion der Android-App gehört jetzt zum Release** (REQ-API-020). Untergrenze, neueste
+  Version und Release-Seite stehen fest in der `application.yml` des Backends (17 / 17) und gehen bei
+  einem Rollback mit zurück. `APP_ANDROID_MINIMUM_VERSION_CODE`, `…_LATEST_VERSION_CODE` und
+  `…_RELEASES_URL` werden nicht mehr gelesen; für den Notfall gibt es die leeren
+  `APP_ANDROID_*_OVERRIDE`, die beim Start mit `WARN` und nach einem Tag als Alarm
+  `AndroidVersionPolicyOverrideActive` auffallen.
+
+- **Stillgelegte App-Endpunkte antworten `410 APP_UPDATE_REQUIRED`** statt mit einem Fehler, auch ohne
+  gültiges Token, damit die App ihre Update-Sperre zeigt (REQ-API-020). Die Liste
+  `api/retired-operations.txt` ist noch leer; bis dahin ändert sich nichts.
+
+- **API-Vertrag: Die Liste der App-Aufrufe ist jetzt Teil des Vertrags.** Die eingefrorene Menge deckt
+  jeden Aufruf der App ab (elf fehlende Operationen und sieben Query-Parameter ergänzt); ein Bruch gegenüber
+  dem letzten Release muss in `declared-breaks.txt` stehen, und dieser Vergleich läuft in CI verpflichtend
+  statt still übersprungen zu werden (REQ-API-016, REQ-API-017).
+
+- **API-Dokumentation: `no-store`-Bereiche ohne ETag und `304`.** `openapi.json` beschreibt für die
+  nie zwischengespeicherten API-Familien nur noch `Cache-Control: private, no-store`, wie das Backend
+  antwortet; ETag und `304 Not Modified` stehen nur bei den revalidierbaren (REQ-SEC-031).
+
+- **`openapi.json`: ein Tag pro Fachdomäne, Vertragsstufe pro Operation.** Jede Operation trägt genau
+  ein Domänen-Tag (22 Domänen, `x-domain`) und ihre Stufe `x-contract-tier` (T0/T1/T2, Quelle
+  `api/contract-tiers.txt`); die Change-Set-`Op`s von Blueprint und Schiff sind erstmals richtig
+  dokumentiert, und der Generator prüft das Dokument vor dem Schreiben (REQ-API-018).
+
+- **Fehlercodes: ein Register statt verstreuter Strings.** Alle 49 Problem-Codes des Backends stehen in
+  `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
+  `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
+
+- **Fehlercodes: ein Register statt verstreuter Strings.** Alle 50 Problem-Codes des Backends stehen in
+  `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
+  `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
+
+- **API-Edge: Die öffentliche API lässt genau die eingefrorenen Operationen durch, nach Verb und Pfad.**
+  Die Freigabe ist eine aus dem Vertrag generierte nginx-Map statt Pfad- und Präfixregeln; alles andere
+  beantwortet die Edge mit 404 (auch die bisherigen 405). `GET /api/v1/me/layout`, `POST /api/v1/job-types`
+  und Pfade unter `/api/v1/me/` und `/api/v1/terms/`, die die App nicht aufruft, sind dort nicht mehr
+  erreichbar; die App selbst ändert sich nicht (REQ-API-021, REQ-OPS-042).
+
 ### Fixed
+
+- **Deploy: kein Fehlalarm mehr während einer Promotion.** Trifft ein Deploy-Tick das kurze Fenster, in dem
+  `promote.yml` die fünf `:stable`-Tags nacheinander verschiebt, wartet `deploy.sh` jetzt ab, statt
+  `DeployFailed` auszulösen. Erst ein Satz, der länger als `IRI_MIXED_RELEASE_GRACE` (900 s) gemischt bleibt, gilt
+  als Fehler.
 
 - **Aufträge: Bestand wird nicht mehr doppelt gezählt, wenn ein Material in mehreren Qualitäten
   gebraucht wird.** Verknüpfter Bestand wird genau einer Stufe angerechnet (höchste Stufe zuerst);
@@ -54,6 +174,54 @@
   `:frontend:lintJs` und `:frontend:prettierCheck` lasen `scripts/**/*.mjs` entgegen ADR-0130 nicht; jetzt
   tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
   die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
+
+- **Datenexport (Art. 15/20 DSGVO) vollständig.** Der Export enthält jetzt auch deine zugewiesenen
+  Rollen, eine Ernennung zum Grand Admiral, Einsätze mit dir als Partyleiter, Einsatzeinheiten in
+  deiner Verantwortung, Interessensbekundungen zu Gesuchen der Materialbörse, Buchungsberechtigungen
+  und persönliche Freigabe-Limits auf Bankkonten sowie Buchungsanträge mit dir als Gegenpartei; andere
+  Personen bleiben dabei ausgeblendet. Im PDF tragen außerdem die vier Abschnitte der verbundenen
+  Anwendungen jetzt einen lesbaren Namen statt ihres internen Schlüssels.
+
+- **Admin: Bearbeiten und Löschen im persönlichen Inventar eines Mitglieds funktionieren wieder.** Das
+  Frontend rief `/api/v1/admin/personal-inventory/{id}` statt `…/items/{id}` auf, das Backend lehnte ab.
+  Ein neuer Test prüft jetzt jeden Backend-Aufruf des Frontends gegen die `openapi.json` (REQ-FE-028).
+
+- **Parallel geladene Seitenabschnitte senden die Sprache des Nutzers ans Backend.** Einsätze, Operationen,
+  Aufträge, Lager, Hangar, Raffinerie, Org-Bank und Einsatzdaten luden Abschnitte ohne `Accept-Language`; der
+  `ParallelPageLoader` übernimmt jetzt den ganzen Anfragekontext aus dem `ContextRegistry` (REQ-FE-030).
+
+- **App: Auftraggeber können ihren Auftrag wieder bearbeiten.** Die öffentliche API-Edge ließ
+  `PUT /api/v1/orders/{id}/requested` nicht durch, die Bearbeitung in der App endete seit v0.2.0 mit 404.
+  Nach dem Deploy ist genau dieser `PUT` freigegeben (andere Methoden bleiben 404).
+
+- **API-Fehler: richtige Status, Codes und Header statt 500 oder leerem Body.** Fehlende Parameter,
+  Header, Cookies oder Multipart-Teile antworten `400 BAD_REQUEST`, ein nicht lieferbarer Medientyp
+  `406 NOT_ACCEPTABLE` (neuer Code), ein zu großer Upload `413 REQUEST_BODY_TOO_LARGE` statt `500`; jeder
+  429 trägt `code = RATE_LIMIT_EXCEEDED`, `Retry-After` und eine Correlation-Id, auch der des
+  Pro-Konto-Limits und `POST /api/v1/live-sync/changed` (bisher ohne Body). Vier Bank-Codes zeigen jetzt
+  einen übersetzten Titel statt des Schlüssels.
+
+- **Datenschutzerklärung korrigiert: der Sitzungs-Cookie ist `SameSite=Lax`.** Konfiguriert war
+  `Strict`, gesetzt wurde aber immer `Lax`; `Lax` bleibt bewusst, weil Anmeldung über Discord und
+  Links aus anderen Seiten den Cookie brauchen. Das Frontend setzt jetzt jedes konfigurierte
+  Cookie-Attribut tatsächlich, ein Test hält den gesendeten `Set-Cookie` fest.
+
+### Security
+
+- **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
+  tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
+  Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
+  (REQ-ORG-028, REQ-SEC-077, REQ-API-015). 13 Admin-/SPI-Endpunkte validieren ihren Body jetzt;
+  gültige Anfragen ändern sich nicht.
+
+- **Pfadgebundene Schutzregeln prüfen sich selbst.** Tests über die echten Endpunkte stellen sicher,
+  dass jeder schreibende Endpunkt in der CSRF-Ausnahme liegt, jede Ratenlimit-Regel einen Endpunkt
+  trifft und die Ausnahmen der Freigabe-, Nutzungsbedingungs- und Datenaustausch-Filter exakte
+  Pfadlisten sind (REQ-SEC-078…080).
+
+- **Die Backend-Clients des Frontends senden nur noch an das Backend.** Jeder `WebClient` lehnt eine Anfrage an
+  einen anderen Host als `app.backend-url` ab, bevor das Bearer-Token angehängt wird; ArchUnit hält die Clients im
+  Backend-Kern (REQ-FE-029).
 
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 

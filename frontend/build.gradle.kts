@@ -294,11 +294,15 @@ val generateOssLicenses =
 
 sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
 
-val backendDtoMirrorDir = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto"
+val backendDtoMirrorDir = "backend/src/main/java"
+
+val updateSnapshots = providers.gradleProperty("updateSnapshots").map { "true" }.orElse("false")
 
 tasks.named<Test>("test") {
+  systemProperty("basetool.updateSnapshots", updateSnapshots.get())
+
   inputs
-    .files(rootProject.fileTree(backendDtoMirrorDir) { include("*.java") })
+    .files(rootProject.fileTree(backendDtoMirrorDir) { include("**/*.java") })
     .withPropertyName("backendDtoMirrorSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
@@ -325,6 +329,11 @@ tasks.named<Test>("test") {
       rootProject.file("frontend/src/e2e/resources/realm-export.e2e.json"),
     )
     .withPropertyName("e2eAudienceParitySources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  inputs
+    .files(fileTree("src/e2e/java") { include("**/*.java") })
+    .withPropertyName("e2eSourcesForTestProfileScan")
     .withPathSensitivity(PathSensitivity.RELATIVE)
   inputs
     .files(

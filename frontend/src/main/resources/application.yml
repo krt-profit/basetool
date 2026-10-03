@@ -27,7 +27,7 @@ server:
         name: __Host-SESSION
         secure: true
         http-only: true
-        same-site: strict
+        same-site: lax
         max-age: 30d
 
 spring:

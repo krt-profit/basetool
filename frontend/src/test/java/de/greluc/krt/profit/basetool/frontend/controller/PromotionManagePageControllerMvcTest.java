@@ -81,7 +81,8 @@ class PromotionManagePageControllerMvcTest {
     UUID catId2 = UUID.randomUUID();
     UUID memberId = UUID.randomUUID();
 
-    PromotionTopicDto topic = new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null);
+    PromotionTopicDto topic =
+        new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null, null);
     PromotionCategoryDto cat1 =
         new PromotionCategoryDto(
             catId1, 0L, topicId, "Profit", "Trading", "Some description", 0, null, null);
@@ -157,7 +158,8 @@ class PromotionManagePageControllerMvcTest {
     UUID memberA = UUID.randomUUID();
     UUID memberB = UUID.randomUUID();
 
-    PromotionTopicDto topic = new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null);
+    PromotionTopicDto topic =
+        new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null, null);
     PromotionCategoryDto cat =
         new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", "desc", 0, null, null);
 
@@ -196,7 +198,8 @@ class PromotionManagePageControllerMvcTest {
     UUID catId = UUID.randomUUID();
     UUID memberId = UUID.randomUUID();
 
-    PromotionTopicDto topic = new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null);
+    PromotionTopicDto topic =
+        new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null, null);
     PromotionCategoryDto cat =
         new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", "desc", 0, null, null);
     MemberEvaluationDto eval =

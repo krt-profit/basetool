@@ -47,7 +47,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -55,7 +54,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * fail_on_pagination_over_collection_fetch} gate is active (REQ-DATA-003).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class PagedFindersNoCollectionFetchTest {
 
   private static final PageRequest PAGE = PageRequest.of(0, 20);

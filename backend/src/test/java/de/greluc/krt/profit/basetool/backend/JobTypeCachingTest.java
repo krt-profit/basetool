@@ -33,11 +33,9 @@ import org.springframework.cache.interceptor.SimpleKey;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class JobTypeCachingTest {
 

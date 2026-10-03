@@ -51,8 +51,6 @@ public class AdminQualityTiersPageController {
 
   private static final String BACKEND_BASE = "/api/v1/admin/quality-tiers";
 
-  private static final String VIEW = "admin/quality-tiers";
-
   /** Response type of the backend's tier list. */
   private static final ParameterizedTypeReference<List<QualityTierDto>> TIER_LIST_TYPE =
       new ParameterizedTypeReference<>() {};
@@ -78,6 +76,6 @@ public class AdminQualityTiersPageController {
       model.addAttribute("error", "admin.qualityTiers.error.load");
       model.addAttribute("tiers", List.of());
     }
-    return "results".equals(fragment) ? VIEW + " :: results" : VIEW;
+    return "results".equals(fragment) ? "admin/quality-tiers :: results" : "admin/quality-tiers";
   }
 }

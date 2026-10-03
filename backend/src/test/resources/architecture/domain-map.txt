@@ -156,6 +156,8 @@ class LikePatterns kernel LIKE escaping
 class RequestMemo platform request-scoped memo
 class DtoConstraints kernel shared validation constants
 class OnUpdate kernel validation group
+class ProblemCode kernel the sealed problem-code contract every module's codes implement (ADR-0235)
+class CoreProblemCode kernel the generic problem codes of the error kernel (ADR-0235)
 class WholeNumber kernel validation constraint
 class WholeNumberValidator kernel validation constraint
 class Quality kernel the 0..1000 quality range (REQ-DATA-023)
@@ -169,6 +171,7 @@ class AppExceptionKind kernel RFC 7807 identities of AppException
 class BadRequestException kernel generic domain exception
 class BusinessConflictException kernel generic domain exception
 class DuplicateEntityException kernel generic domain exception
+class RateLimitExceededException kernel generic domain exception
 class Entities kernel fetch-or-404 helper
 class EntityInUseException kernel generic domain exception
 class NotFoundException kernel generic domain exception
@@ -250,7 +253,7 @@ name ^(AdminExchange) exchange
 name ^(AdminP4k) catalogue
 name ^(QualityTier|AdminQualityTier) catalogue
 name ^Announcement dashboard
-name ^(SystemSetting|AppVersionPolicy|AndroidClient) admin
+name ^(SystemSetting|AppVersionPolicy|AndroidClient|AndroidVersionPolicy) admin
 name ^(LiveSync|LocalLiveSync|RedisLiveSync) livesync
 name ^(City|Location|StarSystem|SpaceStation|Outpost|Poi|Terminal|Planet|Moon|Orbit|Faction|Jurisdiction|Material|Manufacturer|ShipType|JobType|FrequencyType|GameItem|Uex|ScWiki|P4k|Sync|ExternalSync|MasterData|EvictAllMaterialCaches|QuantityType|LookupTable|PairKeyRef|StalePriceSweep|CachedEntityGraphs) catalogue
 

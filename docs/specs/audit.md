@@ -1,6 +1,6 @@
 # Activity audit logs — the unified admin audit trail
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 
 Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-BANK-012),
 [`observability.md`](observability.md) (the log-stream PII rule), [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -650,3 +650,48 @@ and swallowed there, so the scheduler thread survives a bad run.
 **Decision:** [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md),
 amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
 **Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)
+
+### REQ-AUDIT-007 — Audit is never an event; listeners never read the request; observers join the transaction
+
+REQ-AUDIT-001 holds only while the audit row is written **inside the transaction of the mutation it
+records**: an audit-insert failure must roll the mutation back. Three rules keep a well-meant
+"event" from breaking that ([plan §5.3](../DOMAIN_MODULARISATION_PLAN.md)):
+
+1. **No after-commit or asynchronous method records an audit row.** A method annotated
+   `@TransactionalEventListener` or `@Async` (or on an `@Async` class) never calls
+   `AuditService.record` or `BankAuditService.record`, directly or through any method of its own
+   class it reaches, lambdas and method references included. Audit stays a direct, synchronous,
+   `MANDATORY` call from the business transaction.
+2. **No listener reads the request.** A method annotated `@TransactionalEventListener`,
+   `@EventListener` or `@Async` never touches `SecurityContextHolder`, `RequestContextHolder`,
+   `RequestMemo`, `RequestScopeResolver`, or any `AuthHelperService` member except `runAs`, through
+   any method of its own class it reaches. It runs after the request, on another thread or at
+   startup; what it needs travels in the event, or it binds an explicit principal with `runAs`.
+3. **Observer SPI implementations are `MANDATORY`.** An observer SPI — an interface a lower module
+   owns and a higher one implements, called synchronously in the caller's transaction — carries
+   `@ObserverSpi`, and every interface whose simple name ends in `Observer` must carry it. Every
+   method implementing an observer SPI method is `@Transactional(propagation = MANDATORY)`, on the
+   method or its class. No observer SPI exists yet, so the rule's selection floor is zero by
+   design; the planted fixtures prove it fails.
+
+**The one listed exception to rule 1:** `ExchangeDepartureService.onDeparture` (REQ-XCH-008) audits
+the departure work it performs itself — Keycloak consent and session removal, revocations — in its
+own `REQUIRES_NEW` transaction after the roster sync has committed. It records no mutation of the
+publishing transaction. Its row's actor is `system`, because `AuditService.record` itself reads the
+current principal and no request is bound.
+
+**Acceptance**
+
+- [x] An after-commit or asynchronous method reaching an audit recorder fails the build, unless
+  listed; a listed method that no longer records fails.
+- [x] A listener reaching a request-bound helper fails the build; `runAs` is allowed.
+- [x] An unmarked `*Observer` interface, and an observer implementation that is not `MANDATORY`,
+  fail the build.
+- [x] Proven able to fail on `ListenerAndObserverFixtures`: direct, helper and lambda audit calls;
+  the request scope, the current user and the security context read by listeners; an unmarked
+  observer interface; a `REQUIRED` and an unannotated observer implementation — each reported, and
+  the compliant twins (`runAs`, `MANDATORY` on method or class) not. Selection floors: 8
+  after-commit or asynchronous methods, 14 listener methods, 0 observer SPIs.
+
+**Enforced by:** `ListenerAndObserverRulesTest` · **Code:** `annotation/ObserverSpi`,
+`service/AuditService`, `service/BankAuditService`

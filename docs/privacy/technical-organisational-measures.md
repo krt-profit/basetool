@@ -54,7 +54,10 @@ measures below are accordingly proportionate rather than exhaustive.
   (REQ-OPS-026).
 - **The internal hops are TLS as well** — the backend serves HTTPS, and the SMTP transport (when
   enabled) requires STARTTLS and fails rather than falling back to plaintext.
-- **Session cookie** is `Secure`, `HttpOnly`, `SameSite=Strict`.
+- **Session cookie** is `Secure`, `HttpOnly`, `SameSite=Lax` (REQ-SEC-025, pinned by
+  `SessionCookieAttributesTest`). *Corrected 2026-10-03:* this line said `SameSite=Strict`, which
+  was configured but never emitted; `Lax` is the deliberate value, because the login and links
+  opened from other sites need the cookie on a cross-site top-level navigation.
 
 ### Encryption at rest
 

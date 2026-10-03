@@ -556,8 +556,12 @@ Three gates, in order (REQ-OPS-002, REQ-OPS-024):
 
 The host enforces the same on its side: `deploy.sh` refuses a target set whose images were built from
 different commits (or lack the label) and the next timer tick retries, so a promotion that is half done
-never reaches the stack. Break-glass: `IRI_REQUIRE_ONE_RELEASE=false`. If a promotion dies after
-re-tagging some artifacts, re-run `promote.yml` with the same version to finish it.
+never reaches the stack. A tick that lands while `promote` is still moving the five tags sees such a
+set; it logs `is not one release yet … waiting`, applies nothing and does **not** count as a failed
+deploy. Only a set that stays mixed past `IRI_MIXED_RELEASE_GRACE` (900 s) fails and raises
+`DeployFailed` — then the promotion was interrupted. A missing label fails at once. Break-glass:
+`IRI_REQUIRE_ONE_RELEASE=false`. If a promotion dies after re-tagging some artifacts, re-run
+`promote.yml` with the same version to finish it.
 
 `promote.yml` must be dispatched **from `main`**: its first job fails on any other ref, and the
 `production` environment accepts deployments from `main` only. The approval gate guards against a
@@ -725,6 +729,55 @@ none of this: the drift re-apply of the next tick brings it back the same way.
 > back to public ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
 
 `--check-only` doubles as the signature preflight in the real `deploy` context and writes no metric.
+
+### The Android app floor
+
+The minimum Android `versionCode`, the newest published one and the release page the update wall
+links to are **part of the release** (REQ-API-020): reviewed literals under
+`app.android.version-policy.release.*` in `backend/src/main/resources/application.yml`, baked into
+the backend image.
+
+- **Raising the floor** is a change to those literals in the hard-cut wave's pull request, together
+  with the re-cut operations, the ledger lines and the retired-operation list. Publish the app
+  release first, then promote as usual; no host step and no extra restart.
+- **A rollback restores the previous floor by itself** — the health gate's rollback and a promotion
+  of an older version both bring back that release's image and with it its literals. Nothing to
+  revert on the host first.
+- **Break-glass override** — only when a floor must change before a release can ship, for example a
+  committed floor that walls a build that works. A production write: it needs @greluc's explicit yes
+  to the exact command, and it restarts the backend (frontend and ingest through `Requires=`, about
+  a minute of web and app outage):
+
+  ```bash
+  cd /
+  ENVF=/var/iri/code/.env
+  sudo -u deploy cp -p "$ENVF" "$ENVF.backup-$(date +%Y%m%d-%H%M%S)-android-floor"
+  sudo -u deploy sed -i 's|^APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=.*|APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=<N>|' "$ENVF"
+  grep -c '^APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE=<N>$' "$ENVF"
+  sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+    --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+  ${UCTL} restart backend.service
+  ${UCTL} start ingest.service frontend.service
+  ```
+
+  If `.env` has no such line yet, append it instead of the `sed`. `grep -c` must print `1`.
+  **Verify:** `curl -s https://api.profit-base.online/api/v1/app/version-policy` answers `<N>`, and
+  the backend's startup line reads `minimumVersionCode=<N> (emergency override)`. The same applies to
+  `APP_ANDROID_LATEST_VERSION_CODE_OVERRIDE` and `APP_ANDROID_RELEASES_URL_OVERRIDE`.
+  **An override does not roll back with a release.** Fold the value into the release literal in the
+  next pull request, release it, then empty the override (`…_OVERRIDE=`), render and restart the same
+  way. `AndroidVersionPolicyOverrideActive` fires while an override has been in force for a day.
+- **The retired variables** `APP_ANDROID_MINIMUM_VERSION_CODE`, `APP_ANDROID_LATEST_VERSION_CODE`
+  and `APP_ANDROID_RELEASES_URL` reach no container of a release with REQ-API-020. Leave their lines
+  in `.env` unchanged: a rollback to an older release renders its own templates, which still pass
+  them, and that release then runs with the floor it was built for. Remove them once no such release
+  is a rollback target; never edit them again.
+- **Before promoting the first release with REQ-API-020** (one-off, read-only): read the floor
+  production serves, `curl -s https://api.profit-base.online/api/v1/app/version-policy`. The release
+  commits **17 / 17**, the value S8 of
+  [`EXCHANGE_GO_LIVE_RUNBOOK.md`](EXCHANGE_GO_LIVE_RUNBOOK.md) set on 2026-09-28. If production
+  answers anything else, the promotion would change the floor: correct the literal in a pull request
+  first, or accept the change deliberately.
 
 ---
 
@@ -1260,8 +1313,15 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
   labels, JSON, problem+json, the manifest, SVG, plain text), `gzip_vary on`, from 1 KB. The event
   streams are deliberately not in the list, because gzip would buffer them. Until 2026-09-23 the
   list was missing and only HTML left the edge compressed; `check-edge-nginx.sh` now asserts it.
-- **The API vhost's allow-list** is `docker/edge/include/api-allowlist.conf`, the source of truth
-  (ADR-0135). `edge-deny-probe.yml` probes the public deny rules from outside every day.
+- **The API vhost's admission** is the map `docker/edge/include/api-admission.conf`, generated from
+  the frozen contract set together with the server-level refusal `include/api-allowlist.conf` and
+  the API table of `edge-deny-probe.yml` (REQ-API-021, REQ-OPS-042). Never edit the three by hand:
+  change the frozen set, the declared-break ledger or the retired list, run
+  `./gradlew :backend:generateEdgeAdmission`, and review the diff; the backend tests fail when a
+  committed copy differs. It arrives like every edge change — with the promotion, applied by
+  `reconcile_edge`. `edge-deny-probe.yml` asserts the generated table from outside every day; after
+  an admission change is merged and before it is promoted, the rows that changed fail, which reports
+  the pending deploy, not drift.
 
 ### The edge verifies Grafana
 

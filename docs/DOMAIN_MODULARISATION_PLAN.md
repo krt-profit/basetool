@@ -1,7 +1,9 @@
 > **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29, every
 > open decision on 2026-10-01. **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312);
-> Phase 0 in progress — step 0.1, the decision records, is done (ADR-0231 … ADR-0239 and the
-> amendments of §14, 2026-10-02); no class has moved yet. Last reviewed: 2026-10-02.
+> Phase 0 done (2026-10-03, merged as one chain of pull requests, #2350 … #2353): the decision
+> records (ADR-0231 … ADR-0239 and the amendments of §14) and every guard of §6.1 that Phase 0 owns;
+> the app's re-read of the version policy waits for the app release (basetool-android#209). No
+> class has moved yet. Last reviewed: 2026-10-03.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
 > ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
@@ -24,8 +26,8 @@ refuses code that reaches past that API. It is the report of a whole-repository 
   APIs — and two secondary ones: use modern, final language features where they pay off, and
   re-evaluate the findings of the previous audits under today's rules. It names every change with
   its implementation, pros, cons, risks and regressions, and the guard that catches a regression.
-- **What it is not.** A record of finished work: Phase −1 (§7.1) is merged, Phase 0 (§7.2) is in
-  progress, and no class has moved yet. Section 2 lists every decision; section 13 maps the
+- **What it is not.** A record of finished work: Phase −1 (§7.1) and Phase 0 (§7.2) are merged,
+  and no class has moved yet. Section 2 lists every decision; section 13 maps the
   former open decisions onto them.
 - **Scope.** All modules of `basetool`: `backend`, `frontend`, `ingest`, `keycloak-spi`,
   `keycloak-theme`, `logging-support`, `test-support`, the build and the delivery path. Sibling
@@ -478,7 +480,9 @@ The owner therefore decided (2026-10-01, D-11) on a **release-bound floor** — 
 a reviewed default in the release's own configuration, so it deploys and rolls back together with
 the API it protects, with the host value kept only as an emergency override — together with the
 app's re-read on resume and after an unexpected 404 and the `APP_UPDATE_REQUIRED` answer of retired
-paths. The S8 sequence above holds only until the release-bound floor is in place.
+paths. The S8 sequence above holds only until the release-bound floor is in place. *Implemented
+2026-10-03 (REQ-API-020): the floor is a literal in the backend's `application.yml`, the host keeps
+only `APP_ANDROID_*_OVERRIDE`, and retired paths answer `410 APP_UPDATE_REQUIRED`.*
 
 **Machinery the cut needs first** (Phase 0): ADR-0136, REQ-API-001, REQ-API-009 and REQ-API-010
 amended for the hard cut; a declared-break ledger that lists every removed or changed frozen
@@ -604,12 +608,12 @@ audit found.
 | Step | Content | Why first |
 | --- | --- | --- |
 | 0.1 ADRs — **done 2026-10-02** | New (ADR-0231 … ADR-0239): target architecture C and module rules; module interaction styles (§5.3); enforcement tooling (ArchUnit + Modulith in test scope, frozen module baseline); hard cut with forced update and the release-bound minimum version (D-11); error model (D-09). Amended: ADR-0047 (module cycles frozen, layer cycles per module), ADR-0065 (access policies per domain), ADR-0020/0028 (seam rules re-keyed — owner approval), ADR-0032 (single filter chain, typed clients), ADR-0136 (retirement by hard cut), ADR-0206 (exact session list, D-10), ADR-0223 (corrections, §8.1), and the further amendments of §14 | CLAUDE.md: a requirement is amended before code diverges from it |
-| 0.2 Backend guards | G-01 … G-07, G-10, G-12, G-19, G-22 | The refactor must not be able to weaken a gate unnoticed |
-| 0.3 Module map | Domain map as a checked-in artefact; ArchUnit `modules()` rule plus `FreezingArchRule` baseline (150 violations); Spring Modulith spike (`verify()` under ArchUnit 1.5.1, `explicitly-annotated` detection, `Documenter` output) and then `ModularityTest` | Stops new coupling from day one; measures progress |
-| 0.4 Frontend guards | G-13 … G-17; `ParallelPageLoader` on `ContextSnapshotFactory` (fixes the missing locale relay); the three kernel shapes (byte download with headers and per-call timeout, multipart upload, `Flux`) so the eleven bypassing controllers return to the kernel | Typed clients and the package move inherit whatever the kernel does |
-| 0.5 Exchange guards | G-18; ingest re-package by concern (§5.11); keycloak-spi registrations test | The only contract that must not move |
-| 0.6 Build and CI guards | G-20, G-21; `@SpringBootTest` profile unification (BLD-PERF-03, 191 of 231 classes carry `@ActiveProfiles("test")` although Gradle forces it) | Test-context count and coverage floors decide how painful every later step is |
-| 0.7 API machinery | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
+| 0.2 Backend guards — **done 2026-10-03** | G-01 … G-07, G-10, G-12, G-19, G-22 | The refactor must not be able to weaken a gate unnoticed |
+| 0.3 Module map — **done 2026-10-03** | Domain map as a checked-in artefact; ArchUnit `modules()` rule plus `FreezingArchRule` baseline (150 violations as jdeps counted them; ArchUnit's baseline holds 138 edges in 42 module pairs, corrected 2026-10-03); Spring Modulith spike (`verify()` under ArchUnit 1.5.1, `explicitly-annotated` detection, `Documenter` output) and then `ModularityTest` | Stops new coupling from day one; measures progress |
+| 0.4 Frontend guards — **done 2026-10-03** | G-13 … G-17; `ParallelPageLoader` on `ContextSnapshotFactory` (fixes the missing locale relay); the three kernel shapes (byte download with headers and per-call timeout, multipart upload, `Flux`) so the eleven bypassing controllers return to the kernel | Typed clients and the package move inherit whatever the kernel does |
+| 0.5 Exchange guards — **done 2026-10-03** | G-18; ingest re-package by concern (§5.11); keycloak-spi registrations test | The only contract that must not move |
+| 0.6 Build and CI guards — **done 2026-10-03** | G-20, G-21; `@SpringBootTest` profile unification (BLD-PERF-03, 191 of 231 classes carry `@ActiveProfiles("test")` although Gradle forces it) | Test-context count and coverage floors decide how painful every later step is |
+| 0.7 API machinery — **done 2026-10-03** except the app's re-read, which ships with basetool-android#209 | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
 
 ### 7.3 Phase 1 — behaviour-free inversions and re-homings
 
