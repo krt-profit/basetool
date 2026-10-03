@@ -83,6 +83,7 @@ re-reads.
 | Data protection (GDPR) — organisational documents | [`docs/privacy/`](../privacy/README.md) | Living | Current — records of processing, processors, TOMs, DPIA threshold, data-subject requests, breach runbook; the implementing requirements are `REQ-SEC-057…062` in `security-and-access.md` | SEC |
 | TypeScript migration plan | [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md) | Living plan | Costed option, not scheduled — only Phase 0 (ADR-0125/0130, REQ-FE-018) is done; 44 of 100 files carry `// @ts-check` (2026-10-02) | FE |
 | Domain modularisation plan | [`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md) + [appendices](../modularisation/) | Living plan | Decided 2026-09-29, every open decision settled 2026-10-01 (D-09…D-22); Phase −1 merged 2026-10-01 (#2299–#2312), Phase 0 in progress — its decision records are ADR-0231…ADR-0239 (2026-10-02) — whole-repository audit and the plan chosen from it: a package per domain with a published API, Spring Modulith and a frozen ArchUnit baseline in test scope, guards before any move, later Gradle modules for the exchange and the bank; the full per-domain cut of `/api/v1` with a hard cut and a forced app update; modern-feature proposals; the previous audits re-evaluated; the defects found, fixed first in separate pull requests; raw evidence in `docs/archive/domain-modularisation-audit-2026-09/` | BE/FE/API |
+| Backend module boundaries | [`module-boundaries.md`](module-boundaries.md) | Living | Current — guard G-09 of the domain modularisation plan: the domain map assigns every backend class to one of 26 modules (REQ-MOD-001), every class assigned, no dead rule, unique simple names (REQ-MOD-002), the ArchUnit `modules()` rank rule (REQ-MOD-003) with its frozen baseline of 138 class edges that may only shrink (REQ-MOD-004), Spring Modulith in test scope with explicitly annotated detection (REQ-MOD-005) | BE |
 | Archived plans & one-time runbooks (index) | [`docs/archive/README.md`](../archive/README.md) | Historical — archived | Frozen records, not current truth — every implemented plan and executed one-time runbook, including the ones not listed individually above (multi-squadron, Spezialkommando, R8, Materialbörse, item inventory, Android API exposure, members-only, management VPN, the Podman migration and cutover, the edge, monitoring, live-sync, API-vhost and SK rollouts) | — |
 
 Architecture *decisions* (the "why we chose X over Y") live next door in
@@ -127,7 +128,7 @@ REQ-<AREA>-<NNN>     e.g. REQ-ORDERS-012, REQ-AUTH-003
 `<AREA>` is drawn from the same vocabulary as the issue "Affected Area" and the labels:
 `AUTH`, `SEC`, `ORG`, `ORDERS`, `INV`, `MISSION`, `REFINERY`, `HANGAR`, `PROMO`, `BANK`,
 `ADMIN`, `UEX`, `UI`, `BE`, `FE`, `I18N`, `DATA`, `OPS`, `OBS`, `API`, `NOTIF`, `INGEST`,
-`AUDIT`, `ROLE`, `MARKET`, `XCH` (the external client exchange). Numbers are never reused, even
+`AUDIT`, `ROLE`, `MARKET`, `XCH` (the external client exchange), `MOD` (backend module boundaries). Numbers are never reused, even
 after a requirement is removed — mark it superseded instead: keep the heading, suffix it with
 `*(superseded)*` and open the body with a dated callout naming what replaced it (the convention
 `security-and-access.md` uses for REQ-SEC-018 / REQ-SEC-021). `REQ-APP-*` (e.g. `REQ-APP-SYNC-*`)
@@ -175,7 +176,7 @@ keep the old ids — read them with this table.
 
 > **Next free id per area** (highest heading in use + 1, 2026-09-28 — re-grep `main` **and** open
 > PRs before claiming one): `ADMIN-004`, `API-013`, `AUDIT-007`, `BANK-057`, `DATA-019`, `FE-024`,
-> `HANGAR-005`, `INGEST-013`, `INV-055`, `MARKET-021`, `MISSION-021`, `NOTIF-022`, `OBS-020`,
+> `HANGAR-005`, `INGEST-013`, `INV-055`, `MARKET-021`, `MISSION-021`, `MOD-006`, `NOTIF-022`, `OBS-020`,
 > `OPS-036`, `ORDERS-036`, `ORG-028` (`ORG-022` was skipped and stays unused), `PROMO-002`,
 > `REFINERY-022`, `ROLE-007`, `SEC-073`, `UI-026`, `XCH-036` (corrected 2026-09-26: `UI-023` and
 > `UI-024` were already taken, `UI-025` is the „Star-Citizen-Links" page; corrected 2026-09-28:

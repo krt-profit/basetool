@@ -273,6 +273,14 @@ production runs where that is cheap to arrange: the Redis integration tests star
 image by digest (`TestImages.REDIS`, guarded against the compose file and the Quadlet unit), and
 the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`).
 
+Backend module coupling is measured in tests too. An ArchUnit `modules()` rule over the domain map
+lets a module depend only on lower-ranked modules and its same-rank `allow` rows; today's violations
+are frozen in `backend/src/test/resources/architecture/module-baseline/` and may only shrink — a new
+edge fails, a fixed one must be removed from the committed file. Spring Modulith runs beside it in
+test scope only, with explicitly annotated module detection. **Only coupling is ever frozen;** a
+security or structural rule stays a hard rule
+([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-003…005).
+
 ## 8.13 The external client exchange
 
 Three rules hold for every exchange route, and each new resource or capability inherits them:
